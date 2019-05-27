@@ -167,7 +167,7 @@ pub trait ObjectAccess: IndexAccess {
         I: Into<IndexAddress>,
         T: FromView<Self>,
     {
-        T::get(address, *self).map(|value| Ref { value })
+        T::get(address, self.clone()).map(|value| Ref { value })
     }
 
     /// Returns a mutable reference to an existing database object or `None` if
@@ -186,7 +186,7 @@ pub trait ObjectAccess: IndexAccess {
         T: FromView<Self>,
         I: Into<IndexAddress>,
     {
-        T::get(address, *self).map(|value| RefMut { value })
+        T::get(address, self.clone()).map(|value| RefMut { value })
     }
 
     /// Returns a mutable reference to a database object. If the object does not exist, the method
@@ -207,12 +207,12 @@ pub trait ObjectAccess: IndexAccess {
         T: FromView<Self>,
     {
         let address = address.into();
-        let object = T::get(address.clone(), *self).map(|value| RefMut { value });
+        let object = T::get(address.clone(), self.clone()).map(|value| RefMut { value });
 
         match object {
             Some(object) => object,
             _ => RefMut {
-                value: T::create(address, *self),
+                value: T::create(address, self.clone()),
             },
         }
     }
@@ -221,6 +221,8 @@ pub trait ObjectAccess: IndexAccess {
 impl ObjectAccess for &Box<dyn Snapshot> {}
 
 impl ObjectAccess for &Fork {}
+
+impl<T> ObjectAccess for T where T: Deref<Target = dyn Snapshot> + Clone {}
 
 impl Fork {
     /// See: [ObjectAccess::get_object][1].

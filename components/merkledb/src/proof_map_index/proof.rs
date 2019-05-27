@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use failure::Fail;
-use serde::{de::Deserialize, ser::Serialize, Deserializer, Serializer};
+use serde::{Deserializer, Serializer};
 use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::Hash;
@@ -27,7 +27,7 @@ use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
 
-impl Serialize for ProofPath {
+impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -48,7 +48,7 @@ impl Serialize for ProofPath {
 }
 
 #[allow(clippy::use_self)]
-impl<'de> Deserialize<'de> for ProofPath {
+impl<'de> serde::Deserialize<'de> for ProofPath {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,

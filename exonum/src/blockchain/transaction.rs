@@ -140,6 +140,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// # #[macro_use] extern crate exonum_derive;
     /// # #[macro_use] extern crate serde_derive;
     /// #
+    /// use std::borrow::Cow;
     /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum_merkledb::Fork;
@@ -677,8 +678,7 @@ mod tests {
 
     fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
-        let api_channel = mpsc::channel(1);
-        let internal_sender = mpsc::channel(1).0;
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             TemporaryDB::new(),
             //            vec![Box::new(TxResultService) as Box<dyn Service>],

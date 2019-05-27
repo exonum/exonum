@@ -30,6 +30,7 @@
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/version/latest/get-started/create-service
+
 pub use self::{
     block::{Block, BlockProof},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
@@ -132,6 +133,12 @@ impl Blockchain {
             api_sender,
             ..self.clone()
         }
+    }
+
+    /// Returns mapping from the service identifier (`u16`) to service (`Box<dyn Service>`) for
+    /// all services.
+    pub fn service_map(&self) -> &Arc<HashMap<u16, Box<dyn Service>>> {
+        &self.service_map
     }
 
     /// Creates a read-only snapshot of the current storage state.
@@ -470,11 +477,12 @@ impl Blockchain {
         });
 
         let mut schema = Schema::new(&*fork);
-        schema.transaction_results_mut().put(&tx_hash, tx_result);
+        schema.transaction_results().put(&tx_hash, tx_result);
         schema.commit_transaction(&tx_hash);
-        schema.block_transactions_mut(height).push(tx_hash);
+        schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
-        schema.transactions_locations_mut().put(&tx_hash, location);
+        schema.transactions_locations().put(&tx_hash, location);
+        fork.flush();
         Ok(())
     }
 
@@ -498,19 +506,17 @@ impl Blockchain {
             };
 
             {
-                let schema = Schema::new(&fork);
-                for precommit in precommits {
-                    schema.precommits_mut(&block_hash).push(precommit);
-                }
+                let mut schema = Schema::new(&fork);
+                schema.precommits(&block_hash).extend(precommits);
 
                 // Consensus messages cache is useful only during one height, so it should be
                 // cleared when a new height is achieved.
-                schema.consensus_messages_cache_mut().clear();
+                schema.consensus_messages_cache().clear();
                 let txs_in_block = schema.last_block().tx_count();
                 let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
                 debug_assert!(txs_count >= u64::from(txs_in_block));
                 schema
-                    .transactions_pool_len_index_mut()
+                    .transactions_pool_len_index()
                     .set(txs_count - u64::from(txs_in_block));
                 schema.update_transaction_count(u64::from(txs_in_block));
             }
@@ -530,12 +536,7 @@ impl Blockchain {
     /// Saves the `Connect` message from a peer to the cache.
     pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Signed<Connect>) {
         let fork = self.fork();
-
-        {
-            let schema = Schema::new(&fork);
-            schema.peers_cache_mut().put(pubkey, peer);
-        }
-
+        Schema::new(&fork).peers_cache().put(pubkey, peer);
         self.merge(fork.into_patch())
             .expect("Unable to save peer to the peers cache");
     }
@@ -543,24 +544,15 @@ impl Blockchain {
     /// Removes from the cache the `Connect` message from a peer.
     pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
         let fork = self.fork();
-
-        {
-            let schema = Schema::new(&fork);
-            let mut peers = schema.peers_cache_mut();
-            peers.remove(key);
-        }
-
+        Schema::new(&fork).peers_cache().remove(key);
         self.merge(fork.into_patch())
             .expect("Unable to remove peer from the peers cache");
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
-        let snapshot = &self.snapshot();
-        let schema = Schema::new(snapshot);
-
-        let peers_cache_table = schema.peers_cache();
-        peers_cache_table.iter().collect()
+        let snapshot = self.snapshot();
+        Schema::new(&snapshot).peers_cache().iter().collect()
     }
 
     /// Saves the given raw message to the consensus messages cache.
@@ -577,8 +569,8 @@ impl Blockchain {
         let fork = self.fork();
 
         {
-            let schema = Schema::new(&fork);
-            schema.consensus_messages_cache_mut().extend(iter);
+            let mut schema = Schema::new(&fork);
+            schema.consensus_messages_cache().extend(iter);
             schema.set_consensus_round(round);
         }
 

@@ -5,15 +5,6 @@ use std::fmt::Display;
 
 use super::Signed;
 
-/// Helper trait to define serialization format.
-pub trait BinaryForm: Sized {
-    /// Converts transaction into serialized form.
-    fn encode(&self) -> Result<Vec<u8>, failure::Error>;
-
-    /// Converts a serialized byte array into a transaction.
-    fn decode(buffer: &[u8]) -> Result<Self, failure::Error>;
-}
-
 /// Uses `ToHex`/`FromHex` to serialize arbitrary type `T` as
 /// hexadecimal string rather than real Serde::serialize.
 pub(crate) struct HexStringRepresentation;

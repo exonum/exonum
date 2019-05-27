@@ -27,8 +27,6 @@ extern crate exonum_derive;
 extern crate failure;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate exonum;
 
 pub use crate::schema::Schema;
 
@@ -38,9 +36,12 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
+use exonum_merkledb::Snapshot;
+
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{ExecutionError, ExecutionResult},
+    blockchain::{self, Transaction, TransactionSet},
+    crypto::Hash,
     helpers::fabric::{self, Context},
     runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},

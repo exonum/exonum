@@ -23,7 +23,7 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use crate::messages::{BinaryForm, Message, SignedMessage};
+use crate::messages::{Message, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -50,7 +50,7 @@ impl InternalPart {
         raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(move || SignedMessage::decode(&raw).and_then(Message::deserialize))
+        future::lazy(|| SignedMessage::from_raw_buffer(raw).and_then(Message::deserialize))
             .map_err(drop)
             .and_then(|protocol| {
                 let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
@@ -121,9 +121,7 @@ mod tests {
     use std::thread;
 
     use super::*;
-    use crate::crypto::{gen_keypair, Hash, Signature};
-    use crate::helpers::Height;
-    use crate::messages::{BinaryForm, Message, Status};
+    use crate::crypto::{gen_keypair, Signature};
 
     fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, internal_rx) = mpsc::channel(16);
@@ -152,28 +150,23 @@ mod tests {
         thread.join().unwrap()
     }
 
-    fn get_signed_message() -> SignedMessage {
-        let (pk, sk) = gen_keypair();
-        let msg = Message::concrete(Status::new(Height(0), &Hash::zero()), pk, &sk);
-        msg.signed_message().clone()
-    }
-
     #[test]
     fn verify_msg() {
-        let tx = get_signed_message();
+        let (pk, sk) = gen_keypair();
+        let tx = SignedMessage::new(0, 0, &[0; 200], pk, &sk);
 
         let expected_event =
             InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
-        let event = verify_message(tx.encode().unwrap());
+        let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, Some(expected_event));
     }
 
     #[test]
     fn verify_incorrect_msg() {
-        let mut tx = get_signed_message();
-        *tx.signature_mut() = Signature::zero();
+        let (pk, _) = gen_keypair();
+        let tx = SignedMessage::new_with_signature(0, 0, &[0; 200], pk, Signature::zero());
 
-        let event = verify_message(tx.encode().unwrap());
+        let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, None);
     }
 }

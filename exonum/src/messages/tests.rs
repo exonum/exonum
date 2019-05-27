@@ -1,99 +1,77 @@
+use std::borrow::Cow;
+
+use chrono::Utc;
+use hex::FromHex;
+
 use super::{
-    BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, Signed, SignedMessage, Status,
-    TransactionsResponse, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
+    BinaryValue, BlockResponse, Message, Precommit, ProtocolMessage, RawTransaction,
+    ServiceTransaction, Signed, SignedMessage, Status, TransactionsResponse,
+    RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 use crate::blockchain::{Block, BlockProof};
-use crate::crypto::{gen_keypair, hash, CryptoHash, Signature};
+use crate::crypto::{gen_keypair, hash, PublicKey, SecretKey};
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::proto::{self, ProtobufConvert};
-use chrono::Utc;
-use protobuf::Message as PbMessage;
+use crate::proto;
 
 #[test]
-fn test_signed_message_min_size() {
-    let (public_key, secret_key) = gen_keypair();
-    let msg = SignedMessage::new(&[0; 0], public_key, &secret_key);
-    assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.encode().unwrap().len())
-}
-
-#[test]
-fn test_tx_response_empty_size() {
-    let (public_key, secret_key) = gen_keypair();
+fn test_block_response_empty_size() {
+    use crate::crypto::{gen_keypair_from_seed, Seed};
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let msg = TransactionsResponse::new(&public_key, vec![]);
     let msg = Message::concrete(msg, public_key, &secret_key);
-    assert_eq!(TX_RES_EMPTY_SIZE, msg.encode().unwrap().len())
+    assert_eq!(
+        TRANSACTION_RESPONSE_EMPTY_SIZE,
+        msg.signed_message().raw().len()
+    )
+}
+
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[exonum(pb = "proto::schema::tests::CreateWallet", crate = "crate")]
+struct CreateWallet {
+    pubkey: PublicKey,
+    name: String,
+}
+
+impl CreateWallet {
+    fn new(&pubkey: &PublicKey, name: &str) -> Self {
+        Self {
+            pubkey,
+            name: name.to_owned(),
+        }
+    }
 }
 
 #[test]
-fn test_tx_response_with_txs_size() {
-    let (public_key, secret_key) = gen_keypair();
-    let txs = vec![
-        vec![1u8; 8],
-        vec![2u8; 16],
-        vec![3u8; 64],
-        vec![4u8; 256],
-        vec![5u8; 4096],
-    ];
-    let txs_size = txs.iter().fold(0, |acc, tx| acc + tx.len());
-    let pb_max_overhead = TX_RES_PB_OVERHEAD_PAYLOAD * txs.len();
+fn test_known_transaction() {
+    let res = "57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d\
+    0000800000000a220a2057d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d120b\
+    746573745f77616c6c6574a3dac954f891ff93d0da5d4540773532e81aa90e813f77dc8b95105dea6dcf08a6291fc4210335fc4aa37ba4a80ebc8a57b4cb23602d1b2b1800f25362f77d02";
 
-    let msg = TransactionsResponse::new(&public_key, txs);
+    let pk =
+        PublicKey::from_hex("57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d")
+            .unwrap();
+    let sk = SecretKey::from_hex(
+        "d142addc3951d67a99f3fd25a4c1294ee088f7a907ed13c4cc6f7c74b5b3147f\
+         57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d",
+    )
+    .unwrap();
+    let data = CreateWallet::new(&pk, "test_wallet");
+
+    let set = ServiceTransaction::from_raw_unchecked(0, data.to_bytes());
+    let msg = RawTransaction::new(128, set);
+    let msg = Message::concrete(msg, pk, &sk);
+    SignedMessage::from_raw_buffer(hex::decode(res).unwrap()).unwrap();
+    assert_eq!(res, hex::encode(msg.signed_message().raw()));
+}
+
+#[test]
+fn test_empty_tx_size() {
+    use crate::crypto::{gen_keypair_from_seed, Seed};
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+    let set = ServiceTransaction::from_raw_unchecked(0, vec![]);
+    let msg = RawTransaction::new(0, set);
     let msg = Message::concrete(msg, public_key, &secret_key);
-    assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.encode().unwrap().len())
-}
-
-#[test]
-fn test_message_roundtrip() {
-    let (pub_key, secret_key) = gen_keypair();
-    let ts = Utc::now();
-
-    let msg = Message::concrete(
-        Precommit::new(
-            ValidatorId(123),
-            Height(15),
-            Round(25),
-            &hash(&[1, 2, 3]),
-            &hash(&[3, 2, 1]),
-            ts,
-        ),
-        pub_key,
-        &secret_key,
-    );
-
-    let bytes = msg.encode().expect("Signed<T> encode");
-    let msg_enum =
-        Message::deserialize(SignedMessage::decode(&bytes).expect("SignedMessage decode."))
-            .expect("Message deserialize");
-    let msg_roundtrip = Precommit::try_from(msg_enum).expect("Message type");
-    assert_eq!(msg, msg_roundtrip)
-}
-
-#[test]
-fn test_signed_message_unusual_protobuf() {
-    let (pub_key, secret_key) = gen_keypair();
-
-    let mut ex_msg = proto::ExonumMessage::new();
-    let precommit_msg = Precommit::new(
-        ValidatorId(123),
-        Height(15),
-        Round(25),
-        &hash(&[1, 2, 3]),
-        &hash(&[3, 2, 1]),
-        Utc::now(),
-    );
-    ex_msg.set_precommit(precommit_msg.to_pb());
-    let mut payload = ex_msg.write_to_bytes().unwrap();
-    // Duplicate pb serialization to create unusual but correct protobuf message.
-    payload.append(&mut payload.clone());
-
-    let signed = SignedMessage::new(&payload, pub_key, &secret_key);
-
-    let signed_bytes = signed.encode().expect("SignedMessage encode");
-    let msg_enum =
-        Message::deserialize(SignedMessage::decode(&signed_bytes).expect("SignedMessage decode."))
-            .expect("Message deserialize");
-    let deserialized_precommit = Precommit::try_from(msg_enum).expect("Message type");
-    assert_eq!(precommit_msg, *deserialized_precommit.payload())
+    assert_eq!(RAW_TRANSACTION_EMPTY_SIZE, msg.signed_message().raw().len())
 }
 
 #[test]
@@ -155,10 +133,7 @@ fn test_block() {
         Message::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
         Message::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
     ];
-    let precommits_buf: Vec<_> = precommits
-        .iter()
-        .map(|x| x.clone().encode().unwrap())
-        .collect();
+    let precommits_buf: Vec<_> = precommits.iter().map(|x| x.clone().serialize()).collect();
     let block = Message::concrete(
         BlockResponse::new(
             &pub_key,
@@ -177,7 +152,7 @@ fn test_block() {
     assert_eq!(block.transactions().to_vec(), transactions);
 
     let block2: Signed<BlockResponse> = ProtocolMessage::try_from(
-        Message::deserialize(SignedMessage::decode(&block.encode().unwrap()).unwrap()).unwrap(),
+        Message::deserialize(SignedMessage::from_raw_buffer(block.serialize()).unwrap()).unwrap(),
     )
     .unwrap();
 
@@ -219,8 +194,10 @@ fn test_precommit_serde_correct() {
 }
 
 #[test]
-#[should_panic(expected = "Failed to verify signature.")]
+#[should_panic(expected = "Cannot verify message.")]
 fn test_precommit_serde_wrong_signature() {
+    use crate::crypto::SIGNATURE_LENGTH;
+
     let (pub_key, secret_key) = gen_keypair();
     let ts = Utc::now();
 
@@ -238,10 +215,21 @@ fn test_precommit_serde_wrong_signature() {
     );
     // Break signature.
     {
-        let sign = precommit.signed_message_mut().signature_mut();
-        *sign = Signature::zero();
+        let raw_len = precommit.message.raw.len();
+        let signature = &mut precommit.message.raw[raw_len - SIGNATURE_LENGTH..];
+        signature.copy_from_slice(&[0_u8; SIGNATURE_LENGTH]);
     }
     let precommit_json = serde_json::to_string(&precommit).unwrap();
     let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
     assert_eq!(precommit2, precommit);
+}
+
+#[test]
+fn test_raw_transaction_small_size() {
+    assert!(ServiceTransaction::from_bytes(Cow::from(&vec![0_u8; 1])).is_err());
+    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 2])).is_err());
+    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 3])).is_err());
+    let tx = RawTransaction::from_bytes(Cow::from(&vec![0_u8; 4])).unwrap();
+    assert_eq!(tx.service_id, 0);
+    assert_eq!(tx.service_transaction.transaction_id, 0);
 }

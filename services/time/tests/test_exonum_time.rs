@@ -22,7 +22,7 @@ use exonum_merkledb::{IndexAccess, Snapshot};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionResult},
-    crypto::{gen_keypair, CryptoHash, PublicKey},
+    crypto::{gen_keypair, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
 };
@@ -32,7 +32,7 @@ use exonum_time::{
     transactions::TxTime, TimeService,
 };
 
-use std::{collections::HashMap, iter::FromIterator};
+use std::{collections::HashMap, iter::FromIterator, rc::Rc};
 
 fn assert_storage_times_eq<T: IndexAccess>(
     snapshot: T,
@@ -437,8 +437,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
         Some(TransactionResult(Ok(())))
     );
 
-    let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(&snapshot);
+    let schema = TimeSchema::new(Rc::from(testkit.snapshot()));
 
     assert_eq!(schema.time().get(), Some(time0));
     assert_eq!(schema.validators_times().get(pub_key), Some(time0));

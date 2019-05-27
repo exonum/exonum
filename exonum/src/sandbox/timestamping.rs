@@ -17,12 +17,15 @@ pub use crate::proto::schema::tests::TimestampTx;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
+use std::borrow::Cow;
+
 use crate::blockchain::{
     ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
-use crate::messages::{AnyTx, Message, Signed};
-use exonum_merkledb::Snapshot;
+use crate::messages::{Message, AnyTx, Signed};
+use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+use protobuf::Message as PbMessage;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
@@ -38,6 +41,8 @@ impl Transaction for TimestampTx {
         Ok(())
     }
 }
+
+impl_binary_value_for_message! { TimestampTx }
 
 #[derive(Default)]
 pub struct TimestampingService {}

@@ -46,9 +46,6 @@
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-#[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 #[macro_use]
@@ -67,6 +64,9 @@ extern crate serde_derive;
 extern crate serde_json;
 
 // Test dependencies.
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
 
@@ -84,7 +84,6 @@ pub mod api;
 pub mod events;
 pub mod explorer;
 pub mod node;
-pub mod runtime;
 
 //TODO: revert sandbox
 #[cfg(test)]

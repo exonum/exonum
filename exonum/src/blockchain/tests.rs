@@ -16,11 +16,13 @@
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
+use std::borrow::Cow;
+
 use crate::blockchain::{
     Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionContext,
     TransactionSet,
 };
-use crate::crypto::{gen_keypair, CryptoHash, Hash};
+use crate::crypto::{gen_keypair, Hash};
 use crate::helpers::{Height, ValidatorId};
 use crate::messages::{AnyTx, Message};
 use crate::proto;
@@ -168,6 +170,7 @@ mod transactions_tests {
     use crate::crypto::gen_keypair;
     use crate::messages::Message;
     use crate::proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
+    use std::borrow::Cow;
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
@@ -376,8 +379,7 @@ mod memorydb_tests {
 
     fn create_blockchain() -> Blockchain {
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
-        let internal_sender = mpsc::channel(1).0;
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             TemporaryDB::new(),
             //            vec![Box::new(super::TestService) as Box<dyn Service>],  // TODO: use new service API.
@@ -391,8 +393,7 @@ mod memorydb_tests {
 
     fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
-        let internal_sender = mpsc::channel(1).0;
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             TemporaryDB::new(),
             //            vec![service],  // TODO: use new service API.
@@ -461,8 +462,7 @@ mod rocksdb_tests {
     fn create_blockchain(path: &Path) -> Blockchain {
         let db = create_database(path);
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
-        let internal_sender = mpsc::channel(1).0;
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             db,
             //            vec![Box::new(super::TestService) as Box<dyn Service>],
@@ -477,8 +477,7 @@ mod rocksdb_tests {
     fn create_blockchain_with_service(path: &Path, service: Box<dyn Service>) -> Blockchain {
         let db = create_database(path);
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
-        let internal_sender = mpsc::channel(1).0;
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             db,
             //            vec![service],

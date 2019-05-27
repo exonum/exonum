@@ -10,6 +10,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - Module `storage` has been replace by `exonum-merkledb` crate. See related section
+- Signatures of methods `Service::initialize` and `Service::before_commit` has been
+  changed. Now they take immutable reference to `Fork` instead of mutable. (#1293)
+
+- Trait `BinaryForm` has been replaced by `BinaryValue`. (#1298)
+
+  To implement `BinaryValue` for types that implements `Protobuf::Message` use
+  `impl_binary_value_for_message` macros from `exonum-merkledb` crate.
+
+- Module `storage` has been replaced by `exonum-merkledb` crate. See related section
   in changelog for details. (#1293)
 
 - Bootstrapping workflow has been simplified (#1292)
@@ -130,6 +139,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added a new endpoint `system/v1/services` for displaying information
   about available services. (#1288)
 
+- A channel for api requests has been changed to unbounded. (#1308)
+
 #### exonum-merkledb
 
 - Updated `ProofMapIndex` data layout. (#1293)
@@ -150,6 +161,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added a new endpoint `system/v1/services` for displaying information
   about available services. (#1288)
+
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
+- Added `len` method to `MapIndex` and `ProofMapIndex`. (#1312)
+
+- Added `len` method to `KeySetIndex` and `ValueSetIndex`. (#1319)
 
 #### exonum-testkit
 
@@ -526,6 +543,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Remove old dependencies on `iron` and its companions `bodyparser`, `router`
     and others.
   - Simplify the API handlers as follows:
+
     ```rust
     fn my_handler(state: &ServiceApiState, query: MyQueryType)
     -> Result<MyResponse, ApiError>
@@ -533,6 +551,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
       // ...
     }
     ```
+
     where `MyQueryType` type implements `Deserialize` trait and `MyResponse`
     implements `Serialize` trait.
   - Replace old methods `public_api_handler` and `private_api_handler` of

@@ -15,6 +15,8 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
+use exonum_merkledb::{Fork, Snapshot};
+
 use actix::Addr;
 use serde_json::Value;
 
@@ -25,15 +27,17 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use crate::{
+    api::{websocket, ServiceApiBuilder},
+    blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys},
+    crypto::{Hash, PublicKey, SecretKey},
+    events::network::ConnectedPeerAddr,
+    helpers::{Height, Milliseconds, ValidatorId},
+    messages::{Message, RawTransaction, ServiceTransaction, Signed},
+    node::{ApiSender, ConnectInfo, NodeRole, State},
+};
+
 use super::transaction::Transaction;
-use crate::api::{websocket, ServiceApiBuilder};
-use crate::blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
-use crate::crypto::{Hash, PublicKey, SecretKey};
-use crate::events::network::ConnectedPeerAddr;
-use crate::helpers::{Height, Milliseconds, ValidatorId};
-use crate::messages::{AnyTx, Message, ServiceTransaction, Signed};
-use crate::node::{ApiSender, ConnectInfo, NodeRole, State};
-use exonum_merkledb::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
 ///
@@ -53,6 +57,7 @@ use exonum_merkledb::{Fork, Snapshot};
 /// #[macro_use] extern crate serde_derive;
 /// # extern crate failure;
 /// // Exports from `exonum` crate skipped
+/// use std::borrow::Cow;
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
 /// # use exonum::messages::{Signed, AnyTx};
@@ -181,7 +186,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [doc:global_cfg]: https://exonum.com/doc/version/latest/architecture/services/#global-configuration
     /// [`&mut Fork`]: https://exonum.com/doc/version/latest/architecture/storage/#forks
-    fn initialize(&self, fork: &mut Fork) -> Value {
+    fn initialize(&self, fork: &Fork) -> Value {
         Value::Null
     }
 
@@ -269,10 +274,9 @@ impl ServiceContext {
 
     /// Returns the current database snapshot. This snapshot is used to
     /// retrieve schema information from the database.
-    //    pub fn snapshot<'a>(&'a self) -> &'a dyn Snapshot {
-    //        let fork: &'a Fork = &self.fork;
-    //        fork.snapshot()
-    //    }
+    pub fn snapshot(&self) -> &dyn Snapshot {
+        self.fork.as_ref()
+    }
 
     /// Returns the current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {

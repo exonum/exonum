@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::borrow::Cow;
+
 use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
 
 use exonum::{
@@ -84,7 +86,7 @@ impl<T: IndexAccess> CurrencySchema<T> {
 
     /// Returns an immutable version of the wallets table.
     pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
-        MapIndex::new("cryptocurrency.wallets", self.view)
+        MapIndex::new("cryptocurrency.wallets", self.view.clone())
     }
 
     /// Gets a specific wallet from the storage.

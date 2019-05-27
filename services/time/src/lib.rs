@@ -21,7 +21,7 @@
 
 #![deny(
     missing_debug_implementations,
-    // missing_docs,
+    missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
@@ -32,8 +32,6 @@ extern crate failure;
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
-#[macro_use]
-extern crate exonum;
 
 /// Node API.
 pub mod api;
@@ -50,7 +48,7 @@ use exonum_merkledb::{Fork, Snapshot};
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{ExecutionError, ExecutionResult, ServiceContext, Transaction, TransactionSet},
+    blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
     helpers::fabric::{self, Context},
     messages::AnyTx,

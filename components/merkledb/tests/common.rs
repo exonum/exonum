@@ -20,7 +20,7 @@ pub const ACTIONS_MAX_LEN: usize = 100;
 #[macro_export]
 macro_rules! proptest_compare_collections {
     ($name:ident, $collection:ident, $reference:ident, $action:ident) => {
-        use proptest::{proptest, proptest_helper};
+        use proptest::proptest;
         proptest! {
             #[test]
             fn $name(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN)) {

@@ -32,19 +32,16 @@ use crate::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
         SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
     },
-    crypto::{
-        gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, PublicKey, SecretKey, Seed,
-        SEED_LENGTH,
-    },
+    crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
-        AnyTx, BinaryForm, BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit,
-        Prevote, PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, Signed, SignedMessage,
-        Status, TransactionsRequest, TransactionsResponse,
+        BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
+        SignedMessage, Status, TransactionsRequest, TransactionsResponse,
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
@@ -93,7 +90,7 @@ pub struct SandboxInner {
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
-    pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
+    pub api_requests_rx: mpsc::UnboundedReceiver<ExternalMessage>,
 }
 
 impl SandboxInner {
@@ -137,7 +134,8 @@ impl SandboxInner {
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyMessage(message) => {
                         let protocol =
-                            Message::deserialize(SignedMessage::decode(&message).unwrap()).unwrap();
+                            Message::deserialize(SignedMessage::from_raw_buffer(message).unwrap())
+                                .unwrap();
                         self.handler.handle_event(
                             InternalEvent::MessageVerified(Box::new(protocol)).into(),
                         );
@@ -255,10 +253,7 @@ impl Sandbox {
             BlockResponse::new(
                 to,
                 block,
-                precommits
-                    .into_iter()
-                    .map(|p| p.signed_message().encode().unwrap())
-                    .collect(),
+                precommits.into_iter().map(Signed::serialize).collect(),
                 tx_hashes,
             ),
             *public_key,
@@ -416,12 +411,7 @@ impl Sandbox {
         I: IntoIterator<Item = Signed<AnyTx>>,
     {
         Message::concrete(
-            TransactionsResponse::new(
-                to,
-                txs.into_iter()
-                    .map(|p| p.signed_message().encode().unwrap())
-                    .collect(),
-            ),
+            TransactionsResponse::new(to, txs.into_iter().map(Signed::serialize).collect()),
             *author,
             secret_key,
         )
@@ -472,7 +462,7 @@ impl Sandbox {
 
     pub fn recv<T: ProtocolMessage>(&self, msg: &Signed<T>) {
         self.check_unexpected_message();
-        let event = NetworkEvent::MessageReceived(msg.clone().encode().unwrap());
+        let event = NetworkEvent::MessageReceived(msg.clone().serialize());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -639,7 +629,7 @@ impl Sandbox {
 
     pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Signed<AnyTx>>
     where
-        I: IntoIterator<Item = &'a Signed<AnyTx>>,
+        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain_ref().snapshot();
@@ -836,7 +826,7 @@ impl Sandbox {
     pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
-        let api_channel = mpsc::channel(100);
+        let api_channel = mpsc::unbounded();
 
         let address: SocketAddr = self
             .address(ValidatorId(0))
@@ -1067,7 +1057,7 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
-    let api_channel = mpsc::channel(100);
+    let api_channel = mpsc::unbounded();
     let db = TemporaryDB::new();
     let mut blockchain = Blockchain::new(
         db,
@@ -1187,7 +1177,9 @@ mod tests {
     use crate::messages::AnyTx;
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use exonum_merkledb::Snapshot;
+    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+    use protobuf::Message as PbMessage;
+    use std::borrow::Cow;
 
     const SERVICE_ID: u16 = 1;
 
@@ -1205,6 +1197,8 @@ mod tests {
             Message::sign_transaction(payload_tx, SERVICE_ID, keypair.0, &keypair.1)
         }
     }
+
+    impl_binary_value_for_message! { TxAfterCommit }
 
     impl Transaction for TxAfterCommit {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

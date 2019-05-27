@@ -1,6 +1,6 @@
 [package]
 name = "exonum-merkledb"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -24,7 +24,7 @@ hex = "0.3.2"
 leb128 = "0.2"
 num-traits = "0.2"
 rocksdb = "0.12.0"
-rust_decimal = "0.11.3"
+rust_decimal = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -32,14 +32,15 @@ smallvec = "0.6"
 tempfile = "3.0"
 uuid = { version="0.7", features = ["v4"] }
 rand = "0.6.5"
+protobuf = "2.6.0"
 
 [dev-dependencies]
 criterion = "0.2"
 rand = "0.6.5"
 rand_xorshift = "0.1"
-proptest = "0.8"
+proptest = "0.9"
 modifier = "0.1"
-pretty_assertions = "0.5.1"
+pretty_assertions = "0.6"
 
 [[bench]]
 name = "criterion"
@@ -48,3 +49,6 @@ harness = false
 
 [features]
 long_benchmarks = []
+
+[[example]]
+name = "blockchain"

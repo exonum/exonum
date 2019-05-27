@@ -182,7 +182,7 @@ use exonum::{
         ApiAccess,
     },
     blockchain::{Blockchain, GenesisConfig, Schema as CoreSchema, Service, StoredConfiguration},
-    crypto::{self, CryptoHash, Hash},
+    crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
@@ -603,7 +603,7 @@ impl TestKit {
     /// transactions included into one of previous blocks do not lead to any state changes.
     pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
     where
-        I: IntoIterator<Item = Signed<AnyTx>>,
+        I: IntoIterator<Item = Signed<RawTransaction>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
@@ -626,7 +626,7 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe(&mut self, transaction: Signed<AnyTx>) -> Box<dyn Snapshot> {
+    pub fn probe(&mut self, transaction: Signed<RawTransaction>) -> Box<dyn Snapshot> {
         self.probe_all(vec![transaction])
     }
 

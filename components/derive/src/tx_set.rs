@@ -71,13 +71,7 @@ fn get_tx_variants(data: &DataEnum) -> Vec<ParsedVariant> {
 }
 
 fn get_message_id(variant: &Variant) -> Option<u16> {
-    let meta_attrs = variant
-        .attrs
-        .iter()
-        .filter_map(|a| a.parse_meta().ok())
-        .collect::<Vec<_>>();
-
-    let literal = get_exonum_name_value_attributes(&meta_attrs)
+    let literal = get_exonum_name_value_attributes(&variant.attrs)
         .iter()
         .filter_map(|MetaNameValue { ident, lit, .. }| {
             if ident == "message_id" {
@@ -186,7 +180,7 @@ fn implement_into_service_tx(
 ) -> impl quote::ToTokens {
     let tx_set_impl = variants.iter().map(|ParsedVariant { id, ident, .. }| {
         quote! {
-            #name::#ident(ref tx) => (#id, tx.encode().unwrap()),
+            #name::#ident(ref tx) => (#id, tx.to_bytes()),
         }
     });
 
@@ -211,17 +205,16 @@ fn implement_transaction_set_trait(
         let id = variant.id;
         let source_type = variant.source_type();
         quote! {
-            #id => #source_type::decode(&vec).map(#name::from),
+            #id => #source_type::from_bytes(Cow::from(&vec)).map(#name::from),
         }
     });
 
     quote! {
         impl #cr::blockchain::TransactionSet for #name {
             fn tx_from_raw(
-                raw: #cr::messages::AnyTx,
+                raw: #cr::messages::RawTransaction,
             ) -> std::result::Result<Self, _FailureError> {
-                let id = raw.dispatch.method_id as u16;
-                let vec = raw.payload;
+                let (id, vec) = raw.service_transaction().into_raw_parts();
                 match id {
                     #( #tx_set_impl )*
                     num => bail!("Tag {} not found for enum {}.", num, stringify!(#name)),
@@ -257,12 +250,7 @@ fn implement_into_boxed_tx(
 }
 
 fn should_convert_variants(attrs: &[Attribute]) -> bool {
-    let meta_attrs = attrs
-        .iter()
-        .filter_map(|a| a.parse_meta().ok())
-        .collect::<Vec<_>>();
-
-    let value = get_exonum_name_value_attributes(&meta_attrs)
+    let value = get_exonum_name_value_attributes(attrs)
         .iter()
         .filter_map(|MetaNameValue { ident, lit, .. }| {
             if ident == "convert_variants" {
@@ -290,11 +278,6 @@ fn should_convert_variants(attrs: &[Attribute]) -> bool {
 
 pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
-    let meta_attrs = input
-        .attrs
-        .iter()
-        .filter_map(|a| a.parse_meta().ok())
-        .collect::<Vec<_>>();
 
     let name = input.ident;
     let mod_name = Ident::new(&format!("tx_set_impl_{}", name), Span::call_site());
@@ -303,7 +286,7 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
         _ => panic!("Only for enums."),
     };
 
-    let crate_name = super::get_exonum_types_prefix(&meta_attrs);
+    let crate_name = super::get_exonum_types_prefix(&input.attrs);
     let vars = get_tx_variants(&data);
     let convert_variants = should_convert_variants(&input.attrs);
 
@@ -327,7 +310,7 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
 
             use super::*;
             use self::_failure::{bail, Error as _FailureError};
-            use #crate_name::messages::BinaryForm as _BinaryForm;
+            use exonum_merkledb::BinaryValue as _BinaryValue;
 
             #conversions
             #variant_conversions
