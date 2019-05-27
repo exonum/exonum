@@ -22,7 +22,6 @@ use exonum_merkledb::{
     ProofMapIndex,
 };
 
-
 // use exonum_merkledb::{Fork, ProofListIndex, ProofMapIndex, Snapshot, BinaryValue};
 
 use std::{borrow::Cow, ops::Deref};

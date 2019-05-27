@@ -19,7 +19,9 @@ use crate::{
     proto,
 };
 
-use exonum_merkledb::{IndexAccess, ObjectHash, MapIndex, ProofListIndex, ProofMapIndex, Snapshot, BinaryValue};
+use exonum_merkledb::{
+    BinaryValue, IndexAccess, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, Snapshot,
+};
 
 use std::{borrow::Cow, ops::Deref};
 
@@ -237,10 +239,7 @@ where
 
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
-    pub fn votes_by_config_hash(
-        &self,
-        config_hash: &Hash,
-    ) -> ProofListIndex<T, MaybeVote> {
+    pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<T, MaybeVote> {
         ProofListIndex::new_in_family(VOTES, config_hash, self.view)
     }
 

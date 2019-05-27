@@ -357,7 +357,9 @@ impl Blockchain {
 
                     let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
 
-                    for (service_id, vec_service_state) in dispatcher.state_hashes((&fork).snapshot()) {
+                    for (service_id, vec_service_state) in
+                        dispatcher.state_hashes((&fork).snapshot())
+                    {
                         for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
                             let key = Self::service_table_unique_key(service_id as u16, idx);
                             state_hashes.push((key, service_table_hash));
@@ -425,7 +427,6 @@ impl Blockchain {
                 ))
             })?;
             signed_tx
-
         };
 
         fork.flush();

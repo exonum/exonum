@@ -32,16 +32,19 @@ use crate::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
         SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
     },
-    crypto::{gen_keypair, gen_keypair_from_seed, Hash, CryptoHash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    crypto::{
+        gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, PublicKey, SecretKey, Seed,
+        SEED_LENGTH,
+    },
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
-        BlockRequest, BlockResponse, BinaryForm, Connect, Message, PeersRequest, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, AnyTx, Signed,
-        SignedMessage, Status, TransactionsRequest, TransactionsResponse,
+        AnyTx, BinaryForm, BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit,
+        Prevote, PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, Signed, SignedMessage,
+        Status, TransactionsRequest, TransactionsResponse,
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
@@ -134,8 +137,7 @@ impl SandboxInner {
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyMessage(message) => {
                         let protocol =
-                            Message::deserialize(SignedMessage::decode(&message).unwrap())
-                                .unwrap();
+                            Message::deserialize(SignedMessage::decode(&message).unwrap()).unwrap();
                         self.handler.handle_event(
                             InternalEvent::MessageVerified(Box::new(protocol)).into(),
                         );
@@ -253,7 +255,10 @@ impl Sandbox {
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(|p| p.signed_message().encode().unwrap()).collect(),
+                precommits
+                    .into_iter()
+                    .map(|p| p.signed_message().encode().unwrap())
+                    .collect(),
                 tx_hashes,
             ),
             *public_key,
@@ -411,7 +416,12 @@ impl Sandbox {
         I: IntoIterator<Item = Signed<AnyTx>>,
     {
         Message::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(|p| p.signed_message().encode().unwrap()).collect()),
+            TransactionsResponse::new(
+                to,
+                txs.into_iter()
+                    .map(|p| p.signed_message().encode().unwrap())
+                    .collect(),
+            ),
             *author,
             secret_key,
         )

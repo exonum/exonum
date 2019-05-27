@@ -30,7 +30,7 @@ use crate::{
         DeployStatus, InstanceInitData, RuntimeEnvironment,
     },
 };
-use exonum_merkledb::{Fork, Snapshot, IndexAccess};
+use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use protobuf::well_known_types::Any;
 
 mod config;
@@ -143,11 +143,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         Ok(())
     }
 
-    fn vote(
-        &self,
-        ctx: TransactionContext,
-        tx: transactions::Vote,
-    ) -> Result<(), ExecutionError> {
+    fn vote(&self, ctx: TransactionContext, tx: transactions::Vote) -> Result<(), ExecutionError> {
         let author = ctx.author();
         let tx_hash = ctx.tx_hash();
         let fork = ctx.fork();

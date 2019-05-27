@@ -29,7 +29,7 @@ use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
-use exonum_merkledb::{Database, Entry, TemporaryDB, Fork, Snapshot};
+use exonum_merkledb::{Database, Entry, Fork, Snapshot, TemporaryDB};
 use protobuf::{well_known_types::Any, Message};
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;

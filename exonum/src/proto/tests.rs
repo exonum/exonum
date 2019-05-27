@@ -278,7 +278,7 @@ fn test_version_pb_convert() {
     let version_round_trip: Version = ProtobufConvert::from_pb(pb_version).unwrap();
     assert_eq!(version_round_trip, version);
 }
- 
+
 #[derive(Debug, PartialEq, ProtobufConvert)]
 #[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
 struct StructWithFixedArrays {

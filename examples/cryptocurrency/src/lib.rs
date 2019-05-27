@@ -123,7 +123,7 @@ pub mod schema {
 pub mod transactions {
     use super::proto;
     use exonum::crypto::PublicKey;
-    
+
     /// Transaction type for creating a new wallet.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how

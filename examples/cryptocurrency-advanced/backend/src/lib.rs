@@ -40,7 +40,7 @@ pub mod wallet;
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{ExecutionResult, ExecutionError},
+    blockchain::{ExecutionError, ExecutionResult},
     helpers::fabric::{self, Context},
     runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},
@@ -48,8 +48,8 @@ use exonum::{
     },
 };
 
-use crate::transactions::{Issue, Transfer, CreateWallet, Error, ERROR_SENDER_SAME_AS_RECEIVER};
 use crate::api::PublicApi as CryptocurrencyApi;
+use crate::transactions::{CreateWallet, Error, Issue, Transfer, ERROR_SENDER_SAME_AS_RECEIVER};
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
@@ -69,11 +69,7 @@ pub trait Cryptocurrency {
 pub struct CryptocurrencyServiceImpl;
 
 impl Cryptocurrency for CryptocurrencyServiceImpl {
-    fn transfer(
-        &self,
-        context: TransactionContext,
-        arg: Transfer,
-    ) -> ExecutionResult {
+    fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult {
         let from = &context.author();
         let hash = context.tx_hash();
 
@@ -100,11 +96,7 @@ impl Cryptocurrency for CryptocurrencyServiceImpl {
         Ok(())
     }
 
-    fn issue(
-        &self,
-        context: TransactionContext,
-        arg: Issue,
-    ) -> ExecutionResult {
+    fn issue(&self, context: TransactionContext, arg: Issue) -> ExecutionResult {
         let pub_key = &context.author();
         let hash = context.tx_hash();
 
@@ -119,12 +111,7 @@ impl Cryptocurrency for CryptocurrencyServiceImpl {
         }
     }
 
-
-    fn create_wallet(
-        &self,
-        context: TransactionContext,
-        arg: CreateWallet,
-    ) -> ExecutionResult {
+    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult {
         let pub_key = &context.author();
         let hash = context.tx_hash();
 
@@ -138,7 +125,6 @@ impl Cryptocurrency for CryptocurrencyServiceImpl {
             Err(Error::WalletAlreadyExists)?
         }
     }
-
 }
 
 impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);

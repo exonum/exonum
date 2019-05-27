@@ -53,11 +53,14 @@ use exonum::{
 };
 use exonum_time::schema::TimeSchema;
 
-use crate::{api::PublicApi as TimestampingApi, schema::{Schema, TimestampEntry}, transactions::{TxTimestamp, Error}, };
+use crate::{
+    api::PublicApi as TimestampingApi,
+    schema::{Schema, TimestampEntry},
+    transactions::{Error, TxTimestamp},
+};
 
 const TIMESTAMPING_SERVICE: u16 = 130;
 const SERVICE_NAME: &str = "timestamping";
-
 
 #[service_interface]
 pub trait Timestamping {
@@ -68,11 +71,7 @@ pub trait Timestamping {
 pub struct TimestampingServiceImpl;
 
 impl Timestamping for TimestampingServiceImpl {
-    fn timestamp(
-        &self,
-        context: TransactionContext,
-        arg: TxTimestamp,
-    ) -> ExecutionResult {
+    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult {
         let tx_hash = context.tx_hash();
         let time = TimeSchema::new(context.fork())
             .time()

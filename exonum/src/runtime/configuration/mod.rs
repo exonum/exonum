@@ -57,15 +57,14 @@ pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 use serde_json::{to_value, Value};
 
-use exonum_merkledb::{Fork, Snapshot};
 use crate::{
-
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
     messages::AnyTx,
     node::State,
 };
+use exonum_merkledb::{Fork, Snapshot};
 
 use config::ConfigurationServiceConfig;
 

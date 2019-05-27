@@ -23,7 +23,7 @@ use crate::{
     proto,
     runtime::ArtifactSpec,
 };
-use exonum_merkledb::{Fork, Snapshot, ObjectHash};
+use exonum_merkledb::{Fork, ObjectHash, Snapshot};
 
 use super::{
     config::ConfigurationServiceConfig,
@@ -175,7 +175,8 @@ impl Propose {
             StoredConfiguration::try_deserialize(self.cfg.as_bytes()).map_err(InvalidConfig)?;
         self.check_config_candidate(&config_candidate, snapshot)?;
 
-        let cfg = StoredConfiguration::from_bytes(self.cfg.as_bytes().into()).expect("Can't deserialize stored configuration");
+        let cfg = StoredConfiguration::from_bytes(self.cfg.as_bytes().into())
+            .expect("Can't deserialize stored configuration");
         let cfg_hash = CryptoHash::hash(&cfg);
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
             return Err(AlreadyProposed(old_propose));
@@ -323,8 +324,9 @@ impl VotingContext {
             .unwrap();
 
         let propose = propose_data.tx_propose.clone();
-        let prev_cfg_hash =
-            StoredConfiguration::from_bytes(propose.cfg.as_bytes().into()).expect("Wrong stored configuration").previous_cfg_hash;
+        let prev_cfg_hash = StoredConfiguration::from_bytes(propose.cfg.as_bytes().into())
+            .expect("Wrong stored configuration")
+            .previous_cfg_hash;
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
             .get(&prev_cfg_hash)
