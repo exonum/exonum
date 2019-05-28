@@ -14,12 +14,8 @@
 
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
-#![deny(
-    missing_debug_implementations,
-    // missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
+#![deny(unsafe_code, bare_trait_objects)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 #[macro_use]
 extern crate exonum_derive;
@@ -36,21 +32,22 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum_merkledb::Snapshot;
-
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
+    blockchain::{ExecutionError, ExecutionResult, TransactionSet},
     crypto::Hash,
     helpers::fabric::{self, Context},
+    impl_service_dispatcher,
     runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
     },
 };
 
-use crate::api::PublicApi as CryptocurrencyApi;
-use crate::transactions::{CreateWallet, Error, Issue, Transfer, ERROR_SENDER_SAME_AS_RECEIVER};
+use crate::{
+    api::PublicApi as CryptocurrencyApi,
+    transactions::{CreateWallet, Error, Issue, Transfer, ERROR_SENDER_SAME_AS_RECEIVER},
+};
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;

@@ -23,12 +23,8 @@
 //! [docs]: https://exonum.com/doc/version/latest/get-started/create-service
 //! [readme]: https://github.com/exonum/cryptocurrency#readme
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
+#![deny(unsafe_code, bare_trait_objects)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 #[macro_use]
 extern crate exonum_derive;
@@ -41,9 +37,8 @@ pub mod proto;
 
 /// Persistent data.
 pub mod schema {
-    use exonum_merkledb::{IndexAccess, MapIndex};
-
     use exonum::crypto::PublicKey;
+    use exonum_merkledb::{IndexAccess, MapIndex};
 
     use super::proto;
 
@@ -119,8 +114,9 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
-    use super::proto;
     use exonum::crypto::PublicKey;
+
+    use super::proto;
 
     /// Transaction type for creating a new wallet.
     ///
@@ -153,10 +149,6 @@ pub mod transactions {
 
 /// Contract errors.
 pub mod errors {
-    // Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
-    // ECR-1771 for the details.
-    #![allow(bare_trait_objects)]
-
     use exonum::blockchain::ExecutionError;
 
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
@@ -204,15 +196,18 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::api::ServiceApiBuilder;
-    use exonum::blockchain::ExecutionResult;
-    use exonum::runtime::rust::{
-        service::{GenesisInitInfo, Service, ServiceFactory},
-        RustArtifactSpec, TransactionContext,
+    use exonum::{
+        api::ServiceApiBuilder,
+        blockchain::ExecutionResult,
+        impl_service_dispatcher,
+        runtime::rust::{
+            service::{GenesisInitInfo, Service, ServiceFactory},
+            RustArtifactSpec, TransactionContext,
+        },
     };
 
-    use crate::api::CryptocurrencyApi;
     use crate::{
+        api::CryptocurrencyApi,
         errors::Error,
         schema::{CurrencySchema, Wallet},
         transactions::{TxCreateWallet, TxTransfer},
@@ -306,13 +301,6 @@ pub mod contracts {
 
         fn new_instance(&self) -> Box<dyn Service> {
             Box::new(CryptocurrencyServiceImpl)
-        }
-
-        fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
-            vec![
-                GenesisInitInfo::no_init_tx(self.artifact(), "coin-1"),
-                GenesisInitInfo::no_init_tx(self.artifact(), "coin-2"),
-            ]
         }
     }
 }

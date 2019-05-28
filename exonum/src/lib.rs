@@ -84,6 +84,7 @@ pub mod api;
 pub mod events;
 pub mod explorer;
 pub mod node;
+#[macro_use]
 pub mod runtime;
 
 //TODO: revert sandbox
