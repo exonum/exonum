@@ -192,7 +192,7 @@ impl<T> Deref for Signed<T> {
 
 impl<T: ProtocolMessage> BinaryValue for Signed<T> {
     fn to_bytes(&self) -> Vec<u8> {
-        self.message.exonum_message().to_vec()
+        self.message.to_bytes()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {

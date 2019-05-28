@@ -90,6 +90,7 @@ impl ProtobufConvert for SignedMessage {
     }
 }
 
+/// Warning: This implementation checks signature which is slow operation.
 impl BinaryValue for SignedMessage {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_pb().write_to_bytes().unwrap()
@@ -98,7 +99,7 @@ impl BinaryValue for SignedMessage {
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
         pb.merge_from_bytes(&value)?;
-        Self::from_pb_no_verify(pb)
+        Self::from_pb(pb)
     }
 }
 
