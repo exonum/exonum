@@ -232,7 +232,7 @@ pub struct IndexAddress {
 impl IndexAddress {
     /// Creates empty `IndexAddress`.
     pub fn new() -> Self {
-        Self::default()
+        Self::with_root("root")
     }
 
     /// Creates new `IndexAddress` with specified `root` name.

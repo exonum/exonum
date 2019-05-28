@@ -14,7 +14,7 @@
 
 //! An implementation of a Merkelized version of an array list (Merkle tree).
 
-pub use self::proof::{ListProof, ListProofError};
+pub use super::proof::{ListProof, ListProofError};
 
 use std::{
     marker::PhantomData,
@@ -23,19 +23,13 @@ use std::{
 
 use exonum_crypto::Hash;
 
-use self::{key::ProofListKey, proof::ProofOfAbsence};
+use super::{key::ProofListKey, proof::ProofOfAbsence};
 use crate::views::IndexAddress;
 use crate::{
     hash::HashTag,
     views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, ObjectHash,
 };
-
-mod key;
-pub mod lazy;
-mod proof;
-#[cfg(test)]
-mod tests;
 
 // TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
@@ -46,7 +40,7 @@ mod tests;
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ProofListIndex<T: IndexAccess, V> {
+pub struct LazyListIndex<T: IndexAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
@@ -61,14 +55,14 @@ pub struct ProofListIndex<T: IndexAccess, V> {
 /// [`iter_from`]: struct.ProofListIndex.html#method.iter_from
 /// [`ProofListIndex`]: struct.ProofListIndex.html
 #[derive(Debug)]
-pub struct ProofListIndexIter<'a, V> {
+pub struct LazyListIndexIter<'a, V> {
     base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
-impl<T, V> AnyObject<T> for ProofListIndex<T, V>
+impl<T, V> AnyObject<T> for LazyListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue,
+    V: BinaryValue + std::fmt::Debug,
 {
     fn view(self) -> View<T> {
         self.base
@@ -83,10 +77,10 @@ where
     }
 }
 
-impl<T, V> ProofListIndex<T, V>
+impl<T, V> LazyListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue,
+    V: BinaryValue + ObjectHash + std::fmt::Debug,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -239,7 +233,7 @@ where
     }
 
     fn merkle_root(&self) -> Hash {
-        self.get_branch(self.root_key()).unwrap_or_default()
+        HashTag::hash_list(&self.iter().map(|v| v.object_hash()).collect::<Vec<Hash>>())
     }
 
     fn set_len(&mut self, len: u64) {
@@ -455,8 +449,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ProofListIndexIter<V> {
-        ProofListIndexIter {
+    pub fn iter(&self) -> LazyListIndexIter<V> {
+        LazyListIndexIter {
             base_iter: self.base.iter(&0_u8),
         }
     }
@@ -467,7 +461,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, LazyListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
@@ -478,8 +472,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
-        ProofListIndexIter {
+    pub fn iter_from(&self, from: u64) -> LazyListIndexIter<V> {
+        LazyListIndexIter {
             base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }
     }
@@ -504,19 +498,20 @@ where
         self.set_len(len + 1);
         let mut key = ProofListKey::new(1, len);
 
-        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
+        //self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
+        self.base.put(&key, Hash::zero());
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
-            let hash = if key.is_left() {
-                HashTag::hash_single_node(&self.get_branch_unchecked(key))
-            } else {
-                HashTag::hash_node(
-                    &self.get_branch_unchecked(key.as_left()),
-                    &self.get_branch_unchecked(key),
-                )
-            };
+            //    let _hash = if key.is_left() {
+            //        HashTag::hash_single_node(&self.get_branch_unchecked(key))
+            //    } else {
+            //        HashTag::hash_node(
+            //            &self.get_branch_unchecked(key.as_left()),
+            //            &self.get_branch_unchecked(key),
+            //        )
+            //    };
             key = key.parent();
-            self.set_branch(key, hash);
+            self.set_branch(key, Hash::zero());
         }
     }
 
@@ -575,11 +570,12 @@ where
             );
         }
         let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
+        //self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
+        self.base.put(&key, vec![]);
         self.base.put(&ProofListKey::leaf(index), value);
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
-            let hash = if self.has_branch(right) {
+            let _hash = if self.has_branch(right) {
                 HashTag::hash_node(
                     &self.get_branch_unchecked(left),
                     &self.get_branch_unchecked(right),
@@ -588,7 +584,7 @@ where
                 HashTag::hash_single_node(&self.get_branch_unchecked(left))
             };
             key = key.parent();
-            self.set_branch(key, hash);
+            self.set_branch(key, Hash::zero());
         }
     }
 
@@ -603,7 +599,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, LazyListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
@@ -622,10 +618,10 @@ where
     }
 }
 
-impl<T, V> ObjectHash for ProofListIndex<T, V>
+impl<T, V> ObjectHash for LazyListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue + ObjectHash + std::fmt::Debug,
 {
     /// Returns a list hash of the proof list or a hash value of the empty list.
     ///
@@ -658,30 +654,65 @@ where
     /// assert_ne!(hash, default_hash);
     /// ```
     fn object_hash(&self) -> Hash {
-        HashTag::hash_list_node(self.len(), self.merkle_root())
+        HashTag::hash_list(
+            &self
+                .iter()
+                .map(|v| HashTag::hash_leaf(&v.to_bytes()))
+                .collect::<Vec<Hash>>(),
+        )
+        //HashTag::hash_list_node(self.len(), self.merkle_root())
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
+impl<'a, T, V> ::std::iter::IntoIterator for &'a LazyListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue + ObjectHash + std::fmt::Debug,
 {
     type Item = V;
-    type IntoIter = ProofListIndexIter<'a, V>;
+    type IntoIter = LazyListIndexIter<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for ProofListIndexIter<'a, V>
+impl<'a, V> Iterator for LazyListIndexIter<'a, V>
 where
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue + ObjectHash + std::fmt::Debug,
 {
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::{Database, ProofListIndex, TemporaryDB};
+
+    #[test]
+    fn lazy_hash() {
+        let db = TemporaryDB::new();
+
+        let fork = db.fork();
+        let mut index = LazyListIndex::new("index", &fork);
+        for i in 0..10 {
+            index.push(i);
+        }
+
+        let mut index2 = ProofListIndex::new("index2", &fork);
+        for i in 0..10 {
+            index2.push(i);
+        }
+
+        // let proof = index.get_range_proof(1..9);
+        //       dbg!(proof);
+        //
+        assert_eq!(index.object_hash(), index2.object_hash());
+    }
+
 }
