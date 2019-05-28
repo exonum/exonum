@@ -168,29 +168,31 @@ pub use crate::{
 pub mod compare;
 pub mod proto;
 
-use futures::{sync::mpsc, Future, Stream};
-use tokio_core::reactor::Core;
-
-use std::sync::{Arc, Mutex, RwLock};
-use std::{fmt, net::SocketAddr};
-
-use exonum_merkledb::{Database, Patch, Snapshot, TemporaryDB};
-
 use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
     blockchain::{Blockchain, GenesisConfig, Schema as CoreSchema, Service, StoredConfiguration},
-    crypto::{self, CryptoHash, Hash},
+    crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
 };
+use exonum_merkledb::{Database, Patch, Snapshot, TemporaryDB, ObjectHash};
+use futures::{sync::mpsc, Future, Stream};
+use tokio_core::reactor::Core;
 
-use crate::checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use crate::poll_events::poll_events;
+use std::{
+    sync::{Arc, Mutex, RwLock},
+    {fmt, net::SocketAddr},
+};
+
+use crate::{
+    checkpoint_db::{CheckpointDb, CheckpointDbHandler},
+    poll_events::poll_events,
+};
 
 #[macro_use]
 mod macros;
@@ -611,8 +613,8 @@ impl TestKit {
         let snapshot = self.snapshot();
         let schema = CoreSchema::new(&snapshot);
         let uncommitted_txs = transactions.into_iter().filter(|tx| {
-            !schema.transactions().contains(&tx.hash())
-                || schema.transactions_pool().contains(&tx.hash())
+            !schema.transactions().contains(&tx.object_hash())
+                || schema.transactions_pool().contains(&tx.object_hash())
         });
 
         self.checkpoint();
@@ -736,7 +738,7 @@ impl TestKit {
 
                 txs.into_iter()
                     .map(|tx| {
-                        let tx_id = tx.hash();
+                        let tx_id = tx.object_hash();
                         let tx_not_found = !schema.transactions().contains(&tx_id);
                         let tx_in_pool = schema.transactions_pool().contains(&tx_id);
                         assert!(

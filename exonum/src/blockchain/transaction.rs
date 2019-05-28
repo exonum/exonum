@@ -140,6 +140,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// # #[macro_use] extern crate exonum_derive;
     /// # #[macro_use] extern crate serde_derive;
     /// #
+    /// use std::borrow::Cow;
     /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum_merkledb::Fork;
@@ -186,11 +187,7 @@ pub struct TransactionContext<'a> {
 
 impl<'a> TransactionContext<'a> {
     #[doc(hidden)]
-    pub fn new(
-        fork: &'a Fork,
-        service_name: &'a str,
-        raw_message: &Signed<AnyTx>,
-    ) -> Self {
+    pub fn new(fork: &'a Fork, service_name: &'a str, raw_message: &Signed<AnyTx>) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),
@@ -681,8 +678,9 @@ mod tests {
 
     fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::unbounded();
         let internal_sender = mpsc::channel(1).0;
+
         Blockchain::new(
             TemporaryDB::new(),
             //            vec![Box::new(TxResultService) as Box<dyn Service>],

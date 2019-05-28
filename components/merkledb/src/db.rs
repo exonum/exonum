@@ -370,9 +370,9 @@ pub enum Change {
 /// need to consistently apply several sets of changes to the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
-/// `Fork` also supports checkpoints ([`checkpoint`], [`commit`] and
+/// `Fork` also supports checkpoints ([`flush`] and
 /// [`rollback`] methods), which allows rolling back some of the latest changes (e.g., after
-/// a runtime error).
+/// a runtime error). Checkpoint is created automatically after calling the `flush` method.
 ///
 /// `Fork` implements the [`Snapshot`] trait and provides methods for both reading and
 /// writing data. Thus, `&mut Fork` is used as a storage view for creating
@@ -388,7 +388,6 @@ pub enum Change {
 /// [`Patch`]: struct.Patch.html
 /// [`into_patch`]: #method.into_patch
 /// [`merge`]: trait.Database.html#tymethod.merge
-/// [`checkpoint`]: #method.checkpoint
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
 pub struct Fork {
@@ -565,23 +564,16 @@ impl Snapshot for FlushedFork {
 }
 
 impl Fork {
-    /// Finalizes all changes after the latest checkpoint.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no active checkpoint, or the latest checkpoint
-    /// is already committed or rolled back.
+    /// Finalizes all changes that were made after previous execution of the `flush` method.
+    /// If no `flush` method had been called before, finalizes all changes that were
+    /// made after creation of `Fork`.
     pub fn flush(&mut self) {
         let working_patch = mem::replace(&mut self.working_patch, WorkingPatch::new());
         working_patch.merge_into(&mut self.flushed.patch);
     }
 
-    /// Rolls back all changes after the latest checkpoint.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no active checkpoint, or the latest checkpoint
-    /// is already committed or rolled back.
+    /// Rolls back all changes that were made after the latest execution
+    /// of the `flush` method.
     pub fn rollback(&mut self) {
         self.working_patch = WorkingPatch::new();
     }
@@ -599,8 +591,7 @@ impl Fork {
     ///
     /// # Panics
     ///
-    /// Panics if a checkpoint has been created before and has not been committed
-    /// or rolled back yet.
+    /// Panics if a target `Fork` contains unflushed changes.
     pub fn merge(&mut self, patch: Patch) {
         assert!(!self.is_dirty(), "cannot merge a dirty fork");
 
@@ -639,9 +630,9 @@ impl<'a> IndexAccess for &'a Fork {
     }
 }
 
-impl<'a> AsRef<dyn Snapshot> for &'a Fork {
+impl AsRef<dyn Snapshot> for Fork {
     fn as_ref(&self) -> &dyn Snapshot {
-        self.snapshot()
+        &self.flushed
     }
 }
 

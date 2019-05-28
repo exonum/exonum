@@ -21,11 +21,8 @@ use super::{
 };
 use crate::api::ServiceApiBuilder;
 use crate::events::InternalRequest;
+use crate::{crypto::Hash, messages::CallInfo};
 use exonum_merkledb::{Fork, Snapshot};
-use crate::{
-    crypto::Hash,
-    messages::CallInfo,
-};
 use futures::{future::Future, sink::Sink, sync::mpsc};
 
 pub struct Dispatcher {
@@ -182,8 +179,8 @@ impl RuntimeEnvironment for Dispatcher {
 mod tests {
     use super::*;
     use crate::messages::{MethodId, ServiceInstanceId};
-    use exonum_merkledb::{Database, TemporaryDB};
     use crate::runtime::RuntimeIdentifier;
+    use exonum_merkledb::{Database, TemporaryDB};
 
     #[derive(Default)]
     pub struct DispatcherBuilder {

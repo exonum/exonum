@@ -16,6 +16,7 @@ btree
 bytearray
 byteorder
 checkpointed
+chmod
 chrono
 clippy
 clonned

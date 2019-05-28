@@ -28,19 +28,22 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
+use exonum_merkledb::{BinaryValue, HashTag, ObjectHash};
+use protobuf::Message as PbMessage;
 
 use std::{borrow::Cow, fmt::Debug};
 
-use super::{BinaryForm, ServiceTransaction, Signed, SignedMessage};
-use crate::blockchain;
-use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::proto::{
-    self, schema::protocol::ExonumMessage_oneof_message as ExonumMessageEnum, ExonumMessage,
-    ProtobufConvert,
+use crate::{
+    blockchain,
+    crypto::{Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH},
+    helpers::{Height, Round, ValidatorId},
+    proto::{
+        self, schema::protocol::ExonumMessage_oneof_message as ExonumMessageEnum, ExonumMessage,
+        ProtobufConvert,
+    },
 };
-use exonum_merkledb::{BinaryValue, HashTag};
-use protobuf::Message as PbMessage;
+
+use super::{ServiceTransaction, Signed, SignedMessage};
 
 /// Lower bound on the size of the correct `SignedMessage`.
 /// Size of message fields + protobuf overhead.
@@ -712,7 +715,7 @@ impl BlockResponse {
 impl Precommit {
     /// Verify precommits signature and return it's safer wrapper
     pub(crate) fn verify_precommit(buffer: Vec<u8>) -> Result<Signed<Precommit>, failure::Error> {
-        SignedMessage::decode(&buffer)
+        SignedMessage::from_bytes(buffer.into())
             .and_then(|s| Message::deserialize(s))
             .and_then(|m| match m {
                 Message::Consensus(Consensus::Precommit(msg)) => Ok(msg),
@@ -784,7 +787,7 @@ impl AnyTx {
 
 /// Full message constraints list.
 #[doc(hidden)]
-pub trait ProtocolMessage: Debug + Clone + BinaryForm {
+pub trait ProtocolMessage: Debug + Clone + BinaryValue {
     /// Trying to convert `Message` to concrete message,
     /// if ok returns message `Signed<Self>` if fails, returns `Message` back.
     fn try_from(p: Message) -> Result<Signed<Self>, Message>;
@@ -982,10 +985,12 @@ impl Message {
 
     /// Checks buffer and return instance of `Message`.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
-        let signed = SignedMessage::decode(&buffer)?;
+        let signed = SignedMessage::from_bytes(buffer.into())?;
         Self::deserialize(signed)
     }
 }
+
+// TODO simplify macro. [ECR-3222]
 
 macro_rules! impl_protocol_message {
     ($message_variant:path, $subclass_variant:path, $message:ty, $exonum_msg_field:ident) => {
@@ -1134,7 +1139,7 @@ impl<T: ProtocolMessage> From<Signed<T>> for Message {
 
 impl BinaryValue for Message {
     fn to_bytes(&self) -> Vec<u8> {
-        self.signed_message().encode().unwrap()
+        self.signed_message().to_bytes()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
@@ -1144,8 +1149,8 @@ impl BinaryValue for Message {
     }
 }
 
-impl CryptoHash for Message {
-    fn hash(&self) -> Hash {
-        self.signed_message().hash()
+impl ObjectHash for Message {
+    fn object_hash(&self) -> Hash {
+        self.signed_message().object_hash()
     }
 }

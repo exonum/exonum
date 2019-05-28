@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! Sample counter service.
+use std::borrow::Cow;
+
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
 
 use exonum::{
@@ -20,7 +22,7 @@ use exonum::{
     blockchain::{
         ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
+    crypto::{Hash, PublicKey, SecretKey},
     messages::{AnyTx, Message, Signed},
 };
 
@@ -43,7 +45,7 @@ impl<T: IndexAccess> CounterSchema<T> {
     }
 
     fn entry(&self) -> Entry<T, u64> {
-        Entry::new("counter.count", self.view)
+        Entry::new("counter.count", self.view.clone())
     }
 
     pub fn count(&self) -> Option<u64> {

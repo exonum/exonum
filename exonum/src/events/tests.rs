@@ -22,21 +22,21 @@ use std::{
     time::{self, Duration, SystemTime},
 };
 
-use crate::blockchain::ConsensusConfig;
-use crate::crypto::{
-    gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH,
-    SIGNATURE_LENGTH,
-};
-use crate::events::{
-    error::log_error,
-    network::{NetworkConfiguration, NetworkPart},
-    noise::HandshakeParams,
-    NetworkEvent, NetworkRequest,
-};
-use crate::helpers::user_agent;
-use crate::messages::{BinaryForm, Connect, Message, Signed, SignedMessage};
-use crate::node::{
-    state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel,
+use crate::{
+    blockchain::ConsensusConfig,
+    crypto::{
+        gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH,
+        SEED_LENGTH, SIGNATURE_LENGTH,
+    },
+    events::{
+        error::log_error,
+        network::{NetworkConfiguration, NetworkPart},
+        noise::HandshakeParams,
+        NetworkEvent, NetworkRequest,
+    },
+    helpers::user_agent,
+    messages::{BinaryValue, Connect, Message, Signed, SignedMessage},
+    node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel},
 };
 
 #[derive(Debug)]
@@ -116,7 +116,7 @@ impl TestHandler {
     pub fn wait_for_message(&mut self) -> SignedMessage {
         match self.wait_for_event() {
             Ok(NetworkEvent::MessageReceived(msg)) => {
-                SignedMessage::decode(&msg).expect("Signed message decode")
+                SignedMessage::from_bytes(msg.into()).expect("Unable to decode signed message")
             }
             Ok(other) => panic!("Unexpected message received, {:?}", other),
             Err(e) => panic!("An error during wait for message occurred, {:?}", e),
@@ -373,7 +373,6 @@ fn test_network_big_message() {
     e2.disconnect_with(first_key);
     assert_eq!(e2.wait_for_disconnect(), first_key);
 }
-
 #[test]
 fn test_network_max_message_len() {
     let _ = env_logger::try_init();
@@ -381,11 +380,12 @@ fn test_network_max_message_len() {
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
+    // Minimal size of protobuf messages can't be determined exactly.
     let acceptable_message =
-        raw_message(max_message_length - PUBLIC_KEY_LENGTH - SIGNATURE_LENGTH - 100);
+        raw_message(max_message_length - SIGNATURE_LENGTH - PUBLIC_KEY_LENGTH - 100);
     let too_big_message = raw_message(max_message_length + 1000);
-    assert!(too_big_message.encode().unwrap().len() > max_message_length);
-    assert!(acceptable_message.encode().unwrap().len() <= max_message_length);
+    assert!(too_big_message.to_bytes().len() > max_message_length);
+    assert!(acceptable_message.to_bytes().len() <= max_message_length);
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info.clone());

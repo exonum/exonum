@@ -31,7 +31,7 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
         .map(|ServiceMethodDescriptor { name, arg_type, id }| {
             quote! {
                 #id => {
-                    let arg: #arg_type = #cr::messages::BinaryForm::decode(payload)?;
+                    let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(payload.into())?;
                     Ok(self.#name(ctx,arg))
                 }
             }

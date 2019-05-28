@@ -21,7 +21,7 @@
 
 #![deny(
     missing_debug_implementations,
-    // missing_docs,
+    missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
@@ -32,8 +32,6 @@ extern crate failure;
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
-#[macro_use]
-extern crate exonum;
 
 /// Node API.
 pub mod api;
@@ -50,14 +48,14 @@ use exonum_merkledb::{Fork, Snapshot};
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{ServiceContext, Transaction, TransactionSet, ExecutionResult, ExecutionError},
+    blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
     helpers::fabric::{self, Context},
+    messages::AnyTx,
     runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
     },
-    messages::AnyTx,
 };
 use serde_json::Value;
 
@@ -71,7 +69,6 @@ use crate::{
 pub const SERVICE_ID: u16 = 4;
 /// Time service name.
 pub const SERVICE_NAME: &str = "exonum_time";
-
 
 #[service_interface]
 pub trait Time {
@@ -104,11 +101,7 @@ impl TimeServiceImpl {
 }
 
 impl Time for TimeServiceImpl {
-    fn time(
-        &self,
-        context: TransactionContext,
-        arg: TxTime,
-    ) -> ExecutionResult {
+    fn time(&self, context: TransactionContext, arg: TxTime) -> ExecutionResult {
         let author = context.author();
         let view = context.fork();
         arg.check_signed_by_validator(view.as_ref(), &author)?;
@@ -125,7 +118,7 @@ impl Service for TimeServiceImpl {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
     }
-    
+
     fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = TimeSchema::new(snapshot);
         schema.state_hash()

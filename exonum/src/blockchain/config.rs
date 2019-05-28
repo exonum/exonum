@@ -21,15 +21,17 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
+use exonum_merkledb::{BinaryValue, ObjectHash};
 use serde::de::Error;
 use serde_json::Error as JsonError;
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
-use crate::helpers::{Height, Milliseconds};
-use crate::messages::SIGNED_MESSAGE_MIN_SIZE;
-use exonum_merkledb::{BinaryValue, ObjectHash};
+use crate::{
+    crypto::{hash, CryptoHash, Hash, PublicKey},
+    helpers::{Height, Milliseconds},
+    messages::SIGNED_MESSAGE_MIN_SIZE,
+};
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,

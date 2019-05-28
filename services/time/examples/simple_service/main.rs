@@ -21,6 +21,8 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
+use std::borrow::Cow;
+
 use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex, Snapshot};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -28,7 +30,7 @@ use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, Message, Signed},
+    messages::{Message, RawTransaction, Signed},
 };
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
@@ -43,18 +45,18 @@ const SERVICE_NAME: &str = "marker";
 /// Marker service database schema.
 #[derive(Debug)]
 pub struct MarkerSchema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T: IndexAccess> MarkerSchema<T> {
     /// Constructs schema for the given `snapshot`.
-    pub fn new(view: T) -> Self {
-        MarkerSchema { view }
+    pub fn new(access: T) -> Self {
+        MarkerSchema { access }
     }
 
     /// Returns the table mapping `i32` value to public keys authoring marker transactions.
     pub fn marks(&self) -> ProofMapIndex<T, PublicKey, i32> {
-        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view)
+        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.access.clone())
     }
 
     /// Returns hashes for stored table.

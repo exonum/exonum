@@ -5,12 +5,12 @@
   "description": "JS dependencies for Exonum",
   "dependencies": {},
   "devDependencies": {
-    "cspell": "^3.1.3",
-    "markdownlint-cli": "^0.13.0"
+    "cspell": "^3.2.10",
+    "markdownlint-cli": "^0.15.0"
   },
   "scripts": {
     "cspell": "./cspell.sh",
-    "md": "find . -not -path \"./3rdparty/*\" -and -not -path \"./node_modules/*\" -name \"*.md\" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc"
+    "md": "find . -not -path \"*/node_modules/*\" -name \"*.md\" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc"
   },
   "repository": {
     "type": "git",

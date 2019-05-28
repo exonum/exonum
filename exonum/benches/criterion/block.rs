@@ -43,9 +43,9 @@ use exonum_merkledb::{Database, DbOptions, Patch, RocksDB};
 
 use exonum::{
     blockchain::{Blockchain, Schema, Service, Transaction},
-    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
+    crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Signed},
+    messages::{RawTransaction, Signed},
     node::ApiSender,
 };
 use futures::sync::mpsc;
@@ -86,7 +86,7 @@ fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Bloc
     };
     use std::sync::Arc;
 
-    let dummy_channel = mpsc::channel(1);
+    let dummy_channel = mpsc::unbounded();
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let mut blockchain = Blockchain::new(
         Arc::new(db) as Arc<dyn Database>,
@@ -116,10 +116,11 @@ mod timestamping {
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-        messages::{AnyTx, Message, Signed},
+        messages::{Message, RawTransaction, Signed},
     };
     use exonum_merkledb::Snapshot;
     use rand::Rng;
+    use std::borrow::Cow;
 
     const TIMESTAMPING_SERVICE_ID: u16 = 1;
 
@@ -218,6 +219,7 @@ mod cryptocurrency {
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
     use rand::{seq::SliceRandom, Rng};
+    use std::borrow::Cow;
 
     const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 

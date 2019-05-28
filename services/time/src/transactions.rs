@@ -18,6 +18,8 @@
 
 use chrono::{DateTime, Utc};
 
+use std::borrow::Cow;
+
 use exonum_merkledb::{Fork, Snapshot};
 
 use exonum::{
@@ -81,7 +83,7 @@ impl TxTime {
         Message::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
     }
 
-    pub fn check_signed_by_validator(
+    fn check_signed_by_validator(
         &self,
         snapshot: &dyn Snapshot,
         author: &PublicKey,
@@ -95,7 +97,7 @@ impl TxTime {
         }
     }
 
-    pub fn update_validator_time(&self, fork: &Fork, author: &PublicKey) -> ExecutionResult {
+    fn update_validator_time(&self, fork: &Fork, author: &PublicKey) -> ExecutionResult {
         let schema = TimeSchema::new(fork);
         let mut validators_times = schema.validators_times();
         match validators_times.get(author) {
@@ -109,7 +111,7 @@ impl TxTime {
         }
     }
 
-    pub fn update_consolidated_time(fork: &Fork) {
+    fn update_consolidated_time(fork: &Fork) {
         let keys = Schema::new(fork).actual_configuration().validator_keys;
         let schema = TimeSchema::new(fork);
 

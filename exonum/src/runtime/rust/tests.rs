@@ -13,26 +13,33 @@
 // limitations under the License.
 
 use exonum_derive::service_interface;
+use exonum_merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB};
+
 use futures::sync::mpsc;
+use protobuf::{well_known_types::Any, Message};
 use semver::Version;
 
-use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
-
-use super::{
-    service::{Service, ServiceFactory},
-    ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext,
-};
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
+use crate::messages::{CallInfo, ServiceInstanceId};
+use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
 use crate::runtime::dispatcher::Dispatcher;
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
-use exonum_merkledb::{Database, Entry, TemporaryDB, Fork, Snapshot};
-use protobuf::{well_known_types::Any, Message};
+
+use super::{
+    service::{Service, ServiceFactory},
+    ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext,
+};
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
+
+#[derive(Debug, ProtobufConvert)]
+#[exonum(pb = "TestServiceInit", crate = "crate")]
+struct Init {
+    msg: String,
+}
 
 #[derive(Debug, ProtobufConvert)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
@@ -69,7 +76,7 @@ impl TestService for TestServiceImpl {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 1,
         };
-        let payload = TxB { value: arg.value }.encode().unwrap();
+        let payload = TxB { value: arg.value }.into_bytes();
         ctx.dispatch_call(dispatch_info, &payload)
             .expect("Failed to dispatch call");
         Ok(())
@@ -87,13 +94,13 @@ impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl Service for TestServiceImpl {
     fn initialize(&mut self, ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
-        let mut arg: TestServiceInit = BinaryForm::decode(arg.get_value()).map_err(|e| {
+        let mut arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
 
         let fork = ctx.fork() as &Fork;
         let mut entry = Entry::new("constructor_entry", fork);
-        entry.set(arg.take_msg());
+        entry.set(arg.msg);
         Ok(())
     }
 
@@ -176,7 +183,7 @@ fn test_basic_rust_runtime() {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 0,
         };
-        let payload = TxA { value: ARG_A_VALUE }.encode().unwrap();
+        let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = RuntimeContext::from_fork(&mut fork);
         runtime
@@ -201,7 +208,7 @@ fn test_basic_rust_runtime() {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 1,
         };
-        let payload = TxB { value: ARG_B_VALUE }.encode().unwrap();
+        let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = RuntimeContext::from_fork(&mut fork);
         runtime

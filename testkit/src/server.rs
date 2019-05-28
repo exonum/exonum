@@ -156,13 +156,15 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 
 #[cfg(test)]
 mod tests {
-    use exonum::api;
-    use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
-    use exonum::crypto::{gen_keypair, CryptoHash, Hash};
-    use exonum::explorer::BlockWithTransactions;
-    use exonum::helpers::Height;
-    use exonum::messages::{AnyTx, Message, Signed};
-    use exonum_merkledb::Snapshot;
+    use exonum::{
+        api,
+        blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
+        crypto::{gen_keypair, Hash},
+        explorer::BlockWithTransactions,
+        helpers::Height,
+        messages::{AnyTx, Message, Signed},
+    };
+    use exonum_merkledb::{Snapshot, ObjectHash};
 
     use super::{super::proto, *};
     use crate::{TestKitApi, TestKitBuilder};
@@ -302,7 +304,7 @@ mod tests {
         }
 
         let body = CreateBlockQuery {
-            tx_hashes: Some(vec![tx_foo.hash()]),
+            tx_hashes: Some(vec![tx_foo.object_hash()]),
         };
         let block_info: DeBlock = api
             .private("api/testkit")
@@ -315,7 +317,7 @@ mod tests {
         assert_eq!(block_info.transactions[0].content().message(), &tx_foo);
 
         let body = CreateBlockQuery {
-            tx_hashes: Some(vec![tx_bar.hash()]),
+            tx_hashes: Some(vec![tx_bar.object_hash()]),
         };
         let block_info: DeBlock = api
             .private("api/testkit")

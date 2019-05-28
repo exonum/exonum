@@ -1,19 +1,23 @@
-use super::{
-    BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, Signed, SignedMessage, Status,
-    TransactionsResponse, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
-};
-use crate::blockchain::{Block, BlockProof};
-use crate::crypto::{gen_keypair, hash, CryptoHash, Signature};
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::proto::{self, ProtobufConvert};
 use chrono::Utc;
 use protobuf::Message as PbMessage;
+
+use crate::{
+    blockchain::{Block, BlockProof},
+    crypto::{gen_keypair, hash, CryptoHash, Signature},
+    helpers::{Height, Round, ValidatorId},
+    proto::{self, ProtobufConvert},
+};
+
+use super::{
+    BinaryValue, BlockResponse, Message, Precommit, ProtocolMessage, Signed, SignedMessage, Status,
+    TransactionsResponse, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
+};
 
 #[test]
 fn test_signed_message_min_size() {
     let (public_key, secret_key) = gen_keypair();
     let msg = SignedMessage::new(&[0; 0], public_key, &secret_key);
-    assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.encode().unwrap().len())
+    assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.into_bytes().len())
 }
 
 #[test]
@@ -21,7 +25,7 @@ fn test_tx_response_empty_size() {
     let (public_key, secret_key) = gen_keypair();
     let msg = TransactionsResponse::new(&public_key, vec![]);
     let msg = Message::concrete(msg, public_key, &secret_key);
-    assert_eq!(TX_RES_EMPTY_SIZE, msg.encode().unwrap().len())
+    assert_eq!(TX_RES_EMPTY_SIZE, msg.into_bytes().len())
 }
 
 #[test]
@@ -39,7 +43,7 @@ fn test_tx_response_with_txs_size() {
 
     let msg = TransactionsResponse::new(&public_key, txs);
     let msg = Message::concrete(msg, public_key, &secret_key);
-    assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.encode().unwrap().len())
+    assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.into_bytes().len())
 }
 
 #[test]
@@ -60,10 +64,11 @@ fn test_message_roundtrip() {
         &secret_key,
     );
 
-    let bytes = msg.encode().expect("Signed<T> encode");
-    let msg_enum =
-        Message::deserialize(SignedMessage::decode(&bytes).expect("SignedMessage decode."))
-            .expect("Message deserialize");
+    let bytes = msg.to_bytes();
+    let msg_enum = Message::deserialize(
+        SignedMessage::from_bytes(bytes.into()).expect("SignedMessage decode."),
+    )
+    .expect("Message deserialize");
     let msg_roundtrip = Precommit::try_from(msg_enum).expect("Message type");
     assert_eq!(msg, msg_roundtrip)
 }
@@ -88,10 +93,11 @@ fn test_signed_message_unusual_protobuf() {
 
     let signed = SignedMessage::new(&payload, pub_key, &secret_key);
 
-    let signed_bytes = signed.encode().expect("SignedMessage encode");
-    let msg_enum =
-        Message::deserialize(SignedMessage::decode(&signed_bytes).expect("SignedMessage decode."))
-            .expect("Message deserialize");
+    let signed_bytes = signed.into_bytes();
+    let msg_enum = Message::deserialize(
+        SignedMessage::from_bytes(signed_bytes.into()).expect("SignedMessage decode."),
+    )
+    .expect("Message deserialize");
     let deserialized_precommit = Precommit::try_from(msg_enum).expect("Message type");
     assert_eq!(precommit_msg, *deserialized_precommit.payload())
 }
@@ -155,10 +161,7 @@ fn test_block() {
         Message::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
         Message::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
     ];
-    let precommits_buf: Vec<_> = precommits
-        .iter()
-        .map(|x| x.clone().encode().unwrap())
-        .collect();
+    let precommits_buf: Vec<_> = precommits.iter().map(BinaryValue::to_bytes).collect();
     let block = Message::concrete(
         BlockResponse::new(
             &pub_key,
@@ -177,7 +180,7 @@ fn test_block() {
     assert_eq!(block.transactions().to_vec(), transactions);
 
     let block2: Signed<BlockResponse> = ProtocolMessage::try_from(
-        Message::deserialize(SignedMessage::decode(&block.encode().unwrap()).unwrap()).unwrap(),
+        Message::deserialize(SignedMessage::from_bytes(block.to_bytes().into()).unwrap()).unwrap(),
     )
     .unwrap();
 

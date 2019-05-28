@@ -319,7 +319,7 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use crate::messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD};
+    use crate::messages::{RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE};
     use exonum_merkledb::BinaryValue;
 
     let sandbox = timestamping_sandbox();
@@ -332,21 +332,19 @@ fn response_size_larger_than_max_message_len() {
     let tx4 = TimestampingTxGenerator::new(DATA_SIZE + 1).next().unwrap();
 
     assert_eq!(
-        tx1.signed_message().encode().unwrap().len()
-            + tx2.signed_message().encode().unwrap().len()
-            + 1,
-        tx3.signed_message().encode().unwrap().len() + tx4.signed_message().encode().unwrap().len()
+        tx1.signed_message().raw().len() + tx2.signed_message().raw().len() + 1,
+        tx3.signed_message().raw().len() + tx4.signed_message().raw().len()
     );
 
     // Create new config. Set the size of the message to a size
-    // that is slightly larger than message to send the first two transactions.
+    // that is exactly equal to the message to send the first two transactions.
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.consensus.max_message_len = (TX_RES_EMPTY_SIZE
-            + tx1.signed_message().encode().unwrap().len()
-            + TX_RES_PB_OVERHEAD_PAYLOAD
-            + tx2.signed_message().encode().unwrap().len()
-            + TX_RES_PB_OVERHEAD_PAYLOAD) as u32;
+        consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
+            + tx1.signed_message().raw().len()
+            + RAW_TRANSACTION_HEADER
+            + tx2.signed_message().raw().len()
+            + RAW_TRANSACTION_HEADER) as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 

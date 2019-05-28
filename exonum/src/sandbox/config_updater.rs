@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::borrow::Cow;
+
 pub use crate::proto::schema::tests::TxConfig;
 
 use crate::blockchain::{
@@ -22,7 +24,8 @@ use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::helpers::Height;
 use crate::messages::{AnyTx, Message, Signed};
 use crate::proto::ProtobufConvert;
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+use protobuf::Message as PbMessage;
 
 pub const CONFIG_SERVICE: u16 = 1;
 
@@ -64,6 +67,8 @@ impl Transaction for TxConfig {
         Ok(())
     }
 }
+
+impl_binary_value_for_message! { TxConfig }
 
 impl Service for ConfigUpdateService {
     fn service_name(&self) -> &str {

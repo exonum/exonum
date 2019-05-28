@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module implements a *configuration service* for Exonum blockchain framework.
+//! This crate implements a *configuration service* for Exonum blockchain framework.
 //!
 //! Upon being plugged in, the service allows to modify Exonum blockchain configuration
 //! using [proposals](struct.Propose.html) and [voting for proposal](struct.Vote.html),
@@ -32,48 +32,87 @@
 //!
 //! 1. Parse a `StoredConfiguration` from JSON string if necessary.
 //! 2. Convert a `StoredConfiguration` into bytes as per its `StorageValue` implementation.
-//! 3. Use `crate::crypto::hash()` on the obtained bytes.
+//! 3. Use `exonum::crypto::hash()` on the obtained bytes.
 //!
-//! [sc]: https://docs.rs/exonum/0.10.3/exonum/blockchain/config/struct.StoredConfiguration.html
+//! [sc]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html
 //! [docs:config]: https://exonum.com/doc/version/latest/advanced/configuration-updater/
 //!
 //! # Examples
 //!
 //! ```rust,no_run
 //! extern crate exonum;
+//! extern crate exonum_configuration as configuration;
 //!
 //! use exonum::helpers::fabric::NodeBuilder;
 //!
 //! fn main() {
 //!     exonum::helpers::init_logger().unwrap();
 //!     NodeBuilder::new()
+//!         .with_service(Box::new(configuration::ServiceFactory))
 //!         .run();
 //! }
 //! ```
 
-pub use errors::ErrorCode;
-pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
-pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+
+#[macro_use]
+extern crate exonum_derive;
+#[macro_use]
+extern crate failure;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
+#[cfg(test)]
+#[macro_use]
+extern crate assert_matches;
+#[cfg(test)]
+#[macro_use]
+extern crate exonum_testkit;
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
+
+pub use crate::{
+    errors::ErrorCode,
+    schema::{MaybeVote, ProposeData, Schema, VotingDecision},
+    transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst},
+};
 
 use serde_json::{to_value, Value};
 
 use exonum_merkledb::{Fork, Snapshot};
-use crate::{
 
+use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
-    messages::AnyTx,
+    helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
+    messages::RawTransaction,
     node::State,
 };
 
-use config::ConfigurationServiceConfig;
+use crate::{
+    cmd::{Finalize, GenerateCommonConfig},
+    config::ConfigurationServiceConfig,
+};
 
-pub mod api; // TODO: pub only for testing.
-pub mod config; // TODO: pub only for testing.
-pub mod errors; // TODO: pub only for testing.
-pub mod schema; // TODO: pub only for testing.
-pub mod transactions; // TODO: pub only for testing.
+mod api;
+mod cmd;
+mod config;
+mod errors;
+mod proto;
+mod schema;
+#[cfg(test)]
+mod tests;
+mod transactions;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
@@ -124,12 +163,59 @@ impl blockchain::Service for Service {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 
-    fn initialize(&self, _fork: &mut Fork) -> Value {
+    fn initialize(&self, _fork: &Fork) -> Value {
         to_value(self.config.clone()).unwrap()
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
+    }
+}
+
+/// A configuration service creator for the `NodeBuilder`.
+#[derive(Debug)]
+pub struct ServiceFactory;
+
+impl fabric::ServiceFactory for ServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
+    fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
+        Some(match command {
+            v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
+            v if v == fabric::Finalize.name() => Box::new(Finalize),
+            _ => return None,
+        })
+    }
+
+    fn make_service(&mut self, context: &Context) -> Box<dyn blockchain::Service> {
+        let service_config: ConfigurationServiceConfig =
+            context.get(keys::NODE_CONFIG).unwrap().services_configs["configuration_service"]
+                .clone()
+                .try_into()
+                .unwrap();
+
+        if let Some(majority_count) = service_config.majority_count {
+            let validators_count = context
+                .get(keys::NODE_CONFIG)
+                .unwrap()
+                .genesis
+                .validator_keys
+                .len() as u16;
+            let byzantine_majority_count =
+                State::byzantine_majority_count(validators_count as usize) as u16;
+            if majority_count > validators_count || majority_count < byzantine_majority_count {
+                panic!(
+                    "Invalid majority count: {}, it should be >= {} and <= {}",
+                    majority_count, byzantine_majority_count, validators_count
+                );
+            }
+        }
+
+        Box::new(Service {
+            config: service_config,
+        })
     }
 }

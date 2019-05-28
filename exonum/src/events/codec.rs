@@ -17,8 +17,10 @@ use bytes::BytesMut;
 use std::mem;
 use tokio_io::codec::{Decoder, Encoder};
 
-use crate::events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
-use crate::messages::{BinaryForm, SignedMessage, SIGNED_MESSAGE_MIN_SIZE};
+use crate::{
+    events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH},
+    messages::{BinaryValue, SignedMessage, SIGNED_MESSAGE_MIN_SIZE},
+};
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -80,7 +82,7 @@ impl Encoder for MessagesCodec {
     type Error = failure::Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        self.session.encrypt_msg(&msg.encode()?, buf)?;
+        self.session.encrypt_msg(&msg.into_bytes(), buf)?;
         Ok(())
     }
 }
@@ -90,57 +92,14 @@ mod test {
     use bytes::BytesMut;
     use tokio_io::codec::{Decoder, Encoder};
 
+    use crate::{
+        crypto::{gen_keypair, Hash},
+        events::noise::{HandshakeParams, NoiseWrapper},
+        helpers::Height,
+        messages::{BinaryValue, Message, Status, SIGNED_MESSAGE_MIN_SIZE},
+    };
+
     use super::MessagesCodec;
-    use crate::crypto::{gen_keypair, Hash};
-    use crate::events::noise::{HandshakeParams, NoiseWrapper};
-    use crate::helpers::Height;
-    use crate::messages::{BinaryForm, Message, SignedMessage, Status, SIGNED_MESSAGE_MIN_SIZE};
-
-    #[test]
-    fn decode_message_valid_header_size() {
-        let data = vec![0; SIGNED_MESSAGE_MIN_SIZE + 1];
-
-        match get_decoded_message(&data) {
-            Ok(Some(ref message)) if *message == &data[..] => {}
-            _ => panic!("Wrong input"),
-        };
-    }
-
-    #[test]
-    #[should_panic(expected = "Received malicious message with wrong length")]
-    fn decode_message_small_length() {
-        let data = vec![0; SIGNED_MESSAGE_MIN_SIZE - 10];
-
-        get_decoded_message(&data).unwrap();
-    }
-
-    #[test]
-    fn decode_message_eof() {
-        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-
-        let raw = {
-            let (pk, sk) = gen_keypair();
-            let msg = Message::concrete(Status::new(Height(0), &Hash::zero()), pk, &sk);
-            msg.signed_message().clone()
-        };
-        let data = raw.encode().unwrap();
-
-        let mut bytes: BytesMut = BytesMut::new();
-        initiator.encode(raw.clone(), &mut bytes).unwrap();
-        initiator.encode(raw, &mut bytes).unwrap();
-
-        match responder.decode_eof(&mut bytes.clone()) {
-            Ok(Some(ref message)) if *message == &data[..] => {}
-            _ => panic!("Wrong input"),
-        };
-
-        // Emulate EOF behavior.
-        bytes.truncate(1);
-        assert!(responder.decode(&mut bytes).unwrap().is_none());
-
-        bytes.clear();
-        assert!(responder.decode_eof(&mut bytes).unwrap().is_none());
-    }
 
     fn get_decoded_message(data: &[u8]) -> Result<Option<Vec<u8>>, failure::Error> {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
@@ -198,5 +157,51 @@ mod test {
         };
 
         (responder_codec, initiator_codec)
+    }
+
+    #[test]
+    fn decode_message_valid_header_size() {
+        let data = vec![0; SIGNED_MESSAGE_MIN_SIZE + 1];
+
+        match get_decoded_message(&data) {
+            Ok(Some(ref message)) if *message == &data[..] => {}
+            _ => panic!("Wrong input"),
+        };
+    }
+
+    #[test]
+    #[should_panic(expected = "Received malicious message with wrong length")]
+    fn decode_message_small_length() {
+        let data = vec![0; SIGNED_MESSAGE_MIN_SIZE - 10];
+
+        get_decoded_message(&data).unwrap();
+    }
+
+    #[test]
+    fn decode_message_eof() {
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
+
+        let raw = {
+            let (pk, sk) = gen_keypair();
+            let msg = Message::concrete(Status::new(Height(0), &Hash::zero()), pk, &sk);
+            msg.signed_message().clone()
+        };
+        let data = raw.to_bytes();
+
+        let mut bytes: BytesMut = BytesMut::new();
+        initiator.encode(raw.clone(), &mut bytes).unwrap();
+        initiator.encode(raw, &mut bytes).unwrap();
+
+        match responder.decode_eof(&mut bytes.clone()) {
+            Ok(Some(ref message)) if *message == &data[..] => {}
+            _ => panic!("Wrong input"),
+        };
+
+        // Emulate EOF behavior.
+        bytes.truncate(1);
+        assert!(responder.decode(&mut bytes).unwrap().is_none());
+
+        bytes.clear();
+        assert!(responder.decode_eof(&mut bytes).unwrap().is_none());
     }
 }

@@ -28,17 +28,19 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::{net::SocketAddr, thread, time::Duration};
 
-use crate::crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
-use crate::events::{
-    error::into_failure,
-    noise::{
-        wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
-        Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
-        NoiseWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
+use crate::{
+    crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
+    events::{
+        error::into_failure,
+        noise::{
+            wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
+            Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+            NoiseWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
+        },
+        tests::raw_message,
     },
-    tests::raw_message,
+    messages::BinaryValue,
 };
-use crate::messages::BinaryForm;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -164,7 +166,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     let message = raw_message(msg_size);
 
     initiator
-        .encrypt_msg(&message.encode().unwrap(), &mut buffer_msg)
+        .encrypt_msg(&message.to_bytes(), &mut buffer_msg)
         .unwrap_or_else(|e| panic!("Unable to encrypt message with size {}: {}", msg_size, e));
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
@@ -172,7 +174,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     let res = responder
         .decrypt_msg(len, &mut buffer_msg)
         .unwrap_or_else(|e| panic!("Unable to decrypt message with size {}: {}", msg_size, e));
-    assert_eq!(&message.encode().unwrap(), &res);
+    assert_eq!(&message.to_bytes(), &res);
 }
 
 fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {

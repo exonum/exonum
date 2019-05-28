@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::crypto::Hash;
-use crate::messages::{BinaryForm, MethodId};
+use crate::messages::MethodId;
 use crate::runtime::{error::ExecutionError, rust::TransactionContext, RuntimeIdentifier};
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
 use failure::Error;
 use protobuf::well_known_types::Any;
@@ -69,14 +69,14 @@ impl GenesisInitInfo {
     pub fn with_init_tx(
         artifact: RustArtifactSpec,
         service_name: &str,
-        init_tx: impl BinaryForm,
+        init_tx: impl BinaryValue,
     ) -> Self {
         Self {
             artifact,
             service_name: service_name.to_owned(),
             service_constructor: {
                 let mut any = Any::new();
-                any.set_value(init_tx.encode().unwrap());
+                any.set_value(init_tx.into_bytes());
                 any
             },
         }

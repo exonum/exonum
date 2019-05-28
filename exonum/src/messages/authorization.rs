@@ -1,16 +1,15 @@
+use exonum_merkledb::{BinaryValue, ObjectHash};
 use failure::Error;
 use hex::{FromHex, ToHex};
-
-use std::fmt;
-
-use crate::crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature};
-use crate::messages::BinaryForm;
-use crate::proto::{self, ProtobufConvert};
-
-use exonum_merkledb::BinaryValue;
 use protobuf::Message;
 use serde::de::{self, Deserialize, Deserializer};
-use std::borrow::Cow;
+
+use std::{borrow::Cow, fmt};
+
+use crate::{
+    crypto::{self, hash, Hash, PublicKey, SecretKey, Signature},
+    proto::{self, ProtobufConvert},
+};
 
 /// `SignedMessage` will verify the size of the buffer and the signature provided in it.
 /// This allows to keep the raw message buffer, but avoid verifying its signature again
@@ -91,32 +90,21 @@ impl ProtobufConvert for SignedMessage {
     }
 }
 
-impl BinaryForm for SignedMessage {
-    fn encode(&self) -> std::result::Result<Vec<u8>, Error> {
-        self.to_pb().write_to_bytes().map_err(Error::from)
-    }
-
-    fn decode(buffer: &[u8]) -> std::result::Result<Self, Error> {
-        let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-        pb.merge_from_bytes(buffer)?;
-        Self::from_pb(pb)
-    }
-}
-
+/// Warning: This implementation checks signature which is slow operation.
 impl BinaryValue for SignedMessage {
     fn to_bytes(&self) -> Vec<u8> {
-        self.encode().unwrap()
+        self.to_pb().write_to_bytes().unwrap()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
         pb.merge_from_bytes(&value)?;
-        Self::from_pb_no_verify(pb)
+        Self::from_pb(pb)
     }
 }
 
-impl CryptoHash for SignedMessage {
-    fn hash(&self) -> Hash {
+impl ObjectHash for SignedMessage {
+    fn object_hash(&self) -> Hash {
         let mut buff = Vec::new();
         buff.extend_from_slice(&self.exonum_msg);
         buff.extend_from_slice(self.key.as_ref());
@@ -158,15 +146,11 @@ impl<'de> Deserialize<'de> for SignedMessage {
 
 impl ToHex for SignedMessage {
     fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.encode()
-            .map_err(|_| std::fmt::Error)
-            .and_then(|v| v.write_hex(w))
+        self.to_bytes().write_hex(w)
     }
 
     fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.encode()
-            .map_err(|_| std::fmt::Error)
-            .and_then(|v| v.write_hex_upper(w))
+        self.to_bytes().write_hex_upper(w)
     }
 }
 
@@ -176,6 +160,6 @@ impl FromHex for SignedMessage {
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<SignedMessage, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        Self::decode(&bytes).map_err(Error::from)
+        Self::from_bytes(bytes.into()).map_err(Error::from)
     }
 }

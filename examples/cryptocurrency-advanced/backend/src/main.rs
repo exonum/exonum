@@ -19,6 +19,7 @@ fn main() {
     exonum::crypto::init();
     exonum::helpers::init_logger().unwrap();
 
-    let node = NodeBuilder::new().with_service(Box::new(cryptocurrency::CryptocurrencyServiceFactory));
+    let node =
+        NodeBuilder::new().with_service(Box::new(cryptocurrency::CryptocurrencyServiceFactory));
     node.run();
 }

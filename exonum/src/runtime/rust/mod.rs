@@ -15,6 +15,7 @@
 use semver::Version;
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     panic,
 };
@@ -32,9 +33,9 @@ use super::{
 };
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::{BinaryForm, CallInfo};
+use crate::messages::CallInfo;
 use crate::proto::schema;
-use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
 
 use self::service::{Service, ServiceFactory};
 use crate::api::ServiceApiBuilder;
@@ -91,7 +92,8 @@ impl RustRuntime {
             return None;
         }
 
-        let rust_artifact_spec: RustArtifactSpec = BinaryForm::decode(&artifact.raw_spec).ok()?;
+        let rust_artifact_spec: RustArtifactSpec =
+            BinaryValue::from_bytes(Cow::Borrowed(&artifact.raw_spec)).ok()?;
 
         Some(rust_artifact_spec)
     }
@@ -140,7 +142,7 @@ impl RustArtifactSpec {
 
     pub fn into_pb_any(&self) -> Any {
         let mut any = Any::new();
-        any.set_value(self.encode().unwrap());
+        any.set_value(self.to_bytes());
         any
     }
 }
@@ -294,7 +296,7 @@ impl RuntimeEnvironment for RustRuntime {
                 .execute(
                     &mut ctx,
                     CallInfo::new(SERVICE_ID, DEPLOY_METHOD_ID),
-                    &deploy_tx.encode().unwrap(),
+                    &deploy_tx.to_bytes(),
                 )
                 .map_err(|e| format_err!("Rust runtime genesis deploy error: {:?}", e))?
         }
@@ -303,7 +305,7 @@ impl RuntimeEnvironment for RustRuntime {
                 .execute(
                     &mut ctx,
                     CallInfo::new(SERVICE_ID, INIT_METHOD_ID),
-                    &init_tx.encode().unwrap(),
+                    &init_tx.to_bytes(),
                 )
                 .map_err(|e| format_err!("Rust runtime genesis init error: {:?}", e))?
         }

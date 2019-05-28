@@ -14,12 +14,16 @@
 
 use std::mem;
 
-use super::NodeHandler;
-use crate::blockchain::Schema;
-use crate::messages::{
-    BinaryForm, BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
-    TransactionsRequest, TransactionsResponse, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
+use crate::{
+    blockchain::Schema,
+    messages::{
+        BinaryValue, BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests,
+        Signed, TransactionsRequest, TransactionsResponse, TX_RES_EMPTY_SIZE,
+        TX_RES_PB_OVERHEAD_PAYLOAD,
+    },
 };
+
+use super::NodeHandler;
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
 // TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)
@@ -83,7 +87,7 @@ impl NodeHandler {
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
-                let raw = tx.signed_message().encode().unwrap();
+                let raw = tx.signed_message().to_bytes();
                 if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
                         &msg.author(),
@@ -152,7 +156,7 @@ impl NodeHandler {
             block,
             precommits
                 .iter()
-                .map(|p| p.signed_message().encode().unwrap())
+                .map(|p| p.signed_message().to_bytes())
                 .collect(),
             &transactions.iter().collect::<Vec<_>>(),
         ));

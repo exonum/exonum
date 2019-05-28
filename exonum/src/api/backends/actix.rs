@@ -38,10 +38,11 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::api::manager::{ApiManager, RestartServer};
 use crate::api::{
-    error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
-    Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+    error::Error as ApiError,
+    manager::{ApiManager, RestartServer},
+    ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable, Mutable, NamedWith,
+    Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.

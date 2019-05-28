@@ -63,9 +63,3 @@ impl From<failure::Error> for Error {
         Error::InternalError(e)
     }
 }
-
-//impl From<storage::Error> for Error {
-//    fn from(e: storage::Error) -> Self {
-//        Error::Storage(e)
-//    }
-//}

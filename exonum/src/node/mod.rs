@@ -25,8 +25,9 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
+use exonum_merkledb::{Database, DbOptions};
 use failure::Error;
-use futures::{sync::mpsc, Future, Sink};
+use futures::{sync::mpsc, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
@@ -41,31 +42,32 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::api::{
-    backends::actix::{
-        AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntime, SystemRuntimeConfig,
+use crate::{
+    api::{
+        backends::actix::{
+            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntime, SystemRuntimeConfig,
+        },
+        ApiAccess, ApiAggregator,
     },
-    ApiAccess, ApiAggregator,
+    blockchain::{
+        Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState, ValidatorKeys,
+    },
+    crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey},
+    events::{
+        error::{into_failure, LogError},
+        noise::HandshakeParams,
+        HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
+        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest, UnboundedSyncSender,
+    },
+    helpers::{
+        config::ConfigManager,
+        fabric::{NodePrivateConfig, NodePublicConfig},
+        user_agent, Height, Milliseconds, Round, ValidatorId,
+    },
+    messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage},
+    node::state::SharedConnectList,
+    runtime::rust::service::ServiceFactory,
 };
-use crate::blockchain::{
-    Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState, ValidatorKeys,
-};
-use crate::crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
-use crate::events::{
-    error::{into_failure, LogError},
-    noise::HandshakeParams,
-    HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
-    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
-};
-use crate::helpers::{
-    config::ConfigManager,
-    fabric::{NodePrivateConfig, NodePublicConfig},
-    user_agent, Height, Milliseconds, Round, ValidatorId,
-};
-use crate::messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage};
-use crate::node::state::SharedConnectList;
-use crate::runtime::rust::service::ServiceFactory;
-use exonum_merkledb::{Database, DbOptions};
 
 mod basic;
 mod connect_list;
@@ -116,7 +118,7 @@ pub trait SystemStateProvider: ::std::fmt::Debug + Send + 'static {
 
 /// Transactions sender.
 #[derive(Clone)]
-pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
+pub struct ApiSender(pub mpsc::UnboundedSender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
 pub struct NodeHandler {
@@ -342,7 +344,7 @@ pub struct NodeSender {
     /// Network requests sender.
     pub network_requests: SyncSender<NetworkRequest>,
     /// Api requests sender.
-    pub api_requests: SyncSender<ExternalMessage>,
+    pub api_requests: UnboundedSyncSender<ExternalMessage>,
 }
 
 /// Node role.
@@ -782,7 +784,7 @@ impl fmt::Debug for NodeHandler {
 
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
-    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
+    pub fn new(inner: mpsc::UnboundedSender<ExternalMessage>) -> Self {
         ApiSender(inner)
     }
 
@@ -796,11 +798,11 @@ impl ApiSender {
     pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
         self.0
             .clone()
-            .send(message)
-            .wait()
+            .unbounded_send(message)
             .map(drop)
             .map_err(into_failure)
     }
+
     /// Broadcast transaction to other node.
     pub fn broadcast_transaction(&self, tx: Signed<AnyTx>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
@@ -855,8 +857,8 @@ pub struct NodeChannel {
     ),
     /// Channel for api requests.
     pub api_requests: (
-        mpsc::Sender<ExternalMessage>,
-        mpsc::Receiver<ExternalMessage>,
+        mpsc::UnboundedSender<ExternalMessage>,
+        mpsc::UnboundedReceiver<ExternalMessage>,
     ),
     /// Channel for network events.
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
@@ -881,7 +883,7 @@ impl NodeChannel {
         Self {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
-            api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
+            api_requests: mpsc::unbounded(), // TODO ECR-3163
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
             internal_events: mpsc::channel(buffer_sizes.internal_events_capacity),
         }
@@ -1104,6 +1106,8 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::*;
     use crate::blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
@@ -1112,7 +1116,10 @@ mod tests {
     use crate::events::EventHandler;
     use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
-    use exonum_merkledb::{Database, Snapshot, TemporaryDB};
+    use exonum_merkledb::{
+        impl_binary_value_for_message, BinaryValue, Database, Snapshot, TemporaryDB,
+    };
+    use protobuf::Message as ProtobufMessage;
 
     const SERVICE_ID: u16 = 0;
 
@@ -1121,6 +1128,8 @@ mod tests {
     enum SimpleTransactions {
         TxSimple(TxSimple),
     }
+
+    impl_binary_value_for_message! { TxSimple }
 
     impl Transaction for TxSimple {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

@@ -18,6 +18,8 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
+use std::borrow::Cow;
+
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},

@@ -18,12 +18,15 @@ extern crate exonum_testkit;
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
+
+use std::borrow::Cow;
+
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey},
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Message, Signed},
 };
 use exonum_merkledb::Snapshot;

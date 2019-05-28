@@ -31,6 +31,10 @@
 //!              (drop)                           (drop)
 //! ```
 
+pub use self::{authorization::SignedMessage, helpers::to_hex_string, protocol::*};
+pub use exonum_merkledb::BinaryValue;
+
+use exonum_merkledb::ObjectHash;
 use failure::Error;
 use hex::{FromHex, ToHex};
 use serde::{
@@ -40,15 +44,9 @@ use serde::{
 
 use std::{borrow::Cow, fmt, ops::Deref};
 
-use crate::crypto::{CryptoHash, Hash, PublicKey, Signature};
+use crate::crypto::{Hash, PublicKey, Signature};
 
 pub(crate) use self::helpers::HexStringRepresentation;
-pub use self::{
-    authorization::SignedMessage,
-    helpers::{to_hex_string, BinaryForm},
-    protocol::*,
-};
-use exonum_merkledb::BinaryValue;
 
 mod authorization;
 mod helpers;
@@ -112,9 +110,9 @@ impl<T> Signed<T> {
     }
 }
 
-impl<T: ProtocolMessage> CryptoHash for Signed<T> {
-    fn hash(&self) -> Hash {
-        self.message.hash()
+impl<T: ProtocolMessage> ObjectHash for Signed<T> {
+    fn object_hash(&self) -> Hash {
+        self.message.object_hash()
     }
 }
 
@@ -161,7 +159,7 @@ impl<X: ProtocolMessage> FromHex for Signed<X> {
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        let protocol = Message::deserialize(SignedMessage::decode(&bytes)?)?;
+        let protocol = Message::deserialize(SignedMessage::from_bytes(bytes.into())?)?;
         ProtocolMessage::try_from(protocol)
             .map_err(|_| format_err!("Couldn't deserialize message."))
     }
@@ -194,29 +192,13 @@ impl<T> Deref for Signed<T> {
 
 impl<T: ProtocolMessage> BinaryValue for Signed<T> {
     fn to_bytes(&self) -> Vec<u8> {
-        self.message.exonum_message().to_vec()
-    }
-
-    fn into_bytes(self) -> Vec<u8> {
-        self.encode().unwrap()
+        self.message.to_bytes()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_bytes(value)?;
         let msg = Message::deserialize(message).unwrap();
         Ok(T::try_from(msg).unwrap())
-    }
-}
-
-impl<T: ProtocolMessage> BinaryForm for Signed<T> {
-    fn encode(&self) -> Result<Vec<u8>, failure::Error> {
-        self.message.encode()
-    }
-
-    fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
-        let message = SignedMessage::decode(buffer)?;
-        let msg = Message::deserialize(message)?;
-        T::try_from(msg).map_err(|_| format_err!("Wrong message type"))
     }
 }
 

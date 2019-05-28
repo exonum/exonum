@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_merkledb::BinaryValue;
 use futures::{
     future::{self, Either, Executor},
     sync::mpsc,
     Future, Sink, Stream,
 };
-
 use tokio_core::reactor::{Handle, Timeout};
 
 use std::time::{Duration, SystemTime};
 
+use crate::messages::{Message, SignedMessage};
+
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use crate::messages::{BinaryForm, Message, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -50,7 +51,7 @@ impl InternalPart {
         raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(move || SignedMessage::decode(&raw).and_then(Message::deserialize))
+        future::lazy(|| SignedMessage::from_bytes(raw.into()).and_then(Message::deserialize))
             .map_err(drop)
             .and_then(|protocol| {
                 let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
@@ -120,10 +121,13 @@ mod tests {
 
     use std::thread;
 
+    use crate::{
+        crypto::{gen_keypair, Hash, Signature},
+        helpers::Height,
+        messages::{Message, Status},
+    };
+
     use super::*;
-    use crate::crypto::{gen_keypair, Hash, Signature};
-    use crate::helpers::Height;
-    use crate::messages::{BinaryForm, Message, Status};
 
     fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, internal_rx) = mpsc::channel(16);
@@ -164,7 +168,7 @@ mod tests {
 
         let expected_event =
             InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
-        let event = verify_message(tx.encode().unwrap());
+        let event = verify_message(tx.into_bytes());
         assert_eq!(event, Some(expected_event));
     }
 
@@ -173,7 +177,7 @@ mod tests {
         let mut tx = get_signed_message();
         *tx.signature_mut() = Signature::zero();
 
-        let event = verify_message(tx.encode().unwrap());
+        let event = verify_message(tx.into_bytes());
         assert_eq!(event, None);
     }
 }

@@ -28,6 +28,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Message, Signed},
 };
+use exonum_merkledb::ObjectHash;
 
 use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
@@ -201,7 +202,7 @@ fn main() {
 
     // JSON serialization for committed transactions
     let committed_tx: TransactionInfo = explorer
-        .transaction(&block[0].content().signed_message().hash())
+        .transaction(&block[0].content().signed_message().object_hash())
         .unwrap();
     let tx_ref = committed_tx.as_committed().unwrap();
     assert_eq!(

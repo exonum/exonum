@@ -14,18 +14,15 @@
 
 //! Cryptocurrency transactions.
 
-// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
-// ECR-1771 for the details.
-#![allow(bare_trait_objects)]
-
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
     messages::{AnyTx, Message, Signed},
 };
 
-use super::proto;
 use crate::{schema::Schema, CRYPTOCURRENCY_SERVICE_ID};
+
+use super::proto;
 
 pub const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
 

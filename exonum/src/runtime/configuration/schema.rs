@@ -13,21 +13,17 @@
 // limitations under the License.
 
 //! Storage schema for the configuration service.
-use crate::{
-    crypto::{self, CryptoHash, Hash, HASH_SIZE},
-    proto,
-};
+
 use exonum_merkledb::{
     impl_object_hash_for_binary_value, BinaryValue, IndexAccess, ObjectHash, ProofListIndex,
     ProofMapIndex,
 };
 
-
-// use exonum_merkledb::{Fork, ProofListIndex, ProofMapIndex, Snapshot, BinaryValue};
+use exonum::crypto::{self, CryptoHash, Hash, HASH_SIZE};
 
 use std::{borrow::Cow, ops::Deref};
 
-use super::transactions::Propose;
+use crate::{proto, transactions::Propose};
 
 const YEA_TAG: u8 = 1;
 const NAY_TAG: u8 = 2;
@@ -47,7 +43,7 @@ define_names! {
 
 /// Extended information about a proposal used for the storage.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::schema::configuration::ProposeData", crate = "crate")]
+#[exonum(pb = "proto::ProposeData")]
 pub struct ProposeData {
     /// Proposal transaction.
     pub tx_propose: Propose,
@@ -68,7 +64,9 @@ impl ProposeData {
     }
 }
 
-static NO_VOTE_BYTES: [u8; 1] = [0u8];
+lazy_static! {
+    static ref NO_VOTE_BYTES: Vec<u8> = vec![0_u8];
+}
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
@@ -182,12 +180,12 @@ impl BinaryValue for MaybeVote {
     fn to_bytes(&self) -> Vec<u8> {
         match self.0 {
             Some(v) => v.into_bytes(),
-            None => NO_VOTE_BYTES.to_vec(),
+            None => NO_VOTE_BYTES.clone(),
         }
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let res = if NO_VOTE_BYTES.eq(bytes.as_ref()) {
+        let res = if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
             MaybeVote::some(
@@ -204,7 +202,7 @@ impl_object_hash_for_binary_value! { MaybeVote }
 /// Database schema used by the configuration service.
 #[derive(Debug)]
 pub struct Schema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T> Schema<T>
@@ -212,8 +210,8 @@ where
     T: IndexAccess,
 {
     /// Creates a new schema.
-    pub fn new(snapshot: T) -> Schema<T> {
-        Schema { view: snapshot }
+    pub fn new(access: T) -> Schema<T> {
+        Schema { access }
     }
 
     /// Returns propose information indexed by the hash of the configuration corresponding
@@ -222,18 +220,18 @@ where
     /// Consult [the crate-level docs](index.html) for details how hashes of the configuration
     /// are calculated.
     pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<T, Hash, ProposeData> {
-        ProofMapIndex::new(PROPOSES, self.view)
+        ProofMapIndex::new(PROPOSES, self.access.clone())
     }
 
     /// Returns a table of hashes of proposed configurations in the commit order.
     pub fn config_hash_by_ordinal(&self) -> ProofListIndex<T, Hash> {
-        ProofListIndex::new(PROPOSE_HASHES, self.view)
+        ProofListIndex::new(PROPOSE_HASHES, self.access.clone())
     }
 
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
     pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<T, MaybeVote> {
-        ProofListIndex::new_in_family(VOTES, config_hash, self.view)
+        ProofListIndex::new_in_family(VOTES, config_hash, self.access.clone())
     }
 
     /// Returns a `Propose` transaction with a particular configuration hash.
