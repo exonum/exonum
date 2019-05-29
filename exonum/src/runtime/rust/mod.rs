@@ -27,7 +27,7 @@ use crate::{
     crypto::{Hash, PublicKey},
     messages::CallInfo,
     proto::schema,
-    runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID},
+    runtime::configuration_new::{INIT_METHOD_ID, SERVICE_ID},
     runtime::dispatcher::Dispatcher,
 };
 
@@ -277,42 +277,7 @@ impl RuntimeEnvironment for RustRuntime {
         }
     }
 
-    fn genesis_init(&self, fork: &Fork) -> Result<(), failure::Error> {
-        let (deploy_txs, init_txs) = self.inner.services.iter().fold(
-            (Vec::new(), Vec::new()),
-            |(mut deploy_txs, mut init_txs), (_, s)| {
-                let init_info = s.genesis_init_info();
-                if !init_info.is_empty() {
-                    deploy_txs.push(init_info[0].get_deploy_tx());
-                }
-                init_txs.extend(init_info.into_iter().map(|i| i.get_init_tx()));
-                (deploy_txs, init_txs)
-            },
-        );
-
-        let mut ctx = RuntimeContext::new(fork, &PublicKey::zero(), &Hash::zero());
-        for deploy_tx in deploy_txs.into_iter() {
-            self.get_dispatcher()
-                .execute(
-                    &mut ctx,
-                    CallInfo::new(SERVICE_ID, DEPLOY_METHOD_ID),
-                    &deploy_tx.to_bytes(),
-                )
-                .map_err(|e| format_err!("Rust runtime genesis deploy error: {:?}", e))?
-        }
-        for init_tx in init_txs.into_iter() {
-            self.get_dispatcher()
-                .execute(
-                    &mut ctx,
-                    CallInfo::new(SERVICE_ID, INIT_METHOD_ID),
-                    &init_tx.to_bytes(),
-                )
-                .map_err(|e| format_err!("Rust runtime genesis init error: {:?}", e))?
-        }
-        Ok(())
-    }
-
-    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         self.inner
             .initialized
             .iter()

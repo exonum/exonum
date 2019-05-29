@@ -201,7 +201,7 @@ pub mod contracts {
         blockchain::ExecutionResult,
         impl_service_dispatcher,
         runtime::rust::{
-            service::{GenesisInitInfo, Service, ServiceFactory},
+            service::{Service, ServiceFactory},
             RustArtifactSpec, TransactionContext,
         },
     };

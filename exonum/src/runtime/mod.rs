@@ -104,11 +104,7 @@ pub trait RuntimeEnvironment {
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(&self, fork: &Fork);
 
-    fn genesis_init(&self, _ctx: &Fork) -> Result<(), failure::Error> {
-        Ok(())
-    }
-
-    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
     }
 }

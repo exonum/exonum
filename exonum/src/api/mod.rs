@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! API and corresponding utilities.
+
 pub use self::{
     error::Error,
     state::ServiceApiState,
@@ -24,15 +25,18 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeMap, fmt};
 
 use self::{backends::actix, node::public::ExplorerApi};
-use crate::blockchain::{Blockchain, SharedNodeState};
-use crate::crypto::PublicKey;
-use crate::node::ApiSender;
-use crate::runtime::RuntimeEnvironment;
+use crate::{
+    blockchain::{Blockchain, SharedNodeState},
+    crypto::PublicKey,
+    node::ApiSender,
+    runtime::RuntimeEnvironment,
+};
 
 pub mod backends;
 pub mod error;
 pub mod manager;
 pub mod node;
+
 mod state;
 pub(crate) mod websocket;
 mod with;
@@ -347,7 +351,7 @@ impl ApiAggregator {
         let dispatcher = self.blockchain.dispatcher.lock().expect("Dispatcher lock");
         inner.extend(
             dispatcher
-                .get_services_api()
+                .services_api()
                 .into_iter()
                 .map(|(name, mut builder)| {
                     builder.set_blockchain(blockchain.clone());

@@ -246,10 +246,6 @@ impl Blockchain {
                         &config_init_data,
                     )
                     .expect("Config service init");
-
-                dispatcher
-                    .genesis_init(&mut fork)
-                    .expect("Services init error");
             }
 
             // Commit actual configuration

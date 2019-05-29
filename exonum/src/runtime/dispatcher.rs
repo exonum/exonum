@@ -162,18 +162,11 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn genesis_init(&self, fork: &Fork) -> Result<(), failure::Error> {
-        self.runtimes
-            .iter()
-            .map(|(_, v)| v.genesis_init(fork))
-            .collect()
-    }
-
-    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         self.runtimes
             .iter()
             .fold(Vec::new(), |mut api, (_, runtime)| {
-                api.append(&mut runtime.get_services_api());
+                api.append(&mut runtime.services_api());
                 api
             })
     }

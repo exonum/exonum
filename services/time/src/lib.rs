@@ -47,7 +47,7 @@ use exonum::{
     helpers::fabric::{self, Context},
     impl_service_dispatcher,
     runtime::rust::{
-        service::{GenesisInitInfo, Service, ServiceFactory},
+        service::{Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
     },
 };
@@ -145,10 +145,6 @@ impl ServiceFactory for ServiceFactoryImpl {
 
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(TimeServiceImpl::new())
-    }
-
-    fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
-        vec![]
     }
 }
 
