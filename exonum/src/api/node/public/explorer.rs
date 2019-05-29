@@ -165,9 +165,11 @@ impl ExplorerApi {
 
         let (upper, upper_bound) = if let Some(upper) = query.latest {
             if upper > explorer.height() {
-                return Err(ApiError::NotFound(
-                    "Requested latest height is not found".to_string(),
-                ));
+                return Err(ApiError::NotFound(format!(
+                    "Requested latest height {} is greater than the current blockchain height {}",
+                    upper,
+                    explorer.height()
+                )));
             }
             (upper, Bound::Included(upper))
         } else {
