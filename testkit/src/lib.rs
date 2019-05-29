@@ -180,7 +180,7 @@ use exonum::{
     messages::{AnyTx, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
 };
-use exonum_merkledb::{Database, Patch, Snapshot, TemporaryDB, ObjectHash};
+use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
