@@ -19,7 +19,7 @@ use semver::Version;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    panic,
+    fmt, panic,
 };
 
 use crate::{
@@ -34,8 +34,8 @@ use crate::{
 use self::service::{Service, ServiceFactory};
 use super::{
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, ServiceConstructor, RuntimeContext, RuntimeEnvironment,
-    RuntimeIdentifier, ServiceInstanceId,
+    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+    ServiceConstructor, ServiceInstanceId,
 };
 
 #[macro_use]
@@ -47,15 +47,6 @@ pub mod tests;
 pub struct RustRuntime {
     inner: RustRuntimeInner,
     dispatcher: *mut Dispatcher,
-}
-
-impl RustRuntime {
-    pub fn new(dispatcher: &mut Dispatcher) -> Self {
-        Self {
-            inner: Default::default(),
-            dispatcher: &mut *dispatcher,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -87,7 +78,14 @@ impl AsMut<dyn Service + 'static> for InitializedService {
 }
 
 impl RustRuntime {
-    fn parse_artifact(&self, artifact: ArtifactSpec) -> Option<RustArtifactSpec> {
+    pub fn new(dispatcher: &mut Dispatcher) -> Self {
+        Self {
+            inner: Default::default(),
+            dispatcher: &mut *dispatcher,
+        }
+    }
+
+    fn parse_artifact(&self, artifact: &ArtifactSpec) -> Option<RustArtifactSpec> {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return None;
         }
@@ -98,10 +96,41 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+    pub(crate) fn add_builtin_service(
+        &mut self,
+        dispatcher: &mut Dispatcher,
+        service_factory: Box<dyn ServiceFactory>,
+        instance_id: ServiceInstanceId,
+        instance_name: impl Into<String>,
+    ) {
+        let artifact = service_factory.artifact();
+        let service_instance = InitializedService {
+            id: instance_id,
+            service: service_factory.new_instance(),
+        };
+
+        info!(
+            "Added builtin service factory {} with instance: {}/{}",
+            artifact,
+            instance_name.into(),
+            instance_id
+        );
+        // Registers service instance in runtime.
         self.inner
             .services
-            .insert(service_factory.artifact(), service_factory);
+            .insert(artifact.clone(), service_factory);
+        self.inner.deployed.insert(artifact.clone());
+        self.inner.initialized.insert(instance_id, service_instance);
+        // Registers service instance in dispatcher.
+        dispatcher.notify_service_started(instance_id, artifact.into());
+    }
+
+    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+        let artifact = service_factory.artifact();
+
+        info!("Added service factory {}", artifact);
+
+        self.inner.services.insert(artifact, service_factory);
     }
 
     #[allow(unsafe_code)]
@@ -147,11 +176,19 @@ impl RustArtifactSpec {
     }
 }
 
+impl fmt::Display for RustArtifactSpec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.name, self.version)
+    }
+}
+
 impl RuntimeEnvironment for RustRuntime {
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
-            .parse_artifact(artifact)
+            .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
+
+        trace!("Start deploy service: {}", artifact);
 
         let inner = &mut self.inner;
 
@@ -171,7 +208,7 @@ impl RuntimeEnvironment for RustRuntime {
         _cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         let artifact = self
-            .parse_artifact(artifact)
+            .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
         let inner = &self.inner;
@@ -190,8 +227,14 @@ impl RuntimeEnvironment for RustRuntime {
         init: &ServiceConstructor,
     ) -> Result<(), InitError> {
         let artifact = self
-            .parse_artifact(artifact)
+            .parse_artifact(&artifact)
             .ok_or(InitError::WrongArtifact)?;
+
+        trace!(
+            "New service {} instance with id: {}",
+            artifact,
+            init.instance_id
+        );
 
         if !self.inner.deployed.contains(&artifact) {
             return Err(InitError::NotDeployed);

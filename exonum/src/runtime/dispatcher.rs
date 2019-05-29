@@ -25,7 +25,7 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
-    ArtifactSpec, DeployStatus, ServiceConstructor, RuntimeContext, RuntimeEnvironment,
+    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, ServiceConstructor,
     ServiceInstanceId,
 };
 
@@ -66,7 +66,11 @@ impl Dispatcher {
         self.runtimes.insert(id, runtime.into());
     }
 
-    fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
+    pub(crate) fn notify_service_started(
+        &mut self,
+        service_id: ServiceInstanceId,
+        artifact: ArtifactSpec,
+    ) {
         self.runtime_lookup.insert(service_id, artifact.runtime_id);
     }
 }
