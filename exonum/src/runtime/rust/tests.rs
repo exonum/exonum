@@ -135,7 +135,7 @@ fn test_basic_rust_runtime() {
 
     let service_factory = Box::new(TestServiceFactory);
     let artifact: ArtifactSpec = service_factory.artifact().into();
-    runtime.add_service(service_factory);
+    runtime.add_service_factory(service_factory);
 
     // Deploy service
     assert!(runtime.start_deploy(artifact.clone()).is_ok());

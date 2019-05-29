@@ -87,7 +87,7 @@ impl AsMut<dyn Service + 'static> for InitializedService {
 }
 
 impl RustRuntime {
-    fn get_artifact_spec(&self, artifact: ArtifactSpec) -> Option<RustArtifactSpec> {
+    fn parse_artifact(&self, artifact: ArtifactSpec) -> Option<RustArtifactSpec> {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return None;
         }
@@ -98,7 +98,7 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    pub fn add_service(&mut self, service_factory: Box<dyn ServiceFactory>) {
+    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         self.inner
             .services
             .insert(service_factory.artifact(), service_factory);
@@ -150,7 +150,7 @@ impl RustArtifactSpec {
 impl RuntimeEnvironment for RustRuntime {
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
-            .get_artifact_spec(artifact)
+            .parse_artifact(artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
         let inner = &mut self.inner;
@@ -171,7 +171,7 @@ impl RuntimeEnvironment for RustRuntime {
         _cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         let artifact = self
-            .get_artifact_spec(artifact)
+            .parse_artifact(artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
         let inner = &self.inner;
@@ -190,7 +190,7 @@ impl RuntimeEnvironment for RustRuntime {
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
         let artifact = self
-            .get_artifact_spec(artifact)
+            .parse_artifact(artifact)
             .ok_or(InitError::WrongArtifact)?;
 
         if !self.inner.deployed.contains(&artifact) {

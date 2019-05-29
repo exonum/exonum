@@ -310,7 +310,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
 impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
 
 impl Service for ConfigurationServiceImpl {
-    fn initialize(&mut self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
         let arg: ConfigurationServiceInit = BinaryValue::from_bytes(arg.get_value().into())
             .map_err(|e| {
                 ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
@@ -354,7 +354,7 @@ impl ConfigurationServiceFactory {
         let config_factory = Self {
             dispatcher: &mut *dispatcher,
         };
-        rust_runtime.add_service(Box::new(config_factory))
+        rust_runtime.add_service_factory(Box::new(config_factory))
     }
 }
 

@@ -30,7 +30,7 @@ use super::{
 };
 
 pub struct Dispatcher {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
     // TODO Is RefCell enough here?
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
     inner_requests_tx: mpsc::Sender<InternalRequest>,
@@ -43,27 +43,27 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(request_tx: mpsc::Sender<InternalRequest>) -> Pin<Box<Self>> {
+    pub fn new(inner_requests_tx: mpsc::Sender<InternalRequest>) -> Pin<Box<Self>> {
         Pin::new(Box::new(Self {
             runtimes: Default::default(),
             runtime_lookup: Default::default(),
-            inner_requests_tx: request_tx,
+            inner_requests_tx,
         }))
     }
 
-    pub fn new_with_runtimes(
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
-        request_tx: mpsc::Sender<InternalRequest>,
+    pub fn with_runtimes(
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+        inner_requests_tx: mpsc::Sender<InternalRequest>,
     ) -> Pin<Box<Self>> {
         Pin::new(Box::new(Self {
             runtimes,
             runtime_lookup: Default::default(),
-            inner_requests_tx: request_tx,
+            inner_requests_tx,
         }))
     }
 
-    pub fn add_runtime(&mut self, id: u32, runtime: Box<dyn RuntimeEnvironment + Send>) {
-        self.runtimes.insert(id, runtime);
+    pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn RuntimeEnvironment>>) {
+        self.runtimes.insert(id, runtime.into());
     }
 
     fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
@@ -174,14 +174,18 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::messages::{MethodId, ServiceInstanceId};
-    use crate::runtime::RuntimeIdentifier;
     use exonum_merkledb::{Database, TemporaryDB};
+
+    use crate::{
+        messages::{MethodId, ServiceInstanceId},
+        runtime::RuntimeIdentifier,
+    };
+
+    use super::*;
 
     #[derive(Default)]
     pub struct DispatcherBuilder {
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
     }
 
     impl std::fmt::Debug for DispatcherBuilder {
@@ -194,7 +198,7 @@ mod tests {
         pub fn with_runtime(
             mut self,
             runtime_id: u32,
-            runtime: Box<dyn RuntimeEnvironment + Send>,
+            runtime: Box<dyn RuntimeEnvironment>,
         ) -> Self {
             self.runtimes.insert(runtime_id, runtime);
 
@@ -203,7 +207,7 @@ mod tests {
 
         pub fn finalize(self) -> Pin<Box<Dispatcher>> {
             let request_tx = mpsc::channel(0).0;
-            Dispatcher::new_with_runtimes(self.runtimes, request_tx)
+            Dispatcher::with_runtimes(self.runtimes, request_tx)
         }
     }
 

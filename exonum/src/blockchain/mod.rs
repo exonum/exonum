@@ -115,10 +115,10 @@ impl Blockchain {
         ConfigurationServiceFactory::add_to_rust_runtime(&mut dispatcher, &mut rust_runtime);
 
         for s in services.into_iter() {
-            rust_runtime.add_service(s);
+            rust_runtime.add_service_factory(s);
         }
 
-        dispatcher.add_runtime(RuntimeIdentifier::Rust as u32, Box::new(rust_runtime));
+        dispatcher.add_runtime(RuntimeIdentifier::Rust as u32, rust_runtime);
 
         Self {
             db: storage.into(),
