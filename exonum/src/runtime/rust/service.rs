@@ -35,7 +35,7 @@ pub trait ServiceDispatcher {
 }
 
 pub trait Service: ServiceDispatcher + std::fmt::Debug {
-    fn initialize(&mut self, _ctx: TransactionContext, _arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, _ctx: TransactionContext, _arg: &Any) -> Result<(), ExecutionError> {
         Ok(())
     }
 

@@ -71,7 +71,7 @@ use crate::{
         configuration_new::{self as configuration, ConfigurationServiceInit},
         dispatcher::Dispatcher,
         rust::{service::ServiceFactory, RustRuntime},
-        InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+        RuntimeContext, RuntimeEnvironment, RuntimeIdentifier, ServiceConstructor,
     },
 };
 
@@ -226,12 +226,8 @@ impl Blockchain {
                     config_init.is_custom_majority_count = true;
                     config_init.majority_count = majority_count as u32;
                 }
-                let mut constructor_data = Any::new();
-                constructor_data.set_value(config_init.into_bytes());
-                InstanceInitData {
-                    instance_id: configuration::SERVICE_ID,
-                    constructor_data,
-                }
+
+                ServiceConstructor::new(configuration::SERVICE_ID, config_init)
             };
 
             {

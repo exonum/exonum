@@ -25,7 +25,7 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
-    ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
+    ArtifactSpec, DeployStatus, ServiceConstructor, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
 
@@ -96,12 +96,12 @@ impl RuntimeEnvironment for Dispatcher {
         &mut self,
         ctx: &RuntimeContext,
         artifact: ArtifactSpec,
-        init: &InstanceInitData,
+        constructor: &ServiceConstructor,
     ) -> Result<(), InitError> {
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            let result = runtime.init_service(ctx, artifact.clone(), init);
+            let result = runtime.init_service(ctx, artifact.clone(), &constructor);
             if result.is_ok() {
-                self.notify_service_started(init.instance_id.clone(), artifact);
+                self.notify_service_started(constructor.instance_id, artifact);
             }
 
             let _ = self
@@ -252,7 +252,7 @@ mod tests {
             &mut self,
             _: &RuntimeContext,
             artifact: ArtifactSpec,
-            _: &InstanceInitData,
+            _: &ServiceConstructor,
         ) -> Result<(), InitError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
@@ -365,17 +365,17 @@ mod tests {
         let mut fork = db.fork();
         let mut context = RuntimeContext::from_fork(&mut fork);
 
-        let rust_init_data = InstanceInitData {
+        let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,
-            constructor_data: Default::default(),
+            data: Default::default(),
         };
         dispatcher
             .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
             .expect("init_service failed for rust");
 
-        let java_init_data = InstanceInitData {
+        let java_init_data = ServiceConstructor {
             instance_id: JAVA_SERVICE_ID,
-            constructor_data: Default::default(),
+            data: Default::default(),
         };
         dispatcher
             .init_service(&mut context, sample_java_spec.clone(), &java_init_data)
@@ -451,9 +451,9 @@ mod tests {
         let mut fork = db.fork();
         let mut context = RuntimeContext::from_fork(&mut fork);
 
-        let rust_init_data = InstanceInitData {
+        let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,
-            constructor_data: Default::default(),
+            data: Default::default(),
         };
         assert_eq!(
             dispatcher

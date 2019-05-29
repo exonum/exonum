@@ -39,9 +39,24 @@ pub enum DeployStatus {
 }
 
 #[derive(Debug)]
-pub struct InstanceInitData {
+pub struct ServiceConstructor {
     pub instance_id: ServiceInstanceId,
-    pub constructor_data: Any,
+    pub data: Any,
+}
+
+impl ServiceConstructor {
+    pub fn new(instance_id: ServiceInstanceId, data: impl BinaryValue) -> Self {
+        let bytes = data.into_bytes();
+
+        Self {
+            instance_id,
+            data: {
+                let mut data = Any::new();
+                data.set_value(bytes);
+                data
+            },
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -83,7 +98,7 @@ pub trait RuntimeEnvironment: Send + 'static {
         &mut self,
         ctx: &RuntimeContext,
         artifact: ArtifactSpec,
-        init: &InstanceInitData,
+        constructor: &ServiceConstructor,
     ) -> Result<(), InitError>;
 
     /// Execute transaction.

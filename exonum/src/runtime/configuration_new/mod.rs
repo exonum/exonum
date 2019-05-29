@@ -28,7 +28,7 @@ use crate::{
             service::{Service, ServiceFactory},
             RustArtifactSpec, TransactionContext,
         },
-        DeployStatus, InstanceInitData, RuntimeEnvironment,
+        DeployStatus, RuntimeEnvironment, ServiceConstructor,
     },
 };
 
@@ -224,9 +224,9 @@ impl ConfigurationService for ConfigurationServiceImpl {
             .assign_service_id(ctx.fork(), &arg.instance_name)
             .ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
-        let init_data = InstanceInitData {
+        let constructor = ServiceConstructor {
             instance_id,
-            constructor_data: arg.constructor_data,
+            data: arg.constructor_data,
         };
 
         info!(
@@ -235,7 +235,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         );
 
         dispatcher
-            .init_service(ctx.env_context(), artifact_spec, &init_data)
+            .init_service(ctx.env_context(), artifact_spec, &constructor)
             .map_err(|err| {
                 error!("Service instance initialization failed: {:?}", err);
                 ServiceError::InitError(err)
@@ -290,13 +290,13 @@ impl ConfigurationService for ConfigurationServiceImpl {
                 arg.init_tx, instance_id
             );
 
-            let init_data = InstanceInitData {
+            let constructor = ServiceConstructor {
                 instance_id,
-                constructor_data: arg.init_tx.constructor_data,
+                data: arg.init_tx.constructor_data,
             };
 
             dispatcher
-                .init_service(ctx.env_context(), artifact_spec, &init_data)
+                .init_service(ctx.env_context(), artifact_spec, &constructor)
                 .map_err(|err| {
                     error!("Service instance initialization failed: {:?}", err);
                     ServiceError::InitError(err)
@@ -310,7 +310,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
 impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
 
 impl Service for ConfigurationServiceImpl {
-    fn initialize(&mut self, ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, ctx: TransactionContext, arg: &Any) -> Result<(), ExecutionError> {
         let arg: ConfigurationServiceInit = BinaryValue::from_bytes(arg.get_value().into())
             .map_err(|e| {
                 ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))

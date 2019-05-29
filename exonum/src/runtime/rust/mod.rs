@@ -34,7 +34,7 @@ use crate::{
 use self::service::{Service, ServiceFactory};
 use super::{
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
+    ArtifactSpec, DeployStatus, ServiceConstructor, RuntimeContext, RuntimeEnvironment,
     RuntimeIdentifier, ServiceInstanceId,
 };
 
@@ -187,7 +187,7 @@ impl RuntimeEnvironment for RustRuntime {
         &mut self,
         context: &RuntimeContext,
         artifact: ArtifactSpec,
-        init: &InstanceInitData,
+        init: &ServiceConstructor,
     ) -> Result<(), InitError> {
         let artifact = self
             .parse_artifact(artifact)
@@ -205,7 +205,7 @@ impl RuntimeEnvironment for RustRuntime {
             let mut service = self.inner.services.get(&artifact).unwrap().new_instance();
             let ctx = TransactionContext::new(context, self);
             service
-                .initialize(ctx, init.constructor_data.clone())
+                .initialize(ctx, &init.data)
                 .map_err(|e| InitError::ExecutionError(e))?;
             service
         };
