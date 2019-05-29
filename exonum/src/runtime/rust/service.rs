@@ -38,9 +38,9 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
         Ok(())
     }
 
-    fn before_commit(&self, _fork: &mut Fork) {}
+    fn before_commit(&self, _fork: &Fork) {}
 
-    fn after_commit(&self, _fork: &mut Fork) {}
+    fn after_commit(&self, _fork: &Fork) {}
 
     fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]

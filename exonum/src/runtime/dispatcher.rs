@@ -12,18 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_merkledb::{Fork, Snapshot};
+use futures::{future::Future, sink::Sink, sync::mpsc};
+
 use std::{collections::HashMap, pin::Pin};
+
+use crate::{
+    api::ServiceApiBuilder,
+    events::InternalRequest,
+    {crypto::Hash, messages::CallInfo},
+};
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
-use crate::api::ServiceApiBuilder;
-use crate::events::InternalRequest;
-use crate::{crypto::Hash, messages::CallInfo};
-use exonum_merkledb::{Fork, Snapshot};
-use futures::{future::Future, sink::Sink, sync::mpsc};
 
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
@@ -90,7 +94,7 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn init_service(
         &mut self,
-        ctx: &mut RuntimeContext,
+        ctx: &RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
@@ -115,7 +119,7 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn execute(
         &self,
-        context: &mut RuntimeContext,
+        context: &RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -152,13 +156,13 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn after_commit(&self, fork: &mut Fork) {
+    fn after_commit(&self, fork: &Fork) {
         for (_, runtime) in &self.runtimes {
-            runtime.before_commit(fork);
+            runtime.after_commit(fork);
         }
     }
 
-    fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
+    fn genesis_init(&self, fork: &Fork) -> Result<(), failure::Error> {
         self.runtimes
             .iter()
             .map(|(_, v)| v.genesis_init(fork))
@@ -249,7 +253,7 @@ mod tests {
 
         fn init_service(
             &mut self,
-            _: &mut RuntimeContext,
+            _: &RuntimeContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
         ) -> Result<(), InitError> {
@@ -262,7 +266,7 @@ mod tests {
 
         fn execute(
             &self,
-            _: &mut RuntimeContext,
+            _: &RuntimeContext,
             call_info: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -279,7 +283,7 @@ mod tests {
 
         fn before_commit(&self, _: &mut Fork) {}
 
-        fn after_commit(&self, _: &mut Fork) {}
+        fn after_commit(&self, _: &Fork) {}
     }
 
     #[test]

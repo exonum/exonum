@@ -119,7 +119,7 @@ impl Service for TimeServiceImpl {
     }
 
     /// Creates transaction after commit of the block.
-    fn after_commit(&self, fork: &mut Fork) {
+    fn after_commit(&self, fork: &Fork) {
         // The transaction must be created by the validator.
 
         // TODO can't implement after_commit via fork

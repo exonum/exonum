@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
+use protobuf::well_known_types::Any;
 use semver::Version;
 
 use std::{
@@ -20,28 +22,26 @@ use std::{
     panic,
 };
 
-#[macro_use]
-pub mod service;
+use crate::{
+    api::ServiceApiBuilder,
+    crypto::{Hash, PublicKey},
+    messages::CallInfo,
+    proto::schema,
+    runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID},
+    runtime::dispatcher::Dispatcher,
+};
 
-#[cfg(test)]
-pub mod tests;
-
+use self::service::{Service, ServiceFactory};
 use super::{
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     RuntimeIdentifier, ServiceInstanceId,
 };
 
-use crate::crypto::{Hash, PublicKey};
-use crate::messages::CallInfo;
-use crate::proto::schema;
-use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
-
-use self::service::{Service, ServiceFactory};
-use crate::api::ServiceApiBuilder;
-use crate::runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID};
-use crate::runtime::dispatcher::Dispatcher;
-use protobuf::well_known_types::Any;
+#[macro_use]
+pub mod service;
+#[cfg(test)]
+pub mod tests;
 
 #[derive(Debug)]
 pub struct RustRuntime {
@@ -185,7 +185,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn init_service(
         &mut self,
-        context: &mut RuntimeContext,
+        context: &RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
@@ -220,7 +220,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn execute(
         &self,
-        context: &mut RuntimeContext,
+        context: &RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -269,7 +269,7 @@ impl RuntimeEnvironment for RustRuntime {
         }
     }
 
-    fn after_commit(&self, fork: &mut Fork) {
+    fn after_commit(&self, fork: &Fork) {
         let inner = &self.inner;
 
         for (_, service) in &inner.initialized {
@@ -277,7 +277,7 @@ impl RuntimeEnvironment for RustRuntime {
         }
     }
 
-    fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
+    fn genesis_init(&self, fork: &Fork) -> Result<(), failure::Error> {
         let (deploy_txs, init_txs) = self.inner.services.iter().fold(
             (Vec::new(), Vec::new()),
             |(mut deploy_txs, mut init_txs), (_, s)| {
@@ -326,20 +326,20 @@ impl RuntimeEnvironment for RustRuntime {
 }
 
 #[derive(Debug)]
-pub struct TransactionContext<'a, 'c> {
-    env_context: &'a mut RuntimeContext<'c>,
+pub struct TransactionContext<'a, 'b> {
+    env_context: &'a RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
-impl<'a, 'c> TransactionContext<'a, 'c> {
-    fn new(env_context: &'a mut RuntimeContext<'c>, runtime: &'a RustRuntime) -> Self {
+impl<'a, 'b> TransactionContext<'a, 'b> {
+    fn new(env_context: &'a RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
         Self {
             env_context,
             runtime,
         }
     }
 
-    pub fn env_context(&mut self) -> &mut RuntimeContext<'c> {
+    pub fn env_context(&mut self) -> &RuntimeContext<'b> {
         self.env_context
     }
 

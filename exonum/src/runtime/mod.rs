@@ -13,23 +13,24 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-
 use protobuf::well_known_types::Any;
 
-use crate::crypto::{Hash, PublicKey};
-use crate::messages::{CallInfo, ServiceInstanceId};
+use crate::{
+    api::ServiceApiBuilder,
+    crypto::{Hash, PublicKey},
+    messages::{CallInfo, ServiceInstanceId},
+};
 
-use self::rust::RustArtifactSpec;
+use self::{
+    error::{DeployError, ExecutionError, InitError},
+    rust::RustArtifactSpec,
+};
 
 #[macro_use]
 pub mod rust;
-
 pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
-
-use crate::api::ServiceApiBuilder;
-use error::{DeployError, ExecutionError, InitError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DeployStatus {
@@ -80,7 +81,7 @@ pub trait RuntimeEnvironment {
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
         &mut self,
-        ctx: &mut RuntimeContext,
+        ctx: &RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError>;
@@ -88,7 +89,7 @@ pub trait RuntimeEnvironment {
     /// Execute transaction.
     fn execute(
         &self,
-        ctx: &mut RuntimeContext,
+        ctx: &RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -101,9 +102,9 @@ pub trait RuntimeEnvironment {
 
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
-    fn after_commit(&self, fork: &mut Fork);
+    fn after_commit(&self, fork: &Fork);
 
-    fn genesis_init(&self, _ctx: &mut Fork) -> Result<(), failure::Error> {
+    fn genesis_init(&self, _ctx: &Fork) -> Result<(), failure::Error> {
         Ok(())
     }
 
@@ -114,13 +115,13 @@ pub trait RuntimeEnvironment {
 
 #[derive(Debug)]
 pub struct RuntimeContext<'a> {
-    fork: &'a mut Fork,
+    fork: &'a Fork,
     author: PublicKey,
     tx_hash: Hash,
 }
 
 impl<'a> RuntimeContext<'a> {
-    pub fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
+    pub fn new(fork: &'a Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
         Self {
             fork,
             author,
@@ -128,7 +129,7 @@ impl<'a> RuntimeContext<'a> {
         }
     }
 
-    fn from_fork(fork: &'a mut Fork) -> Self {
+    fn from_fork(fork: &'a Fork) -> Self {
         Self::new(fork, &PublicKey::zero(), &Hash::zero())
     }
 }
