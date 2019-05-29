@@ -17,9 +17,6 @@
 #![allow(bare_trait_objects)]
 
 use chrono::{DateTime, Utc};
-
-use std::borrow::Cow;
-
 use exonum_merkledb::{Fork, Snapshot};
 
 use exonum::{
@@ -28,8 +25,9 @@ use exonum::{
     messages::{AnyTx, Message, Signed},
 };
 
-use super::{proto, SERVICE_ID};
 use crate::schema::TimeSchema;
+
+use super::{proto, SERVICE_ID};
 
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]
@@ -83,7 +81,7 @@ impl TxTime {
         Message::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
     }
 
-    fn check_signed_by_validator(
+    pub(crate) fn check_signed_by_validator(
         &self,
         snapshot: &dyn Snapshot,
         author: &PublicKey,
@@ -97,7 +95,7 @@ impl TxTime {
         }
     }
 
-    fn update_validator_time(&self, fork: &Fork, author: &PublicKey) -> ExecutionResult {
+    pub(crate) fn update_validator_time(&self, fork: &Fork, author: &PublicKey) -> ExecutionResult {
         let schema = TimeSchema::new(fork);
         let mut validators_times = schema.validators_times();
         match validators_times.get(author) {
@@ -111,7 +109,7 @@ impl TxTime {
         }
     }
 
-    fn update_consolidated_time(fork: &Fork) {
+    pub(crate) fn update_consolidated_time(fork: &Fork) {
         let keys = Schema::new(fork).actual_configuration().validator_keys;
         let schema = TimeSchema::new(fork);
 

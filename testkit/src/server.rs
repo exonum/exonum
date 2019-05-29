@@ -164,7 +164,7 @@ mod tests {
         helpers::Height,
         messages::{AnyTx, Message, Signed},
     };
-    use exonum_merkledb::{Snapshot, ObjectHash};
+    use exonum_merkledb::{ObjectHash, Snapshot};
 
     use super::{super::proto, *};
     use crate::{TestKitApi, TestKitBuilder};

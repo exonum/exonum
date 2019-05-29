@@ -19,12 +19,8 @@
 //!
 //! [docs:time]: https://exonum.com/doc/version/latest/advanced/time
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
+#![deny(unsafe_code, bare_trait_objects)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 #[macro_use]
 extern crate failure;
@@ -44,20 +40,18 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
-use exonum_merkledb::{Fork, Snapshot};
-
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{Service, ServiceContext, Transaction, TransactionSet},
+    blockchain::ExecutionResult,
     crypto::Hash,
     helpers::fabric::{self, Context},
-    messages::AnyTx,
+    impl_service_dispatcher,
     runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
     },
 };
-use serde_json::Value;
+use exonum_merkledb::{Fork, Snapshot};
 
 use crate::{
     schema::TimeSchema,
