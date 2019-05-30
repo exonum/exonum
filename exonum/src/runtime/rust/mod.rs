@@ -96,6 +96,8 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
+    // TODO Implement special DispatcherBuilder with builtin rust runtime 
+    // and move this method to it. [ECR-3222]
     pub(crate) fn add_builtin_service(
         &mut self,
         dispatcher: &mut Dispatcher,
