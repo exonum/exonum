@@ -131,7 +131,7 @@ fn test_basic_rust_runtime() {
 
     let mut dispatcher = Dispatcher::new(mpsc::channel(0).0);
     // Create runtime and service.
-    let mut runtime = RustRuntime::new(&mut dispatcher);
+    let mut runtime = RustRuntime::new();
 
     let service_factory = Box::new(TestServiceFactory);
     let artifact: ArtifactSpec = service_factory.artifact().into();

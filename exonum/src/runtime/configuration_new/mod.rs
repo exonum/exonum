@@ -22,7 +22,7 @@ use crate::{
     crypto::Hash,
     node::State,
     runtime::{
-        dispatcher::Dispatcher,
+        dispatcher::{Action, Dispatcher},
         error::{ExecutionError, InitError, WRONG_ARG_ERROR},
         rust::{
             service::{Service, ServiceFactory},
@@ -32,13 +32,9 @@ use crate::{
     },
 };
 
-use crate::{
-    messages::{MethodId, ServiceInstanceId},
-    runtime::rust::RustRuntime,
-};
+use crate::messages::{MethodId, ServiceInstanceId};
 
 use self::{
-    config::ConfigurationServiceConfig,
     errors::Error as ServiceError,
     schema::{Schema as ConfigurationSchema, VotingDecision},
     transactions::{enough_votes_to_commit, VotingContext},
@@ -90,9 +86,7 @@ trait ConfigurationService {
 }
 
 #[derive(Debug)]
-pub struct ConfigurationServiceImpl {
-    dispatcher: *mut Dispatcher,
-}
+pub struct ConfigurationServiceImpl;
 
 impl ConfigurationServiceImpl {
     fn assign_service_id(&self, fork: &Fork, instance_name: &String) -> Option<u32> {
@@ -114,11 +108,6 @@ impl ConfigurationServiceImpl {
         let service_ids = schema.service_ids();
 
         service_ids.get(instance_name)
-    }
-
-    #[allow(unsafe_code)]
-    fn get_dispatcher_mut(&self) -> &mut Dispatcher {
-        unsafe { self.dispatcher.as_mut().unwrap() }
     }
 }
 
@@ -191,35 +180,26 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
     fn deploy(
         &self,
-        _ctx: TransactionContext,
+        mut context: TransactionContext,
         arg: transactions::Deploy,
     ) -> Result<(), ExecutionError> {
         info!("Deploying service. {:?}", arg);
 
-        let artifact_spec = arg.get_artifact_spec();
-
-        let dispatcher = self.get_dispatcher_mut();
-        dispatcher.start_deploy(artifact_spec).map_err(|err| {
-            error!("Service instance deploy failed: {:?}", err);
-            ServiceError::DeployError(err)
-        })?;
-
+        let artifact = arg.get_artifact_spec();
+        context.dispatch_action(Action::StartDeploy { artifact });
         // TODO add result into deployable (to check deploy status in before_commit).
-
         Ok(())
     }
 
     fn init(
         &self,
-        mut ctx: TransactionContext,
+        mut context: TransactionContext,
         arg: transactions::Init,
     ) -> Result<(), ExecutionError> {
-        let artifact_spec = arg.get_artifact_spec();
-
-        let dispatcher = self.get_dispatcher_mut();
+        let artifact = arg.get_artifact_spec();
 
         let instance_id = self
-            .assign_service_id(ctx.fork(), &arg.instance_name)
+            .assign_service_id(context.fork(), &arg.instance_name)
             .ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
         let constructor = ServiceConstructor {
@@ -232,13 +212,10 @@ impl ConfigurationService for ConfigurationServiceImpl {
             arg.instance_name, instance_id
         );
 
-        dispatcher
-            .init_service(ctx.env_context(), artifact_spec, &constructor)
-            .map_err(|err| {
-                error!("Service instance initialization failed: {:?}", err);
-                ServiceError::InitError(err)
-            })?;
-
+        context.dispatch_action(Action::InitService {
+            artifact,
+            constructor,
+        });
         Ok(())
     }
 }
@@ -250,20 +227,12 @@ impl Service for ConfigurationServiceImpl {
         ConfigurationSchema::new(snapshot).state_hash()
     }
 }
-#[derive(Debug)]
-pub struct ConfigurationServiceFactory {
-    dispatcher: *mut Dispatcher,
-}
+#[derive(Debug, Default)]
+pub struct ConfigurationServiceFactory;
 
 impl ConfigurationServiceFactory {
     pub const BUILTIN_ID: ServiceInstanceId = 0;
     pub const BUILTIN_NAME: &'static str = "config";
-
-    pub fn new(dispatcher: &mut Dispatcher) -> Self {
-        Self {
-            dispatcher: &mut *dispatcher,
-        }
-    }
 }
 
 impl ServiceFactory for ConfigurationServiceFactory {
@@ -272,8 +241,6 @@ impl ServiceFactory for ConfigurationServiceFactory {
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(ConfigurationServiceImpl {
-            dispatcher: self.dispatcher,
-        })
+        Box::new(ConfigurationServiceImpl)
     }
 }

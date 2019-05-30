@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// TODO: Use two level error codes for ExecutionError, first level is runtime errors [ECR-3236]
+// second level is service errors.
+
+pub use crate::blockchain::ExecutionError;
+
 use crate::blockchain;
 
-pub type ExecutionError = blockchain::ExecutionError;
-
 // TODO: summarize error codes/simplify error creation
+
 pub const DISPATCH_ERROR: u8 = 255;
 pub const WRONG_ARG_ERROR: u8 = 254;
 pub const WRONG_RUNTIME: u8 = 253;
@@ -36,4 +40,16 @@ pub enum InitError {
     NotDeployed,
     ServiceIdExists,
     ExecutionError(ExecutionError),
+}
+
+impl From<DeployError> for ExecutionError {
+    fn from(deploy: DeployError) -> Self {
+        ExecutionError::with_description(128, format!("Deploy failed because: {:?}", deploy))
+    }
+}
+
+impl From<InitError> for ExecutionError {
+    fn from(init: InitError) -> Self {
+        ExecutionError::with_description(129, format!("Init failed because: {:?}", init))
+    }
 }

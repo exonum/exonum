@@ -43,23 +43,19 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(inner_requests_tx: mpsc::Sender<InternalRequest>) -> Pin<Box<Self>> {
-        Pin::new(Box::new(Self {
-            runtimes: Default::default(),
-            runtime_lookup: Default::default(),
-            inner_requests_tx,
-        }))
+    pub fn new(inner_requests_tx: mpsc::Sender<InternalRequest>) -> Self {
+        Self::with_runtimes(Default::default(), inner_requests_tx)
     }
 
     pub fn with_runtimes(
         runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
         inner_requests_tx: mpsc::Sender<InternalRequest>,
-    ) -> Pin<Box<Self>> {
-        Pin::new(Box::new(Self {
+    ) -> Self {
+        Self {
             runtimes,
             runtime_lookup: Default::default(),
             inner_requests_tx,
-        }))
+        }
     }
 
     pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn RuntimeEnvironment>>) {
@@ -75,8 +71,9 @@ impl Dispatcher {
     }
 }
 
-impl RuntimeEnvironment for Dispatcher {
-    fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+// TODO think about runtime environment traits. [ECR-3222]
+impl Dispatcher {
+    pub fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             runtime.start_deploy(artifact)
         } else {
@@ -84,7 +81,7 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn check_deploy_status(
+    pub fn check_deploy_status(
         &self,
         artifact: ArtifactSpec,
         cancel_if_not_complete: bool,
@@ -96,9 +93,9 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn init_service(
+    pub fn init_service(
         &mut self,
-        ctx: &RuntimeContext,
+        ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         constructor: &ServiceConstructor,
     ) -> Result<(), InitError> {
@@ -121,9 +118,9 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn execute(
-        &self,
-        context: &RuntimeContext,
+    pub fn execute(
+        &mut self,
+        context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -137,7 +134,12 @@ impl RuntimeEnvironment for Dispatcher {
         }
 
         if let Some(runtime) = self.runtimes.get(&runtime_id.unwrap()) {
-            runtime.execute(context, call_info, payload)
+            runtime.execute(context, call_info, payload)?;
+            // Executes pending dispatcher actions.
+            context
+                .take_dispatcher_actions()
+                .into_iter()
+                .try_for_each(|action| action.execute(self, context))
         } else {
             Err(ExecutionError::with_description(
                 WRONG_RUNTIME,
@@ -146,7 +148,7 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+    pub fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
         self.runtimes
             .iter()
             .map(|(_, runtime)| runtime.state_hashes(snapshot))
@@ -154,25 +156,57 @@ impl RuntimeEnvironment for Dispatcher {
             .collect::<Vec<_>>()
     }
 
-    fn before_commit(&self, fork: &mut Fork) {
+    pub fn before_commit(&self, fork: &mut Fork) {
         for (_, runtime) in &self.runtimes {
             runtime.before_commit(fork);
         }
     }
 
-    fn after_commit(&self, fork: &Fork) {
+    pub fn after_commit(&self, fork: &Fork) {
         for (_, runtime) in &self.runtimes {
             runtime.after_commit(fork);
         }
     }
 
-    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    pub fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         self.runtimes
             .iter()
             .fold(Vec::new(), |mut api, (_, runtime)| {
                 api.append(&mut runtime.services_api());
                 api
             })
+    }
+}
+
+// TODO Update action names in according with changes in runtime. [ECR-3222]
+#[derive(Debug)]
+pub enum Action {
+    StartDeploy {
+        artifact: ArtifactSpec,
+    },
+    InitService {
+        artifact: ArtifactSpec,
+        constructor: ServiceConstructor,
+    },
+}
+
+impl Action {
+    fn execute(
+        self,
+        dispatcher: &mut Dispatcher,
+        context: &mut RuntimeContext,
+    ) -> Result<(), ExecutionError> {
+        match self {
+            Action::StartDeploy { artifact } => {
+                dispatcher.start_deploy(artifact).map_err(From::from)
+            }
+            Action::InitService {
+                artifact,
+                constructor,
+            } => dispatcher
+                .init_service(context, artifact, &constructor)
+                .map_err(From::from),
+        }
     }
 }
 
@@ -209,7 +243,7 @@ mod tests {
             self
         }
 
-        pub fn finalize(self) -> Pin<Box<Dispatcher>> {
+        pub fn finalize(self) -> Dispatcher {
             let request_tx = mpsc::channel(0).0;
             Dispatcher::with_runtimes(self.runtimes, request_tx)
         }
@@ -254,7 +288,7 @@ mod tests {
 
         fn init_service(
             &mut self,
-            _: &RuntimeContext,
+            _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &ServiceConstructor,
         ) -> Result<(), InitError> {
@@ -267,7 +301,7 @@ mod tests {
 
         fn execute(
             &self,
-            _: &RuntimeContext,
+            _: &mut RuntimeContext,
             call_info: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {

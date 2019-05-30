@@ -69,7 +69,7 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{service::ServiceFactory, RustRuntime},
-        RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+        RuntimeContext, RuntimeIdentifier,
     },
 };
 
@@ -94,7 +94,7 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
-    pub dispatcher: Arc<Mutex<Pin<Box<Dispatcher>>>>,
+    pub dispatcher: Arc<Mutex<Dispatcher>>,
 }
 
 impl Blockchain {
@@ -108,9 +108,9 @@ impl Blockchain {
         internal_req_sender: mpsc::Sender<InternalRequest>,
     ) -> Self {
         let mut dispatcher = Dispatcher::new(internal_req_sender);
-        let mut rust_runtime = RustRuntime::new(&mut dispatcher);
+        let mut rust_runtime = RustRuntime::default();
 
-        let service_factory = Box::new(ConfigurationServiceFactory::new(&mut dispatcher));
+        let service_factory = Box::new(ConfigurationServiceFactory);
         rust_runtime.add_builtin_service(
             &mut dispatcher,
             service_factory,
