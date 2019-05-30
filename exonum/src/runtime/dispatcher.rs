@@ -69,10 +69,9 @@ impl Dispatcher {
     ) {
         self.runtime_lookup.insert(service_id, artifact.runtime_id);
     }
-}
 
-// TODO think about runtime environment traits. [ECR-3222]
-impl Dispatcher {
+    // TODO think about runtime environment traits. [ECR-3222]
+
     pub fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             runtime.start_deploy(artifact)
