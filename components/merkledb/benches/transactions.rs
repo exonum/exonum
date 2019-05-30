@@ -31,7 +31,7 @@ const SEED: [u8; 16] = [100; 16];
 const SAMPLE_SIZE: usize = 10;
 
 #[cfg(all(test, not(feature = "long_benchmarks")))]
-const ITEM_COUNT: [BenchParams; 4] = [
+const ITEM_COUNT: [BenchParams; 10] = [
     BenchParams {
         users: 10_000,
         blocks: 1,

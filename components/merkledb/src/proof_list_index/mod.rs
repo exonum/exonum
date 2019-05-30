@@ -49,7 +49,6 @@ mod tests;
 pub struct ProofListIndex<T: IndexAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
-    pub counter: u32,
     _v: PhantomData<V>,
 }
 
@@ -120,7 +119,6 @@ where
         Self {
             base,
             state,
-            counter: 0,
             _v: PhantomData,
         }
     }
@@ -166,7 +164,6 @@ where
         Self {
             base,
             state,
-            counter: 0,
             _v: PhantomData,
         }
     }
@@ -179,7 +176,6 @@ where
         Self {
             base,
             state,
-            counter: 0,
             _v: PhantomData,
         }
     }
@@ -191,7 +187,6 @@ where
             .map(|(base, state)| Self {
                 base,
                 state,
-                counter: 0,
                 _v: PhantomData,
             })
     }
@@ -509,11 +504,9 @@ where
         self.set_len(len + 1);
         let mut key = ProofListKey::new(1, len);
 
-        self.counter += 1;
         self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
-            self.counter += 1;
             let hash = if key.is_left() {
                 HashTag::hash_single_node(&self.get_branch_unchecked(key))
             } else {
