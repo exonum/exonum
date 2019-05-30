@@ -25,7 +25,7 @@ use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
 use crate::runtime::dispatcher::Dispatcher;
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
-    DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+    DeployStatus, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier, ServiceConstructor,
 };
 
 use super::{
@@ -93,7 +93,7 @@ impl TestService for TestServiceImpl {
 impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl Service for TestServiceImpl {
-    fn initialize(&mut self, ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, ctx: TransactionContext, arg: &Any) -> Result<(), ExecutionError> {
         let mut arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
@@ -135,7 +135,7 @@ fn test_basic_rust_runtime() {
 
     let service_factory = Box::new(TestServiceFactory);
     let artifact: ArtifactSpec = service_factory.artifact().into();
-    runtime.add_service(service_factory);
+    runtime.add_service_factory(service_factory);
 
     // Deploy service
     assert!(runtime.start_deploy(artifact.clone()).is_ok());
@@ -148,9 +148,9 @@ fn test_basic_rust_runtime() {
 
     // Init service
     {
-        let init_data = InstanceInitData {
+        let constructor = ServiceConstructor {
             instance_id: SERVICE_INSTANCE_ID,
-            constructor_data: {
+            data: {
                 let mut arg = TestServiceInit::new();
                 arg.set_msg("constructor_message".to_owned());
 
@@ -165,7 +165,7 @@ fn test_basic_rust_runtime() {
         let tx_hash = Hash::zero();
         let mut context = RuntimeContext::new(&mut fork, &address, &tx_hash);
         runtime
-            .init_service(&mut context, artifact.clone(), &init_data)
+            .init_service(&mut context, artifact.clone(), &constructor)
             .unwrap();
 
         {

@@ -12,50 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
+use protobuf::well_known_types::Any;
 use semver::Version;
 
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    panic,
+    fmt, panic,
+};
+
+use crate::{
+    api::ServiceApiBuilder,
+    crypto::{Hash, PublicKey},
+    messages::CallInfo,
+    proto::schema,
+    runtime::configuration_new::{INIT_METHOD_ID, SERVICE_ID},
+    runtime::dispatcher::Dispatcher,
+};
+
+use self::service::{Service, ServiceFactory};
+use super::{
+    error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
+    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+    ServiceConstructor, ServiceInstanceId,
 };
 
 #[macro_use]
 pub mod service;
-
 #[cfg(test)]
 pub mod tests;
-
-use super::{
-    error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    RuntimeIdentifier, ServiceInstanceId,
-};
-
-use crate::crypto::{Hash, PublicKey};
-use crate::messages::CallInfo;
-use crate::proto::schema;
-use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
-
-use self::service::{Service, ServiceFactory};
-use crate::api::ServiceApiBuilder;
-use crate::runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID};
-use crate::runtime::dispatcher::Dispatcher;
-use protobuf::well_known_types::Any;
 
 #[derive(Debug)]
 pub struct RustRuntime {
     inner: RustRuntimeInner,
     dispatcher: *mut Dispatcher,
-}
-
-impl RustRuntime {
-    pub fn new(dispatcher: &mut Dispatcher) -> Self {
-        Self {
-            inner: Default::default(),
-            dispatcher: &mut *dispatcher,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -87,7 +78,14 @@ impl AsMut<dyn Service + 'static> for InitializedService {
 }
 
 impl RustRuntime {
-    fn get_artifact_spec(&self, artifact: ArtifactSpec) -> Option<RustArtifactSpec> {
+    pub fn new(dispatcher: &mut Dispatcher) -> Self {
+        Self {
+            inner: Default::default(),
+            dispatcher: &mut *dispatcher,
+        }
+    }
+
+    fn parse_artifact(&self, artifact: &ArtifactSpec) -> Option<RustArtifactSpec> {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return None;
         }
@@ -98,10 +96,43 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    pub fn add_service(&mut self, service_factory: Box<dyn ServiceFactory>) {
+    // TODO Implement special DispatcherBuilder with builtin rust runtime 
+    // and move this method to it. [ECR-3222]
+    pub(crate) fn add_builtin_service(
+        &mut self,
+        dispatcher: &mut Dispatcher,
+        service_factory: Box<dyn ServiceFactory>,
+        instance_id: ServiceInstanceId,
+        instance_name: impl Into<String>,
+    ) {
+        let artifact = service_factory.artifact();
+        let service_instance = InitializedService {
+            id: instance_id,
+            service: service_factory.new_instance(),
+        };
+
+        info!(
+            "Added builtin service factory {} with instance: {}/{}",
+            artifact,
+            instance_name.into(),
+            instance_id
+        );
+        // Registers service instance in runtime.
         self.inner
             .services
-            .insert(service_factory.artifact(), service_factory);
+            .insert(artifact.clone(), service_factory);
+        self.inner.deployed.insert(artifact.clone());
+        self.inner.initialized.insert(instance_id, service_instance);
+        // Registers service instance in dispatcher.
+        dispatcher.notify_service_started(instance_id, artifact.into());
+    }
+
+    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+        let artifact = service_factory.artifact();
+
+        info!("Added service factory {}", artifact);
+
+        self.inner.services.insert(artifact, service_factory);
     }
 
     #[allow(unsafe_code)]
@@ -147,11 +178,19 @@ impl RustArtifactSpec {
     }
 }
 
+impl fmt::Display for RustArtifactSpec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.name, self.version)
+    }
+}
+
 impl RuntimeEnvironment for RustRuntime {
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
-            .get_artifact_spec(artifact)
+            .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
+
+        trace!("Start deploy service: {}", artifact);
 
         let inner = &mut self.inner;
 
@@ -171,7 +210,7 @@ impl RuntimeEnvironment for RustRuntime {
         _cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         let artifact = self
-            .get_artifact_spec(artifact)
+            .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
         let inner = &self.inner;
@@ -185,13 +224,19 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn init_service(
         &mut self,
-        context: &mut RuntimeContext,
+        context: &RuntimeContext,
         artifact: ArtifactSpec,
-        init: &InstanceInitData,
+        init: &ServiceConstructor,
     ) -> Result<(), InitError> {
         let artifact = self
-            .get_artifact_spec(artifact)
+            .parse_artifact(&artifact)
             .ok_or(InitError::WrongArtifact)?;
+
+        trace!(
+            "New service {} instance with id: {}",
+            artifact,
+            init.instance_id
+        );
 
         if !self.inner.deployed.contains(&artifact) {
             return Err(InitError::NotDeployed);
@@ -205,7 +250,7 @@ impl RuntimeEnvironment for RustRuntime {
             let mut service = self.inner.services.get(&artifact).unwrap().new_instance();
             let ctx = TransactionContext::new(context, self);
             service
-                .initialize(ctx, init.constructor_data.clone())
+                .initialize(ctx, &init.data)
                 .map_err(|e| InitError::ExecutionError(e))?;
             service
         };
@@ -220,7 +265,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn execute(
         &self,
-        context: &mut RuntimeContext,
+        context: &RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -269,7 +314,7 @@ impl RuntimeEnvironment for RustRuntime {
         }
     }
 
-    fn after_commit(&self, fork: &mut Fork) {
+    fn after_commit(&self, fork: &Fork) {
         let inner = &self.inner;
 
         for (_, service) in &inner.initialized {
@@ -277,42 +322,7 @@ impl RuntimeEnvironment for RustRuntime {
         }
     }
 
-    fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
-        let (deploy_txs, init_txs) = self.inner.services.iter().fold(
-            (Vec::new(), Vec::new()),
-            |(mut deploy_txs, mut init_txs), (_, s)| {
-                let init_info = s.genesis_init_info();
-                if !init_info.is_empty() {
-                    deploy_txs.push(init_info[0].get_deploy_tx());
-                }
-                init_txs.extend(init_info.into_iter().map(|i| i.get_init_tx()));
-                (deploy_txs, init_txs)
-            },
-        );
-
-        let mut ctx = RuntimeContext::new(fork, &PublicKey::zero(), &Hash::zero());
-        for deploy_tx in deploy_txs.into_iter() {
-            self.get_dispatcher()
-                .execute(
-                    &mut ctx,
-                    CallInfo::new(SERVICE_ID, DEPLOY_METHOD_ID),
-                    &deploy_tx.to_bytes(),
-                )
-                .map_err(|e| format_err!("Rust runtime genesis deploy error: {:?}", e))?
-        }
-        for init_tx in init_txs.into_iter() {
-            self.get_dispatcher()
-                .execute(
-                    &mut ctx,
-                    CallInfo::new(SERVICE_ID, INIT_METHOD_ID),
-                    &init_tx.to_bytes(),
-                )
-                .map_err(|e| format_err!("Rust runtime genesis init error: {:?}", e))?
-        }
-        Ok(())
-    }
-
-    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         self.inner
             .initialized
             .iter()
@@ -326,20 +336,20 @@ impl RuntimeEnvironment for RustRuntime {
 }
 
 #[derive(Debug)]
-pub struct TransactionContext<'a, 'c> {
-    env_context: &'a mut RuntimeContext<'c>,
+pub struct TransactionContext<'a, 'b> {
+    env_context: &'a RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
-impl<'a, 'c> TransactionContext<'a, 'c> {
-    fn new(env_context: &'a mut RuntimeContext<'c>, runtime: &'a RustRuntime) -> Self {
+impl<'a, 'b> TransactionContext<'a, 'b> {
+    fn new(env_context: &'a RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
         Self {
             env_context,
             runtime,
         }
     }
 
-    pub fn env_context(&mut self) -> &mut RuntimeContext<'c> {
+    pub fn env_context(&mut self) -> &RuntimeContext<'b> {
         self.env_context
     }
 

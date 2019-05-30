@@ -12,21 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, pin::Pin};
-
-use super::{
-    error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
-    ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId,
-};
-use crate::api::ServiceApiBuilder;
-use crate::events::InternalRequest;
-use crate::{crypto::Hash, messages::CallInfo};
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{future::Future, sink::Sink, sync::mpsc};
 
+use std::{collections::HashMap, pin::Pin};
+
+use crate::{
+    api::ServiceApiBuilder,
+    events::InternalRequest,
+    {crypto::Hash, messages::CallInfo},
+};
+
+use super::{
+    error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
+    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, ServiceConstructor,
+    ServiceInstanceId,
+};
+
 pub struct Dispatcher {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
     // TODO Is RefCell enough here?
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
     inner_requests_tx: mpsc::Sender<InternalRequest>,
@@ -39,30 +43,34 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(request_tx: mpsc::Sender<InternalRequest>) -> Pin<Box<Self>> {
+    pub fn new(inner_requests_tx: mpsc::Sender<InternalRequest>) -> Pin<Box<Self>> {
         Pin::new(Box::new(Self {
             runtimes: Default::default(),
             runtime_lookup: Default::default(),
-            inner_requests_tx: request_tx,
+            inner_requests_tx,
         }))
     }
 
-    pub fn new_with_runtimes(
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
-        request_tx: mpsc::Sender<InternalRequest>,
+    pub fn with_runtimes(
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+        inner_requests_tx: mpsc::Sender<InternalRequest>,
     ) -> Pin<Box<Self>> {
         Pin::new(Box::new(Self {
             runtimes,
             runtime_lookup: Default::default(),
-            inner_requests_tx: request_tx,
+            inner_requests_tx,
         }))
     }
 
-    pub fn add_runtime(&mut self, id: u32, runtime: Box<dyn RuntimeEnvironment + Send>) {
-        self.runtimes.insert(id, runtime);
+    pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn RuntimeEnvironment>>) {
+        self.runtimes.insert(id, runtime.into());
     }
 
-    fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
+    pub(crate) fn notify_service_started(
+        &mut self,
+        service_id: ServiceInstanceId,
+        artifact: ArtifactSpec,
+    ) {
         self.runtime_lookup.insert(service_id, artifact.runtime_id);
     }
 }
@@ -90,14 +98,14 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn init_service(
         &mut self,
-        ctx: &mut RuntimeContext,
+        ctx: &RuntimeContext,
         artifact: ArtifactSpec,
-        init: &InstanceInitData,
+        constructor: &ServiceConstructor,
     ) -> Result<(), InitError> {
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            let result = runtime.init_service(ctx, artifact.clone(), init);
+            let result = runtime.init_service(ctx, artifact.clone(), &constructor);
             if result.is_ok() {
-                self.notify_service_started(init.instance_id.clone(), artifact);
+                self.notify_service_started(constructor.instance_id, artifact);
             }
 
             let _ = self
@@ -115,7 +123,7 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn execute(
         &self,
-        context: &mut RuntimeContext,
+        context: &RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -152,24 +160,17 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn after_commit(&self, fork: &mut Fork) {
+    fn after_commit(&self, fork: &Fork) {
         for (_, runtime) in &self.runtimes {
-            runtime.before_commit(fork);
+            runtime.after_commit(fork);
         }
     }
 
-    fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
-        self.runtimes
-            .iter()
-            .map(|(_, v)| v.genesis_init(fork))
-            .collect()
-    }
-
-    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         self.runtimes
             .iter()
             .fold(Vec::new(), |mut api, (_, runtime)| {
-                api.append(&mut runtime.get_services_api());
+                api.append(&mut runtime.services_api());
                 api
             })
     }
@@ -177,14 +178,18 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::messages::{MethodId, ServiceInstanceId};
-    use crate::runtime::RuntimeIdentifier;
     use exonum_merkledb::{Database, TemporaryDB};
+
+    use crate::{
+        messages::{MethodId, ServiceInstanceId},
+        runtime::RuntimeIdentifier,
+    };
+
+    use super::*;
 
     #[derive(Default)]
     pub struct DispatcherBuilder {
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
     }
 
     impl std::fmt::Debug for DispatcherBuilder {
@@ -197,7 +202,7 @@ mod tests {
         pub fn with_runtime(
             mut self,
             runtime_id: u32,
-            runtime: Box<dyn RuntimeEnvironment + Send>,
+            runtime: Box<dyn RuntimeEnvironment>,
         ) -> Self {
             self.runtimes.insert(runtime_id, runtime);
 
@@ -206,7 +211,7 @@ mod tests {
 
         pub fn finalize(self) -> Pin<Box<Dispatcher>> {
             let request_tx = mpsc::channel(0).0;
-            Dispatcher::new_with_runtimes(self.runtimes, request_tx)
+            Dispatcher::with_runtimes(self.runtimes, request_tx)
         }
     }
 
@@ -249,9 +254,9 @@ mod tests {
 
         fn init_service(
             &mut self,
-            _: &mut RuntimeContext,
+            _: &RuntimeContext,
             artifact: ArtifactSpec,
-            _: &InstanceInitData,
+            _: &ServiceConstructor,
         ) -> Result<(), InitError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
@@ -262,7 +267,7 @@ mod tests {
 
         fn execute(
             &self,
-            _: &mut RuntimeContext,
+            _: &RuntimeContext,
             call_info: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -279,7 +284,7 @@ mod tests {
 
         fn before_commit(&self, _: &mut Fork) {}
 
-        fn after_commit(&self, _: &mut Fork) {}
+        fn after_commit(&self, _: &Fork) {}
     }
 
     #[test]
@@ -364,17 +369,17 @@ mod tests {
         let mut fork = db.fork();
         let mut context = RuntimeContext::from_fork(&mut fork);
 
-        let rust_init_data = InstanceInitData {
+        let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,
-            constructor_data: Default::default(),
+            data: Default::default(),
         };
         dispatcher
             .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
             .expect("init_service failed for rust");
 
-        let java_init_data = InstanceInitData {
+        let java_init_data = ServiceConstructor {
             instance_id: JAVA_SERVICE_ID,
-            constructor_data: Default::default(),
+            data: Default::default(),
         };
         dispatcher
             .init_service(&mut context, sample_java_spec.clone(), &java_init_data)
@@ -450,9 +455,9 @@ mod tests {
         let mut fork = db.fork();
         let mut context = RuntimeContext::from_fork(&mut fork);
 
-        let rust_init_data = InstanceInitData {
+        let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,
-            constructor_data: Default::default(),
+            data: Default::default(),
         };
         assert_eq!(
             dispatcher

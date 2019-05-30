@@ -28,7 +28,7 @@ use crate::{
             service::{Service, ServiceFactory},
             RustArtifactSpec, TransactionContext,
         },
-        DeployStatus, InstanceInitData, RuntimeEnvironment,
+        DeployStatus, RuntimeEnvironment, ServiceConstructor,
     },
 };
 
@@ -92,13 +92,12 @@ trait ConfigurationService {
 
 #[derive(Debug)]
 pub struct ConfigurationServiceImpl {
-    config: ConfigurationServiceConfig,
     dispatcher: *mut Dispatcher,
 }
 
 impl ConfigurationServiceImpl {
     fn assign_service_id(&self, fork: &Fork, instance_name: &String) -> Option<u32> {
-        let mut schema = ConfigurationSchema::new(fork);
+        let schema = ConfigurationSchema::new(fork);
         let mut service_ids = schema.service_ids();
 
         if service_ids.contains(instance_name) {
@@ -224,9 +223,9 @@ impl ConfigurationService for ConfigurationServiceImpl {
             .assign_service_id(ctx.fork(), &arg.instance_name)
             .ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
-        let init_data = InstanceInitData {
+        let constructor = ServiceConstructor {
             instance_id,
-            constructor_data: arg.constructor_data,
+            data: arg.constructor_data,
         };
 
         info!(
@@ -235,7 +234,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         );
 
         dispatcher
-            .init_service(ctx.env_context(), artifact_spec, &init_data)
+            .init_service(ctx.env_context(), artifact_spec, &constructor)
             .map_err(|err| {
                 error!("Service instance initialization failed: {:?}", err);
                 ServiceError::InitError(err)
@@ -290,13 +289,13 @@ impl ConfigurationService for ConfigurationServiceImpl {
                 arg.init_tx, instance_id
             );
 
-            let init_data = InstanceInitData {
+            let constructor = ServiceConstructor {
                 instance_id,
-                constructor_data: arg.init_tx.constructor_data,
+                data: arg.init_tx.constructor_data,
             };
 
             dispatcher
-                .init_service(ctx.env_context(), artifact_spec, &init_data)
+                .init_service(ctx.env_context(), artifact_spec, &constructor)
                 .map_err(|err| {
                     error!("Service instance initialization failed: {:?}", err);
                     ServiceError::InitError(err)
@@ -310,36 +309,6 @@ impl ConfigurationService for ConfigurationServiceImpl {
 impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
 
 impl Service for ConfigurationServiceImpl {
-    fn initialize(&mut self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
-        let arg: ConfigurationServiceInit = BinaryValue::from_bytes(arg.get_value().into())
-            .map_err(|e| {
-                ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
-            })?;
-
-        if arg.is_custom_majority_count {
-            let fork = ctx.fork();
-            // Assuming that Service::initialize is called after genesis block is created.
-            let actual_config = CoreSchema::new(fork).actual_configuration();
-            let validators_count = actual_config.validator_keys.len();
-            let majority_count = arg.majority_count as u16;
-
-            let byzantine_majority_count = State::byzantine_majority_count(validators_count);
-            if (majority_count as usize) > validators_count
-                || (majority_count as usize) < byzantine_majority_count
-            {
-                return Err(ServiceError::InvalidMajorityCount {
-                    min: byzantine_majority_count,
-                    max: validators_count,
-                    proposed: majority_count as usize,
-                })?;
-            }
-
-            self.config.majority_count = Some(majority_count);
-        }
-
-        Ok(())
-    }
-
     fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
         ConfigurationSchema::new(snapshot).state_hash()
     }
@@ -350,11 +319,13 @@ pub struct ConfigurationServiceFactory {
 }
 
 impl ConfigurationServiceFactory {
-    pub fn add_to_rust_runtime(dispatcher: &mut Dispatcher, rust_runtime: &mut RustRuntime) {
-        let config_factory = Self {
+    pub const BUILTIN_ID: ServiceInstanceId = 0;
+    pub const BUILTIN_NAME: &'static str = "config";
+
+    pub fn new(dispatcher: &mut Dispatcher) -> Self {
+        Self {
             dispatcher: &mut *dispatcher,
-        };
-        rust_runtime.add_service(Box::new(config_factory))
+        }
     }
 }
 
@@ -366,7 +337,6 @@ impl ServiceFactory for ConfigurationServiceFactory {
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(ConfigurationServiceImpl {
             dispatcher: self.dispatcher,
-            config: Default::default(),
         })
     }
 }

@@ -13,23 +13,24 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-
 use protobuf::well_known_types::Any;
 
-use crate::crypto::{Hash, PublicKey};
-use crate::messages::{CallInfo, ServiceInstanceId};
+use crate::{
+    api::ServiceApiBuilder,
+    crypto::{Hash, PublicKey},
+    messages::{CallInfo, ServiceInstanceId},
+};
 
-use self::rust::RustArtifactSpec;
+use self::{
+    error::{DeployError, ExecutionError, InitError},
+    rust::RustArtifactSpec,
+};
 
 #[macro_use]
 pub mod rust;
-
 pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
-
-use crate::api::ServiceApiBuilder;
-use error::{DeployError, ExecutionError, InitError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DeployStatus {
@@ -38,9 +39,24 @@ pub enum DeployStatus {
 }
 
 #[derive(Debug)]
-pub struct InstanceInitData {
+pub struct ServiceConstructor {
     pub instance_id: ServiceInstanceId,
-    pub constructor_data: Any,
+    pub data: Any,
+}
+
+impl ServiceConstructor {
+    pub fn new(instance_id: ServiceInstanceId, data: impl BinaryValue) -> Self {
+        let bytes = data.into_bytes();
+
+        Self {
+            instance_id,
+            data: {
+                let mut data = Any::new();
+                data.set_value(bytes);
+                data
+            },
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -66,7 +82,7 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 
 /// Service runtime environment.
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
-pub trait RuntimeEnvironment {
+pub trait RuntimeEnvironment: Send + 'static {
     /// Start artifact deploy.
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 
@@ -80,15 +96,15 @@ pub trait RuntimeEnvironment {
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
         &mut self,
-        ctx: &mut RuntimeContext,
+        ctx: &RuntimeContext,
         artifact: ArtifactSpec,
-        init: &InstanceInitData,
+        constructor: &ServiceConstructor,
     ) -> Result<(), InitError>;
 
     /// Execute transaction.
     fn execute(
         &self,
-        ctx: &mut RuntimeContext,
+        ctx: &RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -101,26 +117,22 @@ pub trait RuntimeEnvironment {
 
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
-    fn after_commit(&self, fork: &mut Fork);
+    fn after_commit(&self, fork: &Fork);
 
-    fn genesis_init(&self, _ctx: &mut Fork) -> Result<(), failure::Error> {
-        Ok(())
-    }
-
-    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
     }
 }
 
 #[derive(Debug)]
 pub struct RuntimeContext<'a> {
-    fork: &'a mut Fork,
+    fork: &'a Fork,
     author: PublicKey,
     tx_hash: Hash,
 }
 
 impl<'a> RuntimeContext<'a> {
-    pub fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
+    pub fn new(fork: &'a Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
         Self {
             fork,
             author,
@@ -128,7 +140,17 @@ impl<'a> RuntimeContext<'a> {
         }
     }
 
-    fn from_fork(fork: &'a mut Fork) -> Self {
+    // TODO Implement author enum. [ECR-3222]
+    fn from_fork(fork: &'a Fork) -> Self {
         Self::new(fork, &PublicKey::zero(), &Hash::zero())
+    }
+}
+
+impl<T> From<T> for Box<dyn RuntimeEnvironment>
+where
+    T: RuntimeEnvironment,
+{
+    fn from(runtime: T) -> Self {
+        Box::new(runtime) as Self
     }
 }

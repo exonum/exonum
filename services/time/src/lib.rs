@@ -47,7 +47,7 @@ use exonum::{
     helpers::fabric::{self, Context},
     impl_service_dispatcher,
     runtime::rust::{
-        service::{GenesisInitInfo, Service, ServiceFactory},
+        service::{Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
     },
 };
@@ -119,7 +119,7 @@ impl Service for TimeServiceImpl {
     }
 
     /// Creates transaction after commit of the block.
-    fn after_commit(&self, fork: &mut Fork) {
+    fn after_commit(&self, fork: &Fork) {
         // The transaction must be created by the validator.
 
         // TODO can't implement after_commit via fork
@@ -145,10 +145,6 @@ impl ServiceFactory for ServiceFactoryImpl {
 
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(TimeServiceImpl::new())
-    }
-
-    fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
-        vec![]
     }
 }
 

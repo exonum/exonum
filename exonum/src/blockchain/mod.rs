@@ -47,11 +47,10 @@ pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_merkledb::{
-    BinaryValue, Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch,
-    Result as StorageResult, Snapshot,
+    Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch, Result as StorageResult,
+    Snapshot,
 };
 use futures::sync::mpsc;
-use protobuf::well_known_types::Any;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -68,10 +67,9 @@ use crate::{
     node::ApiSender,
     runtime::configuration_new::ConfigurationServiceFactory,
     runtime::{
-        configuration_new::{self as configuration, ConfigurationServiceInit},
         dispatcher::Dispatcher,
         rust::{service::ServiceFactory, RustRuntime},
-        InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+        RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
     },
 };
 
@@ -112,13 +110,17 @@ impl Blockchain {
         let mut dispatcher = Dispatcher::new(internal_req_sender);
         let mut rust_runtime = RustRuntime::new(&mut dispatcher);
 
-        ConfigurationServiceFactory::add_to_rust_runtime(&mut dispatcher, &mut rust_runtime);
-
+        let service_factory = Box::new(ConfigurationServiceFactory::new(&mut dispatcher));
+        rust_runtime.add_builtin_service(
+            &mut dispatcher,
+            service_factory,
+            ConfigurationServiceFactory::BUILTIN_ID,
+            ConfigurationServiceFactory::BUILTIN_NAME,
+        );
         for s in services.into_iter() {
-            rust_runtime.add_service(s);
+            rust_runtime.add_service_factory(s);
         }
-
-        dispatcher.add_runtime(RuntimeIdentifier::Rust as u32, Box::new(rust_runtime));
+        dispatcher.add_runtime(RuntimeIdentifier::Rust as u32, rust_runtime);
 
         Self {
             db: storage.into(),
@@ -213,45 +215,7 @@ impl Blockchain {
         };
 
         let patch = {
-            let mut fork = self.fork();
-            let mut ctx = RuntimeContext::new(&mut fork, &PublicKey::zero(), &Hash::zero());
-            // Update service tables
-
-            let config_init_data = {
-                let mut config_init = ConfigurationServiceInit::default();
-                if let Some(majority_count) = config_propose
-                    .consensus
-                    .configuration_service_majority_count
-                {
-                    config_init.is_custom_majority_count = true;
-                    config_init.majority_count = majority_count as u32;
-                }
-                let mut constructor_data = Any::new();
-                constructor_data.set_value(config_init.into_bytes());
-                InstanceInitData {
-                    instance_id: configuration::SERVICE_ID,
-                    constructor_data,
-                }
-            };
-
-            {
-                let mut dispatcher = self.dispatcher.lock().expect("dispatcher lock");
-                dispatcher
-                    .start_deploy(configuration::artifact_spec().into())
-                    .expect("Config service deploy");
-                dispatcher
-                    .init_service(
-                        &mut ctx,
-                        configuration::artifact_spec().into(),
-                        &config_init_data,
-                    )
-                    .expect("Config service init");
-
-                dispatcher
-                    .genesis_init(&mut fork)
-                    .expect("Services init error");
-            }
-
+            let fork = self.fork();
             // Commit actual configuration
             {
                 let mut schema = Schema::new(&fork);
@@ -341,7 +305,6 @@ impl Blockchain {
             // Skip execution for genesis block.
             if height > Height(0) {
                 let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
-
                 dispatcher.before_commit(&mut fork);
             }
 
