@@ -52,36 +52,36 @@ const ITEM_COUNT: [BenchParams; 4] = [
         blocks: 10,
         txs_in_block: 1_000,
     },
-    // BenchParams {
-    //     users: 10_000,
-    //     blocks: 100,
-    //     txs_in_block: 100,
-    // },
-    // BenchParams {
-    //     users: 100,
-    //     blocks: 100,
-    //     txs_in_block: 100,
-    // },
-    // BenchParams {
-    //     users: 10_000,
-    //     blocks: 1_000,
-    //     txs_in_block: 10,
-    // },
-    // BenchParams {
-    //     users: 100,
-    //     blocks: 1_000,
-    //     txs_in_block: 10,
-    // },
-    // BenchParams {
-    //     users: 10_000,
-    //     blocks: 10_000,
-    //     txs_in_block: 1,
-    // },
-    // BenchParams {
-    //     users: 100,
-    //     blocks: 10_000,
-    //     txs_in_block: 1,
-    // },
+    BenchParams {
+        users: 10_000,
+        blocks: 100,
+        txs_in_block: 100,
+    },
+    BenchParams {
+        users: 100,
+        blocks: 100,
+        txs_in_block: 100,
+    },
+    BenchParams {
+        users: 10_000,
+        blocks: 1_000,
+        txs_in_block: 10,
+    },
+    BenchParams {
+        users: 100,
+        blocks: 1_000,
+        txs_in_block: 10,
+    },
+    BenchParams {
+        users: 10_000,
+        blocks: 10_000,
+        txs_in_block: 1,
+    },
+    BenchParams {
+        users: 100,
+        blocks: 10_000,
+        txs_in_block: 1,
+    },
 ];
 
 #[cfg(all(test, feature = "long_benchmarks"))]
