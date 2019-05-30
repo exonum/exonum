@@ -55,7 +55,6 @@ use futures::sync::mpsc;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, iter, mem, panic,
-    pin::Pin,
     sync::{Arc, Mutex},
 };
 

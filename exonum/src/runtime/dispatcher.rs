@@ -15,7 +15,7 @@
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{future::Future, sink::Sink, sync::mpsc};
 
-use std::{collections::HashMap, pin::Pin};
+use std::collections::HashMap;
 
 use crate::{
     api::ServiceApiBuilder,
