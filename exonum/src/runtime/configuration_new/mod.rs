@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::transactions::{ConfigurationServiceInit, Deploy, DeployInit, Init};
+pub use self::transactions::{Deploy, Init};
 
 use exonum_merkledb::{BinaryValue, Fork, IndexAccess, Snapshot};
 use protobuf::well_known_types::Any;
@@ -32,17 +32,22 @@ use crate::{
     },
 };
 
+use crate::{
+    messages::{MethodId, ServiceInstanceId},
+    runtime::rust::RustRuntime,
+};
+
+use self::{
+    config::ConfigurationServiceConfig,
+    errors::Error as ServiceError,
+    schema::{Schema as ConfigurationSchema, VotingDecision},
+    transactions::{enough_votes_to_commit, VotingContext},
+};
+
 mod config;
 mod errors;
 mod schema;
 mod transactions;
-
-use crate::messages::{MethodId, ServiceInstanceId};
-use crate::runtime::rust::RustRuntime;
-use config::ConfigurationServiceConfig;
-use errors::Error as ServiceError;
-use schema::{Schema as ConfigurationSchema, VotingDecision};
-use transactions::{enough_votes_to_commit, VotingContext};
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: ServiceInstanceId = 0;
@@ -82,12 +87,6 @@ trait ConfigurationService {
     ) -> Result<(), ExecutionError>;
 
     fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>;
-
-    fn deploy_and_init(
-        &self,
-        ctx: TransactionContext,
-        arg: transactions::DeployInit,
-    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
@@ -239,68 +238,6 @@ impl ConfigurationService for ConfigurationServiceImpl {
                 error!("Service instance initialization failed: {:?}", err);
                 ServiceError::InitError(err)
             })?;
-
-        Ok(())
-    }
-
-    fn deploy_and_init(
-        &self,
-        mut ctx: TransactionContext,
-        arg: transactions::DeployInit,
-    ) -> Result<(), ExecutionError> {
-        // TODO reduce copy-paste.
-
-        // Deploy
-        {
-            info!("Deploying service. {:?}", arg.deploy_tx);
-
-            let artifact_spec = arg.deploy_tx.get_artifact_spec();
-
-            let dispatcher = self.get_dispatcher_mut();
-            dispatcher
-                .start_deploy(artifact_spec.clone())
-                .map_err(|err| {
-                    error!("Service instance deploy failed: {:?}", err);
-                    ServiceError::DeployError(err)
-                })?;
-
-            // Check if service is deployed.
-            let cancel_if_incomplete = true;
-            if dispatcher
-                .check_deploy_status(artifact_spec, cancel_if_incomplete)
-                .map_err(|err| ServiceError::DeployError(err))?
-                != DeployStatus::Deployed
-            {
-                return Err(ServiceError::InitError(InitError::NotDeployed))?;
-            }
-        }
-
-        // Init
-        {
-            let artifact_spec = arg.init_tx.get_artifact_spec();
-
-            let dispatcher = self.get_dispatcher_mut();
-
-            let instance_id = self
-                .assign_service_id(ctx.fork(), &arg.init_tx.instance_name)
-                .ok_or(ServiceError::ServiceInstanceNameInUse)?;
-            info!(
-                "Initializing service. Init_tx: {:?}, id: {}",
-                arg.init_tx, instance_id
-            );
-
-            let constructor = ServiceConstructor {
-                instance_id,
-                data: arg.init_tx.constructor_data,
-            };
-
-            dispatcher
-                .init_service(ctx.env_context(), artifact_spec, &constructor)
-                .map_err(|err| {
-                    error!("Service instance initialization failed: {:?}", err);
-                    ServiceError::InitError(err)
-                })?;
-        }
 
         Ok(())
     }

@@ -63,9 +63,3 @@ message InitTx {
   string instance_name = 3;
   google.protobuf.Any constructor_data = 4;
 }
-
-// Transaction for instant deploy and initialization of service.
-message DeployInitTx {
-  DeployTx deploy_tx = 1;
-  InitTx init_tx = 2;
-}

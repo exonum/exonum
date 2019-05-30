@@ -91,18 +91,6 @@ pub struct VoteAgainst {
     pub cfg_hash: Hash,
 }
 
-// TODO Implement more convenient wrapper [ECR-3222]
-
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, Default)]
-#[exonum(
-    pb = "proto::schema::configuration::ConfigurationServiceInit",
-    crate = "crate"
-)]
-pub struct ConfigurationServiceInit {
-    pub is_custom_majority_count: bool,
-    pub majority_count: u32,
-}
-
 // TODO implement sign for transactions
 // impl VoteAgainst {
 //     /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
@@ -404,11 +392,4 @@ impl Init {
     pub fn get_artifact_spec(&self) -> ArtifactSpec {
         artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::schema::configuration::DeployInitTx", crate = "crate")]
-pub struct DeployInit {
-    pub deploy_tx: Deploy,
-    pub init_tx: Init,
 }
