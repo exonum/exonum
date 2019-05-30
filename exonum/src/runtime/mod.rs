@@ -149,7 +149,9 @@ impl<'a> RuntimeContext<'a> {
     }
 
     pub(crate) fn take_dispatcher_actions(&mut self) -> Vec<dispatcher::Action> {
-        self.dispatcher_actions.drain(..).collect()
+        let mut other = Vec::new();
+        std::mem::swap(&mut self.dispatcher_actions, &mut other);
+        other
     }
 
     // TODO Implement author enum. [ECR-3222]
