@@ -33,6 +33,7 @@ use crate::{
 
 use self::service::{Service, ServiceFactory};
 use super::{
+    dispatcher,
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
     ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
     ServiceConstructor, ServiceInstanceId,
@@ -43,10 +44,9 @@ pub mod service;
 #[cfg(test)]
 pub mod tests;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RustRuntime {
     inner: RustRuntimeInner,
-    dispatcher: *mut Dispatcher,
 }
 
 #[derive(Debug)]
@@ -78,11 +78,8 @@ impl AsMut<dyn Service + 'static> for InitializedService {
 }
 
 impl RustRuntime {
-    pub fn new(dispatcher: &mut Dispatcher) -> Self {
-        Self {
-            inner: Default::default(),
-            dispatcher: &mut *dispatcher,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     fn parse_artifact(&self, artifact: &ArtifactSpec) -> Option<RustArtifactSpec> {
@@ -96,7 +93,7 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    // TODO Implement special DispatcherBuilder with builtin rust runtime 
+    // TODO Implement special DispatcherBuilder with builtin rust runtime
     // and move this method to it. [ECR-3222]
     pub(crate) fn add_builtin_service(
         &mut self,
@@ -133,15 +130,6 @@ impl RustRuntime {
         info!("Added service factory {}", artifact);
 
         self.inner.services.insert(artifact, service_factory);
-    }
-
-    #[allow(unsafe_code)]
-    fn get_dispatcher(&self) -> &Dispatcher {
-        unsafe {
-            self.dispatcher
-                .as_ref()
-                .expect("*mut Dispatcher dereference.")
-        }
     }
 }
 
@@ -224,7 +212,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn init_service(
         &mut self,
-        context: &RuntimeContext,
+        context: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &ServiceConstructor,
     ) -> Result<(), InitError> {
@@ -265,18 +253,16 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn execute(
         &self,
-        context: &RuntimeContext,
+        context: &mut RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let inner = &self.inner;
-        let instance = inner.initialized.get(&dispatch.instance_id).unwrap();
+        let instance = self.inner.initialized.get(&dispatch.instance_id).unwrap();
 
-        let ctx = TransactionContext::new(context, self);
-
+        let context = TransactionContext::new(context, self);
         instance
             .as_ref()
-            .call(dispatch.method_id, ctx, payload)
+            .call(dispatch.method_id, context, payload)
             .map_err(|e| {
                 ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
             })?
@@ -337,12 +323,12 @@ impl RuntimeEnvironment for RustRuntime {
 
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    env_context: &'a RuntimeContext<'b>,
+    env_context: &'a mut RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    fn new(env_context: &'a RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
+    fn new(env_context: &'a mut RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
         Self {
             env_context,
             runtime,
@@ -371,5 +357,9 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         self.runtime.execute(self.env_context, dispatch, payload)
+    }
+
+    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
+        self.env_context.dispatch_action(action)
     }
 }

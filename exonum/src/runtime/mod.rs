@@ -80,6 +80,8 @@ impl From<RustArtifactSpec> for ArtifactSpec {
     }
 }
 
+// TODO Think about environment methods' names. [ECR-3222]
+
 /// Service runtime environment.
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait RuntimeEnvironment: Send + 'static {
@@ -96,7 +98,7 @@ pub trait RuntimeEnvironment: Send + 'static {
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
         &mut self,
-        ctx: &RuntimeContext,
+        ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         constructor: &ServiceConstructor,
     ) -> Result<(), InitError>;
@@ -104,7 +106,7 @@ pub trait RuntimeEnvironment: Send + 'static {
     /// Execute transaction.
     fn execute(
         &self,
-        ctx: &RuntimeContext,
+        ctx: &mut RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -129,6 +131,7 @@ pub struct RuntimeContext<'a> {
     fork: &'a Fork,
     author: PublicKey,
     tx_hash: Hash,
+    dispatcher_actions: Vec<dispatcher::Action>,
 }
 
 impl<'a> RuntimeContext<'a> {
@@ -137,7 +140,18 @@ impl<'a> RuntimeContext<'a> {
             fork,
             author,
             tx_hash,
+            dispatcher_actions: Vec::new(),
         }
+    }
+
+    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
+        self.dispatcher_actions.push(action);
+    }
+
+    pub(crate) fn take_dispatcher_actions(&mut self) -> Vec<dispatcher::Action> {
+        let mut other = Vec::new();
+        std::mem::swap(&mut self.dispatcher_actions, &mut other);
+        other
     }
 
     // TODO Implement author enum. [ECR-3222]
