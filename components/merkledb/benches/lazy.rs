@@ -6,7 +6,8 @@ use exonum_merkledb::{
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-const ITEM_COUNT: u16 = 1000;
+const SEED: [u8; 16] = [100; 16];
+const ITEM_COUNT: u16 = 100;
 
 fn bench_fn<T, F>(b: &mut Bencher, index_access: T, benchmark: F)
 where
@@ -17,22 +18,23 @@ where
 }
 
 fn bench_default_list<T: IndexAccess>(index_access: T) {
+    let mut rng = XorShiftRng::from_seed(SEED);
     let mut index: ProofListIndex<_, u32> = ProofListIndex::new("index", index_access.clone());
-    for i in 0..ITEM_COUNT {
-        index.push(i.into());
+    for _ in 0..ITEM_COUNT {
+        index.push(rng.next_u32());
     }
     let hash = index.object_hash();
-    black_box(index);
     black_box(hash);
 }
 
-fn bench_default_lazy_list<T: ObjectAccess>(index_access: T) {
-    let mut index: LazyListIndex<_, u32> = LazyListIndex::new("index", index_access.clone());
-    for i in 0..ITEM_COUNT {
-        index.push(i.into());
+fn bench_lazy_list<T: ObjectAccess>(index_access: T) {
+    let mut rng = XorShiftRng::from_seed(SEED);
+    let mut index: LazyListIndex<_, u32> = LazyListIndex::new("index2", index_access.clone());
+    for _ in 0..ITEM_COUNT {
+        index.push(rng.next_u32());
     }
+    index.update_hashes();
     let hash = index.object_hash();
-    black_box(index);
     black_box(hash);
 }
 
@@ -46,6 +48,6 @@ pub fn bench_lazy_hash(c: &mut Criterion) {
     c.bench_function("lazy/index/lazy_object_hash", move |b| {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        bench_fn(b, &fork, |fork| bench_default_lazy_list(fork));
+        bench_fn(b, &fork, |fork| bench_lazy_list(fork));
     });
 }

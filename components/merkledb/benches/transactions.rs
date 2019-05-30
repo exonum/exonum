@@ -23,15 +23,15 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, ListIndex, MapIndex,
-    ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
+    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, LazyListIndex, ListIndex,
+    MapIndex, ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
 };
 
 const SEED: [u8; 16] = [100; 16];
 const SAMPLE_SIZE: usize = 10;
 
 #[cfg(all(test, not(feature = "long_benchmarks")))]
-const ITEM_COUNT: [BenchParams; 10] = [
+const ITEM_COUNT: [BenchParams; 4] = [
     BenchParams {
         users: 10_000,
         blocks: 1,
@@ -52,36 +52,36 @@ const ITEM_COUNT: [BenchParams; 10] = [
         blocks: 10,
         txs_in_block: 1_000,
     },
-    BenchParams {
-        users: 10_000,
-        blocks: 100,
-        txs_in_block: 100,
-    },
-    BenchParams {
-        users: 100,
-        blocks: 100,
-        txs_in_block: 100,
-    },
-    BenchParams {
-        users: 10_000,
-        blocks: 1_000,
-        txs_in_block: 10,
-    },
-    BenchParams {
-        users: 100,
-        blocks: 1_000,
-        txs_in_block: 10,
-    },
-    BenchParams {
-        users: 10_000,
-        blocks: 10_000,
-        txs_in_block: 1,
-    },
-    BenchParams {
-        users: 100,
-        blocks: 10_000,
-        txs_in_block: 1,
-    },
+    // BenchParams {
+    //     users: 10_000,
+    //     blocks: 100,
+    //     txs_in_block: 100,
+    // },
+    // BenchParams {
+    //     users: 100,
+    //     blocks: 100,
+    //     txs_in_block: 100,
+    // },
+    // BenchParams {
+    //     users: 10_000,
+    //     blocks: 1_000,
+    //     txs_in_block: 10,
+    // },
+    // BenchParams {
+    //     users: 100,
+    //     blocks: 1_000,
+    //     txs_in_block: 10,
+    // },
+    // BenchParams {
+    //     users: 10_000,
+    //     blocks: 10_000,
+    //     txs_in_block: 1,
+    // },
+    // BenchParams {
+    //     users: 100,
+    //     blocks: 10_000,
+    //     txs_in_block: 1,
+    // },
 ];
 
 #[cfg(all(test, feature = "long_benchmarks"))]
@@ -214,8 +214,10 @@ impl<T: ObjectAccess> RefSchema<T> {
         self.0.get_object("wallets")
     }
 
-    fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<T, Hash>> {
-        self.0.get_object(("wallets.history", owner))
+    fn wallets_history(&self, owner: &PublicKey) -> RefMut<LazyListIndex<T, Hash>> {
+        RefMut {
+            value: LazyListIndex::new_in_family("wallets_history", owner, self.0.clone()),
+        }
     }
 }
 
@@ -223,6 +225,7 @@ impl<T: ObjectAccess> RefSchema<T> {
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
         let mut history = self.wallets_history(owner);
         history.push(tx_hash);
+        history.update_hashes();
         history.object_hash()
     }
 }

@@ -16,20 +16,28 @@
 
 pub use super::proof::{ListProof, ListProofError};
 
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+
 use std::{
+    io::{Read, Write},
     marker::PhantomData,
+    mem::size_of,
     ops::{Bound, RangeBounds},
 };
 
-use exonum_crypto::Hash;
+use exonum_crypto::{Hash, HASH_SIZE};
 
 use super::{key::ProofListKey, proof::ProofOfAbsence};
-use crate::views::IndexAddress;
 use crate::{
     hash::HashTag,
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
+    views::{
+        AnyObject, BinaryAttribute, IndexAccess, IndexAddress, IndexBuilder, IndexState, IndexType,
+        Iter as ViewIter, View,
+    },
     BinaryKey, BinaryValue, ObjectHash,
 };
+
+const LEN_SIZE: usize = size_of::<u64>();
 
 // TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
@@ -42,7 +50,7 @@ use crate::{
 #[derive(Debug)]
 pub struct LazyListIndex<T: IndexAccess, V> {
     base: View<T>,
-    state: IndexState<T, u64>,
+    state: IndexState<T, ProofListState>,
     _v: PhantomData<V>,
 }
 
@@ -74,6 +82,56 @@ where
 
     fn metadata(&self) -> Vec<u8> {
         self.state.metadata().to_bytes()
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+struct ProofListState {
+    len: u64,
+    hash: Option<Hash>,
+}
+
+impl ProofListState {
+    fn update_len(&mut self, len: u64) {
+        self.len = len;
+    }
+
+    fn update_hash(&mut self, hash: Hash) {
+        self.hash = Some(hash);
+    }
+}
+
+impl BinaryAttribute for ProofListState {
+    fn size(&self) -> usize {
+        let hash_size = match self.hash {
+            Some(_) => HASH_SIZE,
+            None => 0,
+        };
+
+        hash_size + LEN_SIZE
+    }
+
+    fn write<W: Write>(&self, buffer: &mut W) {
+        buffer.write_u64::<LittleEndian>(self.len).unwrap();
+
+        if let Some(hash) = self.hash {
+            let mut tmp = [0_u8; HASH_SIZE];
+            hash.write(&mut tmp);
+            buffer.write_all(&tmp).unwrap();
+        }
+    }
+
+    fn read<R: Read>(buffer: &mut R) -> Self {
+        let mut tmp = [0_u8; HASH_SIZE];
+        let len = buffer.read_u64::<LittleEndian>().unwrap();
+
+        let hash = match buffer.read(&mut tmp).unwrap() {
+            0 => None,
+            HASH_SIZE => Some(Hash::read(&tmp)),
+            other => panic!("Unexpected attribute length: {}", other),
+        };
+
+        Self { len, hash }
     }
 }
 
@@ -237,7 +295,9 @@ where
     }
 
     fn set_len(&mut self, len: u64) {
-        self.state.set(len)
+        let mut metadata = self.state.get();
+        metadata.update_len(len);
+        self.state.set(metadata);
     }
 
     fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
@@ -327,7 +387,7 @@ where
     /// assert_eq!(1, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.state.get()
+        self.state.get().len
     }
 
     /// Returns the height of the proof list.
@@ -496,23 +556,7 @@ where
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.set_len(len + 1);
-        let mut key = ProofListKey::new(1, len);
-
-        //self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
-        self.base.put(&key, Hash::zero());
         self.base.put(&ProofListKey::leaf(len), value);
-        while key.height() < self.height() {
-            //    let _hash = if key.is_left() {
-            //        HashTag::hash_single_node(&self.get_branch_unchecked(key))
-            //    } else {
-            //        HashTag::hash_node(
-            //            &self.get_branch_unchecked(key.as_left()),
-            //            &self.get_branch_unchecked(key),
-            //        )
-            //    };
-            key = key.parent();
-            self.set_branch(key, Hash::zero());
-        }
     }
 
     /// Extends the proof list with the contents of an iterator.
@@ -569,23 +613,7 @@ where
                 index
             );
         }
-        let mut key = ProofListKey::new(1, index);
-        //self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
-        self.base.put(&key, vec![]);
         self.base.put(&ProofListKey::leaf(index), value);
-        while key.height() < self.height() {
-            let (left, right) = (key.as_left(), key.as_right());
-            let _hash = if self.has_branch(right) {
-                HashTag::hash_node(
-                    &self.get_branch_unchecked(left),
-                    &self.get_branch_unchecked(right),
-                )
-            } else {
-                HashTag::hash_single_node(&self.get_branch_unchecked(left))
-            };
-            key = key.parent();
-            self.set_branch(key, Hash::zero());
-        }
     }
 
     /// Clears the proof list, removing all values.
@@ -615,6 +643,61 @@ where
     pub fn clear(&mut self) {
         self.base.clear();
         self.state.clear();
+    }
+
+    pub fn update_hashes(&mut self) {
+        let hash = self.calculate_and_save_hashes();
+        let mut metadata = self.state.get();
+        metadata.update_hash(hash);
+        self.state.set(metadata);
+    }
+
+    fn calculate_and_save_hashes(&mut self) -> Hash {
+        let mut hashes: Vec<Hash> = self
+            .iter()
+            .map(|v| HashTag::hash_leaf(&v.to_bytes()))
+            .collect();
+
+        if hashes.is_empty() {
+            return HashTag::empty_list_hash();
+        }
+
+        for (index, hash) in hashes.iter().enumerate() {
+            let key = ProofListKey::new(1, index as u64);
+            self.set_branch(key, *hash);
+        }
+
+        let mut end = hashes.len();
+        let mut index = 0;
+        let mut height = 2;
+        let mut node_index = 0;
+
+        while end > 1 {
+            let first = hashes[index];
+
+            let result = if index < end - 1 {
+                HashTag::hash_node(&first, &hashes[index + 1])
+            } else {
+                HashTag::hash_single_node(&first)
+            };
+
+            hashes[index / 2] = result;
+
+            index += 2;
+
+            let key = ProofListKey::new(height, node_index as u64);
+            self.set_branch(key, result);
+
+            node_index += 1;
+            if index >= end {
+                index = 0;
+                node_index = 0;
+                end = end / 2 + end % 2;
+                height += 1;
+            }
+        }
+
+        HashTag::hash_list_node(hashes.len() as u64, hashes[0])
     }
 }
 
@@ -654,13 +737,7 @@ where
     /// assert_ne!(hash, default_hash);
     /// ```
     fn object_hash(&self) -> Hash {
-        HashTag::hash_list(
-            &self
-                .iter()
-                .map(|v| HashTag::hash_leaf(&v.to_bytes()))
-                .collect::<Vec<Hash>>(),
-        )
-        //HashTag::hash_list_node(self.len(), self.merkle_root())
+        self.state.get().hash.expect("Hash is not calculated yet")
     }
 }
 
@@ -693,26 +770,107 @@ mod tests {
 
     use super::*;
     use crate::{Database, ProofListIndex, TemporaryDB};
+    use serde_json::{from_str, to_string};
 
     #[test]
-    fn lazy_hash() {
+    fn update_hashes() {
+        let n = 200;
+
         let db = TemporaryDB::new();
 
         let fork = db.fork();
         let mut index = LazyListIndex::new("index", &fork);
-        for i in 0..10 {
+        for i in 0..n {
             index.push(i);
         }
 
         let mut index2 = ProofListIndex::new("index2", &fork);
-        for i in 0..10 {
+        for i in 0..n {
             index2.push(i);
         }
 
-        // let proof = index.get_range_proof(1..9);
-        //       dbg!(proof);
-        //
+        index.update_hashes();
+
+        let height = index.height();
+
+        let key = ProofListKey::new(height, 0);
+        let branch1 = index.get_branch(key);
+        let branch2 = index2.get_branch(key);
+        assert_eq!(branch1, branch2);
+
+        let key = ProofListKey::new(height - 1, 0);
+        let branch1 = index.get_branch(key);
+        let branch2 = index2.get_branch(key);
+        assert_eq!(branch1, branch2);
+
         assert_eq!(index.object_hash(), index2.object_hash());
     }
 
+    #[test]
+    fn test_proof_structure() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut index = LazyListIndex::new("index", &fork);
+        index.update_hashes();
+        assert_eq!(index.object_hash(), HashTag::empty_list_hash());
+
+        // spell-checker:ignore upup
+
+        let h1 = hash_leaf_node(&[0, 1, 2]);
+        let h2 = hash_leaf_node(&[1, 2, 3]);
+        let h3 = hash_leaf_node(&[2, 3, 4]);
+        let h4 = hash_leaf_node(&[3, 4, 5]);
+        let h5 = hash_leaf_node(&[4, 5, 6]);
+        let h12 = hash_branch_node(&[h1.as_ref(), h2.as_ref()].concat());
+        let h34 = hash_branch_node(&[h3.as_ref(), h4.as_ref()].concat());
+        let h1234 = hash_branch_node(&[h12.as_ref(), h34.as_ref()].concat());
+        let h5up = hash_branch_node(h5.as_ref());
+        let h5upup = hash_branch_node(h5up.as_ref());
+        let h12345 = hash_branch_node(&[h1234.as_ref(), h5upup.as_ref()].concat());
+
+        for i in 0_u8..5 {
+            index.push(vec![i, i + 1, i + 2]);
+        }
+
+        let list_hash = HashTag::hash_list_node(index.len(), h12345);
+
+        index.update_hashes();
+        assert_eq!(index.object_hash(), list_hash);
+        let range_proof = index.get_range_proof(4..5);
+
+        assert_eq!(
+            vec![4, 5, 6],
+            *(range_proof.validate(list_hash, 5).unwrap()[0].1)
+        );
+
+        let serialized_proof = to_string(&range_proof).unwrap();
+        let deserialized_proof: ListProof<Vec<u8>> = from_str(&serialized_proof).unwrap();
+        assert_eq!(deserialized_proof, range_proof);
+
+        if let ListProof::Right(left_hash1, right_proof1) = range_proof {
+            assert_eq!(left_hash1, h1234);
+            let unboxed_proof = *right_proof1;
+            if let ListProof::Left(left_proof2, right_hash2) = unboxed_proof {
+                assert!(right_hash2.is_none());
+                let unboxed_proof = *left_proof2;
+                if let ListProof::Left(_, right_hash3) = unboxed_proof {
+                    assert!(right_hash3.is_none());
+                } else {
+                    panic!("Expected ListProof::Left variant");
+                }
+            } else {
+                panic!("Expected ListProof::Left variant");
+            }
+        } else {
+            panic!("Expected ListProof::Right variant");
+        }
+    }
+
+    fn hash_leaf_node(value: &[u8]) -> Hash {
+        HashTag::Blob.hash_stream().update(value).hash()
+    }
+
+    fn hash_branch_node(value: &[u8]) -> Hash {
+        HashTag::ListBranchNode.hash_stream().update(value).hash()
+    }
 }

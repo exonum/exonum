@@ -277,7 +277,8 @@ pub struct Ref<T> {
 #[derive(Debug)]
 /// Utility trait to provide mutable references to `MerkleDB` objects.
 pub struct RefMut<T> {
-    value: T,
+    ///TODO: remove pub
+    pub value: T,
 }
 
 impl<T> Deref for Ref<T> {
