@@ -107,12 +107,12 @@ impl Blockchain {
         internal_req_sender: mpsc::Sender<InternalRequest>,
     ) -> Self {
         let dispatcher = DispatcherBuilder::new(internal_req_sender)
-            .builtin_service(
+            .with_builtin_service(
                 ConfigurationServiceFactory,
                 ConfigurationServiceFactory::BUILTIN_ID,
                 ConfigurationServiceFactory::BUILTIN_NAME,
             )
-            .service_factories(services)
+            .with_service_factories(services)
             .finalize();
 
         Self {

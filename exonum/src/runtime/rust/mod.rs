@@ -356,7 +356,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.runtime_context.author
     }
 
-    // TODO Should we support the ability to call other service from the rust runtime during 
+    // TODO Should we support the ability to call other service from the rust runtime during
     // the transaction execution?
     pub fn dispatch_call(
         &mut self,

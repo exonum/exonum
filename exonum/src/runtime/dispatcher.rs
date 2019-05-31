@@ -193,7 +193,7 @@ impl DispatcherBuilder {
 
     /// Adds built-in service with predefined identifier, keep in mind that the initialize method
     /// of service will not be invoked and thus service must have and empty constructor.
-    pub fn builtin_service(
+    pub fn with_builtin_service(
         mut self,
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         instance_id: ServiceInstanceId,
@@ -212,14 +212,17 @@ impl DispatcherBuilder {
     }
 
     /// Adds service factory to the Rust runtime.
-    pub fn service_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
+    pub fn with_service_factory(
+        mut self,
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+    ) -> Self {
         self.builtin_runtime
             .add_service_factory(service_factory.into());
         self
     }
 
     /// Adds given service factories to the Rust runtime.
-    pub fn service_factories(
+    pub fn with_service_factories(
         mut self,
         service_factories: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
     ) -> Self {
@@ -230,7 +233,7 @@ impl DispatcherBuilder {
     }
 
     /// Adds additional runtime.
-    pub fn runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
+    pub fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
         self.dispatcher.add_runtime(id, runtime);
         self
     }
@@ -371,8 +374,8 @@ mod tests {
         let runtime_b = SampleRuntime::new(RuntimeIdentifier::Java as u32, 1, 0);
 
         let dispatcher = DispatcherBuilder::dummy()
-            .runtime(runtime_a.runtime_type, runtime_a)
-            .runtime(runtime_b.runtime_type, runtime_b)
+            .with_runtime(runtime_a.runtime_type, runtime_a)
+            .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
         assert!(dispatcher
@@ -407,8 +410,8 @@ mod tests {
         );
 
         let mut dispatcher = DispatcherBuilder::dummy()
-            .runtime(runtime_a.runtime_type, runtime_a)
-            .runtime(runtime_b.runtime_type, runtime_b)
+            .with_runtime(runtime_a.runtime_type, runtime_a)
+            .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
         let sample_rust_spec = ArtifactSpec {
