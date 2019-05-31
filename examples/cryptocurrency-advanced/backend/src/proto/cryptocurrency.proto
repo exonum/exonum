@@ -55,3 +55,5 @@ message Wallet {
   // `Hash` of the transactions history.
   exonum.Hash history_hash = 5;
 }
+
+message ConstructorData {}
