@@ -66,7 +66,7 @@ use crate::{
     node::ApiSender,
     runtime::configuration_new::ConfigurationServiceFactory,
     runtime::{
-        dispatcher::Dispatcher,
+        dispatcher::{Dispatcher, DispatcherBuilder},
         rust::{service::ServiceFactory, RustRuntime},
         RuntimeContext, RuntimeIdentifier,
     },
@@ -106,20 +106,14 @@ impl Blockchain {
         api_sender: ApiSender,
         internal_req_sender: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        let mut dispatcher = Dispatcher::new(internal_req_sender);
-        let mut rust_runtime = RustRuntime::default();
-
-        let service_factory = Box::new(ConfigurationServiceFactory);
-        rust_runtime.add_builtin_service(
-            &mut dispatcher,
-            service_factory,
-            ConfigurationServiceFactory::BUILTIN_ID,
-            ConfigurationServiceFactory::BUILTIN_NAME,
-        );
-        for s in services.into_iter() {
-            rust_runtime.add_service_factory(s);
-        }
-        dispatcher.add_runtime(RuntimeIdentifier::Rust as u32, rust_runtime);
+        let dispatcher = DispatcherBuilder::new(internal_req_sender)
+            .builtin_service(
+                ConfigurationServiceFactory,
+                ConfigurationServiceFactory::BUILTIN_ID,
+                ConfigurationServiceFactory::BUILTIN_NAME,
+            )
+            .service_factories(services)
+            .finalize();
 
         Self {
             db: storage.into(),

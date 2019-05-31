@@ -15,6 +15,8 @@
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use protobuf::well_known_types::Any;
 
+use std::fmt::Debug;
+
 use crate::{
     api::ServiceApiBuilder,
     crypto::{Hash, PublicKey},
@@ -84,7 +86,7 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 
 /// Service runtime environment.
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
-pub trait RuntimeEnvironment: Send + 'static {
+pub trait RuntimeEnvironment: Send + Debug + 'static {
     /// Start artifact deploy.
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 

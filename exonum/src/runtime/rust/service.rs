@@ -16,6 +16,8 @@ use exonum_merkledb::{Fork, Snapshot};
 use failure::Error;
 use protobuf::well_known_types::Any;
 
+use std::fmt::Debug;
+
 use crate::{
     api::ServiceApiBuilder,
     crypto::Hash,
@@ -34,7 +36,7 @@ pub trait ServiceDispatcher {
     ) -> Result<Result<(), ExecutionError>, Error>;
 }
 
-pub trait Service: ServiceDispatcher + std::fmt::Debug {
+pub trait Service: ServiceDispatcher + Debug + 'static {
     fn initialize(&mut self, _ctx: TransactionContext, _arg: &Any) -> Result<(), ExecutionError> {
         Ok(())
     }
@@ -51,9 +53,17 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
     // TODO: add other hooks such as "on node startup", etc.
 }
 
-pub trait ServiceFactory: std::fmt::Debug {
+pub trait ServiceFactory: Debug + 'static {
     fn artifact(&self) -> RustArtifactSpec;
     fn new_instance(&self) -> Box<dyn Service>;
+}
+
+impl<T> From<T> for Box<dyn ServiceFactory> 
+    where T: ServiceFactory
+{
+    fn from(factory: T) -> Self { 
+        Box::new(factory) as Self
+    }
 }
 
 #[macro_export]

@@ -25,6 +25,7 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
+    rust::{service::ServiceFactory, RustRuntime},
     ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, ServiceConstructor,
     ServiceInstanceId,
 };
@@ -177,6 +178,65 @@ impl Dispatcher {
     }
 }
 
+#[derive(Debug)]
+pub struct DispatcherBuilder {
+    builtin_runtime: RustRuntime,
+    dispatcher: Dispatcher,
+}
+
+impl DispatcherBuilder {
+    pub fn new(requests: mpsc::Sender<InternalRequest>) -> Self {
+        Self {
+            dispatcher: Dispatcher::new(requests),
+            builtin_runtime: RustRuntime::default(),
+        }
+    }
+
+    /// Adds built-in service with predefined identifier, keep in mind that the initialize method
+    /// of service will not be invoked and thus service must have and empty constructor.
+    pub fn builtin_service(
+        mut self,
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+        instance_id: ServiceInstanceId,
+        instance_name: impl Into<String>,
+    ) -> Self {
+        // Registers service instance in runtime.
+        let artifact = self.builtin_runtime.add_builtin_service(
+            service_factory.into(),
+            instance_id,
+            instance_name,
+        );
+        // Registers service instance in dispatcher.
+        self.dispatcher
+            .notify_service_started(instance_id, artifact);
+        self
+    }
+
+    /// Adds service factory to the Rust runtime.
+    pub fn service_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        self.builtin_runtime
+            .add_service_factory(service_factory.into());
+        self
+    }
+
+    /// Adds given service factories to the Rust runtime.
+    pub fn service_factories(
+        mut self,
+        service_factories: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
+    ) -> Self {
+        for factory in service_factories {
+            self.builtin_runtime.add_service_factory(factory.into());
+        }
+        self
+    }
+
+    pub fn finalize(mut self) -> Dispatcher {
+        self.dispatcher
+            .add_runtime(RustRuntime::ID as u32, self.builtin_runtime);
+        self.dispatcher
+    }
+}
+
 // TODO Update action names in according with changes in runtime. [ECR-3222]
 #[derive(Debug)]
 pub enum Action {
@@ -248,6 +308,7 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
     struct SampleRuntime {
         pub runtime_type: u32,
         pub instance_id: ServiceInstanceId,

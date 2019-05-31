@@ -78,6 +78,8 @@ impl AsMut<dyn Service + 'static> for InitializedService {
 }
 
 impl RustRuntime {
+    pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -97,11 +99,10 @@ impl RustRuntime {
     // and move this method to it. [ECR-3222]
     pub(crate) fn add_builtin_service(
         &mut self,
-        dispatcher: &mut Dispatcher,
         service_factory: Box<dyn ServiceFactory>,
         instance_id: ServiceInstanceId,
         instance_name: impl Into<String>,
-    ) {
+    ) -> ArtifactSpec {
         let artifact = service_factory.artifact();
         let service_instance = InitializedService {
             id: instance_id,
@@ -114,14 +115,13 @@ impl RustRuntime {
             instance_name.into(),
             instance_id
         );
-        // Registers service instance in runtime.
+
         self.inner
             .services
             .insert(artifact.clone(), service_factory);
         self.inner.deployed.insert(artifact.clone());
         self.inner.initialized.insert(instance_id, service_instance);
-        // Registers service instance in dispatcher.
-        dispatcher.notify_service_started(instance_id, artifact.into());
+        artifact.into()
     }
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
