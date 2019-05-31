@@ -29,16 +29,13 @@ impl EventHandler for NodeHandler {
 }
 
 impl NodeHandler {
-    // clippy sure that `InternalEvent` is not consumed in the body
-    // this is because of internal `Copy` types in `JumpToRound`.
-    #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     fn handle_internal_event(&mut self, event: InternalEvent) {
         match event {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
             InternalEvent::MessageVerified(msg) => self.handle_message(*msg),
-            InternalEvent::RestartApi => self.api_runtime.restart(),
+            InternalEvent::RestartApi => unreachable!(),
         }
     }
 
