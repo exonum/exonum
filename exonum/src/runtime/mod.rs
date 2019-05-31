@@ -109,7 +109,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn execute(
         &self,
         ctx: &mut RuntimeContext,
-        dispatch: CallInfo,
+        call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 

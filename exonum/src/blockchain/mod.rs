@@ -398,7 +398,7 @@ impl Blockchain {
             self.dispatcher
                 .lock()
                 .expect("Expected lock on Dispatcher")
-                .execute(&mut context, tx.dispatch.clone(), tx.payload.as_ref())
+                .execute(&mut context, tx.call_info.clone(), tx.payload.as_ref())
         }));
 
         let tx_result = TransactionResult(match catch_result {

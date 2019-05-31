@@ -730,7 +730,7 @@ pub type ServiceInstanceId = u32;
 /// Method id type.
 pub type MethodId = u32;
 
-/// Transaction dispatch info.
+/// Transaction call info.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CallInfo", crate = "crate")]
 pub struct CallInfo {
@@ -750,12 +750,12 @@ impl CallInfo {
     }
 }
 
-/// Transaction with dispatch info.
+/// Transaction with call info.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::AnyTx", crate = "crate")]
 pub struct AnyTx {
     /// Dispatch info.
-    pub dispatch: CallInfo,
+    pub call_info: CallInfo,
     /// Serialized transaction.
     pub payload: Vec<u8>,
 }
@@ -765,7 +765,7 @@ impl AnyTx {
     /// Creates equivalent of `RawTransaction`.
     pub fn as_raw_tx(service_id: u16, tx_id: u16, payload: Vec<u8>) -> Self {
         Self {
-            dispatch: CallInfo {
+            call_info: CallInfo {
                 instance_id: service_id as u32,
                 method_id: tx_id as u32,
             },
@@ -775,13 +775,13 @@ impl AnyTx {
 
     /// Method for compatibility with old transactions.
     pub fn service_id(&self) -> u16 {
-        self.dispatch.instance_id as u16
+        self.call_info.instance_id as u16
     }
 
     /// Method for compatibility with old transactions.
     /// Creates `ServiceTransaction` from `RawTransaction`.
     pub fn service_transaction(&self) -> ServiceTransaction {
-        ServiceTransaction::from_raw_unchecked(self.dispatch.method_id as u16, self.payload.clone())
+        ServiceTransaction::from_raw_unchecked(self.call_info.method_id as u16, self.payload.clone())
     }
 }
 
