@@ -71,12 +71,12 @@ impl TestService for TestServiceImpl {
 
         // Test calling one service from another.
         // TODO: It should be improved to support service auth in the future.
-        let dispatch_info = CallInfo {
+        let call_info = CallInfo {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 1,
         };
         let payload = TxB { value: arg.value }.into_bytes();
-        ctx.dispatch_call(dispatch_info, &payload)
+        ctx.dispatch_call(call_info, &payload)
             .expect("Failed to dispatch call");
         Ok(())
     }
@@ -173,16 +173,14 @@ fn test_basic_rust_runtime() {
     // Execute transaction method A.
     {
         const ARG_A_VALUE: u64 = 11;
-        let dispatch_info = CallInfo {
+        let call_info = CallInfo {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 0,
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
-        runtime
-            .execute(&mut context, dispatch_info, &payload)
-            .unwrap();
+        runtime.execute(&mut context, call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_a_entry", &fork);
@@ -198,16 +196,14 @@ fn test_basic_rust_runtime() {
     // Execute transaction method B.
     {
         const ARG_B_VALUE: u64 = 22;
-        let dispatch_info = CallInfo {
+        let call_info = CallInfo {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 1,
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
-        runtime
-            .execute(&mut context, dispatch_info, &payload)
-            .unwrap();
+        runtime.execute(&mut context, call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_b_entry", &fork);

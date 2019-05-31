@@ -220,7 +220,7 @@ fn implement_transaction_set_trait(
             fn tx_from_raw(
                 raw: #cr::messages::AnyTx,
             ) -> std::result::Result<Self, _FailureError> {
-                let id = raw.dispatch.method_id as u16;
+                let id = raw.call_info.method_id as u16;
                 let vec = raw.payload;
                 match id {
                     #( #tx_set_impl )*

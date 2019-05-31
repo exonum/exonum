@@ -59,7 +59,7 @@ use std::{
 };
 
 use crate::{
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
@@ -83,8 +83,6 @@ mod tests;
 
 /// Id of core service table family.
 pub const CORE_SERVICE: u16 = 0;
-
-// TODO think about BlockchainBuilder [ECR-3222]
 
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
@@ -415,7 +413,7 @@ impl Blockchain {
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 let author = signed_tx.author();
                 let mut context = RuntimeContext::new(fork, author, tx_hash);
-                dispatcher.execute(&mut context, tx.dispatch.clone(), tx.payload.as_ref())
+                dispatcher.execute(&mut context, tx.call_info.clone(), tx.payload.as_ref())
             }))
         };
 
