@@ -260,20 +260,20 @@ impl Runtime for RustRuntime {
     fn execute(
         &self,
         context: &mut RuntimeContext,
-        dispatch: CallInfo,
+        call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let service_instance = self.inner.initialized.get(&dispatch.instance_id).unwrap();
+        let service_instance = self.inner.initialized.get(&call_info.instance_id).unwrap();
 
         let context = TransactionContext {
-            service_id: dispatch.instance_id,
+            service_id: call_info.instance_id,
             runtime_context: context,
             runtime: self,
         };
 
         service_instance
             .as_ref()
-            .call(dispatch.method_id, context, payload)
+            .call(call_info.method_id, context, payload)
             .map_err(|e| {
                 ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
             })?
@@ -360,11 +360,11 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     // the transaction execution?
     pub fn dispatch_call(
         &mut self,
-        dispatch: CallInfo,
+        call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         self.runtime
-            .execute(self.runtime_context, dispatch, payload)
+            .execute(self.runtime_context, call_info, payload)
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {

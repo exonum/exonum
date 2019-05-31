@@ -22,7 +22,7 @@ message CallInfo {
 }
 
 message AnyTx {
-  CallInfo dispatch = 1;
+  CallInfo call_info = 1;
   bytes payload = 2;
 }
 
