@@ -212,7 +212,7 @@ impl Runtime for RustRuntime {
         &mut self,
         context: &mut RuntimeContext,
         artifact: ArtifactSpec,
-        init: &ServiceConstructor,
+        constructor: &ServiceConstructor,
     ) -> Result<(), InitError> {
         let artifact = self
             .parse_artifact(&artifact)
@@ -221,29 +221,37 @@ impl Runtime for RustRuntime {
         trace!(
             "New service {} instance with id: {}",
             artifact,
-            init.instance_id
+            constructor.instance_id
         );
 
         if !self.inner.deployed.contains(&artifact) {
             return Err(InitError::NotDeployed);
         }
 
-        if self.inner.initialized.contains_key(&init.instance_id) {
+        if self
+            .inner
+            .initialized
+            .contains_key(&constructor.instance_id)
+        {
             return Err(InitError::ServiceIdExists);
         }
 
         let service = {
             let mut service = self.inner.services.get(&artifact).unwrap().new_instance();
-            let ctx = TransactionContext::new(context, self);
+            let ctx = TransactionContext {
+                service_id: constructor.instance_id,
+                runtime_context: context,
+                runtime: self,
+            };
             service
-                .initialize(ctx, &init.data)
+                .initialize(ctx, &constructor.data)
                 .map_err(|e| InitError::ExecutionError(e))?;
             service
         };
 
         self.inner.initialized.insert(
-            init.instance_id,
-            InitializedService::new(init.instance_id, service),
+            constructor.instance_id,
+            InitializedService::new(constructor.instance_id, service),
         );
 
         Ok(())
@@ -255,10 +263,15 @@ impl Runtime for RustRuntime {
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let instance = self.inner.initialized.get(&dispatch.instance_id).unwrap();
+        let service_instance = self.inner.initialized.get(&dispatch.instance_id).unwrap();
 
-        let context = TransactionContext::new(context, self);
-        instance
+        let context = TransactionContext {
+            service_id: dispatch.instance_id,
+            runtime_context: context,
+            runtime: self,
+        };
+
+        service_instance
             .as_ref()
             .call(dispatch.method_id, context, payload)
             .map_err(|e| {
@@ -321,16 +334,14 @@ impl Runtime for RustRuntime {
 
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
+    service_id: ServiceInstanceId,
     runtime_context: &'a mut RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    fn new(runtime_context: &'a mut RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
-        Self {
-            runtime_context,
-            runtime,
-        }
+    pub fn service_id(&self) -> ServiceInstanceId {
+        self.service_id
     }
 
     pub fn fork(&self) -> &Fork {
@@ -345,6 +356,8 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.runtime_context.author
     }
 
+    // TODO Should we support the ability to call other service from the rust runtime during 
+    // the transaction execution?
     pub fn dispatch_call(
         &mut self,
         dispatch: CallInfo,
