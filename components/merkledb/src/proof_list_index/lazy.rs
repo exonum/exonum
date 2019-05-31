@@ -19,6 +19,7 @@ pub use super::proof::{ListProof, ListProofError};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use std::{
+    borrow::Cow,
     io::{Read, Write},
     marker::PhantomData,
     mem::size_of,
@@ -82,6 +83,46 @@ where
 
     fn metadata(&self) -> Vec<u8> {
         self.state.metadata().to_bytes()
+    }
+}
+
+struct Branch {
+    hash: Option<Hash>,
+}
+
+impl Branch {
+    fn new(hash: Option<Hash>) -> Self {
+        Self { hash }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.hash.is_none()
+    }
+}
+
+impl BinaryValue for Branch {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(HASH_SIZE);
+
+        if let Some(hash) = self.hash {
+            let mut tmp = [0_u8; HASH_SIZE];
+            hash.write(&mut tmp);
+            res.write_all(&tmp).unwrap();
+        }
+
+        res
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut tmp = [0_u8; HASH_SIZE];
+        let val = bytes.as_ref();
+
+        let hash = match (&val[..]).read(&mut tmp).unwrap() {
+            0 => None,
+            HASH_SIZE => Some(Hash::read(&tmp)),
+            other => panic!("Unexpected attribute length: {}", other),
+        };
+        Ok(Self { hash })
     }
 }
 
@@ -258,6 +299,12 @@ where
     }
 
     fn get_branch_unchecked(&self, key: ProofListKey) -> Hash {
+        debug_assert!(self.has_branch(key));
+
+        self.base.get(&key).unwrap()
+    }
+
+    fn get_branch_new(&self, key: ProofListKey) -> Branch {
         debug_assert!(self.has_branch(key));
 
         self.base.get(&key).unwrap()
@@ -556,7 +603,15 @@ where
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.set_len(len + 1);
+
+        let mut key = ProofListKey::new(1, len);
+        self.base.put(&key, Branch::new(None));
         self.base.put(&ProofListKey::leaf(len), value);
+
+        while key.height() < self.height() {
+            key = key.parent();
+            self.base.put(&key, Branch::new(None));
+        }
     }
 
     /// Extends the proof list with the contents of an iterator.
@@ -613,7 +668,15 @@ where
                 index
             );
         }
+        let mut key = ProofListKey::new(1, index);
+
         self.base.put(&ProofListKey::leaf(index), value);
+        self.base.put(&key, Branch::new(None));
+
+        while key.height() < self.height() {
+            key = key.parent();
+            self.base.put(&key, Branch::new(None));
+        }
     }
 
     /// Clears the proof list, removing all values.
@@ -653,18 +716,31 @@ where
     }
 
     fn calculate_and_save_hashes(&mut self) -> Hash {
-        let mut hashes: Vec<Hash> = self
-            .iter()
-            .map(|v| HashTag::hash_leaf(&v.to_bytes()))
-            .collect();
-
-        if hashes.is_empty() {
+        if self.is_empty() {
             return HashTag::empty_list_hash();
         }
 
-        for (index, hash) in hashes.iter().enumerate() {
-            let key = ProofListKey::new(1, index as u64);
-            self.set_branch(key, *hash);
+        let vec: Vec<(_, Branch, V)> = self
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                let key = ProofListKey::new(1, index as u64);
+                let branch = self.get_branch_new(key);
+                (key, branch, value)
+            })
+            .collect();
+
+        let mut hashes: Vec<Hash> = Vec::with_capacity(self.len() as usize);
+
+        for (key, branch, value) in vec {
+            let hash = if branch.is_empty() {
+                let hash = HashTag::hash_leaf(&value.to_bytes());
+                self.base.put(&key, Branch::new(Some(hash)));
+                hash
+            } else {
+                branch.hash.unwrap()
+            };
+            hashes.push(hash);
         }
 
         let mut end = hashes.len();
@@ -674,19 +750,25 @@ where
 
         while end > 1 {
             let first = hashes[index];
+            let key = ProofListKey::new(height, node_index as u64);
+            let branch = self.get_branch_new(key);
 
-            let result = if index < end - 1 {
-                HashTag::hash_node(&first, &hashes[index + 1])
+            let result = if branch.is_empty() {
+                let result = if index < end - 1 {
+                    HashTag::hash_node(&first, &hashes[index + 1])
+                } else {
+                    HashTag::hash_single_node(&first)
+                };
+
+                self.base.put(&key, Branch::new(Some(result)));
+                result
             } else {
-                HashTag::hash_single_node(&first)
+                branch.hash.unwrap()
             };
 
             hashes[index / 2] = result;
 
             index += 2;
-
-            let key = ProofListKey::new(height, node_index as u64);
-            self.set_branch(key, result);
 
             node_index += 1;
             if index >= end {
@@ -794,16 +876,28 @@ mod tests {
         let height = index.height();
 
         let key = ProofListKey::new(height, 0);
-        let branch1 = index.get_branch(key);
-        let branch2 = index2.get_branch(key);
-        assert_eq!(branch1, branch2);
-
-        let key = ProofListKey::new(height - 1, 0);
-        let branch1 = index.get_branch(key);
-        let branch2 = index2.get_branch(key);
-        assert_eq!(branch1, branch2);
+        let branch1 = index.get_branch_new(key);
 
         assert_eq!(index.object_hash(), index2.object_hash());
+    }
+
+    #[test]
+    fn recalc() {
+        let n = 5;
+
+        let db = TemporaryDB::new();
+
+        let fork = db.fork();
+        let mut index = LazyListIndex::new("index", &fork);
+        for i in 0..n {
+            index.push(i);
+        }
+
+        index.update_hashes();
+
+        dbg!(index.push(10));
+
+        index.update_hashes();
     }
 
     #[test]

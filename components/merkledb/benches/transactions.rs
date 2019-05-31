@@ -219,6 +219,10 @@ impl<T: ObjectAccess> RefSchema<T> {
             value: LazyListIndex::new_in_family("wallets_history", owner, self.0.clone()),
         }
     }
+
+    //  fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<T, Hash>> {
+    //      self.0.get_object(("wallets.history", owner))
+    //  }
 }
 
 impl<T: ObjectAccess> RefSchema<T> {

@@ -7,7 +7,7 @@ use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 const SEED: [u8; 16] = [100; 16];
-const ITEM_COUNT: u16 = 100;
+const ITEM_COUNT: u16 = 1000;
 
 fn bench_fn<T, F>(b: &mut Bencher, index_access: T, benchmark: F)
 where
