@@ -17,8 +17,6 @@
 
 pub use crate::blockchain::ExecutionError;
 
-use crate::blockchain;
-
 // TODO: summarize error codes/simplify error creation
 
 pub const DISPATCH_ERROR: u8 = 255;

@@ -13,19 +13,18 @@
 // limitations under the License.
 
 use exonum_derive::service_interface;
-use exonum_merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB};
-
-use futures::sync::mpsc;
+use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
 use protobuf::{well_known_types::Any, Message};
 use semver::Version;
 
-use crate::crypto::{Hash, PublicKey};
-use crate::messages::{CallInfo, ServiceInstanceId};
-use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
-use crate::runtime::dispatcher::Dispatcher;
-use crate::runtime::{
-    error::{ExecutionError, WRONG_ARG_ERROR},
-    DeployStatus, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier, ServiceConstructor,
+use crate::{
+    crypto::{Hash, PublicKey},
+    messages::{CallInfo, ServiceInstanceId},
+    proto::schema::tests::{TestServiceInit, TestServiceTx},
+    runtime::{
+        error::{ExecutionError, WRONG_ARG_ERROR},
+        DeployStatus, Runtime, RuntimeContext, ServiceConstructor,
+    },
 };
 
 use super::{
@@ -94,7 +93,7 @@ impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl Service for TestServiceImpl {
     fn initialize(&mut self, ctx: TransactionContext, arg: &Any) -> Result<(), ExecutionError> {
-        let mut arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
+        let arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
 
@@ -102,10 +101,6 @@ impl Service for TestServiceImpl {
         let mut entry = Entry::new("constructor_entry", fork);
         entry.set(arg.msg);
         Ok(())
-    }
-
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
     }
 }
 
@@ -129,7 +124,6 @@ impl ServiceFactory for TestServiceFactory {
 fn test_basic_rust_runtime() {
     let db = TemporaryDB::new();
 
-    let mut dispatcher = Dispatcher::new(mpsc::channel(0).0);
     // Create runtime and service.
     let mut runtime = RustRuntime::new();
 
@@ -163,7 +157,7 @@ fn test_basic_rust_runtime() {
         let mut fork = db.fork();
         let address = PublicKey::zero();
         let tx_hash = Hash::zero();
-        let mut context = RuntimeContext::new(&mut fork, &address, &tx_hash);
+        let mut context = RuntimeContext::new(&mut fork, address, tx_hash);
         runtime
             .init_service(&mut context, artifact.clone(), &constructor)
             .unwrap();
@@ -185,7 +179,7 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let mut fork = db.fork();
-        let mut context = RuntimeContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
         runtime
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();
@@ -210,7 +204,7 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let mut fork = db.fork();
-        let mut context = RuntimeContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
         runtime
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();

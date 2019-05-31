@@ -66,9 +66,9 @@ use crate::{
     node::ApiSender,
     runtime::configuration_new::ConfigurationServiceFactory,
     runtime::{
-        dispatcher::Dispatcher,
-        rust::{service::ServiceFactory, RustRuntime},
-        RuntimeContext, RuntimeIdentifier,
+        dispatcher::{Dispatcher, DispatcherBuilder},
+        rust::service::ServiceFactory,
+        RuntimeContext,
     },
 };
 
@@ -98,28 +98,22 @@ pub struct Blockchain {
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new<D: Into<Arc<dyn Database>>>(
-        storage: D,
+    pub fn new(
+        storage: impl Into<Arc<dyn Database>>,
         services: Vec<Box<dyn ServiceFactory>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
         internal_req_sender: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        let mut dispatcher = Dispatcher::new(internal_req_sender);
-        let mut rust_runtime = RustRuntime::default();
-
-        let service_factory = Box::new(ConfigurationServiceFactory);
-        rust_runtime.add_builtin_service(
-            &mut dispatcher,
-            service_factory,
-            ConfigurationServiceFactory::BUILTIN_ID,
-            ConfigurationServiceFactory::BUILTIN_NAME,
-        );
-        for s in services.into_iter() {
-            rust_runtime.add_service_factory(s);
-        }
-        dispatcher.add_runtime(RuntimeIdentifier::Rust as u32, rust_runtime);
+        let dispatcher = DispatcherBuilder::new(internal_req_sender)
+            .with_builtin_service(
+                ConfigurationServiceFactory,
+                ConfigurationServiceFactory::BUILTIN_ID,
+                ConfigurationServiceFactory::BUILTIN_NAME,
+            )
+            .with_service_factories(services)
+            .finalize();
 
         Self {
             db: storage.into(),
@@ -400,7 +394,7 @@ impl Blockchain {
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             let author = signed_tx.author();
-            let mut context = RuntimeContext::new(fork, &author, &tx_hash);
+            let mut context = RuntimeContext::new(fork, author, tx_hash);
             self.dispatcher
                 .lock()
                 .expect("Expected lock on Dispatcher")

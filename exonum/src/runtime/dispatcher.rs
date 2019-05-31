@@ -25,12 +25,12 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
-    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, ServiceConstructor,
-    ServiceInstanceId,
+    rust::{service::ServiceFactory, RustRuntime},
+    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, ServiceConstructor, ServiceInstanceId,
 };
 
 pub struct Dispatcher {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+    runtimes: HashMap<u32, Box<dyn Runtime>>,
     // TODO Is RefCell enough here?
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
     inner_requests_tx: mpsc::Sender<InternalRequest>,
@@ -48,7 +48,7 @@ impl Dispatcher {
     }
 
     pub fn with_runtimes(
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+        runtimes: HashMap<u32, Box<dyn Runtime>>,
         inner_requests_tx: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
@@ -58,7 +58,7 @@ impl Dispatcher {
         }
     }
 
-    pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn RuntimeEnvironment>>) {
+    pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) {
         self.runtimes.insert(id, runtime.into());
     }
 
@@ -177,6 +177,74 @@ impl Dispatcher {
     }
 }
 
+#[derive(Debug)]
+pub struct DispatcherBuilder {
+    builtin_runtime: RustRuntime,
+    dispatcher: Dispatcher,
+}
+
+impl DispatcherBuilder {
+    pub fn new(requests: mpsc::Sender<InternalRequest>) -> Self {
+        Self {
+            dispatcher: Dispatcher::new(requests),
+            builtin_runtime: RustRuntime::default(),
+        }
+    }
+
+    /// Adds built-in service with predefined identifier, keep in mind that the initialize method
+    /// of service will not be invoked and thus service must have and empty constructor.
+    pub fn with_builtin_service(
+        mut self,
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+        instance_id: ServiceInstanceId,
+        instance_name: impl Into<String>,
+    ) -> Self {
+        // Registers service instance in runtime.
+        let artifact = self.builtin_runtime.add_builtin_service(
+            service_factory.into(),
+            instance_id,
+            instance_name,
+        );
+        // Registers service instance in dispatcher.
+        self.dispatcher
+            .notify_service_started(instance_id, artifact);
+        self
+    }
+
+    /// Adds service factory to the Rust runtime.
+    pub fn with_service_factory(
+        mut self,
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+    ) -> Self {
+        self.builtin_runtime
+            .add_service_factory(service_factory.into());
+        self
+    }
+
+    /// Adds given service factories to the Rust runtime.
+    pub fn with_service_factories(
+        mut self,
+        service_factories: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
+    ) -> Self {
+        for factory in service_factories {
+            self.builtin_runtime.add_service_factory(factory.into());
+        }
+        self
+    }
+
+    /// Adds additional runtime.
+    pub fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
+        self.dispatcher.add_runtime(id, runtime);
+        self
+    }
+
+    pub fn finalize(mut self) -> Dispatcher {
+        self.dispatcher
+            .add_runtime(RustRuntime::ID as u32, self.builtin_runtime);
+        self.dispatcher
+    }
+}
+
 // TODO Update action names in according with changes in runtime. [ECR-3222]
 #[derive(Debug)]
 pub enum Action {
@@ -214,40 +282,20 @@ mod tests {
     use exonum_merkledb::{Database, TemporaryDB};
 
     use crate::{
+        crypto::{Hash, PublicKey},
         messages::{MethodId, ServiceInstanceId},
         runtime::RuntimeIdentifier,
     };
 
     use super::*;
 
-    #[derive(Default)]
-    pub struct DispatcherBuilder {
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
-    }
-
-    impl std::fmt::Debug for DispatcherBuilder {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_struct("DispatcherBuilder").finish()
-        }
-    }
-
     impl DispatcherBuilder {
-        pub fn with_runtime(
-            mut self,
-            runtime_id: u32,
-            runtime: Box<dyn RuntimeEnvironment>,
-        ) -> Self {
-            self.runtimes.insert(runtime_id, runtime);
-
-            self
-        }
-
-        pub fn finalize(self) -> Dispatcher {
-            let request_tx = mpsc::channel(0).0;
-            Dispatcher::with_runtimes(self.runtimes, request_tx)
+        fn dummy() -> Self {
+            Self::new(mpsc::channel(0).0)
         }
     }
 
+    #[derive(Debug)]
     struct SampleRuntime {
         pub runtime_type: u32,
         pub instance_id: ServiceInstanceId,
@@ -264,7 +312,7 @@ mod tests {
         }
     }
 
-    impl RuntimeEnvironment for SampleRuntime {
+    impl Runtime for SampleRuntime {
         fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
@@ -322,11 +370,10 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust as u32, 0, 0));
+        let runtime_a = SampleRuntime::new(RuntimeIdentifier::Rust as u32, 0, 0);
+        let runtime_b = SampleRuntime::new(RuntimeIdentifier::Java as u32, 1, 0);
 
-        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java as u32, 1, 0));
-
-        let dispatcher = DispatcherBuilder::default()
+        let dispatcher = DispatcherBuilder::dummy()
             .with_runtime(runtime_a.runtime_type, runtime_a)
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
@@ -351,18 +398,18 @@ mod tests {
         // Create dispatcher and test data.
         let db = TemporaryDB::new();
 
-        let runtime_a = Box::new(SampleRuntime::new(
+        let runtime_a = SampleRuntime::new(
             RuntimeIdentifier::Rust as u32,
             RUST_SERVICE_ID,
             RUST_METHOD_ID,
-        ));
-        let runtime_b = Box::new(SampleRuntime::new(
+        );
+        let runtime_b = SampleRuntime::new(
             RuntimeIdentifier::Java as u32,
             JAVA_SERVICE_ID,
             JAVA_METHOD_ID,
-        ));
+        );
 
-        let mut dispatcher = DispatcherBuilder::default()
+        let mut dispatcher = DispatcherBuilder::dummy()
             .with_runtime(runtime_a.runtime_type, runtime_a)
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
@@ -400,7 +447,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = RuntimeContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
 
         let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,
@@ -462,7 +509,7 @@ mod tests {
         // Create dispatcher and test data.
         let db = TemporaryDB::new();
 
-        let mut dispatcher = DispatcherBuilder::default().finalize();
+        let mut dispatcher = DispatcherBuilder::dummy().finalize();
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
@@ -486,7 +533,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = RuntimeContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
 
         let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,

@@ -27,16 +27,14 @@ use crate::{
     crypto::{Hash, PublicKey},
     messages::CallInfo,
     proto::schema,
-    runtime::configuration_new::{INIT_METHOD_ID, SERVICE_ID},
-    runtime::dispatcher::Dispatcher,
 };
 
 use self::service::{Service, ServiceFactory};
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
-    ServiceConstructor, ServiceInstanceId,
+    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConstructor,
+    ServiceInstanceId,
 };
 
 #[macro_use]
@@ -78,6 +76,8 @@ impl AsMut<dyn Service + 'static> for InitializedService {
 }
 
 impl RustRuntime {
+    pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -97,11 +97,10 @@ impl RustRuntime {
     // and move this method to it. [ECR-3222]
     pub(crate) fn add_builtin_service(
         &mut self,
-        dispatcher: &mut Dispatcher,
         service_factory: Box<dyn ServiceFactory>,
         instance_id: ServiceInstanceId,
         instance_name: impl Into<String>,
-    ) {
+    ) -> ArtifactSpec {
         let artifact = service_factory.artifact();
         let service_instance = InitializedService {
             id: instance_id,
@@ -114,14 +113,13 @@ impl RustRuntime {
             instance_name.into(),
             instance_id
         );
-        // Registers service instance in runtime.
+
         self.inner
             .services
             .insert(artifact.clone(), service_factory);
         self.inner.deployed.insert(artifact.clone());
         self.inner.initialized.insert(instance_id, service_instance);
-        // Registers service instance in dispatcher.
-        dispatcher.notify_service_started(instance_id, artifact.into());
+        artifact.into()
     }
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
@@ -172,7 +170,7 @@ impl fmt::Display for RustArtifactSpec {
     }
 }
 
-impl RuntimeEnvironment for RustRuntime {
+impl Runtime for RustRuntime {
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
             .parse_artifact(&artifact)
@@ -214,7 +212,7 @@ impl RuntimeEnvironment for RustRuntime {
         &mut self,
         context: &mut RuntimeContext,
         artifact: ArtifactSpec,
-        init: &ServiceConstructor,
+        constructor: &ServiceConstructor,
     ) -> Result<(), InitError> {
         let artifact = self
             .parse_artifact(&artifact)
@@ -223,29 +221,37 @@ impl RuntimeEnvironment for RustRuntime {
         trace!(
             "New service {} instance with id: {}",
             artifact,
-            init.instance_id
+            constructor.instance_id
         );
 
         if !self.inner.deployed.contains(&artifact) {
             return Err(InitError::NotDeployed);
         }
 
-        if self.inner.initialized.contains_key(&init.instance_id) {
+        if self
+            .inner
+            .initialized
+            .contains_key(&constructor.instance_id)
+        {
             return Err(InitError::ServiceIdExists);
         }
 
         let service = {
             let mut service = self.inner.services.get(&artifact).unwrap().new_instance();
-            let ctx = TransactionContext::new(context, self);
+            let ctx = TransactionContext {
+                service_id: constructor.instance_id,
+                runtime_context: context,
+                runtime: self,
+            };
             service
-                .initialize(ctx, &init.data)
+                .initialize(ctx, &constructor.data)
                 .map_err(|e| InitError::ExecutionError(e))?;
             service
         };
 
         self.inner.initialized.insert(
-            init.instance_id,
-            InitializedService::new(init.instance_id, service),
+            constructor.instance_id,
+            InitializedService::new(constructor.instance_id, service),
         );
 
         Ok(())
@@ -257,10 +263,15 @@ impl RuntimeEnvironment for RustRuntime {
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let instance = self.inner.initialized.get(&dispatch.instance_id).unwrap();
+        let service_instance = self.inner.initialized.get(&dispatch.instance_id).unwrap();
 
-        let context = TransactionContext::new(context, self);
-        instance
+        let context = TransactionContext {
+            service_id: dispatch.instance_id,
+            runtime_context: context,
+            runtime: self,
+        };
+
+        service_instance
             .as_ref()
             .call(dispatch.method_id, context, payload)
             .map_err(|e| {
@@ -323,43 +334,40 @@ impl RuntimeEnvironment for RustRuntime {
 
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    env_context: &'a mut RuntimeContext<'b>,
+    service_id: ServiceInstanceId,
+    runtime_context: &'a mut RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    fn new(env_context: &'a mut RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
-        Self {
-            env_context,
-            runtime,
-        }
-    }
-
-    pub fn env_context(&mut self) -> &RuntimeContext<'b> {
-        self.env_context
+    pub fn service_id(&self) -> ServiceInstanceId {
+        self.service_id
     }
 
     pub fn fork(&self) -> &Fork {
-        self.env_context.fork
+        self.runtime_context.fork
     }
 
     pub fn tx_hash(&self) -> Hash {
-        self.env_context.tx_hash
+        self.runtime_context.tx_hash
     }
 
     pub fn author(&self) -> PublicKey {
-        self.env_context.author
+        self.runtime_context.author
     }
 
+    // TODO Should we support the ability to call other service from the rust runtime during
+    // the transaction execution?
     pub fn dispatch_call(
         &mut self,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        self.runtime.execute(self.env_context, dispatch, payload)
+        self.runtime
+            .execute(self.runtime_context, dispatch, payload)
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.env_context.dispatch_action(action)
+        self.runtime_context.dispatch_action(action)
     }
 }

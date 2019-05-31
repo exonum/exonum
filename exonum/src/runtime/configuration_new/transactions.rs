@@ -232,7 +232,7 @@ impl Propose {
         // Start writing to storage.
         // NB. DO NOT write to the service schema anywhere else during `Propose::execute`, it may
         // break invariants.
-        let mut schema = Schema::new(fork);
+        let schema = Schema::new(fork);
 
         let propose_data = {
             let mut votes_table = schema.votes_by_config_hash(&cfg_hash);
@@ -340,7 +340,7 @@ impl VotingContext {
         // Start writing to storage.
         // NB. DO NOT write to the service schema anywhere else during `Vote::execute`, it may
         // break invariants.
-        let mut schema = Schema::new(fork);
+        let schema = Schema::new(fork);
 
         let propose_data = {
             let mut votes = schema.votes_by_config_hash(cfg_hash);
