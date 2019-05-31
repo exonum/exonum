@@ -59,7 +59,7 @@ use std::{
 };
 
 use crate::{
-    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
@@ -126,7 +126,8 @@ impl Blockchain {
     }
 
     /// Creates the blockchain instance with the specified dispatcher.
-    pub(crate) fn with_dispatcher(
+    #[cfg(test)]
+    pub fn with_dispatcher(
         db: impl Into<Arc<dyn Database>>,
         dispatcher: Dispatcher,
         service_public_key: PublicKey,
@@ -372,7 +373,7 @@ impl Blockchain {
             );
             trace!("execute block = {:?}", block);
             // Calculate block hash.
-            let block_hash = block.hash();
+            let block_hash = block.object_hash();
             // Update height.
             let schema = Schema::new(&fork);
             schema.block_hashes_by_height().push(block_hash);
@@ -409,15 +410,14 @@ impl Blockchain {
         fork.flush();
 
         let tx = signed_tx.payload();
-
-        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            let author = signed_tx.author();
-            let mut context = RuntimeContext::new(fork, author, tx_hash);
-            self.dispatcher
-                .lock()
-                .expect("Expected lock on Dispatcher")
-                .execute(&mut context, tx.dispatch.clone(), tx.payload.as_ref())
-        }));
+        let catch_result = {
+            let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
+            panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                let author = signed_tx.author();
+                let mut context = RuntimeContext::new(fork, author, tx_hash);
+                dispatcher.execute(&mut context, tx.dispatch.clone(), tx.payload.as_ref())
+            }))
+        };
 
         let tx_result = TransactionResult(match catch_result {
             Ok(execution_result) => {
