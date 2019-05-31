@@ -20,7 +20,7 @@ use crate::{
 };
 
 use exonum_merkledb::{
-    BinaryValue, IndexAccess, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, Snapshot,
+    BinaryValue, IndexAccess, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
 use std::{borrow::Cow, ops::Deref};

@@ -67,8 +67,8 @@ use crate::{
     runtime::configuration_new::ConfigurationServiceFactory,
     runtime::{
         dispatcher::{Dispatcher, DispatcherBuilder},
-        rust::{service::ServiceFactory, RustRuntime},
-        RuntimeContext, RuntimeIdentifier,
+        rust::service::ServiceFactory,
+        RuntimeContext,
     },
 };
 
@@ -98,8 +98,8 @@ pub struct Blockchain {
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new<D: Into<Arc<dyn Database>>>(
-        storage: D,
+    pub fn new(
+        storage: impl Into<Arc<dyn Database>>,
         services: Vec<Box<dyn ServiceFactory>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
@@ -394,7 +394,7 @@ impl Blockchain {
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             let author = signed_tx.author();
-            let mut context = RuntimeContext::new(fork, &author, &tx_hash);
+            let mut context = RuntimeContext::new(fork, author, tx_hash);
             self.dispatcher
                 .lock()
                 .expect("Expected lock on Dispatcher")

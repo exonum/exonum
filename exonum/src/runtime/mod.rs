@@ -84,9 +84,9 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 
 // TODO Think about environment methods' names. [ECR-3222]
 
-/// Service runtime environment.
+/// Runtime environment for services.
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
-pub trait RuntimeEnvironment: Send + Debug + 'static {
+pub trait Runtime: Send + Debug + 'static {
     /// Start artifact deploy.
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 
@@ -137,7 +137,7 @@ pub struct RuntimeContext<'a> {
 }
 
 impl<'a> RuntimeContext<'a> {
-    pub fn new(fork: &'a Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
+    pub fn new(fork: &'a Fork, author: PublicKey, tx_hash: Hash) -> Self {
         Self {
             fork,
             author,
@@ -155,16 +155,11 @@ impl<'a> RuntimeContext<'a> {
         std::mem::swap(&mut self.dispatcher_actions, &mut other);
         other
     }
-
-    // TODO Implement author enum. [ECR-3222]
-    fn from_fork(fork: &'a Fork) -> Self {
-        Self::new(fork, &PublicKey::zero(), &Hash::zero())
-    }
 }
 
-impl<T> From<T> for Box<dyn RuntimeEnvironment>
+impl<T> From<T> for Box<dyn Runtime>
 where
-    T: RuntimeEnvironment,
+    T: Runtime,
 {
     fn from(runtime: T) -> Self {
         Box::new(runtime) as Self

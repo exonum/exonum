@@ -27,16 +27,14 @@ use crate::{
     crypto::{Hash, PublicKey},
     messages::CallInfo,
     proto::schema,
-    runtime::configuration_new::{INIT_METHOD_ID, SERVICE_ID},
-    runtime::dispatcher::Dispatcher,
 };
 
 use self::service::{Service, ServiceFactory};
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
-    ServiceConstructor, ServiceInstanceId,
+    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConstructor,
+    ServiceInstanceId,
 };
 
 #[macro_use]
@@ -172,7 +170,7 @@ impl fmt::Display for RustArtifactSpec {
     }
 }
 
-impl RuntimeEnvironment for RustRuntime {
+impl Runtime for RustRuntime {
     fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
             .parse_artifact(&artifact)
@@ -323,32 +321,28 @@ impl RuntimeEnvironment for RustRuntime {
 
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    env_context: &'a mut RuntimeContext<'b>,
+    runtime_context: &'a mut RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    fn new(env_context: &'a mut RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
+    fn new(runtime_context: &'a mut RuntimeContext<'b>, runtime: &'a RustRuntime) -> Self {
         Self {
-            env_context,
+            runtime_context,
             runtime,
         }
     }
 
-    pub fn env_context(&mut self) -> &RuntimeContext<'b> {
-        self.env_context
-    }
-
     pub fn fork(&self) -> &Fork {
-        self.env_context.fork
+        self.runtime_context.fork
     }
 
     pub fn tx_hash(&self) -> Hash {
-        self.env_context.tx_hash
+        self.runtime_context.tx_hash
     }
 
     pub fn author(&self) -> PublicKey {
-        self.env_context.author
+        self.runtime_context.author
     }
 
     pub fn dispatch_call(
@@ -356,10 +350,11 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        self.runtime.execute(self.env_context, dispatch, payload)
+        self.runtime
+            .execute(self.runtime_context, dispatch, payload)
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.env_context.dispatch_action(action)
+        self.runtime_context.dispatch_action(action)
     }
 }

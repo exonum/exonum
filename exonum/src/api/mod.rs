@@ -29,7 +29,6 @@ use crate::{
     blockchain::{Blockchain, SharedNodeState},
     crypto::PublicKey,
     node::ApiSender,
-    runtime::RuntimeEnvironment,
 };
 
 pub mod backends;

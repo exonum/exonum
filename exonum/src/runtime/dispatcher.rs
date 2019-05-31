@@ -26,12 +26,11 @@ use crate::{
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     rust::{service::ServiceFactory, RustRuntime},
-    ArtifactSpec, DeployStatus, RuntimeContext, RuntimeEnvironment, ServiceConstructor,
-    ServiceInstanceId,
+    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, ServiceConstructor, ServiceInstanceId,
 };
 
 pub struct Dispatcher {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+    runtimes: HashMap<u32, Box<dyn Runtime>>,
     // TODO Is RefCell enough here?
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
     inner_requests_tx: mpsc::Sender<InternalRequest>,
@@ -49,7 +48,7 @@ impl Dispatcher {
     }
 
     pub fn with_runtimes(
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+        runtimes: HashMap<u32, Box<dyn Runtime>>,
         inner_requests_tx: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
@@ -59,7 +58,7 @@ impl Dispatcher {
         }
     }
 
-    pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn RuntimeEnvironment>>) {
+    pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) {
         self.runtimes.insert(id, runtime.into());
     }
 
@@ -230,6 +229,12 @@ impl DispatcherBuilder {
         self
     }
 
+    /// Adds additional runtime.
+    pub fn runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
+        self.dispatcher.add_runtime(id, runtime);
+        self
+    }
+
     pub fn finalize(mut self) -> Dispatcher {
         self.dispatcher
             .add_runtime(RustRuntime::ID as u32, self.builtin_runtime);
@@ -274,37 +279,16 @@ mod tests {
     use exonum_merkledb::{Database, TemporaryDB};
 
     use crate::{
+        crypto::{Hash, PublicKey},
         messages::{MethodId, ServiceInstanceId},
         runtime::RuntimeIdentifier,
     };
 
     use super::*;
 
-    #[derive(Default)]
-    pub struct DispatcherBuilder {
-        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
-    }
-
-    impl std::fmt::Debug for DispatcherBuilder {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_struct("DispatcherBuilder").finish()
-        }
-    }
-
     impl DispatcherBuilder {
-        pub fn with_runtime(
-            mut self,
-            runtime_id: u32,
-            runtime: Box<dyn RuntimeEnvironment>,
-        ) -> Self {
-            self.runtimes.insert(runtime_id, runtime);
-
-            self
-        }
-
-        pub fn finalize(self) -> Dispatcher {
-            let request_tx = mpsc::channel(0).0;
-            Dispatcher::with_runtimes(self.runtimes, request_tx)
+        fn dummy() -> Self {
+            Self::new(mpsc::channel(0).0)
         }
     }
 
@@ -325,7 +309,7 @@ mod tests {
         }
     }
 
-    impl RuntimeEnvironment for SampleRuntime {
+    impl Runtime for SampleRuntime {
         fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
@@ -383,13 +367,12 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust as u32, 0, 0));
+        let runtime_a = SampleRuntime::new(RuntimeIdentifier::Rust as u32, 0, 0);
+        let runtime_b = SampleRuntime::new(RuntimeIdentifier::Java as u32, 1, 0);
 
-        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java as u32, 1, 0));
-
-        let dispatcher = DispatcherBuilder::default()
-            .with_runtime(runtime_a.runtime_type, runtime_a)
-            .with_runtime(runtime_b.runtime_type, runtime_b)
+        let dispatcher = DispatcherBuilder::dummy()
+            .runtime(runtime_a.runtime_type, runtime_a)
+            .runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
         assert!(dispatcher
@@ -412,20 +395,20 @@ mod tests {
         // Create dispatcher and test data.
         let db = TemporaryDB::new();
 
-        let runtime_a = Box::new(SampleRuntime::new(
+        let runtime_a = SampleRuntime::new(
             RuntimeIdentifier::Rust as u32,
             RUST_SERVICE_ID,
             RUST_METHOD_ID,
-        ));
-        let runtime_b = Box::new(SampleRuntime::new(
+        );
+        let runtime_b = SampleRuntime::new(
             RuntimeIdentifier::Java as u32,
             JAVA_SERVICE_ID,
             JAVA_METHOD_ID,
-        ));
+        );
 
-        let mut dispatcher = DispatcherBuilder::default()
-            .with_runtime(runtime_a.runtime_type, runtime_a)
-            .with_runtime(runtime_b.runtime_type, runtime_b)
+        let mut dispatcher = DispatcherBuilder::dummy()
+            .runtime(runtime_a.runtime_type, runtime_a)
+            .runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
         let sample_rust_spec = ArtifactSpec {
@@ -461,7 +444,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = RuntimeContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
 
         let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,
@@ -523,7 +506,7 @@ mod tests {
         // Create dispatcher and test data.
         let db = TemporaryDB::new();
 
-        let mut dispatcher = DispatcherBuilder::default().finalize();
+        let mut dispatcher = DispatcherBuilder::dummy().finalize();
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
@@ -547,7 +530,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = RuntimeContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
 
         let rust_init_data = ServiceConstructor {
             instance_id: RUST_SERVICE_ID,

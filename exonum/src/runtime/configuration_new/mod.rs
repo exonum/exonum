@@ -14,21 +14,19 @@
 
 pub use self::transactions::{Deploy, Init};
 
-use exonum_merkledb::{BinaryValue, Fork, IndexAccess, Snapshot};
-use protobuf::well_known_types::Any;
+use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 
 use crate::{
     blockchain::Schema as CoreSchema,
     crypto::Hash,
-    node::State,
     runtime::{
-        dispatcher::{Action, Dispatcher},
-        error::{ExecutionError, InitError, WRONG_ARG_ERROR},
+        dispatcher::Action,
+        error::ExecutionError,
         rust::{
             service::{Service, ServiceFactory},
             RustArtifactSpec, TransactionContext,
         },
-        DeployStatus, RuntimeEnvironment, ServiceConstructor,
+        ServiceConstructor,
     },
 };
 

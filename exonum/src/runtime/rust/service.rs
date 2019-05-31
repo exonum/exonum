@@ -58,10 +58,11 @@ pub trait ServiceFactory: Debug + 'static {
     fn new_instance(&self) -> Box<dyn Service>;
 }
 
-impl<T> From<T> for Box<dyn ServiceFactory> 
-    where T: ServiceFactory
+impl<T> From<T> for Box<dyn ServiceFactory>
+where
+    T: ServiceFactory,
 {
-    fn from(factory: T) -> Self { 
+    fn from(factory: T) -> Self {
         Box::new(factory) as Self
     }
 }
