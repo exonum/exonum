@@ -489,7 +489,7 @@ mod tests {
     use crate::proto;
     use exonum_merkledb::{Database, Entry, Snapshot, TemporaryDB};
 
-    const TX_RESULT_SERVICE_ID: u16 = 255;
+    const TX_RESULT_SERVICE_ID: u32 = 255;
 
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
@@ -696,7 +696,7 @@ mod tests {
 
     impl Service for TxResultService {
         fn service_id(&self) -> u16 {
-            TX_RESULT_SERVICE_ID
+            TX_RESULT_SERVICE_ID as u16
         }
 
         fn service_name(&self) -> &'static str {

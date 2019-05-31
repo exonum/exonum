@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+pub use self::service::{Service, ServiceFactory};
 
 use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
 use protobuf::well_known_types::Any;
@@ -29,7 +30,6 @@ use crate::{
     proto::schema,
 };
 
-use self::service::{Service, ServiceFactory};
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},

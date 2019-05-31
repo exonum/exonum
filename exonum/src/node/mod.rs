@@ -1156,7 +1156,7 @@ mod tests {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
         msg.set_msg("Hello, World!".to_owned());
-        Message::sign_transaction(msg, SERVICE_ID, p_key, s_key)
+        Message::sign_transaction(msg, SERVICE_ID as u32, p_key, s_key)
     }
 
     struct TestService;

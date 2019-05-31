@@ -314,7 +314,7 @@ impl ServiceContext {
     {
         let msg = Message::sign_transaction(
             tx,
-            self.service_id,
+            self.service_id as u32,
             self.service_keypair.0,
             &self.service_keypair.1,
         );

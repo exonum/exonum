@@ -84,6 +84,8 @@ mod tests;
 /// Id of core service table family.
 pub const CORE_SERVICE: u16 = 0;
 
+// TODO think about BlockchainBuilder [ECR-3222]
+
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
 /// Only nodes with an identical set of services and genesis block can be combined
@@ -97,9 +99,9 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    /// Constructs a blockchain for the given `storage` and list of `services`.
+    /// Constructs a blockchain for the given `db` and list of available artifacts.
     pub fn new(
-        storage: impl Into<Arc<dyn Database>>,
+        db: impl Into<Arc<dyn Database>>,
         services: Vec<Box<dyn ServiceFactory>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
@@ -116,7 +118,23 @@ impl Blockchain {
             .finalize();
 
         Self {
-            db: storage.into(),
+            db: db.into(),
+            service_keypair: (service_public_key, service_secret_key),
+            api_sender,
+            dispatcher: Arc::new(Mutex::new(dispatcher)),
+        }
+    }
+
+    /// Creates the blockchain instance with the specified dispatcher.
+    pub(crate) fn with_dispatcher(
+        db: impl Into<Arc<dyn Database>>,
+        dispatcher: Dispatcher,
+        service_public_key: PublicKey,
+        service_secret_key: SecretKey,
+        api_sender: ApiSender,
+    ) -> Self {
+        Self {
+            db: db.into(),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
             dispatcher: Arc::new(Mutex::new(dispatcher)),
@@ -262,7 +280,7 @@ impl Blockchain {
 
         let msg = Message::sign_transaction(
             tx.service_transaction(),
-            service_id,
+            service_id as u32,
             self.service_keypair.0,
             &self.service_keypair.1,
         );
