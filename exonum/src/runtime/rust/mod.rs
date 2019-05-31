@@ -178,15 +178,13 @@ impl Runtime for RustRuntime {
 
         trace!("Start deploy service: {}", artifact);
 
-        let inner = &mut self.inner;
-
-        if !inner.services.contains_key(&artifact) {
+        if !self.inner.services.contains_key(&artifact) {
             return Err(DeployError::FailedToDeploy);
         }
-
-        if !inner.deployed.insert(artifact) {
+        if !self.inner.deployed.insert(artifact) {
             return Err(DeployError::AlreadyDeployed);
         }
+        
         Ok(())
     }
 
@@ -199,9 +197,7 @@ impl Runtime for RustRuntime {
             .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
-        let inner = &self.inner;
-
-        if inner.deployed.contains(&artifact) {
+        if self.inner.deployed.contains(&artifact) {
             Ok(DeployStatus::Deployed)
         } else {
             Err(DeployError::FailedToDeploy)
@@ -280,9 +276,7 @@ impl Runtime for RustRuntime {
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-        let inner = &self.inner;
-
-        inner
+        self.inner
             .initialized
             .iter()
             .map(|(_, service)| service.state_hash(snapshot))
@@ -290,9 +284,7 @@ impl Runtime for RustRuntime {
     }
 
     fn before_commit(&self, fork: &mut Fork) {
-        let inner = &self.inner;
-
-        for (_, service) in &inner.initialized {
+        for service in self.inner.initialized.values() {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 service.as_ref().before_commit(fork)
             })) {
@@ -312,9 +304,7 @@ impl Runtime for RustRuntime {
     }
 
     fn after_commit(&self, fork: &Fork) {
-        let inner = &self.inner;
-
-        for (_, service) in &inner.initialized {
+        for service in self.inner.initialized.values() {
             service.as_ref().after_commit(fork);
         }
     }
