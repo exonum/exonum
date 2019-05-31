@@ -53,7 +53,9 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
     }
 }
 
-fn implement_into_service_tx(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens
+fn implement_into_service_tx(
+    methods: &[ServiceMethodDescriptor],
+    cr: &dyn ToTokens,
 ) -> impl quote::ToTokens {
     let into_service_tx = methods
         .iter()

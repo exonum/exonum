@@ -26,7 +26,7 @@ use crate::{
     crypto::{gen_keypair, Hash},
     helpers::{Height, ValidatorId},
     impl_service_dispatcher,
-    messages::{AnyTx, Message, ServiceInstanceId, ServiceTransaction, BinaryValue},
+    messages::{AnyTx, BinaryValue, Message, ServiceInstanceId, ServiceTransaction},
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
