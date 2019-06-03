@@ -184,7 +184,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         info!("Deploying service. {:?}", arg);
 
         let artifact = arg.get_artifact_spec();
-        context.dispatch_action(Action::StartDeploy { artifact });
+        context.dispatch_action(Action::BeginDeploy { artifact });
         // TODO add result into deployable (to check deploy status in before_commit).
         Ok(())
     }
@@ -206,11 +206,11 @@ impl ConfigurationService for ConfigurationServiceImpl {
         };
 
         info!(
-            "Initializing service. Name: {}, id: {}",
+            "Starting service. Name: {}, id: {}",
             arg.instance_name, instance_id
         );
 
-        context.dispatch_action(Action::InitService {
+        context.dispatch_action(Action::StartService {
             artifact,
             constructor,
         });

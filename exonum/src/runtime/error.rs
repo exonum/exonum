@@ -32,7 +32,7 @@ pub enum DeployError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum InitError {
+pub enum StartError {
     WrongRuntime,
     WrongArtifact,
     NotDeployed,
@@ -46,8 +46,8 @@ impl From<DeployError> for ExecutionError {
     }
 }
 
-impl From<InitError> for ExecutionError {
-    fn from(init: InitError) -> Self {
-        ExecutionError::with_description(129, format!("Init failed because: {:?}", init))
+impl From<StartError> for ExecutionError {
+    fn from(init: StartError) -> Self {
+        ExecutionError::with_description(129, format!("Start failed because: {:?}", init))
     }
 }

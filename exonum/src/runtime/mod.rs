@@ -25,7 +25,7 @@ use crate::{
 };
 
 use self::{
-    error::{DeployError, ExecutionError, InitError},
+    error::{DeployError, ExecutionError, StartError},
     rust::RustArtifactSpec,
 };
 
@@ -86,30 +86,31 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 // TODO Think about environment methods' names. [ECR-3222]
 
 /// Runtime environment for services.
+///
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
-    /// Start artifact deploy.
-    fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+    /// Begins deploy artifact with the given specification.
+    fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 
-    /// Check deployment status.
+    /// Checks deployment status.
     fn check_deploy_status(
         &self,
         artifact: ArtifactSpec,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError>;
 
-    /// Init artifact with given ID and constructor parameters.
-    fn init_service(
+    /// Starts a new service instance with the given specification and constructor parameters.
+    fn start_service(
         &mut self,
-        ctx: &mut RuntimeContext,
+        context: &mut RuntimeContext,
         artifact: ArtifactSpec,
         constructor: &ServiceConstructor,
-    ) -> Result<(), InitError>;
+    ) -> Result<(), StartError>;
 
     /// Execute transaction.
     fn execute(
         &self,
-        ctx: &mut RuntimeContext,
+        context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
