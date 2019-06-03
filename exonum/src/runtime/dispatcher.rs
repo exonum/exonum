@@ -28,14 +28,13 @@ use crate::{
 };
 
 use super::{
-    error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
+    error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
     rust::{service::ServiceFactory, RustRuntime},
     ArtifactSpec, DeployStatus, Runtime, RuntimeContext, ServiceConstructor, ServiceInstanceId,
 };
 
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn Runtime>>,
-    // TODO Is RefCell enough here?
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
     inner_requests_tx: mpsc::Sender<InternalRequest>,
 }
@@ -76,12 +75,11 @@ impl Dispatcher {
 
     // TODO think about runtime environment traits. [ECR-3222]
 
-    pub fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            runtime.start_deploy(artifact)
-        } else {
-            Err(DeployError::WrongRuntime)
-        }
+    pub fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        self.runtimes
+            .get_mut(&artifact.runtime_id)
+            .ok_or(DeployError::WrongRuntime)
+            .and_then(|runtime| runtime.begin_deploy(artifact))
     }
 
     pub fn check_deploy_status(
@@ -89,21 +87,20 @@ impl Dispatcher {
         artifact: ArtifactSpec,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
-        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
-            runtime.check_deploy_status(artifact, cancel_if_not_complete)
-        } else {
-            Err(DeployError::WrongRuntime)
-        }
+        self.runtimes
+            .get(&artifact.runtime_id)
+            .ok_or(DeployError::WrongRuntime)
+            .and_then(|runtime| runtime.check_deploy_status(artifact, cancel_if_not_complete))
     }
 
-    pub fn init_service(
+    pub fn start_service(
         &mut self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         constructor: &ServiceConstructor,
-    ) -> Result<(), InitError> {
+    ) -> Result<(), StartError> {
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            let result = runtime.init_service(ctx, artifact.clone(), &constructor);
+            let result = runtime.start_service(ctx, artifact.clone(), &constructor);
             if result.is_ok() {
                 self.notify_service_started(constructor.instance_id, artifact);
             }
@@ -117,7 +114,7 @@ impl Dispatcher {
 
             result
         } else {
-            Err(InitError::WrongRuntime)
+            Err(StartError::WrongRuntime)
         }
     }
 
@@ -260,10 +257,10 @@ impl DispatcherBuilder {
 // TODO Update action names in according with changes in runtime. [ECR-3222]
 #[derive(Debug)]
 pub enum Action {
-    StartDeploy {
+    BeginDeploy {
         artifact: ArtifactSpec,
     },
-    InitService {
+    StartService {
         artifact: ArtifactSpec,
         constructor: ServiceConstructor,
     },
@@ -276,14 +273,15 @@ impl Action {
         context: &mut RuntimeContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::StartDeploy { artifact } => {
-                dispatcher.start_deploy(artifact).map_err(From::from)
+            Action::BeginDeploy { artifact } => {
+                dispatcher.begin_deploy(artifact).map_err(From::from)
             }
-            Action::InitService {
+
+            Action::StartService {
                 artifact,
                 constructor,
             } => dispatcher
-                .init_service(context, artifact, &constructor)
+                .start_service(context, artifact, &constructor)
                 .map_err(From::from),
         }
     }
@@ -330,7 +328,7 @@ mod tests {
     }
 
     impl Runtime for SampleRuntime {
-        fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
@@ -350,16 +348,16 @@ mod tests {
             }
         }
 
-        fn init_service(
+        fn start_service(
             &mut self,
             _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &ServiceConstructor,
-        ) -> Result<(), InitError> {
+        ) -> Result<(), StartError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
-                Err(InitError::WrongRuntime)
+                Err(StartError::WrongRuntime)
             }
         }
 
@@ -448,10 +446,10 @@ mod tests {
 
         // Check deploy.
         dispatcher
-            .start_deploy(sample_rust_spec.clone())
+            .begin_deploy(sample_rust_spec.clone())
             .expect("start_deploy failed for rust");
         dispatcher
-            .start_deploy(sample_java_spec.clone())
+            .begin_deploy(sample_java_spec.clone())
             .expect("start_deploy failed for java");
 
         // Check deploy status
@@ -477,7 +475,7 @@ mod tests {
             data: Default::default(),
         };
         dispatcher
-            .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
+            .start_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
             .expect("init_service failed for rust");
 
         let java_init_data = ServiceConstructor {
@@ -485,7 +483,7 @@ mod tests {
             data: Default::default(),
         };
         dispatcher
-            .init_service(&mut context, sample_java_spec.clone(), &java_init_data)
+            .start_service(&mut context, sample_java_spec.clone(), &java_init_data)
             .expect("init_service failed for java");
 
         // Check if we can execute transactions.
@@ -542,7 +540,7 @@ mod tests {
         // Check deploy.
         assert_eq!(
             dispatcher
-                .start_deploy(sample_rust_spec.clone())
+                .begin_deploy(sample_rust_spec.clone())
                 .expect_err("start_deploy succeed"),
             DeployError::WrongArtifact
         );
@@ -564,9 +562,9 @@ mod tests {
         };
         assert_eq!(
             dispatcher
-                .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
+                .start_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
                 .expect_err("init_service succeed"),
-            InitError::WrongArtifact
+            StartError::WrongArtifact
         );
 
         // Check if we can execute transactions.

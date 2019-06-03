@@ -16,7 +16,7 @@ use exonum_merkledb::{Fork, Snapshot};
 use failure::Error;
 use protobuf::well_known_types::Any;
 
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use crate::{
     api::ServiceApiBuilder,
@@ -118,6 +118,14 @@ impl<'a, 'b, 'c> AfterCommitContext<'a, 'b, 'c> {
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }
+    }
+}
+
+impl<'a, 'b, 'c> Debug for AfterCommitContext<'a, 'b, 'c> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("AfterCommitContext")
+            .field("service_id", &self.service_id)
+            .finish()
     }
 }
 

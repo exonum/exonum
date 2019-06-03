@@ -73,15 +73,15 @@ pub enum ErrorCode {
 
     /// Service artifact deployment errored.
     ///
-    /// Can be emitted by `Deploy` or `DeployInit`.
+    /// Can be emitted by `Deploy`.
     DeployError = 96,
     /// Service instance initialization errored.
     ///
-    /// Can be emitted by `Init` or `DeployInit`.
-    InitError = 97,
+    /// Can be emitted by `Init`.
+    StartError = 97,
     /// Service instance name is already in use.
     ///
-    /// Can be emitted by `Init` or `DeployInit`.
+    /// Can be emitted by `Init`.
     ServiceInstanceNameInUse = 98,
 }
 
@@ -128,8 +128,8 @@ pub enum Error {
     #[fail(display = "Deploy error: {:?}", _0)]
     DeployError(runtime_error::DeployError),
 
-    #[fail(display = "Init error: {:?}", _0)]
-    InitError(runtime_error::InitError),
+    #[fail(display = "Start error: {:?}", _0)]
+    StartError(runtime_error::StartError),
 
     #[fail(display = "Service instance name already in use")]
     ServiceInstanceNameInUse,
@@ -150,7 +150,7 @@ impl Error {
             UnknownConfigRef(..) => ErrorCode::UnknownConfigRef,
             AlreadyVoted => ErrorCode::AlreadyVoted,
             DeployError(..) => ErrorCode::DeployError,
-            InitError(..) => ErrorCode::InitError,
+            StartError(..) => ErrorCode::StartError,
             ServiceInstanceNameInUse => ErrorCode::ServiceInstanceNameInUse,
         }
     }

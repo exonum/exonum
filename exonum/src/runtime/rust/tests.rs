@@ -132,7 +132,7 @@ fn test_basic_rust_runtime() {
     runtime.add_service_factory(service_factory);
 
     // Deploy service
-    assert!(runtime.start_deploy(artifact.clone()).is_ok());
+    assert!(runtime.begin_deploy(artifact.clone()).is_ok());
     assert_eq!(
         runtime
             .check_deploy_status(artifact.clone(), false)
@@ -159,7 +159,7 @@ fn test_basic_rust_runtime() {
         let tx_hash = Hash::zero();
         let mut context = RuntimeContext::new(&mut fork, address, tx_hash);
         runtime
-            .init_service(&mut context, artifact.clone(), &constructor)
+            .start_service(&mut context, artifact.clone(), &constructor)
             .unwrap();
 
         {
