@@ -110,12 +110,6 @@ impl<T> Signed<T> {
     }
 }
 
-impl<T: ProtocolMessage> ObjectHash for Signed<T> {
-    fn object_hash(&self) -> Hash {
-        self.message.object_hash()
-    }
-}
-
 impl<T> Signed<T> {
     /// Returns public key of the message creator.
     pub fn author(&self) -> PublicKey {
@@ -199,6 +193,12 @@ impl<T: ProtocolMessage> BinaryValue for Signed<T> {
         let message = SignedMessage::from_bytes(value)?;
         let msg = Message::deserialize(message).unwrap();
         Ok(T::try_from(msg).unwrap())
+    }
+}
+
+impl<T: ProtocolMessage> ObjectHash for Signed<T> {
+    fn object_hash(&self) -> Hash {
+        self.message.object_hash()
     }
 }
 
