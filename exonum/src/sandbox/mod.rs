@@ -448,14 +448,8 @@ impl Sandbox {
         Ref::map(self.inner.borrow(), |inner| inner.handler.state())
     }
 
-    pub fn blockchain_ref(&self) -> Ref<Blockchain> {
-        Ref::map(self.inner.borrow(), |inner| &inner.handler.blockchain)
-    }
-
-    pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(self.inner.borrow_mut(), |inner| {
-            &mut inner.handler.blockchain
-        })
+    pub fn blockchain(&self) -> Blockchain {
+        self.inner.borrow().handler.blockchain.clone()
     }
 
     /// Returns connect message used during initialization.
@@ -619,11 +613,11 @@ impl Sandbox {
     }
 
     pub fn last_block(&self) -> Block {
-        self.blockchain_ref().last_block()
+        self.blockchain().last_block()
     }
 
     pub fn last_hash(&self) -> Hash {
-        self.blockchain_ref().last_hash()
+        self.blockchain().last_hash()
     }
 
     pub fn last_state_hash(&self) -> Hash {
@@ -635,7 +629,7 @@ impl Sandbox {
         I: IntoIterator<Item = &'a Signed<AnyTx>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
@@ -660,7 +654,7 @@ impl Sandbox {
         I: IntoIterator<Item = &'a Signed<AnyTx>>,
     {
         let height = self.current_height();
-        let mut blockchain = self.blockchain_mut();
+        let mut blockchain = self.blockchain();
         let (hashes, recover, patch) = {
             let mut hashes = Vec::new();
             let mut recover = BTreeSet::new();
@@ -707,19 +701,19 @@ impl Sandbox {
         service_id: u16,
         table_idx: usize,
     ) -> MapProof<Hash, Hash> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.configs().object_hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.actual_configuration()
     }
@@ -745,7 +739,7 @@ impl Sandbox {
 
     #[allow(clippy::let_and_return)]
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
         let vec = idx.iter().collect();
@@ -757,7 +751,7 @@ impl Sandbox {
     }
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.block_and_precommits(height)
     }
@@ -780,7 +774,7 @@ impl Sandbox {
     }
 
     pub fn assert_pool_len(&self, expected: u64) {
-        let view = self.blockchain_ref().snapshot();
+        let view = self.blockchain().snapshot();
         let schema = Schema::new(&view);
         assert_eq!(expected, schema.transactions_pool_len());
     }

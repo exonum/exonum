@@ -180,7 +180,7 @@ fn test_reach_thirteen_height() {
 fn test_query_state_hash() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
-    //we do not change the state hash in between blocks for TimestampingService for now
+    // We do not change the state hash in between blocks for TimestampingService for now
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
@@ -275,7 +275,7 @@ fn test_store_txs_positions() {
         add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
     sandbox.assert_state(committed_height.next(), Round(1));
 
-    let snapshot = sandbox.blockchain_ref().snapshot();
+    let snapshot = sandbox.blockchain().snapshot();
     let schema = Schema::new(&snapshot);
     let locations = schema.transactions_locations();
     for (expected_idx, hash) in hashes.iter().enumerate() {

@@ -79,19 +79,19 @@ fn test_schema_config_changes() {
 
     // Check configuration from genesis block
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
+        Schema::new(&sandbox.blockchain().snapshot()).actual_configuration(),
         prev_cfg
     );
     // Try to get configuration from non exists height
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(Height(4)),
+        Schema::new(&sandbox.blockchain().snapshot()).configuration_by_height(Height(4)),
         prev_cfg
     );
     // Commit a new configuration
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
     // Check that following configuration is visible
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).following_configuration(),
+        Schema::new(&sandbox.blockchain().snapshot()).following_configuration(),
         Some(following_cfg.clone())
     );
     // Make following configuration actual
@@ -99,12 +99,12 @@ fn test_schema_config_changes() {
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     // Check that following configuration becomes actual
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
+        Schema::new(&sandbox.blockchain().snapshot()).actual_configuration(),
         following_cfg
     );
     // Check previous configuration
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot())
+        Schema::new(&sandbox.blockchain().snapshot())
             .previous_configuration()
             .unwrap(),
         prev_cfg
@@ -112,11 +112,11 @@ fn test_schema_config_changes() {
 
     // Finally check configuration for some heights
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(Height(0)),
+        Schema::new(&sandbox.blockchain().snapshot()).configuration_by_height(Height(0)),
         prev_cfg
     );
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot())
+        Schema::new(&sandbox.blockchain().snapshot())
             .configuration_by_height(sandbox.current_height()),
         following_cfg
     );
