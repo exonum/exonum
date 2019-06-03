@@ -15,13 +15,10 @@
 //! Simplified node emulation for testing webosckets.
 
 use std::{
+    borrow::Cow,
     net::SocketAddr,
-    sync::{Arc, Mutex},
     thread::{self, JoinHandle},
-    time::Duration,
 };
-
-use futures::sync::mpsc;
 
 use exonum::{
     blockchain::{
@@ -32,12 +29,13 @@ use exonum::{
     helpers,
     messages::{Message, RawTransaction, Signed},
     node::{ApiSender, Node, NodeConfig},
-    storage::{MemoryDB, Snapshot},
 };
 
-pub const SERVICE_ID: u16 = 0;
+use exonum_merkledb::{Snapshot, TemporaryDB};
 
 mod proto;
+
+pub const SERVICE_ID: u16 = 0;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CreateWallet")]
@@ -131,7 +129,7 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
     let service = Box::new(MyService);
-    let node = Node::new(MemoryDB::new(), vec![service], node_cfg, None);
+    let node = Node::new(TemporaryDB::new(), vec![service], node_cfg, None);
     let api_tx = node.channel();
     RunHandle {
         node_thread: thread::spawn(move || {

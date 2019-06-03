@@ -31,15 +31,17 @@ use crate::blockchain::{Block, Schema, TransactionResult, TxLocation};
 use crate::crypto::Hash;
 use crate::events::error::into_failure;
 use crate::explorer::TxStatus;
-use crate::messages::{
-    Message as ExonumMessage, ProtocolMessage, RawTransaction, Signed, SignedMessage,
-};
-use crate::storage::{ListProof, Snapshot};
+use crate::messages::{Message as ExonumMessage, ProtocolMessage, RawTransaction, SignedMessage};
 
+use exonum_merkledb::{IndexAccess, ListProof, Snapshot};
+
+/// Message, coming from websocket connection.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type", content = "payload", rename_all = "kebab-case")]
-pub enum IncomingMessage {
+enum IncomingMessage {
+    /// Set subscription for websocket connection.
     SetSubscriptions(Vec<SubscriptionType>),
+    /// Send transaction to blockchain.
     Transaction(TransactionHex),
 }
 
@@ -47,23 +49,29 @@ pub enum IncomingMessage {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum SubscriptionType {
-    /// Subscription to nothing
+    /// Subscription to nothing.
     None,
-    /// Subscription on new blocks
+    /// Subscription on new blocks.
     Blocks,
     /// Subscription on committed transactions.
-    Transactions { filter: Option<TransactionFilter> },
+    Transactions {
+        /// Optional filter for subscription.
+        filter: Option<TransactionFilter>,
+    },
 }
 
 /// Describe filter for transactions by ID of service and (optionally)
 /// transaction type in service.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub struct TransactionFilter {
+    /// ID of service.
     pub service_id: u16,
+    /// Optional ID of transaction in service (if not set, all transaction of service will be sent).
     pub transaction_id: Option<u16>,
 }
 
 impl TransactionFilter {
+    /// Create new transaction filter.
     pub fn new(service_id: u16, transaction_id: Option<u16>) -> Self {
         Self {
             service_id,
@@ -76,7 +84,9 @@ impl TransactionFilter {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TransactionInfo {
     tx_hash: Hash,
+    /// ID of service.
     pub service_id: u16,
+    /// ID of transaction in service.
     pub transaction_id: u16,
     #[serde(with = "TxStatus")]
     status: TransactionResult,
@@ -87,7 +97,7 @@ pub struct TransactionInfo {
 impl TransactionInfo {
     fn new<T>(schema: &Schema<T>, tx_hash: &Hash) -> Self
     where
-        T: AsRef<dyn Snapshot>,
+        T: AsRef<dyn Snapshot> + IndexAccess,
     {
         let tx = schema.transactions().get(tx_hash).unwrap();
         let service_id = tx.payload().service_id();
@@ -113,7 +123,9 @@ impl TransactionInfo {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Notification {
+    /// Notification about new block.
     Block(Block),
+    /// Notification about new transaction.
     Transaction(TransactionInfo),
 }
 
@@ -243,7 +255,7 @@ impl Handler<Broadcast> for Server {
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
         let snapshot = self.service_api_state.snapshot();
-        let schema = Schema::new(snapshot);
+        let schema = Schema::new(&snapshot);
         let block = schema.blocks().get(&block_hash).unwrap();
         let height = block.height();
         let block_header = Notification::Block(block);

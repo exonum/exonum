@@ -15,7 +15,7 @@
 //! Exonum blockchain explorer API.
 
 use actix::Arbiter;
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpMessage, Query};
+use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
 use futures::{Future, IntoFuture};
 

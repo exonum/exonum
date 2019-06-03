@@ -24,11 +24,11 @@ extern crate serde_derive;
 #[macro_use]
 extern crate pretty_assertions;
 
-use std::{thread::sleep, time::Duration};
-
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, OwnedMessage, WebSocketResult,
 };
+
+use std::{thread::sleep, time::Duration};
 
 use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
 
