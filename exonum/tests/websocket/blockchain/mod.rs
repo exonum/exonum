@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Simplified node emulation for testing webosckets.
+//! Simplified node emulation for testing websockets.
 
 use std::{
     borrow::Cow,
@@ -22,8 +22,7 @@ use std::{
 
 use exonum::{
     blockchain::{
-        ExecutionError, ExecutionResult, Service, Transaction,
-        TransactionContext, TransactionSet,
+        ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey},
     helpers,

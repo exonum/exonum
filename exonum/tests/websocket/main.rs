@@ -64,10 +64,10 @@ fn test_send_transaction() {
     let node_handler = run_node(6330, 8079);
 
     let mut client =
-        create_ws_client("ws://localhost:8082/api/explorer/v1/ws").expect("Cannot connect to node");
+        create_ws_client("ws://localhost:8079/api/explorer/v1/ws").expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
+        .set_read_timeout(Some(Duration::from_secs(60)))
         .unwrap();
 
     // Check that no messages on start.
@@ -109,7 +109,7 @@ fn test_blocks_subscribe() {
         .expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
+        .set_read_timeout(Some(Duration::from_secs(60)))
         .unwrap();
 
     // Get one message and check that it is text.
@@ -139,7 +139,7 @@ fn test_transactions_subscribe() {
         .expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
+        .set_read_timeout(Some(Duration::from_secs(60)))
         .unwrap();
 
     // Send transaction.
@@ -183,7 +183,7 @@ fn test_subscribe() {
         create_ws_client("ws://localhost:8082/api/explorer/v1/ws").expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
+        .set_read_timeout(Some(Duration::from_secs(60)))
         .unwrap();
 
     // Check that no messages on start.
