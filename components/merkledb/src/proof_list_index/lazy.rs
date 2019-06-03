@@ -307,7 +307,7 @@ where
     fn get_branch_new(&self, key: ProofListKey) -> Branch {
         debug_assert!(self.has_branch(key));
 
-        self.base.get(&key).unwrap()
+        self.base.get(&key).unwrap_or(Branch::new(None))
     }
 
     fn root_key(&self) -> ProofListKey {
@@ -605,7 +605,6 @@ where
         self.set_len(len + 1);
 
         let mut key = ProofListKey::new(1, len);
-        self.base.put(&key, Branch::new(None));
         self.base.put(&ProofListKey::leaf(len), value);
 
         while key.height() < self.height() {
@@ -720,15 +719,13 @@ where
             return HashTag::empty_list_hash();
         }
 
-        let vec: Vec<(_, Branch, V)> = self
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                let key = ProofListKey::new(1, index as u64);
-                let branch = self.get_branch_new(key);
-                (key, branch, value)
-            })
-            .collect();
+        let mut vec = Vec::with_capacity(self.len() as usize);
+
+        for (index, value) in self.iter().enumerate() {
+            let key = ProofListKey::new(1, index as u64);
+            let branch = self.get_branch_new(key);
+            vec.push((key, branch, value));
+        }
 
         let mut hashes: Vec<Hash> = Vec::with_capacity(self.len() as usize);
 
