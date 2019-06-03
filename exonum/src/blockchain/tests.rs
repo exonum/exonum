@@ -14,19 +14,15 @@
 
 #![allow(dead_code, unsafe_code)]
 
-use exonum_merkledb::{
-    Database, DbOptions, Error as StorageError, Fork, ListIndex, ObjectHash, RocksDB, Snapshot,
-    TemporaryDB,
-};
+use exonum_merkledb::{Database, Error as StorageError, Fork, ListIndex, ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
 use crate::{
-    blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema},
-    crypto::{gen_keypair, Hash},
+    blockchain::{Blockchain, ExecutionResult, Schema},
+    crypto::gen_keypair,
     helpers::{Height, ValidatorId},
     impl_service_dispatcher,
-    messages::{AnyTx, BinaryValue, Message, ServiceInstanceId, ServiceTransaction},
+    messages::{Message, ServiceInstanceId},
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
@@ -121,7 +117,7 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn before_commit(&self, fork: &Fork) {
+    fn before_commit(&self, _fork: &Fork) {
         panic!("42");
     }
 }

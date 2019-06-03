@@ -59,7 +59,7 @@ use std::{
 };
 
 use crate::{
-    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
@@ -114,17 +114,16 @@ impl Blockchain {
             )
             .with_service_factories(services)
             .finalize();
-
-        Self {
-            db: db.into(),
-            service_keypair: (service_public_key, service_secret_key),
+        Self::with_dispatcher(
+            db,
+            dispatcher,
+            service_public_key,
+            service_secret_key,
             api_sender,
-            dispatcher: Arc::new(Mutex::new(dispatcher)),
-        }
+        )
     }
 
     /// Creates the blockchain instance with the specified dispatcher.
-    #[cfg(test)]
     pub fn with_dispatcher(
         db: impl Into<Arc<dyn Database>>,
         dispatcher: Dispatcher,
