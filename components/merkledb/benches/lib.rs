@@ -16,7 +16,7 @@ use criterion::{criterion_group, criterion_main};
 
 use crate::{
     encoding::bench_encoding, lazy::bench_lazy_hash, refs::bench_refs, storage::bench_storage,
-    transactions::bench_transactions, transactions_lazy::bench_transactions_lazy,
+    transactions::bench_transactions,
 };
 
 mod encoding;
@@ -24,14 +24,12 @@ mod lazy;
 mod refs;
 mod storage;
 mod transactions;
-mod transactions_lazy;
 
 criterion_group!(
     benches,
     bench_storage,
     bench_encoding,
     bench_transactions,
-    bench_transactions_lazy,
     bench_refs,
     bench_lazy_hash,
 );
