@@ -15,9 +15,9 @@
 //! Exonum blockchain explorer API.
 
 use actix::Arbiter;
-use actix_web::{http, ws};
+use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpMessage, Query};
 use chrono::{DateTime, Utc};
-use futures::IntoFuture;
+use futures::{Future, IntoFuture};
 
 use std::ops::{Bound, Range};
 use std::sync::{Arc, Mutex};
@@ -28,7 +28,7 @@ use crate::{
         backends::actix::{
             self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
         },
-        websocket::{Server, Session},
+        websocket::{Server, Session, SubscriptionType, TransactionFilter},
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
     },
     blockchain::{Block, SharedNodeState},
@@ -260,17 +260,20 @@ impl ExplorerApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    /// Subscribes to block commits events.
-    pub fn handle_subscribe(
+    /// Subscribes to events.
+    pub fn handle_ws<Q>(
         name: &'static str,
         backend: &mut actix_backend::ApiBuilder,
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
-    ) {
+        extract_query: Q,
+    ) where
+        Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
+    {
         let server = Arc::new(Mutex::new(None));
         let service_api_state = Arc::new(service_api_state);
 
-        let index = move |req: HttpRequest| -> FutureResponse {
+        let index = move |request: HttpRequest| -> FutureResponse {
             let server = server.clone();
             let service_api_state = service_api_state.clone();
             let mut address = server.lock().expect("Expected mutex lock");
@@ -279,8 +282,15 @@ impl ExplorerApi {
 
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
+            let address = address.to_owned().unwrap();
 
-            Box::new(ws::start(&req, Session::new(address.to_owned().unwrap())).into_future())
+            extract_query(&request)
+                .into_future()
+                .from_err()
+                .and_then(move |query: SubscriptionType| {
+                    ws::start(&request, Session::new(address, vec![query])).into_future()
+                })
+                .responder()
         };
 
         backend.raw_handler(RequestHandler {
@@ -296,11 +306,37 @@ impl ExplorerApi {
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
     ) -> &mut ServiceApiScope {
-        Self::handle_subscribe(
+        // Default subscription for blocks.
+        Self::handle_ws(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
-            service_api_state,
-            shared_node_state,
+            service_api_state.clone(),
+            shared_node_state.clone(),
+            |_| Ok(SubscriptionType::Blocks),
+        );
+        // Default subscription for transactions.
+        Self::handle_ws(
+            "v1/transactions/subscribe",
+            api_scope.web_backend(),
+            service_api_state.clone(),
+            shared_node_state.clone(),
+            |request| {
+                Ok(Query::from_request(request, &Default::default())
+                    .map(
+                        move |query: Query<TransactionFilter>| SubscriptionType::Transactions {
+                            filter: Some(query.into_inner()),
+                        },
+                    )
+                    .unwrap_or(SubscriptionType::Transactions { filter: None }))
+            },
+        );
+        // Default websocket connection.
+        Self::handle_ws(
+            "v1/ws",
+            api_scope.web_backend(),
+            service_api_state.clone(),
+            shared_node_state.clone(),
+            |_| Ok(SubscriptionType::None),
         );
         api_scope
             .endpoint("v1/blocks", Self::blocks)
