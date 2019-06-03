@@ -19,8 +19,9 @@ use std::fmt::Debug;
 
 use crate::{
     api::ServiceApiBuilder,
-    crypto::{Hash, PublicKey},
+    crypto::{Hash, PublicKey, SecretKey},
     messages::{CallInfo, ServiceInstanceId},
+    node::ApiSender,
 };
 
 use self::{
@@ -121,7 +122,12 @@ pub trait Runtime: Send + Debug + 'static {
 
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
-    fn after_commit(&self, fork: &Fork);
+    fn after_commit(
+        &self,
+        snapshot: &dyn Snapshot,
+        service_keypair: &(PublicKey, SecretKey),
+        tx_sender: &ApiSender,
+    );
 
     fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()

@@ -20,7 +20,11 @@ use std::collections::HashMap;
 use crate::{
     api::ServiceApiBuilder,
     events::InternalRequest,
-    {crypto::Hash, messages::CallInfo},
+    node::ApiSender,
+    {
+        crypto::{Hash, PublicKey, SecretKey},
+        messages::CallInfo,
+    },
 };
 
 use super::{
@@ -161,10 +165,15 @@ impl Dispatcher {
         }
     }
 
-    pub fn after_commit(&self, fork: &Fork) {
-        for (_, runtime) in &self.runtimes {
-            runtime.after_commit(fork);
-        }
+    pub fn after_commit(
+        &self,
+        snapshot: Box<dyn Snapshot>,
+        service_keypair: &(PublicKey, SecretKey),
+        tx_sender: &ApiSender,
+    ) {
+        self.runtimes.values().for_each(|runtime| {
+            runtime.after_commit(snapshot.as_ref(), &service_keypair, &tx_sender)
+        });
     }
 
     pub fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
@@ -292,6 +301,11 @@ mod tests {
 
     use super::*;
 
+    enum SampleRuntimes {
+        First = 2,
+        Second = 3,
+    }
+
     impl DispatcherBuilder {
         fn dummy() -> Self {
             Self::new(mpsc::channel(0).0)
@@ -368,13 +382,19 @@ mod tests {
 
         fn before_commit(&self, _: &mut Fork) {}
 
-        fn after_commit(&self, _: &Fork) {}
+        fn after_commit(
+            &self,
+            _snapshot: &dyn Snapshot,
+            _service_keypair: &(PublicKey, SecretKey),
+            _tx_sender: &ApiSender,
+        ) {
+        }
     }
 
     #[test]
     fn test_builder() {
-        let runtime_a = SampleRuntime::new(RuntimeIdentifier::Rust as u32, 0, 0);
-        let runtime_b = SampleRuntime::new(RuntimeIdentifier::Java as u32, 1, 0);
+        let runtime_a = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0);
+        let runtime_b = SampleRuntime::new(SampleRuntimes::Second as u32, 1, 0);
 
         let dispatcher = DispatcherBuilder::dummy()
             .with_runtime(runtime_a.runtime_type, runtime_a)
@@ -383,11 +403,11 @@ mod tests {
 
         assert!(dispatcher
             .runtimes
-            .get(&(RuntimeIdentifier::Rust as u32))
+            .get(&(SampleRuntimes::First as u32))
             .is_some());
         assert!(dispatcher
             .runtimes
-            .get(&(RuntimeIdentifier::Java as u32))
+            .get(&(SampleRuntimes::Second as u32))
             .is_some());
     }
 
@@ -402,12 +422,12 @@ mod tests {
         let db = TemporaryDB::new();
 
         let runtime_a = SampleRuntime::new(
-            RuntimeIdentifier::Rust as u32,
+            SampleRuntimes::First as u32,
             RUST_SERVICE_ID,
             RUST_METHOD_ID,
         );
         let runtime_b = SampleRuntime::new(
-            RuntimeIdentifier::Java as u32,
+            SampleRuntimes::Second as u32,
             JAVA_SERVICE_ID,
             JAVA_METHOD_ID,
         );
@@ -418,11 +438,11 @@ mod tests {
             .finalize();
 
         let sample_rust_spec = ArtifactSpec {
-            runtime_id: RuntimeIdentifier::Rust as u32,
+            runtime_id: SampleRuntimes::First as u32,
             raw_spec: Default::default(),
         };
         let sample_java_spec = ArtifactSpec {
-            runtime_id: RuntimeIdentifier::Java as u32,
+            runtime_id: SampleRuntimes::Second as u32,
             raw_spec: Default::default(),
         };
 
@@ -505,7 +525,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dispatcher_no_service() {
+    fn test_dispatcher_rust_runtime_no_service() {
         const RUST_SERVICE_ID: ServiceInstanceId = 0;
         const RUST_METHOD_ID: MethodId = 0;
 
@@ -524,14 +544,14 @@ mod tests {
             dispatcher
                 .start_deploy(sample_rust_spec.clone())
                 .expect_err("start_deploy succeed"),
-            DeployError::WrongRuntime
+            DeployError::WrongArtifact
         );
 
         assert_eq!(
             dispatcher
                 .check_deploy_status(sample_rust_spec.clone(), false)
                 .expect_err("check_deploy_status succeed"),
-            DeployError::WrongRuntime
+            DeployError::WrongArtifact
         );
 
         // Check if we can init services.
@@ -546,7 +566,7 @@ mod tests {
             dispatcher
                 .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
                 .expect_err("init_service succeed"),
-            InitError::WrongRuntime
+            InitError::WrongArtifact
         );
 
         // Check if we can execute transactions.

@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-pub use self::service::{Service, ServiceFactory};
+
+pub use self::service::{AfterCommitContext, Service, ServiceFactory};
 
 use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
 use protobuf::well_known_types::Any;
@@ -25,8 +26,9 @@ use std::{
 
 use crate::{
     api::ServiceApiBuilder,
-    crypto::{Hash, PublicKey},
+    crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
+    node::ApiSender,
     proto::schema,
 };
 
@@ -303,9 +305,15 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn after_commit(&self, fork: &Fork) {
+    fn after_commit(
+        &self,
+        snapshot: &dyn Snapshot,
+        service_keypair: &(PublicKey, SecretKey),
+        tx_sender: &ApiSender,
+    ) {
         for service in self.inner.initialized.values() {
-            service.as_ref().after_commit(fork);
+            let context = AfterCommitContext::new(service.id, snapshot, service_keypair, tx_sender);
+            service.as_ref().after_commit(context);
         }
     }
 

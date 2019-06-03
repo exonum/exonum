@@ -20,8 +20,11 @@ use std::fmt::Debug;
 
 use crate::{
     api::ServiceApiBuilder,
-    crypto::Hash,
-    messages::MethodId,
+    blockchain::Schema as CoreSchema,
+    crypto::{Hash, PublicKey, SecretKey},
+    helpers::Height,
+    messages::{AnyTx, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
+    node::ApiSender,
     runtime::{error::ExecutionError, rust::TransactionContext},
 };
 
@@ -43,7 +46,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 
     fn before_commit(&self, _fork: &Fork) {}
 
-    fn after_commit(&self, _fork: &Fork) {}
+    fn after_commit(&self, _context: AfterCommitContext) {}
 
     fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
@@ -64,6 +67,57 @@ where
 {
     fn from(factory: T) -> Self {
         Box::new(factory) as Self
+    }
+}
+
+pub struct AfterCommitContext<'a, 'b, 'c> {
+    service_id: ServiceInstanceId,
+    snapshot: &'a dyn Snapshot,
+    service_keypair: &'b (PublicKey, SecretKey),
+    tx_sender: &'c ApiSender,
+}
+
+impl<'a, 'b, 'c> AfterCommitContext<'a, 'b, 'c> {
+    /// Creates context for `after_commit` method.
+    pub(crate) fn new(
+        service_id: ServiceInstanceId,
+        snapshot: &'a dyn Snapshot,
+        service_keypair: &'b (PublicKey, SecretKey),
+        tx_sender: &'c ApiSender,
+    ) -> Self {
+        Self {
+            snapshot,
+            service_keypair,
+            tx_sender,
+            service_id,
+        }
+    }
+
+    /// Returns the current blockchain height. This height is "height of the last committed block".
+    pub fn height(&self) -> Height {
+        CoreSchema::new(self.snapshot).height()
+    }
+
+    /// Signs and broadcasts transaction to other nodes in the network.
+    pub fn broadcast_transaction(&self, tx: impl Into<ServiceTransaction>) {
+        let msg = Message::sign_transaction(
+            tx,
+            self.service_id,
+            self.service_keypair.0,
+            &self.service_keypair.1,
+        );
+
+        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
+            error!("Couldn't broadcast transaction {}.", e);
+        }
+    }
+
+    /// Broadcast transaction to other nodes in the network.
+    /// This transaction should be signed externally.
+    pub fn broadcast_signed_transaction(&self, msg: Signed<AnyTx>) {
+        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
+            error!("Couldn't broadcast transaction {}.", e);
+        }
     }
 }
 

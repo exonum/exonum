@@ -1177,252 +1177,277 @@ where
     HashTag::hash_list(&txs)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
-//     use crate::crypto::{gen_keypair_from_seed, Seed};
-//     use crate::messages::AnyTx;
-//     use crate::proto::schema::tests::TxAfterCommit;
-//     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-//     use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
-//     use protobuf::Message as PbMessage;
-//     use std::borrow::Cow;
+#[cfg(test)]
+mod tests {
+    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue};
+    use protobuf::Message as PbMessage;
+    use semver::Version;
 
-//     const SERVICE_ID: u16 = 1;
+    use std::borrow::Cow;
 
-//     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-//     #[exonum(crate = "crate")]
-//     enum HandleCommitTransactions {
-//         TxAfterCommit(TxAfterCommit),
-//     }
+    use crate::{
+        blockchain::ExecutionResult,
+        crypto::{gen_keypair_from_seed, Seed},
+        messages::{AnyTx, ServiceInstanceId},
+        proto::schema::tests::TxAfterCommit,
+        runtime::rust::{
+            AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext,
+        },
+        sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
+    };
 
-//     impl TxAfterCommit {
-//         pub fn new_with_height(height: Height) -> Signed<AnyTx> {
-//             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-//             let mut payload_tx = TxAfterCommit::new();
-//             payload_tx.set_height(height.0);
-//             Message::sign_transaction(payload_tx, SERVICE_ID, keypair.0, &keypair.1)
-//         }
-//     }
+    use super::*;
 
-//     impl_binary_value_for_message! { TxAfterCommit }
+    #[service_interface(exonum(crate = "crate"))]
+    trait AfterCommitInterface {
+        fn after_commit(&self, context: TransactionContext, arg: TxAfterCommit) -> ExecutionResult;
+    }
 
-//     impl Transaction for TxAfterCommit {
-//         fn execute(&self, _: TransactionContext) -> ExecutionResult {
-//             Ok(())
-//         }
-//     }
+    #[derive(Debug)]
+    pub struct AfterCommitService;
 
-//     struct AfterCommitService;
+    impl_service_dispatcher!(AfterCommitService, AfterCommitInterface);
 
-//     impl Service for AfterCommitService {
-//         fn service_id(&self) -> u16 {
-//             SERVICE_ID
-//         }
+    impl AfterCommitInterface for AfterCommitService {
+        fn after_commit(
+            &self,
+            _context: TransactionContext,
+            _arg: TxAfterCommit,
+        ) -> ExecutionResult {
+            Ok(())
+        }
+    }
 
-//         fn service_name(&self) -> &str {
-//             "after_commit"
-//         }
+    impl Service for AfterCommitService {
+        fn after_commit(&self, context: AfterCommitContext) {
+            debug!("After commit");
+            let tx = TxAfterCommit::new_with_height(context.height());
+            context.broadcast_signed_transaction(tx);
+        }
+    }
 
-//         fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-//             Vec::new()
-//         }
+    impl ServiceFactory for AfterCommitService {
+        fn artifact(&self) -> RustArtifactSpec {
+            RustArtifactSpec {
+                name: "after_commit".into(),
+                version: Version::new(0, 1, 0),
+            }
+        }
 
-//         fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-//             let tx = HandleCommitTransactions::tx_from_raw(raw)?;
-//             Ok(tx.into())
-//         }
+        fn new_instance(&self) -> Box<dyn Service> {
+            Box::new(Self)
+        }
+    }
 
-//         fn after_commit(&self, context: &ServiceContext) {
-//             let tx = TxAfterCommit::new_with_height(context.height());
-//             context.broadcast_signed_transaction(tx);
-//         }
-//     }
+    impl AfterCommitService {
+        pub const ID: ServiceInstanceId = 2;
+    }
 
-//     #[test]
-//     fn test_sandbox_init() {
-//         timestamping_sandbox();
-//     }
+    impl From<AfterCommitService> for BuiltinService {
+        fn from(factory: AfterCommitService) -> Self {
+            Self {
+                factory: factory.into(),
+                instance_id: AfterCommitService::ID,
+                instance_name: "after_commit".into(),
+            }
+        }
+    }
 
-//     #[test]
-//     fn test_sandbox_recv_and_send() {
-//         let s = timestamping_sandbox();
-//         // As far as all validators have connected to each other during
-//         // sandbox initialization, we need to use connect-message with unknown
-//         // keypair.
-//         let (public, secret) = gen_keypair();
-//         let (service, _) = gen_keypair();
-//         let validator_keys = ValidatorKeys {
-//             consensus_key: public,
-//             service_key: service,
-//         };
+    impl TxAfterCommit {
+        pub fn new_with_height(height: Height) -> Signed<AnyTx> {
+            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
+            let mut payload_tx = TxAfterCommit::new();
+            payload_tx.set_height(height.0);
+            Message::sign_transaction(payload_tx, AfterCommitService::ID, keypair.0, &keypair.1)
+        }
+    }
 
-//         let new_peer_addr = gen_primitive_socket_addr(2);
-//         // We also need to add public key from this keypair to the ConnectList.
-//         // Socket address doesn't matter in this case.
-//         s.add_peer_to_connect_list(new_peer_addr, validator_keys);
+    impl_binary_value_for_message! { TxAfterCommit }
 
-//         s.recv(&s.create_connect(
-//             &public,
-//             new_peer_addr.to_string(),
-//             s.time().into(),
-//             &user_agent::get(),
-//             &secret,
-//         ));
-//         s.send(
-//             public,
-//             &s.create_connect(
-//                 &s.public_key(ValidatorId(0)),
-//                 s.address(ValidatorId(0)),
-//                 s.time().into(),
-//                 &user_agent::get(),
-//                 s.secret_key(ValidatorId(0)),
-//             ),
-//         );
-//     }
+    #[test]
+    fn test_sandbox_init() {
+        timestamping_sandbox();
+    }
 
-//     #[test]
-//     fn test_sandbox_assert_status() {
-//         let s = timestamping_sandbox();
-//         s.assert_state(Height(1), Round(1));
-//         s.add_time(Duration::from_millis(999));
-//         s.assert_state(Height(1), Round(1));
-//         s.add_time(Duration::from_millis(1));
-//         s.assert_state(Height(1), Round(2));
-//     }
+    #[test]
+    fn test_sandbox_recv_and_send() {
+        let s = timestamping_sandbox();
+        // As far as all validators have connected to each other during
+        // sandbox initialization, we need to use connect-message with unknown
+        // keypair.
+        let (public, secret) = gen_keypair();
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
 
-//     #[test]
-//     #[should_panic(expected = "Expected to send the message")]
-//     fn test_sandbox_expected_to_send_but_nothing_happened() {
-//         let s = timestamping_sandbox();
-//         s.send(
-//             s.public_key(ValidatorId(1)),
-//             &s.create_connect(
-//                 &s.public_key(ValidatorId(0)),
-//                 s.address(ValidatorId(0)),
-//                 s.time().into(),
-//                 &user_agent::get(),
-//                 s.secret_key(ValidatorId(0)),
-//             ),
-//         );
-//     }
+        let new_peer_addr = gen_primitive_socket_addr(2);
+        // We also need to add public key from this keypair to the ConnectList.
+        // Socket address doesn't matter in this case.
+        s.add_peer_to_connect_list(new_peer_addr, validator_keys);
 
-//     #[test]
-//     #[should_panic(expected = "Expected to send message to other recipient")]
-//     fn test_sandbox_expected_to_send_another_message() {
-//         let s = timestamping_sandbox();
-//         // See comments to `test_sandbox_recv_and_send`.
-//         let (public, secret) = gen_keypair();
-//         let (service, _) = gen_keypair();
-//         let validator_keys = ValidatorKeys {
-//             consensus_key: public,
-//             service_key: service,
-//         };
-//         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-//         s.recv(&s.create_connect(
-//             &public,
-//             s.address(ValidatorId(2)),
-//             s.time().into(),
-//             &user_agent::get(),
-//             &secret,
-//         ));
-//         s.send(
-//             s.public_key(ValidatorId(1)),
-//             &s.create_connect(
-//                 &s.public_key(ValidatorId(0)),
-//                 s.address(ValidatorId(0)),
-//                 s.time().into(),
-//                 &user_agent::get(),
-//                 s.secret_key(ValidatorId(0)),
-//             ),
-//         );
-//     }
+        s.recv(&s.create_connect(
+            &public,
+            new_peer_addr.to_string(),
+            s.time().into(),
+            &user_agent::get(),
+            &secret,
+        ));
+        s.send(
+            public,
+            &s.create_connect(
+                &s.public_key(ValidatorId(0)),
+                s.address(ValidatorId(0)),
+                s.time().into(),
+                &user_agent::get(),
+                s.secret_key(ValidatorId(0)),
+            ),
+        );
+    }
 
-//     #[test]
-//     #[should_panic(expected = "Send unexpected message")]
-//     fn test_sandbox_unexpected_message_when_drop() {
-//         let s = timestamping_sandbox();
-//         // See comments to `test_sandbox_recv_and_send`.
-//         let (public, secret) = gen_keypair();
-//         let (service, _) = gen_keypair();
-//         let validator_keys = ValidatorKeys {
-//             consensus_key: public,
-//             service_key: service,
-//         };
-//         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-//         s.recv(&s.create_connect(
-//             &public,
-//             s.address(ValidatorId(2)),
-//             s.time().into(),
-//             &user_agent::get(),
-//             &secret,
-//         ));
-//     }
+    #[test]
+    fn test_sandbox_assert_status() {
+        let s = timestamping_sandbox();
+        s.assert_state(Height(1), Round(1));
+        s.add_time(Duration::from_millis(999));
+        s.assert_state(Height(1), Round(1));
+        s.add_time(Duration::from_millis(1));
+        s.assert_state(Height(1), Round(2));
+    }
 
-//     #[test]
-//     #[should_panic(expected = "Send unexpected message")]
-//     fn test_sandbox_unexpected_message_when_handle_another_message() {
-//         let s = timestamping_sandbox();
-//         // See comments to `test_sandbox_recv_and_send`.
-//         let (public, secret) = gen_keypair();
-//         let (service, _) = gen_keypair();
-//         let validator_keys = ValidatorKeys {
-//             consensus_key: public,
-//             service_key: service,
-//         };
-//         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-//         s.recv(&s.create_connect(
-//             &public,
-//             s.address(ValidatorId(2)),
-//             s.time().into(),
-//             &user_agent::get(),
-//             &secret,
-//         ));
-//         s.recv(&s.create_connect(
-//             &public,
-//             s.address(ValidatorId(3)),
-//             s.time().into(),
-//             &user_agent::get(),
-//             &secret,
-//         ));
-//         panic!("Oops! We don't catch unexpected message");
-//     }
+    #[test]
+    #[should_panic(expected = "Expected to send the message")]
+    fn test_sandbox_expected_to_send_but_nothing_happened() {
+        let s = timestamping_sandbox();
+        s.send(
+            s.public_key(ValidatorId(1)),
+            &s.create_connect(
+                &s.public_key(ValidatorId(0)),
+                s.address(ValidatorId(0)),
+                s.time().into(),
+                &user_agent::get(),
+                s.secret_key(ValidatorId(0)),
+            ),
+        );
+    }
 
-//     #[test]
-//     #[should_panic(expected = "Send unexpected message")]
-//     fn test_sandbox_unexpected_message_when_time_changed() {
-//         let s = timestamping_sandbox();
-//         // See comments to `test_sandbox_recv_and_send`.
-//         let (public, secret) = gen_keypair();
-//         let (service, _) = gen_keypair();
-//         let validator_keys = ValidatorKeys {
-//             consensus_key: public,
-//             service_key: service,
-//         };
-//         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-//         s.recv(&s.create_connect(
-//             &public,
-//             s.address(ValidatorId(2)),
-//             s.time().into(),
-//             &user_agent::get(),
-//             &secret,
-//         ));
-//         s.add_time(Duration::from_millis(1000));
-//         panic!("Oops! We don't catch unexpected message");
-//     }
+    #[test]
+    #[should_panic(expected = "Expected to send message to other recipient")]
+    fn test_sandbox_expected_to_send_another_message() {
+        let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
+        let (public, secret) = gen_keypair();
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
+        s.recv(&s.create_connect(
+            &public,
+            s.address(ValidatorId(2)),
+            s.time().into(),
+            &user_agent::get(),
+            &secret,
+        ));
+        s.send(
+            s.public_key(ValidatorId(1)),
+            &s.create_connect(
+                &s.public_key(ValidatorId(0)),
+                s.address(ValidatorId(0)),
+                s.time().into(),
+                &user_agent::get(),
+                s.secret_key(ValidatorId(0)),
+            ),
+        );
+    }
 
-//     #[test]
-//     fn test_sandbox_service_after_commit() {
-//         let sandbox = SandboxBuilder::new()
-//             .with_services(vec![
-//                 Box::new(AfterCommitService),
-//                 Box::new(TimestampingService::new()),
-//             ])
-//             .build();
-//         let state = SandboxState::new();
-//         add_one_height(&sandbox, &state);
-//         let tx = TxAfterCommit::new_with_height(Height(1));
-//         sandbox.broadcast(&tx);
-//     }
-// }
+    #[test]
+    #[should_panic(expected = "Send unexpected message")]
+    fn test_sandbox_unexpected_message_when_drop() {
+        let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
+        let (public, secret) = gen_keypair();
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
+        s.recv(&s.create_connect(
+            &public,
+            s.address(ValidatorId(2)),
+            s.time().into(),
+            &user_agent::get(),
+            &secret,
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "Send unexpected message")]
+    fn test_sandbox_unexpected_message_when_handle_another_message() {
+        let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
+        let (public, secret) = gen_keypair();
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
+        s.recv(&s.create_connect(
+            &public,
+            s.address(ValidatorId(2)),
+            s.time().into(),
+            &user_agent::get(),
+            &secret,
+        ));
+        s.recv(&s.create_connect(
+            &public,
+            s.address(ValidatorId(3)),
+            s.time().into(),
+            &user_agent::get(),
+            &secret,
+        ));
+        panic!("Oops! We don't catch unexpected message");
+    }
+
+    #[test]
+    #[should_panic(expected = "Send unexpected message")]
+    fn test_sandbox_unexpected_message_when_time_changed() {
+        let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
+        let (public, secret) = gen_keypair();
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
+        s.recv(&s.create_connect(
+            &public,
+            s.address(ValidatorId(2)),
+            s.time().into(),
+            &user_agent::get(),
+            &secret,
+        ));
+        s.add_time(Duration::from_millis(1000));
+        panic!("Oops! We don't catch unexpected message");
+    }
+
+    // TODO move to testkit [ECR-3251]
+    #[test]
+    fn test_sandbox_service_after_commit() {
+        let sandbox = SandboxBuilder::new()
+            .with_services(vec![
+                BuiltinService::from(AfterCommitService),
+                BuiltinService::from(TimestampingService),
+            ])
+            .build();
+        let state = SandboxState::new();
+        add_one_height(&sandbox, &state);
+        let tx = TxAfterCommit::new_with_height(Height(1));
+        sandbox.broadcast(&tx);
+    }
+}
