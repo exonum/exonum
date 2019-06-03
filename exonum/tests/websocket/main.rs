@@ -91,6 +91,14 @@ fn test_send_transaction() {
             "response": { "tx_hash": tx_hash }
         })
     );
+
+    // Shutdown node.
+    client.shutdown().unwrap();
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
 }
 
 #[test]
@@ -120,7 +128,7 @@ fn test_blocks_subscribe() {
         .api_tx
         .send_external_message(ExternalMessage::Shutdown)
         .unwrap();
-    node_handler.node_thread.join();
+    node_handler.node_thread.join().unwrap();
 }
 
 #[test]
@@ -139,7 +147,7 @@ fn test_transactions_subscribe() {
     let tx = Message::sign_transaction(CreateWallet::new(&pk, "Alice"), SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
-    let res = http_client
+    let _res = http_client
         .post("http://localhost:8081/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
@@ -164,7 +172,7 @@ fn test_transactions_subscribe() {
         .api_tx
         .send_external_message(ExternalMessage::Shutdown)
         .unwrap();
-    node_handler.node_thread.join();
+    node_handler.node_thread.join().unwrap();
 }
 
 #[test]
@@ -211,5 +219,5 @@ fn test_subscribe() {
         .api_tx
         .send_external_message(ExternalMessage::Shutdown)
         .unwrap();
-    node_handler.node_thread.join();
+    node_handler.node_thread.join().unwrap();
 }

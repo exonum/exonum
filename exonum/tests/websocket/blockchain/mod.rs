@@ -22,13 +22,13 @@ use std::{
 
 use exonum::{
     blockchain::{
-        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
+        ExecutionError, ExecutionResult, Service, Transaction,
         TransactionContext, TransactionSet,
     },
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{Hash, PublicKey},
     helpers,
-    messages::{Message, RawTransaction, Signed},
-    node::{ApiSender, Node, NodeConfig},
+    messages::RawTransaction,
+    node::{ApiSender, Node},
 };
 
 use exonum_merkledb::{Snapshot, TemporaryDB};
