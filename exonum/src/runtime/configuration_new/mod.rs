@@ -20,7 +20,7 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::Hash,
     runtime::{
-        dispatcher::Action,
+        dispatcher::{Action, BuiltinService},
         error::ExecutionError,
         rust::{
             service::{Service, ServiceFactory},
@@ -228,11 +228,6 @@ impl Service for ConfigurationServiceImpl {
 #[derive(Debug, Default)]
 pub struct ConfigurationServiceFactory;
 
-impl ConfigurationServiceFactory {
-    pub const BUILTIN_ID: ServiceInstanceId = 0;
-    pub const BUILTIN_NAME: &'static str = "config";
-}
-
 impl ServiceFactory for ConfigurationServiceFactory {
     fn artifact(&self) -> RustArtifactSpec {
         artifact_spec()
@@ -240,5 +235,15 @@ impl ServiceFactory for ConfigurationServiceFactory {
 
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(ConfigurationServiceImpl)
+    }
+}
+
+impl From<ConfigurationServiceFactory> for BuiltinService {
+    fn from(factory: ConfigurationServiceFactory) -> Self {
+        BuiltinService {
+            factory: factory.into(),
+            instance_id: 0,
+            instance_name: "config".to_owned(),
+        }
     }
 }

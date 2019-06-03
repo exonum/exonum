@@ -87,6 +87,5 @@ pub mod node;
 #[macro_use]
 pub mod runtime;
 
-//TODO: revert sandbox
-// #[cfg(test)]
-// mod sandbox;
+#[cfg(test)]
+mod sandbox;

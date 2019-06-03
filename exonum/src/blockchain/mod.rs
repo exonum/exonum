@@ -107,11 +107,7 @@ impl Blockchain {
         internal_req_sender: mpsc::Sender<InternalRequest>,
     ) -> Self {
         let dispatcher = DispatcherBuilder::new(internal_req_sender)
-            .with_builtin_service(
-                ConfigurationServiceFactory,
-                ConfigurationServiceFactory::BUILTIN_ID,
-                ConfigurationServiceFactory::BUILTIN_NAME,
-            )
+            .with_builtin_service(ConfigurationServiceFactory)
             .with_service_factories(services)
             .finalize();
         Self::with_dispatcher(
@@ -490,12 +486,9 @@ impl Blockchain {
             fork.into_patch()
         };
         self.merge(patch)?;
-
         // Invokes `after_commit` for each service in order of their identifiers
-
-        // TODO Data for after_commit should be different
         let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
-        dispatcher.after_commit(&mut self.fork());
+        dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
 
         Ok(())
     }

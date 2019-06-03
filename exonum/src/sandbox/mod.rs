@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use bit_vec::BitVec;
+use exonum_merkledb::{BinaryValue, HashTag, MapProof, ObjectHash, TemporaryDB};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -25,12 +26,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
-
 use crate::{
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-        SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState,
+        StoredConfiguration, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -39,17 +38,18 @@ use crate::{
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
-        BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
-        SignedMessage, Status, TransactionsRequest, TransactionsResponse,
+        AnyTx, BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, Signed, SignedMessage, Status,
+        TransactionsRequest, TransactionsResponse,
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
         ListenerConfig, NodeHandler, NodeSender, PeerAddress, ServiceConfig, State,
         SystemStateProvider,
     },
+    runtime::dispatcher::{BuiltinService, DispatcherBuilder},
     sandbox::{
-        config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
+        config_updater::ConfigUpdaterService, sandbox_tests_helper::PROPOSE_TIMEOUT,
         timestamping::TimestampingService,
     },
 };
@@ -128,18 +128,21 @@ impl SandboxInner {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
                 match internal {
                     InternalRequest::Timeout(t) => self.timers.push(t),
+
                     InternalRequest::JumpToRound(height, round) => self
                         .handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
-                    InternalRequest::Shutdown => unimplemented!(),
+
                     InternalRequest::VerifyMessage(message) => {
-                        let protocol =
-                            Message::deserialize(SignedMessage::from_raw_buffer(message).unwrap())
-                                .unwrap();
-                        self.handler.handle_event(
-                            InternalEvent::MessageVerified(Box::new(protocol)).into(),
-                        );
+                        let protocol = Message::deserialize(
+                            SignedMessage::from_bytes(message.into()).unwrap(),
+                        )
+                        .unwrap();
+                        self.handler
+                            .handle_event(InternalEvent::MessageVerified(Box::new(protocol)).into())
                     }
+
+                    InternalRequest::Shutdown | InternalRequest::RestartApi => unreachable!(),
                 }
             }
             Ok(())
@@ -253,7 +256,7 @@ impl Sandbox {
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(Signed::serialize).collect(),
+                precommits.into_iter().map(Signed::into_bytes).collect(),
                 tx_hashes,
             ),
             *public_key,
@@ -411,7 +414,7 @@ impl Sandbox {
         I: IntoIterator<Item = Signed<AnyTx>>,
     {
         Message::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(Signed::serialize).collect()),
+            TransactionsResponse::new(to, txs.into_iter().map(Signed::into_bytes).collect()),
             *author,
             secret_key,
         )
@@ -445,14 +448,8 @@ impl Sandbox {
         Ref::map(self.inner.borrow(), |inner| inner.handler.state())
     }
 
-    pub fn blockchain_ref(&self) -> Ref<Blockchain> {
-        Ref::map(self.inner.borrow(), |inner| &inner.handler.blockchain)
-    }
-
-    pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(self.inner.borrow_mut(), |inner| {
-            &mut inner.handler.blockchain
-        })
+    pub fn blockchain(&self) -> Blockchain {
+        self.inner.borrow().handler.blockchain.clone()
     }
 
     /// Returns connect message used during initialization.
@@ -462,7 +459,7 @@ impl Sandbox {
 
     pub fn recv<T: ProtocolMessage>(&self, msg: &Signed<T>) {
         self.check_unexpected_message();
-        let event = NetworkEvent::MessageReceived(msg.clone().serialize());
+        let event = NetworkEvent::MessageReceived(msg.to_bytes());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -616,11 +613,11 @@ impl Sandbox {
     }
 
     pub fn last_block(&self) -> Block {
-        self.blockchain_ref().last_block()
+        self.blockchain().last_block()
     }
 
     pub fn last_hash(&self) -> Hash {
-        self.blockchain_ref().last_hash()
+        self.blockchain().last_hash()
     }
 
     pub fn last_state_hash(&self) -> Hash {
@@ -629,15 +626,15 @@ impl Sandbox {
 
     pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Signed<AnyTx>>
     where
-        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+        I: IntoIterator<Item = &'a Signed<AnyTx>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
             .filter(|elem| {
-                let hash_elem = elem.hash();
+                let hash_elem = elem.object_hash();
                 if unique_set.contains(&hash_elem) {
                     return false;
                 }
@@ -657,7 +654,7 @@ impl Sandbox {
         I: IntoIterator<Item = &'a Signed<AnyTx>>,
     {
         let height = self.current_height();
-        let mut blockchain = self.blockchain_mut();
+        let mut blockchain = self.blockchain();
         let (hashes, recover, patch) = {
             let mut hashes = Vec::new();
             let mut recover = BTreeSet::new();
@@ -665,7 +662,7 @@ impl Sandbox {
             {
                 let mut schema = Schema::new(&fork);
                 for raw in txs {
-                    let hash = raw.hash();
+                    let hash = raw.object_hash();
                     hashes.push(hash);
                     if schema.transactions().get(&hash).is_none() {
                         recover.insert(hash);
@@ -704,19 +701,19 @@ impl Sandbox {
         service_id: u16,
         table_idx: usize,
     ) -> MapProof<Hash, Hash> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.configs().object_hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.actual_configuration()
     }
@@ -742,7 +739,7 @@ impl Sandbox {
 
     #[allow(clippy::let_and_return)]
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
         let vec = idx.iter().collect();
@@ -754,7 +751,7 @@ impl Sandbox {
     }
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.block_and_precommits(height)
     }
@@ -777,7 +774,7 @@ impl Sandbox {
     }
 
     pub fn assert_pool_len(&self, expected: u64) {
-        let view = self.blockchain_ref().snapshot();
+        let view = self.blockchain().snapshot();
         let schema = Schema::new(&view);
         assert_eq!(expected, schema.transactions_pool_len());
     }
@@ -957,7 +954,7 @@ impl ConnectList {
 
 pub struct SandboxBuilder {
     initialize: bool,
-    services: Vec<Box<dyn Service>>,
+    services: Vec<BuiltinService>,
     validators_count: u8,
     consensus_config: ConsensusConfig,
 }
@@ -977,6 +974,7 @@ impl SandboxBuilder {
                 min_propose_timeout: PROPOSE_TIMEOUT,
                 max_propose_timeout: PROPOSE_TIMEOUT,
                 propose_timeout_threshold: std::u32::MAX,
+                configuration_service_majority_count: None,
             },
         }
     }
@@ -986,7 +984,7 @@ impl SandboxBuilder {
         self
     }
 
-    pub fn with_services(mut self, services: Vec<Box<dyn Service>>) -> Self {
+    pub fn with_services(mut self, services: Vec<BuiltinService>) -> Self {
         self.services = services;
         self
     }
@@ -1029,7 +1027,7 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 
 /// Constructs an uninitialized instance of a `Sandbox`.
 fn sandbox_with_services_uninitialized(
-    services: Vec<Box<dyn Service>>,
+    services: Vec<BuiltinService>,
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
@@ -1057,11 +1055,18 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
+    let dispatcher = {
+        let mut builder = DispatcherBuilder::new(mpsc::channel(0).0);
+        for service in services {
+            builder = builder.with_builtin_service(service);
+        }
+        builder.finalize()
+    };
+
     let api_channel = mpsc::unbounded();
-    let db = TemporaryDB::new();
-    let mut blockchain = Blockchain::new(
-        db,
-        services,
+    let mut blockchain = Blockchain::with_dispatcher(
+        TemporaryDB::new(),
+        dispatcher,
         service_keys[0].0,
         service_keys[0].1.clone(),
         ApiSender::new(api_channel.0.clone()),
@@ -1156,8 +1161,8 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     SandboxBuilder::new().with_services(vec![
-        Box::new(TimestampingService::new()),
-        Box::new(ConfigUpdateService::new()),
+        BuiltinService::from(TimestampingService),
+        BuiltinService::from(ConfigUpdaterService),
     ])
 }
 
@@ -1165,28 +1170,87 @@ pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
 where
     I: IntoIterator<Item = &'a Signed<AnyTx>>,
 {
-    let txs = txs.into_iter().map(Signed::hash).collect::<Vec<Hash>>();
+    let txs = txs
+        .into_iter()
+        .map(Signed::object_hash)
+        .collect::<Vec<Hash>>();
     HashTag::hash_list(&txs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
-    use crate::crypto::{gen_keypair_from_seed, Seed};
-    use crate::messages::AnyTx;
-    use crate::proto::schema::tests::TxAfterCommit;
-    use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue};
     use protobuf::Message as PbMessage;
+    use semver::Version;
+
     use std::borrow::Cow;
 
-    const SERVICE_ID: u16 = 1;
+    use crate::{
+        blockchain::ExecutionResult,
+        crypto::{gen_keypair_from_seed, Seed},
+        messages::{AnyTx, ServiceInstanceId},
+        proto::schema::tests::TxAfterCommit,
+        runtime::rust::{
+            AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext,
+        },
+        sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
+    };
 
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(crate = "crate")]
-    enum HandleCommitTransactions {
-        TxAfterCommit(TxAfterCommit),
+    use super::*;
+
+    #[service_interface(exonum(crate = "crate"))]
+    trait AfterCommitInterface {
+        fn after_commit(&self, context: TransactionContext, arg: TxAfterCommit) -> ExecutionResult;
+    }
+
+    #[derive(Debug)]
+    pub struct AfterCommitService;
+
+    impl_service_dispatcher!(AfterCommitService, AfterCommitInterface);
+
+    impl AfterCommitInterface for AfterCommitService {
+        fn after_commit(
+            &self,
+            _context: TransactionContext,
+            _arg: TxAfterCommit,
+        ) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    impl Service for AfterCommitService {
+        fn after_commit(&self, context: AfterCommitContext) {
+            debug!("After commit");
+            let tx = TxAfterCommit::new_with_height(context.height());
+            context.broadcast_signed_transaction(tx);
+        }
+    }
+
+    impl ServiceFactory for AfterCommitService {
+        fn artifact(&self) -> RustArtifactSpec {
+            RustArtifactSpec {
+                name: "after_commit".into(),
+                version: Version::new(0, 1, 0),
+            }
+        }
+
+        fn new_instance(&self) -> Box<dyn Service> {
+            Box::new(Self)
+        }
+    }
+
+    impl AfterCommitService {
+        pub const ID: ServiceInstanceId = 2;
+    }
+
+    impl From<AfterCommitService> for BuiltinService {
+        fn from(factory: AfterCommitService) -> Self {
+            Self {
+                factory: factory.into(),
+                instance_id: AfterCommitService::ID,
+                instance_name: "after_commit".into(),
+            }
+        }
     }
 
     impl TxAfterCommit {
@@ -1194,43 +1258,11 @@ mod tests {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
             let mut payload_tx = TxAfterCommit::new();
             payload_tx.set_height(height.0);
-            Message::sign_transaction(payload_tx, SERVICE_ID, keypair.0, &keypair.1)
+            Message::sign_transaction(payload_tx, AfterCommitService::ID, keypair.0, &keypair.1)
         }
     }
 
     impl_binary_value_for_message! { TxAfterCommit }
-
-    impl Transaction for TxAfterCommit {
-        fn execute(&self, _: TransactionContext) -> ExecutionResult {
-            Ok(())
-        }
-    }
-
-    struct AfterCommitService;
-
-    impl Service for AfterCommitService {
-        fn service_id(&self) -> u16 {
-            SERVICE_ID
-        }
-
-        fn service_name(&self) -> &str {
-            "after_commit"
-        }
-
-        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-            Vec::new()
-        }
-
-        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-            let tx = HandleCommitTransactions::tx_from_raw(raw)?;
-            Ok(tx.into())
-        }
-
-        fn after_commit(&self, context: &ServiceContext) {
-            let tx = TxAfterCommit::new_with_height(context.height());
-            context.broadcast_signed_transaction(tx);
-        }
-    }
 
     #[test]
     fn test_sandbox_init() {
@@ -1404,12 +1436,13 @@ mod tests {
         panic!("Oops! We don't catch unexpected message");
     }
 
+    // TODO move to testkit [ECR-3251]
     #[test]
     fn test_sandbox_service_after_commit() {
         let sandbox = SandboxBuilder::new()
             .with_services(vec![
-                Box::new(AfterCommitService),
-                Box::new(TimestampingService::new()),
+                BuiltinService::from(AfterCommitService),
+                BuiltinService::from(TimestampingService),
             ])
             .build();
         let state = SandboxState::new();

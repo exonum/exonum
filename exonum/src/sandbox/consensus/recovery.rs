@@ -15,12 +15,15 @@
 //! Tests in this module are designed to test ability of the node to recover
 //! state after restart/stop.
 
+use exonum_merkledb::ObjectHash;
+
 use std::time::Duration;
 
-use crate::crypto::CryptoHash;
-use crate::helpers::{user_agent, Height, Round, ValidatorId};
-use crate::node;
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder};
+use crate::{
+    helpers::{user_agent, Height, Round, ValidatorId},
+    node,
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder},
+};
 
 #[test]
 fn test_disable_and_enable() {
@@ -133,7 +136,7 @@ fn should_not_vote_after_node_restart() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -143,23 +146,23 @@ fn should_not_vote_after_node_restart() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
-    sandbox.assert_lock(Round(1), Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.object_hash()));
 
     let precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
     sandbox.broadcast(&precommit);
-    sandbox.assert_lock(Round(1), Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.object_hash()));
     let current_height = sandbox.current_height();
     let current_round = sandbox.current_round();
 
@@ -167,14 +170,14 @@ fn should_not_vote_after_node_restart() {
     let sandbox_restarted = sandbox.restart();
 
     // Assert that consensus messages were recovered and we're in locked state now.
-    sandbox_restarted.assert_lock(Round(1), Some(propose.hash()));
+    sandbox_restarted.assert_lock(Round(1), Some(propose.object_hash()));
     sandbox_restarted.assert_state(current_height, current_round);
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
 
     // Receive another propose within the round
     let tx = gen_timestamping_tx();
-    receive_valid_propose_with_transactions(&sandbox_restarted, &[tx.hash()]);
+    receive_valid_propose_with_transactions(&sandbox_restarted, &[tx.object_hash()]);
 
     // Here sandbox goes out of scope and sandbox.drop() will cause panic if there any sent messages
 }
@@ -202,7 +205,7 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -212,18 +215,18 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
-    sandbox.assert_lock(Round(1), Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.object_hash()));
 
     let precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -237,7 +240,7 @@ fn should_save_precommit_to_consensus_cache() {
     let sandbox_restarted = sandbox.restart();
 
     // assert that consensus messages were recovered and we're in locked state now
-    sandbox_restarted.assert_lock(Round(1), Some(propose.hash()));
+    sandbox_restarted.assert_lock(Round(1), Some(propose.object_hash()));
     sandbox_restarted.assert_state(current_height, current_round);
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
@@ -246,8 +249,8 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox_restarted.time().into(),
         sandbox_restarted.secret_key(ValidatorId(1)),
     ));
@@ -256,14 +259,14 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox_restarted.time().into(),
         sandbox_restarted.secret_key(ValidatorId(2)),
     ));
 
     sandbox_restarted.assert_state(Height(2), Round(1));
-    sandbox_restarted.check_broadcast_status(Height(2), &block.hash());
+    sandbox_restarted.check_broadcast_status(Height(2), &block.object_hash());
 }
 
 /// Idea:
@@ -289,7 +292,7 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &first_propose.hash(),
+        &first_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -299,18 +302,18 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &first_propose.hash(),
+        &first_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
-    sandbox.assert_lock(Round(1), Some(first_propose.hash()));
+    sandbox.assert_lock(Round(1), Some(first_propose.object_hash()));
 
     let first_precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
-        &first_propose.hash(),
-        &block.hash(),
+        &first_propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -341,7 +344,7 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(1),
         Height(1),
         Round(2),
-        &second_propose.hash(),
+        &second_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -350,30 +353,30 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(2),
         Height(1),
         Round(2),
-        &second_propose.hash(),
+        &second_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
 
-    sandbox.assert_lock(Round(1), Some(first_propose.hash()));
+    sandbox.assert_lock(Round(1), Some(first_propose.object_hash()));
 
     sandbox.recv(&sandbox.create_prevote(
         ValidatorId(3),
         Height(1),
         Round(2),
-        &second_propose.hash(),
+        &second_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
-    sandbox.assert_lock(Round(2), Some(second_propose.hash()));
+    sandbox.assert_lock(Round(2), Some(second_propose.object_hash()));
 
     let second_precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(2),
-        &second_propose.hash(),
-        &second_block.hash(),
+        &second_propose.object_hash(),
+        &second_block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -383,7 +386,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let saved_time = sandbox.time();
     let sandbox_new = sandbox.restart_with_time(saved_time);
 
-    sandbox_new.assert_lock(Round(2), Some(second_propose.hash()));
+    sandbox_new.assert_lock(Round(2), Some(second_propose.object_hash()));
     sandbox_new.assert_state(Height(1), Round(2));
     sandbox_new.broadcast(&first_prevote);
 

@@ -22,13 +22,13 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    messages::{AnyTx, Message, Signed},
+    messages::{AnyTx, Message, ServiceInstanceId, Signed},
     node::ApiSender,
 };
 
 use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
 
-pub const SERVICE_ID: u16 = 0;
+pub const SERVICE_ID: ServiceInstanceId = 0;
 
 mod proto;
 
@@ -95,7 +95,7 @@ struct MyService;
 
 impl Service for MyService {
     fn service_id(&self) -> u16 {
-        SERVICE_ID
+        SERVICE_ID as u16
     }
 
     fn service_name(&self) -> &str {

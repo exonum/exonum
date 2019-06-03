@@ -14,11 +14,13 @@
 
 //! Tests in this module are designed to test configuration change protocol.
 
-use crate::blockchain::Schema;
-use crate::crypto::CryptoHash;
-use crate::helpers::{Height, ValidatorId};
-use crate::sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox};
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{BinaryValue, ObjectHash};
+
+use crate::{
+    blockchain::Schema,
+    helpers::{Height, ValidatorId},
+    sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox},
+};
 
 /// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus
@@ -34,7 +36,7 @@ fn test_exclude_validator_from_consensus() {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.validator_keys.swap_remove(0);
         consensus_cfg.actual_from = sandbox.current_height().next().next();
-        consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
+        consensus_cfg.previous_cfg_hash = sandbox.cfg().object_hash();
 
         TxConfig::create_signed(
             &sandbox.public_key(ValidatorId(0)),
@@ -63,7 +65,7 @@ fn test_schema_config_changes() {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.txs_block_limit = 2000;
         consensus_cfg.actual_from = sandbox.current_height().next().next();
-        consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
+        consensus_cfg.previous_cfg_hash = sandbox.cfg().object_hash();
 
         let tx = TxConfig::create_signed(
             &sandbox.public_key(ValidatorId(0)),
@@ -77,19 +79,19 @@ fn test_schema_config_changes() {
 
     // Check configuration from genesis block
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
+        Schema::new(&sandbox.blockchain().snapshot()).actual_configuration(),
         prev_cfg
     );
     // Try to get configuration from non exists height
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(Height(4)),
+        Schema::new(&sandbox.blockchain().snapshot()).configuration_by_height(Height(4)),
         prev_cfg
     );
     // Commit a new configuration
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
     // Check that following configuration is visible
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).following_configuration(),
+        Schema::new(&sandbox.blockchain().snapshot()).following_configuration(),
         Some(following_cfg.clone())
     );
     // Make following configuration actual
@@ -97,12 +99,12 @@ fn test_schema_config_changes() {
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     // Check that following configuration becomes actual
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
+        Schema::new(&sandbox.blockchain().snapshot()).actual_configuration(),
         following_cfg
     );
     // Check previous configuration
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot())
+        Schema::new(&sandbox.blockchain().snapshot())
             .previous_configuration()
             .unwrap(),
         prev_cfg
@@ -110,11 +112,11 @@ fn test_schema_config_changes() {
 
     // Finally check configuration for some heights
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(Height(0)),
+        Schema::new(&sandbox.blockchain().snapshot()).configuration_by_height(Height(0)),
         prev_cfg
     );
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot())
+        Schema::new(&sandbox.blockchain().snapshot())
             .configuration_by_height(sandbox.current_height()),
         following_cfg
     );

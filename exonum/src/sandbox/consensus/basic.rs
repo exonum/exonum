@@ -16,19 +16,22 @@
 //! related to consensus protocol handling, such as ability of the node
 //! to add block after receiving correct consensus messages.
 
+use exonum_merkledb::ObjectHash;
 use rand::{thread_rng, Rng};
 
 use std::collections::BTreeMap;
 
-use crate::blockchain::{Blockchain, Schema, CORE_SERVICE};
-use crate::crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::{Precommit, Signed};
-use crate::sandbox::{
-    self,
-    sandbox_tests_helper::*,
-    timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
-    timestamping_sandbox,
+use crate::{
+    blockchain::{Blockchain, Schema, CORE_SERVICE},
+    crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
+    helpers::{Height, Round, ValidatorId},
+    messages::{Precommit, Signed},
+    sandbox::{
+        self,
+        sandbox_tests_helper::*,
+        timestamping::{TimestampingService, TimestampingTxGenerator, DATA_SIZE},
+        timestamping_sandbox,
+    },
 };
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
@@ -57,19 +60,19 @@ fn test_check_leader() {
     let mut was_leader = false;
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
         sandbox.assert_state(Height(1), round);
-        add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
+        add_round_with_transactions(&sandbox, &sandbox_state, &[tx.object_hash()]);
         sandbox.assert_state(Height(1), round.next());
         was_leader = was_leader || sandbox.is_leader();
     }
     assert!(was_leader);
 
-    add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
+    add_round_with_transactions(&sandbox, &sandbox_state, &[tx.object_hash()]);
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
     sandbox.broadcast(&sandbox.create_status(
         &sandbox.public_key(ValidatorId(0)),
         Height(1),
-        &sandbox.last_block().hash(),
+        &sandbox.last_block().object_hash(),
         sandbox.secret_key(ValidatorId(0)),
     ));
 
@@ -110,14 +113,14 @@ fn test_reach_actual_round() {
 
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(3))
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&tx.object_hash())
         .build();
 
     let future_propose = sandbox.create_propose(
         ValidatorId(3),
         Height(1),
         Round(4),
-        &block_at_first_height.clone().hash(),
+        &block_at_first_height.clone().object_hash(),
         &[], // there are no transactions in future propose
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -129,7 +132,7 @@ fn test_reach_actual_round() {
         ValidatorId(2),
         Height(1),
         Round(4),
-        &block_at_first_height.clone().hash(),
+        &block_at_first_height.clone().object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -145,14 +148,14 @@ fn test_reach_one_height_repeatable() {
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     sandbox.assert_state(Height(2), Round(1));
-    let hash_1 = sandbox.last_block().hash();
+    let hash_1 = sandbox.last_block().object_hash();
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     sandbox.assert_state(Height(2), Round(1));
-    let hash_2 = sandbox.last_block().hash();
+    let hash_2 = sandbox.last_block().object_hash();
 
     assert_eq!(hash_2, hash_1);
 }
@@ -177,13 +180,15 @@ fn test_reach_thirteen_height() {
 fn test_query_state_hash() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
-    //we do not change the state hash in between blocks for TimestampingService for now
+    // We do not change the state hash in between blocks for TimestampingService for now
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
         let configs_key = Blockchain::service_table_unique_key(CORE_SERVICE, 0);
-        let timestamp_t1_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 0);
-        let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
+        let timestamp_t1_key =
+            Blockchain::service_table_unique_key(TimestampingService::ID as u16, 0);
+        let timestamp_t2_key =
+            Blockchain::service_table_unique_key(TimestampingService::ID as u16, 1);
 
         let proof_configs = sandbox.get_proof_to_service_table(CORE_SERVICE, 0);
         let proof = proof_configs.check().unwrap();
@@ -194,7 +199,7 @@ fn test_query_state_hash() {
             vec![(&configs_key, &configs_rh)]
         );
 
-        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
+        let proof_configs = sandbox.get_proof_to_service_table(TimestampingService::ID as u16, 0);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.root_hash(), state_hash);
         assert_eq!(
@@ -202,7 +207,7 @@ fn test_query_state_hash() {
             vec![(&timestamp_t1_key, &Hash::new([127; HASH_SIZE]))]
         );
 
-        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
+        let proof_configs = sandbox.get_proof_to_service_table(TimestampingService::ID as u16, 1);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.root_hash(), state_hash);
         assert_eq!(
@@ -232,7 +237,7 @@ fn test_retrieve_block_and_precommits() {
     let block = block_proof.block;
     let precommits: Vec<Signed<Precommit>> = block_proof.precommits;
     let expected_height = target_height.previous();
-    let expected_block_hash = block.hash();
+    let expected_block_hash = block.object_hash();
 
     assert_eq!(expected_height, block.height());
     for precommit in precommits {
@@ -263,14 +268,14 @@ fn test_store_txs_positions() {
     let num_txs = rng.gen_range(3, 100);
     let committed_block1 = generator
         .take(num_txs)
-        .map(|tx| (tx.hash(), tx))
+        .map(|tx| (tx.object_hash(), tx))
         .collect::<BTreeMap<_, _>>();
 
     let hashes =
         add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
     sandbox.assert_state(committed_height.next(), Round(1));
 
-    let snapshot = sandbox.blockchain_ref().snapshot();
+    let snapshot = sandbox.blockchain().snapshot();
     let schema = Schema::new(&snapshot);
     let locations = schema.transactions_locations();
     for (expected_idx, hash) in hashes.iter().enumerate() {

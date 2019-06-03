@@ -12,27 +12,72 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
-
 pub use crate::proto::schema::tests::TxConfig;
 
-use crate::blockchain::{
-    ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
-    TransactionSet,
-};
-use crate::crypto::{Hash, PublicKey, SecretKey};
-use crate::helpers::Height;
-use crate::messages::{AnyTx, Message, Signed};
-use crate::proto::ProtobufConvert;
-use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+use exonum_merkledb::{impl_binary_value_for_message, BinaryValue};
 use protobuf::Message as PbMessage;
+use semver::Version;
 
-pub const CONFIG_SERVICE: u16 = 1;
+use std::borrow::Cow;
 
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-#[exonum(crate = "crate")]
-enum ConfigUpdaterTransactions {
-    TxConfig(TxConfig),
+use crate::{
+    blockchain::{ExecutionResult, Schema, StoredConfiguration},
+    crypto::{PublicKey, SecretKey},
+    helpers::Height,
+    messages::{AnyTx, Message, ServiceInstanceId, Signed},
+    proto::ProtobufConvert,
+    runtime::{
+        dispatcher::BuiltinService,
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+    },
+};
+
+#[service_interface(exonum(crate = "crate"))]
+trait ConfigUpdaterInterface {
+    fn update_config(&self, context: TransactionContext, arg: TxConfig) -> ExecutionResult;
+}
+
+#[derive(Debug)]
+pub struct ConfigUpdaterService;
+
+impl_service_dispatcher!(ConfigUpdaterService, ConfigUpdaterInterface);
+
+impl ConfigUpdaterInterface for ConfigUpdaterService {
+    fn update_config(&self, context: TransactionContext, arg: TxConfig) -> ExecutionResult {
+        let mut schema = Schema::new(context.fork());
+        schema
+            .commit_configuration(StoredConfiguration::try_deserialize(arg.get_config()).unwrap());
+        Ok(())
+    }
+}
+
+impl Service for ConfigUpdaterService {}
+
+impl ServiceFactory for ConfigUpdaterService {
+    fn artifact(&self) -> RustArtifactSpec {
+        RustArtifactSpec {
+            name: "config_updater".into(),
+            version: Version::new(0, 1, 0),
+        }
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
+    }
+}
+
+impl ConfigUpdaterService {
+    pub const ID: ServiceInstanceId = 0;
+}
+
+impl From<ConfigUpdaterService> for BuiltinService {
+    fn from(factory: ConfigUpdaterService) -> Self {
+        Self {
+            factory: factory.into(),
+            instance_id: ConfigUpdaterService::ID,
+            instance_name: "config_updater".into(),
+        }
+    }
 }
 
 impl TxConfig {
@@ -47,44 +92,8 @@ impl TxConfig {
         msg.set_config(config.to_vec());
         msg.set_actual_from(actual_from.0);
 
-        Message::sign_transaction(msg, CONFIG_SERVICE, *from, signer)
-    }
-}
-#[derive(Default)]
-pub struct ConfigUpdateService {}
-
-impl ConfigUpdateService {
-    pub fn new() -> Self {
-        ConfigUpdateService::default()
-    }
-}
-
-impl Transaction for TxConfig {
-    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
-        let mut schema = Schema::new(tc.fork());
-        schema
-            .commit_configuration(StoredConfiguration::try_deserialize(self.get_config()).unwrap());
-        Ok(())
+        Message::sign_transaction(msg, ConfigUpdaterService::ID, *from, signer)
     }
 }
 
 impl_binary_value_for_message! { TxConfig }
-
-impl Service for ConfigUpdateService {
-    fn service_name(&self) -> &str {
-        "sandbox_config_updater"
-    }
-
-    fn service_id(&self) -> u16 {
-        CONFIG_SERVICE
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
-
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
-    }
-}
