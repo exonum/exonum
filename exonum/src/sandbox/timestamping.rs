@@ -14,7 +14,7 @@
 
 pub use crate::proto::schema::tests::TimestampTx;
 
-use exonum_merkledb::{impl_binary_value_for_message, BinaryValue};
+use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
 use protobuf::Message as PbMessage;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -24,7 +24,7 @@ use std::borrow::Cow;
 
 use crate::{
     blockchain::ExecutionResult,
-    crypto::{gen_keypair, PublicKey, SecretKey},
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::{AnyTx, Message, ServiceInstanceId, Signed},
     runtime::{
         dispatcher::BuiltinService,
@@ -50,7 +50,11 @@ impl TimestampingInterface for TimestampingService {
     }
 }
 
-impl Service for TimestampingService {}
+impl Service for TimestampingService {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
+        vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
+    }
+}
 
 impl ServiceFactory for TimestampingService {
     fn artifact(&self) -> RustArtifactSpec {
