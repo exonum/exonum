@@ -22,6 +22,7 @@ use crate::{
     blockchain::{ExecutionError, StoredConfiguration},
     crypto::Hash,
     helpers::Height,
+    runtime::error as runtime_error,
 };
 
 use super::transactions::Propose;
@@ -69,6 +70,19 @@ pub enum ErrorCode {
     ///
     /// Specific for `Vote`.
     AlreadyVoted = 65,
+
+    /// Service artifact deployment errored.
+    ///
+    /// Can be emitted by `Deploy` or `DeployInit`.
+    DeployError = 96,
+    /// Service instance initialization errored.
+    ///
+    /// Can be emitted by `Init` or `DeployInit`.
+    InitError = 97,
+    /// Service instance name is already in use.
+    ///
+    /// Can be emitted by `Init` or `DeployInit`.
+    ServiceInstanceNameInUse = 98,
 }
 
 // Common error types for `Propose` and `Vote`.
@@ -110,6 +124,15 @@ pub enum Error {
 
     #[fail(display = "Validator already voted for a referenced proposal")]
     AlreadyVoted,
+
+    #[fail(display = "Deploy error: {:?}", _0)]
+    DeployError(runtime_error::DeployError),
+
+    #[fail(display = "Init error: {:?}", _0)]
+    InitError(runtime_error::InitError),
+
+    #[fail(display = "Service instance name already in use")]
+    ServiceInstanceNameInUse,
 }
 
 impl Error {
@@ -126,6 +149,9 @@ impl Error {
             InvalidMajorityCount { .. } => ErrorCode::InvalidMajorityCount,
             UnknownConfigRef(..) => ErrorCode::UnknownConfigRef,
             AlreadyVoted => ErrorCode::AlreadyVoted,
+            DeployError(..) => ErrorCode::DeployError,
+            InitError(..) => ErrorCode::InitError,
+            ServiceInstanceNameInUse => ErrorCode::ServiceInstanceNameInUse,
         }
     }
 }

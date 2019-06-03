@@ -14,16 +14,18 @@
 
 //! Storage schema for the configuration service.
 
-use exonum_merkledb::{
-    impl_object_hash_for_binary_value, BinaryValue, IndexAccess, ObjectHash, ProofListIndex,
-    ProofMapIndex,
+use crate::{
+    crypto::{self, CryptoHash, Hash, HASH_SIZE},
+    proto,
 };
 
-use exonum::crypto::{self, CryptoHash, Hash, HASH_SIZE};
+use exonum_merkledb::{
+    BinaryValue, IndexAccess, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
+};
 
 use std::{borrow::Cow, ops::Deref};
 
-use crate::{proto, transactions::Propose};
+use super::transactions::Propose;
 
 const YEA_TAG: u8 = 1;
 const NAY_TAG: u8 = 2;
@@ -39,11 +41,12 @@ define_names! {
     PROPOSES => "proposes";
     PROPOSE_HASHES => "propose_hashes";
     VOTES => "votes";
+    SERVICE_IDS => "service_ids";
 }
 
 /// Extended information about a proposal used for the storage.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::ProposeData")]
+#[exonum(pb = "proto::schema::configuration::ProposeData", crate = "crate")]
 pub struct ProposeData {
     /// Proposal transaction.
     pub tx_propose: Propose,
@@ -64,9 +67,7 @@ impl ProposeData {
     }
 }
 
-lazy_static! {
-    static ref NO_VOTE_BYTES: Vec<u8> = vec![0_u8];
-}
+static NO_VOTE_BYTES: [u8; 1] = [0u8];
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
@@ -109,12 +110,13 @@ impl BinaryValue for VotingDecision {
         assert_eq!(bytes.len(), HASH_SIZE + 1);
         let tag = bytes[HASH_SIZE];
         let raw_hash = Hash::from_slice(&bytes[0..HASH_SIZE]).unwrap();
-        let decision = match tag {
+        let res = match tag {
             YEA_TAG => VotingDecision::Yea(raw_hash),
             NAY_TAG => VotingDecision::Nay(raw_hash),
             _ => panic!("invalid voting tag: {}", tag),
         };
-        Ok(decision)
+
+        Ok(res)
     }
 }
 
@@ -176,28 +178,30 @@ impl CryptoHash for MaybeVote {
     }
 }
 
+impl ObjectHash for MaybeVote {
+    fn object_hash(&self) -> Hash {
+        self.hash()
+    }
+}
+
 impl BinaryValue for MaybeVote {
     fn to_bytes(&self) -> Vec<u8> {
         match self.0 {
             Some(v) => v.into_bytes(),
-            None => NO_VOTE_BYTES.clone(),
+            None => NO_VOTE_BYTES.to_vec(),
         }
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let res = if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
+        let res = if NO_VOTE_BYTES.eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
-            MaybeVote::some(
-                VotingDecision::from_bytes(bytes).expect("Error while deserializing value"),
-            )
+            MaybeVote::some(VotingDecision::from_bytes(bytes)?)
         };
 
         Ok(res)
     }
 }
-
-impl_object_hash_for_binary_value! { MaybeVote }
 
 /// Database schema used by the configuration service.
 #[derive(Debug)]
@@ -228,6 +232,11 @@ where
         ProofListIndex::new(PROPOSE_HASHES, self.access.clone())
     }
 
+    /// Returns a table with mapping between service instance names and their identifiers.
+    pub fn service_ids(&self) -> MapIndex<T, String, u32> {
+        MapIndex::new(SERVICE_IDS, self.access.clone())
+    }
+
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
     pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<T, MaybeVote> {
@@ -243,11 +252,9 @@ where
     }
 
     /// Returns a list of votes for the proposal corresponding to the given configuration hash.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     pub fn votes(&self, cfg_hash: &Hash) -> Vec<Option<VotingDecision>> {
         let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
-        let votes = votes_by_config_hash.iter().map(MaybeVote::into).collect();
-        votes
+        votes_by_config_hash.iter().map(MaybeVote::into).collect()
     }
 
     /// Returns state hash values used by the configuration service.

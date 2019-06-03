@@ -30,7 +30,7 @@ use self::{
 
 #[macro_use]
 pub mod rust;
-pub mod configuration_new;
+pub mod configuration;
 pub mod dispatcher;
 pub mod error;
 

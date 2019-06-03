@@ -12,210 +12,233 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate implements a *configuration service* for Exonum blockchain framework.
-//!
-//! Upon being plugged in, the service allows to modify Exonum blockchain configuration
-//! using [proposals](struct.Propose.html) and [voting for proposal](struct.Vote.html),
-//! both of which are implemented as transactions signed by blockchain validators.
-//!
-//! The service also provides HTTP API for public queries (get actual/following
-//! configuration, etc.) and private queries, intended for use only by validator nodes' maintainers
-//! (post configuration propose, post vote for a configuration propose).
-//!
-//! See [Exonum documentation][docs:config] for more details about the service.
-//!
-//! # Blockchain configuration
-//!
-//! Blockchain configuration corresponds to [`StoredConfiguration`][sc]
-//! in the Exonum core library. The logic of the configuration service extensively uses
-//! hashes of configuration, which are calculated as follows:
-//!
-//! 1. Parse a `StoredConfiguration` from JSON string if necessary.
-//! 2. Convert a `StoredConfiguration` into bytes as per its `StorageValue` implementation.
-//! 3. Use `exonum::crypto::hash()` on the obtained bytes.
-//!
-//! [sc]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html
-//! [docs:config]: https://exonum.com/doc/version/latest/advanced/configuration-updater/
-//!
-//! # Examples
-//!
-//! ```rust,no_run
-//! extern crate exonum;
-//! extern crate exonum_configuration as configuration;
-//!
-//! use exonum::helpers::fabric::NodeBuilder;
-//!
-//! fn main() {
-//!     exonum::helpers::init_logger().unwrap();
-//!     NodeBuilder::new()
-//!         .with_service(Box::new(configuration::ServiceFactory))
-//!         .run();
-//! }
-//! ```
+pub use self::transactions::{Deploy, Init};
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
-
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;
-#[cfg(test)]
-#[macro_use]
-extern crate exonum_testkit;
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-
-pub use crate::{
-    errors::ErrorCode,
-    schema::{MaybeVote, ProposeData, Schema, VotingDecision},
-    transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst},
-};
-
-use serde_json::{to_value, Value};
-
-use exonum_merkledb::{Fork, Snapshot};
-
-use exonum::{
-    api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
-    crypto::Hash,
-    helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
-    messages::RawTransaction,
-    node::State,
-};
+use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 
 use crate::{
-    cmd::{Finalize, GenerateCommonConfig},
-    config::ConfigurationServiceConfig,
+    blockchain::Schema as CoreSchema,
+    crypto::Hash,
+    runtime::{
+        dispatcher::Action,
+        error::ExecutionError,
+        rust::{
+            service::{Service, ServiceFactory},
+            RustArtifactSpec, TransactionContext,
+        },
+        ServiceConstructor,
+    },
 };
 
-mod api;
-mod cmd;
+use crate::messages::{MethodId, ServiceInstanceId};
+
+use self::{
+    errors::Error as ServiceError,
+    schema::{Schema as ConfigurationSchema, VotingDecision},
+    transactions::{enough_votes_to_commit, VotingContext},
+};
+
 mod config;
 mod errors;
-mod proto;
 mod schema;
-#[cfg(test)]
-mod tests;
 mod transactions;
 
 /// Service identifier for the configuration service.
-pub const SERVICE_ID: u16 = 1;
+pub const SERVICE_ID: ServiceInstanceId = 0;
+pub const DEPLOY_METHOD_ID: MethodId = 3;
+pub const INIT_METHOD_ID: MethodId = 4;
 /// Configuration service name.
 pub const SERVICE_NAME: &str = "configuration";
 
-/// ConfigurationService config.
-#[derive(Debug, Default)]
-pub struct Service {
-    config: ConfigurationServiceConfig,
-}
-
-impl Service {
-    /// Create new instance of configuration service.
-    pub fn new(validators_count: usize, majority_count: Option<u16>) -> Self {
-        if let Some(majority_count) = majority_count {
-            let byzantine_majority_count = State::byzantine_majority_count(validators_count) as u16;
-            if majority_count > validators_count as u16 || majority_count < byzantine_majority_count
-            {
-                panic!(
-                    "Invalid majority count: {}, it should be >= {} and <= {}",
-                    majority_count, byzantine_majority_count, validators_count
-                );
-            }
-        }
-
-        Service {
-            config: ConfigurationServiceConfig { majority_count },
-        }
+/// Constant artifact spec.
+pub fn artifact_spec() -> RustArtifactSpec {
+    RustArtifactSpec {
+        name: "core.config".to_owned(),
+        version: semver::Version::new(0, 1, 0),
     }
 }
 
-impl blockchain::Service for Service {
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
+#[service_interface(exonum(crate = "crate"))]
+trait ConfigurationService {
+    fn propose(
+        &self,
+        ctx: TransactionContext,
+        tx: transactions::Propose,
+    ) -> Result<(), ExecutionError>;
 
-    fn service_name(&self) -> &'static str {
-        SERVICE_NAME
-    }
+    fn vote(&self, ctx: TransactionContext, arg: transactions::Vote) -> Result<(), ExecutionError>;
 
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(snapshot);
-        schema.state_hash()
-    }
+    fn vote_against(
+        &self,
+        ctx: TransactionContext,
+        arg: transactions::VoteAgainst,
+    ) -> Result<(), ExecutionError>;
 
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
-    }
+    fn deploy(
+        &self,
+        ctx: TransactionContext,
+        arg: transactions::Deploy,
+    ) -> Result<(), ExecutionError>;
 
-    fn initialize(&self, _fork: &Fork) -> Value {
-        to_value(self.config.clone()).unwrap()
-    }
-
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi::wire(builder);
-        api::PrivateApi::wire(builder);
-    }
+    fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>;
 }
 
-/// A configuration service creator for the `NodeBuilder`.
 #[derive(Debug)]
-pub struct ServiceFactory;
+pub struct ConfigurationServiceImpl;
 
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
+impl ConfigurationServiceImpl {
+    fn assign_service_id(&self, fork: &Fork, instance_name: &String) -> Option<u32> {
+        let schema = ConfigurationSchema::new(fork);
+        let mut service_ids = schema.service_ids();
 
-    fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
-        Some(match command {
-            v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
-            v if v == fabric::Finalize.name() => Box::new(Finalize),
-            _ => return None,
-        })
-    }
-
-    fn make_service(&mut self, context: &Context) -> Box<dyn blockchain::Service> {
-        let service_config: ConfigurationServiceConfig =
-            context.get(keys::NODE_CONFIG).unwrap().services_configs["configuration_service"]
-                .clone()
-                .try_into()
-                .unwrap();
-
-        if let Some(majority_count) = service_config.majority_count {
-            let validators_count = context
-                .get(keys::NODE_CONFIG)
-                .unwrap()
-                .genesis
-                .validator_keys
-                .len() as u16;
-            let byzantine_majority_count =
-                State::byzantine_majority_count(validators_count as usize) as u16;
-            if majority_count > validators_count || majority_count < byzantine_majority_count {
-                panic!(
-                    "Invalid majority count: {}, it should be >= {} and <= {}",
-                    majority_count, byzantine_majority_count, validators_count
-                );
-            }
+        if service_ids.contains(instance_name) {
+            return None;
         }
 
-        Box::new(Service {
-            config: service_config,
-        })
+        let id = service_ids.iter().count() as u32 + 1; // TODO O(n) optimize
+        service_ids.put(instance_name, id);
+
+        Some(id)
+    }
+
+    pub fn get_id_for(&self, snapshot: &dyn Snapshot, instance_name: &String) -> Option<u32> {
+        let schema = ConfigurationSchema::new(snapshot);
+        let service_ids = schema.service_ids();
+
+        service_ids.get(instance_name)
+    }
+}
+
+impl ConfigurationService for ConfigurationServiceImpl {
+    fn propose(
+        &self,
+        ctx: TransactionContext,
+        tx: transactions::Propose,
+    ) -> Result<(), ExecutionError> {
+        let author = ctx.author();
+        let fork = ctx.fork();
+        let (cfg, cfg_hash) = tx.precheck(fork.snapshot(), author).map_err(|err| {
+            error!("Discarding propose {:?}: {}", self, err);
+            err
+        })?;
+
+        tx.save(fork, &cfg, cfg_hash);
+        trace!("Put propose {:?} to config_proposes table", self);
+        Ok(())
+    }
+
+    fn vote(&self, ctx: TransactionContext, tx: transactions::Vote) -> Result<(), ExecutionError> {
+        let author = ctx.author();
+        let tx_hash = ctx.tx_hash();
+        let fork = ctx.fork();
+        let decision = VotingDecision::Yea(tx_hash);
+
+        let vote = VotingContext::new(decision, author, tx.cfg_hash);
+        let parsed_config = vote.precheck(fork.snapshot()).map_err(|err| {
+            error!("Discarding vote {:?}: {}", tx, err);
+            err
+        })?;
+
+        vote.save(fork);
+        trace!(
+            "Put Vote:{:?} to corresponding cfg votes_by_config_hash table",
+            tx
+        );
+
+        if enough_votes_to_commit(fork.snapshot(), &tx.cfg_hash) {
+            CoreSchema::new(fork).commit_configuration(parsed_config);
+        }
+        Ok(())
+    }
+
+    fn vote_against(
+        &self,
+        ctx: TransactionContext,
+        tx: transactions::VoteAgainst,
+    ) -> Result<(), ExecutionError> {
+        let author = ctx.author();
+        let tx_hash = ctx.tx_hash();
+        let fork = ctx.fork();
+        let decision = VotingDecision::Nay(tx_hash);
+
+        let vote_against = VotingContext::new(decision, author, tx.cfg_hash);
+        vote_against.precheck(fork.snapshot()).map_err(|err| {
+            error!("Discarding vote against {:?}: {}", tx, err);
+            err
+        })?;
+
+        vote_against.save(fork);
+        trace!(
+            "Put VoteAgainst:{:?} to corresponding cfg votes_by_config_hash table",
+            tx
+        );
+
+        Ok(())
+    }
+
+    fn deploy(
+        &self,
+        mut context: TransactionContext,
+        arg: transactions::Deploy,
+    ) -> Result<(), ExecutionError> {
+        info!("Deploying service. {:?}", arg);
+
+        let artifact = arg.get_artifact_spec();
+        context.dispatch_action(Action::StartDeploy { artifact });
+        // TODO add result into deployable (to check deploy status in before_commit).
+        Ok(())
+    }
+
+    fn init(
+        &self,
+        mut context: TransactionContext,
+        arg: transactions::Init,
+    ) -> Result<(), ExecutionError> {
+        let artifact = arg.get_artifact_spec();
+
+        let instance_id = self
+            .assign_service_id(context.fork(), &arg.instance_name)
+            .ok_or(ServiceError::ServiceInstanceNameInUse)?;
+
+        let constructor = ServiceConstructor {
+            instance_id,
+            data: arg.constructor_data,
+        };
+
+        info!(
+            "Initializing service. Name: {}, id: {}",
+            arg.instance_name, instance_id
+        );
+
+        context.dispatch_action(Action::InitService {
+            artifact,
+            constructor,
+        });
+        Ok(())
+    }
+}
+
+impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
+
+impl Service for ConfigurationServiceImpl {
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        ConfigurationSchema::new(snapshot).state_hash()
+    }
+}
+#[derive(Debug, Default)]
+pub struct ConfigurationServiceFactory;
+
+impl ConfigurationServiceFactory {
+    pub const BUILTIN_ID: ServiceInstanceId = 0;
+    pub const BUILTIN_NAME: &'static str = "config";
+}
+
+impl ServiceFactory for ConfigurationServiceFactory {
+    fn artifact(&self) -> RustArtifactSpec {
+        artifact_spec()
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(ConfigurationServiceImpl)
     }
 }

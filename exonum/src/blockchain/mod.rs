@@ -64,7 +64,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
     node::ApiSender,
-    runtime::configuration_new::ConfigurationServiceFactory,
+    runtime::configuration::ConfigurationServiceFactory,
     runtime::{
         dispatcher::{Dispatcher, DispatcherBuilder},
         rust::service::ServiceFactory,
