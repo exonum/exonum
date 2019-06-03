@@ -781,7 +781,10 @@ impl AnyTx {
     /// Method for compatibility with old transactions.
     /// Creates `ServiceTransaction` from `RawTransaction`.
     pub fn service_transaction(&self) -> ServiceTransaction {
-        ServiceTransaction::from_raw_unchecked(self.call_info.method_id as u16, self.payload.clone())
+        ServiceTransaction::from_raw_unchecked(
+            self.call_info.method_id as u16,
+            self.payload.clone(),
+        )
     }
 }
 
@@ -961,7 +964,7 @@ impl Message {
     /// This method can panic on serialization failure.
     pub fn sign_transaction<T>(
         transaction: T,
-        service_id: u16,
+        service_id: ServiceInstanceId,
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<AnyTx>
@@ -969,7 +972,7 @@ impl Message {
         T: Into<ServiceTransaction>,
     {
         let set: ServiceTransaction = transaction.into();
-        let any_tx = AnyTx::as_raw_tx(service_id, set.transaction_id, set.payload);
+        let any_tx = AnyTx::as_raw_tx(service_id as u16, set.transaction_id, set.payload);
         Self::concrete(any_tx, public_key, secret_key)
     }
 

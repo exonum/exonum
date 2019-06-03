@@ -358,6 +358,8 @@ impl ApiAggregator {
                 }),
         );
 
+        trace!("Create actix-web worker with api: {:#?}", inner);
+
         match access {
             ApiAccess::Public => backend.extend(
                 inner

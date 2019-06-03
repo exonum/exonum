@@ -38,6 +38,7 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
         });
 
     quote! {
+        #[doc(hidden)]
         fn _dispatch(
                 &self,
                 ctx: #cr::runtime::rust::TransactionContext,
@@ -49,6 +50,28 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
                 _ => bail!("Method not found"),
             }
         }
+    }
+}
+
+fn implement_into_service_tx(
+    methods: &[ServiceMethodDescriptor],
+    cr: &dyn ToTokens,
+) -> impl quote::ToTokens {
+    let into_service_tx = methods
+        .iter()
+        .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
+            quote! {
+                impl From<#arg_type> for #cr::messages::ServiceTransaction {
+                    fn from(value: #arg_type) -> Self {
+                        let arg = exonum_merkledb::BinaryValue::into_bytes(value);
+                        #cr::messages::ServiceTransaction::from_raw_unchecked(#id as u16, arg)
+                    }
+                }
+            }
+        });
+
+    quote! {
+        #( #into_service_tx )*
     }
 }
 
@@ -115,8 +138,13 @@ pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStre
         let method_code = impl_dispatch_method(&methods, &cr).into_token_stream();
         syn::parse(method_code.into()).expect("Can't parse trait item method")
     };
-
     trait_item.items.push(TraitItem::Method(dispatch_method));
 
-    trait_item.into_token_stream().into()
+    let into_service_tx = implement_into_service_tx(&methods, &cr);
+
+    let expanded = quote! {
+        #trait_item
+        #into_service_tx
+    };
+    expanded.into()
 }

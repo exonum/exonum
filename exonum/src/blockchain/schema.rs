@@ -18,7 +18,7 @@ use exonum_merkledb::{
 };
 
 use crate::{
-    crypto::{CryptoHash, Hash, PublicKey},
+    crypto::{Hash, PublicKey},
     helpers::{Height, Round},
     messages::{AnyTx, Connect, Message, Precommit, Signed},
     proto,
@@ -445,7 +445,7 @@ where
             &config_data
         );
 
-        let cfg_hash = config_data.hash();
+        let cfg_hash = config_data.object_hash();
         self.configs().put(&cfg_hash, config_data);
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
@@ -457,10 +457,10 @@ where
     /// be sure to decrement it when transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: Signed<AnyTx>) {
-        self.transactions_pool().insert(tx.hash());
+        self.transactions_pool().insert(tx.object_hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index().set(x + 1);
-        self.transactions().put(&tx.hash(), tx);
+        self.transactions().put(&tx.object_hash(), tx);
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.

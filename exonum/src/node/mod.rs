@@ -56,8 +56,9 @@ use crate::{
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
-        HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
-        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest, UnboundedSyncSender,
+        Event, EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest,
+        NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
+        TimeoutRequest, UnboundedSyncSender,
     },
     helpers::{
         config::ConfigManager,
@@ -142,8 +143,6 @@ pub struct NodeHandler {
     config_manager: Option<ConfigManager>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
-    /// Actix web API runtime.
-    api_runtime: SystemRuntime,
 }
 
 /// Service configuration.
@@ -447,7 +446,6 @@ impl NodeHandler {
         config: Configuration,
         api_state: SharedNodeState,
         config_file_path: Option<String>,
-        api_runtime_config: SystemRuntimeConfig,
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -500,9 +498,6 @@ impl NodeHandler {
             None => None,
         };
 
-        let api_runtime =
-            SystemRuntime::new(api_runtime_config).expect("Failed to start api_runtime.");
-
         Self {
             blockchain,
             api_state,
@@ -514,7 +509,6 @@ impl NodeHandler {
             node_role,
             config_manager,
             allow_expedited_propose: true,
-            api_runtime,
         }
     }
 
@@ -869,6 +863,7 @@ pub struct NodeChannel {
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
+    api_runtime_config: SystemRuntimeConfig,
     api_options: NodeApiConfig,
     network_config: NetworkConfiguration,
     handler: NodeHandler,
@@ -943,7 +938,7 @@ impl Node {
         let network_config = config.network;
 
         let api_cfg = node_cfg.api.clone();
-        let actix_runtime_config = SystemRuntimeConfig {
+        let api_runtime_config = SystemRuntimeConfig {
             api_runtimes: {
                 fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
                     let app_config = move |app: App| -> App {
@@ -985,8 +980,8 @@ impl Node {
             config,
             api_state,
             config_file_path,
-            actix_runtime_config,
         );
+
         Self {
             api_options: api_cfg,
             handler,
@@ -994,6 +989,7 @@ impl Node {
             network_config,
             max_message_len: node_cfg.genesis.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
+            api_runtime_config,
         }
     }
 
@@ -1053,7 +1049,22 @@ impl Node {
         Ok(())
     }
 
-    fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, InternalPart) {
+    fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
+        // TODO refactor node module to reduce complexity.
+        struct HandlerWithRuntime {
+            inner: NodeHandler,
+            system_runtime: SystemRuntime,
+        }
+
+        impl EventHandler for HandlerWithRuntime {
+            fn handle_event(&mut self, event: Event) {
+                match event {
+                    Event::Internal(InternalEvent::RestartApi) => self.system_runtime.restart(),
+                    event => self.inner.handle_event(event),
+                }
+            }
+        }
+
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list().clone();
         let (network_tx, network_rx) = self.channel.network_events;
@@ -1070,7 +1081,11 @@ impl Node {
 
         let (internal_tx, internal_rx) = self.channel.internal_events;
         let handler_part = HandlerPart {
-            handler: self.handler,
+            handler: HandlerWithRuntime {
+                inner: self.handler,
+                system_runtime: SystemRuntime::new(self.api_runtime_config)
+                    .expect("Failed to start api_runtime."),
+            },
             internal_rx,
             network_rx,
             api_rx: self.channel.api_requests.1,
@@ -1141,7 +1156,7 @@ mod tests {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
         msg.set_msg("Hello, World!".to_owned());
-        Message::sign_transaction(msg, SERVICE_ID, p_key, s_key)
+        Message::sign_transaction(msg, SERVICE_ID as u32, p_key, s_key)
     }
 
     struct TestService;

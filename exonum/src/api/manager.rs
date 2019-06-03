@@ -58,7 +58,6 @@ impl ApiManager {
 
     fn start_api_servers(&mut self) {
         let aggregator = self.runtime_config.api_aggregator.clone();
-        trace!("Create actix-web servers with api: {:#?}", aggregator.inner);
         self.api_runtime_addresses = self
             .runtime_config
             .api_runtimes
@@ -80,7 +79,6 @@ impl ApiManager {
         let access = runtime_config.access;
         let listen_address = runtime_config.listen_address;
         info!("Starting {} web api on {}", access, listen_address);
-
         HttpServer::new(move || create_app(&aggregator, runtime_config.clone()))
             .disable_signals()
             .bind(listen_address)
