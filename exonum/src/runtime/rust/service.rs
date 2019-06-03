@@ -30,7 +30,7 @@ use crate::{
 
 use super::RustArtifactSpec;
 
-pub trait ServiceDispatcher {
+pub trait ServiceDispatcher: Send {
     fn call(
         &self,
         method: MethodId,
@@ -56,7 +56,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     // TODO: add other hooks such as "on node startup", etc.
 }
 
-pub trait ServiceFactory: Debug + 'static {
+pub trait ServiceFactory: Send + Debug + 'static {
     fn artifact(&self) -> RustArtifactSpec;
     fn new_instance(&self) -> Box<dyn Service>;
 }

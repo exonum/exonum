@@ -133,9 +133,6 @@ impl RustRuntime {
     }
 }
 
-#[allow(unsafe_code)]
-unsafe impl Send for RustRuntime {}
-
 #[derive(Debug, Default)]
 struct RustRuntimeInner {
     // TODO: Add link to dispatcher
