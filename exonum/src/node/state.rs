@@ -15,6 +15,7 @@
 //! State of the `NodeHandler`.
 
 use bit_vec::BitVec;
+use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
 use serde_json::Value;
 
 use std::{
@@ -24,19 +25,20 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use crate::events::network::ConnectedPeerAddr;
-use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
-use crate::messages::{
-    AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
-    Signed,
+use crate::{
+    blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    crypto::{Hash, PublicKey, SecretKey},
+    events::network::ConnectedPeerAddr,
+    helpers::{Height, Milliseconds, Round, ValidatorId},
+    messages::{
+        AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
+        Signed,
+    },
+    node::{
+        connect_list::{ConnectList, PeerAddress},
+        ConnectInfo,
+    },
 };
-use crate::node::{
-    connect_list::{ConnectList, PeerAddress},
-    ConnectInfo,
-};
-use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, Patch};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 
@@ -296,7 +298,7 @@ impl RequestState {
 impl ProposeState {
     /// Returns hash of the propose.
     pub fn hash(&self) -> Hash {
-        self.propose.hash()
+        self.propose.object_hash()
     }
 
     /// Returns block hash propose was executed.
@@ -899,7 +901,7 @@ impl State {
     /// cannot contain unknown transactions. Returns hash of the propose.
     pub fn add_self_propose(&mut self, msg: Signed<Propose>) -> Hash {
         debug_assert!(self.validator_state().is_some());
-        let propose_hash = msg.hash();
+        let propose_hash = msg.object_hash();
         self.proposes.insert(
             propose_hash,
             ProposeState {
@@ -923,7 +925,7 @@ impl State {
         transactions: &MapIndex<S, Hash, Signed<AnyTx>>,
         transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
-        let propose_hash = msg.hash();
+        let propose_hash = msg.object_hash();
         match self.proposes.entry(propose_hash) {
             Entry::Occupied(..) => bail!("Propose already found"),
             Entry::Vacant(e) => {

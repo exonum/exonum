@@ -14,11 +14,13 @@
 
 //! Tests in this module are designed to test configuration change protocol.
 
-use crate::blockchain::Schema;
-use crate::crypto::CryptoHash;
-use crate::helpers::{Height, ValidatorId};
-use crate::sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox};
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{BinaryValue, ObjectHash};
+
+use crate::{
+    blockchain::Schema,
+    helpers::{Height, ValidatorId},
+    sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox},
+};
 
 /// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus
@@ -34,7 +36,7 @@ fn test_exclude_validator_from_consensus() {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.validator_keys.swap_remove(0);
         consensus_cfg.actual_from = sandbox.current_height().next().next();
-        consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
+        consensus_cfg.previous_cfg_hash = sandbox.cfg().object_hash();
 
         TxConfig::create_signed(
             &sandbox.public_key(ValidatorId(0)),
@@ -63,7 +65,7 @@ fn test_schema_config_changes() {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.txs_block_limit = 2000;
         consensus_cfg.actual_from = sandbox.current_height().next().next();
-        consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
+        consensus_cfg.previous_cfg_hash = sandbox.cfg().object_hash();
 
         let tx = TxConfig::create_signed(
             &sandbox.public_key(ValidatorId(0)),

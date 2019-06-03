@@ -15,19 +15,22 @@
 //! Tests in this module are designed to test details of transaction handling.
 
 use bit_vec::BitVec;
+use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
 
-use crate::crypto::{gen_keypair, CryptoHash, Hash};
-use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
-use crate::messages::{AnyTx, BinaryForm, Signed};
-use crate::node::state::TRANSACTIONS_REQUEST_TIMEOUT;
-use crate::sandbox::{
-    compute_tx_hash,
-    config_updater::TxConfig,
-    sandbox_tests_helper::*,
-    timestamping::{TimestampingTxGenerator, DATA_SIZE},
-    timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
+use crate::{
+    crypto::{gen_keypair, Hash},
+    helpers::{Height, Milliseconds, Round, ValidatorId},
+    messages::{AnyTx, Signed},
+    node::state::TRANSACTIONS_REQUEST_TIMEOUT,
+    sandbox::{
+        compute_tx_hash,
+        config_updater::TxConfig,
+        sandbox_tests_helper::*,
+        timestamping::{TimestampingTxGenerator, DATA_SIZE},
+        timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
+    },
 };
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
@@ -50,7 +53,10 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
 }
 
 fn tx_hashes(transactions: &[Signed<AnyTx>]) -> Vec<Hash> {
-    let mut hashes = transactions.iter().map(Signed::hash).collect::<Vec<_>>();
+    let mut hashes = transactions
+        .iter()
+        .map(Signed::object_hash)
+        .collect::<Vec<_>>();
     hashes.sort();
     hashes
 }
@@ -64,7 +70,7 @@ fn send_txs_into_pool(
         sandbox.recv(tx);
     }
 
-    transactions.sort_by(|tx1, tx2| tx1.hash().cmp(&tx2.hash()));
+    transactions.sort_by(|tx1, tx2| tx1.object_hash().cmp(&tx2.object_hash()));
 
     transactions
 }
@@ -81,7 +87,7 @@ fn response_to_request_txs() {
     sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.public_key(ValidatorId(1)),
         &sandbox.public_key(ValidatorId(0)),
-        &[tx.hash()],
+        &[tx.object_hash()],
         sandbox.secret_key(ValidatorId(1)),
     ));
 
@@ -128,7 +134,7 @@ fn tx_pool_size_overflow() {
         Height(1),
         Round(1),
         &sandbox.last_hash(),
-        &[tx1.hash()],
+        &[tx1.object_hash()],
         sandbox.secret_key(ValidatorId(2)),
     );
 
@@ -145,7 +151,7 @@ fn tx_pool_size_overflow() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -153,7 +159,7 @@ fn tx_pool_size_overflow() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -162,7 +168,7 @@ fn tx_pool_size_overflow() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -170,12 +176,12 @@ fn tx_pool_size_overflow() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
-    sandbox.assert_lock(Round(1), Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.object_hash()));
     sandbox.recv(&tx2);
     sandbox.assert_pool_len(2);
 
@@ -183,8 +189,8 @@ fn tx_pool_size_overflow() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -192,8 +198,8 @@ fn tx_pool_size_overflow() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -203,7 +209,7 @@ fn tx_pool_size_overflow() {
     sandbox.broadcast(&sandbox.create_status(
         &sandbox.public_key(ValidatorId(0)),
         Height(2),
-        &block.hash(),
+        &block.object_hash(),
         sandbox.secret_key(ValidatorId(0)),
     ));
 }
@@ -217,7 +223,7 @@ fn duplicate_tx_in_pool() {
     let tx2 = tx_gen.next().unwrap();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx1.hash()])
+        .with_tx_hashes(&[tx1.object_hash()])
         .build();
 
     sandbox.recv(&propose);
@@ -227,7 +233,7 @@ fn duplicate_tx_in_pool() {
         &sandbox.create_transactions_request(
             &sandbox.public_key(ValidatorId(0)),
             &sandbox.public_key(ValidatorId(2)),
-            &[tx1.hash()],
+            &[tx1.object_hash()],
             &sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -276,7 +282,7 @@ fn incorrect_tx_in_request() {
         .unwrap();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx0.hash()])
+        .with_tx_hashes(&[tx0.object_hash()])
         .build();
 
     // Receive propose with unknown transaction `tx0`.
@@ -288,7 +294,7 @@ fn incorrect_tx_in_request() {
         &sandbox.create_transactions_request(
             &sandbox.public_key(ValidatorId(0)),
             &sandbox.public_key(ValidatorId(2)),
-            &[tx0.hash()],
+            &[tx0.object_hash()],
             &sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -305,7 +311,7 @@ fn incorrect_tx_in_request() {
 
     let tx1 = gen_timestamping_tx();
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx0.hash(), tx1.hash()])
+        .with_tx_hashes(&[tx0.object_hash(), tx1.object_hash()])
         .build();
 
     sandbox.recv(&tx1);
@@ -319,7 +325,10 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use crate::messages::{RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE};
+    // FIXME add this header to messages module.
+    const TX_PB_HEADER_OVERHEAD: usize = 32;
+
+    use crate::messages::TX_RES_PB_OVERHEAD_PAYLOAD;
     use exonum_merkledb::BinaryValue;
 
     let sandbox = timestamping_sandbox();
@@ -332,21 +341,21 @@ fn response_size_larger_than_max_message_len() {
     let tx4 = TimestampingTxGenerator::new(DATA_SIZE + 1).next().unwrap();
 
     assert_eq!(
-        tx1.signed_message().raw().len() + tx2.signed_message().raw().len() + 1,
-        tx3.signed_message().raw().len() + tx4.signed_message().raw().len()
+        tx1.signed_message().to_bytes().len() + tx2.signed_message().to_bytes().len() + 1,
+        tx3.signed_message().to_bytes().len() + tx4.signed_message().to_bytes().len()
     );
 
     // Create new config. Set the size of the message to a size
     // that is exactly equal to the message to send the first two transactions.
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
-            + tx1.signed_message().raw().len()
-            + RAW_TRANSACTION_HEADER
-            + tx2.signed_message().raw().len()
-            + RAW_TRANSACTION_HEADER) as u32;
+        consensus_cfg.consensus.max_message_len = (TX_RES_PB_OVERHEAD_PAYLOAD
+            + tx1.signed_message().to_bytes().len()
+            + TX_PB_HEADER_OVERHEAD
+            + tx2.signed_message().to_bytes().len()
+            + TX_PB_HEADER_OVERHEAD) as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
-        consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
+        consensus_cfg.previous_cfg_hash = sandbox.cfg().object_hash();
 
         TxConfig::create_signed(
             &sandbox.public_key(ValidatorId(0)),
@@ -365,7 +374,7 @@ fn response_size_larger_than_max_message_len() {
     sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.public_key(ValidatorId(1)),
         &sandbox.public_key(ValidatorId(0)),
-        &[tx1.hash(), tx2.hash()],
+        &[tx1.object_hash(), tx2.object_hash()],
         sandbox.secret_key(ValidatorId(1)),
     ));
 
@@ -387,7 +396,7 @@ fn response_size_larger_than_max_message_len() {
     sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.public_key(ValidatorId(1)),
         &sandbox.public_key(ValidatorId(0)),
-        &[tx3.hash(), tx4.hash()],
+        &[tx3.object_hash(), tx4.object_hash()],
         sandbox.secret_key(ValidatorId(1)),
     ));
 
@@ -440,7 +449,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
     sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.object_hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     let block = BlockBuilder::new(&sandbox)
@@ -452,8 +461,8 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         ValidatorId(1),
         Height(1),
         Round(3),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -461,8 +470,8 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         ValidatorId(2),
         Height(1),
         Round(3),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -478,7 +487,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             &sandbox.public_key(ValidatorId(3)),
             &sandbox.public_key(ValidatorId(0)),
             Height(1),
-            &propose.hash(),
+            &propose.object_hash(),
             sandbox.secret_key(ValidatorId(3)),
         ));
 
@@ -495,7 +504,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             &sandbox.public_key(ValidatorId(0)),
             Height(1),
             Round(3),
-            &propose.hash(),
+            &propose.object_hash(),
             validators,
             sandbox.secret_key(ValidatorId(3)),
         ));
@@ -510,7 +519,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         ValidatorId(1),
         Height(1),
         Round(3),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -518,7 +527,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         ValidatorId(2),
         Height(1),
         Round(3),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -527,8 +536,8 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         ValidatorId(0),
         Height(1),
         Round(3),
-        &propose.hash(),
-        &block.hash(),
+        &propose.object_hash(),
+        &block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -537,14 +546,14 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
     sandbox.recv(&precommit_2);
 
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.check_broadcast_status(Height(2), &block.hash());
+    sandbox.check_broadcast_status(Height(2), &block.object_hash());
 
     {
         // respond to RequestTransactions
         sandbox.recv(&sandbox.create_transactions_request(
             &sandbox.public_key(ValidatorId(1)),
             &sandbox.public_key(ValidatorId(0)),
-            &[tx.hash()],
+            &[tx.object_hash()],
             sandbox.secret_key(ValidatorId(1)),
         ));
 
@@ -565,7 +574,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             &sandbox.public_key(ValidatorId(3)),
             &sandbox.public_key(ValidatorId(0)),
             Height(1),
-            &propose.hash(),
+            &propose.object_hash(),
             sandbox.secret_key(ValidatorId(3)),
         ));
 
@@ -586,7 +595,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             &sandbox.public_key(ValidatorId(0)),
             Height(1),
             Round(3),
-            &propose.hash(),
+            &propose.object_hash(),
             validators,
             sandbox.secret_key(ValidatorId(3)),
         ));
@@ -615,7 +624,7 @@ fn not_request_txs_when_get_tx_and_propose() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.object_hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -639,7 +648,7 @@ fn request_txs_when_get_propose_or_prevote() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.object_hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -650,7 +659,7 @@ fn request_txs_when_get_propose_or_prevote() {
         &sandbox.create_transactions_request(
             &sandbox.public_key(ValidatorId(0)),
             &sandbox.public_key(ValidatorId(2)),
-            &[tx.hash()],
+            &[tx.object_hash()],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -661,7 +670,7 @@ fn request_txs_when_get_propose_or_prevote() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -673,7 +682,7 @@ fn request_txs_when_get_propose_or_prevote() {
         &sandbox.create_transactions_request(
             &sandbox.public_key(ValidatorId(0)),
             &sandbox.public_key(ValidatorId(3)),
-            &[tx.hash()],
+            &[tx.object_hash()],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );

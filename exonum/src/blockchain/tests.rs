@@ -26,7 +26,7 @@ use crate::{
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
-        dispatcher::DispatcherBuilder,
+        dispatcher::{BuiltinService, DispatcherBuilder},
         rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
     },
 };
@@ -193,7 +193,11 @@ fn create_blockchain_with_service(
     Blockchain::with_dispatcher(
         TemporaryDB::new(),
         DispatcherBuilder::new(internal_sender)
-            .with_builtin_service(factory, id, name)
+            .with_builtin_service(BuiltinService {
+                factory: factory.into(),
+                instance_id: id,
+                instance_name: name.into(),
+            })
             .finalize(),
         service_keypair.0,
         service_keypair.1,

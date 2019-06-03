@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_merkledb::{ObjectHash, Patch};
+
 use std::collections::HashSet;
 
-use crate::blockchain::Schema;
-use crate::crypto::{CryptoHash, Hash, PublicKey};
-use crate::events::InternalRequest;
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::{
-    AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, Signed, SignedMessage, TransactionsRequest,
-    TransactionsResponse,
+use crate::{
+    blockchain::Schema,
+    crypto::{Hash, PublicKey},
+    events::InternalRequest,
+    helpers::{Height, Round, ValidatorId},
+    messages::{
+        AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
+        PrevotesRequest, Propose, ProposeRequest, Signed, SignedMessage, TransactionsRequest,
+        TransactionsResponse,
+    },
+    node::{NodeHandler, RequestData},
 };
-use crate::node::{NodeHandler, RequestData};
-use exonum_merkledb::Patch;
 
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
@@ -127,7 +130,7 @@ impl NodeHandler {
             }
         };
 
-        let hash = msg.hash();
+        let hash = msg.object_hash();
 
         // Remove request info
         let known_nodes = self.remove_request(&RequestData::Propose(hash));
@@ -161,7 +164,7 @@ impl NodeHandler {
         }
 
         let block = msg.block();
-        let block_hash = block.hash();
+        let block_hash = block.object_hash();
 
         // TODO: Add block with greater height to queue. (ECR-171)
         if self.state.height() != block.height() {
@@ -202,7 +205,7 @@ impl NodeHandler {
         self.validate_block_response(&msg)?;
 
         let block = msg.block();
-        let block_hash = block.hash();
+        let block_hash = block.object_hash();
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
@@ -280,7 +283,7 @@ impl NodeHandler {
     /// Panics if the received block has incorrect `block_hash`.
     pub fn handle_full_block(&mut self, msg: &Signed<BlockResponse>) -> Result<(), failure::Error> {
         let block = msg.block();
-        let block_hash = block.hash();
+        let block_hash = block.object_hash();
 
         if self.state.block(&block_hash).is_none() {
             let (computed_block_hash, patch) =
@@ -530,7 +533,7 @@ impl NodeHandler {
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
     pub fn handle_tx(&mut self, msg: Signed<AnyTx>) -> Result<(), failure::Error> {
-        let hash = msg.hash();
+        let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
         if Schema::new(&snapshot).transactions().contains(&hash) {

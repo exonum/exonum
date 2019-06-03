@@ -15,10 +15,13 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
-use crate::crypto::CryptoHash;
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::{Message, Propose};
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
+use exonum_merkledb::ObjectHash;
+
+use crate::{
+    helpers::{Height, Round, ValidatorId},
+    messages::{Message, Propose},
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
+};
 
 /// HANDLE message
 /// - verify signature
@@ -100,7 +103,7 @@ fn handle_propose_with_incorrect_time() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -135,7 +138,7 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.hash(),
+        &propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));

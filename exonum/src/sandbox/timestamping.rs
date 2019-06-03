@@ -14,38 +14,72 @@
 
 pub use crate::proto::schema::tests::TimestampTx;
 
+use exonum_merkledb::{impl_binary_value_for_message, BinaryValue};
+use protobuf::Message as PbMessage;
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
+use semver::Version;
 
 use std::borrow::Cow;
 
-use crate::blockchain::{
-    ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
+use crate::{
+    blockchain::ExecutionResult,
+    crypto::{gen_keypair, PublicKey, SecretKey},
+    messages::{AnyTx, Message, ServiceInstanceId, Signed},
+    runtime::{
+        dispatcher::BuiltinService,
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+    },
 };
-use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
-use crate::messages::{AnyTx, Message, Signed};
-use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
-use protobuf::Message as PbMessage;
 
-pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
 
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-#[exonum(crate = "crate")]
-pub enum TimestampingTransactions {
-    TimestampTx(TimestampTx),
+#[service_interface(exonum(crate = "crate"))]
+pub trait TimestampingInterface {
+    fn timestamp(&self, context: TransactionContext, arg: TimestampTx) -> ExecutionResult;
 }
 
-impl Transaction for TimestampTx {
-    fn execute(&self, _: TransactionContext) -> ExecutionResult {
+#[derive(Debug)]
+pub struct TimestampingService;
+
+impl_service_dispatcher!(TimestampingService, TimestampingInterface);
+
+impl TimestampingInterface for TimestampingService {
+    fn timestamp(&self, _context: TransactionContext, _arg: TimestampTx) -> ExecutionResult {
         Ok(())
     }
 }
 
-impl_binary_value_for_message! { TimestampTx }
+impl Service for TimestampingService {}
 
-#[derive(Default)]
-pub struct TimestampingService {}
+impl ServiceFactory for TimestampingService {
+    fn artifact(&self) -> RustArtifactSpec {
+        RustArtifactSpec {
+            name: "timestamping".into(),
+            version: Version::new(0, 1, 0),
+        }
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
+    }
+}
+
+impl TimestampingService {
+    pub const ID: ServiceInstanceId = 1;
+}
+
+impl From<TimestampingService> for BuiltinService {
+    fn from(factory: TimestampingService) -> Self {
+        Self {
+            factory: factory.into(),
+            instance_id: TimestampingService::ID,
+            instance_name: "timestamping".into(),
+        }
+    }
+}
+
+impl_binary_value_for_message! { TimestampTx }
 
 pub struct TimestampingTxGenerator {
     rand: XorShiftRng,
@@ -85,34 +119,9 @@ impl Iterator for TimestampingTxGenerator {
         buf.set_data(data);
         Some(Message::sign_transaction(
             buf,
-            TIMESTAMPING_SERVICE,
+            TimestampingService::ID,
             self.public_key,
             &self.secret_key,
         ))
-    }
-}
-
-impl TimestampingService {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl Service for TimestampingService {
-    fn service_name(&self) -> &str {
-        "sandbox_timestamping"
-    }
-
-    fn service_id(&self) -> u16 {
-        TIMESTAMPING_SERVICE
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
-    }
-
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = TimestampingTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
     }
 }

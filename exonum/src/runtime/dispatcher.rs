@@ -183,6 +183,13 @@ pub struct DispatcherBuilder {
     dispatcher: Dispatcher,
 }
 
+#[derive(Debug)]
+pub struct BuiltinService {
+    pub factory: Box<dyn ServiceFactory>,
+    pub instance_id: ServiceInstanceId,
+    pub instance_name: String,
+}
+
 impl DispatcherBuilder {
     pub fn new(requests: mpsc::Sender<InternalRequest>) -> Self {
         Self {
@@ -193,21 +200,17 @@ impl DispatcherBuilder {
 
     /// Adds built-in service with predefined identifier, keep in mind that the initialize method
     /// of service will not be invoked and thus service must have and empty constructor.
-    pub fn with_builtin_service(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-        instance_id: ServiceInstanceId,
-        instance_name: impl Into<String>,
-    ) -> Self {
+    pub fn with_builtin_service(mut self, service: impl Into<BuiltinService>) -> Self {
+        let service = service.into();
         // Registers service instance in runtime.
         let artifact = self.builtin_runtime.add_builtin_service(
-            service_factory.into(),
-            instance_id,
-            instance_name,
+            service.factory,
+            service.instance_id,
+            service.instance_name,
         );
         // Registers service instance in dispatcher.
         self.dispatcher
-            .notify_service_started(instance_id, artifact);
+            .notify_service_started(service.instance_id, artifact);
         self
     }
 
