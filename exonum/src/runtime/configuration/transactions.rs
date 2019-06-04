@@ -393,3 +393,10 @@ impl Init {
         artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::schema::configuration::DeployResult", crate = "crate")]
+pub struct DeployResult {
+    pub artifact: Deploy,
+    pub success: bool,
+}

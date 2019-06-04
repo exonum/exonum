@@ -63,3 +63,9 @@ message InitTx {
   string instance_name = 3;
   google.protobuf.Any constructor_data = 4;
 }
+
+// Internal transaction for service artifact deployment result.
+message DeployResult {
+  DeployTx artifact = 1;
+  bool success = 2;
+}
