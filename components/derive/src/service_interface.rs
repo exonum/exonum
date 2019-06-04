@@ -47,7 +47,7 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
             ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
             match method {
                 #( #match_arms )*
-                _ => bail!("Method not found"),
+                _ => failure::bail!("Method not found"),
             }
         }
     }
