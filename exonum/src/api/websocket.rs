@@ -21,7 +21,7 @@ use rand::{rngs::ThreadRng, Rng};
 
 use futures::Future;
 
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{cell::RefCell, collections::{BTreeMap, HashMap}, sync::Arc};
 
 use crate::api::{
     node::public::explorer::{TransactionHex, TransactionResponse},
@@ -46,7 +46,7 @@ enum IncomingMessage {
 }
 
 /// Subscription type (new blocks or committed transactions).
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum SubscriptionType {
     /// Subscription to nothing.
@@ -62,7 +62,7 @@ pub enum SubscriptionType {
 
 /// Describe filter for transactions by ID of service and (optionally)
 /// transaction type in service.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct TransactionFilter {
     /// ID of service.
     pub service_id: u16,
@@ -134,21 +134,21 @@ pub enum Notification {
 pub(crate) struct Message(pub String);
 
 #[derive(Message)]
-#[rtype(usize)]
+#[rtype(u64)]
 pub(crate) struct Subscribe {
     pub address: Recipient<Message>,
-    pub sub_types: Vec<SubscriptionType>,
+    pub subscriptions: Vec<SubscriptionType>,
 }
 
 #[derive(Message)]
 pub(crate) struct Unsubscribe {
-    pub id: usize,
+    pub id: u64,
 }
 
 #[derive(Message)]
 pub(crate) struct UpdateSubscriptions {
-    pub id: usize,
-    pub sub_types: Vec<SubscriptionType>,
+    pub id: u64,
+    pub subscriptions: Vec<SubscriptionType>,
 }
 
 #[derive(Message)]
@@ -163,7 +163,7 @@ pub(crate) struct Transaction {
 }
 
 pub(crate) struct Server {
-    pub subscribers: HashMap<SubscriptionType, HashMap<usize, Recipient<Message>>>,
+    pub subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
     service_api_state: Arc<ServiceApiState>,
     rng: RefCell<ThreadRng>,
 }
@@ -171,13 +171,13 @@ pub(crate) struct Server {
 impl Server {
     pub fn new(service_api_state: Arc<ServiceApiState>) -> Self {
         Self {
-            subscribers: HashMap::new(),
+            subscribers: BTreeMap::new(),
             service_api_state,
             rng: RefCell::new(rand::thread_rng()),
         }
     }
 
-    fn remove_subscriber(&mut self, id: usize) {
+    fn remove_subscriber(&mut self, id: u64) {
         self.subscribers.iter_mut().for_each(|(_, v)| {
             v.remove(&id);
         });
@@ -185,11 +185,11 @@ impl Server {
 
     fn set_subscriptions(
         &mut self,
-        id: usize,
+        id: u64,
         addr: Recipient<Message>,
-        sub_types: Vec<SubscriptionType>,
+        subscriptions: Vec<SubscriptionType>,
     ) {
-        sub_types.into_iter().for_each(|sub_type| {
+        subscriptions.into_iter().for_each(|sub_type| {
             self.subscribers
                 .entry(sub_type)
                 .or_insert_with(HashMap::new)
@@ -203,15 +203,15 @@ impl Actor for Server {
 }
 
 impl Handler<Subscribe> for Server {
-    type Result = usize;
+    type Result = u64;
 
     fn handle(
         &mut self,
-        Subscribe { address, sub_types }: Subscribe,
+        Subscribe { address, subscriptions }: Subscribe,
         _ctx: &mut Self::Context,
-    ) -> usize {
-        let id = self.rng.borrow_mut().gen::<usize>();
-        self.set_subscriptions(id, address, sub_types);
+    ) -> u64 {
+        let id = self.rng.borrow_mut().gen::<u64>();
+        self.set_subscriptions(id, address, subscriptions);
 
         id
     }
@@ -230,7 +230,7 @@ impl Handler<UpdateSubscriptions> for Server {
 
     fn handle(
         &mut self,
-        UpdateSubscriptions { id, sub_types }: UpdateSubscriptions,
+        UpdateSubscriptions { id, subscriptions }: UpdateSubscriptions,
         _ctx: &mut Self::Context,
     ) {
         // Find address of subscriber. If id not found, assume that subscriber doesn't exist and return.
@@ -246,7 +246,7 @@ impl Handler<UpdateSubscriptions> for Server {
             return;
         };
         self.remove_subscriber(id);
-        self.set_subscriptions(id, addr, sub_types);
+        self.set_subscriptions(id, addr, subscriptions);
     }
 }
 
@@ -327,17 +327,17 @@ impl Server {
 }
 
 pub(crate) struct Session {
-    pub id: usize,
-    pub sub_types: Vec<SubscriptionType>,
+    pub id: u64,
+    pub subscriptions: Vec<SubscriptionType>,
     pub server_address: Addr<Server>,
 }
 
 impl Session {
-    pub fn new(server_address: Addr<Server>, sub_types: Vec<SubscriptionType>) -> Self {
+    pub fn new(server_address: Addr<Server>, subscriptions: Vec<SubscriptionType>) -> Self {
         Self {
             id: 0,
             server_address,
-            sub_types,
+            subscriptions,
         }
     }
 
@@ -348,12 +348,12 @@ impl Session {
         }
     }
 
-    fn set_subscriptions(&mut self, sub_types: Vec<SubscriptionType>) -> WsStatus {
-        self.sub_types = sub_types.clone();
+    fn set_subscriptions(&mut self, subscriptions: Vec<SubscriptionType>) -> WsStatus {
+        self.subscriptions = subscriptions.clone();
         self.server_address
             .try_send(UpdateSubscriptions {
                 id: self.id,
-                sub_types,
+                subscriptions,
             })
             .map(|_| WsStatus::Success { response: None })
             .unwrap_or_else(|e| WsStatus::Error {
@@ -387,7 +387,7 @@ impl Actor for Session {
         self.server_address
             .send(Subscribe {
                 address,
-                sub_types: self.sub_types.clone(),
+                subscriptions: self.subscriptions.clone(),
             })
             .into_actor(self)
             .then(|response, actor, context| {
