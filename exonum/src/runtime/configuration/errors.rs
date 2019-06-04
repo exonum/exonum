@@ -83,6 +83,10 @@ pub enum ErrorCode {
     ///
     /// Can be emitted by `Init` or `DeployInit`.
     ServiceInstanceNameInUse = 98,
+    /// Artifact is already deploying.
+    ///
+    /// Can be emitted by `Deploy`.
+    AlreadyDeploying = 99,
 }
 
 // Common error types for `Propose` and `Vote`.
@@ -133,6 +137,9 @@ pub enum Error {
 
     #[fail(display = "Service instance name already in use")]
     ServiceInstanceNameInUse,
+
+    #[fail(display= "Artifact already deploying")]
+    AlreadyDeploying
 }
 
 impl Error {
@@ -152,6 +159,7 @@ impl Error {
             DeployError(..) => ErrorCode::DeployError,
             InitError(..) => ErrorCode::InitError,
             ServiceInstanceNameInUse => ErrorCode::ServiceInstanceNameInUse,
+            AlreadyDeploying => ErrorCode::AlreadyDeploying,
         }
     }
 }

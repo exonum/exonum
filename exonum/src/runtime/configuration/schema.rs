@@ -17,6 +17,7 @@
 use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
     proto,
+    runtime::ArtifactSpec,
 };
 
 use exonum_merkledb::{
@@ -42,6 +43,7 @@ define_names! {
     PROPOSE_HASHES => "propose_hashes";
     VOTES => "votes";
     SERVICE_IDS => "service_ids";
+    DEPLOYING => "deploying";
 }
 
 /// Extended information about a proposal used for the storage.
@@ -235,6 +237,11 @@ where
     /// Returns a table with mapping between service instance names and their identifiers.
     pub fn service_ids(&self) -> MapIndex<T, String, u32> {
         MapIndex::new(SERVICE_IDS, self.access.clone())
+    }
+
+    /// Returns a table with mapping between deploy height names and their identifiers.
+    pub fn deploying(&self) -> MapIndex<T, ArtifactSpec, u64> {
+        MapIndex::new(DEPLOYING, self.access.clone())
     }
 
     /// Returns a table of votes of validators for a particular proposal, referenced

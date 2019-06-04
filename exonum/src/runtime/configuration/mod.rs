@@ -184,8 +184,22 @@ impl ConfigurationService for ConfigurationServiceImpl {
         info!("Deploying service. {:?}", arg);
 
         let artifact = arg.get_artifact_spec();
+
+        // Add artifact into deploying list.
+        {
+            let fork = context.fork();
+            let schema = ConfigurationSchema::new(fork);
+            let mut deploying = schema.deploying();
+
+            if deploying.contains(&artifact) {
+                return Err(ServiceError::AlreadyDeploying)?;
+            }
+
+            deploying.put(&artifact, arg.activation_height);
+        }
+
         context.dispatch_action(Action::StartDeploy { artifact });
-        // TODO add result into deployable (to check deploy status in before_commit).
+
         Ok(())
     }
 

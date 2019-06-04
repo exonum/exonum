@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot, BinaryKey};
 use protobuf::well_known_types::Any;
 
 use std::fmt::Debug;
@@ -79,6 +79,24 @@ impl From<RustArtifactSpec> for ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
             raw_spec: artifact.into_bytes(),
         }
+    }
+}
+
+impl BinaryKey for ArtifactSpec {
+    fn size(&self) -> usize {
+        BinaryKey::size(&self.runtime_id) + BinaryKey::size(&self.raw_spec)
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        self.runtime_id.write(&mut buffer[0..4]);
+        self.raw_spec.write(&mut buffer[4..4 + self.raw_spec.len()]);
+        self.size()
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        let runtime_id = u32::read(&buffer[0..4]);
+        let raw_spec: Vec<u8> = Vec::read(&buffer[4..]);
+        Self { runtime_id, raw_spec }
     }
 }
 
