@@ -111,7 +111,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - New endpoint: `v1/transactions/subscribe`, which subscribe to new transaction events.
-  This endpoint accept optional parameters: `service_id` and `transaction_id`. (#1335)
+  This endpoint accept optional parameters: `service_id` and `message_id`
+  (`message_id` as in derive macro `TransactionSet`). (#1335)
 
 - New endpoint: `v1/ws`, which open websocket connection and allow to set multiple
   subscription (for blocks and transaction, filtered by service and transaction id)

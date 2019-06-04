@@ -71,15 +71,15 @@ pub struct TransactionFilter {
     /// ID of service.
     pub service_id: u16,
     /// Optional ID of transaction in service (if not set, all transaction of service will be sent).
-    pub transaction_id: Option<u16>,
+    pub message_id: Option<u16>,
 }
 
 impl TransactionFilter {
     /// Create new transaction filter.
-    pub fn new(service_id: u16, transaction_id: Option<u16>) -> Self {
+    pub fn new(service_id: u16, message_id: Option<u16>) -> Self {
         Self {
             service_id,
-            transaction_id,
+            message_id,
         }
     }
 }
@@ -91,7 +91,7 @@ pub struct TransactionInfo {
     /// ID of service.
     pub service_id: u16,
     /// ID of transaction in service.
-    pub transaction_id: u16,
+    pub message_id: u16,
     #[serde(with = "TxStatus")]
     status: TransactionResult,
     location: TxLocation,
@@ -114,7 +114,7 @@ impl TransactionInfo {
         Self {
             tx_hash: *tx_hash,
             service_id,
-            transaction_id: tx_id,
+            message_id: tx_id,
             status: tx_result,
             location,
             proof: location_proof,
@@ -277,7 +277,7 @@ impl Handler<Broadcast> for Server {
             .map(|hash| TransactionInfo::new(&schema, &hash))
             .for_each(|tx_info| {
                 let service_id = tx_info.service_id;
-                let tx_id = tx_info.transaction_id;
+                let tx_id = tx_info.message_id;
                 let data = Notification::Transaction(tx_info);
                 self.broadcast_message(SubscriptionType::Transactions { filter: None }, &data);
                 self.broadcast_message(
