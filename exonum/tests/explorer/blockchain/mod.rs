@@ -14,23 +14,27 @@
 
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
-use futures::sync::mpsc;
-
 use exonum::{
-    blockchain::{
-        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
-        TransactionContext, TransactionSet,
-    },
-    crypto::{self, Hash, PublicKey, SecretKey},
+    blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema},
+    crypto::{self, PublicKey, SecretKey},
+    impl_service_dispatcher,
     messages::{AnyTx, Message, ServiceInstanceId, Signed},
     node::ApiSender,
+    runtime::{
+        dispatcher::{BuiltinService, DispatcherBuilder},
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+    },
 };
-
-use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
+use exonum_merkledb::{ObjectHash, TemporaryDB};
+use futures::sync::mpsc;
+use semver::Version;
 
 pub const SERVICE_ID: ServiceInstanceId = 0;
 
 mod proto;
+
+#[derive(Debug)]
+struct MyService;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CreateWallet")]
@@ -66,15 +70,15 @@ impl Transfer {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub enum ExplorerTransactions {
-    CreateWallet(CreateWallet),
-    Transfer(Transfer),
+#[service_interface]
+pub trait ExplorerTransactions {
+    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult;
+    fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult;
 }
 
-impl Transaction for CreateWallet {
-    fn execute(&self, _: TransactionContext) -> ExecutionResult {
-        if self.name.starts_with("Al") {
+impl ExplorerTransactions for MyService {
+    fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> ExecutionResult {
+        if arg.name.starts_with("Al") {
             Ok(())
         } else {
             Err(ExecutionError::with_description(
@@ -83,31 +87,26 @@ impl Transaction for CreateWallet {
             ))
         }
     }
-}
 
-impl Transaction for Transfer {
-    fn execute(&self, _: TransactionContext) -> ExecutionResult {
-        panic!("oops")
+    fn transfer(&self, _context: TransactionContext, _arg: Transfer) -> ExecutionResult {
+        panic!("oops");
     }
 }
 
-struct MyService;
+impl_service_dispatcher!(MyService, ExplorerTransactions);
 
-impl Service for MyService {
-    fn service_id(&self) -> u16 {
-        SERVICE_ID as u16
+impl Service for MyService {}
+
+impl ServiceFactory for MyService {
+    fn artifact(&self) -> RustArtifactSpec {
+        RustArtifactSpec {
+            name: "my-service".into(),
+            version: Version::new(1, 0, 0),
+        }
     }
 
-    fn service_name(&self) -> &str {
-        "my-service"
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
-
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        ExplorerTransactions::tx_from_raw(raw).map(ExplorerTransactions::into)
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
     }
 }
 
@@ -127,14 +126,19 @@ pub fn create_blockchain() -> Blockchain {
 
     let api_channel = mpsc::unbounded();
     let internal_sender = mpsc::channel(1).0;
-    let mut blockchain = Blockchain::new(
+
+    let mut blockchain = Blockchain::with_dispatcher(
         TemporaryDB::new(),
-        //        vec![MyService.into()],
-        Vec::new(), // TODO: use new service API.
+        DispatcherBuilder::new(internal_sender)
+            .with_builtin_service(BuiltinService {
+                factory: MyService.into(),
+                instance_id: SERVICE_ID,
+                instance_name: "my-service".into(),
+            })
+            .finalize(),
         service_keys.0,
         service_keys.1,
         ApiSender(api_channel.0),
-        internal_sender,
     );
 
     let keys = ValidatorKeys {

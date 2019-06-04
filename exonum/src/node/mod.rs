@@ -1119,22 +1119,27 @@ impl Node {
     }
 }
 
+// TODO implement transaction verification logic [ECR-3253]
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
-    use super::*;
-    use crate::blockchain::{
-        ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
-    };
-    use crate::crypto::gen_keypair;
-    use crate::events::EventHandler;
-    use crate::helpers;
-    use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
     use exonum_merkledb::{
         impl_binary_value_for_message, BinaryValue, Database, Snapshot, TemporaryDB,
     };
     use protobuf::Message as ProtobufMessage;
+
+    use std::borrow::Cow;
+
+    use crate::{
+        blockchain::{
+            ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
+        },
+        crypto::gen_keypair,
+        events::EventHandler,
+        helpers,
+        proto::{schema::tests::TxSimple, ProtobufConvert},
+    };
+
+    use super::*;
 
     const SERVICE_ID: u16 = 0;
 
@@ -1183,11 +1188,10 @@ mod tests {
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = Vec::new(); //vec![Box::new(TestService) as Box<dyn Service>]; // TODO: use new service API.
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let mut node = Node::new(TemporaryDB::new(), services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1212,15 +1216,15 @@ mod tests {
         assert_eq!(schema.transactions_pool_len(), 1);
     }
 
+    #[ignore] // TODO This test will be fixed by [ECR-3256] task
     #[test]
     fn test_transaction_without_service() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let mut node = Node::new(TemporaryDB::new(), services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 

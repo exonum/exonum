@@ -25,17 +25,15 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
+    blockchain::{Schema, TransactionErrorType, TxLocation},
     crypto::{self, Hash},
     explorer::*,
     helpers::Height,
-    messages::{self, AnyTx, Message, Signed},
+    messages::{self, AnyTx, BinaryValue, Message, Signed},
 };
 use exonum_merkledb::ObjectHash;
 
-use crate::blockchain::{
-    create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
-};
+use crate::blockchain::{create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID};
 
 mod blockchain;
 
@@ -230,6 +228,17 @@ fn tx_generator() -> Box<dyn Iterator<Item = Signed<AnyTx>>> {
     }))
 }
 
+// TODO Implement method id getter in CreateWallet. [ECR-3254]
+fn is_create_wallet(tx: &CommittedTransaction) -> bool {
+    let raw_tx = tx.content().raw_transaction();
+    if raw_tx.call_info.method_id == 0 {
+        CreateWallet::from_bytes(raw_tx.payload.into()).unwrap();
+        true
+    } else {
+        false
+    }
+}
+
 #[test]
 fn test_explorer_block_iter() {
     let mut blockchain = create_blockchain();
@@ -357,13 +366,8 @@ fn test_transaction_iterator() {
         }
         for (i, tx) in block.iter().enumerate() {
             let raw_tx = tx.content().raw_transaction();
-            let tx = ExplorerTransactions::tx_from_raw(raw_tx).unwrap();
-            match tx {
-                ExplorerTransactions::CreateWallet(parsed_tx) => {
-                    assert_eq!(parsed_tx.name, format!("Alice #{}", i))
-                }
-                _ => panic!("Transaction couldn't be parsed."),
-            }
+            let parsed_tx = CreateWallet::from_bytes(raw_tx.payload.into()).unwrap();
+            assert_eq!(parsed_tx.name, format!("Alice #{}", i))
         }
     }
 
@@ -409,15 +413,7 @@ fn test_transaction_iterator() {
 
     let create_wallet_positions: Vec<_> = block
         .iter()
-        .filter(|tx| {
-            if let ExplorerTransactions::CreateWallet(_) =
-                ExplorerTransactions::tx_from_raw(tx.content().raw_transaction()).unwrap()
-            {
-                true
-            } else {
-                false
-            }
-        })
+        .filter(is_create_wallet)
         .map(|tx| tx.location().position_in_block())
         .collect();
     assert_eq!(create_wallet_positions, vec![0, 1]);
@@ -435,14 +431,7 @@ fn test_block_with_transactions() {
     assert!(!block.is_empty());
     assert!(block[1].status().is_ok());
 
-    let all_transactions_create_wallets = block.iter().all(|tx| {
-        let tx = ExplorerTransactions::tx_from_raw(tx.content().raw_transaction()).unwrap();
-        if let ExplorerTransactions::CreateWallet(_) = tx {
-            true
-        } else {
-            false
-        }
-    });
+    let all_transactions_create_wallets = block.iter().all(is_create_wallet);
     assert!(all_transactions_create_wallets);
 }
 
