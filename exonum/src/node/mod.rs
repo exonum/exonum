@@ -1183,11 +1183,10 @@ mod tests {
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = Vec::new(); //vec![Box::new(TestService) as Box<dyn Service>]; // TODO: use new service API.
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let mut node = Node::new(TemporaryDB::new(), services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1216,11 +1215,10 @@ mod tests {
     fn test_transaction_without_service() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let mut node = Node::new(TemporaryDB::new(), services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 

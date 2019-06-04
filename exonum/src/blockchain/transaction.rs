@@ -14,19 +14,20 @@
 
 //! `Transaction` related types.
 
+use exonum_merkledb::{BinaryValue, Fork, ObjectHash};
 use hex::ToHex;
 use protobuf::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
-use crate::crypto::{CryptoHash, Hash, PublicKey};
-use crate::messages::{AnyTx, HexStringRepresentation, Signed, SignedMessage};
-use crate::proto::{self, ProtobufConvert};
-use exonum_merkledb::{BinaryValue, Fork, ObjectHash};
+use crate::{
+    crypto::{Hash, PublicKey},
+    messages::{AnyTx, HexStringRepresentation, Signed, SignedMessage},
+    proto::{self, ProtobufConvert},
+};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 const MAX_ERROR_CODE: u16 = u8::max_value() as u16;
 // Represent `(Ok())` `TransactionResult` value.
 const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
@@ -192,7 +193,7 @@ impl<'a> TransactionContext<'a> {
             fork,
             service_id: raw_message.service_id(),
             service_name,
-            tx_hash: raw_message.hash(),
+            tx_hash: raw_message.object_hash(),
             author: raw_message.author(),
         }
     }
@@ -377,9 +378,9 @@ impl fmt::Display for TransactionError {
 // String content (`TransactionError::Description`) is intentionally excluded from the hash
 // calculation because user can be tempted to use error description from a third-party libraries
 // which aren't stable across the versions.
-impl CryptoHash for TransactionResult {
-    fn hash(&self) -> Hash {
-        u16::hash(&status_as_u16(self))
+impl ObjectHash for TransactionResult {
+    fn object_hash(&self) -> Hash {
+        u16::object_hash(&status_as_u16(self))
     }
 }
 
@@ -437,8 +438,6 @@ impl BinaryValue for TransactionResult {
     }
 }
 
-impl_object_hash_for_binary_value! { TransactionResult }
-
 fn status_as_u16(status: &TransactionResult) -> u16 {
     match (*status).0 {
         Ok(()) => TRANSACTION_STATUS_OK,
@@ -473,26 +472,102 @@ fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
     }
 }
 
+// TODO move error tests to runtime module [ECR-3236]
 #[cfg(test)]
 mod tests {
+    use exonum_merkledb::{Database, Entry, TemporaryDB};
     use futures::sync::mpsc;
+    use semver::Version;
 
-    use std::panic;
-    use std::sync::Mutex;
+    use std::{panic, sync::Mutex};
+
+    use crate::{
+        blockchain::{Blockchain, ExecutionResult, Schema},
+        crypto,
+        helpers::{Height, ValidatorId},
+        impl_service_dispatcher,
+        messages::{Message, ServiceInstanceId},
+        node::ApiSender,
+        proto::schema::tests::TestServiceTx,
+        runtime::{
+            dispatcher::{BuiltinService, DispatcherBuilder},
+            rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        },
+    };
 
     use super::*;
-    use crate::blockchain::{Blockchain, Schema, Service};
-    use crate::crypto;
-    use crate::helpers::{Height, ValidatorId};
-    use crate::messages::Message;
-    use crate::node::ApiSender;
-    use crate::proto;
-    use exonum_merkledb::{Database, Entry, Snapshot, TemporaryDB};
 
-    const TX_RESULT_SERVICE_ID: u32 = 255;
+    const TX_CHECK_RESULT_SERVICE_ID: ServiceInstanceId = 255;
 
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "TestServiceTx", crate = "crate")]
+    struct TxResult {
+        value: u64,
+    }
+
+    #[derive(Debug)]
+    struct TxResultCheckService;
+
+    #[service_interface(exonum(crate = "crate"))]
+    trait TxResultCheckInterface {
+        fn tx_result(&self, context: TransactionContext, arg: TxResult) -> ExecutionResult;
+    }
+
+    impl_service_dispatcher!(TxResultCheckService, TxResultCheckInterface);
+
+    impl TxResultCheckInterface for TxResultCheckService {
+        fn tx_result(&self, context: TransactionContext, arg: TxResult) -> ExecutionResult {
+            let mut entry = create_entry(context.fork());
+            entry.set(arg.value);
+            EXECUTION_STATUS.lock().unwrap().clone()
+        }
+    }
+
+    impl Service for TxResultCheckService {}
+
+    impl ServiceFactory for TxResultCheckService {
+        fn artifact(&self) -> RustArtifactSpec {
+            RustArtifactSpec {
+                name: "tx_result_check_service".into(),
+                version: Version::new(1, 0, 0),
+            }
+        }
+
+        fn new_instance(&self) -> Box<dyn Service> {
+            Box::new(Self)
+        }
+    }
+
+    fn create_blockchain() -> Blockchain {
+        let service_keypair = crypto::gen_keypair();
+        let api_channel = mpsc::unbounded();
+        let internal_sender = mpsc::channel(1).0;
+
+        Blockchain::with_dispatcher(
+            TemporaryDB::new(),
+            DispatcherBuilder::new(internal_sender)
+                .with_builtin_service(BuiltinService {
+                    factory: TxResultCheckService.into(),
+                    instance_id: TX_CHECK_RESULT_SERVICE_ID,
+                    instance_name: "tx_result_check_service".into(),
+                })
+                .finalize(),
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
+        )
+    }
+
+    fn create_entry(fork: &Fork) -> Entry<&Fork, u64> {
+        Entry::new("transaction_status_test", fork)
+    }
+
+    fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
+        panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
     }
 
     #[test]
@@ -616,11 +691,11 @@ mod tests {
 
             let transaction = Message::sign_transaction(
                 TxResult { value: index },
-                TX_RESULT_SERVICE_ID,
+                TX_CHECK_RESULT_SERVICE_ID,
                 pk,
                 &sec_key,
             );
-            let hash = transaction.hash();
+            let hash = transaction.object_hash();
             {
                 let fork = blockchain.fork();
                 {
@@ -670,69 +745,5 @@ mod tests {
     fn unknown_panic() {
         let error = make_panic(1);
         assert_eq!(None, panic_description(&error));
-    }
-
-    fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
-        panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
-    }
-
-    fn create_blockchain() -> Blockchain {
-        let service_keypair = crypto::gen_keypair();
-        let api_channel = mpsc::unbounded();
-        let internal_sender = mpsc::channel(1).0;
-
-        Blockchain::new(
-            TemporaryDB::new(),
-            //            vec![Box::new(TxResultService) as Box<dyn Service>],
-            Vec::new(), // TODO: use new service API.
-            service_keypair.0,
-            service_keypair.1,
-            ApiSender::new(api_channel.0),
-            internal_sender,
-        )
-    }
-
-    struct TxResultService;
-
-    impl Service for TxResultService {
-        fn service_id(&self) -> u16 {
-            TX_RESULT_SERVICE_ID as u16
-        }
-
-        fn service_name(&self) -> &'static str {
-            "test service"
-        }
-
-        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-            vec![]
-        }
-
-        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-            Ok(TestTxs::tx_from_raw(raw)?.into())
-        }
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::schema::tests::TestServiceTx", crate = "crate")]
-    struct TxResult {
-        value: u64,
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(crate = "crate")]
-    enum TestTxs {
-        TxResult(TxResult),
-    }
-
-    impl Transaction for TxResult {
-        fn execute(&self, context: TransactionContext) -> ExecutionResult {
-            let mut entry = create_entry(context.fork());
-            entry.set(self.value);
-            EXECUTION_STATUS.lock().unwrap().clone()
-        }
-    }
-
-    fn create_entry(fork: &Fork) -> Entry<&Fork, u64> {
-        Entry::new("transaction_status_test", fork)
     }
 }
