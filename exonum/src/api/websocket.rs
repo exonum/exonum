@@ -21,7 +21,11 @@ use rand::{rngs::ThreadRng, Rng};
 
 use futures::Future;
 
-use std::{cell::RefCell, collections::{BTreeMap, HashMap}, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use crate::api::{
     node::public::explorer::{TransactionHex, TransactionResponse},
@@ -207,7 +211,10 @@ impl Handler<Subscribe> for Server {
 
     fn handle(
         &mut self,
-        Subscribe { address, subscriptions }: Subscribe,
+        Subscribe {
+            address,
+            subscriptions,
+        }: Subscribe,
         _ctx: &mut Self::Context,
     ) -> u64 {
         let id = self.rng.borrow_mut().gen::<u64>();
