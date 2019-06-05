@@ -711,7 +711,11 @@ impl<'a> BlockchainExplorer<'a> {
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
                 let raw_tx = schema.transactions().get(tx_hash).unwrap();
-                (self.transaction_parser)(raw_tx).unwrap()
+                // (self.transaction_parser)(raw_tx).unwrap()
+                TransactionMessage {
+                    message: raw_tx,
+                    transaction: None, // TODO fix blockchain explorer [ECR-3259]
+                }
             }),
 
             location,

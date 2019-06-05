@@ -228,7 +228,7 @@ impl fmt::Debug for TestKit {
 
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given service.
-    pub fn for_service<S>(
+    pub fn for_service(
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
         id: ServiceInstanceId,

@@ -11,23 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use exonum_merkledb::BinaryValue;
-
+//
 use exonum::{
     blockchain::{Schema, StoredConfiguration},
+    config::ConfigurationServiceConfig,
     crypto::{hash, CryptoHash, Hash, HASH_SIZE},
+    errors::Error as ServiceError,
     helpers::{Height, ValidatorId},
     messages::{RawTransaction, Signed},
-};
-use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
-
-use std::str;
-
-use exonum::runtime::configuration::{
-    config::ConfigurationServiceConfig, errors::Error as ServiceError, transactions::VotingContext,
+    transactions::VotingContext,
     ConfigurationTransactions, Propose, Schema as ConfigurationSchema,
     Service as ConfigurationService, Vote, VoteAgainst, VotingDecision, SERVICE_NAME,
 };
+use exonum_merkledb::BinaryValue;
+use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
+
+use std::str;
 
 mod api;
 

@@ -248,6 +248,7 @@ impl Runtime for RustRuntime {
             .initialize(
                 TransactionContext {
                     service_id: spec.id,
+                    service_name: &spec.name,
                     runtime_context: context,
                     runtime: self,
                 },
@@ -279,6 +280,7 @@ impl Runtime for RustRuntime {
 
         let context = TransactionContext {
             service_id: call_info.instance_id,
+            service_name: &service_instance.name,
             runtime_context: context,
             runtime: self,
         };
@@ -343,15 +345,20 @@ impl Runtime for RustRuntime {
 }
 
 #[derive(Debug)]
-pub struct TransactionContext<'a, 'b> {
+pub struct TransactionContext<'a, 'b, 'c> {
     service_id: ServiceInstanceId,
+    service_name: &'c str,
     runtime_context: &'a mut RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
-impl<'a, 'b> TransactionContext<'a, 'b> {
+impl<'a, 'b, 'c> TransactionContext<'a, 'b, 'c> {
     pub fn service_id(&self) -> ServiceInstanceId {
         self.service_id
+    }
+
+    pub fn service_name(&self) -> &str {
+        self.service_name
     }
 
     pub fn fork(&self) -> &Fork {
