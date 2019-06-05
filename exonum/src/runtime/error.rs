@@ -36,6 +36,7 @@ pub enum StartError {
     WrongRuntime,
     WrongArtifact,
     NotDeployed,
+    NotStarted,
     ServiceIdExists,
     ExecutionError(ExecutionError),
 }

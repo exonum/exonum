@@ -36,7 +36,7 @@ use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
     ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConstructor,
-    ServiceInstanceId,
+    ServiceInstanceId, ServiceInstanceSpec,
 };
 
 #[macro_use]
@@ -193,49 +193,68 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn start_service(
-        &mut self,
-        context: &mut RuntimeContext,
-        artifact: ArtifactSpec,
-        constructor: &ServiceConstructor,
-    ) -> Result<(), StartError> {
+    fn start_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
         let artifact = self
-            .parse_artifact(&artifact)
+            .parse_artifact(&spec.artifact)
             .ok_or(StartError::WrongArtifact)?;
 
-        trace!(
-            "New service {} instance with id: {}",
-            artifact,
-            constructor.instance_id
-        );
+        trace!("New service {} instance with id: {}", artifact, spec.id);
 
         if !self.deployed.contains(&artifact) {
             return Err(StartError::NotDeployed);
         }
 
-        if self.started.contains_key(&constructor.instance_id) {
+        if self.started.contains_key(&spec.id) {
             return Err(StartError::ServiceIdExists);
         }
 
-        let service = {
-            let mut service = self.services.get(&artifact).unwrap().new_instance();
-            let ctx = TransactionContext {
-                service_id: constructor.instance_id,
-                runtime_context: context,
-                runtime: self,
-            };
-            service
-                .initialize(ctx, &constructor.data)
-                .map_err(|e| StartError::ExecutionError(e))?;
-            service
-        };
+        let service = self.services.get(&artifact).unwrap().new_instance();
+        self.started
+            .insert(spec.id, StartedService::new(spec.id, service));
+        Ok(())
+    }
 
-        self.started.insert(
-            constructor.instance_id,
-            StartedService::new(constructor.instance_id, service),
+    fn configure_service(
+        &self,
+        context: &mut RuntimeContext,
+        spec: &ServiceInstanceSpec,
+        parameters: &ServiceConstructor,
+    ) -> Result<(), StartError> {
+        let artifact = self
+            .parse_artifact(&spec.artifact)
+            .ok_or(StartError::WrongArtifact)?;
+
+        trace!(
+            "Configure service {} instance with id: {}",
+            artifact,
+            spec.id
         );
 
-        Ok(())
+        let service_descriptor = self.started.get(&spec.id).ok_or(StartError::NotStarted)?;
+        service_descriptor
+            .as_ref()
+            .initialize(
+                TransactionContext {
+                    service_id: spec.id,
+                    runtime_context: context,
+                    runtime: self,
+                },
+                &parameters.data,
+            )
+            .map_err(|e| StartError::ExecutionError(e))
+    }
+
+    fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+        let artifact = self
+            .parse_artifact(&spec.artifact)
+            .ok_or(StartError::WrongArtifact)?;
+
+        trace!("Stop service {} instance with id: {}", artifact, spec.id);
+
+        self.started
+            .remove(&spec.id)
+            .ok_or(StartError::NotStarted)
+            .map(drop)
     }
 
     fn execute(

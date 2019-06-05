@@ -40,7 +40,7 @@ pub trait ServiceDispatcher: Send {
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    fn initialize(&mut self, _ctx: TransactionContext, _arg: &Any) -> Result<(), ExecutionError> {
+    fn initialize(&self, _ctx: TransactionContext, _arg: &Any) -> Result<(), ExecutionError> {
         Ok(())
     }
 
