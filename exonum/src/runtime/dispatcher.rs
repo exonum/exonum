@@ -84,7 +84,7 @@ impl Dispatcher {
         self.runtime_lookup.insert(service_id, artifact.runtime_id);
     }
 
-    pub fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    pub fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
         self.runtimes
             .get_mut(&artifact.runtime_id)
             .ok_or(DeployError::WrongRuntime)
@@ -93,7 +93,7 @@ impl Dispatcher {
 
     pub fn check_deploy_status(
         &self,
-        artifact: ArtifactSpec,
+        artifact: &ArtifactSpec,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         self.runtimes
@@ -229,11 +229,11 @@ impl DispatcherBuilder {
         // Deploys builtin service artifact.
         self.builtin_runtime.add_service_factory(service.factory);
         self.builtin_runtime
-            .begin_deploy(spec.artifact.clone())
+            .begin_deploy(&spec.artifact)
             .and_then(|_| {
                 let status = self
                     .builtin_runtime
-                    .check_deploy_status(spec.artifact.clone(), false)?;
+                    .check_deploy_status(&spec.artifact, false)?;
                 assert_eq!(
                     status,
                     DeployStatus::Deployed,
@@ -306,7 +306,7 @@ impl Action {
     ) -> Result<(), ExecutionError> {
         match self {
             Action::BeginDeploy { artifact } => {
-                dispatcher.begin_deploy(artifact).map_err(From::from)
+                dispatcher.begin_deploy(&artifact).map_err(From::from)
             }
 
             Action::StartService { spec, constructor } => {
@@ -359,7 +359,7 @@ mod tests {
     }
 
     impl Runtime for SampleRuntime {
-        fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
@@ -369,7 +369,7 @@ mod tests {
 
         fn check_deploy_status(
             &self,
-            artifact: ArtifactSpec,
+            artifact: &ArtifactSpec,
             _: bool,
         ) -> Result<DeployStatus, DeployError> {
             if artifact.runtime_id == self.runtime_type {
@@ -495,22 +495,22 @@ mod tests {
 
         // Check deploy.
         dispatcher
-            .begin_deploy(sample_rust_spec.clone())
+            .begin_deploy(&sample_rust_spec)
             .expect("start_deploy failed for rust");
         dispatcher
-            .begin_deploy(sample_java_spec.clone())
+            .begin_deploy(&sample_java_spec)
             .expect("start_deploy failed for java");
 
         // Check deploy status
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone(), false)
+                .check_deploy_status(&sample_rust_spec, false)
                 .unwrap(),
             DeployStatus::Deployed
         );
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_java_spec.clone(), false)
+                .check_deploy_status(&sample_java_spec, false)
                 .unwrap(),
             DeployStatus::Deployed
         );
@@ -598,14 +598,14 @@ mod tests {
         // Check deploy.
         assert_eq!(
             dispatcher
-                .begin_deploy(sample_rust_spec.clone())
+                .begin_deploy(&sample_rust_spec)
                 .expect_err("start_deploy succeed"),
             DeployError::WrongArtifact
         );
 
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone(), false)
+                .check_deploy_status(&sample_rust_spec, false)
                 .expect_err("check_deploy_status succeed"),
             DeployError::WrongArtifact
         );

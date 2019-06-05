@@ -135,7 +135,7 @@ impl fmt::Display for RustArtifactSpec {
 }
 
 impl Runtime for RustRuntime {
-    fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
             .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
@@ -154,7 +154,7 @@ impl Runtime for RustRuntime {
 
     fn check_deploy_status(
         &self,
-        artifact: ArtifactSpec,
+        artifact: &ArtifactSpec,
         _cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         let artifact = self

@@ -95,12 +95,12 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
     /// Begins deploy artifact with the given specification.
-    fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError>;
 
     /// Checks deployment status.
     fn check_deploy_status(
         &self,
-        artifact: ArtifactSpec,
+        artifact: &ArtifactSpec,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError>;
 
