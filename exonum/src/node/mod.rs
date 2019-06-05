@@ -1185,6 +1185,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "TODO: We have to implement transactions verifier [ECR-3253]"]
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
@@ -1216,8 +1217,8 @@ mod tests {
         assert_eq!(schema.transactions_pool_len(), 1);
     }
 
-    #[ignore] // TODO This test will be fixed by [ECR-3256] task
     #[test]
+    #[ignore = "TODO: We have to implement transactions verifier [ECR-3253]"]
     fn test_transaction_without_service() {
         let (p_key, s_key) = gen_keypair();
 

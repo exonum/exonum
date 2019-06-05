@@ -22,6 +22,7 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     fmt, panic,
+    str::FromStr,
 };
 
 use crate::{
@@ -137,6 +138,24 @@ impl RustArtifactSpec {
 impl fmt::Display for RustArtifactSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}/{}", self.name, self.version)
+    }
+}
+
+impl FromStr for RustArtifactSpec {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let split = s.split('/').take(2).collect::<Vec<_>>();
+        match &split[..] {
+            [name, version] => {
+                let version = Version::parse(version)?;
+                Ok(Self {
+                    name: name.to_string(),
+                    version,
+                })
+            },
+            _ => Err(failure::format_err!("Wrong artifact spec format, in should be in form \"artifact_name/artifact_version\""))
+        }
     }
 }
 
@@ -361,4 +380,9 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
         self.runtime_context.dispatch_action(action)
     }
+}
+
+#[test]
+fn parse_artifact_spec_correct() {
+    RustArtifactSpec::from_str("my-service/1.0.0").unwrap();
 }

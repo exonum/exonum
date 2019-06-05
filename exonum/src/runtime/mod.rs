@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use crate::messages::ServiceInstanceId;
+
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use protobuf::well_known_types::Any;
 
@@ -20,7 +22,7 @@ use std::fmt::Debug;
 use crate::{
     api::ServiceApiBuilder,
     crypto::{Hash, PublicKey, SecretKey},
-    messages::{CallInfo, ServiceInstanceId},
+    messages::CallInfo,
     node::ApiSender,
 };
 
@@ -160,6 +162,15 @@ impl<'a> RuntimeContext<'a> {
             fork,
             author,
             tx_hash,
+            dispatcher_actions: Vec::new(),
+        }
+    }
+
+    pub fn without_author(fork: &'a Fork) -> Self {
+        Self {
+            fork,
+            author: PublicKey::zero(),
+            tx_hash: Hash::zero(),
             dispatcher_actions: Vec::new(),
         }
     }
