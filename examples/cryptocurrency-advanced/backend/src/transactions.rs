@@ -14,13 +14,7 @@
 
 //! Cryptocurrency transactions.
 
-use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
-    crypto::{PublicKey, SecretKey},
-    messages::{AnyTx, Message, Signed},
-};
-
-use crate::{schema::Schema, CRYPTOCURRENCY_SERVICE_ID};
+use exonum::{blockchain::ExecutionError, crypto::PublicKey};
 
 use super::proto;
 
@@ -94,110 +88,4 @@ pub struct Issue {
 pub struct CreateWallet {
     /// Name of the new wallet.
     pub name: String,
-}
-
-/// Transaction group.
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub enum WalletTransactions {
-    /// Transfer tx.
-    Transfer(Transfer),
-    /// Issue tx.
-    Issue(Issue),
-    /// CreateWallet tx.
-    CreateWallet(CreateWallet),
-}
-
-impl CreateWallet {
-    #[doc(hidden)]
-    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
-        Message::sign_transaction(
-            Self {
-                name: name.to_owned(),
-            },
-            CRYPTOCURRENCY_SERVICE_ID,
-            *pk,
-            sk,
-        )
-    }
-}
-
-impl Transfer {
-    #[doc(hidden)]
-    pub fn sign(
-        pk: &PublicKey,
-        &to: &PublicKey,
-        amount: u64,
-        seed: u64,
-        sk: &SecretKey,
-    ) -> Signed<AnyTx> {
-        Message::sign_transaction(
-            Self { to, amount, seed },
-            CRYPTOCURRENCY_SERVICE_ID,
-            *pk,
-            sk,
-        )
-    }
-}
-
-impl Transaction for Transfer {
-    fn execute(&self, context: TransactionContext) -> ExecutionResult {
-        let from = &context.author();
-        let hash = context.tx_hash();
-
-        let mut schema = Schema::new(context.fork());
-
-        let to = &self.to;
-        let amount = self.amount;
-
-        if from == to {
-            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER));
-        }
-
-        let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
-
-        let receiver = schema.wallet(to).ok_or(Error::ReceiverNotFound)?;
-
-        if sender.balance < amount {
-            Err(Error::InsufficientCurrencyAmount)?
-        }
-
-        schema.decrease_wallet_balance(sender, amount, &hash);
-        schema.increase_wallet_balance(receiver, amount, &hash);
-
-        Ok(())
-    }
-}
-
-impl Transaction for Issue {
-    fn execute(&self, context: TransactionContext) -> ExecutionResult {
-        let pub_key = &context.author();
-        let hash = context.tx_hash();
-
-        let mut schema = Schema::new(context.fork());
-
-        if let Some(wallet) = schema.wallet(pub_key) {
-            let amount = self.amount;
-            schema.increase_wallet_balance(wallet, amount, &hash);
-            Ok(())
-        } else {
-            Err(Error::ReceiverNotFound)?
-        }
-    }
-}
-
-impl Transaction for CreateWallet {
-    fn execute(&self, context: TransactionContext) -> ExecutionResult {
-        let pub_key = &context.author();
-        let hash = context.tx_hash();
-
-        let mut schema = Schema::new(context.fork());
-
-        if schema.wallet(pub_key).is_none() {
-            let name = &self.name;
-            schema.create_wallet(pub_key, name, &hash);
-            Ok(())
-        } else {
-            Err(Error::WalletAlreadyExists)?
-        }
-    }
 }
