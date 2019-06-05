@@ -97,31 +97,6 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    pub(crate) fn add_builtin_service(
-        &mut self,
-        service_factory: Box<dyn ServiceFactory>,
-        instance_id: ServiceInstanceId,
-        instance_name: impl Into<String>,
-    ) -> ArtifactSpec {
-        let artifact = service_factory.artifact();
-        let service_instance = StartedService {
-            id: instance_id,
-            service: service_factory.new_instance(),
-        };
-
-        info!(
-            "Added builtin service factory {} with instance: {}/{}",
-            artifact,
-            instance_name.into(),
-            instance_id
-        );
-
-        self.services.insert(artifact.clone(), service_factory);
-        self.deployed.insert(artifact.clone());
-        self.started.insert(instance_id, service_instance);
-        artifact.into()
-    }
-
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact();
 

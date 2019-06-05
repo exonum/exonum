@@ -202,6 +202,16 @@ pub struct BuiltinService {
     pub instance_name: String,
 }
 
+impl BuiltinService {
+    pub fn instance_spec(&self) -> ServiceInstanceSpec {
+        ServiceInstanceSpec {
+            artifact: self.factory.artifact().into(),
+            id: self.instance_id,
+            name: self.instance_name.clone(),
+        }
+    }
+}
+
 impl DispatcherBuilder {
     pub fn new(requests: mpsc::Sender<InternalRequest>) -> Self {
         Self {
@@ -215,14 +225,30 @@ impl DispatcherBuilder {
     pub fn with_builtin_service(mut self, service: impl Into<BuiltinService>) -> Self {
         let service = service.into();
         // Registers service instance in runtime.
-        let artifact = self.builtin_runtime.add_builtin_service(
-            service.factory,
-            service.instance_id,
-            service.instance_name,
-        );
+        let spec = service.instance_spec();
+        // Deploys builtin service artifact.
+        self.builtin_runtime.add_service_factory(service.factory);
+        self.builtin_runtime
+            .begin_deploy(spec.artifact.clone())
+            .and_then(|_| {
+                let status = self
+                    .builtin_runtime
+                    .check_deploy_status(spec.artifact.clone(), false)?;
+                assert_eq!(
+                    status,
+                    DeployStatus::Deployed,
+                    "Builtin services must be deployed instantly."
+                );
+                Ok(())
+            })
+            .expect("Unable to deploy builtin service");
+        // Starts builtin service instance.
+        self.builtin_runtime
+            .start_service(&spec)
+            .expect("Unable to start builtin service instance");
         // Registers service instance in dispatcher.
         self.dispatcher
-            .notify_service_started(service.instance_id, artifact);
+            .notify_service_started(service.instance_id, spec.artifact);
         self
     }
 
