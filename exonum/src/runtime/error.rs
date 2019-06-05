@@ -38,6 +38,7 @@ pub enum StartError {
     NotDeployed,
     NotStarted,
     ServiceIdExists,
+    ServiceNameExists,
     ExecutionError(ExecutionError),
 }
 

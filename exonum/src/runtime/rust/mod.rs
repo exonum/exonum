@@ -46,20 +46,22 @@ pub mod tests;
 
 #[derive(Debug, Default)]
 pub struct RustRuntime {
-    services: HashMap<RustArtifactSpec, Box<dyn ServiceFactory>>,
-    deployed: HashSet<RustArtifactSpec>,
-    started: HashMap<ServiceInstanceId, StartedService>,
+    available_artifacts: HashMap<RustArtifactSpec, Box<dyn ServiceFactory>>,
+    deployed_artifacts: HashSet<RustArtifactSpec>,
+    started_services: HashMap<ServiceInstanceId, ServiceDescriptor>,
+    started_services_by_name: HashMap<String, ServiceInstanceId>,
 }
 
 #[derive(Debug)]
-pub struct StartedService {
+pub struct ServiceDescriptor {
     id: ServiceInstanceId,
+    name: String,
     service: Box<dyn Service>,
 }
 
-impl StartedService {
-    pub fn new(id: ServiceInstanceId, service: Box<dyn Service>) -> Self {
-        Self { id, service }
+impl ServiceDescriptor {
+    pub fn new(id: ServiceInstanceId, name: String, service: Box<dyn Service>) -> Self {
+        Self { id, name, service }
     }
 
     pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (ServiceInstanceId, Vec<Hash>) {
@@ -67,13 +69,13 @@ impl StartedService {
     }
 }
 
-impl AsRef<dyn Service + 'static> for StartedService {
+impl AsRef<dyn Service + 'static> for ServiceDescriptor {
     fn as_ref(&self) -> &(dyn Service + 'static) {
         self.service.as_ref()
     }
 }
 
-impl AsMut<dyn Service + 'static> for StartedService {
+impl AsMut<dyn Service + 'static> for ServiceDescriptor {
     fn as_mut(&mut self) -> &mut (dyn Service + 'static) {
         self.service.as_mut()
     }
@@ -97,12 +99,16 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
+    fn add_started_service(&mut self, descriptor: ServiceDescriptor) {
+        self.started_services_by_name
+            .insert(descriptor.name.clone(), descriptor.id);
+        self.started_services.insert(descriptor.id, descriptor);
+    }
+
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact();
-
-        info!("Added service factory {}", artifact);
-
-        self.services.insert(artifact, service_factory);
+        info!("Added available artifact {}", artifact);
+        self.available_artifacts.insert(artifact, service_factory);
     }
 }
 
@@ -142,10 +148,10 @@ impl Runtime for RustRuntime {
 
         trace!("Begin deploy artifact: {}", artifact);
 
-        if !self.services.contains_key(&artifact) {
+        if !self.available_artifacts.contains_key(&artifact) {
             return Err(DeployError::FailedToDeploy);
         }
-        if !self.deployed.insert(artifact) {
+        if !self.deployed_artifacts.insert(artifact) {
             return Err(DeployError::AlreadyDeployed);
         }
 
@@ -161,7 +167,7 @@ impl Runtime for RustRuntime {
             .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
-        if self.deployed.contains(&artifact) {
+        if self.deployed_artifacts.contains(&artifact) {
             Ok(DeployStatus::Deployed)
         } else {
             Err(DeployError::FailedToDeploy)
@@ -175,17 +181,26 @@ impl Runtime for RustRuntime {
 
         trace!("New service {} instance with id: {}", artifact, spec.id);
 
-        if !self.deployed.contains(&artifact) {
+        // Implement ensure like macro to reduce amount of boiler-plate code. [ECR-3222]
+
+        if !self.deployed_artifacts.contains(&artifact) {
             return Err(StartError::NotDeployed);
         }
 
-        if self.started.contains_key(&spec.id) {
+        if self.started_services.contains_key(&spec.id) {
             return Err(StartError::ServiceIdExists);
         }
 
-        let service = self.services.get(&artifact).unwrap().new_instance();
-        self.started
-            .insert(spec.id, StartedService::new(spec.id, service));
+        if self.started_services_by_name.contains_key(&spec.name) {
+            return Err(StartError::ServiceNameExists);
+        }
+
+        let service = self
+            .available_artifacts
+            .get(&artifact)
+            .unwrap()
+            .new_instance();
+        self.add_started_service(ServiceDescriptor::new(spec.id, spec.name.clone(), service));
         Ok(())
     }
 
@@ -205,7 +220,10 @@ impl Runtime for RustRuntime {
             spec.id
         );
 
-        let service_descriptor = self.started.get(&spec.id).ok_or(StartError::NotStarted)?;
+        let service_descriptor = self
+            .started_services
+            .get(&spec.id)
+            .ok_or(StartError::NotStarted)?;
         service_descriptor
             .as_ref()
             .initialize(
@@ -226,7 +244,7 @@ impl Runtime for RustRuntime {
 
         trace!("Stop service {} instance with id: {}", artifact, spec.id);
 
-        self.started
+        self.started_services
             .remove(&spec.id)
             .ok_or(StartError::NotStarted)
             .map(drop)
@@ -238,7 +256,7 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let service_instance = self.started.get(&call_info.instance_id).unwrap();
+        let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
 
         let context = TransactionContext {
             service_id: call_info.instance_id,
@@ -255,14 +273,14 @@ impl Runtime for RustRuntime {
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-        self.started
+        self.started_services
             .iter()
             .map(|(_, service)| service.state_hash(snapshot))
             .collect()
     }
 
     fn before_commit(&self, fork: &mut Fork) {
-        for service in self.started.values() {
+        for service in self.started_services.values() {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 service.as_ref().before_commit(fork)
             })) {
@@ -287,19 +305,19 @@ impl Runtime for RustRuntime {
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
-        for service in self.started.values() {
+        for service in self.started_services.values() {
             let context = AfterCommitContext::new(service.id, snapshot, service_keypair, tx_sender);
             service.as_ref().after_commit(context);
         }
     }
 
     fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
-        self.started
-            .iter()
-            .map(|(id, service)| {
+        self.started_services
+            .values()
+            .map(|service_descriptor| {
                 let mut builder = ServiceApiBuilder::new();
-                service.as_ref().wire_api(&mut builder);
-                (format!("{}", id), builder)
+                service_descriptor.as_ref().wire_api(&mut builder);
+                (service_descriptor.name.clone(), builder)
             })
             .collect()
     }
