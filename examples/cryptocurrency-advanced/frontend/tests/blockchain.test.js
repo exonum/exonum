@@ -4,6 +4,7 @@ import MockAdapter from 'axios-mock-adapter'
 import * as Blockchain from '../src/plugins/blockchain.js'
 import actual from './data/actual.json'
 import proof from './data/proof.json'
+import 'babel-polyfill';
 
 const mock = new MockAdapter(axios)
 const bigIntRegex = /[0-9]+/i;
