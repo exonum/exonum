@@ -47,8 +47,7 @@ use exonum::{
     helpers::fabric::{self, Context},
     impl_service_dispatcher,
     runtime::rust::{
-        service::{Service, ServiceFactory},
-        RustArtifactSpec, TransactionContext,
+        AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext,
     },
 };
 use exonum_merkledb::{Fork, Snapshot};
@@ -65,36 +64,36 @@ pub const SERVICE_ID: u16 = 4;
 pub const SERVICE_NAME: &str = "exonum_time";
 
 #[service_interface]
-pub trait Time {
+pub trait TimeOracleInterface {
     fn time(&self, ctx: TransactionContext, arg: TxTime) -> ExecutionResult;
 }
 
 /// Define the service.
 #[derive(Debug)]
-pub struct TimeServiceImpl {
+pub struct TimeService {
     /// Current time.
     time: Box<dyn TimeProvider>,
 }
 
-impl Default for TimeServiceImpl {
-    fn default() -> TimeServiceImpl {
-        TimeServiceImpl {
+impl Default for TimeService {
+    fn default() -> Self {
+        Self {
             time: Box::new(SystemTimeProvider) as Box<dyn TimeProvider>,
         }
     }
 }
 
-impl TimeServiceImpl {
+impl TimeService {
     /// Create a new `TimeService`.
-    pub fn new() -> TimeServiceImpl {
-        TimeServiceImpl::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 
     // TODO there is no way to provide provider for now.
     // It should be configurable through the configuration service.
 }
 
-impl Time for TimeServiceImpl {
+impl TimeOracleInterface for TimeService {
     fn time(&self, context: TransactionContext, arg: TxTime) -> ExecutionResult {
         let author = context.author();
         let view = context.fork();
@@ -105,9 +104,9 @@ impl Time for TimeServiceImpl {
     }
 }
 
-impl_service_dispatcher!(TimeServiceImpl, Time);
+impl_service_dispatcher!(TimeService, TimeOracleInterface);
 
-impl Service for TimeServiceImpl {
+impl Service for TimeService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
@@ -119,7 +118,7 @@ impl Service for TimeServiceImpl {
     }
 
     /// Creates transaction after commit of the block.
-    fn after_commit(&self, fork: &Fork) {
+    fn after_commit(&self, context: AfterCommitContext) {
         // The transaction must be created by the validator.
 
         // TODO can't implement after_commit via fork
@@ -131,29 +130,15 @@ impl Service for TimeServiceImpl {
     }
 }
 
-pub fn artifact_spec() -> RustArtifactSpec {
-    RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
-}
-
-#[derive(Debug)]
-pub struct ServiceFactoryImpl;
-
-impl ServiceFactory for ServiceFactoryImpl {
-    fn artifact(&self) -> RustArtifactSpec {
-        artifact_spec()
-    }
-
-    fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(TimeServiceImpl::new())
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
 #[derive(Debug)]
 pub struct TimeServiceFactory;
 
-impl fabric::ServiceFactory for TimeServiceFactory {
-    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn ServiceFactory> {
-        Box::new(ServiceFactoryImpl)
+impl ServiceFactory for TimeServiceFactory {
+    fn artifact(&self) -> RustArtifactSpec {
+        RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(TimeService::new())
     }
 }
