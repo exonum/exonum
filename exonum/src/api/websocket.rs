@@ -21,6 +21,8 @@ use rand::{rngs::ThreadRng, Rng};
 
 use futures::Future;
 
+use log::error;
+
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
@@ -84,9 +86,9 @@ impl TransactionFilter {
     }
 }
 
-/// Information about a particular transaction in the blockchain (without transaction content).
+/// Summary about a particular transaction in the blockchain (without transaction content).
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct TransactionInfo {
+pub struct CommittedTransactionSummary {
     tx_hash: Hash,
     /// ID of service.
     pub service_id: u16,
@@ -98,27 +100,27 @@ pub struct TransactionInfo {
     proof: ListProof<Hash>,
 }
 
-impl TransactionInfo {
-    fn new<T>(schema: &Schema<T>, tx_hash: &Hash) -> Self
+impl CommittedTransactionSummary {
+    fn new<T>(schema: &Schema<T>, tx_hash: &Hash) -> Option<Self>
     where
         T: AsRef<dyn Snapshot> + IndexAccess,
     {
-        let tx = schema.transactions().get(tx_hash).unwrap();
+        let tx = schema.transactions().get(tx_hash)?;
         let service_id = tx.payload().service_id();
         let tx_id = tx.payload().transaction_id();
-        let tx_result = schema.transaction_results().get(tx_hash).unwrap();
-        let location = schema.transactions_locations().get(tx_hash).unwrap();
+        let tx_result = schema.transaction_results().get(tx_hash)?;
+        let location = schema.transactions_locations().get(tx_hash)?;
         let location_proof = schema
             .block_transactions(location.block_height())
             .get_proof(location.position_in_block());
-        Self {
+        Some(Self {
             tx_hash: *tx_hash,
             service_id,
             message_id: tx_id,
             status: tx_result,
             location,
             proof: location_proof,
-        }
+        })
     }
 }
 
@@ -130,7 +132,7 @@ pub enum Notification {
     /// Notification about new block.
     Block(Block),
     /// Notification about new transaction.
-    Transaction(TransactionInfo),
+    Transaction(CommittedTransactionSummary),
 }
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).
@@ -274,7 +276,18 @@ impl Handler<Broadcast> for Server {
         let tx_hashes_table = schema.block_transactions(height);
         tx_hashes_table
             .iter()
-            .map(|hash| TransactionInfo::new(&schema, &hash))
+            .filter_map(|hash| {
+                let res = CommittedTransactionSummary::new(&schema, &hash);
+                if res.is_none() {
+                    error!(
+                        "BUG. Cannot build summary about committed transaction {:?} \
+                         because it doesn't exist in \"transactions\", \
+                         \"transaction_results\" nor \"transactions_locations\" indexes.",
+                        hash
+                    );
+                }
+                res
+            })
             .for_each(|tx_info| {
                 let service_id = tx_info.service_id;
                 let tx_id = tx_info.message_id;
