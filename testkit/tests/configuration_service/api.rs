@@ -16,21 +16,23 @@
 
 use exonum::{
     blockchain::{Schema, StoredConfiguration},
-    crypto::{CryptoHash, Hash},
+    crypto::{Hash},
     helpers::{Height, ValidatorId},
 };
-use exonum_testkit::{ApiKind, TestKit, TestKitApi};
-
-use super::{
-    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
-    ConfigurationTestKit,
-};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, txvec};
+use exonum_merkledb::ObjectHash;
 use exonum::runtime::configuration_new::{
     api::{
         ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
         VoteResponse, VotesInfo,
     },
     SERVICE_NAME,
+};
+use assert_matches::*;
+
+use super::{
+    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
+    ConfigurationTestKit,
 };
 
 trait ConfigurationApiTest {
@@ -146,7 +148,7 @@ fn test_actual_config() {
     let expected = {
         let stored = Schema::new(&testkit.snapshot()).actual_configuration();
         ConfigHashInfo {
-            hash: stored.hash(),
+            hash: stored.object_hash(),
             config: stored,
             propose: None,
             votes: None,
@@ -171,7 +173,7 @@ fn test_following_config() {
     let expected = {
         let stored = cfg_proposal.stored_configuration().clone();
         ConfigHashInfo {
-            hash: stored.hash(),
+            hash: stored.object_hash(),
             config: stored,
             propose: None,
             votes: None,
@@ -193,7 +195,7 @@ fn test_config_by_hash1() {
         committed_config: Some(initial_cfg.clone()),
         propose: None,
     };
-    let actual = testkit.api().config_by_hash(initial_cfg.hash());
+    let actual = testkit.api().config_by_hash(initial_cfg.object_hash());
     assert_eq!(expected, actual);
 }
 
@@ -214,11 +216,11 @@ fn test_config_by_hash2() {
         propose: Some(
             ConfigurationSchema::new(&testkit.snapshot())
                 .propose_data_by_config_hash()
-                .get(&new_cfg.hash())
+                .get(&new_cfg.object_hash())
                 .expect("Propose for configuration is absent."),
         ),
     };
-    let actual = testkit.api().config_by_hash(new_cfg.hash());
+    let actual = testkit.api().config_by_hash(new_cfg.object_hash());
     assert_eq!(expected, actual);
 }
 
@@ -241,11 +243,11 @@ fn test_config_by_hash3() {
         propose: Some(
             ConfigurationSchema::new(&testkit.snapshot())
                 .propose_data_by_config_hash()
-                .get(&new_cfg.hash())
+                .get(&new_cfg.object_hash())
                 .expect("Propose for configuration is absent."),
         ),
     };
-    let actual = testkit.api().config_by_hash(new_cfg.hash());
+    let actual = testkit.api().config_by_hash(new_cfg.object_hash());
     assert_eq!(expected, actual);
 }
 
@@ -262,12 +264,12 @@ fn test_votes_for_propose() {
         cfg.stored_configuration().clone()
     };
     let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
-    let cfg_proposal_hash = new_cfg.hash();
-    assert_eq!(None, api.votes_for_propose(new_cfg.hash()));
+    let cfg_proposal_hash = new_cfg.object_hash();
+    assert_eq!(None, api.votes_for_propose(new_cfg.object_hash()));
     testkit.create_block_with_transactions(txvec![tx_propose]);
     assert_eq!(
         Some(vec![None; testkit.network().validators().len()]),
-        api.votes_for_propose(new_cfg.hash())
+        api.votes_for_propose(new_cfg.object_hash())
     );
     // Push votes
     let tx_votes = testkit
@@ -278,7 +280,7 @@ fn test_votes_for_propose() {
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
     let response = api
-        .votes_for_propose(new_cfg.hash())
+        .votes_for_propose(new_cfg.object_hash())
         .expect("Votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("Vote for config is absent");
@@ -306,12 +308,12 @@ fn test_dissenting_votes_for_propose() {
         cfg.stored_configuration().clone()
     };
     let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
-    let cfg_proposal_hash = new_cfg.hash();
-    assert_eq!(None, api.votes_for_propose(new_cfg.hash()));
+    let cfg_proposal_hash = new_cfg.object_hash();
+    assert_eq!(None, api.votes_for_propose(new_cfg.object_hash()));
     testkit.create_block_with_transaction(tx_propose);
     assert_eq!(
         Some(vec![None; testkit.network().validators().len()]),
-        api.votes_for_propose(new_cfg.hash())
+        api.votes_for_propose(new_cfg.object_hash())
     );
     // Push dissenting votes
     let tx_dissenting_votes = testkit
@@ -322,7 +324,7 @@ fn test_dissenting_votes_for_propose() {
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_dissenting_votes);
     let response = api
-        .votes_for_propose(new_cfg.hash())
+        .votes_for_propose(new_cfg.object_hash())
         .expect("Dissenting votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("VoteAgainst for config is absent");
@@ -358,17 +360,17 @@ fn test_all_proposes() {
     testkit.create_block_with_transactions(txvec![tx_propose_1, tx_propose_2]);
     // Check results
     let expected_response_1 = ProposeHashInfo {
-        hash: new_cfg_1.hash(),
+        hash: new_cfg_1.object_hash(),
         propose_data: ConfigurationSchema::new(&testkit.snapshot())
             .propose_data_by_config_hash()
-            .get(&new_cfg_1.hash())
+            .get(&new_cfg_1.object_hash())
             .expect("Propose data is absent"),
     };
     let expected_response_2 = ProposeHashInfo {
-        hash: new_cfg_2.hash(),
+        hash: new_cfg_2.object_hash(),
         propose_data: ConfigurationSchema::new(&testkit.snapshot())
             .propose_data_by_config_hash()
-            .get(&new_cfg_2.hash())
+            .get(&new_cfg_2.object_hash())
             .expect("Propose data is absent"),
     };
     assert_eq!(
@@ -394,7 +396,7 @@ fn test_all_proposes() {
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();
     assert_eq!(
         vec![expected_response_1.clone(), expected_response_2.clone()],
-        api.all_proposes(Some(initial_cfg.hash()), None)
+        api.all_proposes(Some(initial_cfg.object_hash()), None)
     );
 }
 
@@ -421,22 +423,22 @@ fn test_all_committed() {
     testkit.apply_configuration(ValidatorId(1), new_cfg_2.clone());
     // Check results
     let expected_response_1 = ConfigHashInfo {
-        hash: initial_cfg.hash(),
+        hash: initial_cfg.object_hash(),
         config: initial_cfg.clone(),
         propose: None,
         votes: None,
     };
     let expected_response_2 = ConfigHashInfo {
-        hash: new_cfg_1.hash(),
+        hash: new_cfg_1.object_hash(),
         config: new_cfg_1.clone(),
-        propose: Some(testkit.find_propose(new_cfg_1.hash()).unwrap().hash()),
-        votes: Some(testkit.votes_for_propose(new_cfg_1.hash())),
+        propose: Some(testkit.find_propose(new_cfg_1.object_hash()).unwrap().object_hash()),
+        votes: Some(testkit.votes_for_propose(new_cfg_1.object_hash())),
     };
     let expected_response_3 = ConfigHashInfo {
-        hash: new_cfg_2.hash(),
+        hash: new_cfg_2.object_hash(),
         config: new_cfg_2.clone(),
-        propose: Some(testkit.find_propose(new_cfg_2.hash()).unwrap().hash()),
-        votes: Some(testkit.votes_for_propose(new_cfg_2.hash())),
+        propose: Some(testkit.find_propose(new_cfg_2.object_hash()).unwrap().object_hash()),
+        votes: Some(testkit.votes_for_propose(new_cfg_2.object_hash())),
     };
     assert_eq!(
         vec![
@@ -468,7 +470,7 @@ fn test_all_committed() {
     );
     assert_eq!(
         vec![expected_response_2.clone()],
-        api.all_committed(Some(initial_cfg.hash()), None)
+        api.all_committed(Some(initial_cfg.object_hash()), None)
     );
 }
 
@@ -487,7 +489,7 @@ fn test_post_propose_tx() {
     testkit.poll_events();
     // Check results
     let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
-    assert_eq!(tx.hash(), info.tx_hash);
+    assert_eq!(tx.object_hash(), info.tx_hash);
     assert!(testkit.is_tx_in_pool(&info.tx_hash));
 }
 
@@ -505,11 +507,11 @@ fn test_post_vote_tx() {
     let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     testkit.create_block_with_transactions(txvec![tx]);
 
-    let info = api.post_config_vote(new_cfg.hash());
+    let info = api.post_config_vote(new_cfg.object_hash());
     testkit.poll_events();
     // Check results
-    let tx = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
-    assert_eq!(tx.hash(), info.tx_hash);
+    let tx = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.object_hash());
+    assert_eq!(tx.object_hash(), info.tx_hash);
     assert!(testkit.is_tx_in_pool(&info.tx_hash));
 }
 
@@ -527,10 +529,10 @@ fn test_post_vote_against_tx() {
     let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     testkit.create_block_with_transaction(tx);
 
-    let info = api.post_config_vote_against(new_cfg.hash());
+    let info = api.post_config_vote_against(new_cfg.object_hash());
     testkit.poll_events();
     // Check results
-    let tx = new_tx_config_vote_against(&testkit.network().validators()[0], new_cfg.hash());
-    assert_eq!(tx.hash(), info.tx_hash);
+    let tx = new_tx_config_vote_against(&testkit.network().validators()[0], new_cfg.object_hash());
+    assert_eq!(tx.object_hash(), info.tx_hash);
     assert!(testkit.is_tx_in_pool(&info.tx_hash));
 }
