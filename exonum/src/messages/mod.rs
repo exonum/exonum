@@ -85,6 +85,10 @@ impl ServiceTransaction {
     pub fn into_raw_parts(self) -> (u16, Vec<u8>) {
         (self.transaction_id, self.payload)
     }
+
+    fn transaction_id(&self) -> u16 {
+        self.transaction_id
+    }
 }
 
 impl RawTransaction {
@@ -105,6 +109,10 @@ impl RawTransaction {
     /// Returns `service_id` specified for current transaction.
     pub fn service_id(&self) -> u16 {
         self.service_id
+    }
+
+    pub(crate) fn transaction_id(&self) -> u16 {
+        self.service_transaction.transaction_id()
     }
 }
 
