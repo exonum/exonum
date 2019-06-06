@@ -23,7 +23,7 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
-        DeployStatus, Runtime, RuntimeContext, ServiceConstructor,
+        DeployStatus, Runtime, RuntimeContext, ServiceConstructor, ServiceInstanceSpec,
     },
 };
 
@@ -33,6 +33,7 @@ use super::{
 };
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
+const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
 #[derive(Debug, ProtobufConvert)]
 #[exonum(pb = "TestServiceInit", crate = "crate")]
@@ -92,7 +93,7 @@ impl TestService for TestServiceImpl {
 impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl Service for TestServiceImpl {
-    fn initialize(&mut self, ctx: TransactionContext, arg: &Any) -> Result<(), ExecutionError> {
+    fn initialize(&self, ctx: TransactionContext, arg: &Any) -> Result<(), ExecutionError> {
         let arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
@@ -132,18 +133,21 @@ fn test_basic_rust_runtime() {
     runtime.add_service_factory(service_factory);
 
     // Deploy service
-    assert!(runtime.begin_deploy(artifact.clone()).is_ok());
+    assert!(runtime.begin_deploy(&artifact).is_ok());
     assert_eq!(
-        runtime
-            .check_deploy_status(artifact.clone(), false)
-            .unwrap(),
+        runtime.check_deploy_status(&artifact, false).unwrap(),
         DeployStatus::Deployed
     );
 
     // Init service
     {
+        let spec = ServiceInstanceSpec {
+            artifact,
+            id: SERVICE_INSTANCE_ID,
+            name: SERVICE_INSTANCE_NAME.to_owned(),
+        };
+
         let constructor = ServiceConstructor {
-            instance_id: SERVICE_INSTANCE_ID,
             data: {
                 let mut arg = TestServiceInit::new();
                 arg.set_msg("constructor_message".to_owned());
@@ -158,8 +162,10 @@ fn test_basic_rust_runtime() {
         let address = PublicKey::zero();
         let tx_hash = Hash::zero();
         let mut context = RuntimeContext::new(&mut fork, address, tx_hash);
+
+        runtime.start_service(&spec).unwrap();
         runtime
-            .start_service(&mut context, artifact.clone(), &constructor)
+            .configure_service(&mut context, &spec, &constructor)
             .unwrap();
 
         {

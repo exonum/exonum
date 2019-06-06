@@ -26,7 +26,7 @@ use crate::{
             service::{Service, ServiceFactory},
             RustArtifactSpec, TransactionContext,
         },
-        ServiceConstructor,
+        ServiceConstructor, ServiceInstanceSpec,
     },
 };
 
@@ -200,20 +200,22 @@ impl ConfigurationService for ConfigurationServiceImpl {
             .assign_service_id(context.fork(), &arg.instance_name)
             .ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
-        let constructor = ServiceConstructor {
-            instance_id,
-            data: arg.constructor_data,
-        };
-
         info!(
             "Starting service. Name: {}, id: {}",
             arg.instance_name, instance_id
         );
 
-        context.dispatch_action(Action::StartService {
+        let spec = ServiceInstanceSpec {
+            id: instance_id,
+            name: arg.instance_name,
             artifact,
-            constructor,
-        });
+        };
+
+        let constructor = ServiceConstructor {
+            data: arg.constructor_data,
+        };
+
+        context.dispatch_action(Action::StartService { spec, constructor });
         Ok(())
     }
 }

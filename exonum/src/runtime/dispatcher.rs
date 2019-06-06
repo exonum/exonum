@@ -31,6 +31,7 @@ use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
     rust::{service::ServiceFactory, RustRuntime},
     ArtifactSpec, DeployStatus, Runtime, RuntimeContext, ServiceConstructor, ServiceInstanceId,
+    ServiceInstanceSpec,
 };
 
 pub struct Dispatcher {
@@ -65,6 +66,16 @@ impl Dispatcher {
         self.runtimes.insert(id, runtime.into());
     }
 
+    /// Sends restart API message.
+    pub(crate) fn restart_api(&self) {
+        let _ = self
+            .inner_requests_tx
+            .clone()
+            .send(InternalRequest::RestartApi)
+            .wait()
+            .map_err(|e| error!("Failed to request API restart: {}", e));
+    }
+
     pub(crate) fn notify_service_started(
         &mut self,
         service_id: ServiceInstanceId,
@@ -73,9 +84,7 @@ impl Dispatcher {
         self.runtime_lookup.insert(service_id, artifact.runtime_id);
     }
 
-    // TODO think about runtime environment traits. [ECR-3222]
-
-    pub fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    pub fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
         self.runtimes
             .get_mut(&artifact.runtime_id)
             .ok_or(DeployError::WrongRuntime)
@@ -84,7 +93,7 @@ impl Dispatcher {
 
     pub fn check_deploy_status(
         &self,
-        artifact: ArtifactSpec,
+        artifact: &ArtifactSpec,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         self.runtimes
@@ -95,27 +104,24 @@ impl Dispatcher {
 
     pub fn start_service(
         &mut self,
-        ctx: &mut RuntimeContext,
-        artifact: ArtifactSpec,
+        context: &mut RuntimeContext,
+        spec: ServiceInstanceSpec,
         constructor: &ServiceConstructor,
     ) -> Result<(), StartError> {
-        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            let result = runtime.start_service(ctx, artifact.clone(), &constructor);
-            if result.is_ok() {
-                self.notify_service_started(constructor.instance_id, artifact);
-            }
-
-            let _ = self
-                .inner_requests_tx
-                .clone()
-                .send(InternalRequest::RestartApi)
-                .wait()
-                .map_err(|e| error!("Failed to request API restart: {}", e));
-
-            result
-        } else {
-            Err(StartError::WrongRuntime)
-        }
+        // Tries to start and configure service instance.
+        self.runtimes
+            .get_mut(&spec.artifact.runtime_id)
+            .ok_or(StartError::WrongRuntime)
+            .and_then(|runtime| {
+                runtime.start_service(&spec)?;
+                // Tries to configure a started instance of the service, otherwise it stops.
+                runtime
+                    .configure_service(context, &spec, constructor)
+                    .or_else(|_| runtime.stop_service(&spec))?; // TODO Should we emit panic if revert failed? [ECR-3222]
+                Ok(())
+            })?;
+        self.notify_service_started(spec.id, spec.artifact);
+        Ok(())
     }
 
     pub fn execute(
@@ -196,6 +202,16 @@ pub struct BuiltinService {
     pub instance_name: String,
 }
 
+impl BuiltinService {
+    pub fn instance_spec(&self) -> ServiceInstanceSpec {
+        ServiceInstanceSpec {
+            artifact: self.factory.artifact().into(),
+            id: self.instance_id,
+            name: self.instance_name.clone(),
+        }
+    }
+}
+
 impl DispatcherBuilder {
     pub fn new(requests: mpsc::Sender<InternalRequest>) -> Self {
         Self {
@@ -209,14 +225,30 @@ impl DispatcherBuilder {
     pub fn with_builtin_service(mut self, service: impl Into<BuiltinService>) -> Self {
         let service = service.into();
         // Registers service instance in runtime.
-        let artifact = self.builtin_runtime.add_builtin_service(
-            service.factory,
-            service.instance_id,
-            service.instance_name,
-        );
+        let spec = service.instance_spec();
+        // Deploys builtin service artifact.
+        self.builtin_runtime.add_service_factory(service.factory);
+        self.builtin_runtime
+            .begin_deploy(&spec.artifact)
+            .and_then(|_| {
+                let status = self
+                    .builtin_runtime
+                    .check_deploy_status(&spec.artifact, false)?;
+                assert_eq!(
+                    status,
+                    DeployStatus::Deployed,
+                    "Builtin services must be deployed instantly."
+                );
+                Ok(())
+            })
+            .expect("Unable to deploy builtin service");
+        // Starts builtin service instance.
+        self.builtin_runtime
+            .start_service(&spec)
+            .expect("Unable to start builtin service instance");
         // Registers service instance in dispatcher.
         self.dispatcher
-            .notify_service_started(service.instance_id, artifact);
+            .notify_service_started(service.instance_id, spec.artifact);
         self
     }
 
@@ -261,7 +293,7 @@ pub enum Action {
         artifact: ArtifactSpec,
     },
     StartService {
-        artifact: ArtifactSpec,
+        spec: ServiceInstanceSpec,
         constructor: ServiceConstructor,
     },
 }
@@ -274,15 +306,14 @@ impl Action {
     ) -> Result<(), ExecutionError> {
         match self {
             Action::BeginDeploy { artifact } => {
-                dispatcher.begin_deploy(artifact).map_err(From::from)
+                dispatcher.begin_deploy(&artifact).map_err(From::from)
             }
 
-            Action::StartService {
-                artifact,
-                constructor,
-            } => dispatcher
-                .start_service(context, artifact, &constructor)
-                .map_err(From::from),
+            Action::StartService { spec, constructor } => {
+                dispatcher.start_service(context, spec, &constructor)?;
+                dispatcher.restart_api();
+                Ok(())
+            }
         }
     }
 }
@@ -328,7 +359,7 @@ mod tests {
     }
 
     impl Runtime for SampleRuntime {
-        fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
@@ -338,7 +369,7 @@ mod tests {
 
         fn check_deploy_status(
             &self,
-            artifact: ArtifactSpec,
+            artifact: &ArtifactSpec,
             _: bool,
         ) -> Result<DeployStatus, DeployError> {
             if artifact.runtime_id == self.runtime_type {
@@ -348,13 +379,29 @@ mod tests {
             }
         }
 
-        fn start_service(
-            &mut self,
-            _: &mut RuntimeContext,
-            artifact: ArtifactSpec,
-            _: &ServiceConstructor,
+        fn start_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+            if spec.artifact.runtime_id == self.runtime_type {
+                Ok(())
+            } else {
+                Err(StartError::WrongRuntime)
+            }
+        }
+
+        fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+            if spec.artifact.runtime_id == self.runtime_type {
+                Ok(())
+            } else {
+                Err(StartError::WrongRuntime)
+            }
+        }
+
+        fn configure_service(
+            &self,
+            _context: &mut RuntimeContext,
+            spec: &ServiceInstanceSpec,
+            _parameters: &ServiceConstructor,
         ) -> Result<(), StartError> {
-            if artifact.runtime_id == self.runtime_type {
+            if spec.artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
                 Err(StartError::WrongRuntime)
@@ -413,6 +460,8 @@ mod tests {
     fn test_dispatcher() {
         const RUST_SERVICE_ID: ServiceInstanceId = 0;
         const JAVA_SERVICE_ID: ServiceInstanceId = 1;
+        const RUST_SERVICE_NAME: &str = "rust-service";
+        const JAVA_SERVICE_NAME: &str = "java-service";
         const RUST_METHOD_ID: MethodId = 0;
         const JAVA_METHOD_ID: MethodId = 1;
 
@@ -446,22 +495,22 @@ mod tests {
 
         // Check deploy.
         dispatcher
-            .begin_deploy(sample_rust_spec.clone())
+            .begin_deploy(&sample_rust_spec)
             .expect("start_deploy failed for rust");
         dispatcher
-            .begin_deploy(sample_java_spec.clone())
+            .begin_deploy(&sample_java_spec)
             .expect("start_deploy failed for java");
 
         // Check deploy status
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone(), false)
+                .check_deploy_status(&sample_rust_spec, false)
                 .unwrap(),
             DeployStatus::Deployed
         );
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_java_spec.clone(), false)
+                .check_deploy_status(&sample_java_spec, false)
                 .unwrap(),
             DeployStatus::Deployed
         );
@@ -470,20 +519,28 @@ mod tests {
         let mut fork = db.fork();
         let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
 
-        let rust_init_data = ServiceConstructor {
-            instance_id: RUST_SERVICE_ID,
-            data: Default::default(),
-        };
         dispatcher
-            .start_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
+            .start_service(
+                &mut context,
+                ServiceInstanceSpec {
+                    artifact: sample_rust_spec.clone(),
+                    id: RUST_SERVICE_ID,
+                    name: RUST_SERVICE_NAME.into(),
+                },
+                &ServiceConstructor::default(),
+            )
             .expect("init_service failed for rust");
 
-        let java_init_data = ServiceConstructor {
-            instance_id: JAVA_SERVICE_ID,
-            data: Default::default(),
-        };
         dispatcher
-            .start_service(&mut context, sample_java_spec.clone(), &java_init_data)
+            .start_service(
+                &mut context,
+                ServiceInstanceSpec {
+                    artifact: sample_java_spec.clone(),
+                    id: JAVA_SERVICE_ID,
+                    name: JAVA_SERVICE_NAME.into(),
+                },
+                &ServiceConstructor::default(),
+            )
             .expect("init_service failed for java");
 
         // Check if we can execute transactions.
@@ -525,6 +582,7 @@ mod tests {
     #[test]
     fn test_dispatcher_rust_runtime_no_service() {
         const RUST_SERVICE_ID: ServiceInstanceId = 0;
+        const RUST_SERVICE_NAME: &str = "rust-service";
         const RUST_METHOD_ID: MethodId = 0;
 
         // Create dispatcher and test data.
@@ -540,29 +598,33 @@ mod tests {
         // Check deploy.
         assert_eq!(
             dispatcher
-                .begin_deploy(sample_rust_spec.clone())
+                .begin_deploy(&sample_rust_spec)
                 .expect_err("start_deploy succeed"),
             DeployError::WrongArtifact
         );
 
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone(), false)
+                .check_deploy_status(&sample_rust_spec, false)
                 .expect_err("check_deploy_status succeed"),
             DeployError::WrongArtifact
         );
 
-        // Check if we can init services.
+        // Checks if we can start services.
         let mut fork = db.fork();
         let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
 
-        let rust_init_data = ServiceConstructor {
-            instance_id: RUST_SERVICE_ID,
-            data: Default::default(),
-        };
         assert_eq!(
             dispatcher
-                .start_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
+                .start_service(
+                    &mut context,
+                    ServiceInstanceSpec {
+                        artifact: sample_rust_spec.clone(),
+                        id: RUST_SERVICE_ID,
+                        name: RUST_SERVICE_NAME.into()
+                    },
+                    &ServiceConstructor::default()
+                )
                 .expect_err("init_service succeed"),
             StartError::WrongArtifact
         );

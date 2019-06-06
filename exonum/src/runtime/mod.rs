@@ -41,18 +41,16 @@ pub enum DeployStatus {
     Deployed,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ServiceConstructor {
-    pub instance_id: ServiceInstanceId,
     pub data: Any,
 }
 
 impl ServiceConstructor {
-    pub fn new(instance_id: ServiceInstanceId, data: impl BinaryValue) -> Self {
+    pub fn new(data: impl BinaryValue) -> Self {
         let bytes = data.into_bytes();
 
         Self {
-            instance_id,
             data: {
                 let mut data = Any::new();
                 data.set_value(bytes);
@@ -60,6 +58,13 @@ impl ServiceConstructor {
             },
         }
     }
+}
+
+#[derive(Debug)]
+pub struct ServiceInstanceSpec {
+    pub id: ServiceInstanceId,
+    pub name: String,
+    pub artifact: ArtifactSpec,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -90,22 +95,28 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
     /// Begins deploy artifact with the given specification.
-    fn begin_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError>;
 
     /// Checks deployment status.
     fn check_deploy_status(
         &self,
-        artifact: ArtifactSpec,
+        artifact: &ArtifactSpec,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError>;
 
-    /// Starts a new service instance with the given specification and constructor parameters.
-    fn start_service(
-        &mut self,
+    /// Starts a new service instance with the given specification.
+    fn start_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError>;
+
+    /// Configures a service instance with the given parameters.
+    fn configure_service(
+        &self,
         context: &mut RuntimeContext,
-        artifact: ArtifactSpec,
-        constructor: &ServiceConstructor,
+        spec: &ServiceInstanceSpec,
+        parameters: &ServiceConstructor,
     ) -> Result<(), StartError>;
+
+    /// Stops existing service instance with the given specification.
+    fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError>;
 
     /// Execute transaction.
     fn execute(

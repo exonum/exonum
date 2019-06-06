@@ -206,7 +206,7 @@ fn create_blockchain_with_service(
 }
 
 #[test]
-fn handling_tx_panic() {
+fn handling_tx_panic_error() {
     let mut blockchain = create_blockchain();
 
     let (pk, sec_key) = gen_keypair();
