@@ -25,7 +25,7 @@ use super::{
     new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
     ConfigurationTestKit,
 };
-use exonum::runtime::configuration::{
+use exonum::runtime::configuration_new::{
     api::{
         ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
         VoteResponse, VotesInfo,

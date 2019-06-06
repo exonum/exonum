@@ -157,7 +157,7 @@ extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
-    builder::{ServiceInstancesBuilder, TestKitBuilder},
+    builder::{ServiceInstances, TestKitBuilder},
     compare::ComparableSnapshot,
     network::{TestNetwork, TestNetworkConfiguration, TestNode},
     server::TestKitStatus,
@@ -235,7 +235,7 @@ impl TestKit {
         constructor: impl BinaryValue,
     ) -> Self {
         TestKitBuilder::validator()
-            .with_service(ServiceInstancesBuilder::new(service_factory).with_instance(
+            .with_service(ServiceInstances::new(service_factory).with_instance(
                 name,
                 id,
                 constructor,

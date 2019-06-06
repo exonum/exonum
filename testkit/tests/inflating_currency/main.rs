@@ -26,9 +26,7 @@ use exonum::{
     messages::{AnyTx, BinaryValue, Signed},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{
-    txvec, ApiKind, ServiceInstancesBuilder, TestKit, TestKitApi, TestKitBuilder,
-};
+use exonum_testkit::{txvec, ApiKind, ServiceInstances, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 use serde_json::json;
 
@@ -42,7 +40,7 @@ mod proto;
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ServiceInstancesBuilder::new(CurrencyService).with_instance(
+        .with_service(ServiceInstances::new(CurrencyService).with_instance(
             SERVICE_NAME,
             SERVICE_ID,
             (),

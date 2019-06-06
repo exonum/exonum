@@ -174,7 +174,8 @@ impl TestKitBuilder {
     }
 
     /// Adds a rust service to the testkit.
-    pub fn with_service(mut self, service: ServiceInstancesBuilder) -> Self {
+    pub fn with_service(mut self, service: impl Into<ServiceInstances>) -> Self {
+        let service = service.into();
         self.service_factories.push(service.factory);
         self.service_instances.extend(service.instances);
         self
@@ -218,12 +219,12 @@ impl TestKitBuilder {
     }
 }
 
-pub struct ServiceInstancesBuilder {
+pub struct ServiceInstances {
     factory: Box<dyn ServiceFactory>,
     instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
 }
 
-impl ServiceInstancesBuilder {
+impl ServiceInstances {
     pub fn new(factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
         Self {
             factory: factory.into(),
@@ -246,5 +247,14 @@ impl ServiceInstancesBuilder {
         let constructor = ServiceConstructor::new(params);
         self.instances.push((spec, constructor));
         self
+    }
+}
+
+impl<F> From<F> for ServiceInstances
+where
+    F: Fn() -> ServiceInstances,
+{
+    fn from(f: F) -> Self {
+        f()
     }
 }
