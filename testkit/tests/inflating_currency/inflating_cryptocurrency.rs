@@ -11,26 +11,29 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::borrow::Cow;
-
-use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
 
 use exonum::{
     api,
-    blockchain::{
-        ExecutionError, ExecutionResult, Schema as CoreSchema, Service, Transaction,
-        TransactionContext, TransactionSet,
-    },
-    crypto::{Hash, PublicKey, SecretKey},
+    blockchain::{ExecutionError, ExecutionResult, Schema as CoreSchema},
+    crypto::{PublicKey, SecretKey},
     helpers::Height,
+    impl_service_dispatcher,
     messages::{AnyTx, Message, Signed},
+    runtime::{
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        ServiceInstanceId,
+    },
 };
+use exonum_derive::{service_interface, ProtobufConvert};
+use exonum_merkledb::{IndexAccess, MapIndex};
+use serde_derive::{Deserialize, Serialize};
 
 use super::proto;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
-const SERVICE_ID: u16 = 1;
+pub const SERVICE_ID: ServiceInstanceId = 1;
+pub const SERVICE_NAME: &str = "cryptocurrency";
 
 /// Initial balance of newly created wallet.
 pub const INIT_BALANCE: u64 = 0;
@@ -113,12 +116,6 @@ pub struct TxTransfer {
     seed: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub(in crate::inflating_cryptocurrency) enum CurrencyTransactions {
-    TxCreateWallet(TxCreateWallet),
-    TxTransfer(TxTransfer),
-}
-
 impl TxCreateWallet {
     #[doc(hidden)]
     pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
@@ -148,42 +145,46 @@ impl TxTransfer {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
-impl Transaction for TxCreateWallet {
+#[service_interface]
+pub(in crate::inflating_cryptocurrency) trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
-        let author = tc.author();
-        let view = tc.fork();
+    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
+    /// Retrieve two wallets to apply the transfer. Check the sender's
+    /// balance and apply changes to the balances of the wallets.
+    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> ExecutionResult;
+}
+
+impl CurrencyInterface for CurrencyService {
+    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> ExecutionResult {
+        let author = context.author();
+        let view = context.fork();
         let height = CoreSchema::new(view).height();
         let schema = CurrencySchema { view };
         if schema.wallet(&author).is_none() {
-            let wallet = Wallet::new(&author, &self.name, INIT_BALANCE, height.0);
+            let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE, height.0);
             schema.wallets().put(&author, wallet);
         }
         Ok(())
     }
-}
 
-impl Transaction for TxTransfer {
-    /// Retrieve two wallets to apply the transfer. Check the sender's
-    /// balance and apply changes to the balances of the wallets.
-    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
-        let author = tc.author();
-        if author == self.to {
+    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
+        let author = context.author();
+        if author == arg.to {
             Err(ExecutionError::new(0))?
         }
-        let view = tc.fork();
+        let view = context.fork();
         let height = CoreSchema::new(view).height();
         let schema = CurrencySchema { view };
         let sender = schema.wallet(&author);
-        let receiver = schema.wallet(&self.to);
+        let receiver = schema.wallet(&arg.to);
         if let (Some(sender), Some(receiver)) = (sender, receiver) {
-            let amount = self.amount;
+            let amount = arg.amount;
             if sender.actual_balance(height) >= amount {
                 let sender = sender.decrease(amount, height);
                 let receiver = receiver.increase(amount, height);
                 let mut wallets = schema.wallets();
                 wallets.put(&author, sender);
-                wallets.put(&self.to, receiver);
+                wallets.put(&arg.to, receiver);
             }
         }
         Ok(())
@@ -222,29 +223,24 @@ impl CryptocurrencyApi {
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 /// Define the service.
+#[derive(Debug)]
 pub struct CurrencyService;
+
+impl_service_dispatcher!(CurrencyService, CurrencyInterface);
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn service_name(&self) -> &str {
-        "cryptocurrency"
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
-
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
-    /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = CurrencyTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
-    }
-
     fn wire_api(&self, builder: &mut api::ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
+    }
+}
+
+impl ServiceFactory for CurrencyService {
+    fn artifact(&self) -> RustArtifactSpec {
+        "cryptocurrency/1.0.0".parse().unwrap()
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
     }
 }

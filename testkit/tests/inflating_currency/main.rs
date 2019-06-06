@@ -17,26 +17,24 @@
 //! on each block. Correspondingly, the initial wallet balance is set to 0.
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate exonum_testkit;
-#[macro_use]
 extern crate pretty_assertions;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate serde_json;
 
 use exonum::{
     api::node::public::explorer::TransactionResponse,
-    crypto::{self, CryptoHash, PublicKey, SecretKey},
+    crypto::{self, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, BinaryForm, Signed},
+    messages::{AnyTx, BinaryValue, Signed},
 };
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_merkledb::ObjectHash;
+use exonum_testkit::{
+    txvec, ApiKind, ServiceInstancesBuilder, TestKit, TestKitApi, TestKitBuilder,
+};
 use rand::Rng;
+use serde_json::json;
 
-use crate::inflating_cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer};
+use crate::inflating_cryptocurrency::{
+    CurrencyService, TxCreateWallet, TxTransfer, SERVICE_ID, SERVICE_NAME,
+};
 
 mod inflating_cryptocurrency;
 mod proto;
@@ -44,7 +42,11 @@ mod proto;
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(CurrencyService)
+        .with_service(ServiceInstancesBuilder::new(CurrencyService).with_instance(
+            SERVICE_NAME,
+            SERVICE_ID,
+            (),
+        ))
         .create()
 }
 
@@ -53,13 +55,13 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (Signed<AnyTx>, SecretKey) {
     // Create a pre-signed transaction
     let tx = TxCreateWallet::sign(name, &pubkey, &key);
 
-    let data = hex::encode(tx.encode().unwrap());
+    let data = hex::encode(tx.to_bytes());
     let tx_info: TransactionResponse = api
         .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post("v1/transactions")
         .unwrap();
-    assert_eq!(tx_info.tx_hash, tx.hash());
+    assert_eq!(tx_info.tx_hash, tx.object_hash());
 
     (tx, key)
 }
