@@ -12,22 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
-// ECR-1771 for the details.
-#![allow(bare_trait_objects)]
-
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{Fork, Snapshot};
-
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext},
+    blockchain::{ExecutionError, ExecutionResult, Schema},
     crypto::{PublicKey, SecretKey},
     messages::{AnyTx, Message, Signed},
+    runtime::ServiceInstanceId,
 };
+use exonum_merkledb::{Fork, Snapshot};
 
 use crate::schema::TimeSchema;
 
-use super::{proto, SERVICE_ID};
+use super::proto;
 
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]
@@ -64,21 +60,15 @@ impl TxTime {
     }
 }
 
-/// Define TimeService transaction.
-#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
-pub enum TimeTransactions {
-    /// TxTime transaction.
-    TxTime(TxTime),
-}
-
 impl TxTime {
     #[doc(hidden)]
-    pub fn sign(
+    pub fn new_signed(
+        instance_id: ServiceInstanceId,
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<AnyTx> {
-        Message::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
+        Message::sign_transaction(TxTime::new(time), instance_id, *public_key, secret_key)
     }
 
     pub(crate) fn check_signed_by_validator(
@@ -146,16 +136,5 @@ impl TxTime {
                 time.set(validator_times[max_byzantine_nodes]);
             }
         }
-    }
-}
-
-impl Transaction for TxTime {
-    fn execute(&self, context: TransactionContext) -> ExecutionResult {
-        let author = context.author();
-        let view = context.fork();
-        self.check_signed_by_validator(view.as_ref(), &author)?;
-        self.update_validator_time(view, &author)?;
-        Self::update_consolidated_time(view);
-        Ok(())
     }
 }

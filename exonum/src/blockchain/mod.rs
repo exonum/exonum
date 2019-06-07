@@ -55,7 +55,7 @@ use futures::sync::mpsc;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, iter, mem, panic,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use crate::{
@@ -142,6 +142,12 @@ impl Blockchain {
             api_sender,
             ..self.clone()
         }
+    }
+
+    /// Returns reference to the underlying runtime dispatcher.
+    #[doc(hidden)]
+    pub fn dispatcher(&self) -> MutexGuard<Dispatcher> {
+        self.dispatcher.lock().unwrap()
     }
 
     /// Creates a read-only snapshot of the current storage state.

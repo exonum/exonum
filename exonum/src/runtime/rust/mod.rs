@@ -22,6 +22,7 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     fmt, panic,
+    str::FromStr,
 };
 
 use crate::{
@@ -140,6 +141,24 @@ impl fmt::Display for RustArtifactSpec {
     }
 }
 
+impl FromStr for RustArtifactSpec {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let split = s.split('/').take(2).collect::<Vec<_>>();
+        match &split[..] {
+            [name, version] => {
+                let version = Version::parse(version)?;
+                Ok(Self {
+                    name: name.to_string(),
+                    version,
+                })
+            },
+            _ => Err(failure::format_err!("Wrong artifact spec format, in should be in form \"artifact_name/artifact_version\""))
+        }
+    }
+}
+
 impl Runtime for RustRuntime {
     fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
@@ -229,6 +248,7 @@ impl Runtime for RustRuntime {
             .initialize(
                 TransactionContext {
                     service_id: spec.id,
+                    service_name: &spec.name,
                     runtime_context: context,
                     runtime: self,
                 },
@@ -260,6 +280,7 @@ impl Runtime for RustRuntime {
 
         let context = TransactionContext {
             service_id: call_info.instance_id,
+            service_name: &service_instance.name,
             runtime_context: context,
             runtime: self,
         };
@@ -324,15 +345,20 @@ impl Runtime for RustRuntime {
 }
 
 #[derive(Debug)]
-pub struct TransactionContext<'a, 'b> {
+pub struct TransactionContext<'a, 'b, 'c> {
     service_id: ServiceInstanceId,
+    service_name: &'c str,
     runtime_context: &'a mut RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
-impl<'a, 'b> TransactionContext<'a, 'b> {
+impl<'a, 'b, 'c> TransactionContext<'a, 'b, 'c> {
     pub fn service_id(&self) -> ServiceInstanceId {
         self.service_id
+    }
+
+    pub fn service_name(&self) -> &str {
+        self.service_name
     }
 
     pub fn fork(&self) -> &Fork {
@@ -361,4 +387,9 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
         self.runtime_context.dispatch_action(action)
     }
+}
+
+#[test]
+fn parse_artifact_spec_correct() {
+    RustArtifactSpec::from_str("my-service/1.0.0").unwrap();
 }

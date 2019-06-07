@@ -50,10 +50,10 @@ pub struct TransactionResult(pub Result<(), TransactionError>);
 pub struct TransactionMessage {
     #[serde(skip_deserializing)]
     #[serde(rename = "debug")]
-    transaction: Option<Box<dyn Transaction>>,
+    pub(crate) transaction: Option<Box<dyn Transaction>>,
 
     #[serde(with = "HexStringRepresentation")]
-    message: Signed<AnyTx>,
+    pub(crate) message: Signed<AnyTx>,
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {

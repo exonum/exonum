@@ -14,24 +14,16 @@
 
 //! Timestamping transactions.
 
-// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
-// ECR-1771 for the details.
-#![allow(bare_trait_objects)]
-
-use std::borrow::Cow;
-
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
     messages::{AnyTx, Message, Signed},
+    runtime::ServiceInstanceId,
 };
 use exonum_time::schema::TimeSchema;
 
 use super::proto;
-use crate::{
-    schema::{Schema, Timestamp, TimestampEntry},
-    TIMESTAMPING_SERVICE,
-};
+use crate::schema::{Schema, Timestamp, TimestampEntry};
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -57,17 +49,15 @@ pub struct TxTimestamp {
     pub content: Timestamp,
 }
 
-/// Transaction group.
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub enum TimeTransactions {
-    /// A timestamp transaction.
-    TxTimestamp(TxTimestamp),
-}
-
 impl TxTimestamp {
     #[doc(hidden)]
-    pub fn sign(author: &PublicKey, content: Timestamp, key: &SecretKey) -> Signed<AnyTx> {
-        Message::sign_transaction(Self { content }, TIMESTAMPING_SERVICE, *author, key)
+    pub fn new_signed(
+        instance_id: ServiceInstanceId,
+        author: &PublicKey,
+        content: Timestamp,
+        key: &SecretKey,
+    ) -> Signed<AnyTx> {
+        Message::sign_transaction(Self { content }, instance_id, *author, key)
     }
 }
 

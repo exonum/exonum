@@ -139,12 +139,8 @@
 //! }
 //! ```
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
+#![warn(missing_debug_implementations, missing_docs)]
+#![deny(unsafe_code, bare_trait_objects)]
 
 #[cfg_attr(test, macro_use)]
 #[cfg(test)]
@@ -161,6 +157,7 @@ extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
+    builder::{ServiceInstances, TestKitBuilder},
     compare::ComparableSnapshot,
     network::{TestNetwork, TestNetworkConfiguration, TestNode},
     server::TestKitStatus,
@@ -179,8 +176,12 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
+    runtime::{
+        rust::ServiceFactory, RuntimeContext, ServiceConstructor, ServiceInstanceId,
+        ServiceInstanceSpec,
+    },
 };
-use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -197,195 +198,11 @@ use crate::{
 #[macro_use]
 mod macros;
 mod api;
+mod builder;
 mod checkpoint_db;
 mod network;
 mod poll_events;
 mod server;
-
-/// Builder for `TestKit`.
-///
-/// # Testkit server
-///
-/// By calling the [`serve`] method, you can transform testkit into a web server useful for
-/// client-side testing. The testkit-specific APIs are exposed on the private address
-/// with the `/api/testkit` prefix (hereinafter denoted as `{baseURL}`).
-/// In all APIs, the request body (if applicable) and response are JSON-encoded.
-///
-/// ## Testkit status
-///
-/// GET `{baseURL}/v1/status`
-///
-/// Outputs the status of the testkit, which includes:
-///
-/// - Current blockchain height
-/// - Current [test network configuration][cfg]
-/// - Next network configuration if it is scheduled with [`commit_configuration_change`].
-///
-/// ## Create block
-///
-/// POST `{baseURL}/v1/blocks/create`
-///
-/// Creates a new block in the testkit blockchain. If the
-/// JSON body of the request is an empty object, the call is functionally equivalent
-/// to [`create_block`]. Otherwise, if the body has the `tx_hashes` field specifying an array
-/// of transaction hashes, the call is equivalent to [`create_block_with_tx_hashes`] supplied
-/// with these hashes.
-///
-/// Returns the latest block from the blockchain on success.
-///
-/// ## Roll back
-///
-/// POST `{baseURL}/v1/blocks/rollback`
-///
-/// Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
-/// at the specified in JSON body `height` value (a positive integer), so that after the request
-/// the blockchain height is equal to `height - 1`. If the specified height is greater than the
-/// blockchain height, the request performs no action.
-///
-/// Returns the latest block from the blockchain on success.
-///
-/// [`serve`]: #method.serve
-/// [cfg]: struct.TestNetworkConfiguration.html
-/// [`create_block`]: struct.TestKit.html#method.create_block
-/// [`create_block_with_tx_hashes`]: struct.TestKit.html#method.create_block_with_tx_hashes
-/// [`commit_configuration_change`]: struct.TestKit.html#method.commit_configuration_change
-/// [`rollback`]: struct.TestKit.html#method.rollback
-///
-/// # Example
-///
-/// ```
-/// # extern crate exonum;
-/// # extern crate exonum_testkit;
-/// # extern crate failure;
-/// # use exonum::blockchain::{Service, Transaction};
-/// # use exonum::messages::AnyTx;
-/// # use exonum_testkit::TestKitBuilder;
-/// # pub struct MyService;
-/// # impl Service for MyService {
-/// #    fn service_name(&self) -> &str {
-/// #        "documentation"
-/// #    }
-/// #    fn state_hash(&self, _: &exonum_merkledb::Snapshot) -> Vec<exonum::crypto::Hash> {
-/// #        Vec::new()
-/// #    }
-/// #    fn service_id(&self) -> u16 {
-/// #        0
-/// #    }
-/// #    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
-/// #        unimplemented!();
-/// #    }
-/// # }
-/// # fn main() {
-/// let mut testkit = TestKitBuilder::validator()
-///     .with_service(MyService)
-///     .with_validators(4)
-///     .create();
-/// testkit.create_block();
-/// // Other test code
-/// # }
-/// ```
-pub struct TestKitBuilder {
-    our_validator_id: Option<ValidatorId>,
-    validator_count: Option<u16>,
-    services: Vec<Box<dyn Service>>,
-    logger: bool,
-}
-
-impl fmt::Debug for TestKitBuilder {
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::redundant_closure))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        f.debug_struct("TestKitBuilder")
-            .field(
-                "us",
-                &self
-                    .our_validator_id
-                    .map_or("Auditor".to_string(), |id| format!("Validator #{}", id.0)),
-            )
-            .field("validator_count", &self.validator_count)
-            .field(
-                "services",
-                &self
-                    .services
-                    .iter()
-                    .map(|service| service.service_name())
-                    .collect::<Vec<_>>(),
-            )
-            .field("logger", &self.logger)
-            .finish()
-    }
-}
-
-impl TestKitBuilder {
-    /// Creates testkit for the validator node.
-    pub fn validator() -> Self {
-        TestKitBuilder {
-            validator_count: None,
-            our_validator_id: Some(ValidatorId(0)),
-            services: Vec::new(),
-            logger: false,
-        }
-    }
-
-    /// Creates testkit for the auditor node.
-    pub fn auditor() -> Self {
-        TestKitBuilder {
-            validator_count: None,
-            our_validator_id: None,
-            services: Vec::new(),
-            logger: false,
-        }
-    }
-
-    /// Sets the number of validator nodes in the test network.
-    pub fn with_validators(mut self, validator_count: u16) -> Self {
-        assert!(
-            self.validator_count.is_none(),
-            "Number of validators is already specified"
-        );
-        self.validator_count = Some(validator_count);
-        self
-    }
-
-    /// Adds a service to the testkit.
-    pub fn with_service<S>(mut self, service: S) -> Self
-    where
-        S: Into<Box<dyn Service>>,
-    {
-        self.services.push(service.into());
-        self
-    }
-
-    /// Enables a logger inside the testkit.
-    pub fn with_logger(mut self) -> Self {
-        self.logger = true;
-        self
-    }
-
-    /// Creates the testkit.
-    pub fn create(self) -> TestKit {
-        if self.logger {
-            exonum::helpers::init_logger().ok();
-        }
-        crypto::init();
-
-        let network =
-            TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1));
-        let genesis = network.genesis_config();
-        TestKit::assemble(TemporaryDB::new(), self.services, network, genesis)
-    }
-
-    /// Starts a testkit web server, which listens to public and private APIs exposed by
-    /// the testkit, on the respective addresses. The private address also exposes the testkit
-    /// APIs with the `/api/testkit` URL prefix.
-    ///
-    /// Unlike real Exonum nodes, the testkit web server does not create peer-to-peer connections
-    /// with other nodes, and does not create blocks automatically. The only way to commit
-    /// transactions is thus to use the [testkit API](#testkit-server).
-    pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let testkit = self.create();
-        testkit.run(public_api_address, private_api_address);
-    }
-}
 
 /// Testkit for testing blockchain services. It offers simple network configuration emulation
 /// (with no real network setup).
@@ -411,73 +228,105 @@ impl fmt::Debug for TestKit {
 
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given service.
-    pub fn for_service<S>(service: S) -> Self
-    where
-        S: Into<Box<dyn Service>>,
-    {
-        TestKitBuilder::validator().with_service(service).create()
+    pub fn for_service(
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+        name: impl Into<String>,
+        id: ServiceInstanceId,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        TestKitBuilder::validator()
+            .with_service(ServiceInstances::new(service_factory).with_instance(
+                name,
+                id,
+                constructor,
+            ))
+            .create()
     }
 
     fn assemble(
         database: TemporaryDB,
-        services: Vec<Box<dyn Service>>,
+        service_factories: Vec<Box<dyn ServiceFactory>>,
+        service_instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
         network: TestNetwork,
         genesis: GenesisConfig,
     ) -> Self {
-        // TODO rework testkit
-        unimplemented!();
+        let api_channel = mpsc::unbounded();
+        let api_sender = ApiSender::new(api_channel.0.clone());
 
-        // let api_channel = mpsc::channel(1_000);
-        // let api_sender = ApiSender::new(api_channel.0.clone());
+        let db = CheckpointDb::new(database);
+        let db_handler = db.handler();
 
-        // let db = CheckpointDb::new(database);
-        // let db_handler = db.handler();
+        let mut blockchain = Blockchain::new(
+            db,
+            service_factories,
+            *network.us().service_keypair().0,
+            network.us().service_keypair().1.clone(),
+            api_sender.clone(),
+            mpsc::channel(0).0,
+        );
 
-        // let mut blockchain = Blockchain::new(
-        //     db,
-        //     services,
-        //     *network.us().service_keypair().0,
-        //     network.us().service_keypair().1.clone(),
-        //     api_sender.clone(),
-        // );
+        blockchain.initialize(genesis).unwrap();
+        Self::start_services(&mut blockchain, service_instances);
 
-        // blockchain.initialize(genesis).unwrap();
-        // let processing_lock = Arc::new(Mutex::new(()));
-        // let processing_lock_ = Arc::clone(&processing_lock);
+        let processing_lock = Arc::new(Mutex::new(()));
+        let processing_lock_ = Arc::clone(&processing_lock);
 
-        // let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
-        //     let mut blockchain = blockchain.clone();
-        //     Box::new(api_channel.1.and_then(move |event| {
-        //         let guard = processing_lock_.lock().unwrap();
-        //         let fork = blockchain.fork();
-        //         let mut schema = CoreSchema::new(&fork);
-        //         match event {
-        //             ExternalMessage::Transaction(tx) => {
-        //                 let hash = tx.hash();
-        //                 if !schema.transactions().contains(&hash) {
-        //                     schema.add_transaction_into_pool(tx.clone());
-        //                 }
-        //             }
-        //             ExternalMessage::PeerAdd(_)
-        //             | ExternalMessage::Enable(_)
-        //             | ExternalMessage::Rebroadcast
-        //             | ExternalMessage::Shutdown => { /* Ignored */ }
-        //         }
-        //         blockchain.merge(fork.into_patch()).unwrap();
-        //         drop(guard);
-        //         Ok(())
-        //     }))
-        // };
+        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
+            let mut blockchain = blockchain.clone();
+            Box::new(api_channel.1.and_then(move |event| {
+                let guard = processing_lock_.lock().unwrap();
+                let fork = blockchain.fork();
+                let mut schema = CoreSchema::new(&fork);
+                match event {
+                    ExternalMessage::Transaction(tx) => {
+                        let hash = tx.object_hash();
+                        if !schema.transactions().contains(&hash) {
+                            schema.add_transaction_into_pool(tx.clone());
+                        }
+                    }
+                    ExternalMessage::PeerAdd(_)
+                    | ExternalMessage::Enable(_)
+                    | ExternalMessage::Rebroadcast
+                    | ExternalMessage::Shutdown => { /* Ignored */ }
+                }
+                blockchain.merge(fork.into_patch()).unwrap();
+                drop(guard);
+                Ok(())
+            }))
+        };
 
-        // TestKit {
-        //     blockchain,
-        //     db_handler,
-        //     api_sender,
-        //     events_stream,
-        //     processing_lock,
-        //     network,
-        //     cfg_proposal: None,
-        // }
+        TestKit {
+            blockchain,
+            db_handler,
+            api_sender,
+            events_stream,
+            processing_lock,
+            network,
+            cfg_proposal: None,
+        }
+    }
+
+    /// Deploys and starts service instances.
+    fn start_services(
+        blockchain: &mut Blockchain,
+        service_instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
+    ) {
+        // TODO rewrite on top of supervisor service.
+        let fork = blockchain.fork();
+        for (spec, constructor) in service_instances {
+            let mut dispatcher = blockchain.dispatcher();
+            dispatcher
+                .begin_deploy(&spec.artifact)
+                .expect("Unable to deploy service artifact");
+            dispatcher
+                .start_service(
+                    &mut RuntimeContext::without_author(&fork),
+                    spec,
+                    &constructor,
+                )
+                .expect("Unable to start service instance");
+        }
+        blockchain.merge(fork.into_patch()).unwrap();
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -1135,19 +984,20 @@ impl StoppedTestKit {
     /// Note that `services` may differ from the vector of services initially passed to
     /// the `TestKit` (which is also what may happen with real Exonum apps).
     pub fn resume(self, services: Vec<Box<dyn Service>>) -> TestKit {
-        let genesis = {
-            let snapshot = self.db.snapshot();
-            let schema = CoreSchema::new(&snapshot);
-            GenesisConfig::new(
-                schema
-                    .configuration_by_height(Height(0))
-                    .validator_keys
-                    .into_iter(),
-            )
-        };
-        let mut testkit = TestKit::assemble(self.db, services, self.network, genesis);
-        testkit.cfg_proposal = self.cfg_proposal;
-        testkit
+        unimplemented!();
+        // let genesis = {
+        //     let snapshot = self.db.snapshot();
+        //     let schema = CoreSchema::new(&snapshot);
+        //     GenesisConfig::new(
+        //         schema
+        //             .configuration_by_height(Height(0))
+        //             .validator_keys
+        //             .into_iter(),
+        //     )
+        // };
+        // let mut testkit = TestKit::assemble(self.db, services, self.network, genesis);
+        // testkit.cfg_proposal = self.cfg_proposal;
+        // testkit
     }
 }
 

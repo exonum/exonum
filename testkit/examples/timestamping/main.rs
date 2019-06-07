@@ -19,24 +19,23 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use std::borrow::Cow;
-
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::{
-        ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
-    },
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
+    blockchain::{ExecutionResult, Schema},
+    crypto::{gen_keypair, PublicKey, SecretKey},
+    impl_service_dispatcher,
     messages::{AnyTx, Message, Signed},
+    runtime::{
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        ServiceInstanceId,
+    },
 };
-use exonum_merkledb::Snapshot;
-use exonum_testkit::{ApiKind, TestKitBuilder};
+use exonum_merkledb::ObjectHash;
+use exonum_testkit::{ApiKind, ServiceInstances, TestKitBuilder};
 
 mod proto;
 
 // Simple service implementation.
-
-const SERVICE_ID: u16 = 512;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::TxTimestamp")]
@@ -44,62 +43,67 @@ struct TxTimestamp {
     message: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-enum TimestampingServiceTransactions {
-    TxTimestamp(TxTimestamp),
-}
-
 impl TxTimestamp {
-    fn sign(author: &PublicKey, message: &str, key: &SecretKey) -> Signed<AnyTx> {
+    fn sign(
+        instance_id: ServiceInstanceId,
+        author: &PublicKey,
+        message: &str,
+        key: &SecretKey,
+    ) -> Signed<AnyTx> {
         Message::sign_transaction(
             Self {
                 message: message.to_owned(),
             },
-            SERVICE_ID,
+            instance_id,
             *author,
             key,
         )
     }
 }
 
+#[service_interface]
+trait TimestampingInterface {
+    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
+}
+
+#[derive(Debug)]
 struct TimestampingService;
 
-impl Transaction for TxTimestamp {
-    fn execute(&self, _context: TransactionContext) -> ExecutionResult {
+impl TimestampingInterface for TimestampingService {
+    fn timestamp(&self, _context: TransactionContext, _arg: TxTimestamp) -> ExecutionResult {
         Ok(())
     }
 }
 
-impl Service for TimestampingService {
-    fn service_name(&self) -> &str {
-        "timestamping"
-    }
+impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
+impl Service for TimestampingService {}
 
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
+impl ServiceFactory for TimestampingService {
+    fn artifact(&self) -> RustArtifactSpec {
+        "timestamping/1.0.0".parse().unwrap()
     }
-
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = TimestampingServiceTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
     }
 }
 
 fn main() {
+    let instance_id = 512;
     // Create testkit for network with four validators.
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(TimestampingService)
+        .with_service(ServiceInstances::new(TimestampingService).with_instance(
+            "timestamping",
+            instance_id,
+            (),
+        ))
         .create();
     // Create few transactions.
     let keypair = gen_keypair();
-    let tx1 = TxTimestamp::sign(&keypair.0, "Down To Earth", &keypair.1);
-    let tx2 = TxTimestamp::sign(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
-    let tx3 = TxTimestamp::sign(&keypair.0, "Dropping Like Flies", &keypair.1);
+    let tx1 = TxTimestamp::sign(instance_id, &keypair.0, "Down To Earth", &keypair.1);
+    let tx2 = TxTimestamp::sign(instance_id, &keypair.0, "Cry Over Spilt Milk", &keypair.1);
+    let tx3 = TxTimestamp::sign(instance_id, &keypair.0, "Dropping Like Flies", &keypair.1);
 
     // Commit them into blockchain.
     let block =
@@ -110,9 +114,9 @@ fn main() {
     // Check results with schema.
     let snapshot = testkit.snapshot();
     let schema = Schema::new(&snapshot);
-    assert!(schema.transactions().contains(&tx1.hash()));
-    assert!(schema.transactions().contains(&tx2.hash()));
-    assert!(schema.transactions().contains(&tx3.hash()));
+    assert!(schema.transactions().contains(&tx1.object_hash()));
+    assert!(schema.transactions().contains(&tx2.object_hash()));
+    assert!(schema.transactions().contains(&tx3.object_hash()));
 
     // Check results with api.
     let api = testkit.api();
@@ -127,7 +131,9 @@ fn main() {
     assert_eq!(blocks_range.blocks.len(), 2);
 
     api.public(ApiKind::Explorer)
-        .query(&TransactionQuery { hash: tx1.hash() })
+        .query(&TransactionQuery {
+            hash: tx1.object_hash(),
+        })
         .get::<serde_json::Value>("v1/transactions")
         .unwrap();
 }

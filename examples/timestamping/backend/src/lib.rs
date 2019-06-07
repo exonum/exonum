@@ -44,8 +44,9 @@ use exonum::{
     blockchain::ExecutionResult,
     crypto::Hash,
     helpers::fabric,
+    impl_service_dispatcher,
     runtime::rust::{
-        service::{GenesisInitInfo, Service, ServiceFactory},
+        service::{Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
     },
 };
@@ -58,7 +59,6 @@ use crate::{
 };
 
 const TIMESTAMPING_SERVICE: u16 = 130;
-const SERVICE_NAME: &str = "timestamping";
 
 #[service_interface]
 pub trait Timestamping {
@@ -104,24 +104,16 @@ impl Service for TimestampingServiceImpl {
     }
 }
 
-pub fn artifact_spec() -> RustArtifactSpec {
-    RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
-}
-
 #[derive(Debug)]
 pub struct ServiceFactoryImpl;
 
 impl ServiceFactory for ServiceFactoryImpl {
     fn artifact(&self) -> RustArtifactSpec {
-        artifact_spec()
+        RustArtifactSpec::new("timestamping", 0, 1, 0)
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(TimestampingServiceImpl)
-    }
-
-    fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
-        vec![]
     }
 }
 

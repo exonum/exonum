@@ -13,39 +13,45 @@
 // limitations under the License.
 
 //! Sample counter service.
-use std::borrow::Cow;
-
-use exonum_merkledb::{Entry, IndexAccess, Snapshot};
 
 use exonum::{
     api,
-    blockchain::{
-        ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
-    },
+    blockchain::{ExecutionError, ExecutionResult},
     crypto::{Hash, PublicKey, SecretKey},
+    impl_service_dispatcher,
     messages::{AnyTx, Message, Signed},
+    runtime::{
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        ServiceInstanceId,
+    },
 };
+use exonum_derive::{service_interface, ProtobufConvert};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash};
+use log::trace;
+use serde_derive::{Deserialize, Serialize};
 
 use super::proto;
 
-pub const SERVICE_ID: u16 = 1;
-
-// "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
+pub const SERVICE_NAME: &str = "counter";
+pub const SERVICE_ID: ServiceInstanceId = 2;
+/// "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 
-// // // // Schema // // // //
-
 pub struct CounterSchema<T> {
-    view: T,
+    access: T,
 }
 
-impl<T: IndexAccess> CounterSchema<T> {
-    pub fn new(view: T) -> Self {
-        CounterSchema { view }
+impl<'a, T: IndexAccess> CounterSchema<T> {
+    pub fn new(access: T) -> Self {
+        CounterSchema { access }
+    }
+
+    fn index_name(&self, name: &str) -> String {
+        [SERVICE_NAME, ".", name].concat()
     }
 
     fn entry(&self) -> Entry<T, u64> {
-        Entry::new("counter.count", self.view.clone())
+        Entry::new(self.index_name("count"), self.access.clone())
     }
 
     pub fn count(&self) -> Option<u64> {
@@ -79,12 +85,6 @@ pub struct TxIncrement {
     by: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub enum CounterTransactions {
-    Increment(TxIncrement),
-    Reset(TxReset),
-}
-
 impl TxIncrement {
     pub fn new(by: u64) -> Self {
         Self { by }
@@ -95,32 +95,37 @@ impl TxIncrement {
     }
 }
 
-impl Transaction for TxIncrement {
-    // This method purposely does not check counter overflow in order to test
-    // behavior of panicking transactions.
-    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
-        if self.by == 0 {
-            Err(ExecutionError::with_description(
-                0,
-                "Adding zero does nothing!".to_string(),
-            ))?;
-        }
-
-        let mut schema = CounterSchema::new(tc.fork());
-        schema.inc_count(self.by);
-        Ok(())
-    }
-}
-
 impl TxReset {
     pub fn sign(author: &PublicKey, key: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(Self {}, SERVICE_ID, *author, key)
     }
 }
 
-impl Transaction for TxReset {
-    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
-        let mut schema = CounterSchema::new(tc.fork());
+#[service_interface]
+trait CounterServiceInterface {
+    // This method purposely does not check counter overflow in order to test
+    // behavior of panicking transactions.
+    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> ExecutionResult;
+
+    fn reset(&self, context: TransactionContext, arg: TxReset) -> ExecutionResult;
+}
+
+impl CounterServiceInterface for CounterService {
+    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> ExecutionResult {
+        if arg.by == 0 {
+            Err(ExecutionError::with_description(
+                0,
+                "Adding zero does nothing!".to_string(),
+            ))?;
+        }
+
+        let mut schema = CounterSchema::new(context.fork());
+        schema.inc_count(arg.by);
+        Ok(())
+    }
+
+    fn reset(&self, context: TransactionContext, _arg: TxReset) -> ExecutionResult {
+        let mut schema = CounterSchema::new(context.fork());
         schema.set_count(0);
         Ok(())
     }
@@ -143,7 +148,7 @@ impl CounterApi {
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
 
-        let tx_hash = transaction.hash();
+        let tx_hash = transaction.object_hash();
         state.sender().broadcast_transaction(transaction)?;
         Ok(TransactionResponse { tx_hash })
     }
@@ -160,7 +165,7 @@ impl CounterApi {
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
 
-        let tx_hash = transaction.hash();
+        let tx_hash = transaction.object_hash();
         state.sender().broadcast_transaction(transaction)?;
         Ok(TransactionResponse { tx_hash })
     }
@@ -179,28 +184,23 @@ impl CounterApi {
 
 // // // // Service // // // //
 
+#[derive(Debug)]
 pub struct CounterService;
 
+impl_service_dispatcher!(CounterService, CounterServiceInterface);
+
 impl Service for CounterService {
-    fn service_name(&self) -> &str {
-        "counter"
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
-
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
-    /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = CounterTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
-    }
-
     fn wire_api(&self, builder: &mut api::ServiceApiBuilder) {
         CounterApi::wire(builder)
+    }
+}
+
+impl ServiceFactory for CounterService {
+    fn artifact(&self) -> RustArtifactSpec {
+        "counter-service/1.0.0".parse().unwrap()
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
     }
 }
