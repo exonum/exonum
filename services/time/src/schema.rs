@@ -27,7 +27,10 @@ pub struct TimeSchema<'a, T> {
 impl<'a, T: IndexAccess> TimeSchema<'a, T> {
     /// Constructs schema for the given `snapshot`.
     pub fn new(service_name: &'a str, access: T) -> Self {
-        TimeSchema { service_name, access }
+        TimeSchema {
+            service_name,
+            access,
+        }
     }
 
     fn index_name(&self, name: &str) -> String {

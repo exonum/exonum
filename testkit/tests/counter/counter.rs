@@ -190,12 +190,7 @@ pub struct CounterService;
 impl_service_dispatcher!(CounterService, CounterServiceInterface);
 
 impl Service for CounterService {
-    fn wire_api(
-        &self,
-        _service_id: ServiceInstanceId,
-        _service_name: &str,
-        builder: &mut api::ServiceApiBuilder,
-    ) {
+    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut api::ServiceApiBuilder) {
         CounterApi::wire(builder)
     }
 }

@@ -38,7 +38,7 @@ use exonum::{
     helpers::fabric::{self, Context},
     impl_service_dispatcher,
     runtime::rust::{
-        RustArtifactSpec, Service, ServiceFactory, ServiceInstanceId, TransactionContext,
+        RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
     },
 };
 
@@ -126,12 +126,7 @@ impl Cryptocurrency for CryptocurrencyServiceImpl {
 impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
 
 impl Service for CryptocurrencyServiceImpl {
-    fn wire_api(
-        &self,
-        _service_id: ServiceInstanceId,
-        _service_name: &str,
-        builder: &mut ServiceApiBuilder,
-    ) {
+    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder);
     }
 }

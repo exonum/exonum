@@ -47,8 +47,8 @@ use exonum::{
     helpers::fabric::Context,
     impl_service_dispatcher,
     runtime::rust::{
-        AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, ServiceInstanceId,
-        TransactionContext,
+        AfterCommitContext, RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory,
+        ServiceInstanceId, TransactionContext,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -105,23 +105,14 @@ impl TimeOracleInterface for TimeService {
 impl_service_dispatcher!(TimeService, TimeOracleInterface);
 
 impl Service for TimeService {
-    fn wire_api(
-        &self,
-        _service_id: ServiceInstanceId,
-        service_name: &str,
-        builder: &mut ServiceApiBuilder,
-    ) {
-        api::PublicApi::new(service_name).wire(builder);
-        api::PrivateApi::new(service_name).wire(builder);
+    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+        let name = descriptor.service_name();
+        api::PublicApi::new(name).wire(builder);
+        api::PrivateApi::new(name).wire(builder);
     }
 
-    fn state_hash(
-        &self,
-        _service_id: ServiceInstanceId,
-        service_name: &str,
-        snapshot: &dyn Snapshot,
-    ) -> Vec<Hash> {
-        let schema = TimeSchema::new(service_name, snapshot);
+    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = TimeSchema::new(descriptor.service_name(), snapshot);
         schema.state_hash()
     }
 

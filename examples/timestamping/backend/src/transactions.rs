@@ -64,7 +64,8 @@ impl TxTimestamp {
 impl Transaction for TxTimestamp {
     fn execute(&self, context: TransactionContext) -> ExecutionResult {
         let tx_hash = context.tx_hash();
-        let time = TimeSchema::new(context.fork())
+        // TODO Add exonum time oracle name to service configuration parameters.
+        let time = TimeSchema::new("exonum-time", context.fork())
             .time()
             .get()
             .expect("Can't get the time");

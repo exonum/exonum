@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::service::{AfterCommitContext, Service, ServiceFactory};
+pub use self::service::{AfterCommitContext, Service, ServiceDescriptor, ServiceFactory};
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
@@ -50,37 +50,41 @@ pub mod tests;
 pub struct RustRuntime {
     available_artifacts: HashMap<RustArtifactSpec, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactSpec>,
-    started_services: HashMap<ServiceInstanceId, ServiceDescriptor>,
+    started_services: HashMap<ServiceInstanceId, ServiceInstance>,
     started_services_by_name: HashMap<String, ServiceInstanceId>,
 }
 
 #[derive(Debug)]
-pub struct ServiceDescriptor {
+struct ServiceInstance {
     id: ServiceInstanceId,
     name: String,
     service: Box<dyn Service>,
 }
 
-impl ServiceDescriptor {
+impl ServiceInstance {
     pub fn new(id: ServiceInstanceId, name: String, service: Box<dyn Service>) -> Self {
         Self { id, name, service }
+    }
+
+    pub fn descriptor(&self) -> ServiceDescriptor {
+        ServiceDescriptor::new(self.id, &self.name)
     }
 
     pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (ServiceInstanceId, Vec<Hash>) {
         (
             self.id,
-            self.service.state_hash(self.id, &self.name, snapshot),
+            self.service.state_hash(self.descriptor(), snapshot),
         )
     }
 }
 
-impl AsRef<dyn Service + 'static> for ServiceDescriptor {
+impl AsRef<dyn Service + 'static> for ServiceInstance {
     fn as_ref(&self) -> &(dyn Service + 'static) {
         self.service.as_ref()
     }
 }
 
-impl AsMut<dyn Service + 'static> for ServiceDescriptor {
+impl AsMut<dyn Service + 'static> for ServiceInstance {
     fn as_mut(&mut self) -> &mut (dyn Service + 'static) {
         self.service.as_mut()
     }
@@ -104,7 +108,7 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    fn add_started_service(&mut self, descriptor: ServiceDescriptor) {
+    fn add_started_service(&mut self, descriptor: ServiceInstance) {
         self.started_services_by_name
             .insert(descriptor.name.clone(), descriptor.id);
         self.started_services.insert(descriptor.id, descriptor);
@@ -223,13 +227,13 @@ impl Runtime for RustRuntime {
             .get(&artifact)
             .unwrap()
             .new_instance();
-        self.add_started_service(ServiceDescriptor::new(spec.id, spec.name.clone(), service));
+        self.add_started_service(ServiceInstance::new(spec.id, spec.name.clone(), service));
         Ok(())
     }
 
     fn configure_service(
         &self,
-        context: &mut RuntimeContext,
+        runtime_context: &mut RuntimeContext,
         spec: &ServiceInstanceSpec,
         parameters: &ServiceConstructor,
     ) -> Result<(), StartError> {
@@ -243,17 +247,16 @@ impl Runtime for RustRuntime {
             spec.id
         );
 
-        let service_descriptor = self
+        let service_instance = self
             .started_services
             .get(&spec.id)
             .ok_or(StartError::NotStarted)?;
-        service_descriptor
+        service_instance
             .as_ref()
             .configure(
                 TransactionContext {
-                    service_id: spec.id,
-                    service_name: &spec.name,
-                    runtime_context: context,
+                    service_descriptor: service_instance.descriptor(),
+                    runtime_context,
                     runtime: self,
                 },
                 &parameters.data,
@@ -276,16 +279,15 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        context: &mut RuntimeContext,
+        runtime_context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
 
         let context = TransactionContext {
-            service_id: call_info.instance_id,
-            service_name: &service_instance.name,
-            runtime_context: context,
+            service_descriptor: service_instance.descriptor(),
+            runtime_context,
             runtime: self,
         };
 
@@ -310,8 +312,7 @@ impl Runtime for RustRuntime {
                 service.as_ref().before_commit(TransactionContext {
                     runtime: self,
                     runtime_context: &mut RuntimeContext::without_author(fork),
-                    service_id: service.id,
-                    service_name: &service.name,
+                    service_descriptor: service.descriptor(),
                 })
             })) {
                 Ok(..) => fork.flush(),
@@ -336,13 +337,8 @@ impl Runtime for RustRuntime {
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
-            let context = AfterCommitContext::new(
-                service.id,
-                &service.name,
-                snapshot,
-                service_keypair,
-                tx_sender,
-            );
+            let context =
+                AfterCommitContext::new(service.descriptor(), snapshot, service_keypair, tx_sender);
             service.as_ref().after_commit(context);
         }
     }
@@ -350,14 +346,12 @@ impl Runtime for RustRuntime {
     fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
         self.started_services
             .values()
-            .map(|service_descriptor| {
+            .map(|service_instance| {
                 let mut builder = ServiceApiBuilder::new();
-                service_descriptor.as_ref().wire_api(
-                    service_descriptor.id,
-                    &service_descriptor.name,
-                    &mut builder,
-                );
-                (service_descriptor.name.clone(), builder)
+                service_instance
+                    .as_ref()
+                    .wire_api(service_instance.descriptor(), &mut builder);
+                (service_instance.name.clone(), builder)
             })
             .collect()
     }
@@ -366,20 +360,19 @@ impl Runtime for RustRuntime {
 // TODO move to service module [ECR-3222]
 
 #[derive(Debug)]
-pub struct TransactionContext<'a, 'b, 'c> {
-    service_id: ServiceInstanceId,
-    service_name: &'c str,
+pub struct TransactionContext<'a, 'b> {
+    service_descriptor: ServiceDescriptor<'a>,
     runtime_context: &'a mut RuntimeContext<'b>,
     runtime: &'a RustRuntime,
 }
 
-impl<'a, 'b, 'c> TransactionContext<'a, 'b, 'c> {
+impl<'a, 'b> TransactionContext<'a, 'b> {
     pub fn service_id(&self) -> ServiceInstanceId {
-        self.service_id
+        self.service_descriptor.service_id()
     }
 
     pub fn service_name(&self) -> &str {
-        self.service_name
+        self.service_descriptor.service_name()
     }
 
     pub fn fork(&self) -> &Fork {

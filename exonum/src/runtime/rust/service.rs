@@ -44,12 +44,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         Ok(())
     }
 
-    fn state_hash(
-        &self,
-        _service_id: ServiceInstanceId,
-        _service_name: &str,
-        _snapshot: &dyn Snapshot,
-    ) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: ServiceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
@@ -57,19 +52,35 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 
     fn after_commit(&self, _context: AfterCommitContext) {}
 
-    fn wire_api(
-        &self,
-        _service_id: ServiceInstanceId,
-        _service_name: &str,
-        _builder: &mut ServiceApiBuilder,
-    ) {
-    }
+    fn wire_api(&self, _descriptor: ServiceDescriptor, _builder: &mut ServiceApiBuilder) {}
     // TODO: add other hooks such as "on node startup", etc.
 }
 
 pub trait ServiceFactory: Send + Debug + 'static {
     fn artifact(&self) -> RustArtifactSpec;
     fn new_instance(&self) -> Box<dyn Service>;
+}
+
+#[derive(Debug)]
+pub struct ServiceDescriptor<'a> {
+    id: ServiceInstanceId,
+    name: &'a str,
+}
+
+impl<'a> ServiceDescriptor<'a> {
+    pub(crate) fn new(id: ServiceInstanceId, name: &'a str) -> Self {
+        Self { id, name }
+    }
+
+    /// Returns the current service instance identifier.
+    pub fn service_id(&self) -> ServiceInstanceId {
+        self.id
+    }
+
+    /// Returns the current service instance name.
+    pub fn service_name(&self) -> &str {
+        self.name
+    }
 }
 
 impl<T> From<T> for Box<dyn ServiceFactory>
@@ -82,8 +93,7 @@ where
 }
 
 pub struct AfterCommitContext<'a> {
-    service_id: ServiceInstanceId,
-    service_name: &'a str,
+    service_descriptor: ServiceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
     service_keypair: &'a (PublicKey, SecretKey),
     tx_sender: &'a ApiSender,
@@ -92,15 +102,13 @@ pub struct AfterCommitContext<'a> {
 impl<'a> AfterCommitContext<'a> {
     /// Creates context for `after_commit` method.
     pub(crate) fn new(
-        service_id: ServiceInstanceId,
-        service_name: &'a str,
+        service_descriptor: ServiceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            service_id,
-            service_name,
+            service_descriptor,
             snapshot,
             service_keypair,
             tx_sender,
@@ -109,12 +117,12 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns the current service instance identifier.
     pub fn service_id(&self) -> ServiceInstanceId {
-        self.service_id
+        self.service_descriptor.service_id()
     }
 
     /// Returns the current service instance name.
     pub fn service_name(&self) -> &str {
-        self.service_name
+        self.service_descriptor.service_name()
     }
 
     /// Returns the current blockchain height. This height is "height of the last committed block".
@@ -126,7 +134,7 @@ impl<'a> AfterCommitContext<'a> {
     pub fn broadcast_transaction(&self, tx: impl Into<ServiceTransaction>) {
         let msg = Message::sign_transaction(
             tx,
-            self.service_id,
+            self.service_id(),
             self.service_keypair.0,
             &self.service_keypair.1,
         );
@@ -148,8 +156,7 @@ impl<'a> AfterCommitContext<'a> {
 impl<'a> Debug for AfterCommitContext<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
-            .field("service_id", &self.service_id)
-            .field("service_name", &self.service_name)
+            .field("service_descriptor", &self.service_descriptor)
             .finish()
     }
 }

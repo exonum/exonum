@@ -28,7 +28,7 @@ use crate::{
     messages::{AnyTx, Message, ServiceInstanceId, Signed},
     runtime::{
         dispatcher::BuiltinService,
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
     },
 };
 
@@ -51,12 +51,7 @@ impl TimestampingInterface for TimestampingService {
 }
 
 impl Service for TimestampingService {
-    fn state_hash(
-        &self,
-        _service_id: ServiceInstanceId,
-        _service_name: &str,
-        _snapshot: &dyn Snapshot,
-    ) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: ServiceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 }
