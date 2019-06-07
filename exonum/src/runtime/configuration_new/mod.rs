@@ -223,7 +223,12 @@ impl ConfigurationService for ConfigurationServiceImpl {
 impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
 
 impl Service for ConfigurationServiceImpl {
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(
+        &self,
+        _service_id: ServiceInstanceId,
+        _service_name: &str,
+        snapshot: &dyn Snapshot,
+    ) -> Vec<Hash> {
         ConfigurationSchema::new(snapshot).state_hash()
     }
 }

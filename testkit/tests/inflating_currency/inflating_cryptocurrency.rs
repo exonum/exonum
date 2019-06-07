@@ -230,7 +230,12 @@ impl_service_dispatcher!(CurrencyService, CurrencyInterface);
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn wire_api(&self, builder: &mut api::ServiceApiBuilder) {
+    fn wire_api(
+        &self,
+        _service_id: ServiceInstanceId,
+        _service_name: &str,
+        builder: &mut api::ServiceApiBuilder,
+    ) {
         CryptocurrencyApi::wire(builder)
     }
 }

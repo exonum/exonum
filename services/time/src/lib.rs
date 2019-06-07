@@ -44,13 +44,14 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::ExecutionResult,
     crypto::Hash,
-    helpers::fabric::{self, Context},
+    helpers::fabric::Context,
     impl_service_dispatcher,
     runtime::rust::{
-        AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext,
+        AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, ServiceInstanceId,
+        TransactionContext,
     },
 };
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::Snapshot;
 
 use crate::{
     schema::TimeSchema,
@@ -107,12 +108,22 @@ impl TimeOracleInterface for TimeService {
 impl_service_dispatcher!(TimeService, TimeOracleInterface);
 
 impl Service for TimeService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+    fn wire_api(
+        &self,
+        _service_id: ServiceInstanceId,
+        _service_name: &str,
+        builder: &mut ServiceApiBuilder,
+    ) {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
     }
 
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(
+        &self,
+        _service_id: ServiceInstanceId,
+        _service_name: &str,
+        snapshot: &dyn Snapshot,
+    ) -> Vec<Hash> {
         let schema = TimeSchema::new(snapshot);
         schema.state_hash()
     }

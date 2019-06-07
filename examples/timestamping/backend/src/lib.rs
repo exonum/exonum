@@ -46,8 +46,7 @@ use exonum::{
     helpers::fabric,
     impl_service_dispatcher,
     runtime::rust::{
-        service::{Service, ServiceFactory},
-        RustArtifactSpec, TransactionContext,
+        RustArtifactSpec, Service, ServiceFactory, ServiceInstanceId, TransactionContext,
     },
 };
 use exonum_time::schema::TimeSchema;
@@ -94,11 +93,21 @@ impl Timestamping for TimestampingServiceImpl {
 impl_service_dispatcher!(TimestampingServiceImpl, Timestamping);
 
 impl Service for TimestampingServiceImpl {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+    fn wire_api(
+        &self,
+        _service_id: ServiceInstanceId,
+        _service_name: &str,
+        builder: &mut ServiceApiBuilder,
+    ) {
         TimestampingApi::wire(builder);
     }
 
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(
+        &self,
+        _service_id: ServiceInstanceId,
+        _service_name: &str,
+        snapshot: &dyn Snapshot,
+    ) -> Vec<Hash> {
         let schema = Schema::new(snapshot);
         schema.state_hash()
     }

@@ -93,7 +93,7 @@ impl TestService for TestServiceImpl {
 impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl Service for TestServiceImpl {
-    fn initialize(&self, ctx: TransactionContext, arg: &Any) -> Result<(), ExecutionError> {
+    fn configure(&self, ctx: TransactionContext, arg: &Any) -> Result<(), ExecutionError> {
         let arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub use self::service::{AfterCommitContext, Service, ServiceFactory};
+pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
 use protobuf::well_known_types::Any;
@@ -37,7 +38,7 @@ use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
     ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConstructor,
-    ServiceInstanceId, ServiceInstanceSpec,
+    ServiceInstanceSpec,
 };
 
 #[macro_use]
@@ -66,7 +67,10 @@ impl ServiceDescriptor {
     }
 
     pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (ServiceInstanceId, Vec<Hash>) {
-        (self.id, self.service.state_hash(snapshot))
+        (
+            self.id,
+            self.service.state_hash(self.id, &self.name, snapshot),
+        )
     }
 }
 
@@ -245,7 +249,7 @@ impl Runtime for RustRuntime {
             .ok_or(StartError::NotStarted)?;
         service_descriptor
             .as_ref()
-            .initialize(
+            .configure(
                 TransactionContext {
                     service_id: spec.id,
                     service_name: &spec.name,
@@ -303,7 +307,12 @@ impl Runtime for RustRuntime {
     fn before_commit(&self, fork: &mut Fork) {
         for service in self.started_services.values() {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                service.as_ref().before_commit(fork)
+                service.as_ref().before_commit(TransactionContext {
+                    runtime: self,
+                    runtime_context: &mut RuntimeContext::without_author(fork),
+                    service_id: service.id,
+                    service_name: &service.name,
+                })
             })) {
                 Ok(..) => fork.flush(),
                 Err(err) => {
@@ -327,7 +336,13 @@ impl Runtime for RustRuntime {
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
-            let context = AfterCommitContext::new(service.id, snapshot, service_keypair, tx_sender);
+            let context = AfterCommitContext::new(
+                service.id,
+                &service.name,
+                snapshot,
+                service_keypair,
+                tx_sender,
+            );
             service.as_ref().after_commit(context);
         }
     }
@@ -337,12 +352,18 @@ impl Runtime for RustRuntime {
             .values()
             .map(|service_descriptor| {
                 let mut builder = ServiceApiBuilder::new();
-                service_descriptor.as_ref().wire_api(&mut builder);
+                service_descriptor.as_ref().wire_api(
+                    service_descriptor.id,
+                    &service_descriptor.name,
+                    &mut builder,
+                );
                 (service_descriptor.name.clone(), builder)
             })
             .collect()
     }
 }
+
+// TODO move to service module [ECR-3222]
 
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b, 'c> {

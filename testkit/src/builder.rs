@@ -18,7 +18,7 @@ use exonum::{
     crypto,
     helpers::ValidatorId,
     messages::ServiceInstanceId,
-    runtime::{rust::ServiceFactory, ArtifactSpec, ServiceConstructor, ServiceInstanceSpec},
+    runtime::{rust::ServiceFactory, ServiceConstructor, ServiceInstanceSpec},
 };
 use exonum_merkledb::{BinaryValue, TemporaryDB};
 
