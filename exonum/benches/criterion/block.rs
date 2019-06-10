@@ -521,12 +521,16 @@ pub fn bench_block(criterion: &mut Criterion) {
         timestamping::transactions(XorShiftRng::from_seed([2; 16])),
     );
 
+    // We expect lots of panics here, so we switch their reporting off.
+    let panic_hook = panic::take_hook();
+    panic::set_hook(Box::new(|_| ()));
     execute_block_rocksdb(
         criterion,
         "block/timestamping_panic",
         timestamping::Timestamping,
         timestamping::panicking_transactions(XorShiftRng::from_seed([2; 16])),
     );
+    panic::set_hook(panic_hook);
 
     execute_block_rocksdb(
         criterion,
