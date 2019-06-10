@@ -173,7 +173,7 @@ pub trait Transaction: BinaryValue {
     ) -> Signed<AnyTx> {
         let payload = Self::into_bytes(self);
         Message::sign_transaction(
-            ServiceTransaction::from_raw_unchecked(service_id as u16, payload),
+            ServiceTransaction::from_raw_unchecked(Self::METHOD_ID as u16, payload),
             service_id,
             public_key,
             secret_key,

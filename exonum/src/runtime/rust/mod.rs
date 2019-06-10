@@ -285,6 +285,7 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
+        debug!("Execute: {:?}", call_info);
         let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
 
         let context = TransactionContext {
