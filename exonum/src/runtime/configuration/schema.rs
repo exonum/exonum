@@ -15,7 +15,7 @@
 //! Storage schema for the configuration service.
 
 use crate::{
-    crypto::{self, CryptoHash, Hash, HASH_SIZE},
+    crypto::{self, CryptoHash, Hash, PublicKey, HASH_SIZE},
     proto,
     runtime::ArtifactSpec,
 };
@@ -44,6 +44,7 @@ define_names! {
     VOTES => "votes";
     SERVICE_IDS => "service_ids";
     DEPLOYING => "deploying";
+    DEPLOYED => "deployed";
 }
 
 /// Extended information about a proposal used for the storage.
@@ -242,6 +243,10 @@ where
     /// Returns a table with mapping between deploy height names and their identifiers.
     pub fn deploying(&self) -> MapIndex<T, ArtifactSpec, u64> {
         MapIndex::new(DEPLOYING, self.access.clone())
+    }
+
+    pub fn deployed(&self) -> ProofMapIndex<T, ArtifactSpec, PublicKey> {
+        ProofMapIndex::new(DEPLOYED, self.access.clone())
     }
 
     /// Returns a table of votes of validators for a particular proposal, referenced

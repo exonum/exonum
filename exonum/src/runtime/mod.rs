@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot, BinaryKey};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot, BinaryKey, ObjectHash};
 use protobuf::well_known_types::Any;
 
 use std::fmt::Debug;
@@ -97,6 +97,16 @@ impl BinaryKey for ArtifactSpec {
         let runtime_id = u32::read(&buffer[0..4]);
         let raw_spec: Vec<u8> = Vec::read(&buffer[4..]);
         Self { runtime_id, raw_spec }
+    }
+}
+
+impl ObjectHash for ArtifactSpec {
+    fn object_hash(&self) -> Hash {
+        let mut data = vec![0; self.size()];
+
+        self.write(&mut data[..]);
+
+        data.object_hash()
     }
 }
 

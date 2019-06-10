@@ -45,6 +45,9 @@ mod transactions;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: ServiceInstanceId = 0;
+pub const PROPOSE_METHOD_ID: MethodId = 0;
+pub const VOTE_METHOD_ID: MethodId = 1;
+pub const VOTE_AGAINST_METHOD_ID: MethodId = 2;
 pub const DEPLOY_METHOD_ID: MethodId = 3;
 pub const INIT_METHOD_ID: MethodId = 4;
 /// Configuration service name.
@@ -239,6 +242,7 @@ impl Service for ConfigurationServiceImpl {
         ConfigurationSchema::new(snapshot).state_hash()
     }
 }
+
 #[derive(Debug, Default)]
 pub struct ConfigurationServiceFactory;
 

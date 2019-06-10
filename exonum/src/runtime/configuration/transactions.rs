@@ -14,13 +14,14 @@
 
 //! Transaction definitions for the configuration service.
 
-use exonum_merkledb::{Fork, ObjectHash, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, ObjectHash, Snapshot};
 use protobuf::well_known_types::Any;
 
 use crate::{
     blockchain::{Schema as CoreSchema, StoredConfiguration},
-    crypto::{CryptoHash, Hash, PublicKey},
+    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     node::State,
+    messages::{AnyTx, CallInfo, Signed, Message},
     proto,
     runtime::ArtifactSpec,
 };
@@ -29,7 +30,7 @@ use super::{
     config::ConfigurationServiceConfig,
     errors::Error as ServiceError,
     schema::{MaybeVote, ProposeData, Schema, VotingDecision},
-    SERVICE_NAME,
+    SERVICE_NAME, SERVICE_ID, PROPOSE_METHOD_ID, VOTE_METHOD_ID, VOTE_AGAINST_METHOD_ID,
 };
 
 /// Propose a new configuration.
@@ -91,25 +92,64 @@ pub struct VoteAgainst {
     pub cfg_hash: Hash,
 }
 
-// TODO implement sign for transactions
-// impl VoteAgainst {
-//     /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
-//     pub fn sign(_author: &PublicKey, _cfg_hash: &Hash, _key: &SecretKey) -> Signed<RawTransaction> {
-//         unimplemented!()
-//     }
-// }
-// impl Vote {
-//     /// Create `Signed` for `Vote` transaction, signed by provided keys.
-//     pub fn sign(_author: &PublicKey, _cfg_hash: &Hash, _key: &SecretKey) -> Signed<RawTransaction> {
-//         unimplemented!()
-//     }
-// }
-// impl Propose {
-//     /// Create `Signed` for `Propose` transaction, signed by provided keys.
-//     pub fn sign(_author: &PublicKey, _cfg: &str, _key: &SecretKey) -> Signed<RawTransaction> {
-//         unimplemented!()
-//     }
-// }
+impl VoteAgainst {
+    /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg_hash: Hash, key: &SecretKey) -> Signed<AnyTx> {
+        let transaction = Self { cfg_hash };
+
+        let call_info = CallInfo {
+            instance_id: SERVICE_ID,
+            method_id: VOTE_AGAINST_METHOD_ID,
+        };
+
+        let any_tx = AnyTx {
+            call_info,
+            payload: transaction.to_bytes(),
+        };
+
+        Message::sign_transaction(any_tx.service_transaction(), 0, *author, key)
+    }
+}
+
+
+impl Vote {
+    /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg_hash: Hash, key: &SecretKey) -> Signed<AnyTx> {
+        let transaction = Self { cfg_hash };
+
+        let call_info = CallInfo {
+            instance_id: SERVICE_ID,
+            method_id: VOTE_METHOD_ID,
+        };
+
+        let any_tx = AnyTx {
+            call_info,
+            payload: transaction.to_bytes(),
+        };
+
+        Message::sign_transaction(any_tx.service_transaction(), 0, *author, key)
+    }
+}
+
+
+impl Propose {
+    /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<AnyTx> {
+        let transaction = Self { cfg: cfg.to_owned() };
+
+        let call_info = CallInfo {
+            instance_id: SERVICE_ID,
+            method_id: PROPOSE_METHOD_ID,
+        };
+
+        let any_tx = AnyTx {
+            call_info,
+            payload: transaction.to_bytes(),
+        };
+
+        Message::sign_transaction(any_tx.service_transaction(), 0, *author, key)
+    }
+}
 
 /// Checks if a specified key belongs to one of the current validators.
 ///
@@ -161,7 +201,6 @@ impl Propose {
         author: PublicKey,
     ) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use self::ServiceError::*;
-        use exonum_merkledb::BinaryValue;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
@@ -315,8 +354,6 @@ impl VotingContext {
     }
 
     pub fn save(&self, fork: &Fork) {
-        use exonum_merkledb::BinaryValue;
-
         let cfg_hash = &self.cfg_hash;
         let propose_data: ProposeData = Schema::new(fork)
             .propose_data_by_config_hash()
