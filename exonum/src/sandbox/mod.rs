@@ -1191,7 +1191,8 @@ mod tests {
         messages::{AnyTx, ServiceInstanceId},
         proto::schema::tests::TxAfterCommit,
         runtime::rust::{
-            AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext, Transaction,
+            AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, Transaction,
+            TransactionContext,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };

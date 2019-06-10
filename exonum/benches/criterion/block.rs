@@ -126,7 +126,7 @@ mod timestamping {
     use super::gen_keypair_from_rng;
     use crate::proto;
 
-    const TIMESTAMPING_SERVICE_ID: ServiceInstanceId = 1;
+    const TIMESTAMPING_SERVICE_ID: ServiceInstanceId = 254;
 
     #[service_interface]
     pub trait TimestampingInterface {
@@ -242,7 +242,7 @@ mod cryptocurrency {
             arg: SimpleTx,
         ) -> ExecutionResult;
         /// Same as `SimpleTx`, but signals an error 50% of the time.
-        fn transfer_panic_sometimes(
+        fn transfer_error_sometimes(
             &self,
             context: TransactionContext,
             arg: RollbackTx,
@@ -282,7 +282,7 @@ mod cryptocurrency {
             Ok(())
         }
 
-        fn transfer_panic_sometimes(
+        fn transfer_error_sometimes(
             &self,
             context: TransactionContext,
             arg: RollbackTx,
@@ -521,16 +521,12 @@ pub fn bench_block(criterion: &mut Criterion) {
         timestamping::transactions(XorShiftRng::from_seed([2; 16])),
     );
 
-    // We expect lots of panics here, so we switch their reporting off.
-    let panic_hook = panic::take_hook();
-    panic::set_hook(Box::new(|_| ()));
     execute_block_rocksdb(
         criterion,
         "block/timestamping_panic",
         timestamping::Timestamping,
         timestamping::panicking_transactions(XorShiftRng::from_seed([2; 16])),
     );
-    panic::set_hook(panic_hook);
 
     execute_block_rocksdb(
         criterion,

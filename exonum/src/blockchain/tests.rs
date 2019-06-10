@@ -22,7 +22,7 @@ use crate::{
     crypto::gen_keypair,
     helpers::{Height, ValidatorId},
     impl_service_dispatcher,
-    messages::{ServiceInstanceId},
+    messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
