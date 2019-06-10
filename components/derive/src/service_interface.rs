@@ -88,20 +88,6 @@ fn implement_transaction_for_methods(
                     type Service = &'static dyn #trait_name;
 
                     const METHOD_ID: #cr::messages::MethodId = #id;
-
-                    fn sign(self, 
-                        service_id: #cr::messages::ServiceInstanceId,
-                        public_key: #cr::crypto::PublicKey,
-                        secret_key: &#cr::crypto::SecretKey,
-                        ) -> #cr::messages::Signed<#cr::messages::AnyTx> {
-                        let bytes = exonum_merkledb::BinaryValue::into_bytes(self);
-                        let service_tx = #cr::messages::ServiceTransaction::from_raw_unchecked(#id as u16, bytes);
-                        #cr::messages::Message::sign_transaction(
-                            service_tx, 
-                            service_id,
-                            public_key,
-                            secret_key)
-                    }
                 }
             }
         });
