@@ -649,6 +649,22 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(blocks[0].block.height(), Height(4));
     assert_eq!(range.start, Height(3));
     assert_eq!(range.end, Height(5));
+
+    // Check `latest` param isn't exceed the height.
+    let BlocksRange { blocks, range } = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=2&latest=5")
+        .unwrap();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(range.start, Height(4));
+    assert_eq!(range.end, Height(6));
+
+    // Check `latest` param is exceed the height.
+    let result: Result<BlocksRange, ApiError> = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=2&latest=6");
+    assert!(result.is_err());
 }
 
 #[test]

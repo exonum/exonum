@@ -408,14 +408,14 @@ pub struct CommittedTransaction {
 /// Transaction execution status. Simplified version of `TransactionResult`.
 #[serde(tag = "type", rename_all = "kebab-case")]
 #[derive(Debug, Serialize, Deserialize)]
-enum TxStatus<'a> {
+pub(crate) enum TxStatus<'a> {
     Success,
     Panic { description: &'a str },
     Error { code: u8, description: &'a str },
 }
 
 impl<'a> TxStatus<'a> {
-    fn serialize<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
+    pub(crate) fn serialize<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -423,7 +423,7 @@ impl<'a> TxStatus<'a> {
         status.serialize(serializer)
     }
 
-    fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
+    pub(crate) fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
     where
         D: Deserializer<'a>,
     {
