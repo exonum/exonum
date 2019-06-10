@@ -15,9 +15,7 @@
 use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Schema},
-    crypto::{PublicKey, SecretKey},
-    messages::{AnyTx, Message, Signed},
-    runtime::ServiceInstanceId,
+    crypto::PublicKey,
 };
 use exonum_merkledb::{Fork, Snapshot};
 
@@ -61,16 +59,6 @@ impl TxTime {
 }
 
 impl TxTime {
-    #[doc(hidden)]
-    pub fn new_signed(
-        instance_id: ServiceInstanceId,
-        time: DateTime<Utc>,
-        public_key: &PublicKey,
-        secret_key: &SecretKey,
-    ) -> Signed<AnyTx> {
-        Message::sign_transaction(TxTime::new(time), instance_id, *public_key, secret_key)
-    }
-
     pub(crate) fn check_signed_by_validator(
         &self,
         snapshot: &dyn Snapshot,

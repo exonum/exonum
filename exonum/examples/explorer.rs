@@ -27,6 +27,7 @@ use exonum::{
     explorer::*,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Message, Signed},
+    runtime::rust::Transaction as _,
 };
 use exonum_merkledb::ObjectHash;
 
@@ -42,12 +43,7 @@ pub fn mempool_transaction() -> Signed<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    Message::sign_transaction(
-        CreateWallet::new(&pk_alex, "Alex"),
-        SERVICE_ID,
-        pk_alex,
-        &key_alex,
-    )
+    CreateWallet::new(&pk_alex, "Alex").sign(SERVICE_ID, pk_alex, &key_alex)
 }
 
 /// Creates a sample blockchain for the example.
@@ -63,24 +59,10 @@ pub fn sample_blockchain() -> Blockchain {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = Message::sign_transaction(
-        CreateWallet::new(&pk_alice, "Alice"),
-        SERVICE_ID,
-        pk_alice,
-        &key_alice,
-    );
-    let tx_bob = Message::sign_transaction(
-        CreateWallet::new(&pk_bob, "Bob"),
-        SERVICE_ID,
-        pk_bob,
-        &key_bob,
-    );
-    let tx_transfer = Message::sign_transaction(
-        Transfer::new(&pk_alice, &pk_bob, 100),
-        SERVICE_ID,
-        pk_alice,
-        &key_alice,
-    );
+    
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
+    let tx_bob = CreateWallet::new(&pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
+    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);
 
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 

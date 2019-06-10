@@ -24,16 +24,16 @@ use crate::{
     blockchain::{ExecutionResult, Schema, StoredConfiguration},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, Message, ServiceInstanceId, Signed},
+    messages::{AnyTx, ServiceInstanceId, Signed},
     proto::ProtobufConvert,
     runtime::{
         dispatcher::BuiltinService,
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext, Transaction},
     },
 };
 
 #[service_interface(exonum(crate = "crate"))]
-trait ConfigUpdaterInterface {
+pub trait ConfigUpdaterInterface {
     fn update_config(&self, context: TransactionContext, arg: TxConfig) -> ExecutionResult;
 }
 
@@ -91,8 +91,7 @@ impl TxConfig {
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());
         msg.set_actual_from(actual_from.0);
-
-        Message::sign_transaction(msg, ConfigUpdaterService::ID, *from, signer)
+        msg.sign(ConfigUpdaterService::ID, *from, signer)
     }
 }
 

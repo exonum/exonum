@@ -14,13 +14,11 @@
 
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate exonum_derive;
 
 // HACK: Silent "dead_code" warning.
 pub use crate::hooks::{AfterCommitService, TxAfterCommit, SERVICE_ID, SERVICE_NAME};
 
-use exonum::{helpers::Height, messages::Message};
+use exonum::{helpers::Height, runtime::rust::Transaction};
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::{ServiceInstances, TestKitBuilder};
 
@@ -49,12 +47,8 @@ fn test_after_commit() {
 
         assert_eq!(service.counter() as u64, i);
 
-        let tx = Message::sign_transaction(
-            TxAfterCommit::new(Height(i)),
-            SERVICE_ID,
-            testkit.blockchain().service_keypair.0,
-            &testkit.blockchain().service_keypair.1,
-        );
+        let keypair = &testkit.blockchain().service_keypair;
+        let tx = TxAfterCommit::new(Height(i)).sign(SERVICE_ID, keypair.0, &keypair.1);
         assert!(testkit.is_tx_in_pool(&tx.object_hash()));
     }
 
@@ -94,13 +88,10 @@ fn restart_testkit() {
     assert_eq!(testkit.network().validators().len(), 3);
     let transactions_are_committed = (1..=8)
         .map(|i| {
-            let message = Message::sign_transaction(
-                TxAfterCommit::new(Height(i)),
-                SERVICE_ID,
-                testkit.blockchain().service_keypair.0,
-                &testkit.blockchain().service_keypair.1,
-            );
-            message.object_hash()
+            let keypair = &testkit.blockchain().service_keypair;
+            TxAfterCommit::new(Height(i))
+                .sign(SERVICE_ID, keypair.0, &keypair.1)
+                .object_hash()
         })
         .all(|hash| {
             testkit
@@ -120,12 +111,9 @@ fn tx_pool_is_retained_on_restart() {
 
     let tx_hashes: Vec<_> = (100..105)
         .map(|i| {
-            let message = Message::sign_transaction(
-                TxAfterCommit::new(Height(i)),
-                SERVICE_ID,
-                testkit.blockchain().service_keypair.0,
-                &testkit.blockchain().service_keypair.1,
-            );
+            let keypair = &testkit.blockchain().service_keypair;
+            let message = TxAfterCommit::new(Height(i))
+                .sign(SERVICE_ID, keypair.0, &keypair.1);
             let tx_hash = message.object_hash();
             testkit.add_tx(message);
             assert!(testkit.is_tx_in_pool(&tx_hash));
@@ -135,7 +123,7 @@ fn tx_pool_is_retained_on_restart() {
 
     let stopped = testkit.stop();
     let testkit = stopped.resume(vec![
-        //AfterCommitService::new().into()
+        // AfterCommitService::new().into()
     ]);
     assert!(tx_hashes
         .iter()

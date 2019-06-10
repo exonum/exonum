@@ -29,7 +29,8 @@ use exonum::{
     crypto::{self, Hash},
     explorer::*,
     helpers::Height,
-    messages::{self, AnyTx, BinaryValue, Message, Signed},
+    messages::{self, AnyTx, BinaryValue, Signed},
+    runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
 
@@ -46,15 +47,15 @@ fn test_explorer_basics() {
     let (pk_bob, key_bob) = crypto::gen_keypair();
 
     let payload_alice = CreateWallet::new(&pk_alice, "Alice");
-    let tx_alice =
-        Message::sign_transaction(payload_alice.clone(), SERVICE_ID, pk_alice, &key_alice);
+    let tx_alice = payload_alice.clone().sign(SERVICE_ID, pk_alice, &key_alice);
 
     let payload_bob = CreateWallet::new(&pk_bob, "Bob");
-    let tx_bob = Message::sign_transaction(payload_bob.clone(), SERVICE_ID, pk_bob, &key_bob);
+    let tx_bob = payload_bob.clone().sign(SERVICE_ID, pk_bob, &key_bob);
 
     let payload_transfer = Transfer::new(&pk_alice, &pk_bob, 2);
-    let tx_transfer =
-        Message::sign_transaction(payload_transfer.clone(), SERVICE_ID, pk_alice, &key_alice);
+    let tx_transfer = payload_transfer
+        .clone()
+        .sign(SERVICE_ID, pk_alice, &key_alice);
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
@@ -186,12 +187,7 @@ fn test_explorer_pool_transaction() {
     let mut blockchain = create_blockchain();
 
     let (pk_alice, key_alice) = crypto::gen_keypair();
-    let tx_alice = Message::sign_transaction(
-        CreateWallet::new(&pk_alice, "Alice"),
-        SERVICE_ID,
-        pk_alice,
-        &key_alice,
-    );
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
     let tx_hash = tx_alice.object_hash();
 
     {
@@ -219,12 +215,7 @@ fn test_explorer_pool_transaction() {
 fn tx_generator() -> Box<dyn Iterator<Item = Signed<AnyTx>>> {
     Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
-        Message::sign_transaction(
-            CreateWallet::new(&pk, &format!("Alice #{}", i)),
-            SERVICE_ID,
-            pk,
-            &key,
-        )
+        CreateWallet::new(&pk, &format!("Alice #{}", i)).sign(SERVICE_ID, pk, &key)
     }))
 }
 
@@ -375,24 +366,10 @@ fn test_transaction_iterator() {
 
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = Message::sign_transaction(
-        CreateWallet::new(&pk_alice, "Alice"),
-        SERVICE_ID,
-        pk_alice,
-        &key_alice,
-    );
-    let tx_bob = Message::sign_transaction(
-        CreateWallet::new(&pk_bob, "Bob"),
-        SERVICE_ID,
-        pk_bob,
-        &key_bob,
-    );
-    let tx_transfer = Message::sign_transaction(
-        Transfer::new(&pk_alice, &pk_bob, 2),
-        SERVICE_ID,
-        pk_alice,
-        &key_alice,
-    );
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
+    let tx_bob = CreateWallet::new(&pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
+    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 2).sign(SERVICE_ID, pk_alice, &key_alice);
+
     create_block(
         &mut blockchain,
         vec![tx_alice.clone(), tx_bob.clone(), tx_transfer.clone()],
@@ -486,7 +463,8 @@ fn test_block_with_transactions_roundtrip() {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let payload = CreateWallet::new(&pk_alice, "Alice");
-    let tx = Message::sign_transaction(payload.clone(), SERVICE_ID, pk_alice, &key_alice);
+    let tx = payload.clone().sign(SERVICE_ID, pk_alice, &key_alice);
+
     create_block(&mut blockchain, vec![tx.clone()]);
 
     let explorer = BlockchainExplorer::new(&blockchain);

@@ -22,12 +22,12 @@ use crate::{
     crypto::gen_keypair,
     helpers::{Height, ValidatorId},
     impl_service_dispatcher,
-    messages::{Message, ServiceInstanceId},
+    messages::{ServiceInstanceId},
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
         dispatcher::{BuiltinService, DispatcherBuilder},
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
     },
 };
 
@@ -210,10 +210,10 @@ fn handling_tx_panic_error() {
     let mut blockchain = create_blockchain();
 
     let (pk, sec_key) = gen_keypair();
-    let tx_ok1 = Message::sign_transaction(Tx::new(3), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_ok2 = Message::sign_transaction(Tx::new(4), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_failed = Message::sign_transaction(Tx::new(0), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_storage_error = Message::sign_transaction(Tx::new(42), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok1 = Tx::new(3).sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok2 = Tx::new(4).sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_failed = Tx::new(0).sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_storage_error = Tx::new(42).sign(TEST_SERVICE_ID, pk, &sec_key);
 
     let patch = {
         let fork = blockchain.fork();
@@ -271,10 +271,10 @@ fn handling_tx_panic_storage_error() {
     let mut blockchain = create_blockchain();
 
     let (pk, sec_key) = gen_keypair();
-    let tx_ok1 = Message::sign_transaction(Tx::new(3), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_ok2 = Message::sign_transaction(Tx::new(4), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_failed = Message::sign_transaction(Tx::new(0), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_storage_error = Message::sign_transaction(Tx::new(42), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok1 = Tx::new(3).sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok2 = Tx::new(4).sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_failed = Tx::new(0).sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_storage_error = Tx::new(42).sign(TEST_SERVICE_ID, pk, &sec_key);
 
     let patch = {
         let fork = blockchain.fork();

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::service::{AfterCommitContext, Service, ServiceDescriptor, ServiceFactory};
+pub use self::service::{AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction};
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};

@@ -23,7 +23,7 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
+    messages::{AnyTx, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
     runtime::{error::ExecutionError, rust::TransactionContext},
 };
@@ -131,14 +131,8 @@ impl<'a> AfterCommitContext<'a> {
     }
 
     /// Signs and broadcasts transaction to other nodes in the network.
-    pub fn broadcast_transaction(&self, tx: impl Into<ServiceTransaction>) {
-        let msg = Message::sign_transaction(
-            tx,
-            self.service_id(),
-            self.service_keypair.0,
-            &self.service_keypair.1,
-        );
-
+    pub fn broadcast_transaction(&self, tx: impl Transaction) {
+        let msg = tx.sign(self.service_id(), self.service_keypair.0, &self.service_keypair.1);
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }
@@ -159,6 +153,19 @@ impl<'a> Debug for AfterCommitContext<'a> {
             .field("service_descriptor", &self.service_descriptor)
             .finish()
     }
+}
+
+pub trait Transaction {
+    type Service;
+
+    const METHOD_ID: MethodId;
+
+    fn sign(
+        self,
+        service_id: ServiceInstanceId,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Signed<AnyTx>;
 }
 
 #[macro_export]

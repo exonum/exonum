@@ -56,7 +56,7 @@ pub fn artifact_spec() -> RustArtifactSpec {
 }
 
 #[service_interface(exonum(crate = "crate"))]
-trait ConfigurationService {
+pub trait ConfigurationService {
     fn propose(
         &self,
         ctx: TransactionContext,

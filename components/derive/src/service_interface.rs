@@ -75,6 +75,42 @@ fn implement_into_service_tx(
     }
 }
 
+fn implement_transaction_for_methods(
+    trait_name: &Ident,
+    methods: &[ServiceMethodDescriptor],
+    cr: &dyn ToTokens,
+) -> impl quote::ToTokens {
+    let transactions_for_methods = methods
+        .iter()
+        .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
+            quote! {
+                impl #cr::runtime::rust::Transaction for #arg_type {
+                    type Service = &'static dyn #trait_name;
+
+                    const METHOD_ID: #cr::messages::MethodId = #id;
+
+                    fn sign(self, 
+                        service_id: #cr::messages::ServiceInstanceId,
+                        public_key: #cr::crypto::PublicKey,
+                        secret_key: &#cr::crypto::SecretKey,
+                        ) -> #cr::messages::Signed<#cr::messages::AnyTx> {
+                        let bytes = exonum_merkledb::BinaryValue::into_bytes(self);
+                        let service_tx = #cr::messages::ServiceTransaction::from_raw_unchecked(#id as u16, bytes);
+                        #cr::messages::Message::sign_transaction(
+                            service_tx, 
+                            service_id,
+                            public_key,
+                            secret_key)
+                    }
+                }
+            }
+        });
+
+    quote! {
+        #( #transactions_for_methods )*
+    }
+}
+
 pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut trait_item = parse_macro_input!(item as ItemTrait);
     let args = parse_macro_input!(attr as AttributeArgs);
@@ -140,11 +176,11 @@ pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStre
     };
     trait_item.items.push(TraitItem::Method(dispatch_method));
 
-    let into_service_tx = implement_into_service_tx(&methods, &cr);
+    let txs_for_methods = implement_transaction_for_methods(&trait_item.ident, &methods, &cr);
 
     let expanded = quote! {
         #trait_item
-        #into_service_tx
+        #txs_for_methods
     };
     expanded.into()
 }

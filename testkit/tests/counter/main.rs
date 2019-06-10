@@ -23,6 +23,7 @@ use exonum::{
     crypto::{self, PublicKey},
     helpers::Height,
     messages::{self, AnyTx, Signed},
+    runtime::rust::Transaction,
 };
 use exonum_merkledb::{HashTag, ObjectHash};
 use exonum_testkit::{
@@ -48,7 +49,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
 fn inc_count(api: &TestKitApi, by: u64) -> Signed<AnyTx> {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    let tx = TxIncrement::sign(&pubkey, by, &key);
+    let tx = TxIncrement::new(by).sign(SERVICE_ID, pubkey, &key);
 
     let tx_info: TransactionResponse = api
         .public(ApiKind::Service("counter"))
@@ -65,7 +66,7 @@ fn test_inc_count_create_block() {
     let (pubkey, key) = crypto::gen_keypair();
 
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(TxIncrement::sign(&pubkey, 5, &key));
+    testkit.create_block_with_transaction(TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key));
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api
@@ -75,8 +76,8 @@ fn test_inc_count_create_block() {
     assert_eq!(counter, 5);
 
     testkit.create_block_with_transactions(txvec![
-        TxIncrement::sign(&pubkey, 4, &key),
-        TxIncrement::sign(&pubkey, 1, &key),
+        TxIncrement::new(4).sign(SERVICE_ID, pubkey, &key),
+        TxIncrement::new(1).sign(SERVICE_ID, pubkey, &key),
     ]);
 
     let counter: u64 = api
@@ -92,9 +93,9 @@ fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(TxIncrement::sign(&pubkey, 5, &key));
+    testkit.create_block_with_transaction(TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key));
     // Create another block with the same transaction
-    testkit.create_block_with_transaction(TxIncrement::sign(&pubkey, 5, &key));
+    testkit.create_block_with_transaction(TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key));
 }
 
 #[test]
@@ -179,7 +180,7 @@ fn test_private_api() {
     );
     assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
 
-    let tx = TxReset::sign(&pubkey, &key);
+    let tx = TxReset.sign(SERVICE_ID, pubkey, &key);
     let tx_info: TransactionResponse = api
         .private(ApiKind::Service("counter"))
         .query(&tx)
@@ -201,7 +202,7 @@ fn test_probe() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
+        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
     };
 
     let snapshot = testkit.probe(tx.clone());
@@ -216,7 +217,7 @@ fn test_probe() {
 
     let other_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 3, &key)
+        TxIncrement::new(3).sign(SERVICE_ID, pubkey, &key)
     };
 
     let snapshot = testkit.probe_all(txvec![tx.clone(), other_tx.clone()]);
@@ -268,18 +269,18 @@ fn test_probe_advanced() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 6, &key)
+        TxIncrement::new(6).sign(SERVICE_ID, pubkey, &key)
     };
     let other_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 10, &key)
+        TxIncrement::new(10).sign(SERVICE_ID, pubkey, &key)
     };
     let admin_tx = {
         let (pubkey, key) = crypto::gen_keypair_from_seed(
             &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
         );
         assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-        TxReset::sign(&pubkey, &key)
+        TxReset.sign(SERVICE_ID, pubkey, &key)
     };
 
     let snapshot = testkit.probe(tx.clone());
@@ -359,7 +360,7 @@ fn test_snapshot_comparison() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
+        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
     };
     testkit
         .probe(tx.clone())
@@ -374,7 +375,7 @@ fn test_snapshot_comparison() {
 
     let other_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 3, &key)
+        TxIncrement::new(3).sign(SERVICE_ID, pubkey, &key)
     };
     testkit
         .probe(other_tx.clone())
@@ -392,7 +393,7 @@ fn test_snapshot_comparison_panic() {
     let increment_by = 5;
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, increment_by, &key)
+        TxIncrement::new(increment_by).sign(SERVICE_ID, pubkey, &key)
     };
 
     api.send(tx.clone());
@@ -415,7 +416,7 @@ fn create_sample_block(testkit: &mut TestKit) {
     if height == 2 || height == 5 {
         let tx = {
             let (pubkey, key) = crypto::gen_keypair();
-            TxIncrement::sign(&pubkey, height as u64, &key)
+            TxIncrement::new(height as u64).sign(SERVICE_ID, pubkey, &key)
         };
         testkit.api().send(tx.clone());
     }
@@ -710,7 +711,7 @@ fn test_explorer_single_block() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
+        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
     };
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
@@ -752,7 +753,7 @@ fn test_explorer_transaction_info() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
+        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
     };
 
     let info = api
@@ -823,15 +824,15 @@ fn test_explorer_transaction_statuses() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
+        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
     };
     let error_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 0, &key)
+        TxIncrement::new(0).sign(SERVICE_ID, pubkey, &key)
     };
     let panicking_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, u64::max_value() - 3, &key)
+        TxIncrement::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key)
     };
 
     let block = testkit.create_block_with_transactions(txvec![
@@ -888,7 +889,7 @@ fn test_boxed_tx() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
+        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
     };
 
     api.send(tx);
