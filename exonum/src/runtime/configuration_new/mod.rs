@@ -22,10 +22,7 @@ use crate::{
     runtime::{
         dispatcher::{Action, BuiltinService},
         error::ExecutionError,
-        rust::{
-            service::{Service, ServiceFactory},
-            RustArtifactSpec, TransactionContext,
-        },
+        rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ServiceConstructor, ServiceInstanceSpec,
     },
 };
@@ -223,7 +220,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
 impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
 
 impl Service for ConfigurationServiceImpl {
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
         ConfigurationSchema::new(snapshot).state_hash()
     }
 }

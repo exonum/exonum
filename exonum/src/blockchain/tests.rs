@@ -14,7 +14,7 @@
 
 #![allow(dead_code, unsafe_code)]
 
-use exonum_merkledb::{Database, Error as StorageError, Fork, ListIndex, ObjectHash, TemporaryDB};
+use exonum_merkledb::{Database, Error as StorageError, ListIndex, ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
 
 use crate::{
@@ -89,9 +89,9 @@ struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
-    fn before_commit(&self, fork: &Fork) {
+    fn before_commit(&self, context: TransactionContext) {
         debug!("ServiceGood: before commit");
-        let mut index = ListIndex::new(IDX_NAME, fork);
+        let mut index = ListIndex::new(IDX_NAME, context.fork());
         index.push(1);
     }
 }
@@ -117,7 +117,7 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn before_commit(&self, _fork: &Fork) {
+    fn before_commit(&self, _context: TransactionContext) {
         panic!("42");
     }
 }
@@ -143,7 +143,7 @@ struct ServicePanicStorageErrorImpl;
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn before_commit(&self, _fork: &Fork) {
+    fn before_commit(&self, _context: TransactionContext) {
         panic!(StorageError::new("42"));
     }
 }

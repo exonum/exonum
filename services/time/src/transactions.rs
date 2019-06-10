@@ -85,8 +85,13 @@ impl TxTime {
         }
     }
 
-    pub(crate) fn update_validator_time(&self, fork: &Fork, author: &PublicKey) -> ExecutionResult {
-        let schema = TimeSchema::new(fork);
+    pub(crate) fn update_validator_time(
+        &self,
+        service_name: &str,
+        fork: &Fork,
+        author: &PublicKey,
+    ) -> ExecutionResult {
+        let schema = TimeSchema::new(service_name, fork);
         let mut validators_times = schema.validators_times();
         match validators_times.get(author) {
             // The validator time in the storage should be less than in the transaction.
@@ -99,9 +104,9 @@ impl TxTime {
         }
     }
 
-    pub(crate) fn update_consolidated_time(fork: &Fork) {
+    pub(crate) fn update_consolidated_time(service_name: &str, fork: &Fork) {
         let keys = Schema::new(fork).actual_configuration().validator_keys;
-        let schema = TimeSchema::new(fork);
+        let schema = TimeSchema::new(service_name, fork);
 
         // Find all known times for the validators.
         let validator_times = {

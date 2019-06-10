@@ -44,24 +44,20 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::ExecutionResult,
     crypto::Hash,
-    helpers::fabric::{self, Context},
+    helpers::fabric::Context,
     impl_service_dispatcher,
     runtime::rust::{
-        AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext,
+        AfterCommitContext, RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory,
+        ServiceInstanceId, TransactionContext,
     },
 };
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::Snapshot;
 
 use crate::{
     schema::TimeSchema,
     time_provider::{SystemTimeProvider, TimeProvider},
     transactions::TxTime,
 };
-
-/// Time service id.
-pub const SERVICE_ID: u16 = 4;
-/// Time service name.
-pub const SERVICE_NAME: &str = "exonum_time";
 
 #[service_interface]
 pub trait TimeOracleInterface {
@@ -97,9 +93,11 @@ impl TimeOracleInterface for TimeService {
     fn time(&self, context: TransactionContext, arg: TxTime) -> ExecutionResult {
         let author = context.author();
         let view = context.fork();
+        let service_name = context.service_name();
+
         arg.check_signed_by_validator(view.as_ref(), &author)?;
-        arg.update_validator_time(view, &author)?;
-        TxTime::update_consolidated_time(view);
+        arg.update_validator_time(service_name, view, &author)?;
+        TxTime::update_consolidated_time(service_name, view);
         Ok(())
     }
 }
@@ -107,13 +105,14 @@ impl TimeOracleInterface for TimeService {
 impl_service_dispatcher!(TimeService, TimeOracleInterface);
 
 impl Service for TimeService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi::wire(builder);
-        api::PrivateApi::wire(builder);
+    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+        let name = descriptor.service_name();
+        api::PublicApi::new(name).wire(builder);
+        api::PrivateApi::new(name).wire(builder);
     }
 
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = TimeSchema::new(snapshot);
+    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = TimeSchema::new(descriptor.service_name(), snapshot);
         schema.state_hash()
     }
 
@@ -135,7 +134,7 @@ pub struct TimeServiceFactory;
 
 impl ServiceFactory for TimeServiceFactory {
     fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
+        RustArtifactSpec::new("exonum-time", 0, 1, 0)
     }
 
     fn new_instance(&self) -> Box<dyn Service> {

@@ -201,8 +201,7 @@ pub mod contracts {
         blockchain::ExecutionResult,
         impl_service_dispatcher,
         runtime::rust::{
-            service::{Service, ServiceFactory},
-            RustArtifactSpec, TransactionContext,
+            RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
         },
     };
 
@@ -282,7 +281,7 @@ pub mod contracts {
     impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
 
     impl Service for CryptocurrencyServiceImpl {
-        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
             CryptocurrencyApi::wire(builder);
         }
     }

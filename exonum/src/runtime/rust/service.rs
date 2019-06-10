@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::Snapshot;
 use failure::Error;
 use protobuf::well_known_types::Any;
 
@@ -40,25 +40,47 @@ pub trait ServiceDispatcher: Send {
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    fn initialize(&self, _ctx: TransactionContext, _arg: &Any) -> Result<(), ExecutionError> {
+    fn configure(&self, _context: TransactionContext, _params: &Any) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn before_commit(&self, _fork: &Fork) {}
-
-    fn after_commit(&self, _context: AfterCommitContext) {}
-
-    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: ServiceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
+    fn before_commit(&self, _context: TransactionContext) {}
+
+    fn after_commit(&self, _context: AfterCommitContext) {}
+
+    fn wire_api(&self, _descriptor: ServiceDescriptor, _builder: &mut ServiceApiBuilder) {}
     // TODO: add other hooks such as "on node startup", etc.
 }
 
 pub trait ServiceFactory: Send + Debug + 'static {
     fn artifact(&self) -> RustArtifactSpec;
     fn new_instance(&self) -> Box<dyn Service>;
+}
+
+#[derive(Debug)]
+pub struct ServiceDescriptor<'a> {
+    id: ServiceInstanceId,
+    name: &'a str,
+}
+
+impl<'a> ServiceDescriptor<'a> {
+    pub(crate) fn new(id: ServiceInstanceId, name: &'a str) -> Self {
+        Self { id, name }
+    }
+
+    /// Returns the current service instance identifier.
+    pub fn service_id(&self) -> ServiceInstanceId {
+        self.id
+    }
+
+    /// Returns the current service instance name.
+    pub fn service_name(&self) -> &str {
+        self.name
+    }
 }
 
 impl<T> From<T> for Box<dyn ServiceFactory>
@@ -70,27 +92,37 @@ where
     }
 }
 
-pub struct AfterCommitContext<'a, 'b, 'c> {
-    service_id: ServiceInstanceId,
+pub struct AfterCommitContext<'a> {
+    service_descriptor: ServiceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
-    service_keypair: &'b (PublicKey, SecretKey),
-    tx_sender: &'c ApiSender,
+    service_keypair: &'a (PublicKey, SecretKey),
+    tx_sender: &'a ApiSender,
 }
 
-impl<'a, 'b, 'c> AfterCommitContext<'a, 'b, 'c> {
+impl<'a> AfterCommitContext<'a> {
     /// Creates context for `after_commit` method.
     pub(crate) fn new(
-        service_id: ServiceInstanceId,
+        service_descriptor: ServiceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
-        service_keypair: &'b (PublicKey, SecretKey),
-        tx_sender: &'c ApiSender,
+        service_keypair: &'a (PublicKey, SecretKey),
+        tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
+            service_descriptor,
             snapshot,
             service_keypair,
             tx_sender,
-            service_id,
         }
+    }
+
+    /// Returns the current service instance identifier.
+    pub fn service_id(&self) -> ServiceInstanceId {
+        self.service_descriptor.service_id()
+    }
+
+    /// Returns the current service instance name.
+    pub fn service_name(&self) -> &str {
+        self.service_descriptor.service_name()
     }
 
     /// Returns the current blockchain height. This height is "height of the last committed block".
@@ -102,7 +134,7 @@ impl<'a, 'b, 'c> AfterCommitContext<'a, 'b, 'c> {
     pub fn broadcast_transaction(&self, tx: impl Into<ServiceTransaction>) {
         let msg = Message::sign_transaction(
             tx,
-            self.service_id,
+            self.service_id(),
             self.service_keypair.0,
             &self.service_keypair.1,
         );
@@ -121,10 +153,10 @@ impl<'a, 'b, 'c> AfterCommitContext<'a, 'b, 'c> {
     }
 }
 
-impl<'a, 'b, 'c> Debug for AfterCommitContext<'a, 'b, 'c> {
+impl<'a> Debug for AfterCommitContext<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
-            .field("service_id", &self.service_id)
+            .field("service_descriptor", &self.service_descriptor)
             .finish()
     }
 }

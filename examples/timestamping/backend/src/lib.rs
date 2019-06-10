@@ -46,8 +46,7 @@ use exonum::{
     helpers::fabric,
     impl_service_dispatcher,
     runtime::rust::{
-        service::{Service, ServiceFactory},
-        RustArtifactSpec, TransactionContext,
+        RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
     },
 };
 use exonum_time::schema::TimeSchema;
@@ -71,7 +70,8 @@ pub struct TimestampingServiceImpl;
 impl Timestamping for TimestampingServiceImpl {
     fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult {
         let tx_hash = context.tx_hash();
-        let time = TimeSchema::new(context.fork())
+        // TODO Add exonum time oracle name to service configuration parameters.
+        let time = TimeSchema::new("exonum-time", context.fork())
             .time()
             .get()
             .expect("Can't get the time");
@@ -94,11 +94,11 @@ impl Timestamping for TimestampingServiceImpl {
 impl_service_dispatcher!(TimestampingServiceImpl, Timestamping);
 
 impl Service for TimestampingServiceImpl {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
         TimestampingApi::wire(builder);
     }
 
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(snapshot);
         schema.state_hash()
     }
