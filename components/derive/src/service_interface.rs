@@ -53,28 +53,6 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
     }
 }
 
-fn implement_into_service_tx(
-    methods: &[ServiceMethodDescriptor],
-    cr: &dyn ToTokens,
-) -> impl quote::ToTokens {
-    let into_service_tx = methods
-        .iter()
-        .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
-            quote! {
-                impl From<#arg_type> for #cr::messages::ServiceTransaction {
-                    fn from(value: #arg_type) -> Self {
-                        let arg = exonum_merkledb::BinaryValue::into_bytes(value);
-                        #cr::messages::ServiceTransaction::from_raw_unchecked(#id as u16, arg)
-                    }
-                }
-            }
-        });
-
-    quote! {
-        #( #into_service_tx )*
-    }
-}
-
 fn implement_transaction_for_methods(
     trait_name: &Ident,
     methods: &[ServiceMethodDescriptor],

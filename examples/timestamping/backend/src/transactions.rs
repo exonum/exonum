@@ -14,11 +14,7 @@
 
 //! Timestamping transactions.
 
-use exonum::{
-    blockchain::ExecutionError,
-    messages::{AnyTx, Signed},
-    runtime::ServiceInstanceId,
-};
+use exonum::blockchain::ExecutionError;
 
 use super::proto;
 use crate::schema::Timestamp;
