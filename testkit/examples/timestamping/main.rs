@@ -22,13 +22,9 @@ extern crate exonum_derive;
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{ExecutionResult, Schema},
-    crypto::{gen_keypair, PublicKey, SecretKey},
+    crypto::gen_keypair,
     impl_service_dispatcher,
-    messages::{AnyTx, Message, Signed},
-    runtime::{
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
-        ServiceInstanceId,
-    },
+    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, ServiceInstances, TestKitBuilder};
@@ -44,20 +40,10 @@ struct TxTimestamp {
 }
 
 impl TxTimestamp {
-    fn sign(
-        instance_id: ServiceInstanceId,
-        author: &PublicKey,
-        message: &str,
-        key: &SecretKey,
-    ) -> Signed<AnyTx> {
-        Message::sign_transaction(
-            Self {
-                message: message.to_owned(),
-            },
-            instance_id,
-            *author,
-            key,
-        )
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
     }
 }
 
@@ -101,9 +87,9 @@ fn main() {
         .create();
     // Create few transactions.
     let keypair = gen_keypair();
-    let tx1 = TxTimestamp::sign(instance_id, &keypair.0, "Down To Earth", &keypair.1);
-    let tx2 = TxTimestamp::sign(instance_id, &keypair.0, "Cry Over Spilt Milk", &keypair.1);
-    let tx3 = TxTimestamp::sign(instance_id, &keypair.0, "Dropping Like Flies", &keypair.1);
+    let tx1 = TxTimestamp::new("Down To Earth").sign(instance_id, keypair.0, &keypair.1);
+    let tx2 = TxTimestamp::new("Cry Over Spilt Milk").sign(instance_id, keypair.0, &keypair.1);
+    let tx3 = TxTimestamp::new("Dropping Like Flies").sign(instance_id, keypair.0, &keypair.1);
 
     // Commit them into blockchain.
     let block =

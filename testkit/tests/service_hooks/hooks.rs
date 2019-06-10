@@ -40,7 +40,7 @@ pub struct TxAfterCommit {
 }
 
 #[service_interface]
-trait AfterCommitInterface {
+pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,
         context: TransactionContext,

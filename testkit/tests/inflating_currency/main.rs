@@ -24,6 +24,7 @@ use exonum::{
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, BinaryValue, Signed},
+    runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{txvec, ApiKind, ServiceInstances, TestKit, TestKitApi, TestKitBuilder};
@@ -51,7 +52,10 @@ fn init_testkit() -> TestKit {
 fn create_wallet(api: &TestKitApi, name: &str) -> (Signed<AnyTx>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    let tx = TxCreateWallet::sign(name, &pubkey, &key);
+    let tx = TxCreateWallet {
+        name: name.to_owned(),
+    }
+    .sign(SERVICE_ID, pubkey, &key);
 
     let data = hex::encode(tx.to_bytes());
     let tx_info: TransactionResponse = api
@@ -97,20 +101,20 @@ fn test_transfer_scenarios() {
     assert_eq!(get_balance(&api, &tx_bob.author()), 9);
 
     // Transfer funds
-    let tx_a_to_b = TxTransfer::sign(
-        &tx_bob.author(),
-        5, // amount
-        0, // seed
-        &tx_alice.author(),
-        &key_alice,
-    );
-    let next_tx_a_to_b = TxTransfer::sign(
-        &tx_bob.author(),
-        6, // amount
-        1, // seed
-        &tx_alice.author(),
-        &key_alice,
-    );
+    let tx_a_to_b = TxTransfer {
+        to: tx_bob.author(),
+        amount: 5,
+        seed: 0,
+    }
+    .sign(SERVICE_ID, tx_alice.author(), &key_alice);
+
+    let next_tx_a_to_b = TxTransfer {
+        to: tx_bob.author(),
+        amount: 6,
+        seed: 1,
+    }
+    .sign(SERVICE_ID, tx_alice.author(), &key_alice);
+
     // Put transactions from A to B in separate blocks, allowing them both to succeed.
     testkit.checkpoint();
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
@@ -164,7 +168,10 @@ fn test_fuzz_transfers() {
     let keys_and_txs: Vec<_> = (0..USERS)
         .map(|i| {
             let (pubkey, key) = crypto::gen_keypair();
-            let tx = TxCreateWallet::sign(&format!("User #{}", i), &pubkey, &key);
+            let tx = TxCreateWallet {
+                name: format!("User #{}", i),
+            }
+            .sign(SERVICE_ID, pubkey, &key);
             (key, tx)
         })
         .collect();
@@ -188,7 +195,12 @@ fn test_fuzz_transfers() {
             let receiver = &pubkeys[rng.gen_range(0, USERS)];
             let amount = rng.gen_range(1, 2 * height);
 
-            TxTransfer::sign(receiver, amount, rng.gen::<u64>(), sender, sender_key)
+            TxTransfer {
+                to: *receiver,
+                amount,
+                seed: rng.gen::<u64>(),
+            }
+            .sign(SERVICE_ID, *sender, sender_key)
         });
         testkit.create_block_with_transactions(txs);
     }

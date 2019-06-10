@@ -486,12 +486,12 @@ mod tests {
         crypto,
         helpers::{Height, ValidatorId},
         impl_service_dispatcher,
-        messages::{Message, ServiceInstanceId},
+        messages::{ServiceInstanceId},
         node::ApiSender,
         proto::schema::tests::TestServiceTx,
         runtime::{
             dispatcher::{BuiltinService, DispatcherBuilder},
-            rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+            rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext, Transaction},
         },
     };
 
@@ -689,12 +689,8 @@ mod tests {
 
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-            let transaction = Message::sign_transaction(
-                TxResult { value: index },
-                TX_CHECK_RESULT_SERVICE_ID,
-                pk,
-                &sec_key,
-            );
+            let transaction =
+                TxResult { value: index }.sign(TX_CHECK_RESULT_SERVICE_ID, pk, &sec_key);
             let hash = transaction.object_hash();
             {
                 let fork = blockchain.fork();

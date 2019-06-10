@@ -53,25 +53,25 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
     }
 }
 
-fn implement_into_service_tx(
+fn implement_transaction_for_methods(
+    trait_name: &Ident,
     methods: &[ServiceMethodDescriptor],
     cr: &dyn ToTokens,
 ) -> impl quote::ToTokens {
-    let into_service_tx = methods
+    let transactions_for_methods = methods
         .iter()
         .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
             quote! {
-                impl From<#arg_type> for #cr::messages::ServiceTransaction {
-                    fn from(value: #arg_type) -> Self {
-                        let arg = exonum_merkledb::BinaryValue::into_bytes(value);
-                        #cr::messages::ServiceTransaction::from_raw_unchecked(#id as u16, arg)
-                    }
+                impl #cr::runtime::rust::Transaction for #arg_type {
+                    type Service = &'static dyn #trait_name;
+
+                    const METHOD_ID: #cr::messages::MethodId = #id;
                 }
             }
         });
 
     quote! {
-        #( #into_service_tx )*
+        #( #transactions_for_methods )*
     }
 }
 
@@ -140,11 +140,11 @@ pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStre
     };
     trait_item.items.push(TraitItem::Method(dispatch_method));
 
-    let into_service_tx = implement_into_service_tx(&methods, &cr);
+    let txs_for_methods = implement_transaction_for_methods(&trait_item.ident, &methods, &cr);
 
     let expanded = quote! {
         #trait_item
-        #into_service_tx
+        #txs_for_methods
     };
     expanded.into()
 }

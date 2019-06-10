@@ -163,8 +163,10 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         impl_service_dispatcher,
-        messages::{AnyTx, Message, Signed},
-        runtime::rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        messages::{AnyTx, Signed},
+        runtime::rust::{
+            RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext,
+        },
     };
     use exonum_merkledb::ObjectHash;
 
@@ -186,14 +188,10 @@ mod tests {
     impl TxTimestamp {
         fn for_str(s: &str) -> Signed<AnyTx> {
             let (pubkey, key) = gen_keypair();
-            Message::sign_transaction(
-                Self {
-                    message: s.to_owned(),
-                },
-                TIMESTAMP_SERVICE_ID,
-                pubkey,
-                &key,
-            )
+            Self {
+                message: s.to_owned(),
+            }
+            .sign(TIMESTAMP_SERVICE_ID, pubkey, &key)
         }
     }
 

@@ -14,16 +14,10 @@
 
 //! Timestamping transactions.
 
-use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
-    crypto::{PublicKey, SecretKey},
-    messages::{AnyTx, Message, Signed},
-    runtime::ServiceInstanceId,
-};
-use exonum_time::schema::TimeSchema;
+use exonum::blockchain::ExecutionError;
 
 use super::proto;
-use crate::schema::{Schema, Timestamp, TimestampEntry};
+use crate::schema::Timestamp;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -47,39 +41,4 @@ impl From<Error> for ExecutionError {
 pub struct TxTimestamp {
     /// Timestamp content.
     pub content: Timestamp,
-}
-
-impl TxTimestamp {
-    #[doc(hidden)]
-    pub fn new_signed(
-        instance_id: ServiceInstanceId,
-        author: &PublicKey,
-        content: Timestamp,
-        key: &SecretKey,
-    ) -> Signed<AnyTx> {
-        Message::sign_transaction(Self { content }, instance_id, *author, key)
-    }
-}
-
-impl Transaction for TxTimestamp {
-    fn execute(&self, context: TransactionContext) -> ExecutionResult {
-        let tx_hash = context.tx_hash();
-        // TODO Add exonum time oracle name to service configuration parameters.
-        let time = TimeSchema::new("exonum-time", context.fork())
-            .time()
-            .get()
-            .expect("Can't get the time");
-
-        let hash = &self.content.content_hash;
-
-        let schema = Schema::new(context.fork());
-        if let Some(_entry) = schema.timestamps().get(hash) {
-            Err(Error::HashAlreadyExists)?;
-        }
-
-        trace!("Timestamp added: {:?}", self);
-        let entry = TimestampEntry::new(self.content.clone(), &tx_hash, time);
-        schema.add_timestamp(entry);
-        Ok(())
-    }
 }

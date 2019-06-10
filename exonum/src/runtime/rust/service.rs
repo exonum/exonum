@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{BinaryValue, Snapshot};
 use failure::Error;
 use protobuf::well_known_types::Any;
 
@@ -131,14 +131,12 @@ impl<'a> AfterCommitContext<'a> {
     }
 
     /// Signs and broadcasts transaction to other nodes in the network.
-    pub fn broadcast_transaction(&self, tx: impl Into<ServiceTransaction>) {
-        let msg = Message::sign_transaction(
-            tx,
+    pub fn broadcast_transaction(&self, tx: impl Transaction) {
+        let msg = tx.sign(
             self.service_id(),
             self.service_keypair.0,
             &self.service_keypair.1,
         );
-
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }
@@ -158,6 +156,28 @@ impl<'a> Debug for AfterCommitContext<'a> {
         f.debug_struct("AfterCommitContext")
             .field("service_descriptor", &self.service_descriptor)
             .finish()
+    }
+}
+
+pub trait Transaction: BinaryValue {
+    /// Service interface associated for the given transaction.
+    type Service;
+    /// Identifier of service method which executes the given transaction.
+    const METHOD_ID: MethodId;
+    /// Signs given data as service transaction with the specified identifier.
+    fn sign(
+        self,
+        service_id: ServiceInstanceId,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Signed<AnyTx> {
+        let payload = Self::into_bytes(self);
+        Message::sign_transaction(
+            ServiceTransaction::from_raw_unchecked(service_id as u16, payload),
+            service_id,
+            public_key,
+            secret_key,
+        )
     }
 }
 

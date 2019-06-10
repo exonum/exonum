@@ -21,7 +21,7 @@ use exonum::{
     impl_service_dispatcher,
     messages::{AnyTx, Message, Signed},
     runtime::{
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext, Transaction, ServiceDescriptor},
         ServiceInstanceId,
     },
 };
@@ -77,7 +77,7 @@ impl<'a, T: IndexAccess> CounterSchema<T> {
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::TxReset")]
-pub struct TxReset {}
+pub struct TxReset;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::TxIncrement")]
@@ -89,20 +89,10 @@ impl TxIncrement {
     pub fn new(by: u64) -> Self {
         Self { by }
     }
-
-    pub fn sign(author: &PublicKey, by: u64, key: &SecretKey) -> Signed<AnyTx> {
-        Message::sign_transaction(Self::new(by), SERVICE_ID, *author, key)
-    }
-}
-
-impl TxReset {
-    pub fn sign(author: &PublicKey, key: &SecretKey) -> Signed<AnyTx> {
-        Message::sign_transaction(Self {}, SERVICE_ID, *author, key)
-    }
 }
 
 #[service_interface]
-trait CounterServiceInterface {
+pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
     fn increment(&self, context: TransactionContext, arg: TxIncrement) -> ExecutionResult;

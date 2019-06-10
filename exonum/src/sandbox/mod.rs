@@ -1191,7 +1191,7 @@ mod tests {
         messages::{AnyTx, ServiceInstanceId},
         proto::schema::tests::TxAfterCommit,
         runtime::rust::{
-            AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext,
+            AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext, Transaction,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1199,7 +1199,7 @@ mod tests {
     use super::*;
 
     #[service_interface(exonum(crate = "crate"))]
-    trait AfterCommitInterface {
+    pub trait AfterCommitInterface {
         fn after_commit(&self, context: TransactionContext, arg: TxAfterCommit) -> ExecutionResult;
     }
 
@@ -1258,7 +1258,7 @@ mod tests {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
             let mut payload_tx = TxAfterCommit::new();
             payload_tx.set_height(height.0);
-            Message::sign_transaction(payload_tx, AfterCommitService::ID, keypair.0, &keypair.1)
+            payload_tx.sign(AfterCommitService::ID, keypair.0, &keypair.1)
         }
     }
 

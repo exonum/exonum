@@ -15,12 +15,11 @@
 use exonum::{
     api,
     blockchain::{ExecutionError, ExecutionResult, Schema as CoreSchema},
-    crypto::{PublicKey, SecretKey},
+    crypto::{PublicKey},
     helpers::Height,
     impl_service_dispatcher,
-    messages::{AnyTx, Message, Signed},
     runtime::{
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext, ServiceDescriptor},
         ServiceInstanceId,
     },
 };
@@ -104,49 +103,22 @@ impl<T: IndexAccess> CurrencySchema<T> {
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::TxCreateWallet")]
 pub struct TxCreateWallet {
-    name: String,
+    pub name: String,
 }
 
 /// Transfer coins between the wallets.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::TxTransfer")]
 pub struct TxTransfer {
-    to: PublicKey,
-    amount: u64,
-    seed: u64,
-}
-
-impl TxCreateWallet {
-    #[doc(hidden)]
-    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
-        Message::sign_transaction(
-            Self {
-                name: name.to_owned(),
-            },
-            SERVICE_ID,
-            *pk,
-            sk,
-        )
-    }
-}
-
-impl TxTransfer {
-    #[doc(hidden)]
-    pub fn sign(
-        &to: &PublicKey,
-        amount: u64,
-        seed: u64,
-        pk: &PublicKey,
-        sc: &SecretKey,
-    ) -> Signed<AnyTx> {
-        Message::sign_transaction(Self { to, amount, seed }, SERVICE_ID, *pk, sc)
-    }
+    pub to: PublicKey,
+    pub amount: u64,
+    pub seed: u64,
 }
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
 #[service_interface]
-pub(in crate::inflating_cryptocurrency) trait CurrencyInterface {
+pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
     fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
     /// Retrieve two wallets to apply the transfer. Check the sender's
