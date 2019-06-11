@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::BinaryValue;
+use failure::ensure;
 use futures::{
     future::{self, Either, Executor},
     sync::mpsc,
@@ -51,12 +52,16 @@ impl InternalPart {
         raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(|| SignedMessage::from_bytes(raw.into()).and_then(Message::deserialize))
-            .map_err(drop)
-            .and_then(|protocol| {
-                let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
-                Self::send_event(event, internal_tx)
-            })
+        future::lazy(|| {
+            let signed = SignedMessage::from_bytes(raw.into())?;
+            ensure!(signed.verify(), "Failed to verify signature.");
+            Message::deserialize(signed)
+        })
+        .map_err(drop)
+        .and_then(|protocol| {
+            let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
+            Self::send_event(event, internal_tx)
+        })
     }
 
     /// Represents a task that processes Internal Requests and produces Internal Events.

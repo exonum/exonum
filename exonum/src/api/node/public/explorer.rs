@@ -251,6 +251,9 @@ impl ExplorerApi {
     ) -> Result<TransactionResponse, ApiError> {
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::from_bytes(buf.into())?;
+        if !signed.verify() {
+            return Err(ApiError::BadRequest("Failed to verify signature.".into()));
+        }
         let tx_hash = signed.object_hash();
         let signed = AnyTx::try_from(Message::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
