@@ -715,9 +715,9 @@ impl BlockResponse {
 impl Precommit {
     /// Verify precommits signature and return it's safer wrapper
     pub(crate) fn verify_precommit(buffer: Vec<u8>) -> Result<Signed<Precommit>, failure::Error> {
-        let signed = SignedMessage::from_bytes(buffer.into())?;
-        ensure!(signed.verify(), "Failed to verify signature.");
-        Message::deserialize(signed)
+        SignedMessage::from_bytes(buffer.into())
+            .and_then(SignedMessage::verify)
+            .and_then(Message::deserialize)
             .and_then(|m| match m {
                 Message::Consensus(Consensus::Precommit(msg)) => Ok(msg),
                 _ => bail!("Wrong message type."),
