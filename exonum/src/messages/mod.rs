@@ -148,12 +148,15 @@ impl<T> ToHex for Signed<T> {
     }
 }
 
+/// Warning: This implementation checks signature which is slow operation.
 impl<X: ProtocolMessage> FromHex for Signed<X> {
     type Error = Error;
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        let protocol = Message::deserialize(SignedMessage::from_bytes(bytes.into())?)?;
+        let protocol = SignedMessage::from_bytes(bytes.into())
+            .and_then(SignedMessage::verify)
+            .and_then(Message::deserialize)?;
         ProtocolMessage::try_from(protocol)
             .map_err(|_| format_err!("Couldn't deserialize message."))
     }
@@ -211,6 +214,7 @@ impl<T> Serialize for Signed<T> {
     }
 }
 
+/// Warning: This implementation checks signature which is slow operation.
 impl<'de, T> Deserialize<'de> for Signed<T>
 where
     T: ProtocolMessage,

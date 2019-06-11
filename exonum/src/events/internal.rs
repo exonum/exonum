@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum_merkledb::BinaryValue;
-use failure::ensure;
 use futures::{
     future::{self, Either, Executor},
     sync::mpsc,
@@ -53,9 +52,9 @@ impl InternalPart {
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
         future::lazy(|| {
-            let signed = SignedMessage::from_bytes(raw.into())?;
-            ensure!(signed.verify(), "Failed to verify signature.");
-            Message::deserialize(signed)
+            SignedMessage::from_bytes(raw.into())
+                .and_then(SignedMessage::verify)
+                .and_then(Message::deserialize)
         })
         .map_err(drop)
         .and_then(|protocol| {

@@ -11,6 +11,9 @@ use crate::{
     proto::{self, ProtobufConvert},
 };
 
+// FIXME: For the moment, for performance reasons, we have disabled signature verification
+// here and we MUST implement [ECR-3272] task to fix possible security vulnerabilities.
+
 /// `SignedMessage` will verify the size of the buffer and the signature provided in it.
 /// This allows to keep the raw message buffer, but avoid verifying its signature again
 /// as every `SignedMessage` instance is guaranteed to have a correct signature.
@@ -31,11 +34,7 @@ impl SignedMessage {
             sign: signature,
         };
 
-        if msg.verify() {
-            msg
-        } else {
-            panic!("Can't verify signature with given public key.");
-        }
+        msg.verify().expect("Can't verify signature with given public key.")
     }
 
     fn from_pb_no_verify(mut pb: <Self as ProtobufConvert>::ProtoStruct) -> Result<Self, Error> {
@@ -46,8 +45,13 @@ impl SignedMessage {
         })
     }
 
-    pub fn verify(&self) -> bool {
-        crypto::verify(&self.sign, &self.exonum_msg, &self.key)
+    /// Verifies message signature.
+    pub fn verify(self) -> Result<Self, failure::Error> {
+        if !crypto::verify(&self.sign, &self.exonum_msg, &self.key) {
+            Err(format_err!("Failed to verify signature."))
+        } else {
+            Ok(self)
+        }
     }
 
     /// Key which was used to create signature.
@@ -96,8 +100,6 @@ impl BinaryValue for SignedMessage {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
-        // FIXME: For the moment, for performance reasons, we have disabled signature verification
-        // here and we MUST implement [ECR-3272] task to fix possible security vulnerabilities.
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
         pb.merge_from_bytes(&value)?;
         Self::from_pb(pb)
@@ -135,13 +137,7 @@ impl<'de> Deserialize<'de> for SignedMessage {
             sign: des_msg.sign,
         };
 
-        if msg.verify() {
-            Ok(msg)
-        } else {
-            Err(de::Error::custom(format_err!(
-                "Can't verify message signature"
-            )))
-        }
+        msg.verify().map_err(de::Error::custom)
     }
 }
 
@@ -161,6 +157,6 @@ impl FromHex for SignedMessage {
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<SignedMessage, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        Self::from_bytes(bytes.into()).map_err(Error::from)
+        Self::from_bytes(bytes.into()).map_err(Error::from).and_then(Self::verify)
     }
 }
