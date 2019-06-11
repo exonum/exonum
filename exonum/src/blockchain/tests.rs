@@ -22,7 +22,7 @@ use crate::{
     crypto::gen_keypair,
     helpers::{Height, ValidatorId},
     impl_service_dispatcher,
-    messages::{ServiceInstanceId},
+    messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
@@ -207,6 +207,7 @@ fn create_blockchain_with_service(
 
 #[test]
 fn handling_tx_panic_error() {
+    let _ = crate::helpers::init_logger();
     let mut blockchain = create_blockchain();
 
     let (pk, sec_key) = gen_keypair();

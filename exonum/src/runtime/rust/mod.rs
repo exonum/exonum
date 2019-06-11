@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::service::{AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction};
+pub use self::service::{
+    AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction,
+};
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
@@ -283,6 +285,7 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
+        debug!("Execute: {:?}", call_info);
         let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
 
         let context = TransactionContext {

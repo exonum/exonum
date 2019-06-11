@@ -111,6 +111,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
     `(bits_len + 7) / 8` bytes.
 
+### New features
+
+#### exonum
+
+- New endpoint: `v1/transactions/subscribe`, which subscribe to new transaction events.
+  This endpoint accept optional parameters: `service_id` and `message_id`
+  (`message_id` as in derive macro `TransactionSet`). (#1335)
+
+- New endpoint: `v1/ws`, which open websocket connection and allow to set multiple
+  subscription (for blocks and transaction, filtered by service and transaction id)
+  and send transactions (in hex, like in explorer) to blockchain
+  (examples can be found in related pull request). (#1335)
+
 ### Bug Fixes
 
 #### exonum-testkit

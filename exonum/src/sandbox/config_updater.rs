@@ -28,7 +28,7 @@ use crate::{
     proto::ProtobufConvert,
     runtime::{
         dispatcher::BuiltinService,
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext, Transaction},
+        rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
     },
 };
 

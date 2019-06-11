@@ -6,6 +6,7 @@ import actual from './data/actual.json'
 import txNotAccepted from './data/not-accepted.json'
 import txAccepted from './data/accepted.json'
 import proof from './data/proof.json'
+import 'babel-polyfill';
 
 const mock = new MockAdapter(axios)
 const hexRegex = /[0-9A-Fa-f]+/i

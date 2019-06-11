@@ -37,7 +37,7 @@ pub mod manager;
 pub mod node;
 
 mod state;
-pub(crate) mod websocket;
+pub mod websocket;
 mod with;
 
 /// Defines an object that could be used as an API backend.

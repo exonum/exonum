@@ -59,7 +59,7 @@ pub fn sample_blockchain() -> Blockchain {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    
+
     let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
     let tx_bob = CreateWallet::new(&pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);

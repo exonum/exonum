@@ -486,12 +486,12 @@ mod tests {
         crypto,
         helpers::{Height, ValidatorId},
         impl_service_dispatcher,
-        messages::{ServiceInstanceId},
+        messages::ServiceInstanceId,
         node::ApiSender,
         proto::schema::tests::TestServiceTx,
         runtime::{
             dispatcher::{BuiltinService, DispatcherBuilder},
-            rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext, Transaction},
+            rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
         },
     };
 
