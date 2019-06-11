@@ -317,6 +317,7 @@ impl Handler<Transaction> for Server {
     ) -> Self::Result {
         let buf: Vec<u8> = hex::decode(tx.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::from_bytes(buf.into())?;
+        ensure!(signed.verify(), "Failed to verify signature.");
         let tx_hash = signed.object_hash();
         let signed = AnyTx::try_from(ExonumMessage::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;

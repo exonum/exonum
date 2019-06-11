@@ -46,7 +46,7 @@ impl SignedMessage {
         })
     }
 
-    fn verify(&self) -> bool {
+    pub fn verify(&self) -> bool {
         crypto::verify(&self.sign, &self.exonum_msg, &self.key)
     }
 
@@ -83,20 +83,21 @@ impl ProtobufConvert for SignedMessage {
         msg
     }
 
+    /// Warning: This implementation doesn't check signature.
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         let msg = Self::from_pb_no_verify(pb)?;
-        ensure!(msg.verify(), "Failed to verify signature.");
         Ok(msg)
     }
 }
 
-/// Warning: This implementation checks signature which is slow operation.
 impl BinaryValue for SignedMessage {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_pb().write_to_bytes().unwrap()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
+        // FIXME: For the moment, for performance reasons, we have disabled signature verification
+        // here and we MUST implement [ECR-3272] task to fix possible security vulnerabilities.
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
         pb.merge_from_bytes(&value)?;
         Self::from_pb(pb)
