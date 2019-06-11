@@ -174,7 +174,7 @@ where
         },
     );
     c.bench_function(
-        &format!("encoding/{}/hash", name),
+        &format!("encoding/{}/object_hash", name),
         move |b: &mut Bencher| {
             b.iter_with_setup(f, |data| black_box(data.object_hash()));
         },
