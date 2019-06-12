@@ -172,6 +172,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `len` method to `KeySetIndex` and `ValueSetIndex`. (#1319)
 
+- Added `from_patch` method to `Fork`. (#1345)
+
 #### exonum-testkit
 
 - Implemented "stopping" and "resuming" a `TestKit`, allowing to emulate node
