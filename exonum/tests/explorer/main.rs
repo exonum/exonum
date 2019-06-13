@@ -29,7 +29,7 @@ use exonum::{
     crypto::{self, Hash},
     explorer::*,
     helpers::Height,
-    messages::{self, AnyTx, BinaryValue, Signed},
+    messages::{self, AnyTx, Signed},
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
@@ -108,10 +108,7 @@ fn test_explorer_basics() {
         assert_eq!(
             serde_json::to_value(&tx_info).unwrap(),
             json!({
-                "content": {
-                    "debug": payload_alice,
-                    "message": messages::to_hex_string(&tx_alice)
-                },
+                "content": messages::to_hex_string(&tx_alice),
                 "location": {
                     "block_height": 1,
                     "position_in_block": 0,
@@ -141,10 +138,7 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": {
-                    "debug": payload_bob,
-                    "message": messages::to_hex_string(&tx_bob)
-            },
+            "content": messages::to_hex_string(&tx_bob),
             "location": {
                 "block_height": 2,
                 "position_in_block": 0,
@@ -165,10 +159,7 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": {
-                    "debug": payload_transfer,
-                    "message": messages::to_hex_string(&tx_transfer)
-            },
+            "content": messages::to_hex_string(&tx_transfer),
             "location": {
                 "block_height": 2,
                 "position_in_block": 1,
@@ -221,9 +212,12 @@ fn tx_generator() -> Box<dyn Iterator<Item = Signed<AnyTx>>> {
 
 // TODO Implement method id getter in CreateWallet. [ECR-3254]
 fn is_create_wallet(tx: &CommittedTransaction) -> bool {
-    let raw_tx = tx.content().raw_transaction();
-    if raw_tx.call_info.method_id == 0 {
-        CreateWallet::from_bytes(raw_tx.payload.into()).unwrap();
+    let raw_tx = tx.content();
+    if raw_tx.call_info.method_id == CreateWallet::METHOD_ID {
+        raw_tx
+            .payload()
+            .parse::<CreateWallet>()
+            .expect("Unable to parse transaction");
         true
     } else {
         false
@@ -356,8 +350,11 @@ fn test_transaction_iterator() {
             assert_eq!(tx.status(), Ok(()));
         }
         for (i, tx) in block.iter().enumerate() {
-            let raw_tx = tx.content().raw_transaction();
-            let parsed_tx = CreateWallet::from_bytes(raw_tx.payload.into()).unwrap();
+            let raw_tx = tx.content();
+            let parsed_tx = raw_tx
+                .payload()
+                .parse::<CreateWallet>()
+                .expect("Unable to parse transaction");
             assert_eq!(parsed_tx.name, format!("Alice #{}", i))
         }
     }
@@ -435,7 +432,7 @@ fn test_committed_transaction_roundtrip() {
     let json = serde_json::to_value(tx_copy).unwrap();
     let tx_copy: CommittedTransaction = serde_json::from_value(json).unwrap();
 
-    assert_eq!(tx_copy.content().message(), &tx);
+    assert_eq!(tx_copy.content(), &tx);
 }
 
 #[test]
@@ -455,7 +452,7 @@ fn test_transaction_info_roundtrip() {
     let json = serde_json::to_value(&info).unwrap();
     let info: TransactionInfo = serde_json::from_value(json).unwrap();
 
-    assert_eq!(info.content().message(), &tx);
+    assert_eq!(info.content(), &tx);
 }
 
 #[test]
@@ -471,8 +468,5 @@ fn test_block_with_transactions_roundtrip() {
     let block = explorer.block_with_txs(Height(1)).unwrap();
     let block_json = serde_json::to_value(&block).unwrap();
     let block_copy: BlockWithTransactions = serde_json::from_value(block_json).unwrap();
-    assert_eq!(
-        block_copy[0].content().message(),
-        block[0].content().message()
-    );
+    assert_eq!(block_copy[0].content(), block[0].content());
 }

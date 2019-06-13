@@ -247,7 +247,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "TODO: we have to fix blockchain explorer implementation [ECR-3259]"]
     fn test_create_block_with_empty_body() {
         let (testkit, api) = init_handler(Height(0));
 
@@ -267,7 +266,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content().message(), &tx);
+        assert_eq!(block_info.transactions[0].content(), &tx);
 
         // Requests with a body that invoke `create_block`
         let bodies = vec![None, Some(CreateBlockQuery { tx_hashes: None })];
@@ -289,12 +288,11 @@ mod tests {
 
             assert_eq!(block_info.header.height(), Height(1));
             assert_eq!(block_info.transactions.len(), 1);
-            assert_eq!(block_info.transactions[0].content().message(), &tx);
+            assert_eq!(block_info.transactions[0].content(), &tx);
         }
     }
 
     #[test]
-    #[ignore = "TODO: we have to fix blockchain explorer implementation [ECR-3259]"]
     fn test_create_block_with_specified_transactions() {
         let (testkit, api) = init_handler(Height(0));
 
@@ -318,7 +316,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content().message(), &tx_foo);
+        assert_eq!(block_info.transactions[0].content(), &tx_foo);
 
         let body = CreateBlockQuery {
             tx_hashes: Some(vec![tx_bar.object_hash()]),
@@ -331,7 +329,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(2));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content().message(), &tx_bar);
+        assert_eq!(block_info.transactions[0].content(), &tx_bar);
     }
 
     #[test]

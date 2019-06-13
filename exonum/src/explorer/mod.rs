@@ -17,6 +17,7 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
+use exonum_merkledb::{ListProof, Snapshot};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use std::{
@@ -27,17 +28,15 @@ use std::{
     slice,
 };
 
-use crate::blockchain::{
-    Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
-    TransactionResult, TxLocation,
+use crate::{
+    blockchain::{
+        Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
+        TransactionResult, TxLocation,
+    },
+    crypto::{CryptoHash, Hash},
+    helpers::Height,
+    messages::{Precommit, Signed},
 };
-use crate::crypto::{CryptoHash, Hash};
-use crate::helpers::Height;
-use crate::messages::{AnyTx, Precommit, Signed};
-use exonum_merkledb::{ListProof, Snapshot};
-
-/// Transaction parsing result.
-type ParseResult = Result<TransactionMessage, failure::Error>;
 
 /// Ending height of the range (exclusive), given the a priori max height.
 fn end_height(bound: Bound<&Height>, max: Height) -> Height {
@@ -70,7 +69,7 @@ fn end_height(bound: Bound<&Height>, max: Height) -> Height {
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
     header: Block,
-    explorer: &'a BlockchainExplorer<'a>,
+    explorer: &'a BlockchainExplorer,
     precommits: RefCell<Option<Vec<Signed<Precommit>>>>,
     txs: RefCell<Option<Vec<Hash>>>,
 }
@@ -229,7 +228,6 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
     }
 }
 
-//TODO: impl Deserialize
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BlockWithTransactions {
@@ -295,14 +293,11 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 
 /// Information about a particular transaction in the blockchain.
 ///
-/// The type parameter corresponds to some representation of `Box<Transaction>`.
-/// This generalization is needed to deserialize `CommittedTransaction`s.
-///
 /// # JSON presentation
 ///
 /// | Name | Equivalent type | Description |
 /// |------|-------|--------|
-/// | `content` | `Box<`[`Transaction`]`>` | Transaction as recorded in the blockchain |
+/// | `content` | `Signed<AnyTx>` | Transaction as recorded in the blockchain |
 /// | `location` | [`TxLocation`] | Location of the transaction in the block |
 /// | `location_proof` | [`ListProof`]`<`[`Hash`]`>` | Proof of transaction inclusion into a block |
 /// | `status` | (custom; see below) | Execution status |
@@ -343,59 +338,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// # Examples
 ///
-/// Use of the custom type parameter for deserialization:
-///
-/// ```
-/// # extern crate exonum;
-/// # #[macro_use] extern crate exonum_derive;
-/// # #[macro_use] extern crate serde_json;
-/// # #[macro_use] extern crate serde_derive;
-/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
-/// # use exonum::crypto::{Hash, PublicKey, Signature};
-/// # use exonum::explorer::CommittedTransaction;
-/// # use exonum::helpers::Height;
-/// use std::borrow::Cow;
-///
-/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
-/// struct CreateWallet {
-///     name: String,
-/// }
-///
-/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-/// enum Transactions {
-///    CreateWallet(CreateWallet),
-///     // Other transaction types...
-/// }
-///
-/// # impl Transaction for CreateWallet {
-/// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
-/// # }
-///
-/// # fn main() {
-/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
-/// #                    ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
-/// #                    46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
-/// #                    ac2800000005000000416c69636574556b9b7172b7072c\
-/// #                    75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
-/// #                    bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
-/// #                    e4e6ba44e284416f0f";
-/// let json = json!({
-///     "content": {
-///         "message": //...
-/// #                    message,
-///     },
-///     "location": { "block_height": 1, "position_in_block": 0 },
-///     "location_proof": // ...
-/// #                     { "val": Hash::zero() },
-///     "status": { "type": "success" }
-/// });
-///
-/// let parsed: CommittedTransaction =
-///     serde_json::from_value(json).unwrap();
-/// assert_eq!(parsed.location().block_height(), Height(1));
-/// # } // main
-/// ```
+/// TODO [ECR-3275]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
     content: TransactionMessage,
@@ -623,26 +566,21 @@ impl TransactionInfo {
 /// all calls to the methods of an explorer instance are guaranteed to be consistent.
 ///
 /// [`Snapshot`]: ../../exonum_merkledb/trait.Snapshot.html
-pub struct BlockchainExplorer<'a> {
+pub struct BlockchainExplorer {
     snapshot: Box<dyn Snapshot>,
-    transaction_parser: Box<dyn 'a + Fn(Signed<AnyTx>) -> ParseResult>,
 }
 
-impl<'a> fmt::Debug for BlockchainExplorer<'a> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        formatter.pad("BlockchainExplorer { .. }")
+impl fmt::Debug for BlockchainExplorer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("BlockchainExplorer").finish()
     }
 }
 
-impl<'a> BlockchainExplorer<'a> {
+impl BlockchainExplorer {
     /// Creates a new `BlockchainExplorer` instance.
-    pub fn new(blockchain: &'a Blockchain) -> Self {
+    pub fn new(blockchain: &Blockchain) -> Self {
         BlockchainExplorer {
             snapshot: blockchain.snapshot(),
-            transaction_parser: Box::new(move |raw| {
-                let tx = blockchain.tx_from_raw(raw.payload().clone())?;
-                Ok(TransactionMessage::new(raw, tx))
-            }),
         }
     }
 
@@ -661,15 +599,7 @@ impl<'a> BlockchainExplorer<'a> {
     /// Returns transaction message without proof.
     pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<TransactionMessage> {
         let schema = Schema::new(&self.snapshot);
-        let raw_tx = schema.transactions().get(tx_hash)?;
-
-        match (*self.transaction_parser)(raw_tx) {
-            Err(e) => {
-                error!("Error while parsing transaction {:?}: {}", tx_hash, e);
-                None
-            }
-            Ok(v) => Some(v),
-        }
+        schema.transactions().get(tx_hash)
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
@@ -710,12 +640,10 @@ impl<'a> BlockchainExplorer<'a> {
 
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
-                let raw_tx = schema.transactions().get(tx_hash).unwrap();
-                // (self.transaction_parser)(raw_tx).unwrap()
-                TransactionMessage {
-                    message: raw_tx,
-                    transaction: None, // TODO fix blockchain explorer [ECR-3259]
-                }
+                schema
+                    .transactions()
+                    .get(tx_hash)
+                    .expect("BUG: Cannot find transaction in database")
             }),
 
             location,
@@ -778,7 +706,7 @@ impl<'a> BlockchainExplorer<'a> {
 
 /// Iterator over blocks in the blockchain.
 pub struct Blocks<'a> {
-    explorer: &'a BlockchainExplorer<'a>,
+    explorer: &'a BlockchainExplorer,
     ptr: Height,
     back: Height,
 }

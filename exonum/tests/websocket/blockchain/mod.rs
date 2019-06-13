@@ -26,7 +26,6 @@ use exonum::{
 use exonum_merkledb::{Snapshot, TemporaryDB};
 
 use std::{
-    borrow::Cow,
     net::SocketAddr,
     thread::{self, JoinHandle},
 };

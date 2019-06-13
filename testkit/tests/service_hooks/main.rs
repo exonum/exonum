@@ -40,7 +40,7 @@ fn test_after_commit() {
     for i in 1..5 {
         let block = testkit.create_block();
         if i > 1 {
-            let message = &block[0].content().message().payload().payload;
+            let message = &block[0].content().payload().payload;
             let message = TxAfterCommit::from_bytes(message.into()).unwrap();
             assert_eq!(message, TxAfterCommit::new(Height(i - 1)));
         }
@@ -112,8 +112,7 @@ fn tx_pool_is_retained_on_restart() {
     let tx_hashes: Vec<_> = (100..105)
         .map(|i| {
             let keypair = &testkit.blockchain().service_keypair;
-            let message = TxAfterCommit::new(Height(i))
-                .sign(SERVICE_ID, keypair.0, &keypair.1);
+            let message = TxAfterCommit::new(Height(i)).sign(SERVICE_ID, keypair.0, &keypair.1);
             let tx_hash = message.object_hash();
             testkit.add_tx(message);
             assert!(testkit.is_tx_in_pool(&tx_hash));

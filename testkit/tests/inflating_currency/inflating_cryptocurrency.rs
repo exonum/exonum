@@ -15,11 +15,11 @@
 use exonum::{
     api,
     blockchain::{ExecutionError, ExecutionResult, Schema as CoreSchema},
-    crypto::{PublicKey},
+    crypto::PublicKey,
     helpers::Height,
     impl_service_dispatcher,
     runtime::{
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext, ServiceDescriptor},
+        rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ServiceInstanceId,
     },
 };

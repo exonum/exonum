@@ -760,7 +760,6 @@ fn test_explorer_single_block() {
 }
 
 #[test]
-#[ignore = "TODO: we have to fix blockchain explorer implementation [ECR-3259]"]
 fn test_explorer_transaction_info() {
     use exonum::explorer::{BlockchainExplorer, TransactionInfo};
     use exonum::helpers::Height;
@@ -799,10 +798,7 @@ fn test_explorer_transaction_info() {
         info,
         json!({
             "type": "in-pool",
-            "content": {
-                "debug": TxIncrement::new(5),
-                "message": messages::to_hex_string(&tx)
-            },
+            "content": messages::to_hex_string(&tx),
         })
     );
 
@@ -831,7 +827,6 @@ fn test_explorer_transaction_info() {
 }
 
 #[test]
-#[ignore = "TODO: we have to fix blockchain explorer implementation [ECR-3259]"]
 fn test_explorer_transaction_statuses() {
     use exonum::blockchain::TransactionResult;
     use exonum::explorer::TransactionInfo;
@@ -896,23 +891,4 @@ fn test_explorer_transaction_statuses() {
     })
     .collect();
     check_statuses(&statuses);
-}
-
-// Make sure that boxed transaction can be used in the `TestKitApi::send`.
-#[test]
-fn test_boxed_tx() {
-    let (mut testkit, api) = init_testkit();
-
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
-
-    api.send(tx);
-    let block = testkit.create_block();
-    assert_eq!(block.len(), 1);
-    assert_eq!(
-        block[0].content().message().service_id() as u32,
-        counter::SERVICE_ID
-    );
 }

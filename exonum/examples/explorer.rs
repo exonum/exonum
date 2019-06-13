@@ -20,13 +20,15 @@ extern crate exonum_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{Blockchain, Schema, Transaction, TransactionError},
-    crypto::{self, CryptoHash},
+    blockchain::{Blockchain, Schema, TransactionError},
+    crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Message, Signed},
+    messages::{AnyTx, Signed},
     runtime::rust::Transaction as _,
 };
 use exonum_merkledb::ObjectHash;
@@ -122,7 +124,7 @@ fn main() {
     assert_eq!(tx.location().position_in_block(), 0);
 
     // It is possible to access transaction content
-    let content: &dyn Transaction = tx.content().transaction().unwrap();
+    let content = tx.content();
     println!("{:?}", content);
     // ...and transaction status as well
     let status: Result<(), &TransactionError> = tx.status();
@@ -177,7 +179,7 @@ fn main() {
     );
 
     // `TransactionInfo` usage
-    let hash = mempool_transaction().hash();
+    let hash = mempool_transaction().object_hash();
     let tx: TransactionInfo = explorer.transaction(&hash).unwrap();
     assert!(tx.is_in_pool());
     println!("{:?}", tx.content());
@@ -199,7 +201,9 @@ fn main() {
     );
 
     // JSON serialization for transactions in pool
-    let tx_in_pool: TransactionInfo = explorer.transaction(&mempool_transaction().hash()).unwrap();
+    let tx_in_pool: TransactionInfo = explorer
+        .transaction(&mempool_transaction().object_hash())
+        .unwrap();
     assert_eq!(
         serde_json::to_value(&tx_in_pool).unwrap(),
         json!({
