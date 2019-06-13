@@ -28,18 +28,15 @@ use std::{
     slice,
 };
 
-use crate::blockchain::{
-    Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionResult,
-    TxLocation,
-};
 use crate::{
+    blockchain::{
+        Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
+        TransactionResult, TxLocation,
+    },
     crypto::{CryptoHash, Hash},
     helpers::Height,
-    messages::{AnyTx, Precommit, Signed},
+    messages::{Precommit, Signed},
 };
-
-/// Transaction message shortcut.
-type TransactionMessage = Signed<AnyTx>;
 
 /// Ending height of the range (exclusive), given the a priori max height.
 fn end_height(bound: Bound<&Height>, max: Height) -> Height {

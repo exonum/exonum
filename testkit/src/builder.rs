@@ -219,6 +219,7 @@ impl TestKitBuilder {
     }
 }
 
+#[derive(Debug)]
 pub struct ServiceInstances {
     factory: Box<dyn ServiceFactory>,
     instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,

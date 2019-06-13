@@ -81,6 +81,9 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+/// Transaction message shortcut.
+pub type TransactionMessage = Signed<AnyTx>;
+
 /// Id of core service table family.
 pub const CORE_SERVICE: u16 = 0;
 
