@@ -44,4 +44,4 @@ message TxTransfer {
   uint64 seed = 3;
 }
 
-message ConstructorData {}
+message Configuration {}
