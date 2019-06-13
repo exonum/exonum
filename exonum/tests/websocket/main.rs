@@ -24,7 +24,9 @@ extern crate serde_derive;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
+use exonum::{
+    api::websocket::*, crypto::gen_keypair, node::ExternalMessage, runtime::rust::Transaction,
+};
 use exonum_merkledb::ObjectHash;
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, OwnedMessage, WebSocketResult,
@@ -75,7 +77,7 @@ fn test_send_transaction() {
 
     // Send transaction.
     let (pk, sk) = gen_keypair();
-    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Alice"), SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(&pk, "Alice").sign(SERVICE_ID, pk, &sk);
     let tx_hash = tx.object_hash();
     let tx_json =
         serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
@@ -144,7 +146,7 @@ fn test_transactions_subscribe() {
 
     // Send transaction.
     let (pk, sk) = gen_keypair();
-    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Alice"), SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(&pk, "Alice").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client

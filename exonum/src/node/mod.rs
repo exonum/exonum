@@ -905,7 +905,7 @@ impl Node {
         crypto::init();
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let mut blockchain = Blockchain::new(
+        let blockchain = Blockchain::new(
             db,
             services,
             node_cfg.service_public_key,
@@ -913,6 +913,16 @@ impl Node {
             ApiSender::new(channel.api_requests.0.clone()),
             channel.internal_requests.0.clone(),
         );
+        Self::with_blockchain(blockchain, channel, node_cfg, config_file_path)
+    }
+
+    pub fn with_blockchain(
+        mut blockchain: Blockchain,
+        channel: NodeChannel,
+        node_cfg: NodeConfig,
+        config_file_path: Option<String>,
+    ) -> Self {
+        crypto::init();
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
         let peers = node_cfg.connect_list.addresses();
@@ -1122,38 +1132,66 @@ impl Node {
 // TODO implement transaction verification logic [ECR-3253]
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::{
-        impl_binary_value_for_message, BinaryValue, Database, Snapshot, TemporaryDB,
-    };
+    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, TemporaryDB};
     use protobuf::Message as ProtobufMessage;
 
     use std::borrow::Cow;
 
     use crate::{
-        blockchain::{
-            ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
-        },
+        blockchain::{ExecutionResult, Schema},
         crypto::gen_keypair,
         events::EventHandler,
-        helpers,
+        helpers, impl_service_dispatcher,
+        messages::AnyTx,
         proto::{schema::tests::TxSimple, ProtobufConvert},
+        runtime::{
+            dispatcher::{BuiltinService, DispatcherBuilder},
+            rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
+            ServiceInstanceId,
+        },
     };
 
     use super::*;
 
-    const SERVICE_ID: u16 = 0;
-
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(crate = "crate")]
-    enum SimpleTransactions {
-        TxSimple(TxSimple),
-    }
+    const SERVICE_ID: ServiceInstanceId = 0;
 
     impl_binary_value_for_message! { TxSimple }
 
-    impl Transaction for TxSimple {
-        fn execute(&self, _: TransactionContext) -> ExecutionResult {
+    #[service_interface(exonum(crate = "crate"))]
+    pub trait TestInterface {
+        fn simple(&self, context: TransactionContext, arg: TxSimple) -> ExecutionResult;
+    }
+
+    #[derive(Debug)]
+    struct TestService;
+
+    impl TestInterface for TestService {
+        fn simple(&self, _context: TransactionContext, _arg: TxSimple) -> ExecutionResult {
             Ok(())
+        }
+    }
+
+    impl_service_dispatcher!(TestService, TestInterface);
+
+    impl Service for TestService {}
+
+    impl ServiceFactory for TestService {
+        fn artifact(&self) -> RustArtifactSpec {
+            "test-service/0.1.0".parse().unwrap()
+        }
+
+        fn new_instance(&self) -> Box<dyn Service> {
+            Box::new(Self)
+        }
+    }
+
+    impl From<TestService> for BuiltinService {
+        fn from(factory: TestService) -> Self {
+            Self {
+                factory: Box::new(factory),
+                instance_id: SERVICE_ID,
+                instance_name: "test-service".into(),
+            }
         }
     }
 
@@ -1161,27 +1199,7 @@ mod tests {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
         msg.set_msg("Hello, World!".to_owned());
-        Message::sign_transaction(msg, SERVICE_ID as u32, p_key, s_key)
-    }
-
-    struct TestService;
-
-    impl Service for TestService {
-        fn service_id(&self) -> u16 {
-            SERVICE_ID
-        }
-
-        fn service_name(&self) -> &'static str {
-            "test service"
-        }
-
-        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-            vec![]
-        }
-
-        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-            Ok(SimpleTransactions::tx_from_raw(raw)?.into())
-        }
+        msg.sign(SERVICE_ID, p_key, s_key)
     }
 
     #[test]
@@ -1189,10 +1207,24 @@ mod tests {
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
-        let services = Vec::new(); //vec![Box::new(TestService) as Box<dyn Service>]; // TODO: use new service API.
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
+        let dispatcher = DispatcherBuilder::new(channel.internal_requests.0.clone())
+            .with_builtin_service(TestService)
+            .finalize();
 
-        let mut node = Node::new(TemporaryDB::new(), services, node_cfg, None);
+        let mut node = Node::with_blockchain(
+            Blockchain::with_dispatcher(
+                TemporaryDB::new(),
+                dispatcher,
+                node_cfg.service_public_key,
+                node_cfg.service_secret_key.clone(),
+                ApiSender::new(channel.api_requests.0.clone()),
+            ),
+            channel,
+            node_cfg,
+            None,
+        );
 
         let tx = create_simple_tx(p_key, &s_key);
 

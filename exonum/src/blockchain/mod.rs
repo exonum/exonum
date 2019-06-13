@@ -38,8 +38,8 @@ pub use self::{
     schema::{Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
-        ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
-        TransactionErrorType, TransactionResult, TransactionSet,
+        ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
+        TransactionResult, TransactionSet,
     },
 };
 

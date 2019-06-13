@@ -43,7 +43,6 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::ExecutionResult,
     crypto::Hash,
-    helpers::fabric,
     impl_service_dispatcher,
     runtime::rust::{
         RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
@@ -105,24 +104,14 @@ impl Service for TimestampingServiceImpl {
 }
 
 #[derive(Debug)]
-pub struct ServiceFactoryImpl;
+pub struct TimestampingServiceFactory;
 
-impl ServiceFactory for ServiceFactoryImpl {
+impl ServiceFactory for TimestampingServiceFactory {
     fn artifact(&self) -> RustArtifactSpec {
         RustArtifactSpec::new("timestamping", 0, 1, 0)
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(TimestampingServiceImpl)
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct TimestampingServiceFactory;
-
-impl fabric::ServiceFactory for TimestampingServiceFactory {
-    fn make_service_builder(&self, _run_context: &fabric::Context) -> Box<dyn ServiceFactory> {
-        Box::new(ServiceFactoryImpl)
     }
 }

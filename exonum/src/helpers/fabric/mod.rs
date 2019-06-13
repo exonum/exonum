@@ -358,3 +358,21 @@ pub trait ServiceFactory: 'static {
     /// Creates a new service instance from the context returned by the `Run` command.
     fn make_service_builder(&self, run_context: &Context) -> Box<dyn service::ServiceFactory>;
 }
+
+impl<T> ServiceFactory for T
+where
+    T: service::ServiceFactory + Clone,
+{
+    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn service::ServiceFactory> {
+        Box::new(self.clone())
+    }
+}
+
+impl<T> From<T> for Box<dyn ServiceFactory>
+where
+    T: service::ServiceFactory + Clone,
+{
+    fn from(inner: T) -> Self {
+        Box::new(inner)
+    }
+}

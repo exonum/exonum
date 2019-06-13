@@ -132,24 +132,14 @@ impl Service for CryptocurrencyServiceImpl {
 }
 
 #[derive(Debug)]
-pub struct ServiceFactoryImpl;
+pub struct CryptocurrencyServiceFactory;
 
-impl ServiceFactory for ServiceFactoryImpl {
+impl ServiceFactory for CryptocurrencyServiceFactory {
     fn artifact(&self) -> RustArtifactSpec {
         RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(CryptocurrencyServiceImpl)
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct CryptocurrencyServiceFactory;
-
-impl fabric::ServiceFactory for CryptocurrencyServiceFactory {
-    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn ServiceFactory> {
-        Box::new(ServiceFactoryImpl)
     }
 }
