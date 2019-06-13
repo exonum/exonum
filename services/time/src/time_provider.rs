@@ -117,8 +117,14 @@ impl TimeProvider for MockTimeProvider {
     }
 }
 
-impl From<MockTimeProvider> for Box<dyn TimeProvider> {
-    fn from(mock_time_provider: MockTimeProvider) -> Self {
-        Box::new(mock_time_provider) as Box<dyn TimeProvider>
+impl From<MockTimeProvider> for Arc<dyn TimeProvider> {
+    fn from(time_provider: MockTimeProvider) -> Self {
+        Arc::new(time_provider) as Arc<dyn TimeProvider>
+    }
+}
+
+impl From<SystemTimeProvider> for Arc<dyn TimeProvider> {
+    fn from(time_provider: SystemTimeProvider) -> Self {
+        Arc::new(time_provider) as Arc<dyn TimeProvider>
     }
 }

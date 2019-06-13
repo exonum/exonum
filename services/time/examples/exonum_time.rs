@@ -18,6 +18,6 @@ use exonum_time::TimeServiceFactory;
 fn main() {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-        .with_service(TimeServiceFactory)
+        .with_service(TimeServiceFactory::default())
         .run();
 }
