@@ -23,7 +23,7 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
+    messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
     node::ApiSender,
     runtime::{error::ExecutionError, rust::TransactionContext},
 };

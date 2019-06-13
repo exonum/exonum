@@ -15,7 +15,6 @@
 //! `Transaction` related types.
 
 use exonum_merkledb::{BinaryValue, Fork, ObjectHash};
-use hex::ToHex;
 use protobuf::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -23,7 +22,7 @@ use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crate::{
     crypto::{Hash, PublicKey},
-    messages::{AnyTx, HexStringRepresentation, Signed, SignedMessage},
+    messages::{AnyTx, Signed},
     proto::{self, ProtobufConvert},
 };
 
@@ -42,64 +41,6 @@ pub type ExecutionResult = Result<(), ExecutionError>;
 /// framework) that can be obtained through `Schema::transaction_results` method.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TransactionResult(pub Result<(), TransactionError>);
-
-/// Data transfer object for transaction.
-/// This structure is used to send api info about transaction,
-/// and take some new transaction into pool from user input.
-#[derive(Serialize, Deserialize)]
-pub struct TransactionMessage {
-    #[serde(skip_deserializing)]
-    #[serde(rename = "debug")]
-    pub(crate) transaction: Option<Box<dyn Transaction>>,
-
-    #[serde(with = "HexStringRepresentation")]
-    pub(crate) message: Signed<AnyTx>,
-}
-impl ::std::fmt::Debug for TransactionMessage {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
-        let mut signed_message_debug = String::new();
-        self.message
-            .signed_message()
-            .write_hex(&mut signed_message_debug)?;
-
-        let mut debug = fmt.debug_struct("TransactionMessage");
-        debug.field("message", &signed_message_debug);
-        if let Some(ref tx) = self.transaction {
-            debug.field("debug", tx);
-        }
-        debug.finish()
-    }
-}
-
-impl TransactionMessage {
-    /// Returns `SignedMessage`.
-    pub fn signed_message(&self) -> &SignedMessage {
-        self.message.signed_message()
-    }
-    /// Returns `RawTransaction`.
-    pub fn raw_transaction(&self) -> AnyTx {
-        self.message.payload().clone()
-    }
-    /// Returns raw transaction message.
-    pub fn message(&self) -> &Signed<AnyTx> {
-        &self.message
-    }
-    /// Returns transaction smart contract.
-    pub fn transaction(&self) -> Option<&dyn Transaction> {
-        use std::ops::Deref;
-        self.transaction.as_ref().map(Deref::deref)
-    }
-    /// Create new `TransactionMessage` from raw message.
-    pub(crate) fn new(
-        message: Signed<AnyTx>,
-        transaction: Box<dyn Transaction>,
-    ) -> TransactionMessage {
-        TransactionMessage {
-            transaction: Some(transaction),
-            message,
-        }
-    }
-}
 
 impl ::serde::Serialize for dyn Transaction {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

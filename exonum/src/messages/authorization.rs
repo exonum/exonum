@@ -34,7 +34,8 @@ impl SignedMessage {
             sign: signature,
         };
 
-        msg.verify().expect("Can't verify signature with given public key.")
+        msg.verify()
+            .expect("Can't verify signature with given public key.")
     }
 
     fn from_pb_no_verify(mut pb: <Self as ProtobufConvert>::ProtoStruct) -> Result<Self, Error> {
@@ -157,6 +158,8 @@ impl FromHex for SignedMessage {
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<SignedMessage, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        Self::from_bytes(bytes.into()).map_err(Error::from).and_then(Self::verify)
+        Self::from_bytes(bytes.into())
+            .map_err(Error::from)
+            .and_then(Self::verify)
     }
 }

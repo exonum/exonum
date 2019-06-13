@@ -787,6 +787,11 @@ impl AnyTx {
             self.payload.clone(),
         )
     }
+
+    /// Parses transaction content as concrete type.
+    pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
+        T::from_bytes(Cow::Borrowed(&self.payload))
+    }
 }
 
 /// Full message constraints list.

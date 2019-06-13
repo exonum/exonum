@@ -39,7 +39,7 @@ pub use self::{
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
         ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
-        TransactionErrorType, TransactionMessage, TransactionResult, TransactionSet,
+        TransactionErrorType, TransactionResult, TransactionSet,
     },
 };
 
@@ -159,20 +159,6 @@ impl Blockchain {
     /// via the `merge` method.
     pub fn fork(&self) -> Fork {
         self.db.fork()
-    }
-
-    /// Tries to create a `Transaction` object from the given raw message.
-    /// A raw message can be converted into a `Transaction` object only
-    /// if the following conditions are met:
-    ///
-    /// - Blockchain has a service with the `service_id` of the given raw message.
-    /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        // TODO do we need this method to be public?
-        // It's used for checking in consensus.rs and in explorer/mod.rs
-        // self.dispatcher.tx_from_raw(raw)
-
-        unimplemented!()
     }
 
     /// Commits changes from the patch to the blockchain storage.
