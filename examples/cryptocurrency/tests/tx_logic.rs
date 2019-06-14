@@ -23,25 +23,22 @@ extern crate exonum_testkit;
 
 use exonum::{
     crypto::{self, PublicKey, SecretKey},
-    messages::{AnyTx, ServiceInstanceId, Signed},
+    messages::{AnyTx, Signed},
     runtime::rust::Transaction,
 };
-use exonum_testkit::{ServiceInstances, TestKit, TestKitBuilder};
+use exonum_testkit::TestKit;
 
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{
-    contracts::ServiceFactoryImpl,
+    contracts::CryptocurrencyService,
     schema::{CurrencySchema, Wallet},
     transactions::{Configuration, TxCreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
-use crate::constants::{ALICE_NAME, BOB_NAME};
+use crate::constants::{ALICE_NAME, BOB_NAME, INSTANCE_ID, INSTANCE_NAME};
 
 mod constants;
-
-const INSTANCE_ID: ServiceInstanceId = 1280;
-const INSTANCE_NAME: &str = "nnm-token";
 
 #[test]
 fn test_create_wallet() {
@@ -289,13 +286,12 @@ fn test_fuzz_transfers() {
 
 /// Initializes testkit with `CurrencyService`.
 fn init_testkit() -> TestKit {
-    TestKitBuilder::validator()
-        .with_service(ServiceInstances::new(ServiceFactoryImpl).with_instance(
-            INSTANCE_NAME,
-            INSTANCE_ID,
-            Configuration,
-        ))
-        .create()
+    TestKit::for_service(
+        CryptocurrencyService,
+        INSTANCE_NAME,
+        INSTANCE_ID,
+        Configuration,
+    )
 }
 
 /// Creates a wallet with the given name and a random key.

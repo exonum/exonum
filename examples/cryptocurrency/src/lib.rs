@@ -221,16 +221,20 @@ pub mod contracts {
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
 
+    /// Cryptocurrency service transactions.
     #[service_interface]
-    pub trait Cryptocurrency {
+    pub trait CryptocurrencyInterface {
+        /// Creates wallet with the given `name`.
         fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
+        /// Transfers `amount` of the currency from one wallet to another.
         fn transfer(&self, ctx: TransactionContext, arg: TxTransfer) -> ExecutionResult;
     }
 
+    /// Cryptocurrency service implementation.
     #[derive(Debug)]
-    pub struct CryptocurrencyServiceImpl;
+    pub struct CryptocurrencyService;
 
-    impl Cryptocurrency for CryptocurrencyServiceImpl {
+    impl CryptocurrencyInterface for CryptocurrencyService {
         fn create_wallet(
             &self,
             context: TransactionContext,
@@ -284,30 +288,26 @@ pub mod contracts {
         }
     }
 
-    impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
+    impl_service_dispatcher!(CryptocurrencyService, CryptocurrencyInterface);
 
-    impl Service for CryptocurrencyServiceImpl {
+    impl Service for CryptocurrencyService {
         fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
             CryptocurrencyApi::new(descriptor.service_name()).wire(builder);
         }
     }
 
-    #[derive(Debug)]
-    pub struct ServiceFactoryImpl;
-
-    impl ServiceFactory for ServiceFactoryImpl {
+    impl ServiceFactory for CryptocurrencyService {
         fn artifact(&self) -> RustArtifactSpec {
-            RustArtifactSpec::new("cryptocurrency", 0, 1, 0)
+            exonum::artifact_spec_from_crate!()
         }
 
         fn new_instance(&self) -> Box<dyn Service> {
-            Box::new(CryptocurrencyServiceImpl)
+            Box::new(Self)
         }
     }
 }
 
-//
-///// REST API.
+/// Cryptocurrency API implementation.
 pub mod api {
     use exonum::{
         api::{self, ServiceApiBuilder, ServiceApiState},
@@ -328,8 +328,9 @@ pub mod api {
     }
 
     impl CryptocurrencyApi {
-        pub fn new(instance_name: &str) -> Self {
-            Self(instance_name.to_owned())
+        /// Creates a new public API for the specified service instance.
+        pub fn new(service_name: &str) -> Self {
+            Self(service_name.to_owned())
         }
 
         /// Endpoint for getting a single wallet.

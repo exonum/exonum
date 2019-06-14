@@ -26,27 +26,24 @@ extern crate serde_json;
 use exonum::{
     api::{self, node::public::explorer::TransactionQuery},
     crypto::{self, Hash, PublicKey, SecretKey},
-    messages::{self, AnyTx, ServiceInstanceId, Signed},
+    messages::{self, AnyTx, Signed},
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, ServiceInstances, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{
     api::WalletQuery,
-    contracts::ServiceFactoryImpl,
+    contracts::CryptocurrencyService,
     schema::Wallet,
     transactions::{Configuration, TxCreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
-use crate::constants::{ALICE_NAME, BOB_NAME};
+use crate::constants::{ALICE_NAME, BOB_NAME, INSTANCE_ID, INSTANCE_NAME};
 
 mod constants;
-
-const INSTANCE_ID: ServiceInstanceId = 1180;
-const INSTANCE_NAME: &str = "mmm-token";
 
 /// Check that the wallet creation transaction works when invoked via API.
 #[test]
@@ -307,13 +304,12 @@ impl CryptocurrencyApi {
 
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
-    let testkit = TestKitBuilder::validator()
-        .with_service(ServiceInstances::new(ServiceFactoryImpl).with_instance(
-            INSTANCE_NAME,
-            INSTANCE_ID,
-            Configuration,
-        ))
-        .create();
+    let testkit = TestKit::for_service(
+        CryptocurrencyService,
+        INSTANCE_NAME,
+        INSTANCE_ID,
+        Configuration,
+    );
     let api = CryptocurrencyApi {
         inner: testkit.api(),
     };
