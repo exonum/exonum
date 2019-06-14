@@ -49,20 +49,26 @@ impl TimeProvider for SystemTimeProvider {
 /// # extern crate chrono;
 /// use chrono::{Utc, Duration, TimeZone};
 /// use exonum::helpers::Height;
-/// use exonum_testkit::TestKitBuilder;
-/// use exonum_time::{time_provider::MockTimeProvider, schema::TimeSchema, TimeService};
+/// use exonum_testkit::TestKit;
+/// use exonum_time::{time_provider::MockTimeProvider, schema::TimeSchema, TimeServiceFactory};
 ///
 /// # fn main() {
+/// let service_name = "time";
+/// let service_id = 12;
+/// 
 /// let mock_provider = MockTimeProvider::default();
-/// let mut testkit = TestKitBuilder::validator()
-///     .with_service(TimeService::with_provider(mock_provider.clone()))
-///     .create();
+/// let mut testkit = TestKit::for_service(
+///     TimeServiceFactory::with_provider(mock_provider.clone()),
+///     service_name,
+///     service_id,
+///     ()
+/// );
 /// mock_provider.add_time(Duration::seconds(15));
 /// testkit.create_blocks_until(Height(2));
 ///
 /// // The time reported by the mock time provider is reflected by the service.
 /// let snapshot = testkit.snapshot();
-/// let schema = TimeSchema::new(&snapshot);
+/// let schema = TimeSchema::new(&service_name, &snapshot);
 /// assert_eq!(
 ///     Some(Utc.timestamp(15, 0)),
 ///     schema.time().get().map(|time| time)

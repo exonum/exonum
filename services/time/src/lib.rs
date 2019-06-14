@@ -42,13 +42,10 @@ pub mod transactions;
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::ExecutionResult,
     crypto::Hash,
-    helpers::fabric::Context,
     impl_service_dispatcher,
     runtime::rust::{
         AfterCommitContext, RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory,
-        ServiceInstanceId, TransactionContext,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -58,13 +55,8 @@ use std::sync::Arc;
 use crate::{
     schema::TimeSchema,
     time_provider::{SystemTimeProvider, TimeProvider},
-    transactions::TxTime,
+    transactions::{TimeOracleInterface, TxTime},
 };
-
-#[service_interface]
-pub trait TimeOracleInterface {
-    fn time(&self, ctx: TransactionContext, arg: TxTime) -> ExecutionResult;
-}
 
 // TODO there is no way to provide provider for now.
 // It should be configurable through the configuration service.
@@ -74,19 +66,6 @@ pub trait TimeOracleInterface {
 pub struct TimeService {
     /// Current time.
     time: Arc<dyn TimeProvider>,
-}
-
-impl TimeOracleInterface for TimeService {
-    fn time(&self, context: TransactionContext, arg: TxTime) -> ExecutionResult {
-        let author = context.author();
-        let view = context.fork();
-        let service_name = context.service_name();
-
-        arg.check_signed_by_validator(view.as_ref(), &author)?;
-        arg.update_validator_time(service_name, view, &author)?;
-        TxTime::update_consolidated_time(service_name, view);
-        Ok(())
-    }
 }
 
 impl_service_dispatcher!(TimeService, TimeOracleInterface);
@@ -106,16 +85,13 @@ impl Service for TimeService {
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext) {
         // The transaction must be created by the validator.
-
-        // TODO can't implement after_commit via fork
-        unimplemented!();
-        // if context.validator_id().is_none() {
-        //     return;
-        // }
-        // context.broadcast_transaction(TxTime::new(self.time.current_time()));
+        if context.validator_id().is_some() {
+            context.broadcast_transaction(TxTime::new(self.time.current_time()));
+        }
     }
 }
 
+/// Time oracle service factory implementation.
 #[derive(Debug)]
 pub struct TimeServiceFactory {
     time_provider: Arc<dyn TimeProvider>,

@@ -16,12 +16,11 @@ use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Schema},
     crypto::PublicKey,
+    runtime::rust::TransactionContext,
 };
 use exonum_merkledb::{Fork, Snapshot};
 
-use crate::schema::TimeSchema;
-
-use super::proto;
+use crate::{proto, schema::TimeSchema, TimeService};
 
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]
@@ -129,5 +128,25 @@ impl TxTime {
                 time.set(validator_times[max_byzantine_nodes]);
             }
         }
+    }
+}
+
+/// Time oracle service transaction.
+#[service_interface]
+pub trait TimeOracleInterface {
+    /// Receives a new time from one of validators.
+    fn time(&self, ctx: TransactionContext, arg: TxTime) -> ExecutionResult;
+}
+
+impl TimeOracleInterface for TimeService {
+    fn time(&self, context: TransactionContext, arg: TxTime) -> ExecutionResult {
+        let author = context.author();
+        let view = context.fork();
+        let service_name = context.service_name();
+
+        arg.check_signed_by_validator(view.as_ref(), &author)?;
+        arg.update_validator_time(service_name, view, &author)?;
+        TxTime::update_consolidated_time(service_name, view);
+        Ok(())
     }
 }
