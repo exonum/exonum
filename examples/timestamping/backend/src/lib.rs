@@ -37,60 +37,40 @@ pub mod proto;
 pub mod schema;
 pub mod transactions;
 
-use exonum_merkledb::Snapshot;
-
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::ExecutionResult,
+    blockchain::ExecutionError,
     crypto::Hash,
     impl_service_dispatcher,
     runtime::rust::{
         RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
     },
 };
-use exonum_time::schema::TimeSchema;
+use exonum_merkledb::{BinaryValue, Snapshot};
+use protobuf::well_known_types::Any;
 
 use crate::{
     api::PublicApi as TimestampingApi,
     schema::{Schema, TimestampEntry},
-    transactions::{Error, TxTimestamp},
+    transactions::{Configuration, TimestampingInterface},
 };
-
-#[service_interface]
-pub trait TimestampingInterface {
-    fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
-}
 
 #[derive(Debug)]
 pub struct TimestampingService;
 
-impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult {
-        let tx_hash = context.tx_hash();
-        // TODO Add exonum time oracle name to service configuration parameters.
-        let time = TimeSchema::new("exonum-time", context.fork())
-            .time()
-            .get()
-            .expect("Can't get the time");
-
-        let hash = &arg.content.content_hash;
-
-        let schema = Schema::new(context.service_name(), context.fork());
-        if let Some(_entry) = schema.timestamps().get(hash) {
-            Err(Error::HashAlreadyExists)?;
-        }
-
-        trace!("Timestamp added: {:?}", arg);
-        let entry = TimestampEntry::new(arg.content.clone(), &tx_hash, time);
-        schema.add_timestamp(entry);
-
-        Ok(())
-    }
-}
-
 impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
 impl Service for TimestampingService {
+    fn configure(&self, context: TransactionContext, params: &Any) -> Result<(), ExecutionError> {
+        let config = Configuration::from_bytes(params.get_value().into())
+            .map_err(|e| ExecutionError::with_description(0, e.to_string()))?;
+            
+        Schema::new(context.service_name(), context.fork())
+            .config()
+            .set(config);
+        Ok(())
+    }
+
     fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
         TimestampingApi::new(descriptor).wire(builder);
     }

@@ -14,12 +14,11 @@
 
 //! Timestamping database schema.
 
-use super::proto;
 use chrono::{DateTime, Utc};
-
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
-
 use exonum::crypto::Hash;
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+
+use crate::{proto, transactions::Configuration};
 
 /// Stores content's hash and some metadata about it.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert)]
@@ -91,6 +90,11 @@ where
             [self.service_name, ".timestamps"].concat(),
             self.access.clone(),
         )
+    }
+
+    /// Returns the actual timestamping configuration
+    pub fn config(&self) -> Entry<T, Configuration> {
+        Entry::new([self.service_name, ".config"].concat(), self.access.clone())
     }
 
     /// Returns the state hash of the timestamping service.
