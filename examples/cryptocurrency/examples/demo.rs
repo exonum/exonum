@@ -17,7 +17,7 @@ use exonum::{
     blockchain::{GenesisConfig, ValidatorKeys},
     node::{Node, NodeApiConfig, NodeConfig},
 };
-use exonum_cryptocurrency::contracts::ServiceFactoryImpl;
+use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
@@ -61,7 +61,7 @@ fn main() {
     println!("Creating in-memory database...");
     let node = Node::new(
         TemporaryDB::new(),
-        vec![Box::new(ServiceFactoryImpl)],
+        vec![Box::new(CryptocurrencyService)],
         node_config(),
         None,
     );
