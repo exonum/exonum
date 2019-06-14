@@ -24,6 +24,7 @@ use exonum::{
     messages::{to_hex_string, AnyTx, ServiceInstanceId, Signed},
     runtime::rust::Transaction,
 };
+use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, ServiceInstances, TestKit, TestKitApi, TestKitBuilder};
 use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use exonum_timestamping::{
@@ -32,7 +33,6 @@ use exonum_timestamping::{
     transactions::{Configuration, TxTimestamp},
     TimestampingService,
 };
-use exonum_merkledb::ObjectHash;
 
 use std::time::SystemTime;
 

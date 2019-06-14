@@ -19,10 +19,14 @@
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use crate::api::{Error as ApiError, ServiceApiScope, ServiceApiState};
-use crate::blockchain::{Service, SharedNodeState};
-use crate::crypto::PublicKey;
-use crate::node::{ConnectInfo, ExternalMessage};
+use crate::{
+    api::{Error as ApiError, ServiceApiScope, ServiceApiState},
+    blockchain::SharedNodeState,
+    crypto::PublicKey,
+    messages::ServiceInstanceId,
+    node::{ConnectInfo, ExternalMessage},
+    runtime::rust::ServiceDescriptor,
+};
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -30,7 +34,7 @@ pub struct ServiceInfo {
     /// Service name.
     pub name: String,
     /// Service identifier for database schema and service messages.
-    pub id: u16,
+    pub id: ServiceInstanceId,
 }
 
 /// Short information about the current node.
@@ -44,10 +48,7 @@ pub struct NodeInfo {
 
 impl NodeInfo {
     /// Creates new `NodeInfo` from services list.
-    pub fn new<'a, I>(services: I) -> Self
-    where
-        I: IntoIterator<Item = &'a Box<dyn Service>>,
-    {
+    pub fn new<'a, I>(services: impl IntoIterator<Item = ServiceDescriptor<'a>>) -> Self {
         let core_version = option_env!("CARGO_PKG_VERSION").map(ToOwned::to_owned);
         Self {
             core_version,

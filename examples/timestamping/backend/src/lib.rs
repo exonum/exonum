@@ -64,7 +64,7 @@ impl Service for TimestampingService {
     fn configure(&self, context: TransactionContext, params: &Any) -> Result<(), ExecutionError> {
         let config = Configuration::from_bytes(params.get_value().into())
             .map_err(|e| ExecutionError::with_description(0, e.to_string()))?;
-            
+
         Schema::new(context.service_name(), context.fork())
             .config()
             .set(config);
