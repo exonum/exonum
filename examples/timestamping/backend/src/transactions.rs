@@ -14,7 +14,7 @@
 
 //! Timestamping transactions.
 
-use exonum::blockchain::ExecutionError;
+use exonum::{blockchain::ExecutionError, messages::ServiceInstanceId};
 
 use super::proto;
 use crate::schema::Timestamp;
@@ -41,4 +41,14 @@ impl From<Error> for ExecutionError {
 pub struct TxTimestamp {
     /// Timestamp content.
     pub content: Timestamp,
+}
+
+/// Timestamping configuration parameters.
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::Configuration")]
+pub struct Configuration {
+    /// Time oracle service name.
+    pub time_service_name: String,
+    /// Time oracle service id.
+    pub time_service_id: ServiceInstanceId,
 }

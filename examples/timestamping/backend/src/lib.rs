@@ -56,17 +56,15 @@ use crate::{
     transactions::{Error, TxTimestamp},
 };
 
-const TIMESTAMPING_SERVICE: u16 = 130;
-
 #[service_interface]
-pub trait Timestamping {
+pub trait TimestampingInterface {
     fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
 }
 
 #[derive(Debug)]
-pub struct TimestampingServiceImpl;
+pub struct TimestampingService;
 
-impl Timestamping for TimestampingServiceImpl {
+impl TimestampingInterface for TimestampingService {
     fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult {
         let tx_hash = context.tx_hash();
         // TODO Add exonum time oracle name to service configuration parameters.
@@ -77,7 +75,7 @@ impl Timestamping for TimestampingServiceImpl {
 
         let hash = &arg.content.content_hash;
 
-        let schema = Schema::new(context.fork());
+        let schema = Schema::new(context.service_name(), context.fork());
         if let Some(_entry) = schema.timestamps().get(hash) {
             Err(Error::HashAlreadyExists)?;
         }
@@ -90,28 +88,25 @@ impl Timestamping for TimestampingServiceImpl {
     }
 }
 
-impl_service_dispatcher!(TimestampingServiceImpl, Timestamping);
+impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
-impl Service for TimestampingServiceImpl {
-    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        TimestampingApi::wire(builder);
+impl Service for TimestampingService {
+    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+        TimestampingApi::new(descriptor).wire(builder);
     }
 
-    fn state_hash(&self, _descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(snapshot);
+    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = Schema::new(descriptor.service_name(), snapshot);
         schema.state_hash()
     }
 }
 
-#[derive(Debug)]
-pub struct TimestampingServiceFactory;
-
-impl ServiceFactory for TimestampingServiceFactory {
+impl ServiceFactory for TimestampingService {
     fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec::new("timestamping", 0, 1, 0)
+        exonum::artifact_spec_from_crate!()
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(TimestampingServiceImpl)
+        Box::new(TimestampingService)
     }
 }

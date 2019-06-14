@@ -406,6 +406,17 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 }
 
+/// Creates `RustArtifactSpec` by using `CARGO_PKG_NAME` and `CARGO_PKG_VERSION`
+/// variables.
+#[macro_export]
+macro_rules! artifact_spec_from_crate {
+    () => {
+        concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))
+            .parse::<$crate::runtime::rust::RustArtifactSpec>()
+            .unwrap()
+    };
+}
+
 #[test]
 fn parse_artifact_spec_correct() {
     RustArtifactSpec::from_str("my-service/1.0.0").unwrap();

@@ -138,10 +138,12 @@ impl Default for TimeServiceFactory {
 
 impl ServiceFactory for TimeServiceFactory {
     fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec::new("exonum-time", 0, 1, 0)
+        exonum::artifact_spec_from_crate!()
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(TimeService { time: self.time_provider.clone() })
+        Box::new(TimeService {
+            time: self.time_provider.clone(),
+        })
     }
 }

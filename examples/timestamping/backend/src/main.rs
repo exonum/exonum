@@ -17,7 +17,7 @@ use exonum::helpers::fabric::NodeBuilder;
 fn main() {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-        .with_service(exonum_time::TimeServiceFactory)
-        .with_service(exonum_timestamping::TimestampingServiceFactory)
+        .with_service(exonum_time::TimeServiceFactory::default())
+        .with_service(exonum_timestamping::TimestampingService)
         .run();
 }

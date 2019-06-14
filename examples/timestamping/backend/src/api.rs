@@ -19,12 +19,10 @@ use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof},
     crypto::Hash,
+    runtime::rust::{ServiceDescriptor, ServiceInstanceId},
 };
 
-use crate::{
-    schema::{Schema, TimestampEntry},
-    TIMESTAMPING_SERVICE,
-};
+use crate::schema::{Schema, TimestampEntry};
 
 /// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -52,35 +50,48 @@ pub struct TimestampProof {
 }
 
 /// Public service API.
-#[derive(Debug, Clone, Copy)]
-pub struct PublicApi;
+#[derive(Debug, Clone)]
+pub struct PublicApi {
+    service_name: String,
+    service_id: ServiceInstanceId,
+}
 
 impl PublicApi {
+    /// Creates a new public API for the specified service instance.
+    pub fn new(descriptor: ServiceDescriptor) -> Self {
+        Self {
+            service_name: descriptor.service_name().to_owned(),
+            service_id: descriptor.service_id(),
+        }
+    }
+
     /// Endpoint for getting a single timestamp.
     pub fn handle_timestamp(
+        &self,
         state: &ServiceApiState,
-        query: TimestampQuery,
+        hash: &Hash,
     ) -> api::Result<Option<TimestampEntry>> {
         let snapshot = state.snapshot();
-        let schema = Schema::new(&snapshot);
-        Ok(schema.timestamps().get(&query.hash))
+        let schema = Schema::new(&self.service_name, &snapshot);
+        Ok(schema.timestamps().get(hash))
     }
 
     /// Endpoint for getting the proof of a single timestamp.
     pub fn handle_timestamp_proof(
+        &self,
         state: &ServiceApiState,
-        query: TimestampQuery,
+        hash: Hash,
     ) -> api::Result<TimestampProof> {
         let snapshot = state.snapshot();
         let (state_proof, block_info) = {
             let core_schema = blockchain::Schema::new(&snapshot);
             let last_block_height = state.blockchain().last_block().height();
             let block_proof = core_schema.block_and_precommits(last_block_height).unwrap();
-            let state_proof = core_schema.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
+            let state_proof = core_schema.get_proof_to_service_table(self.service_id as u16, 0);
             (state_proof, block_proof)
         };
-        let schema = Schema::new(&snapshot);
-        let timestamp_proof = schema.timestamps().get_proof(query.hash);
+        let schema = Schema::new(&self.service_name, &snapshot);
+        let timestamp_proof = schema.timestamps().get_proof(hash);
         Ok(TimestampProof {
             block_info,
             state_proof,
@@ -89,10 +100,20 @@ impl PublicApi {
     }
 
     /// Wires the above endpoints to public API scope of the given `ServiceApiBuilder`.
-    pub fn wire(builder: &mut ServiceApiBuilder) {
+    pub fn wire(self, builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
-            .endpoint("v1/timestamps/value", Self::handle_timestamp)
-            .endpoint("v1/timestamps/proof", Self::handle_timestamp_proof);
+            .endpoint("v1/timestamps/value", {
+                let api = self.clone();
+                move |state: &ServiceApiState, query: TimestampQuery| {
+                    api.handle_timestamp(state, &query.hash)
+                }
+            })
+            .endpoint("v1/timestamps/proof", {
+                let api = self.clone();
+                move |state: &ServiceApiState, query: TimestampQuery| {
+                    api.handle_timestamp_proof(state, query.hash)
+                }
+            });
     }
 }

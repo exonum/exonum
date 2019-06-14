@@ -902,8 +902,6 @@ impl Node {
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
-        crypto::init();
-
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let blockchain = Blockchain::new(
             db,
