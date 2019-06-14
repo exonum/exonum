@@ -16,9 +16,8 @@ use exonum::helpers::fabric::NodeBuilder;
 use exonum_cryptocurrency_advanced as cryptocurrency;
 
 fn main() {
-    exonum::crypto::init();
     exonum::helpers::init_logger().unwrap();
-
-    let node = NodeBuilder::new().with_service(cryptocurrency::CryptocurrencyServiceFactory);
-    node.run();
+    NodeBuilder::new()
+        .with_service(cryptocurrency::CryptocurrencyService)
+        .run()
 }

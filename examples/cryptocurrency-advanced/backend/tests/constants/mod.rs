@@ -18,3 +18,7 @@
 pub const ALICE_NAME: &str = "Alice";
 /// Bob's wallet name.
 pub const BOB_NAME: &str = "Bob";
+/// Service instance id.
+pub const SERVICE_ID: u32 = 4120;
+/// Service instance name.
+pub const SERVICE_NAME: &str = "tst-token";
