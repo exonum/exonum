@@ -53,8 +53,8 @@ pub struct TxTimestamp {
 
 /// Timestamping configuration parameters.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Configuration")]
-pub struct Configuration {
+#[exonum(pb = "proto::Config")]
+pub struct Config {
     /// Time oracle service name.
     pub time_service_name: String,
     /// Time oracle service id.

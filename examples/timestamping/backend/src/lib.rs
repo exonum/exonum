@@ -52,7 +52,7 @@ use protobuf::well_known_types::Any;
 use crate::{
     api::PublicApi as TimestampingApi,
     schema::{Schema, TimestampEntry},
-    transactions::{Configuration, TimestampingInterface},
+    transactions::{Config, TimestampingInterface},
 };
 
 #[derive(Debug)]
@@ -62,7 +62,7 @@ impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
 impl Service for TimestampingService {
     fn configure(&self, context: TransactionContext, params: &Any) -> Result<(), ExecutionError> {
-        let config = Configuration::from_bytes(params.get_value().into())
+        let config = Config::from_bytes(params.get_value().into())
             .map_err(|e| ExecutionError::with_description(0, e.to_string()))?;
 
         Schema::new(context.service_name(), context.fork())

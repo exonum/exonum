@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
 
-use crate::{proto, transactions::Configuration};
+use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert)]
@@ -93,7 +93,7 @@ where
     }
 
     /// Returns the actual timestamping configuration
-    pub fn config(&self) -> Entry<T, Configuration> {
+    pub fn config(&self) -> Entry<T, Config> {
         Entry::new([self.service_name, ".config"].concat(), self.access.clone())
     }
 

@@ -38,7 +38,7 @@ message TimestampEntry {
 message TxTimestamp { Timestamp content = 1; }
 
 /// Timestamping configuration.
-message Configuration {
+message Config {
   // Time oracle service name.
   string time_service_name = 1;
   // Time oracle service id.

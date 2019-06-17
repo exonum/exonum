@@ -17,7 +17,7 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::timestamping::{Configuration, Timestamp, TimestampEntry, TxTimestamp};
+pub use self::timestamping::{Config, Timestamp, TimestampEntry, TxTimestamp};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 

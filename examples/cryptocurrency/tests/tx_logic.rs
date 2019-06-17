@@ -32,7 +32,7 @@ use exonum_testkit::TestKit;
 use exonum_cryptocurrency::{
     contracts::CryptocurrencyService,
     schema::{CurrencySchema, Wallet},
-    transactions::{Configuration, TxCreateWallet, TxTransfer},
+    transactions::{Config, TxCreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
@@ -290,7 +290,7 @@ fn init_testkit() -> TestKit {
         CryptocurrencyService,
         INSTANCE_NAME,
         INSTANCE_ID,
-        Configuration,
+        Config,
     )
 }
 

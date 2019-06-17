@@ -57,4 +57,4 @@ message Wallet {
 }
 
 // Cryptocurrency configuration.
-message Configuration {}
+message Config {}

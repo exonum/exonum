@@ -45,4 +45,4 @@ message TxTransfer {
 }
 
 // Cryptocurrency configuration.
-message Configuration {}
+message Config {}

@@ -121,8 +121,8 @@ pub mod transactions {
 
     /// Service configuration parameters.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::Configuration")]
-    pub struct Configuration;
+    #[exonum(pb = "proto::Config")]
+    pub struct Config;
 
     /// Transaction type for creating a new wallet.
     ///

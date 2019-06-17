@@ -285,18 +285,18 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        debug!("Execute: {:?}", call_info);
         let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
-
-        let context = TransactionContext {
-            service_descriptor: service_instance.descriptor(),
-            runtime_context,
-            runtime: self,
-        };
-
         service_instance
             .as_ref()
-            .call(call_info.method_id, context, payload)
+            .call(
+                call_info.method_id,
+                TransactionContext {
+                    service_descriptor: service_instance.descriptor(),
+                    runtime_context,
+                    runtime: self,
+                },
+                payload,
+            )
             .map_err(|e| {
                 ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
             })?

@@ -37,7 +37,7 @@ use exonum_cryptocurrency::{
     api::WalletQuery,
     contracts::CryptocurrencyService,
     schema::Wallet,
-    transactions::{Configuration, TxCreateWallet, TxTransfer},
+    transactions::{Config, TxCreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
@@ -308,7 +308,7 @@ fn create_testkit() -> (TestKit, CryptocurrencyApi) {
         CryptocurrencyService,
         INSTANCE_NAME,
         INSTANCE_ID,
-        Configuration,
+        Config,
     );
     let api = CryptocurrencyApi {
         inner: testkit.api(),

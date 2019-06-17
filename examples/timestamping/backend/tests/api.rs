@@ -30,7 +30,7 @@ use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use exonum_timestamping::{
     api::TimestampQuery,
     schema::{Timestamp, TimestampEntry},
-    transactions::{Configuration, TxTimestamp},
+    transactions::{Config, TxTimestamp},
     TimestampingService,
 };
 
@@ -51,7 +51,7 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
         .with_service(ServiceInstances::new(TimestampingService).with_instance(
             SERVICE_NAME,
             SERVICE_ID,
-            Configuration {
+            Config {
                 time_service_name: TIME_SERVICE_NAME.to_owned(),
                 time_service_id: TIME_SERVICE_ID,
             },
