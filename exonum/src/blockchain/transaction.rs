@@ -423,16 +423,15 @@ mod tests {
     use std::{panic, sync::Mutex};
 
     use crate::{
-        blockchain::{Blockchain, ExecutionResult, Schema},
+        blockchain::{Blockchain, ExecutionResult, Schema, ServiceInstances},
         crypto,
-        helpers::{Height, ValidatorId},
+        helpers::{generate_testnet_config, Height, ValidatorId},
         impl_service_dispatcher,
         messages::ServiceInstanceId,
         node::ApiSender,
         proto::schema::tests::TestServiceTx,
-        runtime::{
-            dispatcher::{BuiltinService, DispatcherBuilder},
-            rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
+        runtime::rust::{
+            RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext,
         },
     };
 
@@ -484,22 +483,22 @@ mod tests {
     }
 
     fn create_blockchain() -> Blockchain {
-        let service_keypair = crypto::gen_keypair();
+        let config = generate_testnet_config(1, 0)[0].clone();
+        let service_keypair = config.service_keypair();
         let api_channel = mpsc::unbounded();
         let internal_sender = mpsc::channel(1).0;
 
-        Blockchain::with_dispatcher(
+        Blockchain::new(
             TemporaryDB::new(),
-            DispatcherBuilder::new(internal_sender)
-                .with_builtin_service(BuiltinService {
-                    factory: TxResultCheckService.into(),
-                    instance_id: TX_CHECK_RESULT_SERVICE_ID,
-                    instance_name: "tx_result_check_service".into(),
-                })
-                .finalize(),
-            service_keypair.0,
-            service_keypair.1,
+            vec![ServiceInstances::new(TxResultCheckService).with_instance(
+                TX_CHECK_RESULT_SERVICE_ID,
+                "tx-check-service",
+                (),
+            )],
+            config.genesis,
+            service_keypair,
             ApiSender::new(api_channel.0),
+            internal_sender,
         )
     }
 

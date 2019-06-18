@@ -232,7 +232,7 @@ where
     /// - Table **value** is the root hash of a service table, which contributes
     /// to the `state_hash` of the resulting block.
     ///
-    /// Core tables participate in the resulting state_hash with `CORE_SERVICE`
+    /// Core tables participate in the resulting state_hash with `CORE_ID`
     /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, Hash, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())

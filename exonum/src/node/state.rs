@@ -16,7 +16,6 @@
 
 use bit_vec::BitVec;
 use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
-use serde_json::Value;
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
@@ -550,11 +549,6 @@ impl State {
     /// Returns `ConsensusConfig`.
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
-    }
-
-    /// Returns `BTreeMap` with service configs identified by name.
-    pub fn services_config(&self) -> &BTreeMap<String, Value> {
-        &self.config.services
     }
 
     /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node

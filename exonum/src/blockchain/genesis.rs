@@ -31,19 +31,19 @@ pub struct GenesisConfig {
 
 impl GenesisConfig {
     /// Creates a default configuration from the given list of public keys.
-    pub fn new<I: Iterator<Item = ValidatorKeys>>(validators: I) -> Self {
-        Self::new_with_consensus(ConsensusConfig::default(), validators)
+    pub fn new(validator_keys: impl IntoIterator<Item = ValidatorKeys>) -> Self {
+        Self::new_with_consensus(ConsensusConfig::default(), validator_keys)
     }
 
     /// Creates a configuration from the given consensus configuration and list of public keys.
-    pub fn new_with_consensus<I>(consensus: ConsensusConfig, validator_keys: I) -> Self
-    where
-        I: Iterator<Item = ValidatorKeys>,
-    {
+    pub fn new_with_consensus(
+        consensus: ConsensusConfig,
+        validator_keys: impl IntoIterator<Item = ValidatorKeys>,
+    ) -> Self {
         consensus.warn_if_nonoptimal();
         Self {
             consensus,
-            validator_keys: validator_keys.collect(),
+            validator_keys: validator_keys.into_iter().collect(),
         }
     }
 }

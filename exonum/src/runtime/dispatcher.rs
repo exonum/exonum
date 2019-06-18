@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot, IndexAccess};
 use futures::{future::Future, sink::Sink, sync::mpsc};
 
 use std::collections::HashMap;
 
 use crate::{
     api::ServiceApiBuilder,
+    blockchain::CORE_ID,
     events::InternalRequest,
     node::ApiSender,
     {
@@ -48,22 +49,53 @@ impl std::fmt::Debug for Dispatcher {
 
 impl Dispatcher {
     pub fn new(inner_requests_tx: mpsc::Sender<InternalRequest>) -> Self {
-        Self::with_runtimes(Default::default(), inner_requests_tx)
+        Self::with_runtimes(Vec::new(), inner_requests_tx)
     }
 
     pub fn with_runtimes(
-        runtimes: HashMap<u32, Box<dyn Runtime>>,
+        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
         inner_requests_tx: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
-            runtimes,
+            runtimes: runtimes.into_iter().collect(),
             runtime_lookup: Default::default(),
             inner_requests_tx,
         }
     }
 
+    pub fn restore_state(&mut self, fork: impl IndexAccess) {}
+
     pub fn add_runtime(&mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) {
         self.runtimes.insert(id, runtime.into());
+    }
+
+    /// Adds built-in service with predefined identifier.
+    // TODO rewrite to return error [ECR-3222]
+    pub fn add_builtin_service(
+        &mut self,
+        fork: &Fork,
+        spec: ServiceInstanceSpec,
+        constructor: ServiceConstructor,
+    ) {
+        // Registers service instance in runtime.
+        self.begin_deploy(&spec.artifact)
+            .and_then(|_| {
+                let status = self.check_deploy_status(&spec.artifact, false)?;
+                assert_eq!(
+                    status,
+                    DeployStatus::Deployed,
+                    "Builtin services must be deployed instantly."
+                );
+                Ok(())
+            })
+            .expect("Unable to deploy builtin service");
+        // Starts builtin service instance.
+        self.start_service(
+            &mut RuntimeContext::without_author(fork),
+            spec,
+            &constructor,
+        )
+        .expect("Unable to start builtin service instance");
     }
 
     /// Sends restart API message.
@@ -108,6 +140,10 @@ impl Dispatcher {
         spec: ServiceInstanceSpec,
         constructor: &ServiceConstructor,
     ) -> Result<(), StartError> {
+        // Check that service doesn't use reserved identifiers.
+        if spec.id == CORE_ID as u32 {
+            return Err(StartError::ServiceIdExists);
+        }
         // Tries to start and configure service instance.
         self.runtimes
             .get_mut(&spec.artifact.runtime_id)
@@ -195,61 +231,12 @@ pub struct DispatcherBuilder {
     dispatcher: Dispatcher,
 }
 
-#[derive(Debug)]
-pub struct BuiltinService {
-    pub factory: Box<dyn ServiceFactory>,
-    pub instance_id: ServiceInstanceId,
-    pub instance_name: String,
-}
-
-impl BuiltinService {
-    pub fn instance_spec(&self) -> ServiceInstanceSpec {
-        ServiceInstanceSpec {
-            artifact: self.factory.artifact().into(),
-            id: self.instance_id,
-            name: self.instance_name.clone(),
-        }
-    }
-}
-
 impl DispatcherBuilder {
     pub fn new(requests: mpsc::Sender<InternalRequest>) -> Self {
         Self {
             dispatcher: Dispatcher::new(requests),
             builtin_runtime: RustRuntime::default(),
         }
-    }
-
-    /// Adds built-in service with predefined identifier, keep in mind that the initialize method
-    /// of service will not be invoked and thus service must have and empty constructor.
-    pub fn with_builtin_service(mut self, service: impl Into<BuiltinService>) -> Self {
-        let service = service.into();
-        // Registers service instance in runtime.
-        let spec = service.instance_spec();
-        // Deploys builtin service artifact.
-        self.builtin_runtime.add_service_factory(service.factory);
-        self.builtin_runtime
-            .begin_deploy(&spec.artifact)
-            .and_then(|_| {
-                let status = self
-                    .builtin_runtime
-                    .check_deploy_status(&spec.artifact, false)?;
-                assert_eq!(
-                    status,
-                    DeployStatus::Deployed,
-                    "Builtin services must be deployed instantly."
-                );
-                Ok(())
-            })
-            .expect("Unable to deploy builtin service");
-        // Starts builtin service instance.
-        self.builtin_runtime
-            .start_service(&spec)
-            .expect("Unable to start builtin service instance");
-        // Registers service instance in dispatcher.
-        self.dispatcher
-            .notify_service_started(service.instance_id, spec.artifact);
-        self
     }
 
     /// Adds service factory to the Rust runtime.

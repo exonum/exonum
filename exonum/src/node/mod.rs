@@ -50,7 +50,8 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState, ValidatorKeys,
+        Blockchain, ConsensusConfig, GenesisConfig, Schema, ServiceInstances,
+        SharedNodeState, ValidatorKeys,
     },
     crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey},
     events::{
@@ -67,7 +68,6 @@ use crate::{
     },
     messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage},
     node::state::SharedConnectList,
-    runtime::rust::service::ServiceFactory,
 };
 
 mod basic;
@@ -273,6 +273,12 @@ pub struct NodeConfig<T = SecretKey> {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
+}
+
+impl<T: Clone> NodeConfig<T> {
+    pub(crate) fn service_keypair(&self) -> (PublicKey, T) {
+        (self.service_public_key, self.service_secret_key.clone())
+    }
 }
 
 impl NodeConfig<PathBuf> {
@@ -896,18 +902,18 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new<D: Into<Arc<dyn Database>>>(
-        db: D,
-        services: Vec<Box<dyn ServiceFactory>>,
+    pub fn new(
+        database: impl Into<Arc<dyn Database>>,
+        services: impl IntoIterator<Item = ServiceInstances>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let blockchain = Blockchain::new(
-            db,
+            database,
             services,
-            node_cfg.service_public_key,
-            node_cfg.service_secret_key.clone(),
+            node_cfg.genesis.clone(),
+            node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
             channel.internal_requests.0.clone(),
         );
@@ -921,7 +927,6 @@ impl Node {
         config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
-        blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
         let peers = node_cfg.connect_list.addresses();
 
@@ -1143,7 +1148,6 @@ mod tests {
         messages::AnyTx,
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
-            dispatcher::{BuiltinService, DispatcherBuilder},
             rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
             ServiceInstanceId,
         },
@@ -1183,16 +1187,6 @@ mod tests {
         }
     }
 
-    impl From<TestService> for BuiltinService {
-        fn from(factory: TestService) -> Self {
-            Self {
-                factory: Box::new(factory),
-                instance_id: SERVICE_ID,
-                instance_name: "test-service".into(),
-            }
-        }
-    }
-
     fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<AnyTx> {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
@@ -1206,20 +1200,10 @@ mod tests {
         let (p_key, s_key) = gen_keypair();
 
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
-        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let dispatcher = DispatcherBuilder::new(channel.internal_requests.0.clone())
-            .with_builtin_service(TestService)
-            .finalize();
 
-        let mut node = Node::with_blockchain(
-            Blockchain::with_dispatcher(
-                TemporaryDB::new(),
-                dispatcher,
-                node_cfg.service_public_key,
-                node_cfg.service_secret_key.clone(),
-                ApiSender::new(channel.api_requests.0.clone()),
-            ),
-            channel,
+        let mut node = Node::new(
+            TemporaryDB::new(),
+            vec![ServiceInstances::new(TestService).with_instance(SERVICE_ID, "test-service", ())],
             node_cfg,
             None,
         );
@@ -1252,10 +1236,9 @@ mod tests {
     fn test_transaction_without_service() {
         let (p_key, s_key) = gen_keypair();
 
-        let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(TemporaryDB::new(), services, node_cfg, None);
+        let mut node = Node::new(TemporaryDB::new(), Vec::new(), node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 

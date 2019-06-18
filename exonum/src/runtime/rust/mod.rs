@@ -121,6 +121,20 @@ impl RustRuntime {
         info!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
+
+    pub fn with_available_service(
+        mut self,
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+    ) -> Self {
+        self.add_service_factory(service_factory.into());
+        self
+    }
+}
+
+impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
+    fn from(r: RustRuntime) -> Self {
+        (RustRuntime::ID as u32, Box::new(r))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]

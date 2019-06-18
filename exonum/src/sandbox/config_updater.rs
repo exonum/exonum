@@ -26,10 +26,7 @@ use crate::{
     helpers::Height,
     messages::{AnyTx, ServiceInstanceId, Signed},
     proto::ProtobufConvert,
-    runtime::{
-        dispatcher::BuiltinService,
-        rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
-    },
+    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
 };
 
 #[service_interface(exonum(crate = "crate"))]
@@ -67,17 +64,7 @@ impl ServiceFactory for ConfigUpdaterService {
 }
 
 impl ConfigUpdaterService {
-    pub const ID: ServiceInstanceId = 0;
-}
-
-impl From<ConfigUpdaterService> for BuiltinService {
-    fn from(factory: ConfigUpdaterService) -> Self {
-        Self {
-            factory: factory.into(),
-            instance_id: ConfigUpdaterService::ID,
-            instance_name: "config_updater".into(),
-        }
-    }
+    pub const ID: ServiceInstanceId = 3;
 }
 
 impl TxConfig {

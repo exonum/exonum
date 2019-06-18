@@ -21,6 +21,7 @@ use std::{
 };
 
 use crate::{
+    blockchain::ServiceInstances,
     node::{ExternalMessage, Node},
     runtime::rust::ServiceFactory,
 };
@@ -156,7 +157,15 @@ impl NodeBuilder {
                 service_passphrase.as_bytes(),
             )
         };
-        Node::new(db, self.service_factories, config, Some(config_file_path))
+
+        Node::new(
+            db,
+            self.service_factories
+                .into_iter()
+                .map(ServiceInstances::new),
+            config,
+            Some(config_file_path),
+        )
     }
 }
 

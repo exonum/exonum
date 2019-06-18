@@ -39,12 +39,11 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
-    blockchain::{Blockchain, GenesisConfig, Schema, ValidatorKeys},
+    blockchain::{Blockchain, GenesisConfig, Schema, ServiceInstances, ValidatorKeys},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
     node::ApiSender,
-    runtime::dispatcher::{BuiltinService, DispatcherBuilder},
 };
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
@@ -76,33 +75,23 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 
 fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
-    services: Vec<impl Into<BuiltinService>>,
+    services: Vec<ServiceInstances>,
 ) -> Blockchain {
-    let dummy_channel = mpsc::unbounded();
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
-
-    let mut dispatcher = DispatcherBuilder::new(mpsc::channel(0).0);
-    for service in services {
-        dispatcher = dispatcher.with_builtin_service(service);
-    }
-    let dispatcher = dispatcher.finalize();
-
-    let mut blockchain = Blockchain::with_dispatcher(
-        db,
-        dispatcher,
-        service_keypair.0,
-        service_keypair.1,
-        ApiSender::new(dummy_channel.0),
-    );
-
     let consensus_keypair = crypto::gen_keypair();
     let config = GenesisConfig::new(iter::once(ValidatorKeys {
         consensus_key: consensus_keypair.0,
         service_key: service_keypair.0,
     }));
-    blockchain.initialize(config).unwrap();
 
-    blockchain
+    Blockchain::new(
+        db,
+        services,
+        config,
+        service_keypair,
+        ApiSender::new(mpsc::unbounded().0),
+        mpsc::channel(0).0,
+    )
 }
 
 fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, Patch) {
@@ -111,11 +100,10 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, P
 
 mod timestamping {
     use exonum::{
-        blockchain::ExecutionResult,
+        blockchain::{ExecutionResult, ServiceInstances},
         crypto::Hash,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::dispatcher::BuiltinService,
         runtime::rust::{
             RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext,
         },
@@ -165,13 +153,9 @@ mod timestamping {
         }
     }
 
-    impl From<Timestamping> for BuiltinService {
+    impl From<Timestamping> for ServiceInstances {
         fn from(t: Timestamping) -> Self {
-            Self {
-                factory: Box::new(t),
-                instance_id: TIMESTAMPING_SERVICE_ID,
-                instance_name: "timestamping".into(),
-            }
+            Self::new(t).with_instance(TIMESTAMPING_SERVICE_ID, "timestamping", ())
         }
     }
 
@@ -209,20 +193,20 @@ mod timestamping {
 }
 
 mod cryptocurrency {
-    use super::gen_keypair_from_rng;
-    use crate::proto;
     use exonum::{
-        blockchain::{ExecutionError, ExecutionResult},
+        blockchain::{ExecutionError, ExecutionResult, ServiceInstances},
         crypto::PublicKey,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::{
-            dispatcher::BuiltinService,
-            rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
+        runtime::rust::{
+            RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
     use rand::{seq::SliceRandom, Rng};
+
+    use super::gen_keypair_from_rng;
+    use crate::proto;
 
     const CRYPTOCURRENCY_SERVICE_ID: ServiceInstanceId = 255;
 
@@ -319,13 +303,9 @@ mod cryptocurrency {
         }
     }
 
-    impl From<Cryptocurrency> for BuiltinService {
+    impl From<Cryptocurrency> for ServiceInstances {
         fn from(t: Cryptocurrency) -> Self {
-            Self {
-                factory: Box::new(t),
-                instance_id: CRYPTOCURRENCY_SERVICE_ID,
-                instance_name: "cryptocurrency".into(),
-            }
+            Self::new(t).with_instance(CRYPTOCURRENCY_SERVICE_ID, "cryptocurrency", ())
         }
     }
 
@@ -463,12 +443,12 @@ fn prepare_blockchain(
 fn execute_block_rocksdb(
     criterion: &mut Criterion,
     bench_name: &'static str,
-    service: impl Into<BuiltinService>,
+    service: impl Into<ServiceInstances>,
     mut tx_generator: impl Iterator<Item = Signed<AnyTx>>,
 ) {
     let tempdir = TempDir::new("exonum").unwrap();
     let db = create_rocksdb(&tempdir);
-    let mut blockchain = create_blockchain(db, vec![service]);
+    let mut blockchain = create_blockchain(db, vec![service.into()]);
 
     // We don't particularly care how transactions are distributed in the blockchain
     // in the preparation phase.

@@ -18,17 +18,14 @@ use exonum_merkledb::{Database, Error as StorageError, ListIndex, ObjectHash, Te
 use futures::sync::mpsc;
 
 use crate::{
-    blockchain::{Blockchain, ExecutionResult, Schema},
+    blockchain::{Blockchain, ExecutionResult, Schema, ServiceInstances},
     crypto::gen_keypair,
-    helpers::{Height, ValidatorId},
+    helpers::{generate_testnet_config, Height, ValidatorId},
     impl_service_dispatcher,
     messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
-    runtime::{
-        dispatcher::{BuiltinService, DispatcherBuilder},
-        rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
-    },
+    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -186,22 +183,18 @@ fn create_blockchain_with_service(
     id: ServiceInstanceId,
     name: &str,
 ) -> Blockchain {
-    let service_keypair = gen_keypair();
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let service_keypair = config.service_keypair();
     let api_channel = mpsc::unbounded();
     let internal_sender = mpsc::channel(1).0;
 
-    Blockchain::with_dispatcher(
+    Blockchain::new(
         TemporaryDB::new(),
-        DispatcherBuilder::new(internal_sender)
-            .with_builtin_service(BuiltinService {
-                factory: factory.into(),
-                instance_id: id,
-                instance_name: name.into(),
-            })
-            .finalize(),
-        service_keypair.0,
-        service_keypair.1,
+        vec![ServiceInstances::new(factory).with_instance(id, name, ())],
+        config.genesis,
+        service_keypair,
         ApiSender::new(api_channel.0),
+        internal_sender,
     )
 }
 

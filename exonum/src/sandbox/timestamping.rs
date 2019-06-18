@@ -26,12 +26,9 @@ use crate::{
     blockchain::ExecutionResult,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::{AnyTx, ServiceInstanceId, Signed},
-    runtime::{
-        dispatcher::BuiltinService,
-        rust::{
-            RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, Transaction,
-            TransactionContext,
-        },
+    runtime::rust::{
+        RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, Transaction,
+        TransactionContext,
     },
 };
 
@@ -73,17 +70,7 @@ impl ServiceFactory for TimestampingService {
 }
 
 impl TimestampingService {
-    pub const ID: ServiceInstanceId = 1;
-}
-
-impl From<TimestampingService> for BuiltinService {
-    fn from(factory: TimestampingService) -> Self {
-        Self {
-            factory: factory.into(),
-            instance_id: TimestampingService::ID,
-            instance_name: "timestamping".into(),
-        }
-    }
+    pub const ID: ServiceInstanceId = 2;
 }
 
 impl_binary_value_for_message! { TimestampTx }

@@ -29,7 +29,6 @@ use super::{
     config::ConfigurationServiceConfig,
     errors::Error as ServiceError,
     schema::{MaybeVote, ProposeData, Schema, VotingDecision},
-    SERVICE_NAME,
 };
 
 /// Propose a new configuration.
@@ -142,11 +141,7 @@ pub fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool 
 }
 
 fn get_service_config(config: &StoredConfiguration) -> ConfigurationServiceConfig {
-    config
-        .services
-        .get(SERVICE_NAME)
-        .map(|config| serde_json::from_value(config.clone()).expect("Configuration is invalid"))
-        .unwrap_or_default()
+    unimplemented!()
 }
 
 impl Propose {
