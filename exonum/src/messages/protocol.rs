@@ -764,11 +764,11 @@ pub struct AnyTx {
 impl AnyTx {
     /// Method for compatibility with old transactions.
     /// Creates equivalent of `RawTransaction`.
-    pub fn as_raw_tx(service_id: u16, tx_id: u16, payload: Vec<u8>) -> Self {
+    pub fn new(service_id: u16, tx_id: u16, payload: Vec<u8>) -> Self {
         Self {
             call_info: CallInfo {
-                instance_id: service_id as u32,
-                method_id: tx_id as u32,
+                instance_id: u32::from(service_id),
+                method_id: u32::from(tx_id),
             },
             payload,
         }
@@ -978,7 +978,7 @@ impl Message {
         T: Into<ServiceTransaction>,
     {
         let set: ServiceTransaction = transaction.into();
-        let any_tx = AnyTx::as_raw_tx(service_id as u16, set.transaction_id, set.payload);
+        let any_tx = AnyTx::new(service_id as u16, set.transaction_id, set.payload);
         Self::concrete(any_tx, public_key, secret_key)
     }
 

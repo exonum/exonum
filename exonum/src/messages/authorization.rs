@@ -82,9 +82,9 @@ impl ProtobufConvert for SignedMessage {
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_exonum_msg(ProtobufConvert::to_pb(&self.exonum_msg).into());
-        msg.set_key(ProtobufConvert::to_pb(&self.key).into());
-        msg.set_sign(ProtobufConvert::to_pb(&self.sign).into());
+        msg.set_exonum_msg(ProtobufConvert::to_pb(&self.exonum_msg));
+        msg.set_key(ProtobufConvert::to_pb(&self.key));
+        msg.set_sign(ProtobufConvert::to_pb(&self.sign));
         msg
     }
 

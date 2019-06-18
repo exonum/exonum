@@ -34,6 +34,7 @@ cyclomatic
 datetime
 deadlinks
 decodable
+deployable
 deque
 deref
 deserialization
@@ -48,6 +49,7 @@ discriminants
 doctests
 emsp
 encodable
+errored
 Exonum
 exonumhub
 fsync
@@ -89,6 +91,7 @@ nacl
 nanos
 nodelay
 nonoptimal
+oneof
 oneshot
 openssl
 opslimit
@@ -119,7 +122,7 @@ quux
 readonly
 rebasing
 reddit
-reimplemented
+reimplement
 repr
 reqwest
 RESTful
@@ -137,6 +140,7 @@ rustup
 scalarmult
 scrypt
 seedable
+semver
 serde
 serializable
 serialize

@@ -393,7 +393,8 @@ impl ApiAggregator {
         _blockchain: &Blockchain,
         _shared_api_state: SharedNodeState,
     ) -> ServiceApiBuilder {
-        let builder = ServiceApiBuilder::new();
+        // let builder =
+        ServiceApiBuilder::new()
 
         // TODO Update NodeInfo endpoint.
 
@@ -404,6 +405,6 @@ impl ApiAggregator {
         //     .wire(builder.private_scope());
         // self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
 
-        builder
+        // builder
     }
 }

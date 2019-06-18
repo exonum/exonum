@@ -268,7 +268,7 @@ impl Blockchain {
 
         let msg = Message::sign_transaction(
             tx.service_transaction(),
-            service_id as u32,
+            u32::from(service_id),
             self.service_keypair.0,
             &self.service_keypair.1,
         );
@@ -385,13 +385,12 @@ impl Blockchain {
             let snapshot = new_fork.snapshot();
             let schema = Schema::new(snapshot);
 
-            let signed_tx = schema.transactions().get(&tx_hash).ok_or_else(|| {
+            schema.transactions().get(&tx_hash).ok_or_else(|| {
                 failure::err_msg(format!(
                     "BUG: Cannot find transaction in database. tx: {:?}",
                     tx_hash
                 ))
-            })?;
-            signed_tx
+            })?
         };
 
         fork.flush();
