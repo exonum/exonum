@@ -39,7 +39,7 @@ use crate::blockchain::{
 mod blockchain;
 
 #[test]
-#[allow(clippy::cyclomatic_complexity)]
+#[allow(clippy::cognitive_complexity)]
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
 
