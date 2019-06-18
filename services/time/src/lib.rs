@@ -42,64 +42,30 @@ pub mod transactions;
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::ExecutionResult,
     crypto::Hash,
-    helpers::fabric::Context,
     impl_service_dispatcher,
     runtime::rust::{
         AfterCommitContext, RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory,
-        ServiceInstanceId, TransactionContext,
     },
 };
 use exonum_merkledb::Snapshot;
 
+use std::sync::Arc;
+
 use crate::{
     schema::TimeSchema,
     time_provider::{SystemTimeProvider, TimeProvider},
-    transactions::TxTime,
+    transactions::{TimeOracleInterface, TxTime},
 };
 
-#[service_interface]
-pub trait TimeOracleInterface {
-    fn time(&self, ctx: TransactionContext, arg: TxTime) -> ExecutionResult;
-}
+// TODO there is no way to provide provider for now.
+// It should be configurable through the configuration service.
 
 /// Define the service.
 #[derive(Debug)]
 pub struct TimeService {
     /// Current time.
-    time: Box<dyn TimeProvider>,
-}
-
-impl Default for TimeService {
-    fn default() -> Self {
-        Self {
-            time: Box::new(SystemTimeProvider) as Box<dyn TimeProvider>,
-        }
-    }
-}
-
-impl TimeService {
-    /// Create a new `TimeService`.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    // TODO there is no way to provide provider for now.
-    // It should be configurable through the configuration service.
-}
-
-impl TimeOracleInterface for TimeService {
-    fn time(&self, context: TransactionContext, arg: TxTime) -> ExecutionResult {
-        let author = context.author();
-        let view = context.fork();
-        let service_name = context.service_name();
-
-        arg.check_signed_by_validator(view.as_ref(), &author)?;
-        arg.update_validator_time(service_name, view, &author)?;
-        TxTime::update_consolidated_time(service_name, view);
-        Ok(())
-    }
+    time: Arc<dyn TimeProvider>,
 }
 
 impl_service_dispatcher!(TimeService, TimeOracleInterface);
@@ -119,25 +85,41 @@ impl Service for TimeService {
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext) {
         // The transaction must be created by the validator.
-
-        // TODO can't implement after_commit via fork
-        unimplemented!();
-        // if context.validator_id().is_none() {
-        //     return;
-        // }
-        // context.broadcast_transaction(TxTime::new(self.time.current_time()));
+        if context.validator_id().is_some() {
+            context.broadcast_transaction(TxTime::new(self.time.current_time()));
+        }
     }
 }
 
+/// Time oracle service factory implementation.
 #[derive(Debug)]
-pub struct TimeServiceFactory;
+pub struct TimeServiceFactory {
+    time_provider: Arc<dyn TimeProvider>,
+}
+
+impl TimeServiceFactory {
+    /// Create a new `TimeServiceFactory` with the custom time provider.
+    pub fn with_provider(time_provider: impl Into<Arc<dyn TimeProvider>>) -> Self {
+        Self {
+            time_provider: time_provider.into(),
+        }
+    }
+}
+
+impl Default for TimeServiceFactory {
+    fn default() -> Self {
+        Self::with_provider(SystemTimeProvider)
+    }
+}
 
 impl ServiceFactory for TimeServiceFactory {
     fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec::new("exonum-time", 0, 1, 0)
+        exonum::artifact_spec_from_crate!()
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(TimeService::new())
+        Box::new(TimeService {
+            time: self.time_provider.clone(),
+        })
     }
 }

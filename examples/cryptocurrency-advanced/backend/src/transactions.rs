@@ -14,11 +14,15 @@
 
 //! Cryptocurrency transactions.
 
-use exonum::{blockchain::ExecutionError, crypto::PublicKey};
+use exonum::{
+    blockchain::{ExecutionError, ExecutionResult},
+    crypto::PublicKey,
+    runtime::rust::TransactionContext,
+};
 
-use super::proto;
+use super::{proto, schema::Schema, CryptocurrencyService};
 
-pub const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
+const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -88,4 +92,74 @@ pub struct Issue {
 pub struct CreateWallet {
     /// Name of the new wallet.
     pub name: String,
+}
+
+/// Cryptocurrency service transactions.
+#[service_interface]
+pub trait CryptocurrencyInterface {
+    /// Transfers `amount` of the currency from one wallet to another.
+    fn transfer(&self, ctx: TransactionContext, arg: Transfer) -> ExecutionResult;
+    /// Issues `amount` of the currency to the `wallet`.
+    fn issue(&self, ctx: TransactionContext, arg: Issue) -> ExecutionResult;
+    /// Creates wallet with the given `name`.
+    fn create_wallet(&self, ctx: TransactionContext, arg: CreateWallet) -> ExecutionResult;
+}
+
+impl CryptocurrencyInterface for CryptocurrencyService {
+    fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult {
+        let from = &context.author();
+        let hash = context.tx_hash();
+
+        let mut schema = Schema::new(context.service_name(), context.fork());
+
+        let to = &arg.to;
+        let amount = arg.amount;
+
+        if from == to {
+            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER));
+        }
+
+        let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
+
+        let receiver = schema.wallet(to).ok_or(Error::ReceiverNotFound)?;
+
+        if sender.balance < amount {
+            Err(Error::InsufficientCurrencyAmount)?
+        }
+
+        schema.decrease_wallet_balance(sender, amount, &hash);
+        schema.increase_wallet_balance(receiver, amount, &hash);
+
+        Ok(())
+    }
+
+    fn issue(&self, context: TransactionContext, arg: Issue) -> ExecutionResult {
+        let pub_key = &context.author();
+        let hash = context.tx_hash();
+
+        let mut schema = Schema::new(context.service_name(), context.fork());
+
+        if let Some(wallet) = schema.wallet(pub_key) {
+            let amount = arg.amount;
+            schema.increase_wallet_balance(wallet, amount, &hash);
+            Ok(())
+        } else {
+            Err(Error::ReceiverNotFound)?
+        }
+    }
+
+    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult {
+        let pub_key = &context.author();
+        let hash = context.tx_hash();
+
+        let mut schema = Schema::new(context.service_name(), context.fork());
+
+        if schema.wallet(pub_key).is_none() {
+            let name = &arg.name;
+            schema.create_wallet(pub_key, name, &hash);
+            Ok(())
+        } else {
+            Err(Error::WalletAlreadyExists)?
+        }
+    }
 }

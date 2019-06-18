@@ -85,7 +85,8 @@ pub mod schema {
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
     #[derive(Debug)]
-    pub struct CurrencySchema<T> {
+    pub struct CurrencySchema<'a, T> {
+        name: &'a str,
         access: T,
     }
 
@@ -94,15 +95,15 @@ pub mod schema {
     ///
     /// [`MapIndex`]: https://exonum.com/doc/version/latest/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<T: IndexAccess> CurrencySchema<T> {
+    impl<'a, T: IndexAccess> CurrencySchema<'a, T> {
         /// Creates a new schema instance.
-        pub fn new(access: T) -> Self {
-            CurrencySchema { access }
+        pub fn new(name: &'a str, access: T) -> Self {
+            CurrencySchema { name, access }
         }
 
         /// Returns an immutable version of the wallets table.
         pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
-            MapIndex::new("cryptocurrency.wallets", self.access.clone())
+            MapIndex::new([self.name, ".wallets"].concat(), self.access.clone())
         }
 
         /// Gets a specific wallet from the storage.
@@ -117,6 +118,11 @@ pub mod transactions {
     use exonum::crypto::PublicKey;
 
     use super::proto;
+
+    /// Service configuration parameters.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::Config")]
+    pub struct Config;
 
     /// Transaction type for creating a new wallet.
     ///
@@ -215,16 +221,20 @@ pub mod contracts {
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
 
+    /// Cryptocurrency service transactions.
     #[service_interface]
-    pub trait Cryptocurrency {
+    pub trait CryptocurrencyInterface {
+        /// Creates wallet with the given `name`.
         fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
+        /// Transfers `amount` of the currency from one wallet to another.
         fn transfer(&self, ctx: TransactionContext, arg: TxTransfer) -> ExecutionResult;
     }
 
+    /// Cryptocurrency service implementation.
     #[derive(Debug)]
-    pub struct CryptocurrencyServiceImpl;
+    pub struct CryptocurrencyService;
 
-    impl Cryptocurrency for CryptocurrencyServiceImpl {
+    impl CryptocurrencyInterface for CryptocurrencyService {
         fn create_wallet(
             &self,
             context: TransactionContext,
@@ -232,7 +242,7 @@ pub mod contracts {
         ) -> ExecutionResult {
             let author = context.author();
             let view = context.fork();
-            let schema = CurrencySchema::new(view);
+            let schema = CurrencySchema::new(context.service_name(), view);
             if schema.wallet(&author).is_none() {
                 let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
@@ -251,7 +261,7 @@ pub mod contracts {
                 Err(Error::SenderSameAsReceiver)?
             }
 
-            let schema = CurrencySchema::new(view);
+            let schema = CurrencySchema::new(context.service_name(), view);
 
             let sender = match schema.wallet(&author) {
                 Some(val) => val,
@@ -278,33 +288,26 @@ pub mod contracts {
         }
     }
 
-    impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
+    impl_service_dispatcher!(CryptocurrencyService, CryptocurrencyInterface);
 
-    impl Service for CryptocurrencyServiceImpl {
-        fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-            CryptocurrencyApi::wire(builder);
+    impl Service for CryptocurrencyService {
+        fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+            CryptocurrencyApi::new(descriptor.service_name()).wire(builder);
         }
     }
 
-    pub fn artifact_spec() -> RustArtifactSpec {
-        RustArtifactSpec::new("cryptocurrency", 0, 1, 0)
-    }
-
-    #[derive(Debug)]
-    pub struct ServiceFactoryImpl;
-
-    impl ServiceFactory for ServiceFactoryImpl {
+    impl ServiceFactory for CryptocurrencyService {
         fn artifact(&self) -> RustArtifactSpec {
-            artifact_spec()
+            exonum::artifact_spec_from_crate!()
         }
 
         fn new_instance(&self) -> Box<dyn Service> {
-            Box::new(CryptocurrencyServiceImpl)
+            Box::new(Self)
         }
     }
 }
-//
-///// REST API.
+
+/// Cryptocurrency API implementation.
 pub mod api {
     use exonum::{
         api::{self, ServiceApiBuilder, ServiceApiState},
@@ -315,7 +318,7 @@ pub mod api {
 
     /// Public service API description.
     #[derive(Debug, Clone)]
-    pub struct CryptocurrencyApi;
+    pub struct CryptocurrencyApi(String);
 
     /// The structure describes the query parameters for the `get_wallet` endpoint.
     #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -325,19 +328,28 @@ pub mod api {
     }
 
     impl CryptocurrencyApi {
+        /// Creates a new public API for the specified service instance.
+        pub fn new(service_name: &str) -> Self {
+            Self(service_name.to_owned())
+        }
+
         /// Endpoint for getting a single wallet.
-        pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
+        pub fn get_wallet(
+            &self,
+            state: &ServiceApiState,
+            pub_key: PublicKey,
+        ) -> api::Result<Wallet> {
             let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(&snapshot);
+            let schema = CurrencySchema::new(&self.0, &snapshot);
             schema
-                .wallet(&query.pub_key)
+                .wallet(&pub_key)
                 .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
+        pub fn get_wallets(&self, state: &ServiceApiState) -> api::Result<Vec<Wallet>> {
             let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(&snapshot);
+            let schema = CurrencySchema::new(&self.0, &snapshot);
             let idx = schema.wallets();
             let wallets = idx.values().collect();
             Ok(wallets)
@@ -345,12 +357,20 @@ pub mod api {
 
         /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
         /// endpoints.
-        pub fn wire(builder: &mut ServiceApiBuilder) {
+        pub fn wire(self, builder: &mut ServiceApiBuilder) {
             // Binds handlers to specific routes.
             builder
                 .public_scope()
-                .endpoint("v1/wallet", Self::get_wallet)
-                .endpoint("v1/wallets", Self::get_wallets);
+                .endpoint("v1/wallet", {
+                    let api = self.clone();
+                    move |state: &ServiceApiState, query: WalletQuery| {
+                        api.get_wallet(state, query.pub_key)
+                    }
+                })
+                .endpoint("v1/wallets", {
+                    let api = self.clone();
+                    move |state: &ServiceApiState, _query: ()| api.get_wallets(state)
+                });
         }
     }
 }

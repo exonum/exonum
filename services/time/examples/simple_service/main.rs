@@ -21,24 +21,34 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use std::borrow::Cow;
-
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex, Snapshot};
+use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
+    blockchain::ExecutionResult,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
-    messages::{Message, RawTransaction, Signed},
+    impl_service_dispatcher,
+    messages::{AnyTx, ServiceInstanceId, Signed},
+    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
 };
-use exonum_testkit::TestKitBuilder;
-use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
+use exonum_testkit::{ServiceInstances, TestKitBuilder};
+use exonum_time::{
+    schema::TimeSchema,
+    time_provider::{MockTimeProvider, TimeProvider},
+    TimeServiceFactory,
+};
+
+use std::sync::Arc;
 
 mod proto;
 
+/// Time oracle instance id.
+const TIME_SERVICE_ID: ServiceInstanceId = 112;
+/// Time oracle instance name.
+const TIME_SERVICE_NAME: &str = "time-oracle";
 /// Marker service id.
-const SERVICE_ID: u16 = 128;
+const SERVICE_ID: ServiceInstanceId = 128;
 /// Marker service name.
 const SERVICE_NAME: &str = "marker";
 
@@ -68,36 +78,39 @@ impl<T: IndexAccess> MarkerSchema<T> {
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
 #[exonum(pb = "proto::TxMarker")]
 /// Transaction, which must be executed no later than the specified time (field `time`).
-struct TxMarker {
+pub struct TxMarker {
     mark: i32,
     time: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
-enum MarkerTransactions {
-    TxMarker(TxMarker),
-}
-
 impl TxMarker {
-    fn sign(
+    fn signed(
         mark: i32,
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<AnyTx> {
-        Message::sign_transaction(TxMarker { mark, time }, SERVICE_ID, *public_key, secret_key)
+        Self { mark, time }.sign(SERVICE_ID, *public_key, secret_key)
     }
 }
 
-impl Transaction for TxMarker {
-    fn execute(&self, context: TransactionContext) -> ExecutionResult {
+#[service_interface]
+pub trait MarkerInterface {
+    fn mark(&self, context: TransactionContext, arg: TxMarker) -> ExecutionResult;
+}
+
+#[derive(Debug)]
+struct MarkerService;
+
+impl MarkerInterface for MarkerService {
+    fn mark(&self, context: TransactionContext, arg: TxMarker) -> ExecutionResult {
         let author = context.author();
         let view = context.fork();
-        let time = TimeSchema::new(view).time().get();
+        let time = TimeSchema::new(TIME_SERVICE_NAME, view).time().get();
         match time {
-            Some(current_time) if current_time <= self.time => {
+            Some(current_time) if current_time <= arg.time => {
                 let schema = MarkerSchema::new(view);
-                schema.marks().put(&author, self.mark);
+                schema.marks().put(&author, arg.mark);
             }
             _ => {}
         }
@@ -105,41 +118,42 @@ impl Transaction for TxMarker {
     }
 }
 
-struct MarkerService;
+impl_service_dispatcher!(MarkerService, MarkerInterface);
 
-impl Service for MarkerService {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
+impl Service for MarkerService {}
+
+impl ServiceFactory for MarkerService {
+    fn artifact(&self) -> RustArtifactSpec {
+        "marker/0.1.0".parse().unwrap()
     }
 
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = MarkerSchema::new(snapshot);
-        schema.state_hash()
-    }
-
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = MarkerTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
     }
 }
 
 fn main() {
-    let mock_provider = MockTimeProvider::default();
+    let mock_provider = Arc::new(MockTimeProvider::default());
     // Create testkit for network with one validator.
     let mut testkit = TestKitBuilder::validator()
-        .with_service(MarkerService)
-        .with_service(TimeService::with_provider(mock_provider.clone()))
+        .with_service(
+            ServiceInstances::new(TimeServiceFactory::with_provider(
+                mock_provider.clone() as Arc<dyn TimeProvider>
+            ))
+            .with_instance(TIME_SERVICE_NAME, TIME_SERVICE_ID, ()),
+        )
+        .with_service(ServiceInstances::new(MarkerService).with_instance(
+            SERVICE_NAME,
+            SERVICE_ID,
+            (),
+        ))
         .create();
 
     mock_provider.set_time(Utc.timestamp(10, 0));
     testkit.create_blocks_until(Height(2));
 
     let snapshot = testkit.snapshot();
-    let time_schema = TimeSchema::new(&snapshot);
+    let time_schema = TimeSchema::new(TIME_SERVICE_NAME, &snapshot);
     assert_eq!(
         time_schema.time().get().map(|time| time),
         Some(mock_provider.time())
@@ -148,14 +162,14 @@ fn main() {
     let keypair1 = gen_keypair();
     let keypair2 = gen_keypair();
     let keypair3 = gen_keypair();
-    let tx1 = TxMarker::sign(1, mock_provider.time(), &keypair1.0, &keypair1.1);
-    let tx2 = TxMarker::sign(
+    let tx1 = TxMarker::signed(1, mock_provider.time(), &keypair1.0, &keypair1.1);
+    let tx2 = TxMarker::signed(
         2,
         mock_provider.time() + Duration::seconds(10),
         &keypair2.0,
         &keypair2.1,
     );
-    let tx3 = TxMarker::sign(
+    let tx3 = TxMarker::signed(
         3,
         mock_provider.time() - Duration::seconds(5),
         &keypair3.0,
@@ -169,7 +183,7 @@ fn main() {
     assert_eq!(schema.marks().get(&keypair2.0), Some(2));
     assert_eq!(schema.marks().get(&keypair3.0), None);
 
-    let tx4 = TxMarker::sign(4, Utc.timestamp(15, 0), &keypair3.0, &keypair3.1);
+    let tx4 = TxMarker::signed(4, Utc.timestamp(15, 0), &keypair3.0, &keypair3.1);
     testkit.create_block_with_transactions(txvec![tx4]);
 
     let snapshot = testkit.snapshot();

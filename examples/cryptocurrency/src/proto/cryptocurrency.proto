@@ -44,4 +44,5 @@ message TxTransfer {
   uint64 seed = 3;
 }
 
-message ConstructorData {}
+// Cryptocurrency configuration.
+message Config {}

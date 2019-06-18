@@ -58,17 +58,18 @@ fn implement_transaction_for_methods(
     methods: &[ServiceMethodDescriptor],
     cr: &dyn ToTokens,
 ) -> impl quote::ToTokens {
-    let transactions_for_methods = methods
-        .iter()
-        .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
-            quote! {
-                impl #cr::runtime::rust::Transaction for #arg_type {
-                    type Service = &'static dyn #trait_name;
+    let transactions_for_methods =
+        methods
+            .iter()
+            .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
+                quote! {
+                    impl #cr::runtime::rust::Transaction for #arg_type {
+                        type Service = &'static dyn #trait_name;
 
-                    const METHOD_ID: #cr::messages::MethodId = #id;
+                        const METHOD_ID: #cr::messages::MethodId = #id;
+                    }
                 }
-            }
-        });
+            });
 
     quote! {
         #( #transactions_for_methods )*

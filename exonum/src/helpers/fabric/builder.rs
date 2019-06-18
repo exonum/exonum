@@ -20,6 +20,11 @@ use std::{
     str::FromStr,
 };
 
+use crate::{
+    node::{ExternalMessage, Node},
+    runtime::rust::ServiceFactory,
+};
+
 use super::{
     clap_backend::ClapBackend,
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, Run, RunDev},
@@ -27,10 +32,8 @@ use super::{
     keys,
     maintenance::Maintenance,
     password::{PassInputMethod, SecretKeyType},
-    CommandName, Context, ServiceFactory,
+    CommandName, Context,
 };
-
-use crate::node::{ExternalMessage, Node};
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
@@ -50,13 +53,8 @@ impl NodeBuilder {
     }
 
     /// Appends service to the `NodeBuilder` context.
-    pub fn with_service(mut self, mut factory: Box<dyn ServiceFactory>) -> Self {
-        //TODO: Take endpoints, etc... (ECR-164)
-
-        for (name, command) in &mut self.commands {
-            command.extend(factory.command(name))
-        }
-        self.service_factories.push(factory);
+    pub fn with_service(mut self, factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        self.service_factories.push(factory.into());
         self
     }
 
@@ -142,11 +140,6 @@ impl NodeBuilder {
             .get(keys::NODE_CONFIG)
             .expect("could not find node_config");
         let db = Run::db_helper(ctx, &config.database);
-        let services: Vec<_> = self
-            .service_factories
-            .into_iter()
-            .map(|f| f.make_service_builder(ctx))
-            .collect();
 
         let config = {
             let run_config = ctx.get(keys::RUN_CONFIG).unwrap();
@@ -163,7 +156,7 @@ impl NodeBuilder {
                 service_passphrase.as_bytes(),
             )
         };
-        Node::new(db, services, config, Some(config_file_path))
+        Node::new(db, self.service_factories, config, Some(config_file_path))
     }
 }
 

@@ -56,4 +56,5 @@ message Wallet {
   exonum.Hash history_hash = 5;
 }
 
-message ConstructorData {}
+// Cryptocurrency configuration.
+message Config {}

@@ -34,122 +34,33 @@ pub mod wallet;
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{ExecutionError, ExecutionResult},
-    helpers::fabric::{self, Context},
     impl_service_dispatcher,
-    runtime::rust::{
-        RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
-    },
+    runtime::rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory},
 };
 
-use crate::{
-    api::PublicApi as CryptocurrencyApi,
-    transactions::{CreateWallet, Error, Issue, Transfer, ERROR_SENDER_SAME_AS_RECEIVER},
-};
+use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
 
-/// Unique service ID.
-const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
-/// Name of the service.
-const SERVICE_NAME: &str = "cryptocurrency";
 /// Initial balance of the wallet.
-const INITIAL_BALANCE: u64 = 100;
+pub const INITIAL_BALANCE: u64 = 100;
 
-#[service_interface]
-pub trait Cryptocurrency {
-    fn transfer(&self, ctx: TransactionContext, arg: Transfer) -> ExecutionResult;
-    fn issue(&self, ctx: TransactionContext, arg: Issue) -> ExecutionResult;
-    fn create_wallet(&self, ctx: TransactionContext, arg: CreateWallet) -> ExecutionResult;
-}
-
+/// Cryptocurrency service implementation.
 #[derive(Debug)]
-pub struct CryptocurrencyServiceImpl;
+pub struct CryptocurrencyService;
 
-impl Cryptocurrency for CryptocurrencyServiceImpl {
-    fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult {
-        let from = &context.author();
-        let hash = context.tx_hash();
+impl_service_dispatcher!(CryptocurrencyService, CryptocurrencyInterface);
 
-        let mut schema = Schema::new(context.fork());
-
-        let to = &arg.to;
-        let amount = arg.amount;
-
-        if from == to {
-            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER));
-        }
-
-        let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
-
-        let receiver = schema.wallet(to).ok_or(Error::ReceiverNotFound)?;
-
-        if sender.balance < amount {
-            Err(Error::InsufficientCurrencyAmount)?
-        }
-
-        schema.decrease_wallet_balance(sender, amount, &hash);
-        schema.increase_wallet_balance(receiver, amount, &hash);
-
-        Ok(())
-    }
-
-    fn issue(&self, context: TransactionContext, arg: Issue) -> ExecutionResult {
-        let pub_key = &context.author();
-        let hash = context.tx_hash();
-
-        let mut schema = Schema::new(context.fork());
-
-        if let Some(wallet) = schema.wallet(pub_key) {
-            let amount = arg.amount;
-            schema.increase_wallet_balance(wallet, amount, &hash);
-            Ok(())
-        } else {
-            Err(Error::ReceiverNotFound)?
-        }
-    }
-
-    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult {
-        let pub_key = &context.author();
-        let hash = context.tx_hash();
-
-        let mut schema = Schema::new(context.fork());
-
-        if schema.wallet(pub_key).is_none() {
-            let name = &arg.name;
-            schema.create_wallet(pub_key, name, &hash);
-            Ok(())
-        } else {
-            Err(Error::WalletAlreadyExists)?
-        }
+impl Service for CryptocurrencyService {
+    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+        CryptocurrencyApi::new(descriptor).wire(builder);
     }
 }
 
-impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
-
-impl Service for CryptocurrencyServiceImpl {
-    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        CryptocurrencyApi::wire(builder);
-    }
-}
-
-#[derive(Debug)]
-pub struct ServiceFactoryImpl;
-
-impl ServiceFactory for ServiceFactoryImpl {
+impl ServiceFactory for CryptocurrencyService {
     fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
+        exonum::artifact_spec_from_crate!()
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(CryptocurrencyServiceImpl)
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct CryptocurrencyServiceFactory;
-
-impl fabric::ServiceFactory for CryptocurrencyServiceFactory {
-    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn ServiceFactory> {
-        Box::new(ServiceFactoryImpl)
+        Box::new(Self)
     }
 }

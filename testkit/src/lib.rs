@@ -170,7 +170,7 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
-    blockchain::{Blockchain, GenesisConfig, Schema as CoreSchema, Service, StoredConfiguration},
+    blockchain::{Blockchain, GenesisConfig, Schema as CoreSchema, StoredConfiguration},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
@@ -983,7 +983,10 @@ impl StoppedTestKit {
     ///
     /// Note that `services` may differ from the vector of services initially passed to
     /// the `TestKit` (which is also what may happen with real Exonum apps).
-    pub fn resume(self, services: Vec<Box<dyn Service>>) -> TestKit {
+    pub fn resume(
+        self,
+        services: Vec<ServiceInstances>,
+    ) -> TestKit {
         unimplemented!();
         // let genesis = {
         //     let snapshot = self.db.snapshot();

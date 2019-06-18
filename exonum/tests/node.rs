@@ -14,75 +14,79 @@
 
 // This is a regression test for exonum node.
 
+use exonum::{
+    blockchain::Blockchain,
+    helpers, impl_service_dispatcher,
+    node::{ApiSender, ExternalMessage, Node, NodeChannel, NodeConfig},
+    runtime::{
+        dispatcher::{BuiltinService, DispatcherBuilder},
+        rust::{AfterCommitContext, RustArtifactSpec, Service, ServiceFactory},
+    },
+};
+use exonum_derive::service_interface;
+use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::oneshot, Future, IntoFuture};
-use serde_json::Value;
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
+    cell::RefCell,
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
 };
 
-use exonum_merkledb::{Database, Fork, Snapshot, TemporaryDB};
+#[service_interface]
+trait CommitWatcherInterface {}
 
-use exonum::{
-    blockchain::{Service, ServiceContext, Transaction},
-    crypto::Hash,
-    helpers,
-    messages::AnyTx,
-    node::{ApiSender, ExternalMessage, Node},
-};
+#[derive(Debug)]
+struct CommitWatcherService(pub RefCell<Option<oneshot::Sender<()>>>);
 
-struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
+impl CommitWatcherInterface for CommitWatcherService {}
+
+impl_service_dispatcher!(CommitWatcherService, CommitWatcherInterface);
 
 impl Service for CommitWatcherService {
-    fn service_id(&self) -> u16 {
-        255
-    }
-
-    fn service_name(&self) -> &str {
-        "commit_watcher"
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
-
-    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        unreachable!("An unknown transaction received");
-    }
-
-    fn after_commit(&self, _context: &ServiceContext) {
-        if let Some(oneshot) = self.0.lock().unwrap().take() {
+    fn after_commit(&self, _context: AfterCommitContext) {
+        if let Some(oneshot) = self.0.borrow_mut().take() {
             oneshot.send(()).unwrap();
         }
     }
 }
 
-struct InitializeCheckerService(pub Arc<Mutex<u64>>);
-
-impl Service for InitializeCheckerService {
-    fn service_id(&self) -> u16 {
-        256
+impl ServiceFactory for CommitWatcherService {
+    fn artifact(&self) -> RustArtifactSpec {
+        "after-commit/1.0.0".parse().unwrap()
     }
 
-    fn service_name(&self) -> &str {
-        "initialize_checker"
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self(RefCell::new(self.0.borrow_mut().take())))
+    }
+}
+
+#[service_interface]
+trait StartCheckerInterface {}
+
+#[derive(Debug)]
+struct StartCheckerService;
+
+impl StartCheckerInterface for StartCheckerService {}
+
+impl_service_dispatcher!(StartCheckerService, StartCheckerInterface);
+
+impl Service for StartCheckerService {}
+
+#[derive(Debug)]
+struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
+
+impl ServiceFactory for StartCheckerServiceFactory {
+    fn artifact(&self) -> RustArtifactSpec {
+        "configure/1.0.0".parse().unwrap()
     }
 
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
-
-    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        unreachable!("An unknown transaction received");
-    }
-
-    fn initialize(&self, _fork: &Fork) -> Value {
+    fn new_instance(&self) -> Box<dyn Service> {
         *self.0.lock().unwrap() += 1;
-        Value::Null
+        Box::new(StartCheckerService)
     }
 }
 
@@ -96,8 +100,23 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
-        //        let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-        let node = Node::new(TemporaryDB::new(), Vec::new(), node_cfg, None);
+
+        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
+        let blockchain = Blockchain::with_dispatcher(
+            TemporaryDB::new(),
+            DispatcherBuilder::new(channel.internal_requests.0.clone())
+                .with_builtin_service(BuiltinService {
+                    factory: Box::new(CommitWatcherService(RefCell::new(Some(commit_tx)))),
+                    instance_id: 2,
+                    instance_name: "commit-watcher".to_owned(),
+                })
+                .finalize(),
+            node_cfg.service_public_key,
+            node_cfg.service_secret_key.clone(),
+            ApiSender::new(channel.api_requests.0.clone()),
+        );
+        let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
+
         let api_tx = node.channel();
         node_threads.push(RunHandle {
             node_thread: thread::spawn(move || {
@@ -132,12 +151,24 @@ fn test_node_run() {
 }
 
 #[test]
-#[ignore = "TODO restore dispatcher state after node restart [ECR-3276]"]
 fn test_node_restart_regression() {
-    let start_node = |node_cfg, db, init_times| {
-        //        let service = Box::new(InitializeCheckerService(init_times));
-        // TODO: use new service API.
-        let node = Node::new(db, Vec::new(), node_cfg, None);
+    let start_node = |node_cfg: NodeConfig, db, start_times| {
+        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
+        let blockchain = Blockchain::with_dispatcher(
+            db,
+            DispatcherBuilder::new(channel.internal_requests.0.clone())
+                .with_builtin_service(BuiltinService {
+                    factory: Box::new(StartCheckerServiceFactory(start_times)),
+                    instance_id: 1,
+                    instance_name: "startup-checker".to_owned(),
+                })
+                .finalize(),
+            node_cfg.service_public_key,
+            node_cfg.service_secret_key.clone(),
+            ApiSender::new(channel.api_requests.0.clone()),
+        );
+        let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
+
         let api_tx = node.channel();
         let node_thread = thread::spawn(move || {
             node.run().unwrap();
@@ -149,13 +180,13 @@ fn test_node_restart_regression() {
         node_thread.join().unwrap();
     };
 
-    let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+    let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;
     let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
 
-    let init_times = Arc::new(Mutex::new(0));
+    let start_times = Arc::new(Mutex::new(0));
     // First launch
-    start_node(node_cfg.clone(), db.clone(), Arc::clone(&init_times));
+    start_node(node_cfg.clone(), db.clone(), Arc::clone(&start_times));
     // Second launch
-    start_node(node_cfg, db, Arc::clone(&init_times));
-    assert_eq!(*init_times.lock().unwrap(), 1);
+    start_node(node_cfg, db, Arc::clone(&start_times));
+    assert_eq!(*start_times.lock().unwrap(), 2);
 }

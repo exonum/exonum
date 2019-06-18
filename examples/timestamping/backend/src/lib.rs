@@ -37,92 +37,56 @@ pub mod proto;
 pub mod schema;
 pub mod transactions;
 
-use exonum_merkledb::Snapshot;
-
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::ExecutionResult,
+    blockchain::ExecutionError,
     crypto::Hash,
-    helpers::fabric,
     impl_service_dispatcher,
     runtime::rust::{
         RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
     },
 };
-use exonum_time::schema::TimeSchema;
+use exonum_merkledb::{BinaryValue, Snapshot};
+use protobuf::well_known_types::Any;
 
 use crate::{
     api::PublicApi as TimestampingApi,
     schema::{Schema, TimestampEntry},
-    transactions::{Error, TxTimestamp},
+    transactions::{Config, TimestampingInterface},
 };
 
-const TIMESTAMPING_SERVICE: u16 = 130;
-
-#[service_interface]
-pub trait Timestamping {
-    fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
-}
-
 #[derive(Debug)]
-pub struct TimestampingServiceImpl;
+pub struct TimestampingService;
 
-impl Timestamping for TimestampingServiceImpl {
-    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult {
-        let tx_hash = context.tx_hash();
-        // TODO Add exonum time oracle name to service configuration parameters.
-        let time = TimeSchema::new("exonum-time", context.fork())
-            .time()
-            .get()
-            .expect("Can't get the time");
+impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
-        let hash = &arg.content.content_hash;
+impl Service for TimestampingService {
+    fn configure(&self, context: TransactionContext, params: &Any) -> Result<(), ExecutionError> {
+        let config = Config::from_bytes(params.get_value().into())
+            .map_err(|e| ExecutionError::with_description(0, e.to_string()))?;
 
-        let schema = Schema::new(context.fork());
-        if let Some(_entry) = schema.timestamps().get(hash) {
-            Err(Error::HashAlreadyExists)?;
-        }
-
-        trace!("Timestamp added: {:?}", arg);
-        let entry = TimestampEntry::new(arg.content.clone(), &tx_hash, time);
-        schema.add_timestamp(entry);
-
+        Schema::new(context.service_name(), context.fork())
+            .config()
+            .set(config);
         Ok(())
     }
-}
 
-impl_service_dispatcher!(TimestampingServiceImpl, Timestamping);
-
-impl Service for TimestampingServiceImpl {
-    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        TimestampingApi::wire(builder);
+    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+        TimestampingApi::new(descriptor).wire(builder);
     }
 
-    fn state_hash(&self, _descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(snapshot);
+    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = Schema::new(descriptor.service_name(), snapshot);
         schema.state_hash()
     }
 }
 
-#[derive(Debug)]
-pub struct ServiceFactoryImpl;
-
-impl ServiceFactory for ServiceFactoryImpl {
+impl ServiceFactory for TimestampingService {
     fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec::new("timestamping", 0, 1, 0)
+        exonum::artifact_spec_from_crate!()
     }
 
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(TimestampingServiceImpl)
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct TimestampingServiceFactory;
-
-impl fabric::ServiceFactory for TimestampingServiceFactory {
-    fn make_service_builder(&self, _run_context: &fabric::Context) -> Box<dyn ServiceFactory> {
-        Box::new(ServiceFactoryImpl)
+        Box::new(TimestampingService)
     }
 }

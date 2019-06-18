@@ -36,10 +36,9 @@ pub use self::{
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{Schema, TxLocation},
-    service::{Service, ServiceContext, SharedNodeState},
+    service::SharedNodeState,
     transaction::{
-        ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
-        TransactionErrorType, TransactionResult, TransactionSet,
+        ExecutionError, ExecutionResult, TransactionError, TransactionErrorType, TransactionResult,
     },
 };
 

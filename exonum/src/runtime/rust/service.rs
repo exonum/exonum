@@ -22,7 +22,7 @@ use crate::{
     api::ServiceApiBuilder,
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
-    helpers::Height,
+    helpers::{Height, ValidatorId},
     messages::{AnyTx, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
     node::ApiSender,
     runtime::{error::ExecutionError, rust::TransactionContext},
@@ -125,8 +125,20 @@ impl<'a> AfterCommitContext<'a> {
         self.service_descriptor.service_name()
     }
 
+    /// If the current node is a validator, returns its identifier, for other nodes return `None`.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        // TODO Perhaps we should optimize this method [ECR-3222]
+        CoreSchema::new(self.snapshot)
+            .actual_configuration()
+            .validator_keys
+            .iter()
+            .position(|validator| self.service_keypair.0 == validator.service_key)
+            .map(|id| ValidatorId(id as u16))
+    }
+
     /// Returns the current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {
+        // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot).height()
     }
 

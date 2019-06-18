@@ -285,18 +285,18 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        debug!("Execute: {:?}", call_info);
         let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
-
-        let context = TransactionContext {
-            service_descriptor: service_instance.descriptor(),
-            runtime_context,
-            runtime: self,
-        };
-
         service_instance
             .as_ref()
-            .call(call_info.method_id, context, payload)
+            .call(
+                call_info.method_id,
+                TransactionContext {
+                    service_descriptor: service_instance.descriptor(),
+                    runtime_context,
+                    runtime: self,
+                },
+                payload,
+            )
             .map_err(|e| {
                 ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
             })?
@@ -404,6 +404,17 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
         self.runtime_context.dispatch_action(action)
     }
+}
+
+/// Creates `RustArtifactSpec` by using `CARGO_PKG_NAME` and `CARGO_PKG_VERSION`
+/// variables.
+#[macro_export]
+macro_rules! artifact_spec_from_crate {
+    () => {
+        concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))
+            .parse::<$crate::runtime::rust::RustArtifactSpec>()
+            .unwrap()
+    };
 }
 
 #[test]

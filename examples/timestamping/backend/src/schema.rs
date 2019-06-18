@@ -14,12 +14,11 @@
 
 //! Timestamping database schema.
 
-use super::proto;
 use chrono::{DateTime, Utc};
-
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
-
 use exonum::crypto::Hash;
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+
+use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert)]
@@ -27,7 +26,6 @@ use exonum::crypto::Hash;
 pub struct Timestamp {
     /// Hash of the content.
     pub content_hash: Hash,
-
     /// Additional metadata.
     pub metadata: String,
 }
@@ -48,10 +46,8 @@ impl Timestamp {
 pub struct TimestampEntry {
     /// Timestamp data.
     pub timestamp: Timestamp,
-
     /// Hash of transaction.
     pub tx_hash: Hash,
-
     /// Timestamp time.
     pub time: DateTime<Utc>,
 }
@@ -69,24 +65,36 @@ impl TimestampEntry {
 
 /// Timestamping database schema.
 #[derive(Debug)]
-pub struct Schema<T> {
+pub struct Schema<'a, T> {
+    service_name: &'a str,
     access: T,
 }
 
-impl<T> Schema<T> {
+impl<'a, T> Schema<'a, T> {
     /// Creates a new schema from the database view.
-    pub fn new(access: T) -> Self {
-        Schema { access }
+    pub fn new(service_name: &'a str, access: T) -> Self {
+        Schema {
+            service_name,
+            access,
+        }
     }
 }
 
-impl<T> Schema<T>
+impl<'a, T> Schema<'a, T>
 where
     T: IndexAccess,
 {
     /// Returns the `ProofMapIndex` of timestamps.
     pub fn timestamps(&self) -> ProofMapIndex<T, Hash, TimestampEntry> {
-        ProofMapIndex::new("timestamping.timestamps", self.access.clone())
+        ProofMapIndex::new(
+            [self.service_name, ".timestamps"].concat(),
+            self.access.clone(),
+        )
+    }
+
+    /// Returns the actual timestamping configuration
+    pub fn config(&self) -> Entry<T, Config> {
+        Entry::new([self.service_name, ".config"].concat(), self.access.clone())
     }
 
     /// Returns the state hash of the timestamping service.

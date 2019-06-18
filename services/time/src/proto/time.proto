@@ -23,3 +23,6 @@ message TxTime {
   // Time of the validator.
   google.protobuf.Timestamp time = 1;
 }
+
+// Time oracle configuration.
+message Config {}
