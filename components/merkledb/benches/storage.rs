@@ -17,8 +17,7 @@ use std::collections::HashSet;
 use criterion::{
     black_box, AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
-use rand::{Rng, RngCore, SeedableRng};
-use rand_xorshift::XorShiftRng;
+use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
 use exonum_merkledb::{Database, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB};
@@ -27,7 +26,7 @@ const NAME: &str = "name";
 const FAMILY: &str = "index_family";
 const SAMPLE_SIZE: usize = 10;
 const CHUNK_SIZE: usize = 64;
-const SEED: [u8; 16] = [100; 16];
+const SEED: [u8; 32] = [100; 32];
 
 #[cfg(all(test, not(feature = "long_benchmarks")))]
 const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
@@ -36,7 +35,7 @@ const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
 const ITEM_COUNTS: [usize; 4] = [1_000, 10_000, 100_000, 1_000_000];
 
 fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
-    let mut rng = XorShiftRng::from_seed(SEED);
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let mut exists_keys = HashSet::new();
     let mut base = [0; KEY_SIZE];
     rng.fill_bytes(&mut base);
@@ -201,7 +200,7 @@ fn plain_map_index_with_family_read(b: &mut Bencher, len: usize) {
 }
 
 fn proof_list_append(b: &mut Bencher, len: usize) {
-    let mut rng = XorShiftRng::from_seed(SEED);
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let data = (0..len)
         .map(|_| {
             let mut chunk = vec![0; CHUNK_SIZE];

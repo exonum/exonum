@@ -20,8 +20,7 @@ use exonum_merkledb::{
     proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, ObjectHash,
     ProofListIndex, ProofMapIndex, RocksDB,
 };
-use rand::{Rng, RngCore, SeedableRng};
-use rand_xorshift::XorShiftRng;
+use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use tempdir::TempDir;
 
 use std::collections::HashSet;
@@ -29,11 +28,11 @@ use std::collections::HashSet;
 const NAME: &str = "name";
 const SAMPLE_SIZE: usize = 20;
 const CHUNK_SIZE: usize = 64;
-const SEED: [u8; 16] = [100; 16];
+const SEED: [u8; 32] = [100; 32];
 const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
 
 fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
-    let mut rng = XorShiftRng::from_seed(SEED);
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let mut exists_keys = HashSet::new();
     let mut base = [0; KEY_SIZE];
     rng.fill_bytes(&mut base);
@@ -58,7 +57,7 @@ fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
 }
 
 fn proof_list_append(b: &mut Bencher, db: &dyn Database, len: usize) {
-    let mut rng = XorShiftRng::from_seed(SEED);
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let data = (0..len)
         .map(|_| {
             let mut chunk = vec![0; CHUNK_SIZE];
