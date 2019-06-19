@@ -30,7 +30,6 @@ use websocket::{
 };
 
 use std::{
-    io,
     thread::sleep,
     time::{Duration, Instant},
 };
