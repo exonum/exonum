@@ -176,6 +176,7 @@ pub fn hash(data: &[u8]) -> Hash {
 }
 
 /// A common trait for the ability to compute a cryptographic hash.
+#[deprecated(note = "Use exonum_merkledb::ObjectHash instead")]
 pub trait CryptoHash {
     /// Returns a hash of the value.
     ///
