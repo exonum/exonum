@@ -17,8 +17,7 @@ use std::{borrow::Cow, fmt::Debug, io::Write};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use criterion::{black_box, Bencher, Criterion};
 use failure::{self, format_err};
-use rand::{RngCore, SeedableRng};
-use rand_xorshift::XorShiftRng;
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 
 use exonum_crypto::{self, Hash};
 use exonum_merkledb::{
@@ -28,7 +27,7 @@ use exonum_merkledb::{
 };
 
 const CHUNK_SIZE: usize = 64;
-const SEED: [u8; 16] = [100; 16];
+const SEED: [u8; 32] = [100; 32];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct SimpleData {
@@ -101,7 +100,7 @@ impl BinaryValue for CursorData {
 }
 
 fn gen_bytes_data() -> Vec<u8> {
-    let mut rng = XorShiftRng::from_seed(SEED);
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let mut v = vec![0; CHUNK_SIZE];
     rng.fill_bytes(&mut v);
     v

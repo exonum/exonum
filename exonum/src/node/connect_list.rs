@@ -82,18 +82,18 @@ impl ConnectList {
 
 #[cfg(test)]
 mod test {
-    use rand::{RngCore, SeedableRng};
-    use rand_xorshift::XorShiftRng;
+    use rand::{rngs::StdRng, RngCore, SeedableRng};
 
     use super::*;
     use crate::crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
     use crate::node::ConnectInfo;
 
-    static VALIDATORS: [[u8; 16]; 2] = [[1; 16], [2; 16]];
-    static REGULAR_PEERS: [u8; 16] = [3; 16];
+    const SEED_LENGTH: usize = 32;
+    static VALIDATORS: [[u8; SEED_LENGTH]; 2] = [[1; SEED_LENGTH], [2; SEED_LENGTH]];
+    static REGULAR_PEERS: [u8; SEED_LENGTH] = [3; SEED_LENGTH];
 
-    fn make_keys(source: [u8; 16], count: usize) -> Vec<PublicKey> {
-        let mut rng = XorShiftRng::from_seed(source);
+    fn make_keys(source: [u8; SEED_LENGTH], count: usize) -> Vec<PublicKey> {
+        let mut rng: StdRng = SeedableRng::from_seed(source);
         (0..count)
             .map(|_| {
                 let mut key = [0; PUBLIC_KEY_LENGTH];

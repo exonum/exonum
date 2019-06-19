@@ -673,7 +673,7 @@ mod tests {
     const IDX_NAME: &str = "idx_name";
 
     #[test]
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn test_list_index_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
