@@ -261,9 +261,7 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
     }
 
     for client in clients {
-        assert_eq!(
-            client.shutdown().unwrap_err().kind(),
-            io::ErrorKind::NotConnected
-        );
+        // Behavior of TcpStream::shutdown on disconnected stream is platform-specific.
+        let _ = client.shutdown();
     }
 }
