@@ -94,7 +94,7 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
-    pub dispatcher: Arc<Mutex<Dispatcher>>,
+    dispatcher: Arc<Mutex<Dispatcher>>,
 }
 
 impl Blockchain {
@@ -125,7 +125,7 @@ impl Blockchain {
     }
 
     /// Creates the blockchain instance with the specified dispatcher.
-    pub fn with_dispatcher(
+    pub(crate) fn with_dispatcher(
         db: impl Into<Arc<dyn Database>>,
         dispatcher: Dispatcher,
         service_public_key: PublicKey,
@@ -150,8 +150,7 @@ impl Blockchain {
     }
 
     /// Returns reference to the underlying runtime dispatcher.
-    #[doc(hidden)]
-    pub fn dispatcher(&self) -> MutexGuard<Dispatcher> {
+    pub(crate) fn dispatcher(&self) -> MutexGuard<Dispatcher> {
         self.dispatcher.lock().unwrap()
     }
 

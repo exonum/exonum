@@ -15,7 +15,7 @@
 use exonum_merkledb::{BinaryValue, Database};
 use futures::sync::mpsc;
 
-use std::sync::Arc;
+use std::{sync::Arc, fmt};
 
 use crate::{
     blockchain::{Blockchain, GenesisConfig, Schema},
