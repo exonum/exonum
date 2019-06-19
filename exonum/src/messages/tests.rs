@@ -1,9 +1,10 @@
 use chrono::Utc;
+use exonum_merkledb::ObjectHash;
 use protobuf::Message as PbMessage;
 
 use crate::{
     blockchain::{Block, BlockProof},
-    crypto::{gen_keypair, hash, CryptoHash, Signature},
+    crypto::{gen_keypair, hash, Signature},
     helpers::{Height, Round, ValidatorId},
     proto::{self, ProtobufConvert},
 };
@@ -157,9 +158,9 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Message::concrete(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
-        Message::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
-        Message::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
+        Message::concrete(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).object_hash(),
+        Message::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).object_hash(),
+        Message::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).object_hash(),
     ];
     let precommits_buf: Vec<_> = precommits.iter().map(BinaryValue::to_bytes).collect();
     let block = Message::concrete(

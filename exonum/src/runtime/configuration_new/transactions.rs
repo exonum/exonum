@@ -19,7 +19,7 @@ use protobuf::well_known_types::Any;
 
 use crate::{
     blockchain::{Schema as CoreSchema, StoredConfiguration},
-    crypto::{CryptoHash, Hash, PublicKey},
+    crypto::{Hash, PublicKey},
     node::State,
     proto,
     runtime::ArtifactSpec,
@@ -172,7 +172,7 @@ impl Propose {
 
         let cfg = StoredConfiguration::from_bytes(self.cfg.as_bytes().into())
             .expect("Can't deserialize stored configuration");
-        let cfg_hash = CryptoHash::hash(&cfg);
+        let cfg_hash = cfg.object_hash();
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
             return Err(AlreadyProposed(old_propose));
         }
@@ -189,7 +189,7 @@ impl Propose {
         use self::ServiceError::*;
 
         let actual_config = CoreSchema::new(snapshot).actual_configuration();
-        if candidate.previous_cfg_hash != actual_config.hash() {
+        if candidate.previous_cfg_hash != actual_config.object_hash() {
             return Err(InvalidConfigRef(actual_config));
         }
 

@@ -20,7 +20,7 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::Hash,
     runtime::{
-        dispatcher::{Action},
+        dispatcher::Action,
         error::ExecutionError,
         rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ServiceConstructor, ServiceInstanceSpec,

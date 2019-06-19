@@ -70,7 +70,7 @@ impl ServiceFactory for TimestampingService {
 }
 
 impl TimestampingService {
-    pub const ID: ServiceInstanceId = 2;
+    pub const ID: ServiceInstanceId = 3;
 }
 
 impl_binary_value_for_message! { TimestampTx }

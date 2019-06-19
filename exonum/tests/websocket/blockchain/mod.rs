@@ -15,12 +15,11 @@
 //! Simplified node emulation for testing websockets.
 
 use exonum::{
-    blockchain::{Blockchain, ExecutionError, ExecutionResult},
+    blockchain::{ExecutionError, ExecutionResult, ServiceInstances},
     crypto::PublicKey,
     helpers, impl_service_dispatcher,
-    node::{ApiSender, Node, NodeChannel},
+    node::{ApiSender, Node},
     runtime::{
-        dispatcher::{BuiltinService, DispatcherBuilder},
         rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
         ServiceInstanceId,
     },
@@ -98,16 +97,6 @@ impl ServiceFactory for MyService {
     }
 }
 
-impl From<MyService> for BuiltinService {
-    fn from(factory: MyService) -> Self {
-        Self {
-            factory: Box::new(factory),
-            instance_id: SERVICE_ID,
-            instance_name: "ws-service".into(),
-        }
-    }
-}
-
 pub struct RunHandle {
     pub node_thread: JoinHandle<()>,
     pub api_tx: ApiSender,
@@ -121,20 +110,9 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
-    let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-    let dispatcher = DispatcherBuilder::new(channel.internal_requests.0.clone())
-        .with_builtin_service(MyService)
-        .finalize();
-
-    let node = Node::with_blockchain(
-        Blockchain::with_dispatcher(
-            TemporaryDB::new(),
-            dispatcher,
-            node_cfg.service_public_key,
-            node_cfg.service_secret_key.clone(),
-            ApiSender::new(channel.api_requests.0.clone()),
-        ),
-        channel,
+    let node = Node::new(
+        TemporaryDB::new(),
+        vec![ServiceInstances::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
         node_cfg,
         None,
     );

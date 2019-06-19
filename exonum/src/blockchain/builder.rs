@@ -109,7 +109,6 @@ impl BlockchainBuilder {
                 self.service_keypair.1,
                 api_sender,
             );
-            blockchain.create_genesis_block(self.genesis_config)?;
             // Adds builtin services.
             blockchain.merge({
                 let fork = blockchain.fork();
@@ -120,6 +119,8 @@ impl BlockchainBuilder {
                 });
                 fork.into_patch()
             })?;
+            // Commits genesis block.
+            blockchain.create_genesis_block(self.genesis_config)?;
             blockchain
         })
     }

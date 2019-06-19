@@ -25,10 +25,10 @@ use exonum_merkledb::{BinaryValue, ObjectHash};
 use serde::de::Error;
 use serde_json::Error as JsonError;
 
-use std::collections::{HashSet};
+use std::collections::HashSet;
 
 use crate::{
-    crypto::{hash, CryptoHash, Hash, PublicKey},
+    crypto::{Hash, PublicKey},
     helpers::{Height, Milliseconds},
     messages::SIGNED_MESSAGE_MIN_SIZE,
 };
@@ -243,13 +243,6 @@ impl StoredConfiguration {
         }
 
         Ok(config)
-    }
-}
-
-impl CryptoHash for StoredConfiguration {
-    fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize().unwrap();
-        hash(&vec_bytes)
     }
 }
 

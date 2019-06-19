@@ -15,7 +15,7 @@
 //! Storage schema for the configuration service.
 
 use crate::{
-    crypto::{self, CryptoHash, Hash, HASH_SIZE},
+    crypto::{Hash, HASH_SIZE},
     proto,
 };
 
@@ -79,13 +79,6 @@ pub enum VotingDecision {
     Nay(Hash),
 }
 
-impl CryptoHash for VotingDecision {
-    fn hash(&self) -> Hash {
-        let res = BinaryValue::into_bytes(*self);
-        res.hash()
-    }
-}
-
 impl VotingDecision {
     /// Returns internal transaction hash.
     pub fn tx_hash(&self) -> Hash {
@@ -119,6 +112,8 @@ impl BinaryValue for VotingDecision {
         Ok(res)
     }
 }
+
+impl_object_hash_for_binary_value! { VotingDecision }
 
 /// A functional equivalent to `Option<VotingDecision>` used to store votes in the service
 /// schema.
@@ -169,20 +164,7 @@ impl Deref for MaybeVote {
     }
 }
 
-impl CryptoHash for MaybeVote {
-    fn hash(&self) -> Hash {
-        match self.0 {
-            Some(ref vote) => vote.hash(),
-            None => crypto::hash(&NO_VOTE_BYTES),
-        }
-    }
-}
-
-impl ObjectHash for MaybeVote {
-    fn object_hash(&self) -> Hash {
-        self.hash()
-    }
-}
+impl_object_hash_for_binary_value! { MaybeVote }
 
 impl BinaryValue for MaybeVote {
     fn to_bytes(&self) -> Vec<u8> {

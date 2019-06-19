@@ -25,7 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use exonum_merkledb::{Database, DbOptions};
+use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Sink};
 use tokio_core::reactor::Core;
@@ -50,10 +50,10 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, Schema, ServiceInstances,
-        SharedNodeState, ValidatorKeys,
+        Blockchain, ConsensusConfig, GenesisConfig, Schema, ServiceInstances, SharedNodeState,
+        ValidatorKeys,
     },
-    crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey},
+    crypto::{self, read_keys_from_file, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
@@ -276,7 +276,8 @@ pub struct NodeConfig<T = SecretKey> {
 }
 
 impl<T: Clone> NodeConfig<T> {
-    pub(crate) fn service_keypair(&self) -> (PublicKey, T) {
+    /// Returns service keypair.
+    pub fn service_keypair(&self) -> (PublicKey, T) {
         (self.service_public_key, self.service_secret_key.clone())
     }
 }
@@ -455,7 +456,7 @@ impl NodeHandler {
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
-            (block.hash(), block.height().next())
+            (block.object_hash(), block.height().next())
         };
 
         let snapshot = blockchain.snapshot();
@@ -754,7 +755,7 @@ impl NodeHandler {
 
     /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain.last_block().hash()
+        self.blockchain.last_block().object_hash()
     }
 
     /// Returns start time of the requested round.
@@ -921,7 +922,7 @@ impl Node {
     }
 
     pub fn with_blockchain(
-        mut blockchain: Blockchain,
+        blockchain: Blockchain,
         channel: NodeChannel,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,

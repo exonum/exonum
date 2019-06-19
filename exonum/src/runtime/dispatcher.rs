@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{Fork, Snapshot, IndexAccess};
+use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future::Future, sink::Sink, sync::mpsc};
 
 use std::collections::HashMap;
@@ -445,8 +445,8 @@ mod tests {
 
     #[test]
     fn test_dispatcher() {
-        const RUST_SERVICE_ID: ServiceInstanceId = 0;
-        const JAVA_SERVICE_ID: ServiceInstanceId = 1;
+        const RUST_SERVICE_ID: ServiceInstanceId = 2;
+        const JAVA_SERVICE_ID: ServiceInstanceId = 3;
         const RUST_SERVICE_NAME: &str = "rust-service";
         const JAVA_SERVICE_NAME: &str = "java-service";
         const RUST_METHOD_ID: MethodId = 0;
@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn test_dispatcher_rust_runtime_no_service() {
-        const RUST_SERVICE_ID: ServiceInstanceId = 0;
+        const RUST_SERVICE_ID: ServiceInstanceId = 2;
         const RUST_SERVICE_NAME: &str = "rust-service";
         const RUST_METHOD_ID: MethodId = 0;
 

@@ -295,14 +295,14 @@ fn handling_tx_panic_storage_error() {
 
 #[test]
 fn service_execute_good() {
-    let blockchain = create_blockchain_with_service(ServiceGoodImpl, 1, "service_good");
+    let blockchain = create_blockchain_with_service(ServiceGoodImpl, 3, "service_good");
     let mut db = TemporaryDB::new();
     assert_service_execute(&blockchain, &mut db);
 }
 
 #[test]
 fn service_execute_panic() {
-    let blockchain = create_blockchain_with_service(ServicePanicImpl, 1, "service_panic");
+    let blockchain = create_blockchain_with_service(ServicePanicImpl, 4, "service_panic");
     let mut db = TemporaryDB::new();
     assert_service_execute_panic(&blockchain, &mut db);
 }
@@ -311,7 +311,7 @@ fn service_execute_panic() {
 #[should_panic]
 fn service_execute_panic_storage_error() {
     let blockchain =
-        create_blockchain_with_service(ServicePanicStorageErrorImpl, 1, "service_execute_error");
+        create_blockchain_with_service(ServicePanicStorageErrorImpl, 5, "service_execute_error");
     let mut db = TemporaryDB::new();
     assert_service_execute_panic(&blockchain, &mut db);
 }

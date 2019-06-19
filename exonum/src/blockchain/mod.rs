@@ -53,7 +53,7 @@ use exonum_merkledb::{
 use futures::sync::mpsc;
 
 use std::{
-    collections::{HashMap},
+    collections::HashMap,
     fmt, iter, mem, panic,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -65,9 +65,7 @@ use crate::{
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
     node::ApiSender,
     runtime::{
-        configuration_new::ConfigurationServiceFactory,
-        dispatcher::{Dispatcher},
-        RuntimeContext,
+        configuration_new::ConfigurationServiceFactory, dispatcher::Dispatcher, RuntimeContext,
     },
 };
 

@@ -28,8 +28,8 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, ServiceInstances,
-        SharedNodeState, StoredConfiguration, ValidatorKeys,
+        Block, BlockProof, Blockchain, BlockchainBuilder, ConsensusConfig, GenesisConfig, Schema,
+        ServiceInstances, SharedNodeState, StoredConfiguration, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -1065,18 +1065,18 @@ fn sandbox_with_services_uninitialized(
             }),
     );
 
+    let connect_list_config =
+        ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
+
     let api_channel = mpsc::unbounded();
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
         services,
-        genesis.clone(),
+        genesis,
         service_keys[0].clone(),
         ApiSender::new(api_channel.0.clone()),
         mpsc::channel(0).0,
     );
-
-    let connect_list_config =
-        ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
     let config = Configuration {
         listener: ListenerConfig {

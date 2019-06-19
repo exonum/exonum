@@ -64,7 +64,7 @@ impl ServiceFactory for ConfigUpdaterService {
 }
 
 impl ConfigUpdaterService {
-    pub const ID: ServiceInstanceId = 3;
+    pub const ID: ServiceInstanceId = 2;
 }
 
 impl TxConfig {
