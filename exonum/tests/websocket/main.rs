@@ -25,10 +25,15 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use websocket::{
-    client::sync::Client, stream::sync::TcpStream, ClientBuilder, OwnedMessage, WebSocketResult,
+    client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
+    OwnedMessage, WebSocketResult,
 };
 
-use std::{thread::sleep, time::Duration};
+use std::{
+    io,
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
 use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
 
@@ -220,4 +225,45 @@ fn test_subscribe() {
         .send_external_message(ExternalMessage::Shutdown)
         .unwrap();
     node_handler.node_thread.join().unwrap();
+}
+
+#[test]
+fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
+    let node_handler = run_node(6334, 8083);
+
+    let mut clients = (0..8)
+        .map(|_| {
+            let client = create_ws_client("ws://localhost:8083/api/explorer/v1/ws")
+                .expect("Cannot connect to node");
+            client
+                .stream_ref()
+                .set_read_timeout(Some(Duration::from_secs(60)))
+                .unwrap();
+            client
+        })
+        .collect::<Vec<_>>();
+
+    let now = Instant::now();
+
+    // Shutdown node before clients.
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
+
+    assert!(now.elapsed().as_secs() < 15);
+
+    // Each client should receive Close message.
+    let msg = OwnedMessage::from(WsMessage::close_because(1000, "node shutdown"));
+    for client in clients.iter_mut() {
+        assert_eq!(client.recv_message().unwrap(), msg);
+    }
+
+    for client in clients {
+        assert_eq!(
+            client.shutdown().unwrap_err().kind(),
+            io::ErrorKind::NotConnected
+        );
+    }
 }
