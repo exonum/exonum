@@ -709,8 +709,8 @@ fn test_explorer_single_block() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ServiceInstances::new(CounterService).with_instance(
-            SERVICE_NAME,
             SERVICE_ID,
+            SERVICE_NAME,
             (),
         ))
         .create();

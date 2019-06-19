@@ -14,7 +14,7 @@
 use exonum_merkledb::TemporaryDB;
 
 use exonum::{
-    blockchain::{GenesisConfig, ValidatorKeys},
+    blockchain::{GenesisConfig, ValidatorKeys, ServiceInstances},
     node::{Node, NodeApiConfig, NodeConfig},
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
@@ -61,7 +61,7 @@ fn main() {
     println!("Creating in-memory database...");
     let node = Node::new(
         TemporaryDB::new(),
-        vec![Box::new(CryptocurrencyService)],
+        vec![ServiceInstances::new(CryptocurrencyService)],
         node_config(),
         None,
     );

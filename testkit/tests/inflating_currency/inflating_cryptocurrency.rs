@@ -31,7 +31,7 @@ use super::proto;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
-pub const SERVICE_ID: ServiceInstanceId = 1;
+pub const SERVICE_ID: ServiceInstanceId = 55;
 pub const SERVICE_NAME: &str = "cryptocurrency";
 
 /// Initial balance of newly created wallet.

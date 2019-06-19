@@ -16,10 +16,11 @@ use serde::{Deserialize, Serialize};
 
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
-    crypto::{self, CryptoHash, PublicKey, SecretKey},
+    crypto::{self, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     messages::{Message, Precommit, Propose, Signed},
 };
+use exonum_merkledb::ObjectHash;
 
 /// Emulated test network.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -198,7 +199,7 @@ impl TestNode {
                     .expect("An attempt to create propose from a non-validator node."),
                 propose.height(),
                 propose.round(),
-                &propose.hash(),
+                &propose.object_hash(),
                 block_hash,
                 SystemTime::now().into(),
             ),
@@ -226,8 +227,8 @@ impl TestNode {
     }
 
     /// Returns the service keypair of the node.
-    pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
-        (&self.service_public_key, &self.service_secret_key)
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
+        (self.service_public_key, self.service_secret_key.clone())
     }
 
     /// Returns the consensus keypair of the node.
@@ -255,7 +256,7 @@ impl TestNetworkConfiguration {
         network: &TestNetwork,
         mut stored_configuration: StoredConfiguration,
     ) -> Self {
-        let prev_hash = CryptoHash::hash(&stored_configuration);
+        let prev_hash = stored_configuration.object_hash();
         stored_configuration.previous_cfg_hash = prev_hash;
 
         TestNetworkConfiguration {
@@ -324,25 +325,19 @@ impl TestNetworkConfiguration {
     }
 
     /// Returns the configuration for service with the given identifier.
-    pub fn service_config<D>(&self, id: &str) -> D
+    pub fn service_config<D>(&self, _id: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
     {
-        let value = self
-            .stored_configuration
-            .services
-            .get(id)
-            .expect("Unable to find configuration for service");
-        serde_json::from_value(value.clone()).unwrap()
+        unimplemented!();
     }
 
     /// Modifies the configuration of the service with the given identifier.
-    pub fn set_service_config<D>(&mut self, id: &str, config: D)
+    pub fn set_service_config<D>(&mut self, _id: &str, _config: D)
     where
         D: Serialize,
     {
-        let value = serde_json::to_value(config).unwrap();
-        self.stored_configuration.services.insert(id.into(), value);
+        unimplemented!();
     }
 
     /// Returns the resulting exonum blockchain configuration.

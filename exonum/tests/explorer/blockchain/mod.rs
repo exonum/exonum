@@ -27,7 +27,7 @@ use exonum_merkledb::{ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
 use semver::Version;
 
-pub const SERVICE_ID: ServiceInstanceId = 0;
+pub const SERVICE_ID: ServiceInstanceId = 4;
 
 mod proto;
 

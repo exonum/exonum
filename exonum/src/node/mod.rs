@@ -1156,7 +1156,7 @@ mod tests {
 
     use super::*;
 
-    const SERVICE_ID: ServiceInstanceId = 0;
+    const SERVICE_ID: ServiceInstanceId = 15;
 
     impl_binary_value_for_message! { TxSimple }
 

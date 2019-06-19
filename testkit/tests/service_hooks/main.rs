@@ -26,7 +26,7 @@ mod hooks;
 mod proto;
 
 fn after_commit_service_instances(factory: AfterCommitService) -> ServiceInstances {
-    ServiceInstances::new(factory).with_instance(SERVICE_NAME, SERVICE_ID, ())
+    ServiceInstances::new(factory).with_instance(SERVICE_ID, SERVICE_NAME, ())
 }
 
 #[test]

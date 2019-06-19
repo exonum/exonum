@@ -128,8 +128,8 @@ impl BlockchainBuilder {
 
 #[derive(Debug)]
 pub struct ServiceInstances {
-    factory: Box<dyn ServiceFactory>,
-    instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
+    pub factory: Box<dyn ServiceFactory>,
+    pub instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
 }
 
 impl ServiceInstances {

@@ -14,15 +14,16 @@
 
 //! Testkit builder.
 
+pub use exonum::blockchain::ServiceInstances;
+
 use exonum::{
     crypto,
     helpers::ValidatorId,
-    messages::ServiceInstanceId,
     runtime::{rust::ServiceFactory, ServiceConstructor, ServiceInstanceSpec},
 };
-use exonum_merkledb::{BinaryValue, TemporaryDB};
+use exonum_merkledb::{TemporaryDB};
 
-use std::{fmt, net::SocketAddr};
+use std::{net::SocketAddr};
 
 use crate::{TestKit, TestNetwork};
 
@@ -111,8 +112,7 @@ use crate::{TestKit, TestNetwork};
 pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     validator_count: Option<u16>,
-    service_factories: Vec<Box<dyn ServiceFactory>>,
-    service_instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
+    service_instances: Vec<ServiceInstances>,
     logger: bool,
 }
 
@@ -146,7 +146,6 @@ impl TestKitBuilder {
         TestKitBuilder {
             validator_count: None,
             our_validator_id: Some(ValidatorId(0)),
-            service_factories: Vec::new(),
             service_instances: Vec::new(),
             logger: false,
         }
@@ -157,7 +156,6 @@ impl TestKitBuilder {
         TestKitBuilder {
             validator_count: None,
             our_validator_id: None,
-            service_factories: Vec::new(),
             service_instances: Vec::new(),
             logger: false,
         }
@@ -175,9 +173,7 @@ impl TestKitBuilder {
 
     /// Adds a rust service to the testkit.
     pub fn with_service(mut self, service: impl Into<ServiceInstances>) -> Self {
-        let service = service.into();
-        self.service_factories.push(service.factory);
-        self.service_instances.extend(service.instances);
+        self.service_instances.push(service.into());
         self
     }
 
@@ -199,7 +195,6 @@ impl TestKitBuilder {
         let genesis = network.genesis_config();
         TestKit::assemble(
             TemporaryDB::new(),
-            self.service_factories,
             self.service_instances,
             network,
             genesis,
@@ -216,46 +211,5 @@ impl TestKitBuilder {
     pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let testkit = self.create();
         testkit.run(public_api_address, private_api_address);
-    }
-}
-
-#[derive(Debug)]
-pub struct ServiceInstances {
-    factory: Box<dyn ServiceFactory>,
-    instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
-}
-
-impl ServiceInstances {
-    pub fn new(factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        Self {
-            factory: factory.into(),
-            instances: Vec::new(),
-        }
-    }
-
-    /// Adds new service instance to the builder.
-    pub fn with_instance(
-        mut self,
-        name: impl Into<String>,
-        id: ServiceInstanceId,
-        params: impl BinaryValue,
-    ) -> Self {
-        let spec = ServiceInstanceSpec {
-            artifact: self.factory.artifact().into(),
-            id,
-            name: name.into(),
-        };
-        let constructor = ServiceConstructor::new(params);
-        self.instances.push((spec, constructor));
-        self
-    }
-}
-
-impl<F> From<F> for ServiceInstances
-where
-    F: Fn() -> ServiceInstances,
-{
-    fn from(f: F) -> Self {
-        f()
     }
 }

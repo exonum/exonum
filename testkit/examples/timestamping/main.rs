@@ -80,8 +80,8 @@ fn main() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ServiceInstances::new(TimestampingService).with_instance(
-            "timestamping",
             instance_id,
+            "timestamping",
             (),
         ))
         .create();

@@ -14,10 +14,10 @@
 
 use exonum::{
     blockchain::Schema,
-    crypto::CryptoHash,
     helpers::{Height, ValidatorId},
 };
 use exonum_testkit::TestKitBuilder;
+use exonum_merkledb::ObjectHash;
 
 fn main() {
     let mut testkit = TestKitBuilder::auditor().with_validators(3).create();
@@ -49,7 +49,7 @@ fn main() {
         Schema::new(&testkit.snapshot())
             .previous_configuration()
             .unwrap()
-            .hash(),
+            .object_hash(),
         stored.previous_cfg_hash
     );
 }

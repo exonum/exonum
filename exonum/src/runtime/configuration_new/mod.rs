@@ -41,11 +41,8 @@ mod schema;
 mod transactions;
 
 /// Service identifier for the configuration service.
-pub const SERVICE_ID: ServiceInstanceId = 0;
 pub const DEPLOY_METHOD_ID: MethodId = 3;
 pub const INIT_METHOD_ID: MethodId = 4;
-/// Configuration service name.
-pub const SERVICE_NAME: &str = "configuration";
 
 /// Constant artifact spec.
 pub fn artifact_spec() -> RustArtifactSpec {

@@ -140,11 +140,11 @@ fn main() {
             ServiceInstances::new(TimeServiceFactory::with_provider(
                 mock_provider.clone() as Arc<dyn TimeProvider>
             ))
-            .with_instance(TIME_SERVICE_NAME, TIME_SERVICE_ID, ()),
+            .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
         )
         .with_service(ServiceInstances::new(MarkerService).with_instance(
-            SERVICE_NAME,
             SERVICE_ID,
+            SERVICE_NAME,
             (),
         ))
         .create();

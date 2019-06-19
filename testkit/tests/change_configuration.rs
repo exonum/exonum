@@ -14,14 +14,12 @@
 
 #[macro_use]
 extern crate pretty_assertions;
-#[macro_use]
-extern crate serde_derive;
 
 use exonum::{
     blockchain::Schema,
-    crypto::CryptoHash,
     helpers::{Height, ValidatorId},
 };
+use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
 #[test]
@@ -108,7 +106,7 @@ fn test_add_to_validators() {
         Schema::new(&testkit.snapshot())
             .previous_configuration()
             .unwrap()
-            .hash(),
+            .object_hash(),
         stored.previous_cfg_hash
     );
 }
@@ -137,40 +135,15 @@ fn test_exclude_from_validators() {
         Schema::new(&testkit.snapshot())
             .previous_configuration()
             .unwrap()
-            .hash(),
+            .object_hash(),
         stored.previous_cfg_hash
     );
 }
 
 #[test]
+#[ignore = "Implement new configuration change logic [ECR-3285]"]
 fn test_change_service_config() {
-    #[derive(Debug, Serialize, Deserialize, Clone)]
-    struct ServiceConfig {
-        name: String,
-        value: u64,
-    };
 
-    let service_cfg = ServiceConfig {
-        name: String::from("Config"),
-        value: 64,
-    };
-
-    let mut testkit = TestKitBuilder::validator().create();
-    let cfg_change_height = Height(5);
-    let proposal = {
-        let mut cfg = testkit.configuration_change_proposal();
-        cfg.set_service_config("my_service", service_cfg.clone());
-        cfg.set_actual_from(cfg_change_height);
-        cfg
-    };
-    testkit.commit_configuration_change(proposal);
-
-    testkit.create_blocks_until(cfg_change_height.previous());
-
-    assert_eq!(
-        serde_json::to_value(service_cfg).unwrap(),
-        testkit.actual_configuration().services["my_service"]
-    );
 }
 
 #[test]

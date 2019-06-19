@@ -42,8 +42,8 @@ fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ServiceInstances::new(CurrencyService).with_instance(
-            SERVICE_NAME,
             SERVICE_ID,
+            SERVICE_NAME,
             (),
         ))
         .create()

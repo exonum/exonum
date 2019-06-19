@@ -228,8 +228,8 @@ mod tests {
     fn init_handler(height: Height) -> (Arc<RwLock<TestKit>>, TestKitApi) {
         let testkit = TestKitBuilder::validator()
             .with_service(ServiceInstances::new(SampleService).with_instance(
-                TIMESTAMP_SERVICE_NAME,
                 TIMESTAMP_SERVICE_ID,
+                TIMESTAMP_SERVICE_NAME,
                 (),
             ))
             .create();

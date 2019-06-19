@@ -46,11 +46,11 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mut testkit = TestKitBuilder::validator()
         .with_service(
             ServiceInstances::new(TimeServiceFactory::with_provider(mock_provider.clone()))
-                .with_instance(TIME_SERVICE_NAME, TIME_SERVICE_ID, ()),
+                .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
         )
         .with_service(ServiceInstances::new(TimestampingService).with_instance(
-            SERVICE_NAME,
             SERVICE_ID,
+            SERVICE_NAME,
             Config {
                 time_service_name: TIME_SERVICE_NAME.to_owned(),
                 time_service_id: TIME_SERVICE_ID,
