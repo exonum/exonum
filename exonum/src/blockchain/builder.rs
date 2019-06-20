@@ -170,7 +170,6 @@ mod tests {
 
     #[test]
     fn finalize_without_genesis_block() {
-        let _ = crate::helpers::init_logger();
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
 

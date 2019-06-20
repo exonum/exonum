@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{IndexAccess, ProofMapIndex};
 
-use super::{ArtifactSpec, ServiceInstanceSpec, StartError};
+use super::{ArtifactSpec, DeployError, ServiceInstanceSpec, StartError};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -41,10 +41,10 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds artifact specification to the set of deployed artifacts.
-    pub fn add_deployed_artifact(&mut self, artifact: ArtifactSpec) -> Result<(), StartError> {
+    pub fn add_deployed_artifact(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         // Checks that we have not already deployed this artifact.
         if self.deployed_artifacts().contains(&artifact.raw) {
-            return Err(StartError::WrongArtifact);
+            return Err(DeployError::AlreadyDeployed);
         }
 
         self.deployed_artifacts()
@@ -56,13 +56,10 @@ impl<T: IndexAccess> Schema<T> {
     /// Adds information about started service instance to the schema.
     /// Note that method doesn't check that service identifier is free.
     pub fn add_started_service(&mut self, spec: ServiceInstanceSpec) -> Result<(), StartError> {
-        let runtime_id = self.deployed_artifacts().get(&spec.artifact.raw);
-        // TODO Impement proper pending deploy logic [ECR-3291]
-        let runtime_id = runtime_id.unwrap_or_else(|| {
-            let runtime_id = spec.artifact.runtime_id;
-            self.add_deployed_artifact(spec.artifact.clone()).unwrap();
-            runtime_id
-        });
+        let runtime_id = self
+            .deployed_artifacts()
+            .get(&spec.artifact.raw)
+            .ok_or(StartError::NotDeployed)?;
         // Checks that runtime identifier is proper in instance.
         if runtime_id != spec.artifact.runtime_id {
             return Err(StartError::WrongRuntime);
