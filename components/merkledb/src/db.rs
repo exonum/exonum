@@ -764,7 +764,7 @@ where
 
 impl<T: Database> From<T> for Box<dyn Database> {
     fn from(db: T) -> Self {
-        Box::new(db) as Self
+        Box::<T>::new(db) as Self
     }
 }
 
