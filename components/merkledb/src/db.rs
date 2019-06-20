@@ -21,6 +21,7 @@ use std::{
         Bound::{Included, Unbounded},
         HashMap,
     },
+    fmt,
     iter::{FromIterator, Iterator as StdIterator, Peekable},
     mem,
     ops::{Deref, DerefMut},
@@ -390,11 +391,13 @@ pub enum Change {
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
+#[derive(Debug)]
 pub struct Fork {
     flushed: FlushedFork,
     working_patch: WorkingPatch,
 }
 
+#[derive(Debug)]
 pub struct FlushedFork {
     snapshot: Box<dyn Snapshot>,
     patch: Patch,
@@ -642,12 +645,6 @@ impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
     }
 }
 
-impl ::std::fmt::Debug for Fork {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "Fork(..)")
-    }
-}
-
 impl<'a, T> ForkIter<'a, T>
 where
     T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
@@ -765,10 +762,27 @@ where
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::use_self))]
 impl<T: Database> From<T> for Box<dyn Database> {
     fn from(db: T) -> Self {
         Box::new(db) as Self
+    }
+}
+
+impl fmt::Debug for dyn Database {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Database").finish()
+    }
+}
+
+impl fmt::Debug for dyn Snapshot {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Snapshot").finish()
+    }
+}
+
+impl fmt::Debug for dyn Iterator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Iterator").finish()
     }
 }
 
