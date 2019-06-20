@@ -21,9 +21,9 @@ use exonum::{
     helpers::ValidatorId,
     runtime::{rust::ServiceFactory, ServiceConstructor, ServiceInstanceSpec},
 };
-use exonum_merkledb::{TemporaryDB};
+use exonum_merkledb::TemporaryDB;
 
-use std::{net::SocketAddr};
+use std::net::SocketAddr;
 
 use crate::{TestKit, TestNetwork};
 
@@ -193,12 +193,7 @@ impl TestKitBuilder {
         let network =
             TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1));
         let genesis = network.genesis_config();
-        TestKit::assemble(
-            TemporaryDB::new(),
-            self.service_instances,
-            network,
-            genesis,
-        )
+        TestKit::assemble(TemporaryDB::new(), self.service_instances, network, genesis)
     }
 
     /// Starts a testkit web server, which listens to public and private APIs exposed by

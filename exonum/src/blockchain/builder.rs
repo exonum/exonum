@@ -15,7 +15,7 @@
 use exonum_merkledb::{BinaryValue, Database};
 use futures::sync::mpsc;
 
-use std::{sync::Arc, fmt};
+use std::{fmt, sync::Arc};
 
 use crate::{
     blockchain::{Blockchain, GenesisConfig, Schema},
@@ -112,11 +112,10 @@ impl BlockchainBuilder {
             // Adds builtin services.
             blockchain.merge({
                 let fork = blockchain.fork();
-                self.builtin_instances.into_iter().for_each(|service| {
-                    blockchain
-                        .dispatcher()
-                        .add_builtin_service(&fork, service.0, service.1)
-                });
+                for service in self.builtin_instances {
+                    let mut dispatcher = blockchain.dispatcher();
+                    dispatcher.add_builtin_service(&fork, service.0, service.1);
+                }
                 fork.into_patch()
             })?;
             // Commits genesis block.

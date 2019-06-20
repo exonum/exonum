@@ -14,7 +14,7 @@
 use exonum_merkledb::TemporaryDB;
 
 use exonum::{
-    blockchain::{GenesisConfig, ValidatorKeys, ServiceInstances},
+    blockchain::{GenesisConfig, ServiceInstances, ValidatorKeys},
     node::{Node, NodeApiConfig, NodeConfig},
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;

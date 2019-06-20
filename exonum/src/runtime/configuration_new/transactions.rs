@@ -364,7 +364,7 @@ pub struct Deploy {
 fn artifact_spec_from_any(runtime_id: u32, artifact_spec: &Any) -> ArtifactSpec {
     ArtifactSpec {
         runtime_id,
-        raw_spec: artifact_spec.get_value().to_vec(),
+        raw: artifact_spec.get_value().to_vec(),
     }
 }
 

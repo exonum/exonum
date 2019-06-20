@@ -24,6 +24,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
     node::ApiSender,
+    proto::schema,
 };
 
 use self::{
@@ -41,6 +42,24 @@ pub mod error;
 pub enum DeployStatus {
     DeployInProgress,
     Deployed,
+}
+
+impl DeployStatus {
+    pub fn is_deployed(&self) -> bool {
+        if let DeployStatus::Deployed = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_pending(&self) -> bool {
+        if let DeployStatus::DeployInProgress = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -62,7 +81,8 @@ impl ServiceConstructor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::ServiceInstanceSpec", crate = "crate")]
 pub struct ServiceInstanceSpec {
     pub id: ServiceInstanceId,
     pub name: String,
@@ -75,17 +95,18 @@ pub enum RuntimeIdentifier {
     Java = 1,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::ArtifactSpec", crate = "crate")]
 pub struct ArtifactSpec {
-    runtime_id: u32,
-    raw_spec: Vec<u8>,
+    pub runtime_id: u32,
+    pub raw: Vec<u8>,
 }
 
 impl From<RustArtifactSpec> for ArtifactSpec {
     fn from(artifact: RustArtifactSpec) -> Self {
         ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
-            raw_spec: artifact.into_bytes(),
+            raw: artifact.into_bytes(),
         }
     }
 }
@@ -97,7 +118,7 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
     /// Begins deploy artifact with the given specification.
-    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError>;
+    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError>;
 
     /// Checks deployment status.
     fn check_deploy_status(

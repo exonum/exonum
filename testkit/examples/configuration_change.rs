@@ -16,8 +16,8 @@ use exonum::{
     blockchain::Schema,
     helpers::{Height, ValidatorId},
 };
-use exonum_testkit::TestKitBuilder;
 use exonum_merkledb::ObjectHash;
+use exonum_testkit::TestKitBuilder;
 
 fn main() {
     let mut testkit = TestKitBuilder::auditor().with_validators(3).create();

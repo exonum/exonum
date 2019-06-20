@@ -105,7 +105,7 @@ impl RustRuntime {
         }
 
         let rust_artifact_spec: RustArtifactSpec =
-            BinaryValue::from_bytes(Cow::Borrowed(&artifact.raw_spec)).ok()?;
+            BinaryValue::from_bytes(Cow::Borrowed(&artifact.raw)).ok()?;
 
         Some(rust_artifact_spec)
     }
@@ -184,7 +184,7 @@ impl FromStr for RustArtifactSpec {
 }
 
 impl Runtime for RustRuntime {
-    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
+    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
         let artifact = self
             .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
@@ -198,7 +198,7 @@ impl Runtime for RustRuntime {
             return Err(DeployError::AlreadyDeployed);
         }
 
-        Ok(())
+        Ok(DeployStatus::Deployed)
     }
 
     fn check_deploy_status(

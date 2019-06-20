@@ -142,9 +142,7 @@ fn test_exclude_from_validators() {
 
 #[test]
 #[ignore = "Implement new configuration change logic [ECR-3285]"]
-fn test_change_service_config() {
-
-}
+fn test_change_service_config() {}
 
 #[test]
 #[should_panic(expected = "The `actual_from` height should be greater than the current")]

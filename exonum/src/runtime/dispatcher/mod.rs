@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use schema::Schema;
+
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future::Future, sink::Sink, sync::mpsc};
 
@@ -34,6 +36,8 @@ use super::{
     ServiceInstanceSpec,
 };
 
+mod schema;
+
 pub(crate) struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn Runtime>>,
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
@@ -47,6 +51,7 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
+    /// Creates a new dispatcher with the specified runtimes.
     pub fn with_runtimes(
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
         inner_requests_tx: mpsc::Sender<InternalRequest>,
@@ -58,24 +63,45 @@ impl Dispatcher {
         }
     }
 
-    pub fn restore_state(&mut self, _access: impl IndexAccess) {}
+    /// Restores dispatcher from the state which saved in the specified snapshot.
+    ///
+    /// # Panics
+    /// TODO [ECR-3275]
+    pub fn restore_state(&mut self, snapshot: impl IndexAccess) {
+        let schema = Schema::new(snapshot);
+        // Restores information about the deployed services.
+        for (raw, runtime_id) in &schema.deployed_artifacts() {
+            let artifact = ArtifactSpec { raw, runtime_id };
+            let status = self
+                .deploy(&artifact)
+                .expect("Unable to restore deployed artifacts");
+            assert!(
+                status.is_deployed(),
+                "During the restart artifacts must be deployed instantly."
+            );
+        }
+        // Restarts active service instances.
+        for spec in schema.started_services().values() {
+            self.restart_service(&spec)
+                .expect("Unable to restart services");
+        }
+    }
 
     /// Adds built-in service with predefined identifier.
     // TODO rewrite to return error [ECR-3222]
-    pub fn add_builtin_service(
+    pub(crate) fn add_builtin_service(
         &mut self,
         fork: &Fork,
         spec: ServiceInstanceSpec,
         constructor: ServiceConstructor,
     ) {
         // Registers service instance in runtime.
-        self.begin_deploy(&spec.artifact)
-            .and_then(|_| {
-                let status = self.check_deploy_status(&spec.artifact, false)?;
+        self.deploy(&spec.artifact)
+            .and_then(|status| {
                 assert_eq!(
                     status,
                     DeployStatus::Deployed,
-                    "Builtin services must be deployed instantly."
+                    "Builtin artifacts must be deployed instantly."
                 );
                 Ok(())
             })
@@ -89,31 +115,6 @@ impl Dispatcher {
         .expect("Unable to start builtin service instance");
     }
 
-    /// Sends restart API message.
-    pub(crate) fn restart_api(&self) {
-        let _ = self
-            .inner_requests_tx
-            .clone()
-            .send(InternalRequest::RestartApi)
-            .wait()
-            .map_err(|e| error!("Failed to request API restart: {}", e));
-    }
-
-    pub(crate) fn notify_service_started(
-        &mut self,
-        service_id: ServiceInstanceId,
-        artifact: ArtifactSpec,
-    ) {
-        self.runtime_lookup.insert(service_id, artifact.runtime_id);
-    }
-
-    pub fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
-        self.runtimes
-            .get_mut(&artifact.runtime_id)
-            .ok_or(DeployError::WrongRuntime)
-            .and_then(|runtime| runtime.begin_deploy(artifact))
-    }
-
     pub fn check_deploy_status(
         &self,
         artifact: &ArtifactSpec,
@@ -125,13 +126,63 @@ impl Dispatcher {
             .and_then(|runtime| runtime.check_deploy_status(artifact, cancel_if_not_complete))
     }
 
-    pub fn start_service(
+    pub fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+        self.runtimes
+            .iter()
+            .map(|(_, runtime)| runtime.state_hashes(snapshot))
+            .flatten()
+            .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+        self.runtimes
+            .iter()
+            .fold(Vec::new(), |mut api, (_, runtime)| {
+                api.append(&mut runtime.services_api());
+                api
+            })
+    }
+
+    /// Sends restart API message.
+    fn restart_api(&self) {
+        let _ = self
+            .inner_requests_tx
+            .clone()
+            .send(InternalRequest::RestartApi)
+            .wait()
+            .map_err(|e| error!("Failed to request API restart: {}", e));
+    }
+
+    fn deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
+        self.runtimes
+            .get_mut(&artifact.runtime_id)
+            .ok_or(DeployError::WrongRuntime)
+            .and_then(|runtime| runtime.begin_deploy(artifact))
+    }
+
+    /// Registers service instance in the runtime lookup table.
+    fn register_running_service(&mut self, spec: &ServiceInstanceSpec) {
+        self.runtime_lookup
+            .insert(spec.id, spec.artifact.runtime_id);
+    }
+
+    /// Just starts a new service instance.
+    fn restart_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+        self.runtimes
+            .get_mut(&spec.artifact.runtime_id)
+            .ok_or(StartError::WrongRuntime)
+            .and_then(|runtime| runtime.start_service(spec))
+    }
+
+    /// Starts and configures a new service instance. After that it writes information about
+    /// service instance to the dispatcher's information schema.
+    fn start_service(
         &mut self,
         context: &mut RuntimeContext,
         spec: ServiceInstanceSpec,
         constructor: &ServiceConstructor,
     ) -> Result<(), StartError> {
-        // Check that service doesn't use reserved identifiers.
+        // Check that service doesn't use existing identifiers.
         if spec.id == CORE_ID as u32 {
             return Err(StartError::ServiceIdExists);
         }
@@ -147,11 +198,13 @@ impl Dispatcher {
                     .or_else(|_| runtime.stop_service(&spec))?; // TODO Should we emit panic if revert failed? [ECR-3222]
                 Ok(())
             })?;
-        self.notify_service_started(spec.id, spec.artifact);
+        self.register_running_service(&spec);
+        // Adds service instance to the dispatcher schema.
+        Schema::new(context.fork).add_started_service(spec)?;
         Ok(())
     }
 
-    pub fn execute(
+    pub(crate) fn execute(
         &mut self,
         context: &mut RuntimeContext,
         call_info: CallInfo,
@@ -181,21 +234,13 @@ impl Dispatcher {
         }
     }
 
-    pub fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-        self.runtimes
-            .iter()
-            .map(|(_, runtime)| runtime.state_hashes(snapshot))
-            .flatten()
-            .collect::<Vec<_>>()
-    }
-
-    pub fn before_commit(&self, fork: &mut Fork) {
+    pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (_, runtime) in &self.runtimes {
             runtime.before_commit(fork);
         }
     }
 
-    pub fn after_commit(
+    pub(crate) fn after_commit(
         &self,
         snapshot: Box<dyn Snapshot>,
         service_keypair: &(PublicKey, SecretKey),
@@ -204,15 +249,6 @@ impl Dispatcher {
         self.runtimes.values().for_each(|runtime| {
             runtime.after_commit(snapshot.as_ref(), &service_keypair, &tx_sender)
         });
-    }
-
-    pub fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
-        self.runtimes
-            .iter()
-            .fold(Vec::new(), |mut api, (_, runtime)| {
-                api.append(&mut runtime.services_api());
-                api
-            })
     }
 }
 
@@ -236,7 +272,7 @@ impl Action {
     ) -> Result<(), ExecutionError> {
         match self {
             Action::BeginDeploy { artifact } => {
-                dispatcher.begin_deploy(&artifact).map_err(From::from)
+                dispatcher.deploy(&artifact).map(drop).map_err(From::from)
             }
 
             Action::StartService { spec, constructor } => {
@@ -255,7 +291,7 @@ mod tests {
     use crate::{
         crypto::{Hash, PublicKey},
         messages::{MethodId, ServiceInstanceId},
-        runtime::RuntimeIdentifier,
+        runtime::{rust::RustRuntime, RuntimeIdentifier},
     };
 
     use super::*;
@@ -312,9 +348,9 @@ mod tests {
     }
 
     impl Runtime for SampleRuntime {
-        fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
+        fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
             if artifact.runtime_id == self.runtime_type {
-                Ok(())
+                Ok(DeployStatus::Deployed)
             } else {
                 Err(DeployError::WrongRuntime)
             }
@@ -439,19 +475,19 @@ mod tests {
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: SampleRuntimes::First as u32,
-            raw_spec: Default::default(),
+            raw: Vec::default(),
         };
         let sample_java_spec = ArtifactSpec {
             runtime_id: SampleRuntimes::Second as u32,
-            raw_spec: Default::default(),
+            raw: Vec::default(),
         };
 
         // Check deploy.
         dispatcher
-            .begin_deploy(&sample_rust_spec)
+            .deploy(&sample_rust_spec)
             .expect("start_deploy failed for rust");
         dispatcher
-            .begin_deploy(&sample_java_spec)
+            .deploy(&sample_java_spec)
             .expect("start_deploy failed for java");
 
         // Check deploy status
@@ -541,17 +577,19 @@ mod tests {
         // Create dispatcher and test data.
         let db = TemporaryDB::new();
 
-        let mut dispatcher = DispatcherBuilder::default().finalize();
+        let mut dispatcher = DispatcherBuilder::default()
+            .with_runtime(RuntimeIdentifier::Rust as u32, RustRuntime::default())
+            .finalize();
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
-            raw_spec: Default::default(),
+            raw: Vec::default(),
         };
 
         // Check deploy.
         assert_eq!(
             dispatcher
-                .begin_deploy(&sample_rust_spec)
+                .deploy(&sample_rust_spec)
                 .expect_err("start_deploy succeed"),
             DeployError::WrongArtifact
         );

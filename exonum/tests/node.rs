@@ -143,6 +143,8 @@ fn test_node_run() {
 
 #[test]
 fn test_node_restart_regression() {
+    let _ = crate::helpers::init_logger();
+
     let start_node =
         |node_cfg: NodeConfig, db, start_times| {
             let node =
