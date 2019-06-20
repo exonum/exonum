@@ -60,6 +60,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-merkledb
 
+- Added `Debug` implementation for `Database`, `Snapshot`, `Iterator` dynamic traits (#????)
+
 - Changed storage layout (#1293)
 
   - Changed indexes metadata layout in the database.
