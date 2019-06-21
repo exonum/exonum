@@ -23,7 +23,7 @@ use crate::{
         dispatcher::Action,
         error::ExecutionError,
         rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ServiceConstructor, ServiceInstanceSpec,
+        ServiceConfig, InstanceSpec,
     },
 };
 
@@ -199,13 +199,13 @@ impl ConfigurationService for ConfigurationServiceImpl {
             arg.instance_name, instance_id
         );
 
-        let spec = ServiceInstanceSpec {
+        let spec = InstanceSpec {
             id: instance_id,
             name: arg.instance_name,
             artifact,
         };
 
-        let constructor = ServiceConstructor {
+        let constructor = ServiceConfig {
             data: arg.constructor_data,
         };
 

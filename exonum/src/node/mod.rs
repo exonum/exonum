@@ -50,7 +50,7 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, Schema, ServiceInstances, SharedNodeState,
+        Blockchain, ConsensusConfig, GenesisConfig, Schema, InstanceCollection, SharedNodeState,
         ValidatorKeys,
     },
     crypto::{self, read_keys_from_file, Hash, PublicKey, SecretKey},
@@ -905,7 +905,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        services: impl IntoIterator<Item = ServiceInstances>,
+        services: impl IntoIterator<Item = InstanceCollection>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
@@ -1204,7 +1204,7 @@ mod tests {
 
         let mut node = Node::new(
             TemporaryDB::new(),
-            vec![ServiceInstances::new(TestService).with_instance(SERVICE_ID, "test-service", ())],
+            vec![InstanceCollection::new(TestService).with_instance(SERVICE_ID, "test-service", ())],
             node_cfg,
             None,
         );

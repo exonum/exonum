@@ -157,7 +157,7 @@ extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
-    builder::{ServiceInstances, TestKitBuilder},
+    builder::{InstanceCollection, TestKitBuilder},
     compare::ComparableSnapshot,
     network::{TestNetwork, TestNetworkConfiguration, TestNode},
     server::TestKitStatus,
@@ -232,7 +232,7 @@ impl TestKit {
         constructor: impl BinaryValue,
     ) -> Self {
         TestKitBuilder::validator()
-            .with_service(ServiceInstances::new(service_factory).with_instance(
+            .with_service(InstanceCollection::new(service_factory).with_instance(
                 id,
                 name,
                 constructor,
@@ -242,7 +242,7 @@ impl TestKit {
 
     fn assemble(
         database: TemporaryDB,
-        service_factories: Vec<ServiceInstances>,
+        service_factories: Vec<InstanceCollection>,
         network: TestNetwork,
         genesis: GenesisConfig,
     ) -> Self {
@@ -953,7 +953,7 @@ impl StoppedTestKit {
     ///
     /// Note that `services` may differ from the vector of services initially passed to
     /// the `TestKit` (which is also what may happen with real Exonum apps).
-    pub fn resume(self, _services: Vec<ServiceInstances>) -> TestKit {
+    pub fn resume(self, _services: Vec<InstanceCollection>) -> TestKit {
         unimplemented!();
         // let genesis = {
         //     let snapshot = self.db.snapshot();

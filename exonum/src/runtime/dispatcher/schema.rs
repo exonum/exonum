@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{IndexAccess, ProofMapIndex};
 
-use super::{ArtifactSpec, DeployError, ServiceInstanceSpec, StartError};
+use super::{ArtifactSpec, DeployError, InstanceSpec, StartError};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -36,7 +36,7 @@ impl<T: IndexAccess> Schema<T> {
 
     /// Set of running services instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
-    pub fn started_services(&self) -> ProofMapIndex<T, String, ServiceInstanceSpec> {
+    pub fn started_services(&self) -> ProofMapIndex<T, String, InstanceSpec> {
         ProofMapIndex::new("core.dispatcher.started_services", self.access.clone())
     }
 
@@ -55,7 +55,7 @@ impl<T: IndexAccess> Schema<T> {
 
     /// Adds information about started service instance to the schema.
     /// Note that method doesn't check that service identifier is free.
-    pub fn add_started_service(&mut self, spec: ServiceInstanceSpec) -> Result<(), StartError> {
+    pub fn add_started_service(&mut self, spec: InstanceSpec) -> Result<(), StartError> {
         let runtime_id = self
             .deployed_artifacts()
             .get(&spec.artifact.raw)

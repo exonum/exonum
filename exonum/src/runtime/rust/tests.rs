@@ -25,7 +25,7 @@ use crate::{
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        DeployStatus, RuntimeContext, ServiceConstructor, ServiceInstanceSpec,
+        DeployStatus, RuntimeContext, ServiceConfig, InstanceSpec,
     },
 };
 
@@ -156,13 +156,13 @@ fn test_basic_rust_runtime() {
 
     // Init service
     {
-        let spec = ServiceInstanceSpec {
+        let spec = InstanceSpec {
             artifact,
             id: SERVICE_INSTANCE_ID,
             name: SERVICE_INSTANCE_NAME.to_owned(),
         };
 
-        let constructor = ServiceConstructor {
+        let constructor = ServiceConfig {
             data: {
                 let mut arg = TestServiceInit::new();
                 arg.set_msg("constructor_message".to_owned());

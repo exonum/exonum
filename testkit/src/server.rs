@@ -170,7 +170,7 @@ mod tests {
     };
     use exonum_merkledb::ObjectHash;
 
-    use crate::{ServiceInstances, TestKitApi, TestKitBuilder};
+    use crate::{InstanceCollection, TestKitApi, TestKitBuilder};
 
     use super::{super::proto, *};
 
@@ -227,7 +227,7 @@ mod tests {
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> (Arc<RwLock<TestKit>>, TestKitApi) {
         let testkit = TestKitBuilder::validator()
-            .with_service(ServiceInstances::new(SampleService).with_instance(
+            .with_service(InstanceCollection::new(SampleService).with_instance(
                 TIMESTAMP_SERVICE_ID,
                 TIMESTAMP_SERVICE_NAME,
                 (),

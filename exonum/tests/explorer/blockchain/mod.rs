@@ -15,7 +15,7 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema, ServiceInstances},
+    blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema, InstanceCollection},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     impl_service_dispatcher,
@@ -121,7 +121,7 @@ pub fn create_blockchain() -> Blockchain {
     let service_keypair = config.service_keypair();
     Blockchain::new(
         TemporaryDB::new(),
-        vec![ServiceInstances::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
+        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
         config.genesis,
         service_keypair,
         ApiSender(mpsc::unbounded().0),

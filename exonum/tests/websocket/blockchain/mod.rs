@@ -15,7 +15,7 @@
 //! Simplified node emulation for testing websockets.
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, ServiceInstances},
+    blockchain::{ExecutionError, ExecutionResult, InstanceCollection},
     crypto::PublicKey,
     helpers, impl_service_dispatcher,
     node::{ApiSender, Node},
@@ -112,7 +112,7 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
 
     let node = Node::new(
         TemporaryDB::new(),
-        vec![ServiceInstances::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
+        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
         node_cfg,
         None,
     );

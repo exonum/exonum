@@ -32,7 +32,7 @@ use exonum::{
     messages::{AnyTx, ServiceInstanceId, Signed},
     runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
 };
-use exonum_testkit::{ServiceInstances, TestKitBuilder};
+use exonum_testkit::{InstanceCollection, TestKitBuilder};
 use exonum_time::{
     schema::TimeSchema,
     time_provider::{MockTimeProvider, TimeProvider},
@@ -137,12 +137,12 @@ fn main() {
     // Create testkit for network with one validator.
     let mut testkit = TestKitBuilder::validator()
         .with_service(
-            ServiceInstances::new(TimeServiceFactory::with_provider(
+            InstanceCollection::new(TimeServiceFactory::with_provider(
                 mock_provider.clone() as Arc<dyn TimeProvider>
             ))
             .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
         )
-        .with_service(ServiceInstances::new(MarkerService).with_instance(
+        .with_service(InstanceCollection::new(MarkerService).with_instance(
             SERVICE_ID,
             SERVICE_NAME,
             (),

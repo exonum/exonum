@@ -14,7 +14,7 @@
 
 //! Testkit builder.
 
-pub use exonum::blockchain::ServiceInstances;
+pub use exonum::blockchain::InstanceCollection;
 
 use exonum::{
     crypto,
@@ -111,7 +111,7 @@ use crate::{TestKit, TestNetwork};
 pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     validator_count: Option<u16>,
-    service_instances: Vec<ServiceInstances>,
+    service_instances: Vec<InstanceCollection>,
     logger: bool,
 }
 
@@ -171,7 +171,7 @@ impl TestKitBuilder {
     }
 
     /// Adds a rust service to the testkit.
-    pub fn with_service(mut self, service: impl Into<ServiceInstances>) -> Self {
+    pub fn with_service(mut self, service: impl Into<InstanceCollection>) -> Self {
         self.service_instances.push(service.into());
         self
     }

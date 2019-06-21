@@ -21,7 +21,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::ServiceInstances,
+    blockchain::InstanceCollection,
     node::{ExternalMessage, Node},
     runtime::rust::ServiceFactory,
 };
@@ -162,7 +162,7 @@ impl NodeBuilder {
             db,
             self.service_factories
                 .into_iter()
-                .map(ServiceInstances::new),
+                .map(InstanceCollection::new),
             config,
             Some(config_file_path),
         )

@@ -26,7 +26,7 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        Runtime, ServiceConstructor, ServiceInstanceSpec,
+        Runtime, ServiceConfig, InstanceSpec,
     },
 };
 
@@ -36,7 +36,7 @@ pub struct BlockchainBuilder {
     pub genesis_config: GenesisConfig,
     pub service_keypair: (PublicKey, SecretKey),
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
-    pub builtin_instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
+    pub builtin_instances: Vec<(InstanceSpec, ServiceConfig)>,
 }
 
 impl BlockchainBuilder {
@@ -56,7 +56,7 @@ impl BlockchainBuilder {
 
     pub fn with_rust_runtime(
         mut self,
-        services: impl IntoIterator<Item = ServiceInstances>,
+        services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {
         let mut runtime = RustRuntime::new();
         for service in services {
@@ -126,12 +126,13 @@ impl BlockchainBuilder {
 }
 
 #[derive(Debug)]
-pub struct ServiceInstances {
+pub struct InstanceCollection {
     pub factory: Box<dyn ServiceFactory>,
-    pub instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
+    pub instances: Vec<(InstanceSpec, ServiceConfig)>,
 }
 
-impl ServiceInstances {
+impl InstanceCollection {
+    /// Creates a new blank collection of instances for the specified service factory.
     pub fn new(factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
         Self {
             factory: factory.into(),
@@ -139,22 +140,26 @@ impl ServiceInstances {
         }
     }
 
-    /// Adds new service instance to the builder.
+    /// Adds a new service instance to the collection.
     pub fn with_instance(
         mut self,
         id: ServiceInstanceId,
         name: impl Into<String>,
         params: impl BinaryValue,
     ) -> Self {
-        let spec = ServiceInstanceSpec {
+        let spec = InstanceSpec {
             artifact: self.factory.artifact().into(),
             id,
             name: name.into(),
         };
-        let constructor = ServiceConstructor::new(params);
+        let constructor = ServiceConfig::new(params);
         self.instances.push((spec, constructor));
         self
     }
+}
+
+impl<T: ServiceFactory> From<T> for InstanceCollection {
+    fn from(factory: T) -> Self { Self::new(factory) }
 }
 
 #[cfg(test)]
@@ -196,7 +201,7 @@ mod tests {
         Blockchain::new(
             TemporaryDB::new(),
             vec![
-                ServiceInstances::new(ConfigurationServiceFactory).with_instance(
+                InstanceCollection::new(ConfigurationServiceFactory).with_instance(
                     ConfigurationServiceFactory::BUILTIN_ID,
                     ConfigurationServiceFactory::BUILTIN_NAME,
                     (),

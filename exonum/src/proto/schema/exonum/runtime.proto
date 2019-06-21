@@ -39,7 +39,7 @@ message ArtifactSpec {
   bytes raw = 2;
 }
 
-message ServiceInstanceSpec {
+message InstanceSpec {
   uint32 id = 1;
   string name = 2;
   ArtifactSpec artifact = 3;

@@ -28,7 +28,7 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, ServiceInstances,
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, InstanceCollection,
         SharedNodeState, StoredConfiguration, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
@@ -953,7 +953,7 @@ impl ConnectList {
 
 pub struct SandboxBuilder {
     initialize: bool,
-    services: Vec<ServiceInstances>,
+    services: Vec<InstanceCollection>,
     validators_count: u8,
     consensus_config: ConsensusConfig,
 }
@@ -983,7 +983,7 @@ impl SandboxBuilder {
         self
     }
 
-    pub fn with_services(mut self, services: Vec<ServiceInstances>) -> Self {
+    pub fn with_services(mut self, services: Vec<InstanceCollection>) -> Self {
         self.services = services;
         self
     }
@@ -1026,7 +1026,7 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 
 /// Constructs an uninitialized instance of a `Sandbox`.
 fn sandbox_with_services_uninitialized(
-    services: Vec<ServiceInstances>,
+    services: Vec<InstanceCollection>,
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
@@ -1151,12 +1151,12 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     SandboxBuilder::new().with_services(vec![
-        ServiceInstances::new(TimestampingService).with_instance(
+        InstanceCollection::new(TimestampingService).with_instance(
             TimestampingService::ID,
             "timestamping",
             (),
         ),
-        ServiceInstances::new(ConfigUpdaterService).with_instance(
+        InstanceCollection::new(ConfigUpdaterService).with_instance(
             ConfigUpdaterService::ID,
             "config-updater",
             (),
@@ -1430,12 +1430,12 @@ mod tests {
     fn test_sandbox_service_after_commit() {
         let sandbox = SandboxBuilder::new()
             .with_services(vec![
-                ServiceInstances::new(TimestampingService).with_instance(
+                InstanceCollection::new(TimestampingService).with_instance(
                     TimestampingService::ID,
                     "timestamping",
                     (),
                 ),
-                ServiceInstances::new(AfterCommitService).with_instance(
+                InstanceCollection::new(AfterCommitService).with_instance(
                     AfterCommitService::ID,
                     "after-commit",
                     (),

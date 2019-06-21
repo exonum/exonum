@@ -423,7 +423,7 @@ mod tests {
     use std::{panic, sync::Mutex};
 
     use crate::{
-        blockchain::{Blockchain, ExecutionResult, Schema, ServiceInstances},
+        blockchain::{Blockchain, ExecutionResult, Schema, InstanceCollection},
         crypto,
         helpers::{generate_testnet_config, Height, ValidatorId},
         impl_service_dispatcher,
@@ -490,7 +490,7 @@ mod tests {
 
         Blockchain::new(
             TemporaryDB::new(),
-            vec![ServiceInstances::new(TxResultCheckService).with_instance(
+            vec![InstanceCollection::new(TxResultCheckService).with_instance(
                 TX_CHECK_RESULT_SERVICE_ID,
                 "tx-check-service",
                 (),

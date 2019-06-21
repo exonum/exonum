@@ -15,7 +15,7 @@
 // This is a regression test for exonum node.
 
 use exonum::{
-    blockchain::ServiceInstances,
+    blockchain::InstanceCollection,
     helpers, impl_service_dispatcher,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::rust::{AfterCommitContext, RustArtifactSpec, Service, ServiceFactory},
@@ -101,7 +101,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
         let node = Node::new(
             TemporaryDB::new(),
             vec![
-                ServiceInstances::new(CommitWatcherService(RefCell::new(Some(commit_tx))))
+                InstanceCollection::new(CommitWatcherService(RefCell::new(Some(commit_tx))))
                     .with_instance(2, "commit-watcher", ()),
             ],
             node_cfg,
@@ -149,7 +149,7 @@ fn test_node_restart_regression() {
                 Node::new(
                     db,
                     vec![
-                        ServiceInstances::new(StartCheckerServiceFactory(start_times))
+                        InstanceCollection::new(StartCheckerServiceFactory(start_times))
                             .with_instance(4, "startup-checker", ()),
                     ],
                     node_cfg,

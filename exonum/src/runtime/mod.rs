@@ -64,11 +64,11 @@ impl DeployStatus {
 }
 
 #[derive(Debug, Default)]
-pub struct ServiceConstructor {
+pub struct ServiceConfig {
     pub data: Any,
 }
 
-impl ServiceConstructor {
+impl ServiceConfig {
     pub fn new(data: impl BinaryValue) -> Self {
         let bytes = data.into_bytes();
 
@@ -83,8 +83,8 @@ impl ServiceConstructor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
-#[exonum(pb = "schema::runtime::ServiceInstanceSpec", crate = "crate")]
-pub struct ServiceInstanceSpec {
+#[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
+pub struct InstanceSpec {
     pub id: ServiceInstanceId,
     pub name: String,
     pub artifact: ArtifactSpec,
@@ -129,18 +129,18 @@ pub trait Runtime: Send + Debug + 'static {
     ) -> Result<DeployStatus, DeployError>;
 
     /// Starts a new service instance with the given specification.
-    fn start_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError>;
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
 
     /// Configures a service instance with the given parameters.
     fn configure_service(
         &self,
         context: &Fork,
-        spec: &ServiceInstanceSpec,
-        parameters: &ServiceConstructor,
+        spec: &InstanceSpec,
+        parameters: &ServiceConfig,
     ) -> Result<(), StartError>;
 
     /// Stops existing service instance with the given specification.
-    fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError>;
+    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
 
     /// Execute transaction.
     // TODO Do not use dispatcher struct directly.

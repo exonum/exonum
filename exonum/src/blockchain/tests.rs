@@ -18,7 +18,7 @@ use exonum_merkledb::{Database, Error as StorageError, ListIndex, ObjectHash, Te
 use futures::sync::mpsc;
 
 use crate::{
-    blockchain::{Blockchain, ExecutionResult, Schema, ServiceInstances},
+    blockchain::{Blockchain, ExecutionResult, Schema, InstanceCollection},
     crypto::gen_keypair,
     helpers::{generate_testnet_config, Height, ValidatorId},
     impl_service_dispatcher,
@@ -190,7 +190,7 @@ fn create_blockchain_with_service(
 
     Blockchain::new(
         TemporaryDB::new(),
-        vec![ServiceInstances::new(factory).with_instance(id, name, ())],
+        vec![InstanceCollection::new(factory).with_instance(id, name, ())],
         config.genesis,
         service_keypair,
         ApiSender::new(api_channel.0),

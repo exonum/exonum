@@ -39,7 +39,7 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
-    blockchain::{Blockchain, GenesisConfig, Schema, ServiceInstances, ValidatorKeys},
+    blockchain::{Blockchain, GenesisConfig, Schema, InstanceCollection, ValidatorKeys},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
@@ -75,7 +75,7 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 
 fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
-    services: Vec<ServiceInstances>,
+    services: Vec<InstanceCollection>,
 ) -> Blockchain {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
@@ -100,7 +100,7 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, P
 
 mod timestamping {
     use exonum::{
-        blockchain::{ExecutionResult, ServiceInstances},
+        blockchain::{ExecutionResult, InstanceCollection},
         crypto::Hash,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
@@ -153,7 +153,7 @@ mod timestamping {
         }
     }
 
-    impl From<Timestamping> for ServiceInstances {
+    impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
             Self::new(t).with_instance(TIMESTAMPING_SERVICE_ID, "timestamping", ())
         }
@@ -194,7 +194,7 @@ mod timestamping {
 
 mod cryptocurrency {
     use exonum::{
-        blockchain::{ExecutionError, ExecutionResult, ServiceInstances},
+        blockchain::{ExecutionError, ExecutionResult, InstanceCollection},
         crypto::PublicKey,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
@@ -303,7 +303,7 @@ mod cryptocurrency {
         }
     }
 
-    impl From<Cryptocurrency> for ServiceInstances {
+    impl From<Cryptocurrency> for InstanceCollection {
         fn from(t: Cryptocurrency) -> Self {
             Self::new(t).with_instance(CRYPTOCURRENCY_SERVICE_ID, "cryptocurrency", ())
         }
@@ -443,7 +443,7 @@ fn prepare_blockchain(
 fn execute_block_rocksdb(
     criterion: &mut Criterion,
     bench_name: &'static str,
-    service: impl Into<ServiceInstances>,
+    service: impl Into<InstanceCollection>,
     mut tx_generator: impl Iterator<Item = Signed<AnyTx>>,
 ) {
     let tempdir = TempDir::new("exonum").unwrap();

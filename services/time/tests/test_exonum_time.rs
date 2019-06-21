@@ -28,7 +28,7 @@ use exonum::{
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, ServiceInstances, TestKitApi, TestKitBuilder, TestNode};
+use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
     api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
     transactions::TxTime, TimeServiceFactory,
@@ -41,9 +41,9 @@ const INSTANCE_NAME: &str = "my-time";
 
 struct TimeServiceInstance;
 
-impl From<TimeServiceInstance> for ServiceInstances {
+impl From<TimeServiceInstance> for InstanceCollection {
     fn from(_: TimeServiceInstance) -> Self {
-        ServiceInstances::new(TimeServiceFactory::default()).with_instance(
+        InstanceCollection::new(TimeServiceFactory::default()).with_instance(
             INSTANCE_ID,
             INSTANCE_NAME,
             (),
@@ -319,7 +319,7 @@ fn test_mock_provider() {
     let mock_provider = MockTimeProvider::default();
     let mut testkit = TestKitBuilder::validator()
         .with_service(
-            ServiceInstances::new(TimeServiceFactory::with_provider(mock_provider.clone()))
+            InstanceCollection::new(TimeServiceFactory::with_provider(mock_provider.clone()))
                 .with_instance(INSTANCE_ID, INSTANCE_NAME, ()),
         )
         .create();

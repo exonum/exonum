@@ -33,7 +33,7 @@
 
 pub use self::{
     block::{Block, BlockProof},
-    builder::{BlockchainBuilder, ServiceInstances},
+    builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{Schema, TxLocation},
@@ -102,7 +102,7 @@ impl Blockchain {
     // TODO Write proper doc string. [ECR-3275]
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        services: impl IntoIterator<Item = ServiceInstances>,
+        services: impl IntoIterator<Item = InstanceCollection>,
         config: GenesisConfig,
         service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
@@ -111,7 +111,7 @@ impl Blockchain {
         let mut services = services.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         // Adds builtin configuration service.
         services.push(
-            ServiceInstances::new(ConfigurationServiceFactory).with_instance(
+            InstanceCollection::new(ConfigurationServiceFactory).with_instance(
                 ConfigurationServiceFactory::BUILTIN_ID,
                 ConfigurationServiceFactory::BUILTIN_NAME,
                 (),

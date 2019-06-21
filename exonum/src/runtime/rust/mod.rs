@@ -39,8 +39,8 @@ use crate::{
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConstructor,
-    ServiceInstanceSpec,
+    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConfig,
+    InstanceSpec,
 };
 
 #[macro_use]
@@ -217,7 +217,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn start_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
             .ok_or(StartError::WrongArtifact)?;
@@ -250,8 +250,8 @@ impl Runtime for RustRuntime {
     fn configure_service(
         &self,
         fork: &Fork,
-        spec: &ServiceInstanceSpec,
-        parameters: &ServiceConstructor,
+        spec: &InstanceSpec,
+        parameters: &ServiceConfig,
     ) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
@@ -273,7 +273,7 @@ impl Runtime for RustRuntime {
             .map_err(|e| StartError::ExecutionError(e))
     }
 
-    fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
             .ok_or(StartError::WrongArtifact)?;
