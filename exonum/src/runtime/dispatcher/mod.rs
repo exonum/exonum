@@ -156,7 +156,7 @@ impl Dispatcher {
             .map_err(|e| error!("Failed to request API restart: {}", e));
     }
 
-    // TODO Impement proper pending deploy logic [ECR-3291]
+    // TODO Implement proper pending deploy logic [ECR-3291]
     pub(crate) fn deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
         self.runtimes
             .get_mut(&artifact.runtime_id)
@@ -301,7 +301,7 @@ impl Action {
         match self {
             Action::BeginDeploy { artifact } => {
                 let status = dispatcher.deploy(&artifact)?;
-                // TODO Impement proper pending deploy logic [ECR-3291]
+                // TODO Implement proper pending deploy logic [ECR-3291]
                 if status.is_deployed() {
                     dispatcher.register_artifact(context.fork, artifact)?;
                 }
@@ -452,7 +452,7 @@ mod tests {
 
         fn after_commit(
             &self,
-            _dipsatcher: &Dispatcher,
+            _dispatcher: &Dispatcher,
             _snapshot: &dyn Snapshot,
             _service_keypair: &(PublicKey, SecretKey),
             _tx_sender: &ApiSender,

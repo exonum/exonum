@@ -158,10 +158,6 @@ impl InstanceCollection {
     }
 }
 
-impl<T: ServiceFactory> From<T> for InstanceCollection {
-    fn from(factory: T) -> Self { Self::new(factory) }
-}
-
 #[cfg(test)]
 mod tests {
     use exonum_merkledb::TemporaryDB;
@@ -194,7 +190,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "AlreadyDeployed")]
-    fn finalize_dublicate_services() {
+    fn finalize_duplicate_services() {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
 
