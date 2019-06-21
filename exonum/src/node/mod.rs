@@ -275,9 +275,9 @@ pub struct NodeConfig<T = SecretKey> {
     pub thread_pool_size: Option<u8>,
 }
 
-impl<T: Clone> NodeConfig<T> {
+impl NodeConfig<SecretKey> {
     /// Returns service keypair.
-    pub fn service_keypair(&self) -> (PublicKey, T) {
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
         (self.service_public_key, self.service_secret_key.clone())
     }
 }
