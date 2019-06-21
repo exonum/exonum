@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use self::dispatcher::Dispatcher;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
@@ -111,7 +112,7 @@ impl From<RustArtifactSpec> for ArtifactSpec {
     }
 }
 
-// TODO Think about environment methods' names. [ECR-3222]
+// TODO Think about runtime methods' names. [ECR-3222]
 
 /// Runtime environment for services.
 ///
@@ -133,7 +134,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// Configures a service instance with the given parameters.
     fn configure_service(
         &self,
-        context: &mut RuntimeContext,
+        context: &Fork,
         spec: &ServiceInstanceSpec,
         parameters: &ServiceConstructor,
     ) -> Result<(), StartError>;
@@ -142,8 +143,10 @@ pub trait Runtime: Send + Debug + 'static {
     fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError>;
 
     /// Execute transaction.
+    // TODO Do not use dispatcher struct directly.
     fn execute(
         &self,
+        dispatcher: &dispatcher::Dispatcher,
         context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
@@ -153,12 +156,13 @@ pub trait Runtime: Send + Debug + 'static {
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)>;
 
     /// Calls `before_commit` for all the services stored in the runtime.
-    fn before_commit(&self, fork: &mut Fork);
+    fn before_commit(&self, dispatcher: &dispatcher::Dispatcher, fork: &mut Fork);
 
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(
         &self,
+        dipsatcher: &dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,

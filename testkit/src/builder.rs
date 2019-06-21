@@ -19,7 +19,6 @@ pub use exonum::blockchain::ServiceInstances;
 use exonum::{
     crypto,
     helpers::ValidatorId,
-    runtime::{rust::ServiceFactory, ServiceConstructor, ServiceInstanceSpec},
 };
 use exonum_merkledb::TemporaryDB;
 

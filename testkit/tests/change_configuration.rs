@@ -23,6 +23,7 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
 #[test]
+#[ignore = "Implement new configuration change logic [ECR-3285]"]
 fn test_following_config() {
     let mut testkit = TestKitBuilder::validator().create();
     let cfg_change_height = Height(10);
@@ -48,6 +49,7 @@ fn test_following_config() {
 }
 
 #[test]
+#[ignore = "Implement new configuration change logic [ECR-3285]"]
 fn test_configuration_and_rollbacks() {
     let mut testkit = TestKitBuilder::validator().create();
     testkit.create_blocks_until(Height(5));

@@ -28,6 +28,7 @@ use crate::{
         crypto::{Hash, PublicKey, SecretKey},
         messages::CallInfo,
     },
+    messages::AnyTx,
 };
 
 use super::{
@@ -38,7 +39,7 @@ use super::{
 
 mod schema;
 
-pub(crate) struct Dispatcher {
+pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn Runtime>>,
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
     inner_requests_tx: mpsc::Sender<InternalRequest>,
@@ -156,7 +157,7 @@ impl Dispatcher {
     }
 
     // TODO Impement proper pending deploy logic [ECR-3291]
-    fn deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
+    pub(crate) fn deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
         self.runtimes
             .get_mut(&artifact.runtime_id)
             .ok_or(DeployError::WrongRuntime)
@@ -164,7 +165,11 @@ impl Dispatcher {
     }
 
     /// Registers deployed artifact in the dispatcher's information schema.
-    fn register_artifact(&self, fork: &Fork, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    pub(crate) fn register_artifact(
+        &self,
+        fork: &Fork,
+        artifact: ArtifactSpec,
+    ) -> Result<(), DeployError> {
         Schema::new(fork).add_deployed_artifact(artifact)
     }
 
@@ -188,12 +193,12 @@ impl Dispatcher {
 
     /// Starts and configures a new service instance. After that it writes information about
     /// service instance to the dispatcher's information schema.
-    fn start_service(
+    pub(crate) fn start_service(
         &mut self,
         context: &mut RuntimeContext,
         spec: ServiceInstanceSpec,
         constructor: &ServiceConstructor,
-    ) -> Result<(), StartError> {        
+    ) -> Result<(), StartError> {
         // Check that service doesn't use existing identifiers.
         if self.identifier_exists(spec.id) {
             return Err(StartError::ServiceIdExists);
@@ -206,7 +211,7 @@ impl Dispatcher {
                 runtime.start_service(&spec)?;
                 // Tries to configure a started instance of the service, otherwise it stops.
                 runtime
-                    .configure_service(context, &spec, constructor)
+                    .configure_service(context.fork, &spec, constructor)
                     .or_else(|_| runtime.stop_service(&spec))?; // TODO Should we emit panic if revert failed? [ECR-3222]
                 Ok(())
             })?;
@@ -216,8 +221,23 @@ impl Dispatcher {
         Ok(())
     }
 
+    /// Executes transaction. // TODO documentation [ECR-3275]
     pub(crate) fn execute(
         &mut self,
+        context: &mut RuntimeContext,
+        transaction: &AnyTx,
+    ) -> Result<(), ExecutionError> {
+        self.call(context, transaction.call_info, &transaction.payload)?;
+        // Executes pending dispatcher actions.
+        context
+            .take_dispatcher_actions()
+            .into_iter()
+            .try_for_each(|action| action.execute(self, context))
+    }
+
+    /// Calls the corresponding runtime method.
+    pub(crate) fn call(
+        &self,
         context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
@@ -232,12 +252,8 @@ impl Dispatcher {
         }
 
         if let Some(runtime) = self.runtimes.get(&runtime_id.unwrap()) {
-            runtime.execute(context, call_info, payload)?;
-            // Executes pending dispatcher actions.
-            context
-                .take_dispatcher_actions()
-                .into_iter()
-                .try_for_each(|action| action.execute(self, context))
+            runtime.execute(self, context, call_info, payload)?;
+            Ok(())
         } else {
             Err(ExecutionError::with_description(
                 WRONG_RUNTIME,
@@ -248,7 +264,7 @@ impl Dispatcher {
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (_, runtime) in &self.runtimes {
-            runtime.before_commit(fork);
+            runtime.before_commit(self, fork);
         }
     }
 
@@ -259,7 +275,7 @@ impl Dispatcher {
         tx_sender: &ApiSender,
     ) {
         self.runtimes.values().for_each(|runtime| {
-            runtime.after_commit(snapshot.as_ref(), &service_keypair, &tx_sender)
+            runtime.after_commit(self, snapshot.as_ref(), &service_keypair, &tx_sender)
         });
     }
 }
@@ -403,7 +419,7 @@ mod tests {
 
         fn configure_service(
             &self,
-            _context: &mut RuntimeContext,
+            _fork: &Fork,
             spec: &ServiceInstanceSpec,
             _parameters: &ServiceConstructor,
         ) -> Result<(), StartError> {
@@ -416,6 +432,7 @@ mod tests {
 
         fn execute(
             &self,
+            _: &Dispatcher,
             _: &mut RuntimeContext,
             call_info: CallInfo,
             _: &[u8],
@@ -431,10 +448,11 @@ mod tests {
             vec![]
         }
 
-        fn before_commit(&self, _: &mut Fork) {}
+        fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
 
         fn after_commit(
             &self,
+            _dipsatcher: &Dispatcher,
             _snapshot: &dyn Snapshot,
             _service_keypair: &(PublicKey, SecretKey),
             _tx_sender: &ApiSender,
@@ -523,8 +541,12 @@ mod tests {
 
         let mut fork = db.fork();
         // Register artifacts
-        dispatcher.register_artifact(&fork, sample_rust_spec.clone()).unwrap();
-        dispatcher.register_artifact(&fork, sample_java_spec.clone()).unwrap();
+        dispatcher
+            .register_artifact(&fork, sample_rust_spec.clone())
+            .unwrap();
+        dispatcher
+            .register_artifact(&fork, sample_java_spec.clone())
+            .unwrap();
         // Check if we can init services.
         let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
 
@@ -556,7 +578,7 @@ mod tests {
         let tx_payload = [0x00_u8; 1];
 
         dispatcher
-            .execute(
+            .call(
                 &mut context,
                 CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
@@ -564,7 +586,7 @@ mod tests {
             .expect("Correct tx rust");
 
         dispatcher
-            .execute(
+            .call(
                 &mut context,
                 CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
@@ -572,7 +594,7 @@ mod tests {
             .expect_err("Incorrect tx rust");
 
         dispatcher
-            .execute(
+            .call(
                 &mut context,
                 CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
@@ -580,7 +602,7 @@ mod tests {
             .expect("Correct tx java");
 
         dispatcher
-            .execute(
+            .call(
                 &mut context,
                 CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
@@ -644,7 +666,7 @@ mod tests {
         let tx_payload = [0x00_u8; 1];
 
         dispatcher
-            .execute(
+            .call(
                 &mut context,
                 CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,

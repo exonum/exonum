@@ -379,13 +379,13 @@ impl Blockchain {
 
         fork.flush();
 
-        let tx = signed_tx.payload();
+        let transaction = signed_tx.payload();
         let catch_result = {
             let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 let author = signed_tx.author();
                 let mut context = RuntimeContext::new(fork, author, tx_hash);
-                dispatcher.execute(&mut context, tx.call_info.clone(), tx.payload.as_ref())
+                dispatcher.execute(&mut context, transaction)
             }))
         };
 
@@ -410,7 +410,7 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                error!("{:?} transaction execution panicked: {:?}", transaction, err);
 
                 Err(TransactionError::from_panic(&err))
             }

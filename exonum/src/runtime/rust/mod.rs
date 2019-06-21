@@ -249,7 +249,7 @@ impl Runtime for RustRuntime {
 
     fn configure_service(
         &self,
-        runtime_context: &mut RuntimeContext,
+        fork: &Fork,
         spec: &ServiceInstanceSpec,
         parameters: &ServiceConstructor,
     ) -> Result<(), StartError> {
@@ -269,14 +269,7 @@ impl Runtime for RustRuntime {
             .ok_or(StartError::NotStarted)?;
         service_instance
             .as_ref()
-            .configure(
-                TransactionContext {
-                    service_descriptor: service_instance.descriptor(),
-                    runtime_context,
-                    runtime: self,
-                },
-                &parameters.data,
-            )
+            .configure(service_instance.descriptor(), fork, &parameters.data)
             .map_err(|e| StartError::ExecutionError(e))
     }
 
@@ -295,6 +288,7 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
+        dispatcher: &super::dispatcher::Dispatcher,
         runtime_context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
@@ -307,7 +301,7 @@ impl Runtime for RustRuntime {
                 TransactionContext {
                     service_descriptor: service_instance.descriptor(),
                     runtime_context,
-                    runtime: self,
+                    dispatcher,
                 },
                 payload,
             )
@@ -323,11 +317,11 @@ impl Runtime for RustRuntime {
             .collect()
     }
 
-    fn before_commit(&self, fork: &mut Fork) {
+    fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {
         for service in self.started_services.values() {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 service.as_ref().before_commit(TransactionContext {
-                    runtime: self,
+                    dispatcher,
                     runtime_context: &mut RuntimeContext::without_author(fork),
                     service_descriptor: service.descriptor(),
                 })
@@ -349,6 +343,7 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
+        _dispatcher: &super::dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
@@ -380,7 +375,7 @@ impl Runtime for RustRuntime {
 pub struct TransactionContext<'a, 'b> {
     service_descriptor: ServiceDescriptor<'a>,
     runtime_context: &'a mut RuntimeContext<'b>,
-    runtime: &'a RustRuntime,
+    dispatcher: &'a super::dispatcher::Dispatcher,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
@@ -411,8 +406,8 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        self.runtime
-            .execute(self.runtime_context, call_info, payload)
+        self.dispatcher
+            .call(self.runtime_context, call_info, payload)
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {

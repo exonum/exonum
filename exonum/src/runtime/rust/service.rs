@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use failure::Error;
 use protobuf::well_known_types::Any;
 
@@ -40,7 +40,12 @@ pub trait ServiceDispatcher: Send {
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    fn configure(&self, _context: TransactionContext, _params: &Any) -> Result<(), ExecutionError> {
+    fn configure(
+        &self,
+        _descriptor: ServiceDescriptor,
+        _fork: &Fork,
+        _params: &Any,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
