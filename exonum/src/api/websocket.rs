@@ -137,7 +137,16 @@ pub enum Notification {
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).
 #[derive(Message, Debug)]
-pub(crate) struct Message(pub String);
+pub(crate) enum Message {
+    /// This message will send data to a client.
+    Data(String),
+    /// This message will terminate a client session.
+    Close,
+}
+
+/// This message will terminate server.
+#[derive(Message)]
+pub(crate) struct Terminate;
 
 #[derive(Message)]
 #[rtype(u64)]
@@ -202,10 +211,27 @@ impl Server {
                 .insert(id, addr.clone());
         });
     }
+
+    fn disconnect_all(&mut self) {
+        for (_, subscriber) in self.subscribers.iter_mut() {
+            for recipient in subscriber.values_mut() {
+                if let Err(err) = recipient.do_send(Message::Close) {
+                    debug!("Can't send Close message to a websocket client: {:?}", err);
+                }
+            }
+            subscriber.clear();
+        }
+        self.subscribers.clear();
+    }
 }
 
 impl Actor for Server {
     type Context = Context<Self>;
+
+    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
+        self.disconnect_all();
+        Running::Stop
+    }
 }
 
 impl Handler<Subscribe> for Server {
@@ -330,6 +356,14 @@ impl Handler<Transaction> for Server {
     }
 }
 
+impl Handler<Terminate> for Server {
+    type Result = ();
+
+    fn handle(&mut self, _msg: Terminate, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
+    }
+}
+
 impl Server {
     fn broadcast_message<T>(&mut self, sub_type: SubscriptionType, data: &T)
     where
@@ -341,7 +375,7 @@ impl Server {
             .or_insert_with(HashMap::new)
             .iter()
             .for_each(|(_, addr)| {
-                let _ = addr.do_send(Message(serialized.clone()));
+                let _ = addr.do_send(Message::Data(serialized.clone()));
             });
     }
 }
@@ -432,7 +466,17 @@ impl Handler<Message> for Session {
     type Result = ();
 
     fn handle(&mut self, msg: Message, ctx: &mut Self::Context) {
-        ctx.text(msg.0);
+        match msg {
+            Message::Data(x) => ctx.text(x),
+            Message::Close => {
+                ctx.close(Some(ws::CloseReason {
+                    code: ws::CloseCode::Normal,
+                    description: Some("node shutdown".into()),
+                }));
+                ctx.stop();
+                ctx.terminate();
+            }
+        }
     }
 }
 
