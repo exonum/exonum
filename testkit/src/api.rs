@@ -17,7 +17,7 @@
 pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
-use reqwest::{Client, Response, StatusCode};
+use reqwest::{Client, Response, StatusCode, RequestBuilder as ReqwestBuilder};
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{self, Display};
@@ -120,6 +120,8 @@ impl TestKitApi {
     }
 }
 
+type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + 'b>;
+
 /// An HTTP requests builder. This type can be used to send requests to
 /// the appropriate `TestKitApi` handlers.
 pub struct RequestBuilder<'a, 'b, Q = ()>
@@ -131,6 +133,7 @@ where
     access: ApiAccess,
     prefix: String,
     query: Option<&'b Q>,
+    modifier: Option<ReqwestModifier<'b>>,
 }
 
 impl<'a, 'b, Q> fmt::Debug for RequestBuilder<'a, 'b, Q>
@@ -162,6 +165,7 @@ where
             access,
             prefix,
             query: None,
+            modifier: None,
         }
     }
 
@@ -173,12 +177,28 @@ where
             access: self.access,
             prefix: self.prefix.clone(),
             query: Some(query),
+            modifier: None,
+        }
+    }
+
+    /// Allows to modify a request before sending it by executing a provided closure.
+    pub fn with<F>(&self, f: F) -> Self
+    where
+        F: Fn(ReqwestBuilder) -> ReqwestBuilder + 'b,
+    {
+        RequestBuilder {
+            test_server_url: self.test_server_url.clone(),
+            test_client: self.test_client,
+            access: self.access,
+            prefix: self.prefix.clone(),
+            query: self.query,
+            modifier: Some(Box::new(f)),
         }
     }
 
     /// Sends a get request to the testing API endpoint and decodes response as
     /// the corresponding type.
-    pub fn get<R>(&self, endpoint: &str) -> api::Result<R>
+    pub fn get<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -203,17 +223,17 @@ where
 
         trace!("GET {}", url);
 
-        let response = self
-            .test_client
-            .get(&url)
-            .send()
-            .expect("Unable to send request");
+        let mut builder = self.test_client.get(&url);
+        if let Some(modifier) = self.modifier {
+            builder = modifier(builder);
+        }
+        let response = builder.send().expect("Unable to send request");
         Self::response_to_api_result(response)
     }
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
-    pub fn post<R>(&self, endpoint: &str) -> api::Result<R>
+    pub fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -228,12 +248,15 @@ where
         trace!("POST {}", url);
 
         let builder = self.test_client.post(&url);
-        let builder = if let Some(ref query) = self.query.as_ref() {
+        let mut builder = if let Some(ref query) = self.query.as_ref() {
             trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
             builder.json(query)
         } else {
             builder.json(&serde_json::Value::Null)
         };
+        if let Some(modifier) = self.modifier {
+            builder = modifier(builder);
+        }
         let response = builder.send().expect("Unable to send request");
         Self::response_to_api_result(response)
     }
@@ -267,7 +290,7 @@ where
                 trace!("Body: {}", body);
                 serde_json::from_str(&body).expect("Unable to deserialize body")
             }),
-            StatusCode::FORBIDDEN => Err(api::Error::Unauthorized),
+            StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(api::Error::Unauthorized),
             StatusCode::BAD_REQUEST => Err(api::Error::BadRequest(error(response))),
             StatusCode::NOT_FOUND => Err(api::Error::NotFound(error(response))),
             s if s.is_server_error() => Err(api::Error::InternalError(format_err!(
