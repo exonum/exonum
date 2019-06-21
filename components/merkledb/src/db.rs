@@ -762,12 +762,6 @@ where
     }
 }
 
-impl<T: Database> From<T> for Box<dyn Database> {
-    fn from(db: T) -> Self {
-        Box::<T>::new(db) as Self
-    }
-}
-
 impl fmt::Debug for dyn Database {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Database").finish()
