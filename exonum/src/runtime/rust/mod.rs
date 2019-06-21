@@ -13,7 +13,7 @@
 // limitations under the License.
 
 pub use self::service::{
-    AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction,
+    AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction, TransactionContext,
 };
 pub use crate::messages::ServiceInstanceId;
 
@@ -343,15 +343,19 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
-        _dispatcher: &super::dispatcher::Dispatcher,
+        dispatcher: &super::dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
-            let context =
-                AfterCommitContext::new(service.descriptor(), snapshot, service_keypair, tx_sender);
-            service.as_ref().after_commit(context);
+            service.as_ref().after_commit(AfterCommitContext::new(
+                dispatcher,
+                service.descriptor(),
+                snapshot,
+                service_keypair,
+                tx_sender,
+            ));
         }
     }
 
@@ -366,52 +370,6 @@ impl Runtime for RustRuntime {
                 (service_instance.name.clone(), builder)
             })
             .collect()
-    }
-}
-
-// TODO move to service module [ECR-3222]
-
-#[derive(Debug)]
-pub struct TransactionContext<'a, 'b> {
-    service_descriptor: ServiceDescriptor<'a>,
-    runtime_context: &'a mut RuntimeContext<'b>,
-    dispatcher: &'a super::dispatcher::Dispatcher,
-}
-
-impl<'a, 'b> TransactionContext<'a, 'b> {
-    pub fn service_id(&self) -> ServiceInstanceId {
-        self.service_descriptor.service_id()
-    }
-
-    pub fn service_name(&self) -> &str {
-        self.service_descriptor.service_name()
-    }
-
-    pub fn fork(&self) -> &Fork {
-        self.runtime_context.fork
-    }
-
-    pub fn tx_hash(&self) -> Hash {
-        self.runtime_context.tx_hash
-    }
-
-    pub fn author(&self) -> PublicKey {
-        self.runtime_context.author
-    }
-
-    // TODO Should we support the ability to call other service from the rust runtime during
-    // the transaction execution?
-    pub fn dispatch_call(
-        &mut self,
-        call_info: CallInfo,
-        payload: &[u8],
-    ) -> Result<(), ExecutionError> {
-        self.dispatcher
-            .call(self.runtime_context, call_info, payload)
-    }
-
-    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.runtime_context.dispatch_action(action)
     }
 }
 

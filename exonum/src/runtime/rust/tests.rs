@@ -58,17 +58,17 @@ struct TxB {
 
 #[service_interface(exonum(crate = "crate"))]
 trait TestService {
-    fn method_a(&self, ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
-    fn method_b(&self, ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
+    fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
+    fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
 pub struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
-    fn method_a(&self, mut ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
+    fn method_a(&self, mut context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
         {
-            let fork = ctx.fork() as &Fork;
+            let fork = context.fork() as &Fork;
             let mut entry = Entry::new("method_a_entry", fork);
             entry.set(arg.value);
         }
@@ -80,13 +80,13 @@ impl TestService for TestServiceImpl {
             method_id: 1,
         };
         let payload = TxB { value: arg.value }.into_bytes();
-        ctx.dispatch_call(call_info, &payload)
+        context.call(call_info, &payload)
             .expect("Failed to dispatch call");
         Ok(())
     }
 
-    fn method_b(&self, ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
-        let fork = ctx.fork() as &Fork;
+    fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
+        let fork = context.fork() as &Fork;
         let mut entry = Entry::new("method_b_entry", fork);
         entry.set(arg.value);
         Ok(())
