@@ -19,7 +19,7 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix = "0.7.9"
+actix = "0.8.3"
 actix-net = "0.2.6"
 actix-web = { version = "0.7.18", default-features = false }
 log = "0.4.6"
