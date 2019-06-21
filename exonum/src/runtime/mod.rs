@@ -162,7 +162,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(
         &self,
-        dipsatcher: &dispatcher::Dispatcher,
+        dispatcher: &dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,

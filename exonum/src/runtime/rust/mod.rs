@@ -39,8 +39,8 @@ use crate::{
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConfig,
-    InstanceSpec,
+    ArtifactSpec, DeployStatus, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
+    ServiceConfig,
 };
 
 #[macro_use]

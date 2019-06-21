@@ -23,7 +23,7 @@ use crate::{
         dispatcher::Action,
         error::ExecutionError,
         rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ServiceConfig, InstanceSpec,
+        InstanceSpec, ServiceConfig,
     },
 };
 

@@ -28,7 +28,7 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, InstanceCollection,
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema,
         SharedNodeState, StoredConfiguration, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},

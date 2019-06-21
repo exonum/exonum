@@ -33,8 +33,8 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, ServiceConfig, ServiceInstanceId,
-    InstanceSpec,
+    ArtifactSpec, DeployStatus, InstanceSpec, Runtime, RuntimeContext, ServiceConfig,
+    ServiceInstanceId,
 };
 
 mod schema;

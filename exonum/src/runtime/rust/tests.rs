@@ -25,7 +25,7 @@ use crate::{
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        DeployStatus, RuntimeContext, ServiceConfig, InstanceSpec,
+        DeployStatus, InstanceSpec, RuntimeContext, ServiceConfig,
     },
 };
 
@@ -80,7 +80,8 @@ impl TestService for TestServiceImpl {
             method_id: 1,
         };
         let payload = TxB { value: arg.value }.into_bytes();
-        context.call(call_info, &payload)
+        context
+            .call(call_info, &payload)
             .expect("Failed to dispatch call");
         Ok(())
     }
@@ -199,9 +200,7 @@ fn test_basic_rust_runtime() {
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
-        dispatcher
-            .call(&mut context, call_info, &payload)
-            .unwrap();
+        dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_a_entry", &fork);
@@ -224,9 +223,7 @@ fn test_basic_rust_runtime() {
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
-        dispatcher
-            .call(&mut context, call_info, &payload)
-            .unwrap();
+        dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_b_entry", &fork);

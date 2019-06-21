@@ -39,7 +39,7 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
-    blockchain::{Blockchain, GenesisConfig, Schema, InstanceCollection, ValidatorKeys},
+    blockchain::{Blockchain, GenesisConfig, InstanceCollection, Schema, ValidatorKeys},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},

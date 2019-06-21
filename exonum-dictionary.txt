@@ -34,6 +34,7 @@ cyclomatic
 datetime
 deadlinks
 decodable
+deployable
 deque
 deref
 deserialization
@@ -48,6 +49,7 @@ discriminants
 doctests
 emsp
 encodable
+errored
 Exonum
 exonumhub
 fsync
@@ -73,10 +75,10 @@ markdownlint
 memlimit
 memorydb
 mempool
-metadada
 Merkelized
 Merkle
 merkledb
+metadada
 middlewares
 millis
 mkdir
@@ -89,6 +91,7 @@ nacl
 nanos
 nodelay
 nonoptimal
+oneof
 oneshot
 openssl
 opslimit
@@ -137,6 +140,7 @@ rustup
 scalarmult
 scrypt
 seedable
+semver
 serde
 serializable
 serialize
@@ -190,5 +194,5 @@ whitelisted
 writeln
 xorshift
 xsalsa
-zeroize
 xsalsa
+zeroize

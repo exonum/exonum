@@ -26,7 +26,7 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        Runtime, ServiceConfig, InstanceSpec,
+        InstanceSpec, Runtime, ServiceConfig,
     },
 };
 

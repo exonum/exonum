@@ -18,7 +18,7 @@ use exonum_merkledb::{Database, Error as StorageError, ListIndex, ObjectHash, Te
 use futures::sync::mpsc;
 
 use crate::{
-    blockchain::{Blockchain, ExecutionResult, Schema, InstanceCollection},
+    blockchain::{Blockchain, ExecutionResult, InstanceCollection, Schema},
     crypto::gen_keypair,
     helpers::{generate_testnet_config, Height, ValidatorId},
     impl_service_dispatcher,

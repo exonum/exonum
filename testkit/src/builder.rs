@@ -16,10 +16,7 @@
 
 pub use exonum::blockchain::InstanceCollection;
 
-use exonum::{
-    crypto,
-    helpers::ValidatorId,
-};
+use exonum::{crypto, helpers::ValidatorId};
 use exonum_merkledb::TemporaryDB;
 
 use std::net::SocketAddr;

@@ -410,7 +410,10 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!("{:?} transaction execution panicked: {:?}", transaction, err);
+                error!(
+                    "{:?} transaction execution panicked: {:?}",
+                    transaction, err
+                );
 
                 Err(TransactionError::from_panic(&err))
             }

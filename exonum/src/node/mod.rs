@@ -50,7 +50,7 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, Schema, InstanceCollection, SharedNodeState,
+        Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema, SharedNodeState,
         ValidatorKeys,
     },
     crypto::{self, read_keys_from_file, Hash, PublicKey, SecretKey},
@@ -1204,7 +1204,11 @@ mod tests {
 
         let mut node = Node::new(
             TemporaryDB::new(),
-            vec![InstanceCollection::new(TestService).with_instance(SERVICE_ID, "test-service", ())],
+            vec![InstanceCollection::new(TestService).with_instance(
+                SERVICE_ID,
+                "test-service",
+                (),
+            )],
             node_cfg,
             None,
         );

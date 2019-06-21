@@ -423,7 +423,7 @@ mod tests {
     use std::{panic, sync::Mutex};
 
     use crate::{
-        blockchain::{Blockchain, ExecutionResult, Schema, InstanceCollection},
+        blockchain::{Blockchain, ExecutionResult, InstanceCollection, Schema},
         crypto,
         helpers::{generate_testnet_config, Height, ValidatorId},
         impl_service_dispatcher,

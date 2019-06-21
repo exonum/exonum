@@ -15,7 +15,7 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema, InstanceCollection},
+    blockchain::{Blockchain, ExecutionError, ExecutionResult, InstanceCollection, Schema},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     impl_service_dispatcher,
