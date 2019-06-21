@@ -5,8 +5,8 @@
   "description": "JS dependencies for Exonum",
   "dependencies": {},
   "devDependencies": {
-    "cspell": "^3.2.10",
-    "markdownlint-cli": "^0.15.0"
+    "cspell": "^4.0.23",
+    "markdownlint-cli": "^0.17.0"
   },
   "scripts": {
     "cspell": "./cspell.sh",
