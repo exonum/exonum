@@ -108,7 +108,7 @@ impl Blockchain {
         api_sender: ApiSender,
         dispatcher_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        let mut services = services.into_iter().map(|x| x.into()).collect::<Vec<_>>();
+        let mut services = services.into_iter().collect::<Vec<_>>();
         // Adds builtin configuration service.
         services.push(
             InstanceCollection::new(ConfigurationServiceFactory).with_instance(
@@ -252,7 +252,7 @@ impl Blockchain {
 
         let msg = Message::sign_transaction(
             tx.service_transaction(),
-            service_id as u32,
+            u32::from(service_id),
             self.service_keypair.0,
             &self.service_keypair.1,
         );
