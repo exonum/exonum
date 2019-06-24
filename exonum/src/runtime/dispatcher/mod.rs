@@ -188,7 +188,7 @@ impl Dispatcher {
     }
 
     fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
-        id == CORE_ID as u32 || self.runtime_lookup.contains_key(&id)
+        id == u32::from(CORE_ID) || self.runtime_lookup.contains_key(&id)
     }
 
     /// Starts and configures a new service instance. After that it writes information about
@@ -263,7 +263,7 @@ impl Dispatcher {
     }
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
-        for (_, runtime) in &self.runtimes {
+        for runtime in self.runtimes.values() {
             runtime.before_commit(self, fork);
         }
     }
@@ -548,7 +548,7 @@ mod tests {
             .register_artifact(&fork, sample_java_spec.clone())
             .unwrap();
         // Check if we can init services.
-        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
+        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
 
         dispatcher
             .start_service(
@@ -645,7 +645,7 @@ mod tests {
 
         // Checks if we can start services.
         let mut fork = db.fork();
-        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
+        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
 
         assert_eq!(
             dispatcher

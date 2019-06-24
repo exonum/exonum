@@ -89,7 +89,7 @@ impl ConfigurationServiceImpl {
             return None;
         }
 
-        let id = service_ids.iter().count() as u32 + 1; // TODO O(n) optimize
+        let id = service_ids.iter().count() as u32 + 2; // TODO O(n) optimize
         service_ids.put(instance_name, id);
 
         Some(id)

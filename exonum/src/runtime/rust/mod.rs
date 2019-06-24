@@ -270,7 +270,7 @@ impl Runtime for RustRuntime {
         service_instance
             .as_ref()
             .configure(service_instance.descriptor(), fork, &parameters.data)
-            .map_err(|e| StartError::ExecutionError(e))
+            .map_err(StartError::ExecutionError)
     }
 
     fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
