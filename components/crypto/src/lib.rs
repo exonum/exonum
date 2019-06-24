@@ -31,23 +31,17 @@ pub use self::crypto_impl::{
 pub use self::crypto_lib::sodiumoxide::x25519;
 pub use self::utils::{generate_keys_file, read_keys_from_file};
 
-use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Duration, Utc};
-use rust_decimal::Decimal;
+use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     Serialize, Serializer,
 };
-use uuid::Uuid;
 
 use std::{
     default::Default,
     fmt,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
-    time::{SystemTime, UNIX_EPOCH},
 };
-
-use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -173,17 +167,6 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 pub fn hash(data: &[u8]) -> Hash {
     let dig = crypto_impl::hash(data);
     Hash(dig)
-}
-
-/// A common trait for the ability to compute a cryptographic hash.
-#[deprecated(note = "Use exonum_merkledb::ObjectHash instead")]
-pub trait CryptoHash {
-    /// Returns a hash of the value.
-    ///
-    /// The hashing strategy must satisfy the basic requirements of cryptographic hashing:
-    /// equal values must have the same hash and not equal values must have different hashes
-    /// (except for negligible probability).
-    fn hash(&self) -> Hash;
 }
 
 /// Initializes the cryptographic backend.
@@ -507,171 +490,6 @@ impl Default for Hash {
     }
 }
 
-impl CryptoHash for Hash {
-    fn hash(&self) -> Hash {
-        *self
-    }
-}
-
-impl CryptoHash for bool {
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
-    }
-}
-
-impl CryptoHash for u8 {
-    fn hash(&self) -> Hash {
-        hash(&[*self])
-    }
-}
-
-impl CryptoHash for u16 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_u16(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u32 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_u32(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u64 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_u64(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u128 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 16];
-        LittleEndian::write_u128(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i8 {
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
-    }
-}
-
-impl CryptoHash for i16 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_i16(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i32 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_i32(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i64 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_i64(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i128 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 16];
-        LittleEndian::write_i128(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for () {
-    fn hash(&self) -> Hash {
-        Hash(crypto_impl::EMPTY_SLICE_HASH)
-    }
-}
-
-impl CryptoHash for PublicKey {
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
-}
-
-impl CryptoHash for Vec<u8> {
-    fn hash(&self) -> Hash {
-        hash(self)
-    }
-}
-
-impl CryptoHash for String {
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
-}
-
-impl CryptoHash for SystemTime {
-    fn hash(&self) -> Hash {
-        let duration = self
-            .duration_since(UNIX_EPOCH)
-            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
-        let secs = duration.as_secs();
-        let nanos = duration.subsec_nanos();
-
-        let mut buffer = [0_u8; 12];
-        LittleEndian::write_u64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        hash(&buffer)
-    }
-}
-
-impl CryptoHash for DateTime<Utc> {
-    fn hash(&self) -> Hash {
-        let secs = self.timestamp();
-        let nanos = self.timestamp_subsec_nanos();
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        buffer.hash()
-    }
-}
-
-// TODO: think about move it anywhere (ECR-2217).
-impl CryptoHash for Duration {
-    fn hash(&self) -> Hash {
-        let secs = self.num_seconds();
-        let nanos_as_duration = *self - Self::seconds(secs);
-        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_i32(&mut buffer[8..12], nanos);
-        buffer.hash()
-    }
-}
-
-impl CryptoHash for Uuid {
-    fn hash(&self) -> Hash {
-        hash(self.as_bytes())
-    }
-}
-
-impl CryptoHash for Decimal {
-    fn hash(&self) -> Hash {
-        hash(&self.serialize())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -679,6 +497,12 @@ mod tests {
     use serde::de::DeserializeOwned;
 
     use hex::FromHex;
+
+    /// Hash of an empty slice.
+    const EMPTY_SLICE_HASH: crate::crypto_impl::Hash = crate::crypto_impl::Hash([
+        227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65,
+        228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85,
+    ]);
 
     #[test]
     fn to_from_hex_hash() {
@@ -772,7 +596,7 @@ mod tests {
     fn range_sodium() {
         let h = hash(&[]);
         let sub_range = &h[10..20];
-        assert_eq!(&crypto_impl::EMPTY_SLICE_HASH[10..20], sub_range);
+        assert_eq!(&EMPTY_SLICE_HASH[10..20], sub_range);
     }
 
     #[test]
@@ -813,7 +637,7 @@ mod tests {
 
     #[test]
     fn empty_slice_hash() {
-        assert_eq!(Hash(super::crypto_impl::EMPTY_SLICE_HASH), hash(&[]));
+        assert_eq!(Hash(EMPTY_SLICE_HASH), hash(&[]));
     }
 
     fn assert_serialize_deserialize<T>(original_value: &T)

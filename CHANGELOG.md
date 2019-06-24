@@ -111,6 +111,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
     `(bits_len + 7) / 8` bytes.
 
+#### exonum-crypto
+
+- Removed deprecated `CryptoHash` trait, use `exonum-merkledb::ObjectHash` instad (#1361)
+
 ### New features
 
 #### exonum

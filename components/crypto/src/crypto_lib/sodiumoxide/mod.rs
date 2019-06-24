@@ -73,12 +73,6 @@ pub const SEED_LENGTH: usize = ed25519::SEEDBYTES;
 /// Number of bytes in a signature.
 pub const SIGNATURE_LENGTH: usize = ed25519::SIGNATUREBYTES;
 
-/// Hash of an empty slice.
-pub const EMPTY_SLICE_HASH: Hash = Hash([
-    227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228,
-    100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85,
-]);
-
 /// Initializes the sodium library and automatically selects faster versions
 /// of the primitives, if possible.
 pub fn init() -> bool {
