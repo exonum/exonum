@@ -134,7 +134,7 @@ impl<T> Signed<T> {
 
     /// Returns a signature of the message.
     pub fn signature(&self) -> Signature {
-        self.message.signature().clone()
+        *self.message.signature()
     }
 }
 

@@ -983,10 +983,7 @@ impl StoppedTestKit {
     ///
     /// Note that `services` may differ from the vector of services initially passed to
     /// the `TestKit` (which is also what may happen with real Exonum apps).
-    pub fn resume(
-        self,
-        services: Vec<ServiceInstances>,
-    ) -> TestKit {
+    pub fn resume(self, services: Vec<ServiceInstances>) -> TestKit {
         unimplemented!();
         // let genesis = {
         //     let snapshot = self.db.snapshot();

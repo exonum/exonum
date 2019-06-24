@@ -138,7 +138,7 @@ impl RustArtifactSpec {
         }
     }
 
-    pub fn into_pb_any(&self) -> Any {
+    pub fn into_pb_any(self) -> Any {
         let mut any = Any::new();
         any.set_value(self.to_bytes());
         any
@@ -263,7 +263,7 @@ impl Runtime for RustRuntime {
                 },
                 &parameters.data,
             )
-            .map_err(|e| StartError::ExecutionError(e))
+            .map_err(StartError::ExecutionError)
     }
 
     fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {

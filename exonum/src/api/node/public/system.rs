@@ -105,8 +105,8 @@ impl SystemApi {
 
     fn handle_list_services_info(
         self,
-        name: &'static str,
-        api_scope: &mut ServiceApiScope,
+        _name: &'static str,
+        _api_scope: &mut ServiceApiScope,
     ) -> Self {
         // TODO rewrite this method with new API.
 

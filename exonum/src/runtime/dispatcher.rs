@@ -163,7 +163,7 @@ impl Dispatcher {
     }
 
     pub fn before_commit(&self, fork: &mut Fork) {
-        for (_, runtime) in &self.runtimes {
+        for runtime in self.runtimes.values() {
             runtime.before_commit(fork);
         }
     }
@@ -516,8 +516,8 @@ mod tests {
         );
 
         // Check if we can init services.
-        let mut fork = db.fork();
-        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
+        let fork = db.fork();
+        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
 
         dispatcher
             .start_service(
@@ -611,8 +611,8 @@ mod tests {
         );
 
         // Checks if we can start services.
-        let mut fork = db.fork();
-        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
+        let fork = db.fork();
+        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
 
         assert_eq!(
             dispatcher
