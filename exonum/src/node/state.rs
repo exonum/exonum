@@ -139,11 +139,11 @@ pub struct ProposeState {
 }
 
 /// State of a block.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
-    patch: Patch,
+    patch: Option<Patch>,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
 }
@@ -340,7 +340,7 @@ impl BlockState {
     pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
         Self {
             hash,
-            patch,
+            patch: Some(patch),
             txs,
             proposer_id,
         }
@@ -352,8 +352,8 @@ impl BlockState {
     }
 
     /// Returns the changes that should be made for block committing.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    pub fn patch(&mut self) -> Patch {
+        self.patch.take().unwrap()
     }
 
     /// Returns block's transactions.
@@ -783,6 +783,10 @@ impl State {
         self.blocks.get(hash)
     }
 
+    pub fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
+        self.blocks.get_mut(hash)
+    }
+
     /// Updates mode's round.
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
@@ -971,7 +975,7 @@ impl State {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => Some(e.insert(BlockState {
                 hash: block_hash,
-                patch,
+                patch: Some(patch),
                 txs,
                 proposer_id,
             })),

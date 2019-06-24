@@ -139,7 +139,10 @@ impl<T: Database> CheckpointDbInner<T> {
         // NB: make sure that **both** the db and the journal
         // are updated atomically.
         let snapshot = self.db.snapshot();
-        self.db.merge(patch.clone())?;
+
+        //TODO revert
+        return Ok(());
+        //self.db.merge(patch.clone())?;
         let rev_fork = self.db.fork();
 
         // Reverse a patch to get a backup patch.
@@ -220,7 +223,7 @@ mod tests {
         use std::iter::FromIterator;
 
         let mut patch_set: BTreeSet<(&str, _, _)> = BTreeSet::new();
-        for (name, changes) in patch.iter() {
+        for (name, changes) in patch.changes.iter() {
             for (key, value) in changes.iter() {
                 patch_set.insert((name, key.clone(), OrdChange::from(value)));
             }

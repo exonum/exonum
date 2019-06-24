@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::{
+    fmt,
     cell::RefCell,
     cmp::Ordering::{Equal, Greater, Less},
     collections::{
@@ -143,7 +144,7 @@ impl IntoIterator for Changes {
 /// the blockchain, changes are first collected into a patch and then applied to
 /// the storage.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub struct Patch2 {
     changes: HashMap<String, Changes>,
 }
 
@@ -269,57 +270,6 @@ impl WorkingPatch {
     }
 }
 
-impl Patch {
-    /// Creates a new empty `Patch` instance.
-    fn new() -> Self {
-        Self {
-            changes: HashMap::new(),
-        }
-    }
-
-    /// Returns iterator over changes.
-    pub fn iter(&self) -> HmIter<String, Changes> {
-        self.changes.iter()
-    }
-
-    /// Returns the number of changes.
-    pub fn len(&self) -> usize {
-        self.changes
-            .iter()
-            .fold(0, |acc, (_, changes)| acc + changes.data.len())
-    }
-
-    /// Returns `true` if this patch contains no changes and `false` otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Produces a patch that would reverse the effects of this patch for a given
-    /// snapshot.
-    pub fn undo(self, snapshot: &dyn Snapshot) -> Self {
-        let mut rev_patch = Self::new();
-
-        for (name, changes) in self {
-            let rev_changes = BTreeMap::from_iter(changes.into_iter().map(|(key, ..)| {
-                match snapshot.get(&name, &key) {
-                    Some(value) => (key, Change::Put(value)),
-                    None => (key, Change::Delete),
-                }
-            }));
-
-            rev_patch.changes.insert(
-                name,
-                Changes {
-                    data: rev_changes,
-                    prefixes_to_remove: vec![],
-                },
-            );
-        }
-
-        rev_patch
-    }
-}
-
 /// Iterator over the `Patch` data.
 #[derive(Debug)]
 pub struct PatchIterator {
@@ -391,13 +341,20 @@ pub enum Change {
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
 pub struct Fork {
-    flushed: FlushedFork,
+    patch: Patch,
     working_patch: WorkingPatch,
 }
 
-pub struct FlushedFork {
+#[derive(Debug)]
+pub struct Patch {
     snapshot: Box<dyn Snapshot>,
-    patch: Patch,
+    pub changes: HashMap<String, Changes>,
+}
+
+impl fmt::Debug for Box<dyn Snapshot> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Snapshot")
+    }
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
@@ -455,9 +412,9 @@ pub trait Database: Send + Sync + 'static {
     /// Creates a new fork of the database from its current state.
     fn fork(&self) -> Fork {
         Fork {
-            flushed: FlushedFork {
+            patch: Patch {
                 snapshot: self.snapshot(),
-                patch: Patch::new(),
+                changes: HashMap::new(),
             },
             working_patch: WorkingPatch::new(),
         }
@@ -496,7 +453,7 @@ pub trait Database: Send + Sync + 'static {
 ///
 /// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
 /// to a full key (a string column family name + key as an array of bytes within the family).
-pub trait Snapshot: 'static {
+pub trait Snapshot: Send + Sync + 'static {
     /// Returns a value corresponding to the specified key as a raw vector of bytes,
     /// or `None` if it does not exist.
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>>;
@@ -524,9 +481,9 @@ pub trait Iterator {
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
-impl Snapshot for FlushedFork {
+impl Snapshot for Patch {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(changes) = self.patch.changes.get(name) {
+        if let Some(changes) = self.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(ref v) => return Some(v.clone()),
@@ -538,7 +495,7 @@ impl Snapshot for FlushedFork {
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        if let Some(changes) = self.patch.changes.get(name) {
+        if let Some(changes) = self.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(..) => return true,
@@ -551,7 +508,7 @@ impl Snapshot for FlushedFork {
 
     fn iter(&self, name: &str, from: &[u8]) -> Iter {
         let range = (Included(from), Unbounded);
-        let changes = match self.patch.changes.get(name) {
+        let changes = match self.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
             None => None,
         };
@@ -564,12 +521,20 @@ impl Snapshot for FlushedFork {
 }
 
 impl Fork {
+
+    pub fn from_patch(patch: Patch) -> Self {
+        Self {
+            patch,
+            working_patch: WorkingPatch::new(),
+        }
+    }
+
     /// Finalizes all changes that were made after previous execution of the `flush` method.
     /// If no `flush` method had been called before, finalizes all changes that were
     /// made after creation of `Fork`.
     pub fn flush(&mut self) {
         let working_patch = mem::replace(&mut self.working_patch, WorkingPatch::new());
-        working_patch.merge_into(&mut self.flushed.patch);
+        working_patch.merge_into(&mut self.patch);
     }
 
     /// Rolls back all changes that were made after the latest execution
@@ -581,7 +546,7 @@ impl Fork {
     /// Converts the fork into `Patch` consuming the fork instance.
     pub fn into_patch(mut self) -> Patch {
         self.flush();
-        self.flushed.patch
+        self.patch
     }
 
     /// Merges a patch from another fork to this fork.
@@ -596,13 +561,13 @@ impl Fork {
         assert!(!self.is_dirty(), "cannot merge a dirty fork");
 
         for (name, changes) in patch {
-            if let Some(in_changes) = self.flushed.patch.changes.get_mut(&name) {
+            if let Some(in_changes) = self.patch.changes.get_mut(&name) {
                 in_changes.data.extend(changes.into_iter());
                 continue;
             }
 
             {
-                self.flushed.patch.changes.insert(name.to_owned(), changes);
+                self.patch.changes.insert(name.to_owned(), changes);
             }
         }
     }
@@ -622,7 +587,7 @@ impl<'a> IndexAccess for &'a Fork {
     type Changes = ChangesRef<'a>;
 
     fn snapshot(&self) -> &dyn Snapshot {
-        &self.flushed
+        &self.patch
     }
 
     fn changes(&self, address: &IndexAddress) -> Self::Changes {
@@ -632,7 +597,7 @@ impl<'a> IndexAccess for &'a Fork {
 
 impl AsRef<dyn Snapshot> for Fork {
     fn as_ref(&self) -> &dyn Snapshot {
-        &self.flushed
+        &self.patch
     }
 }
 

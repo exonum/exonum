@@ -16,7 +16,7 @@ use exonum_crypto::Hash;
 
 use crate::{
     Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, SparseListIndex,
-    ValueSetIndex,
+    ValueSetIndex, TemporaryDB, Database,
 };
 
 // This should compile to ensure ?Sized bound on `new_in_family` (see #1024).
@@ -31,4 +31,14 @@ fn should_compile() {
     let _: ProofMapIndex<_, Hash, ()> = ProofMapIndex::new_in_family("", "", &fork);
     let _: SparseListIndex<_, ()> = SparseListIndex::new_in_family("", "", &fork);
     let _: ValueSetIndex<_, ()> = ValueSetIndex::new_in_family("", "", &fork);
+}
+
+#[test]
+fn fork_from_patch() {
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let patch = fork.into_patch();
+
+    let fork = Fork::from_patch(patch);
 }

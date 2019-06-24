@@ -455,7 +455,7 @@ impl Blockchain {
     /// for each service in the increasing order of their identifiers.
     pub fn commit<I>(
         &mut self,
-        patch: &Patch,
+        patch: Patch,
         block_hash: Hash,
         precommits: I,
     ) -> Result<(), failure::Error>
@@ -464,9 +464,8 @@ impl Blockchain {
     {
         let patch = {
             let fork = {
-                let mut fork = self.db.fork();
-                fork.merge(patch.clone()); // FIXME: Avoid cloning here. (ECR-1631)
-                fork
+                Fork::from_patch(patch)
+    //               fork.merge(patch.clone()); // FIXME: Avoid cloning here. (ECR-1631)
             };
 
             {
