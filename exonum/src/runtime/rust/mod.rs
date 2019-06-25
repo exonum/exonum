@@ -17,12 +17,10 @@ pub use self::service::{
 };
 pub use crate::messages::ServiceInstanceId;
 
-use exonum_merkledb::{BinaryValue, Error as StorageError, Fork, Snapshot};
-use protobuf::well_known_types::Any;
+use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
 use semver::Version;
 
 use std::{
-    borrow::Cow,
     collections::{HashMap, HashSet},
     fmt, panic,
     str::FromStr,
@@ -33,13 +31,12 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
     node::ApiSender,
-    proto::schema,
 };
 
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
+    ArtifactId, DeployStatus, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
     ServiceConfig,
 };
 
@@ -50,20 +47,20 @@ pub mod tests;
 
 #[derive(Debug, Default)]
 pub struct RustRuntime {
-    available_artifacts: HashMap<RustArtifactSpec, Box<dyn ServiceFactory>>,
-    deployed_artifacts: HashSet<RustArtifactSpec>,
-    started_services: HashMap<ServiceInstanceId, ServiceInstance>,
+    available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
+    deployed_artifacts: HashSet<RustArtifactId>,
+    started_services: HashMap<ServiceInstanceId, Instance>,
     started_services_by_name: HashMap<String, ServiceInstanceId>,
 }
 
 #[derive(Debug)]
-struct ServiceInstance {
+struct Instance {
     id: ServiceInstanceId,
     name: String,
     service: Box<dyn Service>,
 }
 
-impl ServiceInstance {
+impl Instance {
     pub fn new(id: ServiceInstanceId, name: String, service: Box<dyn Service>) -> Self {
         Self { id, name, service }
     }
@@ -80,13 +77,13 @@ impl ServiceInstance {
     }
 }
 
-impl AsRef<dyn Service + 'static> for ServiceInstance {
+impl AsRef<dyn Service + 'static> for Instance {
     fn as_ref(&self) -> &(dyn Service + 'static) {
         self.service.as_ref()
     }
 }
 
-impl AsMut<dyn Service + 'static> for ServiceInstance {
+impl AsMut<dyn Service + 'static> for Instance {
     fn as_mut(&mut self) -> &mut (dyn Service + 'static) {
         self.service.as_mut()
     }
@@ -99,21 +96,17 @@ impl RustRuntime {
         Self::default()
     }
 
-    fn parse_artifact(&self, artifact: &ArtifactSpec) -> Option<RustArtifactSpec> {
+    fn parse_artifact(&self, artifact: &ArtifactId) -> Option<RustArtifactId> {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return None;
         }
-
-        let rust_artifact_spec: RustArtifactSpec =
-            BinaryValue::from_bytes(Cow::Borrowed(&artifact.raw)).ok()?;
-
-        Some(rust_artifact_spec)
+        artifact.name.parse().ok()
     }
 
-    fn add_started_service(&mut self, descriptor: ServiceInstance) {
+    fn add_started_service(&mut self, instance: Instance) {
         self.started_services_by_name
-            .insert(descriptor.name.clone(), descriptor.id);
-        self.started_services.insert(descriptor.id, descriptor);
+            .insert(instance.name.clone(), instance.id);
+        self.started_services.insert(instance.id, instance);
     }
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
@@ -137,35 +130,37 @@ impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
-#[exonum(pb = "schema::runtime::RustArtifactSpec", crate = "crate")]
-pub struct RustArtifactSpec {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RustArtifactId {
     pub name: String,
     pub version: Version,
 }
 
-impl RustArtifactSpec {
+impl RustArtifactId {
     pub fn new(name: &str, major: u64, minor: u64, patch: u64) -> Self {
         Self {
             name: name.to_owned(),
             version: Version::new(major, minor, patch),
         }
     }
+}
 
-    pub fn into_pb_any(&self) -> Any {
-        let mut any = Any::new();
-        any.set_value(self.to_bytes());
-        any
+impl From<RustArtifactId> for ArtifactId {
+    fn from(inner: RustArtifactId) -> Self {
+        ArtifactId {
+            runtime_id: RustRuntime::ID as u32,
+            name: inner.to_string(),
+        }
     }
 }
 
-impl fmt::Display for RustArtifactSpec {
+impl fmt::Display for RustArtifactId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}/{}", self.name, self.version)
     }
 }
 
-impl FromStr for RustArtifactSpec {
+impl FromStr for RustArtifactId {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -184,7 +179,7 @@ impl FromStr for RustArtifactSpec {
 }
 
 impl Runtime for RustRuntime {
-    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
+    fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
         let artifact = self
             .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
@@ -203,7 +198,7 @@ impl Runtime for RustRuntime {
 
     fn check_deploy_status(
         &self,
-        artifact: &ArtifactSpec,
+        artifact: &ArtifactId,
         _cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         let artifact = self
@@ -243,7 +238,7 @@ impl Runtime for RustRuntime {
             .get(&artifact)
             .unwrap()
             .new_instance();
-        self.add_started_service(ServiceInstance::new(spec.id, spec.name.clone(), service));
+        self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
         Ok(())
     }
 
@@ -373,18 +368,18 @@ impl Runtime for RustRuntime {
     }
 }
 
-/// Creates `RustArtifactSpec` by using `CARGO_PKG_NAME` and `CARGO_PKG_VERSION`
+/// Creates `RustArtifactId` by using `CARGO_PKG_NAME` and `CARGO_PKG_VERSION`
 /// variables.
 #[macro_export]
 macro_rules! artifact_spec_from_crate {
     () => {
         concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))
-            .parse::<$crate::runtime::rust::RustArtifactSpec>()
+            .parse::<$crate::runtime::rust::RustArtifactId>()
             .unwrap()
     };
 }
 
 #[test]
-fn parse_artifact_spec_correct() {
-    RustArtifactSpec::from_str("my-service/1.0.0").unwrap();
+fn parse_artifact_id_correct() {
+    RustArtifactId::from_str("my-service/1.0.0").unwrap();
 }

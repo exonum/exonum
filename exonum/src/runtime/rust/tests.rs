@@ -32,7 +32,7 @@ use crate::{
 use super::{
     dispatcher::Dispatcher,
     service::{Service, ServiceFactory},
-    ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext,
+    ArtifactId, RustArtifactId, RustRuntime, TransactionContext,
 };
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
@@ -117,8 +117,8 @@ impl Service for TestServiceImpl {
 struct TestServiceFactory;
 
 impl ServiceFactory for TestServiceFactory {
-    fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
+        RustArtifactId {
             name: "test_service".to_owned(),
             version: Version::new(0, 1, 0),
         }
@@ -137,7 +137,7 @@ fn test_basic_rust_runtime() {
     let mut runtime = RustRuntime::new();
 
     let service_factory = Box::new(TestServiceFactory);
-    let artifact: ArtifactSpec = service_factory.artifact().into();
+    let artifact: ArtifactId = service_factory.artifact().into();
     runtime.add_service_factory(service_factory);
 
     // Create dummy dispatcher.
@@ -177,7 +177,7 @@ fn test_basic_rust_runtime() {
         let mut fork = db.fork();
         let address = PublicKey::zero();
         let tx_hash = Hash::zero();
-        let mut context = RuntimeContext::new(&mut fork, address, tx_hash);
+        let mut context = RuntimeContext::new(&fork, address, tx_hash);
 
         dispatcher
             .start_service(&mut context, spec, &constructor)
@@ -199,7 +199,7 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let mut fork = db.fork();
-        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
+        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
         dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {

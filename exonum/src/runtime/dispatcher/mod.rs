@@ -33,7 +33,7 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactSpec, DeployStatus, InstanceSpec, Runtime, RuntimeContext, ServiceConfig,
+    ArtifactId, DeployStatus, InstanceSpec, Runtime, RuntimeContext, ServiceConfig,
     ServiceInstanceId,
 };
 
@@ -47,7 +47,9 @@ pub struct Dispatcher {
 
 impl std::fmt::Debug for Dispatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("Dispatcher").finish()
+        f.debug_struct("Dispatcher")
+            .field("runtimes", &self.runtimes)
+            .finish()
     }
 }
 
@@ -71,8 +73,8 @@ impl Dispatcher {
     pub fn restore_state(&mut self, snapshot: impl IndexAccess) {
         let schema = Schema::new(snapshot);
         // Restores information about the deployed services.
-        for (raw, runtime_id) in &schema.deployed_artifacts() {
-            let artifact = ArtifactSpec { raw, runtime_id };
+        for (name, runtime_id) in &schema.deployed_artifacts() {
+            let artifact = ArtifactId { name, runtime_id };
             let status = self
                 .deploy(&artifact)
                 .expect("Unable to restore deployed artifacts");
@@ -120,7 +122,7 @@ impl Dispatcher {
 
     pub fn check_deploy_status(
         &self,
-        artifact: &ArtifactSpec,
+        artifact: &ArtifactId,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         self.runtimes
@@ -157,7 +159,7 @@ impl Dispatcher {
     }
 
     // TODO Implement proper pending deploy logic [ECR-3291]
-    pub(crate) fn deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
+    pub(crate) fn deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
         self.runtimes
             .get_mut(&artifact.runtime_id)
             .ok_or(DeployError::WrongRuntime)
@@ -168,7 +170,7 @@ impl Dispatcher {
     pub(crate) fn register_artifact(
         &self,
         fork: &Fork,
-        artifact: ArtifactSpec,
+        artifact: ArtifactId,
     ) -> Result<(), DeployError> {
         Schema::new(fork).add_deployed_artifact(artifact)
     }
@@ -284,7 +286,7 @@ impl Dispatcher {
 #[derive(Debug)]
 pub enum Action {
     BeginDeploy {
-        artifact: ArtifactSpec,
+        artifact: ArtifactId,
     },
     StartService {
         spec: InstanceSpec,
@@ -381,7 +383,7 @@ mod tests {
     }
 
     impl Runtime for SampleRuntime {
-        fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
+        fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(DeployStatus::Deployed)
             } else {
@@ -391,7 +393,7 @@ mod tests {
 
         fn check_deploy_status(
             &self,
-            artifact: &ArtifactSpec,
+            artifact: &ArtifactId,
             _: bool,
         ) -> Result<DeployStatus, DeployError> {
             if artifact.runtime_id == self.runtime_type {
@@ -508,13 +510,13 @@ mod tests {
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
-        let sample_rust_spec = ArtifactSpec {
+        let sample_rust_spec = ArtifactId {
             runtime_id: SampleRuntimes::First as u32,
-            raw: vec![1],
+            name: "first".into(),
         };
-        let sample_java_spec = ArtifactSpec {
+        let sample_java_spec = ArtifactId {
             runtime_id: SampleRuntimes::Second as u32,
-            raw: vec![2],
+            name: "second".into(),
         };
 
         // Check deploy.
@@ -539,7 +541,7 @@ mod tests {
             DeployStatus::Deployed
         );
 
-        let mut fork = db.fork();
+        let fork = db.fork();
         // Register artifacts
         dispatcher
             .register_artifact(&fork, sample_rust_spec.clone())
@@ -623,10 +625,7 @@ mod tests {
             .with_runtime(RuntimeIdentifier::Rust as u32, RustRuntime::default())
             .finalize();
 
-        let sample_rust_spec = ArtifactSpec {
-            runtime_id: RuntimeIdentifier::Rust as u32,
-            raw: Vec::default(),
-        };
+        let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo");
 
         // Check deploy.
         assert_eq!(
@@ -644,7 +643,7 @@ mod tests {
         );
 
         // Checks if we can start services.
-        let mut fork = db.fork();
+        let fork = db.fork();
         let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
 
         assert_eq!(

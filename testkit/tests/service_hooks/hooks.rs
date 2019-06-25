@@ -19,7 +19,7 @@ use exonum::{
     helpers::Height,
     impl_service_dispatcher,
     runtime::{
-        rust::{AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory, TransactionContext},
         ServiceInstanceId,
     },
 };
@@ -90,7 +90,7 @@ impl Service for AfterCommitService {
 impl_service_dispatcher!(AfterCommitService, AfterCommitInterface);
 
 impl ServiceFactory for AfterCommitService {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         "after-commit/1.0.0".parse().unwrap()
     }
 

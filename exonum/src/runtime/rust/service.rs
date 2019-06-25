@@ -28,11 +28,11 @@ use crate::{
     runtime::{
         dispatcher::{self, Dispatcher},
         error::ExecutionError,
-        ArtifactSpec, DeployError, DeployStatus, RuntimeContext,
+        ArtifactId, DeployError, DeployStatus, RuntimeContext,
     },
 };
 
-use super::RustArtifactSpec;
+use super::RustArtifactId;
 
 pub trait ServiceDispatcher: Send {
     fn call(
@@ -66,7 +66,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 }
 
 pub trait ServiceFactory: Send + Debug + 'static {
-    fn artifact(&self) -> RustArtifactSpec;
+    fn artifact(&self) -> RustArtifactId;
     fn new_instance(&self) -> Box<dyn Service>;
 }
 
@@ -215,7 +215,7 @@ impl<'a> AfterCommitContext<'a> {
     // TODO implement pending deployment logic [ECR-3291]
     pub(crate) fn _check_deploy_status(
         &self,
-        artifact: &ArtifactSpec,
+        artifact: &ArtifactId,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError> {
         self.dispatcher

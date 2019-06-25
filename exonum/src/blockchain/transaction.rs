@@ -430,9 +430,7 @@ mod tests {
         messages::ServiceInstanceId,
         node::ApiSender,
         proto::schema::tests::TestServiceTx,
-        runtime::rust::{
-            RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext,
-        },
+        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
     };
 
     use super::*;
@@ -470,8 +468,8 @@ mod tests {
     impl Service for TxResultCheckService {}
 
     impl ServiceFactory for TxResultCheckService {
-        fn artifact(&self) -> RustArtifactSpec {
-            RustArtifactSpec {
+        fn artifact(&self) -> RustArtifactId {
+            RustArtifactId {
                 name: "tx_result_check_service".into(),
                 version: Version::new(1, 0, 0),
             }

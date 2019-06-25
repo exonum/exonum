@@ -22,7 +22,7 @@ use crate::{
     runtime::{
         dispatcher::Action,
         error::ExecutionError,
-        rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
+        rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         InstanceSpec, ServiceConfig,
     },
 };
@@ -45,8 +45,8 @@ pub const DEPLOY_METHOD_ID: MethodId = 3;
 pub const INIT_METHOD_ID: MethodId = 4;
 
 /// Constant artifact spec.
-pub fn artifact_spec() -> RustArtifactSpec {
-    RustArtifactSpec {
+pub fn artifact_spec() -> RustArtifactId {
+    RustArtifactId {
         name: "core.config".to_owned(),
         version: semver::Version::new(0, 1, 0),
     }
@@ -177,8 +177,9 @@ impl ConfigurationService for ConfigurationServiceImpl {
     ) -> Result<(), ExecutionError> {
         info!("Deploying service. {:?}", arg);
 
-        let artifact = arg.get_artifact_spec();
-        context.dispatch_action(Action::BeginDeploy { artifact });
+        context.dispatch_action(Action::BeginDeploy {
+            artifact: arg.artifact,
+        });
         // TODO add result into deployable (to check deploy status in before_commit).
         Ok(())
     }
@@ -188,8 +189,6 @@ impl ConfigurationService for ConfigurationServiceImpl {
         mut context: TransactionContext,
         arg: transactions::Init,
     ) -> Result<(), ExecutionError> {
-        let artifact = arg.get_artifact_spec();
-
         let instance_id = self
             .assign_service_id(context.fork(), &arg.instance_name)
             .ok_or(ServiceError::ServiceInstanceNameInUse)?;
@@ -202,7 +201,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         let spec = InstanceSpec {
             id: instance_id,
             name: arg.instance_name,
-            artifact,
+            artifact: arg.artifact,
         };
 
         let constructor = ServiceConfig {
@@ -230,7 +229,7 @@ impl ConfigurationServiceFactory {
 }
 
 impl ServiceFactory for ConfigurationServiceFactory {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         artifact_spec()
     }
 

@@ -19,7 +19,7 @@ use exonum::{
     helpers::Height,
     impl_service_dispatcher,
     runtime::{
-        rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
+        rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ServiceInstanceId,
     },
 };
@@ -208,7 +208,7 @@ impl Service for CurrencyService {
 }
 
 impl ServiceFactory for CurrencyService {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         "cryptocurrency/1.0.0".parse().unwrap()
     }
 

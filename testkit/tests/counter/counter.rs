@@ -21,7 +21,7 @@ use exonum::{
     impl_service_dispatcher,
     messages::{AnyTx, Signed},
     runtime::{
-        rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
+        rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ServiceInstanceId,
     },
 };
@@ -186,7 +186,7 @@ impl Service for CounterService {
 }
 
 impl ServiceFactory for CounterService {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         "counter-service/1.0.0".parse().unwrap()
     }
 

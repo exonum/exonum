@@ -42,7 +42,7 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
     impl_service_dispatcher,
-    runtime::rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory},
+    runtime::rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
 };
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use protobuf::well_known_types::Any;
@@ -85,7 +85,7 @@ impl Service for TimestampingService {
 }
 
 impl ServiceFactory for TimestampingService {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         exonum::artifact_spec_from_crate!()
     }
 

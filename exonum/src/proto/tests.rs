@@ -14,14 +14,12 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
-use semver::Version;
+use exonum_merkledb::BinaryValue;
 
 use std::{borrow::Cow, collections::HashMap};
 
-use super::schema;
-use super::ProtobufConvert;
+use super::{schema, ProtobufConvert};
 use crate::crypto::{self, Hash, PublicKey, Signature};
-use exonum_merkledb::BinaryValue;
 
 #[test]
 fn test_hash_pb_convert() {
@@ -266,17 +264,6 @@ fn test_struct_with_maps_roundtrip() {
     let bytes = map_struct.to_bytes();
     let struct_encode_round_trip = StructWithMaps::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, map_struct);
-}
-
-#[test]
-fn test_version_pb_convert() {
-    let version = Version::parse("1.2.3-alpha2").unwrap();
-
-    let pb_version = version.to_pb();
-    assert_eq!(pb_version.get_data(), "1.2.3-alpha2");
-
-    let version_round_trip: Version = ProtobufConvert::from_pb(pb_version).unwrap();
-    assert_eq!(version_round_trip, version);
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert)]

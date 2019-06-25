@@ -17,6 +17,7 @@ pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use protobuf::well_known_types::Any;
+use serde_derive::{Deserialize, Serialize};
 
 use std::fmt::Debug;
 
@@ -28,10 +29,7 @@ use crate::{
     proto::schema,
 };
 
-use self::{
-    error::{DeployError, ExecutionError, StartError},
-    rust::RustArtifactSpec,
-};
+use self::error::{DeployError, ExecutionError, StartError};
 
 #[macro_use]
 pub mod rust;
@@ -82,32 +80,34 @@ impl ServiceConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
     pub id: ServiceInstanceId,
     pub name: String,
-    pub artifact: ArtifactSpec,
+    pub artifact: ArtifactId,
 }
 
+// TODO Replace by more convienent solution [ECR-3222]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum RuntimeIdentifier {
     Rust = 0,
     Java = 1,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
-#[exonum(pb = "schema::runtime::ArtifactSpec", crate = "crate")]
-pub struct ArtifactSpec {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
+pub struct ArtifactId {
     pub runtime_id: u32,
-    pub raw: Vec<u8>,
+    pub name: String,
 }
 
-impl From<RustArtifactSpec> for ArtifactSpec {
-    fn from(artifact: RustArtifactSpec) -> Self {
-        ArtifactSpec {
-            runtime_id: RuntimeIdentifier::Rust as u32,
-            raw: artifact.into_bytes(),
+impl ArtifactId {
+    /// Creates a new artifact identifier from the given runtime id and name.
+    pub fn new(runtime_id: u32, name: impl Into<String>) -> Self {
+        Self {
+            runtime_id,
+            name: name.into(),
         }
     }
 }
@@ -119,12 +119,12 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
     /// Begins deploy artifact with the given specification.
-    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError>;
+    fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError>;
 
     /// Checks deployment status.
     fn check_deploy_status(
         &self,
-        artifact: &ArtifactSpec,
+        artifact: &ArtifactId,
         cancel_if_not_complete: bool,
     ) -> Result<DeployStatus, DeployError>;
 

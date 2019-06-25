@@ -26,21 +26,13 @@ message AnyTx {
   bytes payload = 2;
 }
 
-// Semver version
-message Version { string data = 1; }
-
-message RustArtifactSpec {
-  string name = 1;
-  Version version = 2;
-}
-
-message ArtifactSpec {
+message ArtifactId {
   uint32 runtime_id = 1;
-  bytes raw = 2;
+  string name = 2;
 }
 
 message InstanceSpec {
   uint32 id = 1;
   string name = 2;
-  ArtifactSpec artifact = 3;
+  ArtifactId artifact = 3;
 }

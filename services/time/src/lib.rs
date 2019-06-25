@@ -45,7 +45,7 @@ use exonum::{
     crypto::Hash,
     impl_service_dispatcher,
     runtime::rust::{
-        AfterCommitContext, RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory,
+        AfterCommitContext, RustArtifactId, Service, ServiceDescriptor, ServiceFactory,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -113,7 +113,7 @@ impl Default for TimeServiceFactory {
 }
 
 impl ServiceFactory for TimeServiceFactory {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         exonum::artifact_spec_from_crate!()
     }
 

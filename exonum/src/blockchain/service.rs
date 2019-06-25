@@ -540,6 +540,13 @@ impl SharedNodeState {
             })
         }
     }
+
+    pub(crate) fn shutdown_broadcast_server(&self) {
+        let state = self.state.read().expect("Expected read lock");
+        if let Some(server) = state.broadcast_server_address.as_ref() {
+            server.do_send(websocket::Terminate);
+        }
+    }
 }
 
 impl<'a, S: Service> From<S> for Box<dyn Service + 'a> {

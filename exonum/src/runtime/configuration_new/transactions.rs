@@ -22,7 +22,7 @@ use crate::{
     crypto::{Hash, PublicKey},
     node::State,
     proto,
-    runtime::ArtifactSpec,
+    runtime::ArtifactId,
 };
 
 use super::{
@@ -140,7 +140,7 @@ pub fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool 
     votes_count >= majority_count
 }
 
-fn get_service_config(config: &StoredConfiguration) -> ConfigurationServiceConfig {
+fn get_service_config(_config: &StoredConfiguration) -> ConfigurationServiceConfig {
     unimplemented!()
 }
 
@@ -356,35 +356,14 @@ impl VotingContext {
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
 #[exonum(pb = "proto::schema::configuration::DeployTx", crate = "crate")]
 pub struct Deploy {
-    pub runtime_id: u32,
+    pub artifact: ArtifactId,
     pub activation_height: u64,
-    pub artifact_spec: Any,
-}
-
-fn artifact_spec_from_any(runtime_id: u32, artifact_spec: &Any) -> ArtifactSpec {
-    ArtifactSpec {
-        runtime_id,
-        raw: artifact_spec.get_value().to_vec(),
-    }
-}
-
-impl Deploy {
-    pub fn get_artifact_spec(&self) -> ArtifactSpec {
-        artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
 #[exonum(pb = "proto::schema::configuration::InitTx", crate = "crate")]
 pub struct Init {
-    pub runtime_id: u32,
-    pub artifact_spec: Any,
+    pub artifact: ArtifactId,
     pub instance_name: String,
     pub constructor_data: Any,
-}
-
-impl Init {
-    pub fn get_artifact_spec(&self) -> ArtifactSpec {
-        artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
-    }
 }

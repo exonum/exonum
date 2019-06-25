@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{IndexAccess, ProofMapIndex};
 
-use super::{ArtifactSpec, DeployError, InstanceSpec, StartError};
+use super::{ArtifactId, DeployError, InstanceSpec, StartError};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -29,8 +29,8 @@ impl<T: IndexAccess> Schema<T> {
         Self { access }
     }
 
-    /// Set of deployed artifacts: Key is raw spec, Value is runtime identifier.
-    pub fn deployed_artifacts(&self) -> ProofMapIndex<T, Vec<u8>, u32> {
+    /// Set of deployed artifacts: Key is artifact name, Value is runtime identifier.
+    pub fn deployed_artifacts(&self) -> ProofMapIndex<T, String, u32> {
         ProofMapIndex::new("core.dispatcher.deployed_artifacts", self.access.clone())
     }
 
@@ -41,14 +41,14 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds artifact specification to the set of deployed artifacts.
-    pub fn add_deployed_artifact(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    pub fn add_deployed_artifact(&mut self, artifact: ArtifactId) -> Result<(), DeployError> {
         // Checks that we have not already deployed this artifact.
-        if self.deployed_artifacts().contains(&artifact.raw) {
+        if self.deployed_artifacts().contains(&artifact.name) {
             return Err(DeployError::AlreadyDeployed);
         }
 
         self.deployed_artifacts()
-            .put(&artifact.raw, artifact.runtime_id);
+            .put(&artifact.name, artifact.runtime_id);
 
         Ok(())
     }
@@ -58,7 +58,7 @@ impl<T: IndexAccess> Schema<T> {
     pub fn add_started_service(&mut self, spec: InstanceSpec) -> Result<(), StartError> {
         let runtime_id = self
             .deployed_artifacts()
-            .get(&spec.artifact.raw)
+            .get(&spec.artifact.name)
             .ok_or(StartError::NotDeployed)?;
         // Checks that runtime identifier is proper in instance.
         if runtime_id != spec.artifact.runtime_id {

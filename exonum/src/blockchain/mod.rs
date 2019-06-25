@@ -54,7 +54,7 @@ use futures::sync::mpsc;
 
 use std::{
     collections::HashMap,
-    fmt, iter, mem, panic,
+    iter, mem, panic,
     sync::{Arc, Mutex, MutexGuard},
 };
 
@@ -89,6 +89,7 @@ pub const CORE_ID: u16 = 0;
 ///
 /// Only nodes with an identical set of services and genesis block can be combined
 /// into a single network.
+#[derive(Debug, Clone)]
 pub struct Blockchain {
     db: Arc<dyn Database>,
     #[doc(hidden)]
@@ -516,22 +517,5 @@ impl Blockchain {
 
         self.merge(fork.into_patch())
             .expect("Unable to save messages to the consensus cache");
-    }
-}
-
-impl fmt::Debug for Blockchain {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Blockchain(..)")
-    }
-}
-
-impl Clone for Blockchain {
-    fn clone(&self) -> Self {
-        Self {
-            db: Arc::clone(&self.db),
-            api_sender: self.api_sender.clone(),
-            service_keypair: self.service_keypair.clone(),
-            dispatcher: Arc::clone(&self.dispatcher),
-        }
     }
 }

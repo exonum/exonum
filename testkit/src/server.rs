@@ -164,9 +164,7 @@ mod tests {
         helpers::Height,
         impl_service_dispatcher,
         messages::{AnyTx, Signed},
-        runtime::rust::{
-            RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext,
-        },
+        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
     };
     use exonum_merkledb::ObjectHash;
 
@@ -214,7 +212,7 @@ mod tests {
     impl Service for SampleService {}
 
     impl ServiceFactory for SampleService {
-        fn artifact(&self) -> RustArtifactSpec {
+        fn artifact(&self) -> RustArtifactId {
             "sample-service/1.0.0".parse().unwrap()
         }
 

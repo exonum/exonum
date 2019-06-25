@@ -207,7 +207,7 @@ pub mod contracts {
         blockchain::ExecutionResult,
         impl_service_dispatcher,
         runtime::rust::{
-            RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
+            RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
         },
     };
 
@@ -297,7 +297,7 @@ pub mod contracts {
     }
 
     impl ServiceFactory for CryptocurrencyService {
-        fn artifact(&self) -> RustArtifactSpec {
+        fn artifact(&self) -> RustArtifactId {
             exonum::artifact_spec_from_crate!()
         }
 

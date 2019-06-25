@@ -24,7 +24,7 @@ use exonum::{
     blockchain::{ExecutionResult, Schema},
     crypto::gen_keypair,
     impl_service_dispatcher,
-    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
+    runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
@@ -66,7 +66,7 @@ impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 impl Service for TimestampingService {}
 
 impl ServiceFactory for TimestampingService {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         "timestamping/1.0.0".parse().unwrap()
     }
     fn new_instance(&self) -> Box<dyn Service> {
