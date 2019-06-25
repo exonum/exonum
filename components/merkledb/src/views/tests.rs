@@ -868,7 +868,7 @@ fn fork_from_patch() {
     }
 
     let patch = fork.into_patch();
-    let fork = Fork::from_patch(patch);
+    let fork = Fork::from_patch(patch, db.snapshot());
     {
         let index = ListIndex::new("index", &fork);
 

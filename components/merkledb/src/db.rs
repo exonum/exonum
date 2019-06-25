@@ -521,14 +521,17 @@ impl Snapshot for Patch {
 }
 
 impl Fork {
-    /// Creates a fork based on the provided `patch`.
+    /// Creates a fork based on the provided `patch` and `snapshot`.
     ///
     /// Note: using created fork to modify data already present in `patch` may lead
     /// to an inconsistent database state. Hence, this method is useful only if you
     /// are sure that the fork and `patch` interacted with different indices.
-    pub fn from_patch(patch: Patch) -> Self {
+    pub fn from_patch(patch: Patch, snapshot: Box<dyn Snapshot>) -> Self {
         Self {
-            patch,
+            patch: Patch {
+                changes: patch.changes,
+                snapshot,
+            },
             working_patch: WorkingPatch::new(),
         }
     }

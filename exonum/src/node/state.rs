@@ -353,7 +353,7 @@ impl BlockState {
 
     /// Returns the changes that should be made for block committing.
     pub fn patch(&mut self) -> Patch {
-        self.patch.take().unwrap()
+        self.patch.take().expect("Patch is already committed")
     }
 
     /// Returns block's transactions.
