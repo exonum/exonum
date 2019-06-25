@@ -1201,6 +1201,9 @@ impl FinalizeAuditorConfig {
             });
             peers
         } else {
+            // Waiting for waiting for state update.
+            thread::sleep_ms(node_cfg.api.state_update_timeout as u32);
+
             primary_cfg.add_auditor_request.validators_api.iter()
                 .filter_map(|api| Self::load_node_configuration(api, &primary_cfg.consensus_public_key, sys))
                 .map(|config| ConnectInfo {

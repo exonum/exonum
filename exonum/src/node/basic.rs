@@ -94,7 +94,7 @@ impl NodeHandler {
         }
 
         if !self.state.connect_list().is_peer_allowed(&public_key) {
-            error!(
+            warn!(
                 "Received connect message from {:?} peer which not in ConnectList.",
                 public_key
             );

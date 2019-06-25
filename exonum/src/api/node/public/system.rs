@@ -19,7 +19,7 @@ use crate::blockchain::{Schema, SharedNodeState, GenesisConfig};
 use crate::helpers::user_agent;
 use crate::crypto::PublicKey;
 use exonum_merkledb::DbOptions;
-use crate::node::{NodeConfig, MemoryPoolConfig, ConnectListConfig, AuditorConfig};
+use crate::node::{NodeConfig, MemoryPoolConfig, ConnectListConfig, AuditorConfig, NodeApiConfig};
 use std::path::PathBuf;
 use crate::events::NetworkConfiguration;
 use std::collections::btree_map::BTreeMap;
@@ -78,6 +78,8 @@ pub struct KeyInfo {
 /// Shared configuration
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct SharedConfiguration {
+    /// Api configuration.
+    pub api: NodeApiConfig,
     /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,
     /// Remote Network address used by this node.
@@ -106,6 +108,7 @@ impl SharedConfiguration {
     /// Create new shared configuration.
     pub fn new(config: NodeConfig<PathBuf>) -> SharedConfiguration {
         SharedConfiguration {
+            api: config.api,
             genesis: config.genesis,
             external_address: config.external_address,
             network: config.network,
