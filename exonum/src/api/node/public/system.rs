@@ -14,9 +14,16 @@
 
 //! Public system API.
 
-use crate::api::{ServiceApiScope, ServiceApiState};
-use crate::blockchain::{Schema, SharedNodeState};
+use crate::api::{Error as ApiError, ServiceApiScope, ServiceApiState};
+use crate::blockchain::{Schema, SharedNodeState, GenesisConfig};
 use crate::helpers::user_agent;
+use crate::crypto::PublicKey;
+use exonum_merkledb::DbOptions;
+use crate::node::{NodeConfig, MemoryPoolConfig, ConnectListConfig, AuditorConfig};
+use std::path::PathBuf;
+use crate::events::NetworkConfiguration;
+use std::collections::btree_map::BTreeMap;
+use toml::Value;
 
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -59,6 +66,58 @@ struct ServiceInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServicesResponse {
     services: Vec<ServiceInfo>,
+}
+
+/// Information about service public key.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct KeyInfo {
+    /// Public key.
+    pub pub_key: PublicKey,
+}
+
+/// Shared configuration
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct SharedConfiguration {
+    /// Initial config that will be written in the first block.
+    pub genesis: GenesisConfig,
+    /// Remote Network address used by this node.
+    pub external_address: String,
+    /// Network configuration.
+    pub network: NetworkConfiguration,
+    /// Memory pool configuration.
+    pub mempool: MemoryPoolConfig,
+    /// Additional config, usable for services.
+    #[serde(default)]
+    pub services_configs: BTreeMap<String, Value>,
+    /// Optional database configuration.
+    #[serde(default)]
+    pub database: DbOptions,
+    /// Node's ConnectList.
+    pub connect_list: ConnectListConfig,
+    /// Transaction Verification Thread Pool size.
+    pub thread_pool_size: Option<u8>,
+    /// Auditor configuration.
+    pub auditor: AuditorConfig,
+    /// Consensus public key.
+    pub consensus_public_key: PublicKey,
+}
+
+impl SharedConfiguration {
+    /// Create new shared configuration.
+    pub fn new(config: NodeConfig<PathBuf>) -> SharedConfiguration {
+        SharedConfiguration {
+            genesis: config.genesis,
+            external_address: config.external_address,
+            network: config.network,
+            mempool: config.mempool,
+            services_configs: config.services_configs,
+            database: config.database,
+            connect_list: config.connect_list,
+            thread_pool_size: config.thread_pool_size,
+            auditor: config.auditor,
+            consensus_public_key: config.consensus_public_key,
+        }
+    }
 }
 
 /// Public system API.
@@ -143,12 +202,37 @@ impl SystemApi {
         }
     }
 
+    fn handle_service_key_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
+            Ok(KeyInfo { pub_key: state.public_key().clone() })
+        });
+        self
+    }
+
+    fn handle_remote_config_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        let _self = self.clone();
+        api_scope.endpoint(name, move |_state: &ServiceApiState, query: KeyInfo| {
+            if !self.shared_api_state.has_peer(&query.pub_key) {
+                return Err(ApiError::NotFound("Peer with this public key not found".to_owned()));
+            }
+
+            self.shared_api_state.load_configuration()
+                .map(SharedConfiguration::new)
+                .ok_or(ApiError::NotFound("Node configuration not found".to_owned()))
+        });
+
+        _self
+    }
+
     /// Adds public system API endpoints to the corresponding scope.
     pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         self.handle_stats_info("v1/stats", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)
             .handle_user_agent_info("v1/user_agent", api_scope)
-            .handle_list_services_info("v1/services", api_scope);
+            .handle_list_services_info("v1/services", api_scope)
+            .handle_user_agent_info("v1/user_agent", api_scope)
+            .handle_service_key_info("v1/service_key", api_scope)
+            .handle_remote_config_info("v1/remote_config", api_scope);
         api_scope
     }
 }

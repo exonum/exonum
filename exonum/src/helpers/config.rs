@@ -27,6 +27,40 @@ use std::{
 };
 
 use crate::node::{ConnectListConfig, NodeConfig};
+use std::sync::{Arc, RwLock};
+
+/// Stored configuration accessor.
+#[derive(Debug, Clone)]
+pub struct ConfigAccessor {
+    path: Arc<RwLock<PathBuf>>
+}
+
+impl ConfigAccessor {
+    /// Create new stored configuration accessor.
+    pub fn new<P>(path: P) -> Self
+        where
+            P: AsRef<Path> + Send + 'static,
+    {
+        ConfigAccessor {
+            path: Arc::new(RwLock::new(path.as_ref().to_path_buf()))
+        }
+    }
+
+    /// Loads TOML-encoded configuration.
+    pub fn load<T>(&self) -> Result<T, Error>
+        where
+            T: for<'r> Deserialize<'r>, {
+        ConfigFile::load(self.path.read().unwrap().as_path())
+    }
+
+    /// Saves TOML-encoded configuration.
+    pub fn save<T>(&self, value: &T) -> Result<(), Error>
+        where
+            T: Serialize {
+        ConfigFile::save(value, self.path.write().unwrap().as_path())
+    }
+}
+
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
@@ -35,9 +69,9 @@ pub struct ConfigFile {}
 impl ConfigFile {
     /// Loads TOML-encoded file.
     pub fn load<P, T>(path: P) -> Result<T, Error>
-    where
-        T: for<'r> Deserialize<'r>,
-        P: AsRef<Path>,
+        where
+            T: for<'r> Deserialize<'r>,
+            P: AsRef<Path>,
     {
         let path = path.as_ref();
         let res = do_load(path).context(format!("loading config from {}", path.display()))?;
@@ -46,9 +80,9 @@ impl ConfigFile {
 
     /// Saves TOML-encoded file.
     pub fn save<P, T>(value: &T, path: P) -> Result<(), Error>
-    where
-        T: Serialize,
-        P: AsRef<Path>,
+        where
+            T: Serialize,
+            P: AsRef<Path>,
     {
         let path = path.as_ref();
         do_save(value, path).with_context(|_| format!("saving config to {}", path.display()))?;
@@ -89,10 +123,7 @@ pub enum ConfigRequest {
 
 impl ConfigManager {
     /// Creates a new `ConfigManager` instance for the given path.
-    pub fn new<P>(path: P) -> Self
-    where
-        P: AsRef<Path> + Send + 'static,
-    {
+    pub fn new(accessor: ConfigAccessor) -> Self {
         let (tx, rx) = mpsc::channel();
         let handle = thread::spawn(move || {
             info!("ConfigManager started");
@@ -101,7 +132,7 @@ impl ConfigManager {
                     ConfigRequest::UpdateConnectList(connect_list) => {
                         info!("Updating connect list. New value: {:?}", connect_list);
 
-                        let res = Self::update_connect_list(connect_list, &path);
+                        let res = Self::update_connect_list(connect_list, &accessor);
 
                         if let Err(ref error) = res {
                             error!("Unable to update config: {}", error);
@@ -131,13 +162,10 @@ impl ConfigManager {
     // Updates ConnectList on file system synchronously.
     // This method is public only for testing and should not be used explicitly.
     #[doc(hidden)]
-    pub fn update_connect_list<P>(connect_list: ConnectListConfig, path: &P) -> Result<(), Error>
-    where
-        P: AsRef<Path>,
-    {
-        let mut current_config: NodeConfig<PathBuf> = ConfigFile::load(path)?;
+    pub fn update_connect_list(connect_list: ConnectListConfig, accessor: &ConfigAccessor) -> Result<(), Error> {
+        let mut current_config: NodeConfig<PathBuf> = accessor.load()?;
         current_config.connect_list = connect_list;
-        ConfigFile::save(&current_config, path)?;
+        accessor.save(&current_config)?;
 
         Ok(())
     }

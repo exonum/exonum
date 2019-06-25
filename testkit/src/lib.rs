@@ -456,7 +456,8 @@ impl TestKit {
                     ExternalMessage::PeerAdd(_)
                     | ExternalMessage::Enable(_)
                     | ExternalMessage::Rebroadcast
-                    | ExternalMessage::Shutdown => { /* Ignored */ }
+                    | ExternalMessage::Shutdown
+                    | ExternalMessage::AuditorAdd(_) => { /* Ignored */ }
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
                 drop(guard);

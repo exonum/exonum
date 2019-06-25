@@ -19,7 +19,7 @@ use crate::crypto::PublicKey;
 use crate::events::error::LogError;
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::Height;
-use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
+use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status, Event};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -38,6 +38,7 @@ impl NodeHandler {
             Message::Responses(Responses::TransactionsResponse(msg)) => {
                 self.handle_txs_batch(&msg).log_error()
             }
+            Message::Event(Event::AddAuditor(evn)) => self.handle_add_auditor_event(evn),
         }
     }
 

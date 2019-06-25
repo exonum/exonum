@@ -17,13 +17,16 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts, rsplitn
 
+use actix_web::{client, HttpMessage};
+use futures::future::{Future, lazy};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
+    thread,
 };
-
+use hex::FromHex;
 use super::{
     internal::{CollectedCommand, Command, Feedback},
     keys,
@@ -34,11 +37,20 @@ use super::{
     },
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
-use crate::api::backends::actix::AllowOrigin;
+use crate::api::{
+    backends::actix::AllowOrigin,
+    node::public::system::KeyInfo,
+};
 use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
 use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
-use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
+use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig, ConnectInfo};
+use crate::helpers::fabric::shared::{AuditorPrimaryConfig, AddAuditorInfo};
+use crate::api::node::private::AddAuditorRequest;
+use actix::SystemRunner;
+use std::ffi::OsStr;
+use std::time::Duration;
+use crate::api::node::public::system::SharedConfiguration;
 use exonum_merkledb::{Database, DbOptions, RocksDB};
 
 const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
@@ -52,6 +64,12 @@ const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
 const PUBLIC_ALLOW_ORIGIN: &str = "PUBLIC_ALLOW_ORIGIN";
 const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
 const SERVICE_KEY_PASS_METHOD: &str = "SERVICE_KEY_PASS_METHOD";
+const VALIDATORS_API: &str = "VALIDATORS_API";
+const CONNECT_ALL: &str = "CONNECT_ALL";
+const CONSENSUS_KEY: &str = "CONSENSUS_KEY";
+const VALIDATORS_KEYS: &str = "VALIDATORS_KEYS";
+const VALIDATORS_KEY_PATHS: &str = "VALIDATORS_KEY_PATH";
+const WAIT: &str = "WAIT";
 
 /// Run command.
 pub struct Run;
@@ -409,70 +427,6 @@ impl Command for GenerateCommonConfig {
 /// Command for the node configuration generation.
 pub struct GenerateNodeConfig;
 
-impl GenerateNodeConfig {
-    fn addresses(context: &Context) -> (String, SocketAddr) {
-        let external_address_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
-        let listen_address_str = &context.arg::<String>(LISTEN_ADDRESS).ok();
-
-        // Try case where peer external address is socket address or ip address.
-        let external_address_socket = external_address_str.parse().or_else(|_| {
-            external_address_str
-                .parse()
-                .map(|ip| SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT))
-        });
-
-        let (external_address, external_port) = if let Ok(addr) = external_address_socket {
-            (addr.to_string(), addr.port())
-        } else {
-            let port = external_address_str
-                .rsplitn(2, ':')
-                .next()
-                .and_then(|p| p.parse::<u16>().ok());
-            if let Some(port) = port {
-                (external_address_str.clone(), port)
-            } else {
-                let port = DEFAULT_EXONUM_LISTEN_PORT;
-                (format!("{}:{}", external_address_str, port), port)
-            }
-        };
-
-        let listen_address: SocketAddr = listen_address_str.as_ref().map_or_else(
-            || {
-                let listen_ip = match external_address_socket {
-                    Ok(addr) => match addr.ip() {
-                        IpAddr::V4(_) => "0.0.0.0".parse().unwrap(),
-                        IpAddr::V6(_) => "::".parse().unwrap(),
-                    },
-                    Err(_) => "0.0.0.0".parse().unwrap(),
-                };
-                SocketAddr::new(listen_ip, external_port)
-            },
-            |a| {
-                a.parse().unwrap_or_else(|_| {
-                    panic!(
-                        "Correct socket address is expected for {}: {:?}",
-                        LISTEN_ADDRESS, a
-                    )
-                })
-            },
-        );
-
-        (external_address, listen_address)
-    }
-
-    fn get_passphrase(
-        context: &Context,
-        method: PassInputMethod,
-        secret_key_type: SecretKeyType,
-    ) -> ZeroizeOnDrop<String> {
-        if context.get_flag_occurrences(NO_PASSWORD).is_some() {
-            ZeroizeOnDrop::default()
-        } else {
-            method.get_passphrase(secret_key_type, false)
-        }
-    }
-}
-
 impl Command for GenerateNodeConfig {
     fn args(&self) -> Vec<Argument> {
         vec![
@@ -566,7 +520,7 @@ impl Command for GenerateNodeConfig {
         let consensus_secret_key_path = output_dir.join(consensus_secret_key_name);
         let service_secret_key_path = output_dir.join(service_secret_key_name);
 
-        let addresses = Self::addresses(&context);
+        let addresses = addresses(&context);
         let common: CommonConfigTemplate =
             ConfigFile::load(&common_config_path).expect("Could not load common config");
         context.set(keys::COMMON_CONFIG, common.clone());
@@ -583,7 +537,7 @@ impl Command for GenerateNodeConfig {
         let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
         let consensus_public_key = {
-            let passphrase = Self::get_passphrase(
+            let passphrase = get_passphrase(
                 &new_context,
                 consensus_key_pass_method,
                 SecretKeyType::Consensus,
@@ -591,7 +545,7 @@ impl Command for GenerateNodeConfig {
             create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())
         };
         let service_public_key = {
-            let passphrase = Self::get_passphrase(
+            let passphrase = get_passphrase(
                 &new_context,
                 service_key_pass_method,
                 SecretKeyType::Service,
@@ -821,6 +775,7 @@ impl Command for Finalize {
                 database: Default::default(),
                 connect_list,
                 thread_pool_size: Default::default(),
+                auditor: Default::default(),
             }
         };
 
@@ -843,6 +798,614 @@ impl Command for Finalize {
     }
 }
 
+/// Connect auditor command.
+pub struct RequestConnectAuditor;
+
+impl RequestConnectAuditor {
+    fn exe_name() -> String {
+        std::env::current_exe().ok()
+            .as_ref()
+            .map(Path::new)
+            .and_then(Path::file_name)
+            .and_then(OsStr::to_str)
+            .map(|s| format!("./{}", s))
+            .unwrap_or("".to_owned())
+    }
+}
+
+impl Command for RequestConnectAuditor {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_named(
+                VALIDATORS_API,
+                true,
+                "Validators api addresses",
+                "v",
+                "validators-api",
+                true,
+            ),
+            Argument::new_named(
+                CONNECT_ALL,
+                false,
+                "Connect to all validators.",
+                None,
+                "connect-all",
+                false,
+            ),
+            Argument::new_named(
+                PEER_ADDRESS,
+                true,
+                "Remote peer address",
+                "a",
+                "peer-address",
+                false,
+            ),
+            Argument::new_flag(
+                NO_PASSWORD,
+                "Don't prompt for passwords when generating private keys (leave empty)",
+                "n",
+                "no-password",
+                false,
+            ),
+            Argument::new_named(
+                CONSENSUS_KEY_PASS_METHOD,
+                false,
+                "Passphrase entry method for consensus key.\n\
+                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
+                 If ENV_VAR_NAME is not specified $EXONUM_CONSENSUS_PASS is used",
+                None,
+                "consensus-key-pass",
+                false,
+            ),
+            Argument::new_named(
+                SERVICE_KEY_PASS_METHOD,
+                false,
+                "Passphrase entry method for service key.\n\
+                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
+                 If ENV_VAR_NAME is not specified $EXONUM_SERVICE_PASS is used",
+                None,
+                "service-key-pass",
+                false,
+            ),
+            Argument::new_positional(
+                "OUTPUT_DIR",
+                true,
+                "Path where the node configuration will be saved.",
+            ),
+        ]
+    }
+
+    fn name(&self) -> CommandName {
+        "request_connect_auditor"
+    }
+
+    fn about(&self) -> &str {
+        "Create primary auditor configuration and send connect auditor request"
+    }
+
+    fn execute(&self, _commands: &HashMap<CommandName, CollectedCommand>,
+               context: Context,
+               exts: &dyn Fn(Context) -> Context) -> Feedback {
+        let connect_all: bool = context
+            .arg::<String>(CONNECT_ALL)
+            .unwrap_or_else(|_| "false".into())
+            .parse()
+            .expect("expected correct passphrase input method for connect_all flag");
+        let output_dir: PathBuf = context
+            .arg("OUTPUT_DIR")
+            .expect("expected output directory for the node configuration");
+        let consensus_key_pass_method: PassInputMethod = context
+            .arg::<String>(CONSENSUS_KEY_PASS_METHOD)
+            .unwrap_or_default()
+            .parse()
+            .expect("expected correct passphrase input method for consensus key");
+        let service_key_pass_method: PassInputMethod = context
+            .arg::<String>(SERVICE_KEY_PASS_METHOD)
+            .unwrap_or_default()
+            .parse()
+            .expect("expected correct passphrase input method for service key");
+
+        let consensus_secret_key_name = "consensus.key.toml";
+        let service_secret_key_name = "service.key.toml";
+        let add_auditor_request_key_name = "request.toml";
+        let consensus_secret_key_path = output_dir.join(consensus_secret_key_name);
+        let service_secret_key_path = output_dir.join(service_secret_key_name);
+        let output_config_path = output_dir.join(add_auditor_request_key_name);
+
+        let (external_address, listen_address) = addresses(&context);
+
+        let validators_api = validators(&context);
+
+        let new_context = exts(context);
+
+        let consensus_public_key = {
+            let passphrase = get_passphrase(
+                &new_context,
+                consensus_key_pass_method,
+                SecretKeyType::Consensus,
+            );
+            create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())
+        };
+        let service_public_key = {
+            let passphrase = get_passphrase(
+                &new_context,
+                service_key_pass_method,
+                SecretKeyType::Service,
+            );
+            create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
+        };
+
+        let validators_api = validators_api
+            .expect("expected correct passphrase input method for validators_api");
+
+        let validators_api_param = validators_api.join(" ");
+
+        let consensus_secret_key = fs::canonicalize(consensus_secret_key_path)
+            .expect("Failed to create canonical path.");
+        let service_secret_key = fs::canonicalize(service_secret_key_path)
+            .expect("Failed to create canonical path.");
+
+        let config = AuditorPrimaryConfig {
+            listen_address,
+            external_address: external_address.clone(),
+            consensus_public_key,
+            consensus_secret_key,
+            service_public_key,
+            service_secret_key,
+            add_auditor_request: AddAuditorInfo {
+                validators_api,
+                connect_all,
+            },
+        };
+
+        ConfigFile::save(&config, output_config_path).expect("Could not write config file.");
+
+        println!(
+            "{} add_auditor --connect-all {} --peer-address {} --consensus-pub-key {} --validators-api {} --private-api-address ",
+            Self::exe_name(), connect_all, external_address, consensus_public_key.to_hex(), validators_api_param
+        );
+
+        Feedback::None
+    }
+}
+
+pub struct AddAuditor;
+
+impl AddAuditor {
+    fn parse_validator_api(context: &Context, sys: &mut SystemRunner) -> Option<Vec<PublicKey>> {
+        validators(context)
+            .map(|validators_api| {
+                validators_api.iter()
+                    .map(|api| format!("http://{}/api/system/v1/service_key", api))
+                    .map(|url| {
+                        match sys.block_on(lazy(|| {
+                            client::get(url.clone())
+                                .finish()
+                                .expect("Failed to create http client.")
+                                .send()
+                                .map_err(|err| format!("{:?}", err))
+                                .and_then(|response| {
+                                    response
+                                        .body()
+                                        .map_err(|err| format!("{:?}", err))
+                                        .and_then(|body| serde_json::from_slice(body.as_ref())
+                                            .map_err(|err| format!("{:?}", err)))
+                                }).map(|key: KeyInfo| key.pub_key)
+                        })) {
+                            Ok(key) => key,
+                            Err(err) => panic!("Failed to perform request [{}]; Error [{:?}]", url, err),
+                        }
+                    }).collect()
+            })
+    }
+
+    fn parse_validators_keys(context: &Context) -> Option<Vec<PublicKey>> {
+        context
+            .arg_multiple::<String>(VALIDATORS_KEYS)
+            .map(|keys| keys.iter()
+                .map(|key| PublicKey::from_hex(key)
+                    .expect("expected correct passphrase input method for validator public key"))
+                .collect()
+            ).ok()
+    }
+
+    fn parse_validator_key_path(context: &Context) -> Option<Vec<PublicKey>> {
+        context
+            .arg_multiple::<String>(VALIDATORS_KEY_PATHS)
+            .map(|path_vec| path_vec.iter()
+                .map(|path| ConfigFile::load(path).expect("Failed to load validator public config."))
+                .map(|config: SharedConfig| config.node.validator_keys.service_key)
+                .collect()
+            ).ok()
+    }
+
+    fn validator_keys(context: &Context, sys: &mut SystemRunner) -> Vec<PublicKey> {
+        if let Some(keys) = Self::parse_validators_keys(context) {
+            return keys;
+        }
+
+        if let Some(keys) = Self::parse_validator_key_path(context) {
+            return keys;
+        }
+
+        if let Some(keys) = Self::parse_validator_api(context, sys) {
+            return keys;
+        }
+
+        panic!("Failed to get validator list to add auditor. See validators_api, validators_key or validators_key_paths")
+    }
+}
+
+impl Command for AddAuditor {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_named(
+                CONNECT_ALL,
+                false,
+                "Connect to all validators.",
+                None,
+                "connect-all",
+                false,
+            ),
+            Argument::new_named(
+                VALIDATORS_API,
+                false,
+                "Validators api addresses",
+                "v",
+                "validators-api",
+                true,
+            ),
+            Argument::new_named(
+                VALIDATORS_KEYS,
+                false,
+                "Validators service key",
+                "k",
+                "validators-key",
+                true,
+            ),
+            Argument::new_named(
+                VALIDATORS_KEY_PATHS,
+                false,
+                "Validators service key",
+                "p",
+                "validators-key-paths",
+                true,
+            ),
+            Argument::new_named(
+                PEER_ADDRESS,
+                true,
+                "Remote peer address",
+                "a",
+                "peer-address",
+                false,
+            ),
+            Argument::new_named(
+                CONSENSUS_KEY,
+                true,
+                "Consensus public key",
+                None,
+                "consensus-pub-key",
+                false,
+            ),
+            Argument::new_named(
+                PRIVATE_API_ADDRESS,
+                true,
+                "Listen address for private api.",
+                None,
+                "private-api-address",
+                false,
+            )
+        ]
+    }
+
+    fn name(&self) -> CommandName {
+        "add_auditor"
+    }
+
+    fn about(&self) -> &str {
+        "Add auditor to the blockchain net"
+    }
+
+    fn execute(&self, _commands: &HashMap<CommandName, CollectedCommand>,
+               context: Context,
+               _exts: &dyn Fn(Context) -> Context) -> Feedback {
+        let connect_all: bool = context
+            .arg::<String>(CONNECT_ALL)
+            .unwrap_or_else(|_| "false".into())
+            .parse()
+            .expect("expected correct passphrase input method for connect-all flag");
+
+        let public_key = context
+            .arg::<String>(CONSENSUS_KEY).ok()
+            .and_then(|hex| PublicKey::from_hex(hex).ok())
+            .expect("expected correct passphrase input method for consensus-pub-key");
+
+        let (external_address, _) = addresses(&context);
+
+        let mut sys = actix::System::new("add_auditor");
+        let validators = if connect_all {
+            vec![]
+        } else {
+            Self::validator_keys(&context, &mut sys)
+        };
+
+        let req = AddAuditorRequest {
+            address: external_address,
+            public_key,
+            connect_all,
+            validators,
+        };
+
+        let private_api = context
+            .arg::<String>(PRIVATE_API_ADDRESS)
+            .expect("expected correct passphrase input method for private-api-address flag");
+
+        if let Err(err) = sys.block_on(lazy(|| {
+            client::post(format!("http://{}/api/system/v1/auditor/add", private_api))
+                .header("Content-Type", "application/json")
+                .body(serde_json::to_string(&req).unwrap())
+                .expect("Failed to create http client.")
+                .send()
+                .map_err(|err| format!("{:?}", err))
+                .and_then(|response| {
+                    let is_success = response.status().is_success();
+                    response.body()
+                        .map_err(|err| format!("{:?}", err))
+                        .and_then(move |data|
+                            if is_success {
+                                Ok(())
+                            } else {
+                                Err(String::from_utf8_lossy(data.as_ref()).to_string())
+                            })
+                })
+        })) {
+            panic!("Failed to add auditor: {}", err);
+        }
+        Feedback::None
+    }
+}
+
+pub struct FinalizeAuditorConfig;
+
+impl FinalizeAuditorConfig {
+    fn load_node_configuration(public_api: &str, public_key: &PublicKey, sys: &mut SystemRunner) -> Option<SharedConfiguration> {
+        sys.block_on(lazy(|| {
+            client::get(format!("http://{}/api/system/v1/remote_config?pub_key={}", public_api, public_key.to_hex()))
+                .finish()
+                .expect("Failed to create http client.")
+                .send()
+                .map_err(|err| format!("{:?}", err))
+                .and_then(|response| {
+                    response
+                        .body()
+                        .map_err(|err| format!("{:?}", err))
+                        .and_then(|body| serde_json::from_slice(body.as_ref())
+                            .map_err(|err| format!("{:?}", err)))
+                })
+        })).ok()
+    }
+
+    fn merge_config(primary_cfg: AuditorPrimaryConfig, api: NodeApiConfig, node_cfg: SharedConfiguration, sys: &mut SystemRunner) -> NodeConfig<PathBuf> {
+        let peers: Vec<_> = if primary_cfg.add_auditor_request.connect_all {
+            let validator_consensus_keys: Vec<_> = node_cfg.genesis.validator_keys.iter()
+                .map(|key| key.consensus_key.clone())
+                .collect();
+
+            let mut peers: Vec<_> = node_cfg.connect_list.peers.into_iter()
+                .filter(|peer| validator_consensus_keys.contains(&peer.public_key))
+                .collect();
+
+            peers.push(ConnectInfo {
+                address: node_cfg.external_address,
+                public_key: node_cfg.consensus_public_key,
+            });
+            peers
+        } else {
+            primary_cfg.add_auditor_request.validators_api.iter()
+                .filter_map(|api| Self::load_node_configuration(api, &primary_cfg.consensus_public_key, sys))
+                .map(|config| ConnectInfo {
+                    address: config.external_address,
+                    public_key: config.consensus_public_key,
+                })
+                .collect()
+        };
+
+        NodeConfig {
+            genesis: node_cfg.genesis,
+            listen_address: primary_cfg.listen_address,
+            external_address: primary_cfg.external_address,
+            network: node_cfg.network,
+            consensus_public_key: primary_cfg.consensus_public_key,
+            consensus_secret_key: primary_cfg.consensus_secret_key,
+            service_public_key: primary_cfg.service_public_key,
+            service_secret_key: primary_cfg.service_secret_key,
+            api,
+            mempool: node_cfg.mempool,
+            services_configs: node_cfg.services_configs,
+            database: node_cfg.database,
+            connect_list: ConnectListConfig { peers },
+            thread_pool_size: node_cfg.thread_pool_size,
+            auditor: Default::default(),
+        }
+    }
+}
+
+impl Command for FinalizeAuditorConfig {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_flag(
+                WAIT,
+                "Wait for an auditor to be added.",
+                "w",
+                "wait",
+                false,
+            ),
+            Argument::new_named(
+                PUBLIC_API_ADDRESS,
+                false,
+                "Listen address for public api.",
+                None,
+                "public-api-address",
+                false,
+            ),
+            Argument::new_named(
+                PRIVATE_API_ADDRESS,
+                false,
+                "Listen address for private api.",
+                None,
+                "private-api-address",
+                false,
+            ),
+            Argument::new_named(
+                PUBLIC_ALLOW_ORIGIN,
+                false,
+                "Cross-origin resource sharing options for responses returned by public API handlers.",
+                None,
+                "public-allow-origin",
+                false,
+            ),
+            Argument::new_named(
+                PRIVATE_ALLOW_ORIGIN,
+                false,
+                "Cross-origin resource sharing options for responses returned by private API handlers.",
+                None,
+                "private-allow-origin",
+                false,
+            ),
+            Argument::new_positional("PRIMARY_CONFIG", true, "Path to our primari config."),
+            Argument::new_positional("OUTPUT_CONFIG_PATH", true, "Path to output node config."),
+        ]
+    }
+
+    fn name(&self) -> CommandName {
+        "finalize_auditor_config"
+    }
+
+    fn about(&self) -> &str {
+        "Create node config."
+    }
+
+    fn execute(&self, _commands: &HashMap<CommandName, CollectedCommand>,
+               context: Context,
+               _exts: &dyn Fn(Context) -> Context) -> Feedback {
+        let primary_config_path = context
+            .arg::<String>("PRIMARY_CONFIG")
+            .expect("primary config path not found");
+        let output_config_path = context
+            .arg::<String>("OUTPUT_CONFIG_PATH")
+            .expect("output config path not found");
+        let primary_config: AuditorPrimaryConfig = ConfigFile::load(primary_config_path)
+            .expect("Failed to load primary config.");
+
+        let public_api_address = Run::public_api_address(&context);
+        let private_api_address = Run::private_api_address(&context);
+        let public_allow_origin = Finalize::public_allow_origin(&context);
+        let private_allow_origin = Finalize::private_allow_origin(&context);
+
+        let mut sys = actix::System::new("finalize_auditor_config");
+
+        let wait = context.has_flag(WAIT);
+
+        let validators_api = primary_config.add_auditor_request.validators_api.clone();
+        let pub_key = primary_config.consensus_public_key.clone();
+
+        let node_config = if wait {
+            loop {
+                match validators_api.iter()
+                    .find_map(|api| Self::load_node_configuration(api, &pub_key, &mut sys)) {
+                    Some(c) => {
+                        break Some(c);
+                    }
+                    None => {
+                        thread::sleep(Duration::from_secs(10))
+                    }
+                }
+            }
+        } else {
+            validators_api.iter()
+                .find_map(|api| Self::load_node_configuration(api, &pub_key, &mut sys))
+        };
+
+        let node_config = node_config.expect("Auditor is not approved yet.");
+
+        let api = NodeApiConfig {
+            public_api_address,
+            private_api_address,
+            public_allow_origin,
+            private_allow_origin,
+            ..Default::default()
+        };
+
+        let node_config = Self::merge_config(primary_config, api, node_config, &mut sys);
+
+        ConfigFile::save(&node_config, output_config_path).expect("Could not write config file.");
+
+        Feedback::None
+    }
+}
+
+fn addresses(context: &Context) -> (String, SocketAddr) {
+    let external_address_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
+    let listen_address_str = &context.arg::<String>(LISTEN_ADDRESS).ok();
+
+// Try case where peer external address is socket address or ip address.
+    let external_address_socket = external_address_str.parse().or_else(|_| {
+        external_address_str
+            .parse()
+            .map(|ip| SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT))
+    });
+
+    let (external_address, external_port) = if let Ok(addr) = external_address_socket {
+        (addr.to_string(), addr.port())
+    } else {
+        let port = external_address_str
+            .rsplitn(2, ':')
+            .next()
+            .and_then(|p| p.parse::<u16>().ok());
+        if let Some(port) = port {
+            (external_address_str.clone(), port)
+        } else {
+            let port = DEFAULT_EXONUM_LISTEN_PORT;
+            (format!("{}:{}", external_address_str, port), port)
+        }
+    };
+
+    let listen_address: SocketAddr = listen_address_str.as_ref().map_or_else(
+        || {
+            let listen_ip = match external_address_socket {
+                Ok(addr) => match addr.ip() {
+                    IpAddr::V4(_) => "0.0.0.0".parse().unwrap(),
+                    IpAddr::V6(_) => "::".parse().unwrap(),
+                },
+                Err(_) => "0.0.0.0".parse().unwrap(),
+            };
+            SocketAddr::new(listen_ip, external_port)
+        },
+        |a| {
+            a.parse().unwrap_or_else(|_| {
+                panic!(
+                    "Correct socket address is expected for {}: {:?}",
+                    LISTEN_ADDRESS, a
+                )
+            })
+        },
+    );
+
+    (external_address, listen_address)
+}
+
+fn get_passphrase(
+    context: &Context,
+    method: PassInputMethod,
+    secret_key_type: SecretKeyType,
+) -> ZeroizeOnDrop<String> {
+    if context.get_flag_occurrences(NO_PASSWORD).is_some() {
+        ZeroizeOnDrop::default()
+    } else {
+        method.get_passphrase(secret_key_type, false)
+    }
+}
+
 fn create_secret_key_file(
     secret_key_path: impl AsRef<Path>,
     passphrase: impl AsRef<[u8]>,
@@ -861,6 +1424,33 @@ fn create_secret_key_file(
     }
 }
 
+/// Parse validator_api parameter.
+fn validators(context: &Context) -> Option<Vec<String>> {
+    context
+        .arg_multiple::<String>(VALIDATORS_API)
+        .map(|api| {
+            api.iter()
+                .map(|address| {
+                    match address.parse().or_else(|_| {
+                        address
+                            .parse()
+                            .map(|ip| SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT))
+                    }) {
+                        Ok(address) => address.to_string(),
+                        Err(_) => {
+                            address
+                                .rsplitn(2, ':')
+                                .next()
+                                .and_then(|p| p.parse::<u16>().ok())
+                                .map(|_p| address.clone())
+                                .unwrap_or_else(|| format!("{}:{}", address, DEFAULT_EXONUM_LISTEN_PORT))
+                        }
+                    }
+                })
+                .collect()
+        }).ok()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -872,14 +1462,14 @@ mod test {
         let external = "127.0.0.1:1234";
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (external.to_string(), "0.0.0.0:1234".parse().unwrap())
         );
 
         let external = "127.0.0.1";
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (
                 SocketAddr::new(external.parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT).to_string(),
                 SocketAddr::new("0.0.0.0".parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT)
@@ -889,7 +1479,7 @@ mod test {
         let external = "2001:db8::1";
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (
                 SocketAddr::new(external.parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT).to_string(),
                 SocketAddr::new("::".parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT)
@@ -899,14 +1489,14 @@ mod test {
         let external = "[2001:db8::1]:1234";
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (external.to_string(), "[::]:1234".parse().unwrap())
         );
 
         let external = "localhost";
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (
                 format!("{}:{}", external, DEFAULT_EXONUM_LISTEN_PORT),
                 SocketAddr::new("0.0.0.0".parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT)
@@ -916,7 +1506,7 @@ mod test {
         let external = "localhost:1234";
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (
                 external.to_string(),
                 SocketAddr::new("0.0.0.0".parse().unwrap(), 1234)
@@ -928,7 +1518,7 @@ mod test {
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         ctx.set_arg(LISTEN_ADDRESS, listen.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (external.to_string(), listen.parse().unwrap())
         );
 
@@ -937,7 +1527,7 @@ mod test {
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         ctx.set_arg(LISTEN_ADDRESS, listen.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (external.to_string(), listen.parse().unwrap())
         );
 
@@ -946,12 +1536,11 @@ mod test {
         ctx.set_arg(PEER_ADDRESS, external.to_string());
         ctx.set_arg(LISTEN_ADDRESS, listen.to_string());
         assert_eq!(
-            GenerateNodeConfig::addresses(&ctx),
+            addresses(&ctx),
             (
                 format!("{}:{}", external, DEFAULT_EXONUM_LISTEN_PORT),
                 listen.parse().unwrap()
             )
         );
     }
-
 }

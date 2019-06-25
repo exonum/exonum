@@ -93,3 +93,10 @@ message BlockRequest {
   exonum.PublicKey to = 1;
   uint64 height = 2;
 }
+
+message AddAuditor {
+  string address = 1;
+  exonum.PublicKey public_key = 2;
+  bool connect_all = 3;
+  repeated exonum.PublicKey validators = 4;
+}

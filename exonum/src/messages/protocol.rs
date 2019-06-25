@@ -699,6 +699,20 @@ impl Precommit {
     }
 }
 
+/// Add auditor event.
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::AddAuditor", crate = "crate")]
+pub struct AddAuditor {
+    /// Peer address.
+    pub address: String,
+    /// Peer public key.
+    pub public_key: PublicKey,
+    /// Connect to all validators.
+    pub connect_all: bool,
+    /// Validators public keys.
+    pub validators: Vec<PublicKey>,
+}
+
 /// Full message constraints list.
 #[doc(hidden)]
 pub trait ProtocolMessage: Debug + Clone + BinaryValue {
@@ -876,7 +890,11 @@ impl_protocol! {
             /// Request of some future block.
             BlockRequest = 4,
         },
-
+        /// Exonum node event.
+        4 => Event {
+            /// Add auditor event.
+            AddAuditor = 0,
+        },
     }
 }
 

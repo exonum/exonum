@@ -25,6 +25,7 @@ use std::{
     fmt,
     net::SocketAddr,
     sync::{Arc, RwLock},
+    path::PathBuf,
 };
 
 use crate::{
@@ -32,9 +33,9 @@ use crate::{
     blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
-    helpers::{Height, Milliseconds, ValidatorId},
+    helpers::{Height, Milliseconds, ValidatorId, config::ConfigAccessor},
     messages::{Message, RawTransaction, ServiceTransaction, Signed},
-    node::{ApiSender, ConnectInfo, NodeRole, State},
+    node::{ApiSender, ConnectInfo, NodeRole, State, NodeConfig},
 };
 
 use super::transaction::Transaction;
@@ -350,6 +351,7 @@ pub struct ApiNodeState {
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
     broadcast_server_address: Option<Addr<websocket::Server>>,
+    peers: HashSet<PublicKey>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -384,14 +386,17 @@ pub struct SharedNodeState {
     state: Arc<RwLock<ApiNodeState>>,
     /// Timeout to update API state.
     pub state_update_timeout: Milliseconds,
+    /// Stored configuration accessor.
+    config_accessor: Option<ConfigAccessor>,
 }
 
 impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
-    pub fn new(state_update_timeout: Milliseconds) -> Self {
+    pub fn new(state_update_timeout: Milliseconds, config_accessor: Option<ConfigAccessor>) -> Self {
         Self {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
             state_update_timeout,
+            config_accessor,
         }
     }
     /// Returns a list of connected addresses of other nodes.
@@ -436,6 +441,9 @@ impl SharedNodeState {
         lock.majority_count = state.majority_count();
         lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
+        lock.peers = state.connect_list().peers().iter()
+            .map(|ci| ci.public_key.to_owned())
+            .collect();
 
         for (p, a) in state.connections() {
             match a {
@@ -552,6 +560,16 @@ impl SharedNodeState {
         if let Some(server) = state.broadcast_server_address.as_ref() {
             server.do_send(websocket::Terminate);
         }
+    }
+
+    pub(crate) fn has_peer(&self, pub_key: &PublicKey) -> bool {
+        let lock = self.state.read().expect("Expected read lock");
+        lock.peers.contains(pub_key)
+    }
+
+    /// Load stored configuration.
+    pub(crate) fn load_configuration(&self) -> Option<NodeConfig<PathBuf>> {
+        self.config_accessor.as_ref().and_then(|accessor| accessor.load().ok())
     }
 }
 

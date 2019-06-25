@@ -148,7 +148,7 @@ pub fn create_testkit_handlers(inner: &Arc<RwLock<TestKit>>) -> ServiceApiBuilde
 pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggregator {
     let mut aggregator = ApiAggregator::new(
         testkit.read().unwrap().blockchain().clone(),
-        SharedNodeState::new(10_000),
+        SharedNodeState::new(10_000, None),
     );
     aggregator.insert("testkit", create_testkit_handlers(testkit));
     aggregator

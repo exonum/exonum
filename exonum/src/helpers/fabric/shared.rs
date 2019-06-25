@@ -93,3 +93,31 @@ pub struct NodeRunConfig {
     pub consensus_pass_method: String,
     pub service_pass_method: String,
 }
+
+/// `AddAuditorRequest` Add auditor request.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddAuditorInfo {
+    /// Validators api addresses.
+    pub validators_api: Vec<String>,
+    /// Connect to all validator nodes.
+    pub connect_all: bool
+}
+
+/// `AuditorPrimaryConfig` collects all public and secret keys and add auditor request.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuditorPrimaryConfig {
+    /// Listen address.
+    pub listen_address: SocketAddr,
+    /// External address.
+    pub external_address: String,
+    /// Consensus public key.
+    pub consensus_public_key: PublicKey,
+    /// Path to the consensus secret key file.
+    pub consensus_secret_key: PathBuf,
+    /// Service public key.
+    pub service_public_key: PublicKey,
+    /// Path to the service secret key file.
+    pub service_secret_key: PathBuf,
+    /// Add auditor request
+    pub add_auditor_request: AddAuditorInfo,
+}

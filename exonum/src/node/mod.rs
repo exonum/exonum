@@ -60,8 +60,9 @@ use crate::helpers::{
     fabric::{NodePrivateConfig, NodePublicConfig},
     user_agent, Height, Milliseconds, Round, ValidatorId,
 };
-use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
+use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage, AddAuditor};
 use crate::node::state::SharedConnectList;
+use crate::helpers::config::ConfigAccessor;
 use exonum_merkledb::{Database, DbOptions};
 
 mod basic;
@@ -83,6 +84,8 @@ pub enum ExternalMessage {
     Shutdown,
     /// Rebroadcast transactions from the pool.
     Rebroadcast,
+    /// Add a new auditor.
+    AuditorAdd(Signed<AddAuditor>),
 }
 
 /// Node timeout types.
@@ -137,6 +140,8 @@ pub struct NodeHandler {
     config_manager: Option<ConfigManager>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
+    /// Can this node auto connect auditors?
+    allow_auto_connect: bool,
 }
 
 /// Service configuration.
@@ -234,6 +239,21 @@ impl Default for MemoryPoolConfig {
     }
 }
 
+/// Auditor configuration parameters.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AuditorConfig {
+    /// Does this node auto connect auditors?
+    pub allow_auto_connect: bool,
+}
+
+impl Default for AuditorConfig {
+    fn default() -> Self {
+        Self {
+            allow_auto_connect: false
+        }
+    }
+}
+
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeConfig<T = SecretKey> {
@@ -267,6 +287,8 @@ pub struct NodeConfig<T = SecretKey> {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
+    /// Auditor configuration.
+    pub auditor: AuditorConfig,
 }
 
 impl NodeConfig<PathBuf> {
@@ -310,6 +332,7 @@ impl NodeConfig<PathBuf> {
             database: self.database,
             connect_list: self.connect_list,
             thread_pool_size: self.thread_pool_size,
+            auditor: self.auditor,
         }
     }
 }
@@ -327,6 +350,8 @@ pub struct Configuration {
     pub peer_discovery: Vec<String>,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
+    /// Auditor config.
+    pub auditor: AuditorConfig,
 }
 
 /// Channel for messages, timeouts and api requests.
@@ -439,7 +464,7 @@ impl NodeHandler {
         system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
-        config_file_path: Option<String>,
+        config_accessor: Option<ConfigAccessor>,
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -487,10 +512,7 @@ impl NodeHandler {
         let is_enabled = api_state.is_enabled();
         api_state.set_node_role(node_role);
 
-        let config_manager = match config_file_path {
-            Some(path) => Some(ConfigManager::new(path)),
-            None => None,
-        };
+        let config_manager = config_accessor.map(ConfigManager::new);
 
         Self {
             blockchain,
@@ -503,6 +525,7 @@ impl NodeHandler {
             node_role,
             config_manager,
             allow_expedited_propose: true,
+            allow_auto_connect: config.auditor.allow_auto_connect,
         }
     }
 
@@ -642,6 +665,24 @@ impl NodeHandler {
         }
     }
 
+
+    /// Add peer.
+    pub fn add_peer(&mut self, connect_info: ConnectInfo) {
+        info!("Send Connect message to {}", connect_info);
+        self.state.add_peer_to_connect_list(connect_info.clone());
+        self.connect(connect_info.public_key);
+
+        if self.config_manager.is_some() {
+            let connect_list_config =
+                ConnectListConfig::from_connect_list(&self.state.connect_list());
+
+            self.config_manager
+                .as_ref()
+                .unwrap()
+                .store_connect_list(connect_list_config);
+        }
+    }
+
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
@@ -755,7 +796,7 @@ impl NodeHandler {
         let previous_round: u64 = round.previous().into();
         let ms = previous_round * self.first_round_timeout()
             + (previous_round * previous_round.saturating_sub(1)) / 2
-                * self.round_timeout_increase();
+            * self.round_timeout_increase();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
@@ -816,6 +857,21 @@ pub struct ConnectInfo {
 impl fmt::Display for ConnectInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.address)
+    }
+}
+
+/// Data needed to add new Auditor.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct AddAuditorRequest {
+    /// Auditor connect info.
+    pub connect_info: ConnectInfo,
+    /// Validators to create peer connection.
+    pub validators: Vec<PublicKey>,
+}
+
+impl fmt::Display for AddAuditorRequest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.connect_info)
     }
 }
 
@@ -923,9 +979,14 @@ impl Node {
             mempool: node_cfg.mempool,
             network: node_cfg.network,
             peer_discovery: peers,
+            auditor: node_cfg.auditor,
         };
 
-        let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
+        let config_accessor = config_file_path.map(ConfigAccessor::new);
+        let api_state = SharedNodeState::new(
+            node_cfg.api.state_update_timeout as u64,
+            config_accessor.clone(),
+        );
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
         let handler = NodeHandler::new(
@@ -935,7 +996,7 @@ impl Node {
             system_state,
             config,
             api_state,
-            config_file_path,
+            config_accessor,
         );
         Self {
             api_options: node_cfg.api,
@@ -1036,7 +1097,7 @@ impl Node {
                 self.handler.api_state.clone(),
             ),
         }
-        .start()?;
+            .start()?;
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(

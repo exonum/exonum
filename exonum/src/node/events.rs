@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ExternalMessage, NodeHandler, NodeTimeout};
 use crate::blockchain::Schema;
 use crate::events::{
     error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent,
@@ -58,19 +58,7 @@ impl NodeHandler {
                 self.handle_incoming_tx(tx);
             }
             ExternalMessage::PeerAdd(info) => {
-                info!("Send Connect message to {}", info);
-                self.state.add_peer_to_connect_list(info.clone());
-                self.connect(info.public_key);
-
-                if self.config_manager.is_some() {
-                    let connect_list_config =
-                        ConnectListConfig::from_connect_list(&self.state.connect_list());
-
-                    self.config_manager
-                        .as_ref()
-                        .unwrap()
-                        .store_connect_list(connect_list_config);
-                }
+                self.add_peer(info);
             }
             ExternalMessage::Enable(value) => {
                 let s = if value { "enabled" } else { "disabled" };
@@ -88,6 +76,10 @@ impl NodeHandler {
             }
             ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
             ExternalMessage::Rebroadcast => self.handle_rebroadcast(),
+            ExternalMessage::AuditorAdd(add_auditor) => {
+                self.handle_add_auditor_event(add_auditor.clone());
+                self.broadcast(add_auditor);
+            }
         }
     }
 

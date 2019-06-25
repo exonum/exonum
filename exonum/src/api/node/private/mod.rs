@@ -48,8 +48,8 @@ pub struct NodeInfo {
 impl NodeInfo {
     /// Creates new `NodeInfo` from services list.
     pub fn new<'a, I>(services: I) -> Self
-    where
-        I: IntoIterator<Item = &'a Box<dyn Service>>,
+        where
+            I: IntoIterator<Item=&'a Box<dyn Service>>,
     {
         let core_version = option_env!("CARGO_PKG_VERSION").map(ToOwned::to_owned);
         Self {
@@ -101,6 +101,19 @@ struct ConsensusEnabledQuery {
     enabled: bool,
 }
 
+/// Add auditor request.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AddAuditorRequest {
+    /// Peer address.
+    pub address: String,
+    /// Peer public key.
+    pub public_key: PublicKey,
+    /// Connect to all validators.
+    pub connect_all: bool,
+    /// Validators public keys.
+    pub validators: Vec<PublicKey>,
+}
+
 /// Private system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
@@ -125,7 +138,8 @@ impl SystemApi {
             .handle_is_consensus_enabled("v1/consensus_enabled", api_scope)
             .handle_set_consensus_enabled("v1/consensus_enabled", api_scope)
             .handle_shutdown("v1/shutdown", api_scope)
-            .handle_rebroadcast("v1/rebroadcast", api_scope);
+            .handle_rebroadcast("v1/rebroadcast", api_scope)
+            .handle_add_auditor("v1/auditor/add", api_scope);
         api_scope
     }
 
@@ -233,6 +247,28 @@ impl SystemApi {
                     .map_err(ApiError::from)
             },
         );
+        self
+    }
+
+    fn handle_add_auditor(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        api_scope.endpoint_mut(name, move |state: &ServiceApiState, query: AddAuditorRequest| {
+            use crate::messages;
+
+            let message = messages::Message::concrete(
+                messages::AddAuditor {
+                    address: query.address,
+                    public_key: query.public_key,
+                    connect_all: query.connect_all,
+                    validators: query.validators,
+                },
+                state.public_key().clone(),
+                state.secret_key(),
+            );
+            state
+                .sender()
+                .send_external_message(ExternalMessage::AuditorAdd(message))?;
+            Ok(())
+        });
         self
     }
 }
