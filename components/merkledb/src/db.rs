@@ -531,6 +531,11 @@ impl Snapshot for Patch {
 }
 
 impl Fork {
+    /// Creates a fork based on the provided `patch`.
+    ///
+    /// Note: using created fork to modify data already present in `patch` may lead
+    /// to an inconsistent database state. Hence, this method is useful only if you
+    /// are sure that the fork and `patch` interacted with different indices.
     pub fn from_patch(patch: Patch) -> Self {
         Self {
             patch,
@@ -589,20 +594,6 @@ impl Fork {
     /// Patch containing current changes made in this fork.
     pub fn working_patch(&self) -> &WorkingPatch {
         &self.working_patch
-    }
-
-    /// Creates a fork based on the provided `patch` and `snapshot`.
-    ///
-    /// Note: using created fork to modify data already present in `patch` may lead
-    /// to an inconsistent database state. Hence, this method is useful only if you
-    /// are sure that the fork and `patch` interacted with different indices.
-    pub fn from_patch(patch: Patch, snapshot: Box<dyn Snapshot>) -> Self {
-        let flushed = FlushedFork { snapshot, patch };
-
-        Self {
-            flushed,
-            working_patch: WorkingPatch::new(),
-        }
     }
 }
 
