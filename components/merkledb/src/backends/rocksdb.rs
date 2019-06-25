@@ -209,12 +209,12 @@ impl From<RocksDB> for Arc<dyn Database> {
 
 impl fmt::Debug for RocksDB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "RocksDB(..)")
+        f.debug_struct("RocksDB").finish()
     }
 }
 
 impl fmt::Debug for RocksDBSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "RocksDBSnapshot(..)")
+        f.debug_struct("RocksDBSnapshot").finish()
     }
 }

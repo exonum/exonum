@@ -312,7 +312,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn test_rollback() {
         let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();

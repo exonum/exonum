@@ -1,9 +1,8 @@
 use criterion::{black_box, Bencher, Criterion};
 use exonum_merkledb::{Database, IndexAccess, ListIndex, ObjectAccess, RefMut, TemporaryDB};
-use rand::{RngCore, SeedableRng};
-use rand_xorshift::XorShiftRng;
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-const SEED: [u8; 16] = [100; 16];
+const SEED: [u8; 32] = [100; 32];
 const ITEM_COUNT: u16 = 10000;
 
 fn bench_fn<T, F>(b: &mut Bencher, index_access: T, benchmark: F)
@@ -16,7 +15,7 @@ where
 
 fn bench_with_index_access<T: IndexAccess>(index_access: T) {
     for _ in 0..ITEM_COUNT {
-        let mut rng = XorShiftRng::from_seed(SEED);
+        let mut rng: StdRng = SeedableRng::from_seed(SEED);
         let index: ListIndex<_, u32> =
             ListIndex::new_in_family("index", &rng.next_u32(), index_access.clone());
         black_box(index);
@@ -25,7 +24,7 @@ fn bench_with_index_access<T: IndexAccess>(index_access: T) {
 
 fn bench_with_object_access<T: ObjectAccess>(object_access: T) {
     for _ in 0..ITEM_COUNT {
-        let mut rng = XorShiftRng::from_seed(SEED);
+        let mut rng: StdRng = SeedableRng::from_seed(SEED);
         let index: RefMut<ListIndex<_, u32>> = object_access.get_object(("index", &rng.next_u32()));
         black_box(index);
     }

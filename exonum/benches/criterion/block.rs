@@ -48,7 +48,6 @@ use exonum::{
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
 use rand::{Rng, SeedableRng};
-use rand_xorshift::XorShiftRng;
 use tempdir::TempDir;
 
 use std::{iter, sync::Arc};
@@ -109,7 +108,7 @@ mod timestamping {
         },
     };
     use exonum_merkledb::ObjectHash;
-    use rand::Rng;
+    use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
     use crate::proto;
@@ -171,7 +170,7 @@ mod timestamping {
         data: Hash,
     }
 
-    pub fn transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
             Tx {
@@ -181,7 +180,7 @@ mod timestamping {
         })
     }
 
-    pub fn panicking_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn panicking_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
             PanickingTx {
@@ -203,7 +202,7 @@ mod cryptocurrency {
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
-    use rand::{seq::SliceRandom, Rng};
+    use rand::{seq::SliceRandom, rngs::StdRng};
 
     use super::gen_keypair_from_rng;
     use crate::proto;
@@ -333,7 +332,7 @@ mod cryptocurrency {
         seed: u32,
     }
 
-    pub fn provable_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn provable_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -348,7 +347,7 @@ mod cryptocurrency {
         )
     }
 
-    pub fn unprovable_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn unprovable_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -363,7 +362,7 @@ mod cryptocurrency {
         )
     }
 
-    pub fn rollback_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn rollback_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -498,7 +497,7 @@ pub fn bench_block(criterion: &mut Criterion) {
         criterion,
         "block/timestamping",
         timestamping::Timestamping,
-        timestamping::transactions(XorShiftRng::from_seed([2; 16])),
+        timestamping::transactions(SeedableRng::from_seed([2; 32])),
     );
 
     // We expect lots of panics here, so we switch their reporting off.
@@ -508,7 +507,7 @@ pub fn bench_block(criterion: &mut Criterion) {
         criterion,
         "block/timestamping_panic",
         timestamping::Timestamping,
-        timestamping::panicking_transactions(XorShiftRng::from_seed([2; 16])),
+        timestamping::panicking_transactions(SeedableRng::from_seed([2; 32])),
     );
     panic::set_hook(panic_hook);
 
@@ -516,20 +515,20 @@ pub fn bench_block(criterion: &mut Criterion) {
         criterion,
         "block/cryptocurrency",
         cryptocurrency::Cryptocurrency,
-        cryptocurrency::provable_transactions(XorShiftRng::from_seed([3; 16])),
+        cryptocurrency::provable_transactions(SeedableRng::from_seed([3; 32])),
     );
 
     execute_block_rocksdb(
         criterion,
         "block/cryptocurrency_no_proofs",
         cryptocurrency::Cryptocurrency,
-        cryptocurrency::unprovable_transactions(XorShiftRng::from_seed([4; 16])),
+        cryptocurrency::unprovable_transactions(SeedableRng::from_seed([4; 32])),
     );
 
     execute_block_rocksdb(
         criterion,
         "block/cryptocurrency_rollback",
         cryptocurrency::Cryptocurrency,
-        cryptocurrency::rollback_transactions(XorShiftRng::from_seed([4; 16])),
+        cryptocurrency::rollback_transactions(SeedableRng::from_seed([4; 32])),
     );
 }

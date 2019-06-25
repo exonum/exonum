@@ -16,8 +16,7 @@ pub use crate::proto::schema::tests::TimestampTx;
 
 use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
 use protobuf::Message as PbMessage;
-use rand::{RngCore, SeedableRng};
-use rand_xorshift::XorShiftRng;
+use rand::{rngs::ThreadRng, thread_rng, RngCore};
 use semver::Version;
 
 use std::borrow::Cow;
@@ -76,7 +75,7 @@ impl TimestampingService {
 impl_binary_value_for_message! { TimestampTx }
 
 pub struct TimestampingTxGenerator {
-    rand: XorShiftRng,
+    rand: ThreadRng,
     data_size: usize,
     public_key: PublicKey,
     secret_key: SecretKey,
@@ -92,7 +91,7 @@ impl TimestampingTxGenerator {
         data_size: usize,
         keypair: (PublicKey, SecretKey),
     ) -> TimestampingTxGenerator {
-        let rand = XorShiftRng::from_seed([9; 16]);
+        let rand = thread_rng();
 
         TimestampingTxGenerator {
             rand,
