@@ -88,6 +88,7 @@ pub struct InstanceSpec {
     pub artifact: ArtifactId,
 }
 
+// TODO Replace by more convienent solution [ECR-3222]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum RuntimeIdentifier {
     Rust = 0,
