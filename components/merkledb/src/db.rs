@@ -22,7 +22,7 @@ use std::{
         HashMap,
     },
     fmt,
-    iter::{FromIterator, Iterator as StdIterator, Peekable},
+    iter::{Iterator as StdIterator, Peekable},
     mem,
     ops::{Deref, DerefMut},
 };
@@ -136,16 +136,6 @@ impl IntoIterator for Changes {
             inner: self.data.into_iter(),
         }
     }
-}
-
-/// A set of serial changes that should be applied to a storage atomically.
-///
-/// This set can contain changes from multiple tables. When a block is added to
-/// the blockchain, changes are first collected into a patch and then applied to
-/// the storage.
-#[derive(Debug, Clone)]
-pub struct Patch2 {
-    changes: HashMap<String, Changes>,
 }
 
 #[derive(Debug, Default)]
@@ -346,16 +336,15 @@ pub struct Fork {
     working_patch: WorkingPatch,
 }
 
+/// A set of serial changes that should be applied to a storage atomically.
+///
+/// This set can contain changes from multiple tables. When a block is added to
+/// the blockchain, changes are first collected into a patch and then applied to
+/// the storage.
 #[derive(Debug)]
 pub struct Patch {
     snapshot: Box<dyn Snapshot>,
     changes: HashMap<String, Changes>,
-}
-
-impl fmt::Debug for Box<dyn Snapshot> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Snapshot")
-    }
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
