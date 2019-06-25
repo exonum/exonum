@@ -26,8 +26,7 @@ use crate::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::{AnyTx, ServiceInstanceId, Signed},
     runtime::rust::{
-        RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
-        TransactionContext,
+        RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction, TransactionContext,
     },
 };
 

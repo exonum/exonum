@@ -430,9 +430,7 @@ mod tests {
         messages::ServiceInstanceId,
         node::ApiSender,
         proto::schema::tests::TestServiceTx,
-        runtime::rust::{
-            RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
-        },
+        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
     };
 
     use super::*;

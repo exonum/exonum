@@ -179,9 +179,7 @@ impl MessageVerifier {
 
         tx_sender
             .send_all(stream::iter_ok(
-                messages
-                    .into_iter()
-                    .map(InternalRequest::VerifyMessage),
+                messages.into_iter().map(InternalRequest::VerifyMessage),
             ))
             .map(drop)
             .map_err(drop)

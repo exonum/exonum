@@ -103,9 +103,7 @@ mod timestamping {
         crypto::Hash,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{
-            RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
-        },
+        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
     };
     use exonum_merkledb::ObjectHash;
     use rand::rngs::StdRng;
@@ -197,12 +195,10 @@ mod cryptocurrency {
         crypto::PublicKey,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{
-            RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
-        },
+        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
-    use rand::{seq::SliceRandom, rngs::StdRng};
+    use rand::{rngs::StdRng, seq::SliceRandom};
 
     use super::gen_keypair_from_rng;
     use crate::proto;

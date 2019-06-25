@@ -47,7 +47,9 @@ pub struct Dispatcher {
 
 impl std::fmt::Debug for Dispatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("Dispatcher").field("runtimes", &self.runtimes).finish()
+        f.debug_struct("Dispatcher")
+            .field("runtimes", &self.runtimes)
+            .finish()
     }
 }
 
@@ -175,7 +177,8 @@ impl Dispatcher {
 
     /// Registers service instance in the runtime lookup table.
     fn register_running_service(&mut self, spec: &InstanceSpec) {
-        self.runtime_lookup.insert(spec.id, spec.artifact.runtime_id);
+        self.runtime_lookup
+            .insert(spec.id, spec.artifact.runtime_id);
     }
 
     /// Just starts a new service instance.
