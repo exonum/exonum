@@ -41,12 +41,11 @@ rust:
   - 1.35.0
 
 cache:
+  npm: true
   directories:
-  - $HOME/.cargo
   - $HOME/.local
-  - $TRAVIS_BUILD_DIR/target
-  - $TRAVIS_BUILD_DIR/node_modules
-  - $TRAVIS_BUILD_DIR/testkit/server/node_modules
+  - $HOME/.cargo
+  timeout: 900
 
 dist: xenial
 sudo: required
@@ -120,7 +119,7 @@ jobs:
   - name: test
     install:
     - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
+    - cd $TRAVIS_BUILD_DIR/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
@@ -143,6 +142,9 @@ jobs:
   - name: benchmarks
     script:
     - RUST_LOG=off cargo check --benches --features "long_benchmarks"
+
+before_cache:
+  - rm -rf $HOME/.cargo/registry
 
 notifications:
   webhooks:
