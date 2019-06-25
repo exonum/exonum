@@ -98,20 +98,23 @@ jobs:
   # Run kcov.
   - name: kcov
     install:
-    - wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
-    - tar xzf v36.tar.gz
-    - cd kcov-36
-    - mkdir build
-    - cd build
-    - cmake ..
-    - make
-    - make install DESTDIR=../../kcov-build
-    - cd ../..
-    - rm -rf kcov-36
+    - |
+      if [ ! -f "$HOME/.local/bin/kcov" ]; then
+        wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
+        tar xzf v36.tar.gz
+        cd kcov-36
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=../../.local -DCMAKE_BUILD_TYPE=Release
+        make -j2
+        make install
+        cd ../..
+        rm -rf kcov-36
+      fi
     script:
     - cargo test --no-run
     - cd $TRAVIS_BUILD_DIR
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./.local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
