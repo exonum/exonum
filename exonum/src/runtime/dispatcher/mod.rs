@@ -47,7 +47,7 @@ pub struct Dispatcher {
 
 impl std::fmt::Debug for Dispatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("Dispatcher").finish()
+        f.debug_struct("Dispatcher").field("runtimes", &self.runtimes).finish()
     }
 }
 
