@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use failure::Error;
 use protobuf::well_known_types::Any;
 
@@ -23,9 +23,13 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
+    messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
     node::ApiSender,
-    runtime::{error::ExecutionError, rust::TransactionContext},
+    runtime::{
+        dispatcher::{self, Dispatcher},
+        error::ExecutionError,
+        ArtifactSpec, DeployError, DeployStatus, RuntimeContext,
+    },
 };
 
 use super::RustArtifactSpec;
@@ -40,7 +44,12 @@ pub trait ServiceDispatcher: Send {
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    fn configure(&self, _context: TransactionContext, _params: &Any) -> Result<(), ExecutionError> {
+    fn configure(
+        &self,
+        _descriptor: ServiceDescriptor,
+        _fork: &Fork,
+        _params: &Any,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -59,6 +68,15 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 pub trait ServiceFactory: Send + Debug + 'static {
     fn artifact(&self) -> RustArtifactSpec;
     fn new_instance(&self) -> Box<dyn Service>;
+}
+
+impl<T> From<T> for Box<dyn ServiceFactory>
+where
+    T: ServiceFactory,
+{
+    fn from(factory: T) -> Self {
+        Box::new(factory) as Self
+    }
 }
 
 #[derive(Debug)]
@@ -83,16 +101,46 @@ impl<'a> ServiceDescriptor<'a> {
     }
 }
 
-impl<T> From<T> for Box<dyn ServiceFactory>
-where
-    T: ServiceFactory,
-{
-    fn from(factory: T) -> Self {
-        Box::new(factory) as Self
+#[derive(Debug)]
+pub struct TransactionContext<'a, 'b> {
+    pub(super) service_descriptor: ServiceDescriptor<'a>,
+    pub(super) runtime_context: &'a mut RuntimeContext<'b>,
+    pub(super) dispatcher: &'a super::dispatcher::Dispatcher,
+}
+
+impl<'a, 'b> TransactionContext<'a, 'b> {
+    pub fn service_id(&self) -> ServiceInstanceId {
+        self.service_descriptor.service_id()
+    }
+
+    pub fn service_name(&self) -> &str {
+        self.service_descriptor.service_name()
+    }
+
+    pub fn fork(&self) -> &Fork {
+        self.runtime_context.fork
+    }
+
+    pub fn tx_hash(&self) -> Hash {
+        self.runtime_context.tx_hash
+    }
+
+    pub fn author(&self) -> PublicKey {
+        self.runtime_context.author
+    }
+
+    pub fn call(&mut self, call_info: CallInfo, payload: &[u8]) -> Result<(), ExecutionError> {
+        self.dispatcher
+            .call(self.runtime_context, call_info, payload)
+    }
+
+    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
+        self.runtime_context.dispatch_action(action)
     }
 }
 
 pub struct AfterCommitContext<'a> {
+    dispatcher: &'a Dispatcher,
     service_descriptor: ServiceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
     service_keypair: &'a (PublicKey, SecretKey),
@@ -102,12 +150,14 @@ pub struct AfterCommitContext<'a> {
 impl<'a> AfterCommitContext<'a> {
     /// Creates context for `after_commit` method.
     pub(crate) fn new(
+        dispatcher: &'a Dispatcher,
         service_descriptor: ServiceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
+            dispatcher,
             service_descriptor,
             snapshot,
             service_keypair,
@@ -161,6 +211,16 @@ impl<'a> AfterCommitContext<'a> {
             error!("Couldn't broadcast transaction {}.", e);
         }
     }
+
+    // TODO implement pending deployment logic [ECR-3291]
+    pub(crate) fn _check_deploy_status(
+        &self,
+        artifact: &ArtifactSpec,
+        cancel_if_not_complete: bool,
+    ) -> Result<DeployStatus, DeployError> {
+        self.dispatcher
+            .check_deploy_status(artifact, cancel_if_not_complete)
+    }
 }
 
 impl<'a> Debug for AfterCommitContext<'a> {
@@ -171,12 +231,13 @@ impl<'a> Debug for AfterCommitContext<'a> {
     }
 }
 
+/// Transaction specification for the concrete service interface.
 pub trait Transaction: BinaryValue {
     /// Service interface associated for the given transaction.
     type Service;
     /// Identifier of service method which executes the given transaction.
     const METHOD_ID: MethodId;
-    /// Signs given data as service transaction with the specified identifier.
+    /// Signs given data as service transaction with the specified instance identifier.
     fn sign(
         self,
         service_id: ServiceInstanceId,
@@ -200,7 +261,7 @@ macro_rules! impl_service_dispatcher {
             fn call(
                 &self,
                 method: $crate::messages::MethodId,
-                ctx: $crate::runtime::rust::TransactionContext,
+                ctx: $crate::runtime::rust::service::TransactionContext,
                 payload: &[u8],
             ) -> Result<Result<(), $crate::runtime::error::ExecutionError>, failure::Error> {
                 <$struct_name as $interface>::_dispatch(self, ctx, method, payload)

@@ -28,8 +28,8 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState,
-        StoredConfiguration, ValidatorKeys,
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema,
+        SharedNodeState, StoredConfiguration, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -47,7 +47,6 @@ use crate::{
         ListenerConfig, NodeHandler, NodeSender, PeerAddress, ServiceConfig, State,
         SystemStateProvider,
     },
-    runtime::dispatcher::{BuiltinService, DispatcherBuilder},
     sandbox::{
         config_updater::ConfigUpdaterService, sandbox_tests_helper::PROPOSE_TIMEOUT,
         timestamping::TimestampingService,
@@ -954,7 +953,7 @@ impl ConnectList {
 
 pub struct SandboxBuilder {
     initialize: bool,
-    services: Vec<BuiltinService>,
+    services: Vec<InstanceCollection>,
     validators_count: u8,
     consensus_config: ConsensusConfig,
 }
@@ -984,7 +983,7 @@ impl SandboxBuilder {
         self
     }
 
-    pub fn with_services(mut self, services: Vec<BuiltinService>) -> Self {
+    pub fn with_services(mut self, services: Vec<InstanceCollection>) -> Self {
         self.services = services;
         self
     }
@@ -1027,7 +1026,7 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 
 /// Constructs an uninitialized instance of a `Sandbox`.
 fn sandbox_with_services_uninitialized(
-    services: Vec<BuiltinService>,
+    services: Vec<InstanceCollection>,
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
@@ -1055,23 +1054,6 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
-    let dispatcher = {
-        let mut builder = DispatcherBuilder::new(mpsc::channel(0).0);
-        for service in services {
-            builder = builder.with_builtin_service(service);
-        }
-        builder.finalize()
-    };
-
-    let api_channel = mpsc::unbounded();
-    let mut blockchain = Blockchain::with_dispatcher(
-        TemporaryDB::new(),
-        dispatcher,
-        service_keys[0].0,
-        service_keys[0].1.clone(),
-        ApiSender::new(api_channel.0.clone()),
-    );
-
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
         validators
@@ -1086,7 +1068,15 @@ fn sandbox_with_services_uninitialized(
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
-    blockchain.initialize(genesis).unwrap();
+    let api_channel = mpsc::unbounded();
+    let blockchain = Blockchain::new(
+        TemporaryDB::new(),
+        services,
+        genesis,
+        service_keys[0].clone(),
+        ApiSender::new(api_channel.0.clone()),
+        mpsc::channel(0).0,
+    );
 
     let config = Configuration {
         listener: ListenerConfig {
@@ -1161,8 +1151,16 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     SandboxBuilder::new().with_services(vec![
-        BuiltinService::from(TimestampingService),
-        BuiltinService::from(ConfigUpdaterService),
+        InstanceCollection::new(TimestampingService).with_instance(
+            TimestampingService::ID,
+            "timestamping",
+            (),
+        ),
+        InstanceCollection::new(ConfigUpdaterService).with_instance(
+            ConfigUpdaterService::ID,
+            "config-updater",
+            (),
+        ),
     ])
 }
 
@@ -1242,16 +1240,6 @@ mod tests {
 
     impl AfterCommitService {
         pub const ID: ServiceInstanceId = 2;
-    }
-
-    impl From<AfterCommitService> for BuiltinService {
-        fn from(factory: AfterCommitService) -> Self {
-            Self {
-                factory: factory.into(),
-                instance_id: AfterCommitService::ID,
-                instance_name: "after_commit".into(),
-            }
-        }
     }
 
     impl TxAfterCommit {
@@ -1442,8 +1430,16 @@ mod tests {
     fn test_sandbox_service_after_commit() {
         let sandbox = SandboxBuilder::new()
             .with_services(vec![
-                BuiltinService::from(AfterCommitService),
-                BuiltinService::from(TimestampingService),
+                InstanceCollection::new(TimestampingService).with_instance(
+                    TimestampingService::ID,
+                    "timestamping",
+                    (),
+                ),
+                InstanceCollection::new(AfterCommitService).with_instance(
+                    AfterCommitService::ID,
+                    "after-commit",
+                    (),
+                ),
             ])
             .build();
         let state = SandboxState::new();

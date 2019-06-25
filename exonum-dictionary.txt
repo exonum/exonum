@@ -75,10 +75,10 @@ markdownlint
 memlimit
 memorydb
 mempool
-metadada
 Merkelized
 Merkle
 merkledb
+metadada
 middlewares
 millis
 mkdir
@@ -194,5 +194,5 @@ whitelisted
 writeln
 xorshift
 xsalsa
-zeroize
 xsalsa
+zeroize

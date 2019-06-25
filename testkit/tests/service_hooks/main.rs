@@ -20,13 +20,13 @@ pub use crate::hooks::{AfterCommitService, TxAfterCommit, SERVICE_ID, SERVICE_NA
 
 use exonum::{helpers::Height, runtime::rust::Transaction};
 use exonum_merkledb::{BinaryValue, ObjectHash};
-use exonum_testkit::{ServiceInstances, TestKitBuilder};
+use exonum_testkit::{InstanceCollection, TestKitBuilder};
 
 mod hooks;
 mod proto;
 
-fn after_commit_service_instances(factory: AfterCommitService) -> ServiceInstances {
-    ServiceInstances::new(factory).with_instance(SERVICE_NAME, SERVICE_ID, ())
+fn after_commit_service_instances(factory: AfterCommitService) -> InstanceCollection {
+    InstanceCollection::new(factory).with_instance(SERVICE_ID, SERVICE_NAME, ())
 }
 
 #[test]

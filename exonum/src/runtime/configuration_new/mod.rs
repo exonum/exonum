@@ -20,10 +20,10 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::Hash,
     runtime::{
-        dispatcher::{Action, BuiltinService},
+        dispatcher::Action,
         error::ExecutionError,
         rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ServiceConstructor, ServiceInstanceSpec,
+        InstanceSpec, ServiceConfig,
     },
 };
 
@@ -41,11 +41,8 @@ mod schema;
 mod transactions;
 
 /// Service identifier for the configuration service.
-pub const SERVICE_ID: ServiceInstanceId = 0;
 pub const DEPLOY_METHOD_ID: MethodId = 3;
 pub const INIT_METHOD_ID: MethodId = 4;
-/// Configuration service name.
-pub const SERVICE_NAME: &str = "configuration";
 
 /// Constant artifact spec.
 pub fn artifact_spec() -> RustArtifactSpec {
@@ -92,7 +89,7 @@ impl ConfigurationServiceImpl {
             return None;
         }
 
-        let id = service_ids.iter().count() as u32 + 1; // TODO O(n) optimize
+        let id = service_ids.iter().count() as u32 + 2; // TODO O(n) optimize
         service_ids.put(instance_name, id);
 
         Some(id)
@@ -202,13 +199,13 @@ impl ConfigurationService for ConfigurationServiceImpl {
             arg.instance_name, instance_id
         );
 
-        let spec = ServiceInstanceSpec {
+        let spec = InstanceSpec {
             id: instance_id,
             name: arg.instance_name,
             artifact,
         };
 
-        let constructor = ServiceConstructor {
+        let constructor = ServiceConfig {
             data: arg.constructor_data,
         };
 
@@ -227,6 +224,11 @@ impl Service for ConfigurationServiceImpl {
 #[derive(Debug, Default)]
 pub struct ConfigurationServiceFactory;
 
+impl ConfigurationServiceFactory {
+    pub const BUILTIN_ID: ServiceInstanceId = 1;
+    pub const BUILTIN_NAME: &'static str = "config";
+}
+
 impl ServiceFactory for ConfigurationServiceFactory {
     fn artifact(&self) -> RustArtifactSpec {
         artifact_spec()
@@ -234,15 +236,5 @@ impl ServiceFactory for ConfigurationServiceFactory {
 
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(ConfigurationServiceImpl)
-    }
-}
-
-impl From<ConfigurationServiceFactory> for BuiltinService {
-    fn from(factory: ConfigurationServiceFactory) -> Self {
-        BuiltinService {
-            factory: factory.into(),
-            instance_id: 0,
-            instance_name: "config".to_owned(),
-        }
     }
 }

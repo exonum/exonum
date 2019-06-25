@@ -15,13 +15,10 @@
 // This is a regression test for exonum node.
 
 use exonum::{
-    blockchain::Blockchain,
+    blockchain::InstanceCollection,
     helpers, impl_service_dispatcher,
-    node::{ApiSender, ExternalMessage, Node, NodeChannel, NodeConfig},
-    runtime::{
-        dispatcher::{BuiltinService, DispatcherBuilder},
-        rust::{AfterCommitContext, RustArtifactSpec, Service, ServiceFactory},
-    },
+    node::{ApiSender, ExternalMessage, Node, NodeConfig},
+    runtime::rust::{AfterCommitContext, RustArtifactSpec, Service, ServiceFactory},
 };
 use exonum_derive::service_interface;
 use exonum_merkledb::{Database, TemporaryDB};
@@ -101,21 +98,15 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
 
-        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let blockchain = Blockchain::with_dispatcher(
+        let node = Node::new(
             TemporaryDB::new(),
-            DispatcherBuilder::new(channel.internal_requests.0.clone())
-                .with_builtin_service(BuiltinService {
-                    factory: Box::new(CommitWatcherService(RefCell::new(Some(commit_tx)))),
-                    instance_id: 2,
-                    instance_name: "commit-watcher".to_owned(),
-                })
-                .finalize(),
-            node_cfg.service_public_key,
-            node_cfg.service_secret_key.clone(),
-            ApiSender::new(channel.api_requests.0.clone()),
+            vec![
+                InstanceCollection::new(CommitWatcherService(RefCell::new(Some(commit_tx))))
+                    .with_instance(2, "commit-watcher", ()),
+            ],
+            node_cfg,
+            None,
         );
-        let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
 
         let api_tx = node.channel();
         node_threads.push(RunHandle {
@@ -152,33 +143,29 @@ fn test_node_run() {
 
 #[test]
 fn test_node_restart_regression() {
-    let start_node = |node_cfg: NodeConfig, db, start_times| {
-        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let blockchain = Blockchain::with_dispatcher(
-            db,
-            DispatcherBuilder::new(channel.internal_requests.0.clone())
-                .with_builtin_service(BuiltinService {
-                    factory: Box::new(StartCheckerServiceFactory(start_times)),
-                    instance_id: 1,
-                    instance_name: "startup-checker".to_owned(),
-                })
-                .finalize(),
-            node_cfg.service_public_key,
-            node_cfg.service_secret_key.clone(),
-            ApiSender::new(channel.api_requests.0.clone()),
-        );
-        let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
+    let start_node =
+        |node_cfg: NodeConfig, db, start_times| {
+            let node =
+                Node::new(
+                    db,
+                    vec![
+                        InstanceCollection::new(StartCheckerServiceFactory(start_times))
+                            .with_instance(4, "startup-checker", ()),
+                    ],
+                    node_cfg,
+                    None,
+                );
 
-        let api_tx = node.channel();
-        let node_thread = thread::spawn(move || {
-            node.run().unwrap();
-        });
-        // Wait for shutdown
-        api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
-        node_thread.join().unwrap();
-    };
+            let api_tx = node.channel();
+            let node_thread = thread::spawn(move || {
+                node.run().unwrap();
+            });
+            // Wait for shutdown
+            api_tx
+                .send_external_message(ExternalMessage::Shutdown)
+                .unwrap();
+            node_thread.join().unwrap();
+        };
 
     let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;
     let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();

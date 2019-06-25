@@ -17,7 +17,7 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
-use exonum_merkledb::{ListProof, Snapshot};
+use exonum_merkledb::{ListProof, ObjectHash, Snapshot};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use std::{
@@ -33,7 +33,7 @@ use crate::{
         Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
         TransactionResult, TxLocation,
     },
-    crypto::{CryptoHash, Hash},
+    crypto::Hash,
     helpers::Height,
     messages::{Precommit, Signed},
 };
@@ -605,7 +605,7 @@ impl BlockchainExplorer {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn precommits(&self, block: &Block) -> Vec<Signed<Precommit>> {
         let schema = Schema::new(&self.snapshot);
-        let precommits_table = schema.precommits(&block.hash());
+        let precommits_table = schema.precommits(&block.object_hash());
         let precommits = precommits_table.iter().collect();
         precommits
     }

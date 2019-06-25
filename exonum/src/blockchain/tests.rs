@@ -18,17 +18,14 @@ use exonum_merkledb::{Database, Error as StorageError, ListIndex, ObjectHash, Te
 use futures::sync::mpsc;
 
 use crate::{
-    blockchain::{Blockchain, ExecutionResult, Schema},
+    blockchain::{Blockchain, ExecutionResult, InstanceCollection, Schema},
     crypto::gen_keypair,
-    helpers::{Height, ValidatorId},
+    helpers::{generate_testnet_config, Height, ValidatorId},
     impl_service_dispatcher,
     messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
-    runtime::{
-        dispatcher::{BuiltinService, DispatcherBuilder},
-        rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
-    },
+    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -186,28 +183,23 @@ fn create_blockchain_with_service(
     id: ServiceInstanceId,
     name: &str,
 ) -> Blockchain {
-    let service_keypair = gen_keypair();
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let service_keypair = config.service_keypair();
     let api_channel = mpsc::unbounded();
     let internal_sender = mpsc::channel(1).0;
 
-    Blockchain::with_dispatcher(
+    Blockchain::new(
         TemporaryDB::new(),
-        DispatcherBuilder::new(internal_sender)
-            .with_builtin_service(BuiltinService {
-                factory: factory.into(),
-                instance_id: id,
-                instance_name: name.into(),
-            })
-            .finalize(),
-        service_keypair.0,
-        service_keypair.1,
+        vec![InstanceCollection::new(factory).with_instance(id, name, ())],
+        config.genesis,
+        service_keypair,
         ApiSender::new(api_channel.0),
+        internal_sender,
     )
 }
 
 #[test]
 fn handling_tx_panic_error() {
-    let _ = crate::helpers::init_logger();
     let mut blockchain = create_blockchain();
 
     let (pk, sec_key) = gen_keypair();
@@ -302,14 +294,14 @@ fn handling_tx_panic_storage_error() {
 
 #[test]
 fn service_execute_good() {
-    let blockchain = create_blockchain_with_service(ServiceGoodImpl, 1, "service_good");
+    let blockchain = create_blockchain_with_service(ServiceGoodImpl, 3, "service_good");
     let mut db = TemporaryDB::new();
     assert_service_execute(&blockchain, &mut db);
 }
 
 #[test]
 fn service_execute_panic() {
-    let blockchain = create_blockchain_with_service(ServicePanicImpl, 1, "service_panic");
+    let blockchain = create_blockchain_with_service(ServicePanicImpl, 4, "service_panic");
     let mut db = TemporaryDB::new();
     assert_service_execute_panic(&blockchain, &mut db);
 }
@@ -318,7 +310,7 @@ fn service_execute_panic() {
 #[should_panic]
 fn service_execute_panic_storage_error() {
     let blockchain =
-        create_blockchain_with_service(ServicePanicStorageErrorImpl, 1, "service_execute_error");
+        create_blockchain_with_service(ServicePanicStorageErrorImpl, 5, "service_execute_error");
     let mut db = TemporaryDB::new();
     assert_service_execute_panic(&blockchain, &mut db);
 }

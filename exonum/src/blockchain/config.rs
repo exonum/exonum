@@ -25,10 +25,10 @@ use exonum_merkledb::{BinaryValue, ObjectHash};
 use serde::de::Error;
 use serde_json::Error as JsonError;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use crate::{
-    crypto::{hash, CryptoHash, Hash, PublicKey},
+    crypto::{Hash, PublicKey},
     helpers::{Height, Milliseconds},
     messages::SIGNED_MESSAGE_MIN_SIZE,
 };
@@ -45,8 +45,7 @@ pub struct ValidatorKeys {
     pub service_key: PublicKey,
 }
 
-/// Exonum blockchain global configuration. Services
-/// and their parameters are also included into this configuration.
+/// Exonum blockchain global configuration.
 ///
 /// This configuration must be the same for any Exonum node in a certain
 /// network on the given height.
@@ -66,10 +65,6 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Services specific variables.
-    /// Keys are `service_name` from the `Service` trait and values are the serialized JSON.
-    #[serde(default)]
-    pub services: BTreeMap<String, serde_json::Value>,
 }
 
 /// Consensus algorithm parameters.
@@ -251,13 +246,6 @@ impl StoredConfiguration {
     }
 }
 
-impl CryptoHash for StoredConfiguration {
-    fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize().unwrap();
-        hash(&vec_bytes)
-    }
-}
-
 impl_object_hash_for_binary_value! { StoredConfiguration }
 
 impl BinaryValue for StoredConfiguration {
@@ -384,7 +372,6 @@ mod tests {
             actual_from: Height(42),
             validator_keys,
             consensus: ConsensusConfig::default(),
-            services: BTreeMap::new(),
         }
     }
 

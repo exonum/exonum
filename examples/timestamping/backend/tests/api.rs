@@ -25,7 +25,7 @@ use exonum::{
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, ServiceInstances, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
 use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use exonum_timestamping::{
     api::TimestampQuery,
@@ -45,12 +45,12 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let mut testkit = TestKitBuilder::validator()
         .with_service(
-            ServiceInstances::new(TimeServiceFactory::with_provider(mock_provider.clone()))
-                .with_instance(TIME_SERVICE_NAME, TIME_SERVICE_ID, ()),
+            InstanceCollection::new(TimeServiceFactory::with_provider(mock_provider.clone()))
+                .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
         )
-        .with_service(ServiceInstances::new(TimestampingService).with_instance(
-            SERVICE_NAME,
+        .with_service(InstanceCollection::new(TimestampingService).with_instance(
             SERVICE_ID,
+            SERVICE_NAME,
             Config {
                 time_service_name: TIME_SERVICE_NAME.to_owned(),
                 time_service_id: TIME_SERVICE_ID,

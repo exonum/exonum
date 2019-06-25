@@ -19,7 +19,7 @@ use protobuf::well_known_types::Any;
 
 use crate::{
     blockchain::{Schema as CoreSchema, StoredConfiguration},
-    crypto::{CryptoHash, Hash, PublicKey},
+    crypto::{Hash, PublicKey},
     node::State,
     proto,
     runtime::ArtifactSpec,
@@ -29,7 +29,6 @@ use super::{
     config::ConfigurationServiceConfig,
     errors::Error as ServiceError,
     schema::{MaybeVote, ProposeData, Schema, VotingDecision},
-    SERVICE_NAME,
 };
 
 /// Propose a new configuration.
@@ -142,11 +141,7 @@ pub fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool 
 }
 
 fn get_service_config(config: &StoredConfiguration) -> ConfigurationServiceConfig {
-    config
-        .services
-        .get(SERVICE_NAME)
-        .map(|config| serde_json::from_value(config.clone()).expect("Configuration is invalid"))
-        .unwrap_or_default()
+    unimplemented!()
 }
 
 impl Propose {
@@ -177,7 +172,7 @@ impl Propose {
 
         let cfg = StoredConfiguration::from_bytes(self.cfg.as_bytes().into())
             .expect("Can't deserialize stored configuration");
-        let cfg_hash = CryptoHash::hash(&cfg);
+        let cfg_hash = cfg.object_hash();
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
             return Err(AlreadyProposed(old_propose));
         }
@@ -194,7 +189,7 @@ impl Propose {
         use self::ServiceError::*;
 
         let actual_config = CoreSchema::new(snapshot).actual_configuration();
-        if candidate.previous_cfg_hash != actual_config.hash() {
+        if candidate.previous_cfg_hash != actual_config.object_hash() {
             return Err(InvalidConfigRef(actual_config));
         }
 
@@ -369,7 +364,7 @@ pub struct Deploy {
 fn artifact_spec_from_any(runtime_id: u32, artifact_spec: &Any) -> ArtifactSpec {
     ArtifactSpec {
         runtime_id,
-        raw_spec: artifact_spec.get_value().to_vec(),
+        raw: artifact_spec.get_value().to_vec(),
     }
 }
 

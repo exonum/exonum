@@ -302,11 +302,6 @@ impl ServiceContext {
         &self.stored_configuration.consensus
     }
 
-    /// Returns service specific global variables as a JSON value.
-    pub fn actual_service_config(&self, service: &dyn Service) -> &Value {
-        &self.stored_configuration.services[service.service_name()]
-    }
-
     /// Signs and broadcasts transaction to other nodes in the network.
     pub fn broadcast_transaction<T>(&self, tx: T)
     where

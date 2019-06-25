@@ -25,7 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use exonum_merkledb::{Database, DbOptions};
+use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Sink};
 use tokio_core::reactor::Core;
@@ -50,9 +50,10 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState, ValidatorKeys,
+        Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema, SharedNodeState,
+        ValidatorKeys,
     },
-    crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey},
+    crypto::{self, read_keys_from_file, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
@@ -67,7 +68,6 @@ use crate::{
     },
     messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage},
     node::state::SharedConnectList,
-    runtime::rust::service::ServiceFactory,
 };
 
 mod basic;
@@ -275,6 +275,13 @@ pub struct NodeConfig<T = SecretKey> {
     pub thread_pool_size: Option<u8>,
 }
 
+impl NodeConfig<SecretKey> {
+    /// Returns service keypair.
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
+        (self.service_public_key, self.service_secret_key.clone())
+    }
+}
+
 impl NodeConfig<PathBuf> {
     /// Converts `NodeConfig<PathBuf>` to `NodeConfig<SecretKey>` reading the key files.
     pub fn read_secret_keys(
@@ -449,7 +456,7 @@ impl NodeHandler {
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
-            (block.hash(), block.height().next())
+            (block.object_hash(), block.height().next())
         };
 
         let snapshot = blockchain.snapshot();
@@ -748,7 +755,7 @@ impl NodeHandler {
 
     /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain.last_block().hash()
+        self.blockchain.last_block().object_hash()
     }
 
     /// Returns start time of the requested round.
@@ -896,18 +903,18 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new<D: Into<Arc<dyn Database>>>(
-        db: D,
-        services: Vec<Box<dyn ServiceFactory>>,
+    pub fn new(
+        database: impl Into<Arc<dyn Database>>,
+        services: impl IntoIterator<Item = InstanceCollection>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let blockchain = Blockchain::new(
-            db,
+            database,
             services,
-            node_cfg.service_public_key,
-            node_cfg.service_secret_key.clone(),
+            node_cfg.genesis.clone(),
+            node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
             channel.internal_requests.0.clone(),
         );
@@ -915,13 +922,12 @@ impl Node {
     }
 
     pub fn with_blockchain(
-        mut blockchain: Blockchain,
+        blockchain: Blockchain,
         channel: NodeChannel,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
-        blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
         let peers = node_cfg.connect_list.addresses();
 
@@ -1143,7 +1149,6 @@ mod tests {
         messages::AnyTx,
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
-            dispatcher::{BuiltinService, DispatcherBuilder},
             rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
             ServiceInstanceId,
         },
@@ -1151,7 +1156,7 @@ mod tests {
 
     use super::*;
 
-    const SERVICE_ID: ServiceInstanceId = 0;
+    const SERVICE_ID: ServiceInstanceId = 15;
 
     impl_binary_value_for_message! { TxSimple }
 
@@ -1183,16 +1188,6 @@ mod tests {
         }
     }
 
-    impl From<TestService> for BuiltinService {
-        fn from(factory: TestService) -> Self {
-            Self {
-                factory: Box::new(factory),
-                instance_id: SERVICE_ID,
-                instance_name: "test-service".into(),
-            }
-        }
-    }
-
     fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<AnyTx> {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
@@ -1206,20 +1201,14 @@ mod tests {
         let (p_key, s_key) = gen_keypair();
 
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
-        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let dispatcher = DispatcherBuilder::new(channel.internal_requests.0.clone())
-            .with_builtin_service(TestService)
-            .finalize();
 
-        let mut node = Node::with_blockchain(
-            Blockchain::with_dispatcher(
-                TemporaryDB::new(),
-                dispatcher,
-                node_cfg.service_public_key,
-                node_cfg.service_secret_key.clone(),
-                ApiSender::new(channel.api_requests.0.clone()),
-            ),
-            channel,
+        let mut node = Node::new(
+            TemporaryDB::new(),
+            vec![InstanceCollection::new(TestService).with_instance(
+                SERVICE_ID,
+                "test-service",
+                (),
+            )],
             node_cfg,
             None,
         );
@@ -1252,10 +1241,9 @@ mod tests {
     fn test_transaction_without_service() {
         let (p_key, s_key) = gen_keypair();
 
-        let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(TemporaryDB::new(), services, node_cfg, None);
+        let mut node = Node::new(TemporaryDB::new(), Vec::new(), node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 

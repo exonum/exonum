@@ -15,21 +15,19 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema},
+    blockchain::{Blockchain, ExecutionError, ExecutionResult, InstanceCollection, Schema},
     crypto::{self, PublicKey, SecretKey},
+    helpers::generate_testnet_config,
     impl_service_dispatcher,
     messages::{AnyTx, Message, ServiceInstanceId, Signed},
     node::ApiSender,
-    runtime::{
-        dispatcher::{BuiltinService, DispatcherBuilder},
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
-    },
+    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
 };
 use exonum_merkledb::{ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
 use semver::Version;
 
-pub const SERVICE_ID: ServiceInstanceId = 0;
+pub const SERVICE_ID: ServiceInstanceId = 4;
 
 mod proto;
 
@@ -119,36 +117,16 @@ pub fn consensus_keys() -> (PublicKey, SecretKey) {
 
 /// Creates a blockchain with no blocks.
 pub fn create_blockchain() -> Blockchain {
-    use exonum::blockchain::{GenesisConfig, ValidatorKeys};
-
-    let (consensus_key, _) = consensus_keys();
-    let service_keys = crypto::gen_keypair();
-
-    let api_channel = mpsc::unbounded();
-    let internal_sender = mpsc::channel(1).0;
-
-    let mut blockchain = Blockchain::with_dispatcher(
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let service_keypair = config.service_keypair();
+    Blockchain::new(
         TemporaryDB::new(),
-        DispatcherBuilder::new(internal_sender)
-            .with_builtin_service(BuiltinService {
-                factory: MyService.into(),
-                instance_id: SERVICE_ID,
-                instance_name: "my-service".into(),
-            })
-            .finalize(),
-        service_keys.0,
-        service_keys.1,
-        ApiSender(api_channel.0),
-    );
-
-    let keys = ValidatorKeys {
-        consensus_key,
-        service_key: service_keys.0,
-    };
-    blockchain
-        .initialize(GenesisConfig::new(vec![keys].into_iter()))
-        .unwrap();
-    blockchain
+        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
+        config.genesis,
+        service_keypair,
+        ApiSender(mpsc::unbounded().0),
+        mpsc::channel(0).0,
+    )
 }
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*

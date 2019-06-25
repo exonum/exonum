@@ -88,7 +88,7 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
     let (p, s) = crypto::gen_keypair();
     (0..count)
         .map(|_| {
-            let msg = Message::concrete(AnyTx::as_raw_tx(0, 0, vec![0; tx_size]), p, &s);
+            let msg = Message::concrete(AnyTx::new(0, 0, vec![0; tx_size]), p, &s);
             msg.into_bytes()
         })
         .collect()
@@ -181,7 +181,7 @@ impl MessageVerifier {
             .send_all(stream::iter_ok(
                 messages
                     .into_iter()
-                    .map(|message| InternalRequest::VerifyMessage(message)),
+                    .map(InternalRequest::VerifyMessage),
             ))
             .map(drop)
             .map_err(drop)

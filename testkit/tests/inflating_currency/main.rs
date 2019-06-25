@@ -27,7 +27,7 @@ use exonum::{
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{txvec, ApiKind, ServiceInstances, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{txvec, ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 use serde_json::json;
 
@@ -41,9 +41,9 @@ mod proto;
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ServiceInstances::new(CurrencyService).with_instance(
-            SERVICE_NAME,
+        .with_service(InstanceCollection::new(CurrencyService).with_instance(
             SERVICE_ID,
+            SERVICE_NAME,
             (),
         ))
         .create()

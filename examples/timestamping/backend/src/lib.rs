@@ -42,11 +42,9 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
     impl_service_dispatcher,
-    runtime::rust::{
-        RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
-    },
+    runtime::rust::{RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory},
 };
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use protobuf::well_known_types::Any;
 
 use crate::{
@@ -61,11 +59,16 @@ pub struct TimestampingService;
 impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
 impl Service for TimestampingService {
-    fn configure(&self, context: TransactionContext, params: &Any) -> Result<(), ExecutionError> {
+    fn configure(
+        &self,
+        descriptor: ServiceDescriptor,
+        fork: &Fork,
+        params: &Any,
+    ) -> Result<(), ExecutionError> {
         let config = Config::from_bytes(params.get_value().into())
             .map_err(|e| ExecutionError::with_description(0, e.to_string()))?;
 
-        Schema::new(context.service_name(), context.fork())
+        Schema::new(descriptor.service_name(), fork)
             .config()
             .set(config);
         Ok(())

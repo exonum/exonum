@@ -33,6 +33,7 @@
 
 pub use self::{
     block::{Block, BlockProof},
+    builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{Schema, TxLocation},
@@ -52,7 +53,7 @@ use exonum_merkledb::{
 use futures::sync::mpsc;
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fmt, iter, mem, panic,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -63,15 +64,13 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
     node::ApiSender,
-    runtime::configuration_new::ConfigurationServiceFactory,
     runtime::{
-        dispatcher::{Dispatcher, DispatcherBuilder},
-        rust::service::ServiceFactory,
-        RuntimeContext,
+        configuration_new::ConfigurationServiceFactory, dispatcher::Dispatcher, RuntimeContext,
     },
 };
 
 mod block;
+mod builder;
 mod genesis;
 mod schema;
 mod service;
@@ -83,8 +82,8 @@ mod tests;
 /// Transaction message shortcut.
 pub type TransactionMessage = Signed<AnyTx>;
 
-/// Id of core service table family.
-pub const CORE_SERVICE: u16 = 0;
+/// Id of core information schema.
+pub const CORE_ID: u16 = 0;
 
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
@@ -95,34 +94,38 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
-    pub dispatcher: Arc<Mutex<Dispatcher>>,
+    dispatcher: Arc<Mutex<Dispatcher>>,
 }
 
 impl Blockchain {
-    /// Constructs a blockchain for the given `db` and list of available artifacts.
+    /// Constructs a blockchain for the given `database` and list of `services`, also adds builtin services.
+    // TODO Write proper doc string. [ECR-3275]
     pub fn new(
-        db: impl Into<Arc<dyn Database>>,
-        services: Vec<Box<dyn ServiceFactory>>,
-        service_public_key: PublicKey,
-        service_secret_key: SecretKey,
+        database: impl Into<Arc<dyn Database>>,
+        services: impl IntoIterator<Item = InstanceCollection>,
+        config: GenesisConfig,
+        service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
-        internal_req_sender: mpsc::Sender<InternalRequest>,
+        dispatcher_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        let dispatcher = DispatcherBuilder::new(internal_req_sender)
-            .with_builtin_service(ConfigurationServiceFactory)
-            .with_service_factories(services)
-            .finalize();
-        Self::with_dispatcher(
-            db,
-            dispatcher,
-            service_public_key,
-            service_secret_key,
-            api_sender,
-        )
+        let mut services = services.into_iter().collect::<Vec<_>>();
+        // Adds builtin configuration service.
+        services.push(
+            InstanceCollection::new(ConfigurationServiceFactory).with_instance(
+                ConfigurationServiceFactory::BUILTIN_ID,
+                ConfigurationServiceFactory::BUILTIN_NAME,
+                (),
+            ),
+        );
+
+        BlockchainBuilder::new(database, config, service_keypair)
+            .with_rust_runtime(services)
+            .finalize(api_sender, dispatcher_requests)
+            .expect("Unable to create blockchain instance")
     }
 
     /// Creates the blockchain instance with the specified dispatcher.
-    pub fn with_dispatcher(
+    pub(crate) fn with_dispatcher(
         db: impl Into<Arc<dyn Database>>,
         dispatcher: Dispatcher,
         service_public_key: PublicKey,
@@ -147,8 +150,7 @@ impl Blockchain {
     }
 
     /// Returns reference to the underlying runtime dispatcher.
-    #[doc(hidden)]
-    pub fn dispatcher(&self) -> MutexGuard<Dispatcher> {
+    pub(crate) fn dispatcher(&self) -> MutexGuard<Dispatcher> {
         self.dispatcher.lock().unwrap()
     }
 
@@ -186,23 +188,6 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
-    /// Creates and commits the genesis block with the given genesis configuration
-    /// if the blockchain has not been initialized.
-    ///
-    /// # Panics
-    ///
-    /// * If the genesis block was not committed.
-    /// * If storage version is not specified or not supported.
-    pub fn initialize(&mut self, cfg: GenesisConfig) -> Result<(), failure::Error> {
-        let has_genesis_block = !Schema::new(&self.snapshot())
-            .block_hashes_by_height()
-            .is_empty();
-        if !has_genesis_block {
-            self.create_genesis_block(cfg)?;
-        }
-        Ok(())
-    }
-
     /// Creates and commits the genesis block with the given genesis configuration.
     fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), failure::Error> {
         let config_propose = StoredConfiguration {
@@ -210,7 +195,6 @@ impl Blockchain {
             actual_from: Height::zero(),
             validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
-            services: BTreeMap::new(),
         };
 
         let patch = {
@@ -316,7 +300,7 @@ impl Blockchain {
                     let mut state_hashes = Vec::new();
 
                     for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
-                        let key = Self::service_table_unique_key(CORE_SERVICE, idx);
+                        let key = Self::service_table_unique_key(CORE_ID, idx);
                         state_hashes.push((key, core_table_hash));
                     }
 
@@ -386,22 +370,22 @@ impl Blockchain {
             let schema = Schema::new(snapshot);
 
             schema.transactions().get(&tx_hash).ok_or_else(|| {
-                failure::err_msg(format!(
+                failure::format_err!(
                     "BUG: Cannot find transaction in database. tx: {:?}",
                     tx_hash
-                ))
+                )
             })?
         };
 
         fork.flush();
 
-        let tx = signed_tx.payload();
+        let transaction = signed_tx.payload();
         let catch_result = {
             let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 let author = signed_tx.author();
                 let mut context = RuntimeContext::new(fork, author, tx_hash);
-                dispatcher.execute(&mut context, tx.call_info.clone(), tx.payload.as_ref())
+                dispatcher.execute(&mut context, transaction)
             }))
         };
 
@@ -426,7 +410,10 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                error!(
+                    "{:?} transaction execution panicked: {:?}",
+                    transaction, err
+                );
 
                 Err(TransactionError::from_panic(&err))
             }

@@ -27,7 +27,7 @@ use exonum::{
     runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, ServiceInstances, TestKitBuilder};
+use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
 
 mod proto;
 
@@ -79,9 +79,9 @@ fn main() {
     // Create testkit for network with four validators.
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ServiceInstances::new(TimestampingService).with_instance(
-            "timestamping",
+        .with_service(InstanceCollection::new(TimestampingService).with_instance(
             instance_id,
+            "timestamping",
             (),
         ))
         .create();

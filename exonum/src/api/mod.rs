@@ -347,7 +347,7 @@ impl ApiAggregator {
         let mut inner = self.inner.clone();
 
         let blockchain = self.blockchain.clone();
-        let dispatcher = self.blockchain.dispatcher.lock().expect("Dispatcher lock");
+        let dispatcher = self.blockchain.dispatcher();
         inner.extend(
             dispatcher
                 .services_api()

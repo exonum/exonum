@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use self::dispatcher::Dispatcher;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
@@ -24,6 +25,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
     node::ApiSender,
+    proto::schema,
 };
 
 use self::{
@@ -43,12 +45,30 @@ pub enum DeployStatus {
     Deployed,
 }
 
+impl DeployStatus {
+    pub fn is_deployed(&self) -> bool {
+        if let DeployStatus::Deployed = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_pending(&self) -> bool {
+        if let DeployStatus::DeployInProgress = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Debug, Default)]
-pub struct ServiceConstructor {
+pub struct ServiceConfig {
     pub data: Any,
 }
 
-impl ServiceConstructor {
+impl ServiceConfig {
     pub fn new(data: impl BinaryValue) -> Self {
         let bytes = data.into_bytes();
 
@@ -62,8 +82,9 @@ impl ServiceConstructor {
     }
 }
 
-#[derive(Debug)]
-pub struct ServiceInstanceSpec {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
+pub struct InstanceSpec {
     pub id: ServiceInstanceId,
     pub name: String,
     pub artifact: ArtifactSpec,
@@ -75,29 +96,30 @@ pub enum RuntimeIdentifier {
     Java = 1,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::ArtifactSpec", crate = "crate")]
 pub struct ArtifactSpec {
-    runtime_id: u32,
-    raw_spec: Vec<u8>,
+    pub runtime_id: u32,
+    pub raw: Vec<u8>,
 }
 
 impl From<RustArtifactSpec> for ArtifactSpec {
     fn from(artifact: RustArtifactSpec) -> Self {
         ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
-            raw_spec: artifact.into_bytes(),
+            raw: artifact.into_bytes(),
         }
     }
 }
 
-// TODO Think about environment methods' names. [ECR-3222]
+// TODO Think about runtime methods' names. [ECR-3222]
 
 /// Runtime environment for services.
 ///
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
     /// Begins deploy artifact with the given specification.
-    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError>;
+    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError>;
 
     /// Checks deployment status.
     fn check_deploy_status(
@@ -107,22 +129,24 @@ pub trait Runtime: Send + Debug + 'static {
     ) -> Result<DeployStatus, DeployError>;
 
     /// Starts a new service instance with the given specification.
-    fn start_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError>;
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
 
     /// Configures a service instance with the given parameters.
     fn configure_service(
         &self,
-        context: &mut RuntimeContext,
-        spec: &ServiceInstanceSpec,
-        parameters: &ServiceConstructor,
+        context: &Fork,
+        spec: &InstanceSpec,
+        parameters: &ServiceConfig,
     ) -> Result<(), StartError>;
 
     /// Stops existing service instance with the given specification.
-    fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError>;
+    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
 
     /// Execute transaction.
+    // TODO Do not use dispatcher struct directly.
     fn execute(
         &self,
+        dispatcher: &dispatcher::Dispatcher,
         context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
@@ -132,12 +156,13 @@ pub trait Runtime: Send + Debug + 'static {
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)>;
 
     /// Calls `before_commit` for all the services stored in the runtime.
-    fn before_commit(&self, fork: &mut Fork);
+    fn before_commit(&self, dispatcher: &dispatcher::Dispatcher, fork: &mut Fork);
 
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(
         &self,
+        dispatcher: &dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,

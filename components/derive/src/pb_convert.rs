@@ -99,13 +99,6 @@ fn implement_protobuf_convert_trait(
 
 fn implement_storage_traits(name: &Ident, cr: &dyn quote::ToTokens) -> impl quote::ToTokens {
     quote! {
-        impl #cr::crypto::CryptoHash for #name {
-            fn hash(&self) -> #cr::crypto::Hash {
-                let v = self.to_pb().write_to_bytes().unwrap();
-                #cr::crypto::hash(&v)
-            }
-        }
-
         impl exonum_merkledb::ObjectHash for #name {
              fn object_hash(&self) -> #cr::crypto::Hash {
                 let v = self.to_pb().write_to_bytes().unwrap();

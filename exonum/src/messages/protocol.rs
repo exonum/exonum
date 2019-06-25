@@ -732,7 +732,7 @@ pub type ServiceInstanceId = u32;
 pub type MethodId = u32;
 
 /// Transaction call info.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CallInfo", crate = "crate")]
 pub struct CallInfo {
     /// Service instance id.

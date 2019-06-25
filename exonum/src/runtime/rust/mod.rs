@@ -13,7 +13,7 @@
 // limitations under the License.
 
 pub use self::service::{
-    AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction,
+    AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction, TransactionContext,
 };
 pub use crate::messages::ServiceInstanceId;
 
@@ -39,8 +39,8 @@ use crate::{
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactSpec, DeployStatus, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConstructor,
-    ServiceInstanceSpec,
+    ArtifactSpec, DeployStatus, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
+    ServiceConfig,
 };
 
 #[macro_use]
@@ -105,7 +105,7 @@ impl RustRuntime {
         }
 
         let rust_artifact_spec: RustArtifactSpec =
-            BinaryValue::from_bytes(Cow::Borrowed(&artifact.raw_spec)).ok()?;
+            BinaryValue::from_bytes(Cow::Borrowed(&artifact.raw)).ok()?;
 
         Some(rust_artifact_spec)
     }
@@ -120,6 +120,20 @@ impl RustRuntime {
         let artifact = service_factory.artifact();
         info!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
+    }
+
+    pub fn with_available_service(
+        mut self,
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+    ) -> Self {
+        self.add_service_factory(service_factory.into());
+        self
+    }
+}
+
+impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
+    fn from(r: RustRuntime) -> Self {
+        (RustRuntime::ID as u32, Box::new(r))
     }
 }
 
@@ -138,7 +152,7 @@ impl RustArtifactSpec {
         }
     }
 
-    pub fn into_pb_any(self) -> Any {
+    pub fn into_pb_any(&self) -> Any {
         let mut any = Any::new();
         any.set_value(self.to_bytes());
         any
@@ -170,7 +184,7 @@ impl FromStr for RustArtifactSpec {
 }
 
 impl Runtime for RustRuntime {
-    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<(), DeployError> {
+    fn begin_deploy(&mut self, artifact: &ArtifactSpec) -> Result<DeployStatus, DeployError> {
         let artifact = self
             .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
@@ -184,7 +198,7 @@ impl Runtime for RustRuntime {
             return Err(DeployError::AlreadyDeployed);
         }
 
-        Ok(())
+        Ok(DeployStatus::Deployed)
     }
 
     fn check_deploy_status(
@@ -203,7 +217,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn start_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
             .ok_or(StartError::WrongArtifact)?;
@@ -235,9 +249,9 @@ impl Runtime for RustRuntime {
 
     fn configure_service(
         &self,
-        runtime_context: &mut RuntimeContext,
-        spec: &ServiceInstanceSpec,
-        parameters: &ServiceConstructor,
+        fork: &Fork,
+        spec: &InstanceSpec,
+        parameters: &ServiceConfig,
     ) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
@@ -255,18 +269,11 @@ impl Runtime for RustRuntime {
             .ok_or(StartError::NotStarted)?;
         service_instance
             .as_ref()
-            .configure(
-                TransactionContext {
-                    service_descriptor: service_instance.descriptor(),
-                    runtime_context,
-                    runtime: self,
-                },
-                &parameters.data,
-            )
+            .configure(service_instance.descriptor(), fork, &parameters.data)
             .map_err(StartError::ExecutionError)
     }
 
-    fn stop_service(&mut self, spec: &ServiceInstanceSpec) -> Result<(), StartError> {
+    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
             .ok_or(StartError::WrongArtifact)?;
@@ -281,6 +288,7 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
+        dispatcher: &super::dispatcher::Dispatcher,
         runtime_context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
@@ -293,7 +301,7 @@ impl Runtime for RustRuntime {
                 TransactionContext {
                     service_descriptor: service_instance.descriptor(),
                     runtime_context,
-                    runtime: self,
+                    dispatcher,
                 },
                 payload,
             )
@@ -309,11 +317,11 @@ impl Runtime for RustRuntime {
             .collect()
     }
 
-    fn before_commit(&self, fork: &mut Fork) {
+    fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {
         for service in self.started_services.values() {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 service.as_ref().before_commit(TransactionContext {
-                    runtime: self,
+                    dispatcher,
                     runtime_context: &mut RuntimeContext::without_author(fork),
                     service_descriptor: service.descriptor(),
                 })
@@ -335,14 +343,19 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
+        dispatcher: &super::dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
-            let context =
-                AfterCommitContext::new(service.descriptor(), snapshot, service_keypair, tx_sender);
-            service.as_ref().after_commit(context);
+            service.as_ref().after_commit(AfterCommitContext::new(
+                dispatcher,
+                service.descriptor(),
+                snapshot,
+                service_keypair,
+                tx_sender,
+            ));
         }
     }
 
@@ -357,52 +370,6 @@ impl Runtime for RustRuntime {
                 (service_instance.name.clone(), builder)
             })
             .collect()
-    }
-}
-
-// TODO move to service module [ECR-3222]
-
-#[derive(Debug)]
-pub struct TransactionContext<'a, 'b> {
-    service_descriptor: ServiceDescriptor<'a>,
-    runtime_context: &'a mut RuntimeContext<'b>,
-    runtime: &'a RustRuntime,
-}
-
-impl<'a, 'b> TransactionContext<'a, 'b> {
-    pub fn service_id(&self) -> ServiceInstanceId {
-        self.service_descriptor.service_id()
-    }
-
-    pub fn service_name(&self) -> &str {
-        self.service_descriptor.service_name()
-    }
-
-    pub fn fork(&self) -> &Fork {
-        self.runtime_context.fork
-    }
-
-    pub fn tx_hash(&self) -> Hash {
-        self.runtime_context.tx_hash
-    }
-
-    pub fn author(&self) -> PublicKey {
-        self.runtime_context.author
-    }
-
-    // TODO Should we support the ability to call other service from the rust runtime during
-    // the transaction execution?
-    pub fn dispatch_call(
-        &mut self,
-        call_info: CallInfo,
-        payload: &[u8],
-    ) -> Result<(), ExecutionError> {
-        self.runtime
-            .execute(self.runtime_context, call_info, payload)
-    }
-
-    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.runtime_context.dispatch_action(action)
     }
 }
 

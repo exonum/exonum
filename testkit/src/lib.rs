@@ -157,7 +157,7 @@ extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
-    builder::{ServiceInstances, TestKitBuilder},
+    builder::{InstanceCollection, TestKitBuilder},
     compare::ComparableSnapshot,
     network::{TestNetwork, TestNetworkConfiguration, TestNode},
     server::TestKitStatus,
@@ -176,10 +176,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
-    runtime::{
-        rust::ServiceFactory, RuntimeContext, ServiceConstructor, ServiceInstanceId,
-        ServiceInstanceSpec,
-    },
+    runtime::{rust::ServiceFactory, ServiceInstanceId},
 };
 use exonum_merkledb::{BinaryValue, Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
@@ -235,9 +232,9 @@ impl TestKit {
         constructor: impl BinaryValue,
     ) -> Self {
         TestKitBuilder::validator()
-            .with_service(ServiceInstances::new(service_factory).with_instance(
-                name,
+            .with_service(InstanceCollection::new(service_factory).with_instance(
                 id,
+                name,
                 constructor,
             ))
             .create()
@@ -245,8 +242,7 @@ impl TestKit {
 
     fn assemble(
         database: TemporaryDB,
-        service_factories: Vec<Box<dyn ServiceFactory>>,
-        service_instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
+        service_factories: Vec<InstanceCollection>,
         network: TestNetwork,
         genesis: GenesisConfig,
     ) -> Self {
@@ -256,17 +252,14 @@ impl TestKit {
         let db = CheckpointDb::new(database);
         let db_handler = db.handler();
 
-        let mut blockchain = Blockchain::new(
+        let blockchain = Blockchain::new(
             db,
             service_factories,
-            *network.us().service_keypair().0,
-            network.us().service_keypair().1.clone(),
+            genesis,
+            network.us().service_keypair(),
             api_sender.clone(),
             mpsc::channel(0).0,
         );
-
-        blockchain.initialize(genesis).unwrap();
-        Self::start_services(&mut blockchain, service_instances);
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -304,29 +297,6 @@ impl TestKit {
             network,
             cfg_proposal: None,
         }
-    }
-
-    /// Deploys and starts service instances.
-    fn start_services(
-        blockchain: &mut Blockchain,
-        service_instances: Vec<(ServiceInstanceSpec, ServiceConstructor)>,
-    ) {
-        // TODO rewrite on top of supervisor service.
-        let fork = blockchain.fork();
-        for (spec, constructor) in service_instances {
-            let mut dispatcher = blockchain.dispatcher();
-            dispatcher
-                .begin_deploy(&spec.artifact)
-                .expect("Unable to deploy service artifact");
-            dispatcher
-                .start_service(
-                    &mut RuntimeContext::without_author(&fork),
-                    spec,
-                    &constructor,
-                )
-                .expect("Unable to start service instance");
-        }
-        blockchain.merge(fork.into_patch()).unwrap();
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -983,7 +953,7 @@ impl StoppedTestKit {
     ///
     /// Note that `services` may differ from the vector of services initially passed to
     /// the `TestKit` (which is also what may happen with real Exonum apps).
-    pub fn resume(self, services: Vec<ServiceInstances>) -> TestKit {
+    pub fn resume(self, _services: Vec<InstanceCollection>) -> TestKit {
         unimplemented!();
         // let genesis = {
         //     let snapshot = self.db.snapshot();
