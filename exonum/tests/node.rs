@@ -18,7 +18,7 @@ use exonum::{
     blockchain::InstanceCollection,
     helpers, impl_service_dispatcher,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
-    runtime::rust::{AfterCommitContext, RustArtifactSpec, Service, ServiceFactory},
+    runtime::rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory},
 };
 use exonum_derive::service_interface;
 use exonum_merkledb::{Database, TemporaryDB};
@@ -52,7 +52,7 @@ impl Service for CommitWatcherService {
 }
 
 impl ServiceFactory for CommitWatcherService {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         "after-commit/1.0.0".parse().unwrap()
     }
 
@@ -77,7 +77,7 @@ impl Service for StartCheckerService {}
 struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
 
 impl ServiceFactory for StartCheckerServiceFactory {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         "configure/1.0.0".parse().unwrap()
     }
 

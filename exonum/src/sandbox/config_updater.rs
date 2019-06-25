@@ -26,7 +26,7 @@ use crate::{
     helpers::Height,
     messages::{AnyTx, ServiceInstanceId, Signed},
     proto::ProtobufConvert,
-    runtime::rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
+    runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
 };
 
 #[service_interface(exonum(crate = "crate"))]
@@ -51,8 +51,8 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
 impl Service for ConfigUpdaterService {}
 
 impl ServiceFactory for ConfigUpdaterService {
-    fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
+        RustArtifactId {
             name: "config_updater".into(),
             version: Version::new(0, 1, 0),
         }

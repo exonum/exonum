@@ -1149,7 +1149,7 @@ mod tests {
         messages::AnyTx,
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
-            rust::{RustArtifactSpec, Service, ServiceFactory, Transaction, TransactionContext},
+            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
             ServiceInstanceId,
         },
     };
@@ -1179,7 +1179,7 @@ mod tests {
     impl Service for TestService {}
 
     impl ServiceFactory for TestService {
-        fn artifact(&self) -> RustArtifactSpec {
+        fn artifact(&self) -> RustArtifactId {
             "test-service/0.1.0".parse().unwrap()
         }
 

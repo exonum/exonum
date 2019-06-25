@@ -20,7 +20,7 @@ use exonum::{
     helpers, impl_service_dispatcher,
     node::{ApiSender, Node},
     runtime::{
-        rust::{RustArtifactSpec, Service, ServiceFactory, TransactionContext},
+        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
         ServiceInstanceId,
     },
 };
@@ -89,7 +89,7 @@ impl_service_dispatcher!(MyService, MyServiceInterface);
 impl Service for MyService {}
 
 impl ServiceFactory for MyService {
-    fn artifact(&self) -> RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
         "ws-test/0.1.0".parse().unwrap()
     }
     fn new_instance(&self) -> Box<dyn Service> {

@@ -76,7 +76,6 @@ mod tests;
 use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;
 use protobuf::well_known_types;
-use semver::Version;
 
 use std::collections::HashMap;
 
@@ -230,18 +229,6 @@ impl ProtobufConvert for ValidatorId {
             "u32 is our of range for valid ValidatorId"
         );
         Ok(ValidatorId(pb as u16))
-    }
-}
-
-impl ProtobufConvert for Version {
-    type ProtoStruct = self::schema::runtime::Version;
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut pb = Self::ProtoStruct::new();
-        pb.set_data(self.to_string());
-        pb
-    }
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
-        Ok(pb.take_data().parse()?)
     }
 }
 

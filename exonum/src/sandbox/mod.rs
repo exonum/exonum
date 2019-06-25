@@ -1189,7 +1189,7 @@ mod tests {
         messages::{AnyTx, ServiceInstanceId},
         proto::schema::tests::TxAfterCommit,
         runtime::rust::{
-            AfterCommitContext, RustArtifactSpec, Service, ServiceFactory, Transaction,
+            AfterCommitContext, RustArtifactId, Service, ServiceFactory, Transaction,
             TransactionContext,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
@@ -1226,8 +1226,8 @@ mod tests {
     }
 
     impl ServiceFactory for AfterCommitService {
-        fn artifact(&self) -> RustArtifactSpec {
-            RustArtifactSpec {
+        fn artifact(&self) -> RustArtifactId {
+            RustArtifactId {
                 name: "after_commit".into(),
                 version: Version::new(0, 1, 0),
             }

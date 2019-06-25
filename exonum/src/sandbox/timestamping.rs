@@ -26,7 +26,7 @@ use crate::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::{AnyTx, ServiceInstanceId, Signed},
     runtime::rust::{
-        RustArtifactSpec, Service, ServiceDescriptor, ServiceFactory, Transaction,
+        RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
         TransactionContext,
     },
 };
@@ -56,8 +56,8 @@ impl Service for TimestampingService {
 }
 
 impl ServiceFactory for TimestampingService {
-    fn artifact(&self) -> RustArtifactSpec {
-        RustArtifactSpec {
+    fn artifact(&self) -> RustArtifactId {
+        RustArtifactId {
             name: "timestamping".into(),
             version: Version::new(0, 1, 0),
         }
