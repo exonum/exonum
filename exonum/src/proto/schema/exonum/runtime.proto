@@ -27,8 +27,8 @@ message AnyTx {
 }
 
 message ArtifactId {
-  uint32 runtime = 1;
-  string raw_id = 2;
+  uint32 runtime_id = 1;
+  string name = 2;
 }
 
 message InstanceSpec {

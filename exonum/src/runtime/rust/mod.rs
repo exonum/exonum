@@ -97,10 +97,10 @@ impl RustRuntime {
     }
 
     fn parse_artifact(&self, artifact: &ArtifactId) -> Option<RustArtifactId> {
-        if artifact.runtime != RuntimeIdentifier::Rust as u32 {
+        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return None;
         }
-        artifact.raw_id.parse().ok()
+        artifact.name.parse().ok()
     }
 
     fn add_started_service(&mut self, instance: Instance) {
@@ -148,8 +148,8 @@ impl RustArtifactId {
 impl From<RustArtifactId> for ArtifactId {
     fn from(inner: RustArtifactId) -> Self {
         ArtifactId {
-            runtime: RustRuntime::ID as u32,
-            raw_id: inner.to_string(),
+            runtime_id: RustRuntime::ID as u32,
+            name: inner.to_string(),
         }
     }
 }

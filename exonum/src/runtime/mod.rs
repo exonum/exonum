@@ -97,17 +97,16 @@ pub enum RuntimeIdentifier {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
 pub struct ArtifactId {
-    pub runtime: u32,
-    pub raw_id: String,
+    pub runtime_id: u32,
+    pub name: String,
 }
 
 impl ArtifactId {
-    /// Creates a new artifact identifier from the given runtime and
-    /// corresponding runtime-specific artifact id.
-    pub fn new(runtime: u32, raw: impl Into<String>) -> Self {
+    /// Creates a new artifact identifier from the given runtime id and name.
+    pub fn new(runtime_id: u32, name: impl Into<String>) -> Self {
         Self {
-            runtime,
-            raw_id: raw.into(),
+            runtime_id,
+            name: name.into(),
         }
     }
 }
