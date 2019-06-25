@@ -455,7 +455,7 @@ impl Blockchain {
     /// for each service in the increasing order of their identifiers.
     pub fn commit<I>(
         &mut self,
-        patch: &Patch,
+        patch: Patch,
         block_hash: Hash,
         precommits: I,
     ) -> Result<(), failure::Error>
@@ -463,7 +463,7 @@ impl Blockchain {
         I: Iterator<Item = Signed<Precommit>>,
     {
         let patch = {
-            let fork = Fork::from_patch(patch.clone(), self.db.snapshot());
+            let fork = Fork::from_patch(patch);
 
             {
                 let mut schema = Schema::new(&fork);

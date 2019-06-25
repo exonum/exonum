@@ -477,11 +477,15 @@ impl NodeHandler {
 
         // Merge changes into storage
         let (committed_txs, proposer) = {
-            // FIXME: Avoid of clone here. (ECR-171)
-            let block_state = self.state.block(&block_hash).unwrap().clone();
-            self.blockchain
-                .commit(block_state.patch(), block_hash, precommits)
-                .unwrap();
+            let (committed_txs, proposer) = {
+                let block_state = self.state.block_mut(&block_hash).unwrap();
+
+                self.blockchain
+                    .commit(block_state.patch(), block_hash, precommits)
+                    .unwrap();
+
+                (block_state.txs().len(), block_state.proposer_id())
+            };
             // Update node state.
             self.state
                 .update_config(Schema::new(&self.blockchain.snapshot()).actual_configuration());
@@ -489,7 +493,7 @@ impl NodeHandler {
             let block_hash = self.blockchain.last_hash();
             self.state
                 .new_height(&block_hash, self.system_state.current_time());
-            (block_state.txs().len(), block_state.proposer_id())
+            (committed_txs, proposer)
         };
 
         self.api_state.broadcast(&block_hash);
