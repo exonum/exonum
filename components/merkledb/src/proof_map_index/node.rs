@@ -114,8 +114,8 @@ impl ObjectHash for BranchNode {
     }
 }
 
-impl ::std::fmt::Debug for BranchNode {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl std::fmt::Debug for BranchNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("BranchNode")
             .field("left_path", &self.child_path(ChildKind::Left))
             .field("left_hash", &self.child_hash(ChildKind::Left))

@@ -22,7 +22,7 @@ use std::{
         HashMap,
     },
     fmt,
-    iter::{Iterator as StdIterator, Peekable},
+    iter::{FromIterator, Iterator as StdIterator, Peekable},
     mem,
     ops::{Deref, DerefMut},
 };
@@ -340,6 +340,7 @@ pub enum Change {
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
+#[derive(Debug)]
 pub struct Fork {
     patch: Patch,
     working_patch: WorkingPatch,
@@ -621,12 +622,6 @@ impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
     }
 }
 
-impl ::std::fmt::Debug for Fork {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "Fork(..)")
-    }
-}
-
 impl<'a, T> ForkIter<'a, T>
 where
     T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
@@ -744,10 +739,21 @@ where
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::use_self))]
-impl<T: Database> From<T> for Box<dyn Database> {
-    fn from(db: T) -> Self {
-        Box::new(db) as Self
+impl fmt::Debug for dyn Database {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Database").finish()
+    }
+}
+
+impl fmt::Debug for dyn Snapshot {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Snapshot").finish()
+    }
+}
+
+impl fmt::Debug for dyn Iterator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Iterator").finish()
     }
 }
 
