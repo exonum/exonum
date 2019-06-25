@@ -45,6 +45,7 @@ cache:
   directories:
   - $HOME/.local
   - $HOME/.cargo
+  - $TRAVIS_BUILD_DIR/target
   timeout: 900
 
 dist: xenial
@@ -105,7 +106,7 @@ jobs:
         cd kcov-36
         mkdir build
         cd build
-        cmake .. -DCMAKE_INSTALL_PREFIX=../../.local -DCMAKE_BUILD_TYPE=Release
+        cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.local -DCMAKE_BUILD_TYPE=Release
         make -j2
         make install
         cd ../..
@@ -114,7 +115,7 @@ jobs:
     script:
     - cargo test --no-run
     - cd $TRAVIS_BUILD_DIR
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./.local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; $HOME/.local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
@@ -147,7 +148,12 @@ jobs:
     - RUST_LOG=off cargo check --benches --features "long_benchmarks"
 
 before_cache:
-  - rm -rf $HOME/.cargo/registry
+  - |
+    cd $TRAVIS_BUILD_DIR/target/debug
+    rm -rf incremental examples
+    find . -maxdepth 1 -type f -executable -delete
+    find deps -type f -size +20M -delete
+    du -h -d 1 .
 
 notifications:
   webhooks:
