@@ -32,8 +32,8 @@ use super::{
 };
 
 use crate::blockchain::Service;
+use crate::helpers::fabric::details::{AddAuditor, FinalizeAuditorConfig, RequestConnectAuditor};
 use crate::node::{ExternalMessage, Node};
-use crate::helpers::fabric::details::{RequestConnectAuditor, AddAuditor, FinalizeAuditorConfig};
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.

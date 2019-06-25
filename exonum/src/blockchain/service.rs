@@ -24,8 +24,8 @@ use std::{
     collections::{HashMap, HashSet},
     fmt,
     net::SocketAddr,
-    sync::{Arc, RwLock},
     path::PathBuf,
+    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -33,9 +33,9 @@ use crate::{
     blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
-    helpers::{Height, Milliseconds, ValidatorId, config::ConfigAccessor},
+    helpers::{config::ConfigAccessor, Height, Milliseconds, ValidatorId},
     messages::{Message, RawTransaction, ServiceTransaction, Signed},
-    node::{ApiSender, ConnectInfo, NodeRole, State, NodeConfig},
+    node::{ApiSender, ConnectInfo, NodeConfig, NodeRole, State},
 };
 
 use super::transaction::Transaction;
@@ -392,7 +392,10 @@ pub struct SharedNodeState {
 
 impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
-    pub fn new(state_update_timeout: Milliseconds, config_accessor: Option<ConfigAccessor>) -> Self {
+    pub fn new(
+        state_update_timeout: Milliseconds,
+        config_accessor: Option<ConfigAccessor>,
+    ) -> Self {
         Self {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
             state_update_timeout,
@@ -441,7 +444,10 @@ impl SharedNodeState {
         lock.majority_count = state.majority_count();
         lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
-        lock.peers = state.connect_list().peers().iter()
+        lock.peers = state
+            .connect_list()
+            .peers()
+            .iter()
             .map(|ci| ci.public_key.to_owned())
             .collect();
 
@@ -569,7 +575,9 @@ impl SharedNodeState {
 
     /// Load stored configuration.
     pub(crate) fn load_configuration(&self) -> Option<NodeConfig<PathBuf>> {
-        self.config_accessor.as_ref().and_then(|accessor| accessor.load().ok())
+        self.config_accessor
+            .as_ref()
+            .and_then(|accessor| accessor.load().ok())
     }
 }
 

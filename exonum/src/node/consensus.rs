@@ -18,8 +18,12 @@ use crate::blockchain::Schema;
 use crate::crypto::{CryptoHash, Hash, PublicKey};
 use crate::events::InternalRequest;
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::{BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage, TransactionsRequest, TransactionsResponse, AddAuditor};
-use crate::node::{NodeHandler, RequestData, ConnectInfo};
+use crate::messages::{
+    AddAuditor, BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
+    TransactionsRequest, TransactionsResponse,
+};
+use crate::node::{ConnectInfo, NodeHandler, RequestData};
 use exonum_merkledb::Patch;
 
 // TODO Reduce view invocations. (ECR-171)
@@ -596,7 +600,12 @@ impl NodeHandler {
     pub fn handle_add_auditor_event(&mut self, evn: Signed<AddAuditor>) {
         info!("Received Add auditor event.");
         if self.allow_auto_connect {
-            if !self.state.validators().iter().any(|e| e.service_key == evn.author()) {
+            if !self
+                .state
+                .validators()
+                .iter()
+                .any(|e| e.service_key == evn.author())
+            {
                 info!("Skip AddAuditor event. Only validator can send add auditor event.");
                 return;
             }

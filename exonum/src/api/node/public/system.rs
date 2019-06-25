@@ -15,14 +15,14 @@
 //! Public system API.
 
 use crate::api::{Error as ApiError, ServiceApiScope, ServiceApiState};
-use crate::blockchain::{Schema, SharedNodeState, GenesisConfig};
-use crate::helpers::user_agent;
+use crate::blockchain::{GenesisConfig, Schema, SharedNodeState};
 use crate::crypto::PublicKey;
-use exonum_merkledb::DbOptions;
-use crate::node::{NodeConfig, MemoryPoolConfig, ConnectListConfig, AuditorConfig, NodeApiConfig};
-use std::path::PathBuf;
 use crate::events::NetworkConfiguration;
+use crate::helpers::user_agent;
+use crate::node::{AuditorConfig, ConnectListConfig, MemoryPoolConfig, NodeApiConfig, NodeConfig};
+use exonum_merkledb::DbOptions;
 use std::collections::btree_map::BTreeMap;
+use std::path::PathBuf;
 use toml::Value;
 
 /// Information about the current state of the node memory pool.
@@ -207,21 +207,32 @@ impl SystemApi {
 
     fn handle_service_key_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
         api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
-            Ok(KeyInfo { pub_key: state.public_key().clone() })
+            Ok(KeyInfo {
+                pub_key: state.public_key().clone(),
+            })
         });
         self
     }
 
-    fn handle_remote_config_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_remote_config_info(
+        self,
+        name: &'static str,
+        api_scope: &mut ServiceApiScope,
+    ) -> Self {
         let _self = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, query: KeyInfo| {
             if !self.shared_api_state.has_peer(&query.pub_key) {
-                return Err(ApiError::NotFound("Peer with this public key not found".to_owned()));
+                return Err(ApiError::NotFound(
+                    "Peer with this public key not found".to_owned(),
+                ));
             }
 
-            self.shared_api_state.load_configuration()
+            self.shared_api_state
+                .load_configuration()
                 .map(SharedConfiguration::new)
-                .ok_or(ApiError::NotFound("Node configuration not found".to_owned()))
+                .ok_or(ApiError::NotFound(
+                    "Node configuration not found".to_owned(),
+                ))
         });
 
         _self

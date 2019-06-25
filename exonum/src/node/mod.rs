@@ -55,14 +55,16 @@ use crate::events::{
     HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
     NetworkPart, NetworkRequest, SyncSender, TimeoutRequest, UnboundedSyncSender,
 };
+use crate::helpers::config::ConfigAccessor;
 use crate::helpers::{
     config::ConfigManager,
     fabric::{NodePrivateConfig, NodePublicConfig},
     user_agent, Height, Milliseconds, Round, ValidatorId,
 };
-use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage, AddAuditor};
+use crate::messages::{
+    AddAuditor, Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage,
+};
 use crate::node::state::SharedConnectList;
-use crate::helpers::config::ConfigAccessor;
 use exonum_merkledb::{Database, DbOptions};
 
 mod basic;
@@ -249,7 +251,7 @@ pub struct AuditorConfig {
 impl Default for AuditorConfig {
     fn default() -> Self {
         Self {
-            allow_auto_connect: false
+            allow_auto_connect: false,
         }
     }
 }
@@ -665,7 +667,6 @@ impl NodeHandler {
         }
     }
 
-
     /// Add peer.
     pub fn add_peer(&mut self, connect_info: ConnectInfo) {
         info!("Send Connect message to {}", connect_info);
@@ -796,7 +797,7 @@ impl NodeHandler {
         let previous_round: u64 = round.previous().into();
         let ms = previous_round * self.first_round_timeout()
             + (previous_round * previous_round.saturating_sub(1)) / 2
-            * self.round_timeout_increase();
+                * self.round_timeout_increase();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
@@ -1097,7 +1098,7 @@ impl Node {
                 self.handler.api_state.clone(),
             ),
         }
-            .start()?;
+        .start()?;
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(

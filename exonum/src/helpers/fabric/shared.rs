@@ -100,7 +100,7 @@ pub struct AddAuditorInfo {
     /// Validators api addresses.
     pub validators_api: Vec<String>,
     /// Connect to all validator nodes.
-    pub connect_all: bool
+    pub connect_all: bool,
 }
 
 /// `AuditorPrimaryConfig` collects all public and secret keys and add auditor request.

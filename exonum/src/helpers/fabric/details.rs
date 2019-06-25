@@ -17,16 +17,6 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts, rsplitn
 
-use actix_web::{client, HttpMessage};
-use futures::future::{Future, lazy};
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    net::{IpAddr, SocketAddr},
-    path::{Path, PathBuf},
-    thread,
-};
-use hex::FromHex;
 use super::{
     internal::{CollectedCommand, Command, Feedback},
     keys,
@@ -37,21 +27,28 @@ use super::{
     },
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
-use crate::api::{
-    backends::actix::AllowOrigin,
-    node::public::system::KeyInfo,
-};
+use crate::api::node::private::AddAuditorRequest;
+use crate::api::node::public::system::SharedConfiguration;
+use crate::api::{backends::actix::AllowOrigin, node::public::system::KeyInfo};
 use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
 use crate::crypto::{generate_keys_file, PublicKey};
+use crate::helpers::fabric::shared::{AddAuditorInfo, AuditorPrimaryConfig};
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
-use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig, ConnectInfo};
-use crate::helpers::fabric::shared::{AuditorPrimaryConfig, AddAuditorInfo};
-use crate::api::node::private::AddAuditorRequest;
+use crate::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
 use actix::SystemRunner;
+use actix_web::{client, HttpMessage};
+use exonum_merkledb::{Database, DbOptions, RocksDB};
+use futures::future::{lazy, Future};
+use hex::FromHex;
 use std::ffi::OsStr;
 use std::time::Duration;
-use crate::api::node::public::system::SharedConfiguration;
-use exonum_merkledb::{Database, DbOptions, RocksDB};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    net::{IpAddr, SocketAddr},
+    path::{Path, PathBuf},
+    thread,
+};
 
 const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -803,7 +800,8 @@ pub struct RequestConnectAuditor;
 
 impl RequestConnectAuditor {
     fn exe_name() -> String {
-        std::env::current_exe().ok()
+        std::env::current_exe()
+            .ok()
             .as_ref()
             .map(Path::new)
             .and_then(Path::file_name)
@@ -883,9 +881,12 @@ impl Command for RequestConnectAuditor {
         "Create primary auditor configuration and send connect auditor request"
     }
 
-    fn execute(&self, _commands: &HashMap<CommandName, CollectedCommand>,
-               context: Context,
-               exts: &dyn Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+        exts: &dyn Fn(Context) -> Context,
+    ) -> Feedback {
         let connect_all: bool = context
             .arg::<String>(CONNECT_ALL)
             .unwrap_or_else(|_| "false".into())
@@ -935,15 +936,15 @@ impl Command for RequestConnectAuditor {
             create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
         };
 
-        let validators_api = validators_api
-            .expect("expected correct passphrase input method for validators_api");
+        let validators_api =
+            validators_api.expect("expected correct passphrase input method for validators_api");
 
         let validators_api_param = validators_api.join(" ");
 
-        let consensus_secret_key = fs::canonicalize(consensus_secret_key_path)
-            .expect("Failed to create canonical path.");
-        let service_secret_key = fs::canonicalize(service_secret_key_path)
-            .expect("Failed to create canonical path.");
+        let consensus_secret_key =
+            fs::canonicalize(consensus_secret_key_path).expect("Failed to create canonical path.");
+        let service_secret_key =
+            fs::canonicalize(service_secret_key_path).expect("Failed to create canonical path.");
 
         let config = AuditorPrimaryConfig {
             listen_address,
@@ -973,50 +974,66 @@ pub struct AddAuditor;
 
 impl AddAuditor {
     fn parse_validator_api(context: &Context, sys: &mut SystemRunner) -> Option<Vec<PublicKey>> {
-        validators(context)
-            .map(|validators_api| {
-                validators_api.iter()
-                    .map(|api| format!("http://{}/api/system/v1/service_key", api))
-                    .map(|url| {
-                        match sys.block_on(lazy(|| {
-                            client::get(url.clone())
-                                .finish()
-                                .expect("Failed to create http client.")
-                                .send()
-                                .map_err(|err| format!("{:?}", err))
-                                .and_then(|response| {
-                                    response
-                                        .body()
-                                        .map_err(|err| format!("{:?}", err))
-                                        .and_then(|body| serde_json::from_slice(body.as_ref())
-                                            .map_err(|err| format!("{:?}", err)))
-                                }).map(|key: KeyInfo| key.pub_key)
-                        })) {
-                            Ok(key) => key,
-                            Err(err) => panic!("Failed to perform request [{}]; Error [{:?}]", url, err),
+        validators(context).map(|validators_api| {
+            validators_api
+                .iter()
+                .map(|api| format!("http://{}/api/system/v1/service_key", api))
+                .map(|url| {
+                    match sys.block_on(lazy(|| {
+                        client::get(url.clone())
+                            .finish()
+                            .expect("Failed to create http client.")
+                            .send()
+                            .map_err(|err| format!("{:?}", err))
+                            .and_then(|response| {
+                                response
+                                    .body()
+                                    .map_err(|err| format!("{:?}", err))
+                                    .and_then(|body| {
+                                        serde_json::from_slice(body.as_ref())
+                                            .map_err(|err| format!("{:?}", err))
+                                    })
+                            })
+                            .map(|key: KeyInfo| key.pub_key)
+                    })) {
+                        Ok(key) => key,
+                        Err(err) => {
+                            panic!("Failed to perform request [{}]; Error [{:?}]", url, err)
                         }
-                    }).collect()
-            })
+                    }
+                })
+                .collect()
+        })
     }
 
     fn parse_validators_keys(context: &Context) -> Option<Vec<PublicKey>> {
         context
             .arg_multiple::<String>(VALIDATORS_KEYS)
-            .map(|keys| keys.iter()
-                .map(|key| PublicKey::from_hex(key)
-                    .expect("expected correct passphrase input method for validator public key"))
-                .collect()
-            ).ok()
+            .map(|keys| {
+                keys.iter()
+                    .map(|key| {
+                        PublicKey::from_hex(key).expect(
+                            "expected correct passphrase input method for validator public key",
+                        )
+                    })
+                    .collect()
+            })
+            .ok()
     }
 
     fn parse_validator_key_path(context: &Context) -> Option<Vec<PublicKey>> {
         context
             .arg_multiple::<String>(VALIDATORS_KEY_PATHS)
-            .map(|path_vec| path_vec.iter()
-                .map(|path| ConfigFile::load(path).expect("Failed to load validator public config."))
-                .map(|config: SharedConfig| config.node.validator_keys.service_key)
-                .collect()
-            ).ok()
+            .map(|path_vec| {
+                path_vec
+                    .iter()
+                    .map(|path| {
+                        ConfigFile::load(path).expect("Failed to load validator public config.")
+                    })
+                    .map(|config: SharedConfig| config.node.validator_keys.service_key)
+                    .collect()
+            })
+            .ok()
     }
 
     fn validator_keys(context: &Context, sys: &mut SystemRunner) -> Vec<PublicKey> {
@@ -1094,7 +1111,7 @@ impl Command for AddAuditor {
                 None,
                 "private-api-address",
                 false,
-            )
+            ),
         ]
     }
 
@@ -1106,9 +1123,12 @@ impl Command for AddAuditor {
         "Add auditor to the blockchain net"
     }
 
-    fn execute(&self, _commands: &HashMap<CommandName, CollectedCommand>,
-               context: Context,
-               _exts: &dyn Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+        _exts: &dyn Fn(Context) -> Context,
+    ) -> Feedback {
         let connect_all: bool = context
             .arg::<String>(CONNECT_ALL)
             .unwrap_or_else(|_| "false".into())
@@ -1116,7 +1136,8 @@ impl Command for AddAuditor {
             .expect("expected correct passphrase input method for connect-all flag");
 
         let public_key = context
-            .arg::<String>(CONSENSUS_KEY).ok()
+            .arg::<String>(CONSENSUS_KEY)
+            .ok()
             .and_then(|hex| PublicKey::from_hex(hex).ok())
             .expect("expected correct passphrase input method for consensus-pub-key");
 
@@ -1149,14 +1170,16 @@ impl Command for AddAuditor {
                 .map_err(|err| format!("{:?}", err))
                 .and_then(|response| {
                     let is_success = response.status().is_success();
-                    response.body()
+                    response
+                        .body()
                         .map_err(|err| format!("{:?}", err))
-                        .and_then(move |data|
+                        .and_then(move |data| {
                             if is_success {
                                 Ok(())
                             } else {
                                 Err(String::from_utf8_lossy(data.as_ref()).to_string())
-                            })
+                            }
+                        })
                 })
         })) {
             panic!("Failed to add auditor: {}", err);
@@ -1168,30 +1191,51 @@ impl Command for AddAuditor {
 pub struct FinalizeAuditorConfig;
 
 impl FinalizeAuditorConfig {
-    fn load_node_configuration(public_api: &str, public_key: &PublicKey, sys: &mut SystemRunner) -> Option<SharedConfiguration> {
+    fn load_node_configuration(
+        public_api: &str,
+        public_key: &PublicKey,
+        sys: &mut SystemRunner,
+    ) -> Option<SharedConfiguration> {
         sys.block_on(lazy(|| {
-            client::get(format!("http://{}/api/system/v1/remote_config?pub_key={}", public_api, public_key.to_hex()))
-                .finish()
-                .expect("Failed to create http client.")
-                .send()
-                .map_err(|err| format!("{:?}", err))
-                .and_then(|response| {
-                    response
-                        .body()
-                        .map_err(|err| format!("{:?}", err))
-                        .and_then(|body| serde_json::from_slice(body.as_ref())
-                            .map_err(|err| format!("{:?}", err)))
-                })
-        })).ok()
+            client::get(format!(
+                "http://{}/api/system/v1/remote_config?pub_key={}",
+                public_api,
+                public_key.to_hex()
+            ))
+            .finish()
+            .expect("Failed to create http client.")
+            .send()
+            .map_err(|err| format!("{:?}", err))
+            .and_then(|response| {
+                response
+                    .body()
+                    .map_err(|err| format!("{:?}", err))
+                    .and_then(|body| {
+                        serde_json::from_slice(body.as_ref()).map_err(|err| format!("{:?}", err))
+                    })
+            })
+        }))
+        .ok()
     }
 
-    fn merge_config(primary_cfg: AuditorPrimaryConfig, api: NodeApiConfig, node_cfg: SharedConfiguration, sys: &mut SystemRunner) -> NodeConfig<PathBuf> {
+    fn merge_config(
+        primary_cfg: AuditorPrimaryConfig,
+        api: NodeApiConfig,
+        node_cfg: SharedConfiguration,
+        sys: &mut SystemRunner,
+    ) -> NodeConfig<PathBuf> {
         let peers: Vec<_> = if primary_cfg.add_auditor_request.connect_all {
-            let validator_consensus_keys: Vec<_> = node_cfg.genesis.validator_keys.iter()
+            let validator_consensus_keys: Vec<_> = node_cfg
+                .genesis
+                .validator_keys
+                .iter()
                 .map(|key| key.consensus_key.clone())
                 .collect();
 
-            let mut peers: Vec<_> = node_cfg.connect_list.peers.into_iter()
+            let mut peers: Vec<_> = node_cfg
+                .connect_list
+                .peers
+                .into_iter()
                 .filter(|peer| validator_consensus_keys.contains(&peer.public_key))
                 .collect();
 
@@ -1204,8 +1248,13 @@ impl FinalizeAuditorConfig {
             // Waiting for waiting for state update.
             thread::sleep_ms(node_cfg.api.state_update_timeout as u32);
 
-            primary_cfg.add_auditor_request.validators_api.iter()
-                .filter_map(|api| Self::load_node_configuration(api, &primary_cfg.consensus_public_key, sys))
+            primary_cfg
+                .add_auditor_request
+                .validators_api
+                .iter()
+                .filter_map(|api| {
+                    Self::load_node_configuration(api, &primary_cfg.consensus_public_key, sys)
+                })
                 .map(|config| ConnectInfo {
                     address: config.external_address,
                     public_key: config.consensus_public_key,
@@ -1288,17 +1337,20 @@ impl Command for FinalizeAuditorConfig {
         "Create node config."
     }
 
-    fn execute(&self, _commands: &HashMap<CommandName, CollectedCommand>,
-               context: Context,
-               _exts: &dyn Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+        _exts: &dyn Fn(Context) -> Context,
+    ) -> Feedback {
         let primary_config_path = context
             .arg::<String>("PRIMARY_CONFIG")
             .expect("primary config path not found");
         let output_config_path = context
             .arg::<String>("OUTPUT_CONFIG_PATH")
             .expect("output config path not found");
-        let primary_config: AuditorPrimaryConfig = ConfigFile::load(primary_config_path)
-            .expect("Failed to load primary config.");
+        let primary_config: AuditorPrimaryConfig =
+            ConfigFile::load(primary_config_path).expect("Failed to load primary config.");
 
         let public_api_address = Run::public_api_address(&context);
         let private_api_address = Run::private_api_address(&context);
@@ -1314,18 +1366,19 @@ impl Command for FinalizeAuditorConfig {
 
         let node_config = if wait {
             loop {
-                match validators_api.iter()
-                    .find_map(|api| Self::load_node_configuration(api, &pub_key, &mut sys)) {
+                match validators_api
+                    .iter()
+                    .find_map(|api| Self::load_node_configuration(api, &pub_key, &mut sys))
+                {
                     Some(c) => {
                         break Some(c);
                     }
-                    None => {
-                        thread::sleep(Duration::from_secs(10))
-                    }
+                    None => thread::sleep(Duration::from_secs(10)),
                 }
             }
         } else {
-            validators_api.iter()
+            validators_api
+                .iter()
                 .find_map(|api| Self::load_node_configuration(api, &pub_key, &mut sys))
         };
 
@@ -1351,7 +1404,7 @@ fn addresses(context: &Context) -> (String, SocketAddr) {
     let external_address_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
     let listen_address_str = &context.arg::<String>(LISTEN_ADDRESS).ok();
 
-// Try case where peer external address is socket address or ip address.
+    // Try case where peer external address is socket address or ip address.
     let external_address_socket = external_address_str.parse().or_else(|_| {
         external_address_str
             .parse()
@@ -1440,18 +1493,19 @@ fn validators(context: &Context) -> Option<Vec<String>> {
                             .map(|ip| SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT))
                     }) {
                         Ok(address) => address.to_string(),
-                        Err(_) => {
-                            address
-                                .rsplitn(2, ':')
-                                .next()
-                                .and_then(|p| p.parse::<u16>().ok())
-                                .map(|_p| address.clone())
-                                .unwrap_or_else(|| format!("{}:{}", address, DEFAULT_EXONUM_LISTEN_PORT))
-                        }
+                        Err(_) => address
+                            .rsplitn(2, ':')
+                            .next()
+                            .and_then(|p| p.parse::<u16>().ok())
+                            .map(|_p| address.clone())
+                            .unwrap_or_else(|| {
+                                format!("{}:{}", address, DEFAULT_EXONUM_LISTEN_PORT)
+                            }),
                     }
                 })
                 .collect()
-        }).ok()
+        })
+        .ok()
 }
 
 #[cfg(test)]
