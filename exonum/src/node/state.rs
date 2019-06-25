@@ -783,6 +783,7 @@ impl State {
         self.blocks.get(hash)
     }
 
+    /// Returns a mutable block with the specified hash.
     pub fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
         self.blocks.get_mut(hash)
     }

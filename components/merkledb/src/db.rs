@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::{
-    fmt,
     cell::RefCell,
     cmp::Ordering::{Equal, Greater, Less},
     collections::{
@@ -22,7 +21,8 @@ use std::{
         Bound::{Included, Unbounded},
         HashMap,
     },
-    iter::{FromIterator, Iterator as StdIterator, Peekable},
+    fmt,
+    iter::{Iterator as StdIterator, Peekable},
     mem,
     ops::{Deref, DerefMut},
 };
@@ -348,7 +348,7 @@ pub struct Fork {
 #[derive(Debug)]
 pub struct Patch {
     snapshot: Box<dyn Snapshot>,
-    pub changes: HashMap<String, Changes>,
+    changes: HashMap<String, Changes>,
 }
 
 impl fmt::Debug for Box<dyn Snapshot> {
@@ -481,6 +481,16 @@ pub trait Iterator {
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
+impl Patch {
+    pub fn changes(&self) -> HashMap<String, Changes> {
+        self.changes.clone()
+    }
+
+    pub fn iter(&self) -> HmIter<String, Changes> {
+        self.changes.iter()
+    }
+}
+
 impl Snapshot for Patch {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
         if let Some(changes) = self.changes.get(name) {
@@ -521,7 +531,6 @@ impl Snapshot for Patch {
 }
 
 impl Fork {
-
     pub fn from_patch(patch: Patch) -> Self {
         Self {
             patch,

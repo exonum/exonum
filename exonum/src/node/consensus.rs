@@ -477,9 +477,8 @@ impl NodeHandler {
 
         // Merge changes into storage
         let (committed_txs, proposer) = {
-            // FIXME: Avoid of clone here. (ECR-171)
             let (committed_txs, proposer) = {
-                let mut block_state = self.state.block_mut(&block_hash).unwrap(); //.clone();
+                let block_state = self.state.block_mut(&block_hash).unwrap();
 
                 self.blockchain
                     .commit(block_state.patch(), block_hash, precommits)

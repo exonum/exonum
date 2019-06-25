@@ -463,10 +463,7 @@ impl Blockchain {
         I: Iterator<Item = Signed<Precommit>>,
     {
         let patch = {
-            let fork = {
-                Fork::from_patch(patch)
-    //               fork.merge(patch.clone()); // FIXME: Avoid cloning here. (ECR-1631)
-            };
+            let fork = Fork::from_patch(patch);
 
             {
                 let mut schema = Schema::new(&fork);
