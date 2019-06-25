@@ -38,15 +38,15 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.34.0
+  - 1.35.0
 
 cache:
   directories:
-  - node_modules
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
-  - $TRAVIS_BUILD_DIR/testkit/examples/server/node_modules
+  - $TRAVIS_BUILD_DIR/node_modules
+  - $TRAVIS_BUILD_DIR/testkit/server/node_modules
 
 dist: xenial
 sudo: required

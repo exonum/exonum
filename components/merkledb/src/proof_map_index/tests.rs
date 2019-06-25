@@ -18,9 +18,8 @@ use pretty_assertions::assert_eq;
 use rand::{
     self,
     seq::{IteratorRandom, SliceRandom},
-    Rng, RngCore, SeedableRng,
+    thread_rng, Rng, RngCore,
 };
-use rand_xorshift::XorShiftRng;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{self, json};
 
@@ -38,7 +37,7 @@ const IDX_NAME: &str = "idx_name";
 
 // Makes large data set with unique keys
 fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
     let mut exists_keys = HashSet::new();
     let mut base = [0; KEY_SIZE];
     rng.fill_bytes(&mut base);
@@ -492,7 +491,7 @@ where
     let indexes = if batch_size < MAX_CHECKED_ELEMENTS {
         (0..batch_size).collect()
     } else {
-        let mut rng = XorShiftRng::from_seed(rand::random());
+        let mut rng = thread_rng();
         (0..batch_size).choose_multiple(&mut rng, MAX_CHECKED_ELEMENTS)
     };
 
@@ -522,7 +521,7 @@ where
         table.put(key, value.clone());
     }
 
-    let mut rng = XorShiftRng::from_seed(rand::random());
+    let mut rng = thread_rng();
 
     // Test for batches of 1, 11, ..., 101 keys
     for proof_size in (0..11).map(|x| x * 10 + 1) {
@@ -1086,7 +1085,7 @@ fn test_build_multiproof_simple() {
 #[test]
 fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let db = TemporaryDB::default();
-    let mut rng = XorShiftRng::from_seed(rand::random());
+    let mut rng = thread_rng();
     let batch_sizes = (7..9).map(|x| 1 << x);
 
     for batch_size in batch_sizes {
@@ -1111,7 +1110,7 @@ fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
 #[test]
 fn test_fuzz_insert_build_proofs() {
     let db = TemporaryDB::default();
-    let mut rng = XorShiftRng::from_seed(rand::random());
+    let mut rng = thread_rng();
     let batch_sizes = (7..9).map(|x| (1 << x) - 1);
 
     for batch_size in batch_sizes {
@@ -1132,7 +1131,7 @@ fn test_fuzz_insert_build_proofs() {
 #[test]
 fn test_fuzz_insert_build_multiproofs() {
     let db = TemporaryDB::default();
-    let mut rng = XorShiftRng::from_seed(rand::random());
+    let mut rng = thread_rng();
     let batch_sizes = (7..9).map(|x| 1 << x);
 
     for batch_size in batch_sizes {
@@ -1155,7 +1154,7 @@ fn test_fuzz_delete_build_proofs() {
     const SAMPLE_SIZE: usize = 200;
     let db = TemporaryDB::default();
 
-    let mut rng = XorShiftRng::from_seed(rand::random());
+    let mut rng = thread_rng();
     let mut exists_keys = HashSet::default();
     let data = generate_random_data_keys(&mut exists_keys, SAMPLE_SIZE, &mut rng);
 

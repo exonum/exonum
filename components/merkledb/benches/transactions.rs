@@ -17,8 +17,7 @@ use std::{borrow::Cow, collections::HashMap};
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
-use rand::{Rng, RngCore, SeedableRng};
-use rand_xorshift::XorShiftRng;
+use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
@@ -27,7 +26,7 @@ use exonum_merkledb::{
     ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
 };
 
-const SEED: [u8; 16] = [100; 16];
+const SEED: [u8; 32] = [100; 32];
 const SAMPLE_SIZE: usize = 10;
 
 #[cfg(all(test, not(feature = "long_benchmarks")))]
@@ -239,7 +238,7 @@ impl Block {
 }
 
 fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> Vec<Block> {
-    let mut rng = XorShiftRng::from_seed(SEED);
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let users = (0..wallets_count)
         .into_iter()
         .map(|idx| {
@@ -249,7 +248,7 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
         })
         .collect::<HashMap<_, _>>();
 
-    let get_random_user = |rng: &mut XorShiftRng| -> PublicKey {
+    let get_random_user = |rng: &mut StdRng| -> PublicKey {
         let id = rng.gen_range(0, wallets_count);
         *users.get(&id).unwrap()
     };
