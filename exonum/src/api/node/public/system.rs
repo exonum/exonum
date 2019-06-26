@@ -230,9 +230,7 @@ impl SystemApi {
             self.shared_api_state
                 .load_configuration()
                 .map(SharedConfiguration::new)
-                .ok_or_else(|| ApiError::NotFound(
-                    "Node configuration not found".to_owned(),
-                ))
+                .ok_or_else(|| ApiError::NotFound("Node configuration not found".to_owned()))
         });
 
         _self

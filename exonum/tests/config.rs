@@ -29,6 +29,7 @@ use exonum::{
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
 
+use exonum::helpers::config::ConfigAccessor;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -38,7 +39,6 @@ use std::{
     panic,
     path::{Path, PathBuf},
 };
-use exonum::helpers::config::ConfigAccessor;
 
 #[derive(Debug)]
 struct ConfigSpec {
