@@ -265,6 +265,13 @@ impl Dispatcher {
 // TODO Update action names in according with changes in runtime. [ECR-3222]
 #[derive(Debug)]
 pub enum Action {
+    /// This action tries to deploy artifact on the current node without registration.
+    /// In this way you can be sure that artifact is deployed in the corresponding runtime
+    /// before register.
+    DeployArtifact {
+        artifact: ArtifactId,
+    },
+    /// This action registers deployed artifact in the dispatcher.
     RegisterArtifact {
         artifact: ArtifactId,
     },
@@ -281,10 +288,14 @@ impl Action {
         context: &mut RuntimeContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::RegisterArtifact { artifact } => {
-                dispatcher.register_artifact(context.fork, artifact)?;
-                Ok(())
-            }
+            Action::DeployArtifact { artifact } => dispatcher
+                .deploy_artifact(artifact)
+                .wait()
+                .map_err(From::from),
+
+            Action::RegisterArtifact { artifact } => dispatcher
+                .register_artifact(context.fork, artifact)
+                .map_err(From::from),
 
             Action::StartService { spec, constructor } => {
                 dispatcher.start_service(context, spec, &constructor)?;

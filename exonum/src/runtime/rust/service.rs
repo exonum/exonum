@@ -25,11 +25,7 @@ use crate::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
     node::ApiSender,
-    runtime::{
-        dispatcher::{self},
-        error::ExecutionError,
-        RuntimeContext,
-    },
+    runtime::{dispatcher, error::ExecutionError, RuntimeContext},
 };
 
 use super::RustArtifactId;
@@ -115,6 +111,17 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     pub fn service_name(&self) -> &str {
         self.service_descriptor.service_name()
+    }
+
+    /// If the current node is a validator, returns its identifier, for other nodes return `None`.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        // TODO Perhaps we should optimize this method [ECR-3222]
+        CoreSchema::new(self.runtime_context.fork)
+            .actual_configuration()
+            .validator_keys
+            .iter()
+            .position(|validator| self.author() == validator.service_key)
+            .map(|id| ValidatorId(id as u16))
     }
 
     pub fn fork(&self) -> &Fork {
