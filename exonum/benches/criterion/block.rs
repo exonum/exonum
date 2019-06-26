@@ -475,9 +475,7 @@ fn prepare_blockchain(
         let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
         // precommits in any way (they are checked beforehand by the consensus algorithm).
-        blockchain
-            .commit(patch, block_hash, iter::empty())
-            .unwrap();
+        blockchain.commit(patch, block_hash, iter::empty()).unwrap();
     }
 }
 
