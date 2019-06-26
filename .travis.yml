@@ -41,12 +41,13 @@ rust:
   - 1.35.0
 
 cache:
+  npm: true
   directories:
-  - $HOME/.cargo
   - $HOME/.local
+  - $HOME/.cargo
+  - $HOME/.kcov
   - $TRAVIS_BUILD_DIR/target
-  - $TRAVIS_BUILD_DIR/node_modules
-  - $TRAVIS_BUILD_DIR/testkit/server/node_modules
+  timeout: 900
 
 dist: xenial
 sudo: required
@@ -82,13 +83,8 @@ jobs:
     - cargo clean --doc
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
-    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde
-    - mkdir -p target/doc/exonum/encoding/serialize/reexport/de/serde
     - mkdir -p target/doc/exonum_configuration
     - mkdir -p target/std/string
-    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
-    - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
-    - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
     - touch target/doc/exonum_configuration/enum.Option.html
     - touch target/std/string/struct.String.html
     - touch target/std/primitive.usize.html
@@ -96,23 +92,26 @@ jobs:
     - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc
 
-  # Run kcov.
+    # Run kcov.
   - name: kcov
     install:
-    - wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
-    - tar xzf v36.tar.gz
-    - cd kcov-36
-    - mkdir build
-    - cd build
-    - cmake ..
-    - make
-    - make install DESTDIR=../../kcov-build
-    - cd ../..
-    - rm -rf kcov-36
+    - |
+      if [ ! -f "$HOME/.kcov/bin/kcov" ]; then
+        wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
+        tar xzf v36.tar.gz
+        cd kcov-36
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.kcov -DCMAKE_BUILD_TYPE=Release
+        make -j2
+        make install
+        cd ../..
+        rm -rf kcov-36
+      fi
     script:
     - cargo test --no-run
     - cd $TRAVIS_BUILD_DIR
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; $HOME/.kcov/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
@@ -120,7 +119,7 @@ jobs:
   - name: test
     install:
     - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
+    - cd $TRAVIS_BUILD_DIR/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
@@ -143,6 +142,14 @@ jobs:
   - name: benchmarks
     script:
     - RUST_LOG=off cargo check --benches --features "long_benchmarks"
+
+before_cache:
+  - |
+    cd $TRAVIS_BUILD_DIR/target/debug
+    rm -rf incremental examples
+    find . -maxdepth 1 -type f -executable -delete
+    find deps -type f -size +20M -delete
+    du -h -d 1 .
 
 notifications:
   webhooks:
