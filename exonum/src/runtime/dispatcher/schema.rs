@@ -29,7 +29,7 @@ impl<T: IndexAccess> Schema<T> {
         Self { access }
     }
 
-    /// Set of deployed artifacts: Key is artifact name, Value is runtime identifier.
+    /// Deployed artifacts registry where key is artifact name, value is runtime identifier.
     pub fn deployed_artifacts(&self) -> ProofMapIndex<T, String, u32> {
         ProofMapIndex::new("core.dispatcher.deployed_artifacts", self.access.clone())
     }
@@ -49,7 +49,6 @@ impl<T: IndexAccess> Schema<T> {
 
         self.deployed_artifacts()
             .put(&artifact.name, artifact.runtime_id);
-
         Ok(())
     }
 
@@ -64,6 +63,7 @@ impl<T: IndexAccess> Schema<T> {
         if runtime_id != spec.artifact.runtime_id {
             return Err(StartError::WrongRuntime);
         }
+
         let name = spec.name.clone();
         self.started_services().put(&name, spec);
         Ok(())

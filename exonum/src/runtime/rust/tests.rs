@@ -25,7 +25,7 @@ use crate::{
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        DeployStatus, InstanceSpec, RuntimeContext, ServiceConfig,
+        InstanceSpec, RuntimeContext, ServiceConfig,
     },
 };
 
@@ -145,11 +145,6 @@ fn test_basic_rust_runtime() {
 
     // Deploy service.
     let fork = db.fork();
-    dispatcher.deploy(&artifact).unwrap();
-    assert_eq!(
-        dispatcher.check_deploy_status(&artifact, false).unwrap(),
-        DeployStatus::Deployed
-    );
     dispatcher
         .register_artifact(&fork, artifact.clone())
         .unwrap();
@@ -174,7 +169,7 @@ fn test_basic_rust_runtime() {
             },
         };
 
-        let mut fork = db.fork();
+        let fork = db.fork();
         let address = PublicKey::zero();
         let tx_hash = Hash::zero();
         let mut context = RuntimeContext::new(&fork, address, tx_hash);
@@ -198,7 +193,7 @@ fn test_basic_rust_runtime() {
             method_id: 0,
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
-        let mut fork = db.fork();
+        let fork = db.fork();
         let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
         dispatcher.call(&mut context, call_info, &payload).unwrap();
 
@@ -221,8 +216,8 @@ fn test_basic_rust_runtime() {
             method_id: 1,
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
-        let mut fork = db.fork();
-        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
+        let fork = db.fork();
+        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
         dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {

@@ -28,7 +28,7 @@ use crate::{
     runtime::{
         dispatcher::{self, Dispatcher},
         error::ExecutionError,
-        ArtifactId, DeployError, DeployStatus, RuntimeContext,
+        RuntimeContext,
     },
 };
 
@@ -210,16 +210,6 @@ impl<'a> AfterCommitContext<'a> {
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }
-    }
-
-    // TODO implement pending deployment logic [ECR-3291]
-    pub(crate) fn _check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError> {
-        self.dispatcher
-            .check_deploy_status(artifact, cancel_if_not_complete)
     }
 }
 

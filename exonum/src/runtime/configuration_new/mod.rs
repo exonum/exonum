@@ -177,7 +177,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
     ) -> Result<(), ExecutionError> {
         info!("Deploying service. {:?}", arg);
 
-        context.dispatch_action(Action::BeginDeploy {
+        context.dispatch_action(Action::RegisterArtifact {
             artifact: arg.artifact,
         });
         // TODO add result into deployable (to check deploy status in before_commit).

@@ -18,6 +18,7 @@ pub use self::service::{
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
+use futures::{Future, IntoFuture};
 use semver::Version;
 
 use std::{
@@ -36,8 +37,7 @@ use crate::{
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactId, DeployStatus, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
-    ServiceConfig,
+    ArtifactId, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConfig,
 };
 
 #[macro_use]
@@ -122,6 +122,25 @@ impl RustRuntime {
         self.add_service_factory(service_factory.into());
         self
     }
+
+    fn deploy(&mut self, artifact: ArtifactId) -> Result<(), DeployError> {
+        let artifact = self
+            .parse_artifact(&artifact)
+            .ok_or(DeployError::WrongArtifact)?;
+
+        trace!("Deployed artifact: {}", artifact);
+
+        if self.deployed_artifacts.contains(&artifact) {
+            return Ok(());
+        }
+
+        if !self.available_artifacts.contains_key(&artifact) {
+            return Err(DeployError::FailedToDeploy);
+        }
+        self.deployed_artifacts.insert(artifact);
+
+        Ok(())
+    }
 }
 
 impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
@@ -179,37 +198,11 @@ impl FromStr for RustArtifactId {
 }
 
 impl Runtime for RustRuntime {
-    fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
-        let artifact = self
-            .parse_artifact(&artifact)
-            .ok_or(DeployError::WrongArtifact)?;
-
-        trace!("Begin deploy artifact: {}", artifact);
-
-        if !self.available_artifacts.contains_key(&artifact) {
-            return Err(DeployError::FailedToDeploy);
-        }
-        if !self.deployed_artifacts.insert(artifact) {
-            return Err(DeployError::AlreadyDeployed);
-        }
-
-        Ok(DeployStatus::Deployed)
-    }
-
-    fn check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        _cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError> {
-        let artifact = self
-            .parse_artifact(&artifact)
-            .ok_or(DeployError::WrongArtifact)?;
-
-        if self.deployed_artifacts.contains(&artifact) {
-            Ok(DeployStatus::Deployed)
-        } else {
-            Err(DeployError::FailedToDeploy)
-        }
+    fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+    ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+        Box::new(self.deploy(artifact).into_future())
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {

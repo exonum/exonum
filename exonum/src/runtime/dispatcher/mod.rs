@@ -33,8 +33,7 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactId, DeployStatus, InstanceSpec, Runtime, RuntimeContext, ServiceConfig,
-    ServiceInstanceId,
+    ArtifactId, InstanceSpec, Runtime, RuntimeContext, ServiceConfig, ServiceInstanceId,
 };
 
 mod schema;
@@ -75,13 +74,8 @@ impl Dispatcher {
         // Restores information about the deployed services.
         for (name, runtime_id) in &schema.deployed_artifacts() {
             let artifact = ArtifactId { name, runtime_id };
-            let status = self
-                .deploy(&artifact)
-                .expect("Unable to restore deployed artifacts");
-            assert!(
-                status.is_deployed(),
-                "During the restart artifacts must be deployed instantly."
-            );
+            self.deploy_artifact(artifact)
+                .expect("Unable to restore deployed artifact");
         }
         // Restarts active service instances.
         for spec in schema.started_services().values() {
@@ -98,17 +92,7 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: ServiceConfig,
     ) {
-        // Registers service instance in runtime.
-        self.deploy(&spec.artifact)
-            .and_then(|status| {
-                assert_eq!(
-                    status,
-                    DeployStatus::Deployed,
-                    "Builtin artifacts must be deployed instantly."
-                );
-                Ok(())
-            })
-            .expect("Unable to deploy builtin service");
+        // Registers service's artifact in runtime.
         self.register_artifact(fork, spec.artifact.clone())
             .expect("Unable to register builtin artifact");
         // Starts builtin service instance.
@@ -118,17 +102,6 @@ impl Dispatcher {
             &constructor,
         )
         .expect("Unable to start builtin service instance");
-    }
-
-    pub fn check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError> {
-        self.runtimes
-            .get(&artifact.runtime_id)
-            .ok_or(DeployError::WrongRuntime)
-            .and_then(|runtime| runtime.check_deploy_status(artifact, cancel_if_not_complete))
     }
 
     pub fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
@@ -159,19 +132,21 @@ impl Dispatcher {
     }
 
     // TODO Implement proper pending deploy logic [ECR-3291]
-    pub(crate) fn deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
+    pub(crate) fn deploy_artifact(&mut self, artifact: ArtifactId) -> Result<(), DeployError> {
         self.runtimes
             .get_mut(&artifact.runtime_id)
             .ok_or(DeployError::WrongRuntime)
-            .and_then(|runtime| runtime.begin_deploy(artifact))
+            .and_then(|runtime| runtime.deploy_artifact(artifact).wait())
     }
 
     /// Registers deployed artifact in the dispatcher's information schema.
     pub(crate) fn register_artifact(
-        &self,
+        &mut self,
         fork: &Fork,
         artifact: ArtifactId,
     ) -> Result<(), DeployError> {
+        // Ensures that artifact is successfully deployed.
+        self.deploy_artifact(artifact.clone())?;
         Schema::new(fork).add_deployed_artifact(artifact)
     }
 
@@ -232,7 +207,7 @@ impl Dispatcher {
         self.call(context, transaction.call_info, &transaction.payload)?;
         // Executes pending dispatcher actions.
         context
-            .take_dispatcher_actions()
+            .take_actions()
             .into_iter()
             .try_for_each(|action| action.execute(self, context))
     }
@@ -285,7 +260,7 @@ impl Dispatcher {
 // TODO Update action names in according with changes in runtime. [ECR-3222]
 #[derive(Debug)]
 pub enum Action {
-    BeginDeploy {
+    RegisterArtifact {
         artifact: ArtifactId,
     },
     StartService {
@@ -301,12 +276,8 @@ impl Action {
         context: &mut RuntimeContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::BeginDeploy { artifact } => {
-                let status = dispatcher.deploy(&artifact)?;
-                // TODO Implement proper pending deploy logic [ECR-3291]
-                if status.is_deployed() {
-                    dispatcher.register_artifact(context.fork, artifact)?;
-                }
+            Action::RegisterArtifact { artifact } => {
+                dispatcher.register_artifact(context.fork, artifact)?;
                 Ok(())
             }
 
@@ -322,6 +293,7 @@ impl Action {
 #[cfg(test)]
 mod tests {
     use exonum_merkledb::{Database, TemporaryDB};
+    use futures::IntoFuture;
 
     use crate::{
         crypto::{Hash, PublicKey},
@@ -383,24 +355,18 @@ mod tests {
     }
 
     impl Runtime for SampleRuntime {
-        fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
-            if artifact.runtime_id == self.runtime_type {
-                Ok(DeployStatus::Deployed)
-            } else {
-                Err(DeployError::WrongRuntime)
-            }
-        }
-
-        fn check_deploy_status(
-            &self,
-            artifact: &ArtifactId,
-            _: bool,
-        ) -> Result<DeployStatus, DeployError> {
-            if artifact.runtime_id == self.runtime_type {
-                Ok(DeployStatus::Deployed)
-            } else {
-                Err(DeployError::WrongRuntime)
-            }
+        fn deploy_artifact(
+            &mut self,
+            artifact: ArtifactId,
+        ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+            Box::new(
+                if artifact.runtime_id == self.runtime_type {
+                    Ok(())
+                } else {
+                    Err(DeployError::WrongRuntime)
+                }
+                .into_future(),
+            )
         }
 
         fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
@@ -519,36 +485,15 @@ mod tests {
             name: "second".into(),
         };
 
-        // Check deploy.
-        dispatcher
-            .deploy(&sample_rust_spec)
-            .expect("start_deploy failed for rust");
-        dispatcher
-            .deploy(&sample_java_spec)
-            .expect("start_deploy failed for java");
-
-        // Check deploy status
-        assert_eq!(
-            dispatcher
-                .check_deploy_status(&sample_rust_spec, false)
-                .unwrap(),
-            DeployStatus::Deployed
-        );
-        assert_eq!(
-            dispatcher
-                .check_deploy_status(&sample_java_spec, false)
-                .unwrap(),
-            DeployStatus::Deployed
-        );
-
+        // Check if we can deploy services.
         let fork = db.fork();
-        // Register artifacts
         dispatcher
             .register_artifact(&fork, sample_rust_spec.clone())
-            .unwrap();
+            .expect("Deploy artifact failed for rust");
         dispatcher
             .register_artifact(&fork, sample_java_spec.clone())
-            .unwrap();
+            .expect("Deploy artifact failed for java");
+
         // Check if we can init services.
         let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
 
@@ -630,15 +575,8 @@ mod tests {
         // Check deploy.
         assert_eq!(
             dispatcher
-                .deploy(&sample_rust_spec)
-                .expect_err("start_deploy succeed"),
-            DeployError::WrongArtifact
-        );
-
-        assert_eq!(
-            dispatcher
-                .check_deploy_status(&sample_rust_spec, false)
-                .expect_err("check_deploy_status succeed"),
+                .deploy_artifact(sample_rust_spec.clone())
+                .expect_err("deploy artifact succeed"),
             DeployError::WrongArtifact
         );
 
@@ -657,7 +595,7 @@ mod tests {
                     },
                     &ServiceConfig::default()
                 )
-                .expect_err("init_service succeed"),
+                .expect_err("start service succeed"),
             StartError::WrongArtifact
         );
 

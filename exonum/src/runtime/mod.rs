@@ -16,6 +16,7 @@ pub use self::dispatcher::Dispatcher;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use futures::Future;
 use protobuf::well_known_types::Any;
 use serde_derive::{Deserialize, Serialize};
 
@@ -118,15 +119,12 @@ impl ArtifactId {
 ///
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
-    /// Begins deploy artifact with the given specification.
-    fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError>;
-
-    /// Checks deployment status.
-    fn check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError>;
+    /// Request to deploy artifact with the given identifier and additional specification.
+    /// It immediately returns true if artifact have already deployed.
+    fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+    ) -> Box<dyn Future<Item = (), Error = DeployError>>;
 
     /// Starts a new service instance with the given specification.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
@@ -178,7 +176,7 @@ pub struct RuntimeContext<'a> {
     fork: &'a Fork,
     author: PublicKey,
     tx_hash: Hash,
-    dispatcher_actions: Vec<dispatcher::Action>,
+    actions: Vec<dispatcher::Action>,
 }
 
 impl<'a> RuntimeContext<'a> {
@@ -187,7 +185,7 @@ impl<'a> RuntimeContext<'a> {
             fork,
             author,
             tx_hash,
-            dispatcher_actions: Vec::new(),
+            actions: Vec::new(),
         }
     }
 
@@ -196,17 +194,17 @@ impl<'a> RuntimeContext<'a> {
             fork,
             author: PublicKey::zero(),
             tx_hash: Hash::zero(),
-            dispatcher_actions: Vec::new(),
+            actions: Vec::new(),
         }
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.dispatcher_actions.push(action);
+        self.actions.push(action);
     }
 
-    pub(crate) fn take_dispatcher_actions(&mut self) -> Vec<dispatcher::Action> {
+    pub(crate) fn take_actions(&mut self) -> Vec<dispatcher::Action> {
         let mut other = Vec::new();
-        std::mem::swap(&mut self.dispatcher_actions, &mut other);
+        std::mem::swap(&mut self.actions, &mut other);
         other
     }
 }
