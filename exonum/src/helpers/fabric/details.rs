@@ -1246,7 +1246,9 @@ impl FinalizeAuditorConfig {
             peers
         } else {
             // Waiting for waiting for state update.
-            thread::sleep(Duration::from_millis(node_cfg.api.state_update_timeout as u64));
+            thread::sleep(Duration::from_millis(
+                node_cfg.api.state_update_timeout as u64,
+            ));
 
             primary_cfg
                 .add_auditor_request
