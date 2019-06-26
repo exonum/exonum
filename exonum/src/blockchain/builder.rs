@@ -31,6 +31,7 @@ use crate::{
 };
 
 // TODO Modern replacement for DispatcherBuilder [ECR-3275]
+#[derive(Debug)]
 pub struct BlockchainBuilder {
     pub database: Arc<dyn Database>,
     pub genesis_config: GenesisConfig,

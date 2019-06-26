@@ -15,7 +15,7 @@
 pub use schema::Schema;
 
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
-use futures::{future::Future, sink::Sink, sync::mpsc};
+use futures::{future, sync::mpsc, Future, Sink};
 
 use std::collections::HashMap;
 
@@ -75,6 +75,7 @@ impl Dispatcher {
         for (name, runtime_id) in &schema.deployed_artifacts() {
             let artifact = ArtifactId { name, runtime_id };
             self.deploy_artifact(artifact)
+                .wait()
                 .expect("Unable to restore deployed artifact");
         }
         // Restarts active service instances.
@@ -132,11 +133,15 @@ impl Dispatcher {
     }
 
     // TODO Implement proper pending deploy logic [ECR-3291]
-    pub(crate) fn deploy_artifact(&mut self, artifact: ArtifactId) -> Result<(), DeployError> {
-        self.runtimes
-            .get_mut(&artifact.runtime_id)
-            .ok_or(DeployError::WrongRuntime)
-            .and_then(|runtime| runtime.deploy_artifact(artifact).wait())
+    pub(crate) fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+    ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
+            runtime.deploy_artifact(artifact)
+        } else {
+            Box::new(future::err(DeployError::WrongRuntime))
+        }
     }
 
     /// Registers deployed artifact in the dispatcher's information schema.
@@ -146,7 +151,7 @@ impl Dispatcher {
         artifact: ArtifactId,
     ) -> Result<(), DeployError> {
         // Ensures that artifact is successfully deployed.
-        self.deploy_artifact(artifact.clone())?;
+        self.deploy_artifact(artifact.clone()).wait()?;
         Schema::new(fork).add_deployed_artifact(artifact)
     }
 
@@ -252,7 +257,7 @@ impl Dispatcher {
         tx_sender: &ApiSender,
     ) {
         self.runtimes.values().for_each(|runtime| {
-            runtime.after_commit(self, snapshot.as_ref(), &service_keypair, &tx_sender)
+            runtime.after_commit(snapshot.as_ref(), &service_keypair, &tx_sender)
         });
     }
 }
@@ -420,7 +425,6 @@ mod tests {
 
         fn after_commit(
             &self,
-            _dispatcher: &Dispatcher,
             _snapshot: &dyn Snapshot,
             _service_keypair: &(PublicKey, SecretKey),
             _tx_sender: &ApiSender,
@@ -576,6 +580,7 @@ mod tests {
         assert_eq!(
             dispatcher
                 .deploy_artifact(sample_rust_spec.clone())
+                .wait()
                 .expect_err("deploy artifact succeed"),
             DeployError::WrongArtifact
         );

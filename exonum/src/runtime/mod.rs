@@ -38,30 +38,6 @@ pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum DeployStatus {
-    DeployInProgress,
-    Deployed,
-}
-
-impl DeployStatus {
-    pub fn is_deployed(&self) -> bool {
-        if let DeployStatus::Deployed = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_pending(&self) -> bool {
-        if let DeployStatus::DeployInProgress = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct ServiceConfig {
     pub data: Any,
@@ -160,7 +136,6 @@ pub trait Runtime: Send + Debug + 'static {
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(
         &self,
-        dispatcher: &dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,

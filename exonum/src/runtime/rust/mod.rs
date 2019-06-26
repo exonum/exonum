@@ -331,14 +331,12 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
-        dispatcher: &super::dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
-                dispatcher,
                 service.descriptor(),
                 snapshot,
                 service_keypair,

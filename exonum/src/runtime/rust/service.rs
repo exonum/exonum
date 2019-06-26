@@ -26,7 +26,7 @@ use crate::{
     messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
     node::ApiSender,
     runtime::{
-        dispatcher::{self, Dispatcher},
+        dispatcher::{self},
         error::ExecutionError,
         RuntimeContext,
     },
@@ -140,7 +140,6 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 }
 
 pub struct AfterCommitContext<'a> {
-    dispatcher: &'a Dispatcher,
     service_descriptor: ServiceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
     service_keypair: &'a (PublicKey, SecretKey),
@@ -150,14 +149,12 @@ pub struct AfterCommitContext<'a> {
 impl<'a> AfterCommitContext<'a> {
     /// Creates context for `after_commit` method.
     pub(crate) fn new(
-        dispatcher: &'a Dispatcher,
         service_descriptor: ServiceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            dispatcher,
             service_descriptor,
             snapshot,
             service_keypair,
