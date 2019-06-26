@@ -44,6 +44,9 @@ mod password;
 /// Default port value.
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 
+/// Default port value.
+pub const DEFAULT_PUBLIC_API_PORT: u16 = 8000;
+
 /// Name of the `Command`.
 pub type CommandName = &'static str;
 

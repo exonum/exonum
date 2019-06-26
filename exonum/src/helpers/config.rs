@@ -51,7 +51,7 @@ impl ConfigAccessor {
     where
         T: for<'r> Deserialize<'r>,
     {
-        ConfigFile::load(self.path.read().unwrap().as_path())
+        ConfigFile::load(self.path.read().expect("Expected read lock.").as_path())
     }
 
     /// Saves TOML-encoded configuration.
@@ -59,7 +59,10 @@ impl ConfigAccessor {
     where
         T: Serialize,
     {
-        ConfigFile::save(value, self.path.write().unwrap().as_path())
+        ConfigFile::save(
+            value,
+            self.path.write().expect("Expected write lock.").as_path(),
+        )
     }
 }
 

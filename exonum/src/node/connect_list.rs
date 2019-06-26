@@ -20,7 +20,7 @@ use crate::crypto::PublicKey;
 use crate::node::{ConnectInfo, ConnectListConfig};
 
 /// Network address of the peer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PeerAddress {
     /// External address of the peer hostname:port.
     pub address: String,

@@ -495,8 +495,27 @@ fn test_update_config() {
     let config_accessor = ConfigAccessor::new(config_path.clone());
     ConfigManager::update_connect_list(connect_list.clone(), &config_accessor)
         .expect("Unable to update connect list");
-    let config = load_node_config(&config_path);
+    let config: NodeConfig<PathBuf> = config_accessor.load().expect("Can't load node config file");
 
     let new_connect_list = config.connect_list;
     assert_eq!(new_connect_list.peers, connect_list.peers);
+}
+
+#[test]
+fn test_config_accessor() {
+    let env = ConfigSpec::new_without_pass();
+    let config_path = env.output_dir().join("node.toml");
+    fs::create_dir(&config_path.parent().unwrap()).unwrap();
+    fs::copy(&env.expected_node_config_file(0), &config_path).unwrap();
+
+    let config_accessor = ConfigAccessor::new(config_path.clone());
+    let mut old_config: NodeConfig<PathBuf> =
+        config_accessor.load().expect("Can't load node config file");
+
+    old_config.auditor.allow_auto_connect = true;
+    config_accessor.save(&old_config).unwrap();
+
+    let new_config: NodeConfig<PathBuf> =
+        config_accessor.load().expect("Can't load node config file");
+    assert_eq!(new_config.auditor.allow_auto_connect, true);
 }

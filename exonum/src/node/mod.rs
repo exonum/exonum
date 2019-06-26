@@ -1181,8 +1181,8 @@ mod tests {
     };
     use crate::crypto::gen_keypair;
     use crate::events::EventHandler;
-    use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
+    use crate::{helpers, messages};
     use exonum_merkledb::{
         impl_binary_value_for_message, BinaryValue, Database, Snapshot, TemporaryDB,
     };
@@ -1284,5 +1284,93 @@ mod tests {
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 0);
+    }
+
+    #[test]
+    fn test_handle_add_auditor_event() {
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        node_cfg.auditor.allow_auto_connect = true;
+        let mut node = Node::new(db, services, node_cfg.clone(), None);
+
+        let (auditor_p_key, _) = gen_keypair();
+        let message = messages::Message::concrete(
+            messages::AddAuditor {
+                address: "localhost:5332".to_string(),
+                public_key: auditor_p_key,
+                connect_all: true,
+                validators: vec![],
+            },
+            node_cfg.service_public_key,
+            &node_cfg.service_secret_key,
+        );
+
+        node.handler.handle_add_auditor_event(message);
+
+        let connect_msg = node
+            .state()
+            .connect_list()
+            .find_address_by_key(&auditor_p_key)
+            .unwrap();
+        assert_eq!(&connect_msg.address, "localhost:5332");
+
+        let (auditor_p_key, _) = gen_keypair();
+        let message = messages::Message::concrete(
+            messages::AddAuditor {
+                address: "localhost:5331".to_string(),
+                public_key: auditor_p_key,
+                connect_all: false,
+                validators: vec![node_cfg.service_public_key],
+            },
+            node_cfg.service_public_key,
+            &node_cfg.service_secret_key,
+        );
+        node.handler.handle_add_auditor_event(message);
+        let connect_msg = node
+            .state()
+            .connect_list()
+            .find_address_by_key(&auditor_p_key)
+            .unwrap();
+        assert_eq!(&connect_msg.address, "localhost:5331");
+
+        let (auditor_p_key, _) = gen_keypair();
+        let message = messages::Message::concrete(
+            messages::AddAuditor {
+                address: "localhost:5330".to_string(),
+                public_key: auditor_p_key,
+                connect_all: false,
+                validators: vec![auditor_p_key],
+            },
+            node_cfg.service_public_key,
+            &node_cfg.service_secret_key,
+        );
+        node.handler.handle_add_auditor_event(message);
+        assert_eq!(
+            node.state()
+                .connect_list()
+                .find_address_by_key(&auditor_p_key),
+            None
+        );
+
+        node.handler.allow_auto_connect = false;
+        let (auditor_p_key, _) = gen_keypair();
+        let message = messages::Message::concrete(
+            messages::AddAuditor {
+                address: "localhost:5301".to_string(),
+                public_key: auditor_p_key,
+                connect_all: true,
+                validators: vec![node_cfg.service_public_key],
+            },
+            node_cfg.service_public_key,
+            &node_cfg.service_secret_key,
+        );
+        node.handler.handle_add_auditor_event(message);
+        assert_eq!(
+            node.state()
+                .connect_list()
+                .find_address_by_key(&auditor_p_key),
+            None
+        );
     }
 }

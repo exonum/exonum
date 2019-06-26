@@ -33,9 +33,10 @@ use crate::api::{backends::actix::AllowOrigin, node::public::system::KeyInfo};
 use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
 use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::fabric::shared::{AddAuditorInfo, AuditorPrimaryConfig};
+use crate::helpers::fabric::DEFAULT_PUBLIC_API_PORT;
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
 use crate::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
-use actix::SystemRunner;
+use actix::{System, SystemRunner};
 use actix_web::{client, HttpMessage};
 use exonum_merkledb::{Database, DbOptions, RocksDB};
 use futures::future::{lazy, Future};
@@ -799,7 +800,7 @@ impl Command for Finalize {
 pub struct RequestConnectAuditor;
 
 impl RequestConnectAuditor {
-    fn exe_name() -> String {
+    pub fn exe_name() -> String {
         std::env::current_exe()
             .ok()
             .as_ref()
@@ -1143,7 +1144,7 @@ impl Command for AddAuditor {
 
         let (external_address, _) = addresses(&context);
 
-        let mut sys = actix::System::new("add_auditor");
+        let mut sys = System::new("add_auditor");
         let validators = if connect_all {
             vec![]
         } else {
@@ -1218,7 +1219,7 @@ impl FinalizeAuditorConfig {
         .ok()
     }
 
-    fn merge_config(
+    pub fn merge_config(
         primary_cfg: AuditorPrimaryConfig,
         api: NodeApiConfig,
         node_cfg: SharedConfiguration,
@@ -1359,7 +1360,7 @@ impl Command for FinalizeAuditorConfig {
         let public_allow_origin = Finalize::public_allow_origin(&context);
         let private_allow_origin = Finalize::private_allow_origin(&context);
 
-        let mut sys = actix::System::new("finalize_auditor_config");
+        let mut sys = System::new("finalize_auditor_config");
 
         let wait = context.has_flag(WAIT);
 
@@ -1492,7 +1493,7 @@ fn validators(context: &Context) -> Option<Vec<String>> {
                     match address.parse().or_else(|_| {
                         address
                             .parse()
-                            .map(|ip| SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT))
+                            .map(|ip| SocketAddr::new(ip, DEFAULT_PUBLIC_API_PORT))
                     }) {
                         Ok(address) => address.to_string(),
                         Err(_) => address
@@ -1500,9 +1501,7 @@ fn validators(context: &Context) -> Option<Vec<String>> {
                             .next()
                             .and_then(|p| p.parse::<u16>().ok())
                             .map(|_p| address.clone())
-                            .unwrap_or_else(|| {
-                                format!("{}:{}", address, DEFAULT_EXONUM_LISTEN_PORT)
-                            }),
+                            .unwrap_or_else(|| format!("{}:{}", address, DEFAULT_PUBLIC_API_PORT)),
                     }
                 })
                 .collect()
@@ -1513,6 +1512,8 @@ fn validators(context: &Context) -> Option<Vec<String>> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use exonum_crypto::gen_keypair;
+    use std::collections::btree_map::BTreeMap;
 
     #[test]
     fn test_generate_node_config_addresses() {
@@ -1600,6 +1601,123 @@ mod test {
                 format!("{}:{}", external, DEFAULT_EXONUM_LISTEN_PORT),
                 listen.parse().unwrap()
             )
+        );
+    }
+
+    #[test]
+    fn test_request_connect_auditor_validators() {
+        let mut ctx = Context::default();
+
+        ctx.set_arg_multiple(
+            VALIDATORS_API,
+            vec!["localhost:8009".to_string(), "127.0.0.1".to_string()],
+        );
+        assert_eq!(
+            validators(&ctx).unwrap(),
+            vec!["localhost:8009".to_string(), "127.0.0.1:8000".to_string()]
+        );
+
+        ctx.set_arg_multiple(
+            VALIDATORS_API,
+            vec![
+                "2001:db8::1".to_string(),
+                "[2001:db8::1]:8001".to_string(),
+                "example.com".to_string(),
+            ],
+        );
+        assert_eq!(
+            validators(&ctx).unwrap(),
+            vec![
+                "[2001:db8::1]:8000".to_string(),
+                "[2001:db8::1]:8001".to_string(),
+                "example.com:8000".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_request_connect_auditor_exe_name() {
+        assert_eq!(
+            RequestConnectAuditor::exe_name().starts_with("./exonum"),
+            true
+        );
+    }
+
+    #[test]
+    fn test_finalize_auditor_config_merge_config() {
+        let mut system = System::new("finalize_auditor_config");
+        let (consensus_public_key, _) = gen_keypair();
+        let consensus_secret_key = PathBuf::new();
+        let (service_public_key, _) = gen_keypair();
+        let service_secret_key = PathBuf::new();
+
+        let primary_cfg = AuditorPrimaryConfig {
+            listen_address: "0.0.0.0:6000".parse().unwrap(),
+            external_address: "localhost:6000".to_string(),
+            consensus_public_key,
+            consensus_secret_key,
+            service_public_key,
+            service_secret_key,
+            add_auditor_request: AddAuditorInfo {
+                validators_api: vec![],
+                connect_all: true,
+            },
+        };
+
+        let api = NodeApiConfig {
+            public_api_address: "localhost:8000".parse().ok(),
+            private_api_address: "localhost:9021".parse().ok(),
+            public_allow_origin: None,
+            private_allow_origin: None,
+            ..Default::default()
+        };
+
+        let genesis = GenesisConfig {
+            consensus: Default::default(),
+            validator_keys: vec![ValidatorKeys {
+                consensus_key: gen_keypair().0,
+                service_key: gen_keypair().0,
+            }],
+        };
+
+        let shared_external_address = "localhost:6335";
+        let (node_consensus_public_key, _) = gen_keypair();
+        let shared_config = SharedConfiguration {
+            api: NodeApiConfig {
+                public_api_address: "localhost:8001".parse().ok(),
+                private_api_address: "localhost:9022".parse().ok(),
+                public_allow_origin: None,
+                private_allow_origin: None,
+                ..Default::default()
+            },
+            genesis: genesis.clone(),
+            external_address: shared_external_address.to_string(),
+            network: Default::default(),
+            mempool: Default::default(),
+            services_configs: BTreeMap::new(),
+            database: Default::default(),
+            connect_list: Default::default(),
+            thread_pool_size: None,
+            auditor: Default::default(),
+            consensus_public_key: node_consensus_public_key,
+        };
+
+        let node_config = FinalizeAuditorConfig::merge_config(
+            primary_cfg,
+            api.clone(),
+            shared_config,
+            &mut system,
+        );
+        assert_eq!(node_config.genesis, genesis);
+        assert_eq!(node_config.api, api);
+        assert_eq!(node_config.consensus_public_key, consensus_public_key);
+        assert_eq!(node_config.service_public_key, service_public_key);
+        assert_eq!(
+            node_config.connect_list.peers,
+            vec![ConnectInfo {
+                address: shared_external_address.to_string(),
+                public_key: node_consensus_public_key
+            }]
         );
     }
 }
