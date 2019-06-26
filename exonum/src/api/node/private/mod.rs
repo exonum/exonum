@@ -263,7 +263,7 @@ impl SystemApi {
                         connect_all: query.connect_all,
                         validators: query.validators,
                     },
-                    state.public_key().clone(),
+                    *state.public_key(),
                     state.secret_key(),
                 );
                 state

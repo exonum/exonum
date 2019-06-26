@@ -208,7 +208,7 @@ impl SystemApi {
     fn handle_service_key_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
         api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
             Ok(KeyInfo {
-                pub_key: state.public_key().clone(),
+                pub_key: *state.public_key(),
             })
         });
         self
@@ -230,7 +230,7 @@ impl SystemApi {
             self.shared_api_state
                 .load_configuration()
                 .map(SharedConfiguration::new)
-                .ok_or(ApiError::NotFound(
+                .ok_or_else(|| ApiError::NotFound(
                     "Node configuration not found".to_owned(),
                 ))
         });

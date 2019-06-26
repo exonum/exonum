@@ -38,6 +38,7 @@ use std::{
     panic,
     path::{Path, PathBuf},
 };
+use exonum::helpers::config::ConfigAccessor;
 
 #[derive(Debug)]
 struct ConfigSpec {
@@ -491,7 +492,8 @@ fn test_update_config() {
 
     let connect_list = ConnectListConfig { peers: vec![peer] };
 
-    ConfigManager::update_connect_list(connect_list.clone(), &config_path)
+    let config_accessor = ConfigAccessor::new(config_path.clone());
+    ConfigManager::update_connect_list(connect_list.clone(), &config_accessor)
         .expect("Unable to update connect list");
     let config = load_node_config(&config_path);
 

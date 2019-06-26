@@ -807,7 +807,7 @@ impl RequestConnectAuditor {
             .and_then(Path::file_name)
             .and_then(OsStr::to_str)
             .map(|s| format!("./{}", s))
-            .unwrap_or("".to_owned())
+            .unwrap_or_else(|| "".to_owned())
     }
 }
 
@@ -1229,7 +1229,7 @@ impl FinalizeAuditorConfig {
                 .genesis
                 .validator_keys
                 .iter()
-                .map(|key| key.consensus_key.clone())
+                .map(|key| key.consensus_key)
                 .collect();
 
             let mut peers: Vec<_> = node_cfg
@@ -1326,7 +1326,7 @@ impl Command for FinalizeAuditorConfig {
                 "private-allow-origin",
                 false,
             ),
-            Argument::new_positional("PRIMARY_CONFIG", true, "Path to our primari config."),
+            Argument::new_positional("PRIMARY_CONFIG", true, "Path to our primary config."),
             Argument::new_positional("OUTPUT_CONFIG_PATH", true, "Path to output node config."),
         ]
     }
@@ -1364,7 +1364,7 @@ impl Command for FinalizeAuditorConfig {
         let wait = context.has_flag(WAIT);
 
         let validators_api = primary_config.add_auditor_request.validators_api.clone();
-        let pub_key = primary_config.consensus_public_key.clone();
+        let pub_key = primary_config.consensus_public_key;
 
         let node_config = if wait {
             loop {

@@ -861,6 +861,7 @@ impl Sandbox {
             network: NetworkConfiguration::default(),
             peer_discovery: Vec::new(),
             mempool: Default::default(),
+            auditor: Default::default(),
         };
 
         let system_state = SandboxSystemStateProvider {
@@ -1097,6 +1098,7 @@ fn sandbox_with_services_uninitialized(
         network: NetworkConfiguration::default(),
         peer_discovery: Vec::new(),
         mempool: Default::default(),
+        auditor: Default::default(),
     };
 
     let system_state = SandboxSystemStateProvider {
@@ -1121,7 +1123,7 @@ fn sandbox_with_services_uninitialized(
         node_sender,
         Box::new(system_state),
         config.clone(),
-        SharedNodeState::new(5000),
+        SharedNodeState::new(5000, None),
         None,
     );
     handler.initialize();

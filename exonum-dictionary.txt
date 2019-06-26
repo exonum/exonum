@@ -192,3 +192,4 @@ xorshift
 xsalsa
 zeroize
 xsalsa
+canonicalize

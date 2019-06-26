@@ -7,6 +7,10 @@ service_secret_key = "service.key.toml"
 
 [api]
 state_update_timeout = 10000
+
+[auditor]
+allow_auto_connect = false
+
 [[connect_list.peers]]
 address = "0.0.0.0:8002"
 public_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
