@@ -18,11 +18,16 @@ pub use self::{
     schema::Schema,
 };
 
+use exonum_merkledb::Snapshot;
+
 use crate::{
+    crypto::Hash,
+    api::ServiceApiBuilder,
     messages::ServiceInstanceId,
-    runtime::rust::{RustArtifactId, Service, ServiceFactory},
+    runtime::rust::{RustArtifactId, Service, ServiceFactory, ServiceDescriptor},
 };
 
+mod api;
 mod errors;
 mod proto;
 mod schema;
@@ -31,7 +36,15 @@ mod transactions;
 #[derive(Debug)]
 pub struct Supervisor;
 
-impl Service for Supervisor {}
+impl Service for Supervisor {
+    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        Schema::new(descriptor.service_name(), snapshot).state_hash()
+    }
+
+    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+        api::wire(descriptor, builder)
+    }
+}
 
 impl ServiceFactory for Supervisor {
     fn artifact(&self) -> RustArtifactId {

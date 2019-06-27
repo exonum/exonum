@@ -238,7 +238,7 @@ impl Blockchain {
     pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
         let service_id = tx.service_id();
 
-        // TODO check if service exists?
+        // TODO check if service exists? [ECR-3222]
 
         // if !self.dispatcher.services().contains_key(&service_id) {
         //     return Err(format_err!(

@@ -23,7 +23,7 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
+    messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
     runtime::{dispatcher, error::ExecutionError, RuntimeContext},
 };
@@ -231,20 +231,20 @@ pub trait Transaction: BinaryValue {
     type Service;
     /// Identifier of service method which executes the given transaction.
     const METHOD_ID: MethodId;
-    /// Signs given data as service transaction with the specified instance identifier.
+
+    /// Creates unsigned service transaction from the value.
+    fn into_any_tx(self, service_id: ServiceInstanceId) -> AnyTx {
+        AnyTx::new(service_id as u16, Self::METHOD_ID as u16, self.into_bytes())
+    }
+
+    /// Signs value as service transaction with the specified instance identifier.
     fn sign(
         self,
         service_id: ServiceInstanceId,
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<AnyTx> {
-        let payload = Self::into_bytes(self);
-        Message::sign_transaction(
-            ServiceTransaction::from_raw_unchecked(Self::METHOD_ID as u16, payload),
-            service_id,
-            public_key,
-            secret_key,
-        )
+        Message::concrete(self.into_any_tx(service_id), public_key, secret_key)
     }
 }
 

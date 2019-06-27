@@ -75,6 +75,14 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         pending_instances.put(&instance_spec, confirmations);
         len
     }
+
+    /// Returns hashes for tables with proofs.
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![
+            self.pending_artifacts().object_hash(),
+            self.pending_instances().object_hash(),
+        ]
+    }
 }
 
 /// A set of binary values.
