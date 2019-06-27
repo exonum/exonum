@@ -74,7 +74,7 @@ mod events;
 mod requests;
 
 /// External messages.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
@@ -1305,8 +1305,8 @@ mod tests {
             node_cfg.service_public_key,
             &node_cfg.service_secret_key,
         );
-
-        node.handler.handle_add_auditor_event(message);
+        node.handler
+            .handle_message(Message::Event(messages::Event::AddAuditor(message)));
 
         let connect_msg = node
             .state()
@@ -1314,7 +1314,6 @@ mod tests {
             .find_address_by_key(&auditor_p_key)
             .unwrap();
         assert_eq!(&connect_msg.address, "localhost:5332");
-
         let (auditor_p_key, _) = gen_keypair();
         let message = messages::Message::concrete(
             messages::AddAuditor {
@@ -1326,7 +1325,8 @@ mod tests {
             node_cfg.service_public_key,
             &node_cfg.service_secret_key,
         );
-        node.handler.handle_add_auditor_event(message);
+        node.handler
+            .handle_message(Message::Event(messages::Event::AddAuditor(message)));
         let connect_msg = node
             .state()
             .connect_list()
@@ -1345,7 +1345,8 @@ mod tests {
             node_cfg.service_public_key,
             &node_cfg.service_secret_key,
         );
-        node.handler.handle_add_auditor_event(message);
+        node.handler
+            .handle_message(Message::Event(messages::Event::AddAuditor(message)));
         assert_eq!(
             node.state()
                 .connect_list()
@@ -1365,7 +1366,8 @@ mod tests {
             node_cfg.service_public_key,
             &node_cfg.service_secret_key,
         );
-        node.handler.handle_add_auditor_event(message);
+        node.handler
+            .handle_message(Message::Event(messages::Event::AddAuditor(message)));
         assert_eq!(
             node.state()
                 .connect_list()

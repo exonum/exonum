@@ -95,7 +95,7 @@ pub struct NodeRunConfig {
 }
 
 /// `AddAuditorRequest` Add auditor request.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct AddAuditorInfo {
     /// Validators api addresses.
     pub validators_api: Vec<String>,

@@ -20,7 +20,10 @@ pub use self::{
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, Run, RunDev},
     internal::Command,
     maintenance::Maintenance,
-    shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig},
+    shared::{
+        AbstractConfig, AddAuditorInfo, AuditorPrimaryConfig, CommonConfigTemplate,
+        NodePrivateConfig, NodePublicConfig,
+    },
 };
 
 use serde::{Deserialize, Serialize};

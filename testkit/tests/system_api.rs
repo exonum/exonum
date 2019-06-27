@@ -15,11 +15,15 @@
 #[macro_use]
 extern crate pretty_assertions;
 
+use exonum::api::node::private::AddAuditorRequest;
+use exonum::api::node::public::system::{KeyInfo, SharedConfiguration};
+use exonum::node::{ConnectInfo, ExternalMessage};
 use exonum::{
     api::node::{
         private::NodeInfo,
         public::system::{ConsensusStatus, HealthCheckInfo, StatsInfo},
     },
+    crypto::gen_keypair,
     helpers::user_agent,
     messages::PROTOCOL_MAJOR_VERSION,
 };
@@ -101,4 +105,88 @@ fn rebroadcast() {
             .unwrap(),
         ()
     )
+}
+
+#[test]
+fn service_key() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    let info: KeyInfo = api.public(ApiKind::System).get("v1/service_key").unwrap();
+
+    assert_eq!(info.pub_key, *testkit.us().service_keypair().0)
+}
+
+#[test]
+#[should_panic(expected = "Peer with this public key not found")]
+fn remote_config() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    api.public(ApiKind::System)
+        .query(&KeyInfo {
+            pub_key: gen_keypair().0,
+        })
+        .get::<SharedConfiguration>("v1/remote_config")
+        .unwrap();
+}
+
+#[test]
+fn auditor_add() {
+    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    let (pub_key, _) = gen_keypair();
+
+    api.private(ApiKind::System)
+        .query(&AddAuditorRequest {
+            address: "localhost:5333".to_string(),
+            public_key: pub_key,
+            connect_all: true,
+            validators: vec![],
+        })
+        .post::<()>("v1/auditor/add")
+        .unwrap();
+
+    testkit.poll_events();
+
+    testkit
+        .received_messages()
+        .iter()
+        .find(|msg| match msg {
+            ExternalMessage::AuditorAdd(msg) => {
+                msg.connect_all && msg.address == "localhost:5333" && msg.public_key == pub_key
+            }
+            _ => false,
+        })
+        .unwrap();
+}
+
+#[test]
+fn peer_add() {
+    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    let (pub_key, _) = gen_keypair();
+
+    api.private(ApiKind::System)
+        .query(&ConnectInfo {
+            address: "localhost:5333".to_string(),
+            public_key: pub_key,
+        })
+        .post::<()>("v1/peers")
+        .unwrap();
+
+    testkit.poll_events();
+
+    testkit
+        .received_messages()
+        .iter()
+        .find(|msg| match msg {
+            ExternalMessage::PeerAdd(msg) => {
+                msg.address == "localhost:5333" && msg.public_key == pub_key
+            }
+            _ => false,
+        })
+        .unwrap();
 }

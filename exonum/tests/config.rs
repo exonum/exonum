@@ -24,12 +24,14 @@ use exonum::{
     crypto::{PublicKey, PUBLIC_KEY_LENGTH},
     helpers::{
         config::{ConfigFile, ConfigManager},
-        fabric::NodeBuilder,
+        fabric::{AuditorPrimaryConfig, NodeBuilder},
     },
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
 
+use exonum::api::node::public::system::SharedConfiguration;
 use exonum::helpers::config::ConfigAccessor;
+use exonum::helpers::fabric::AddAuditorInfo;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -518,4 +520,54 @@ fn test_config_accessor() {
     let new_config: NodeConfig<PathBuf> =
         config_accessor.load().expect("Can't load node config file");
     assert_eq!(new_config.auditor.allow_auto_connect, true);
+}
+
+#[test]
+fn test_shared_configuration() {
+    let env = ConfigSpec::new_without_pass();
+    let config_accessor = ConfigAccessor::new(env.expected_node_config_file(0));
+    let config: NodeConfig<PathBuf> = config_accessor.load().expect("Can't load node config file");
+    let shared_config = SharedConfiguration::new(config.clone());
+    let shared_config: SharedConfiguration =
+        serde_json::from_str(&serde_json::to_string(&shared_config).unwrap()).unwrap();
+
+    assert_eq!(shared_config.api, config.api);
+    assert_eq!(shared_config.genesis, config.genesis);
+    assert_eq!(shared_config.external_address, config.external_address);
+    assert_eq!(shared_config.network, config.network);
+    assert_eq!(shared_config.mempool, config.mempool);
+    assert_eq!(shared_config.database, config.database);
+    assert_eq!(shared_config.connect_list, config.connect_list);
+    assert_eq!(shared_config.thread_pool_size, config.thread_pool_size);
+    assert_eq!(shared_config.auditor, config.auditor);
+    assert_eq!(
+        shared_config.consensus_public_key,
+        config.consensus_public_key
+    );
+}
+
+#[test]
+fn test_auditor_primary_configuration() {
+    let env = ConfigSpec::new_without_pass();
+
+    let validators_api = vec!["localhost:8080".to_string(), "localhost:8081".to_string()];
+    env.command("request_connect_auditor")
+        .with_arg(&env.output_node_config_dir(0))
+        .with_arg("--validators-api")
+        .with_args(validators_api.clone())
+        .with_named_arg("-a", "127.0.0.1")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+
+    let cfg: AuditorPrimaryConfig =
+        ConfigFile::load(&env.output_node_config_dir(0).join("request.toml")).unwrap();
+
+    assert_eq!(
+        cfg.add_auditor_request,
+        AddAuditorInfo {
+            validators_api,
+            connect_all: false
+        }
+    );
 }

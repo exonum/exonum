@@ -165,6 +165,7 @@ pub use crate::{
     network::{TestNetwork, TestNetworkConfiguration, TestNode},
     server::TestKitStatus,
 };
+
 pub mod compare;
 pub mod proto;
 
@@ -395,6 +396,7 @@ pub struct TestKit {
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
+    external_messages: Arc<Mutex<Vec<ExternalMessage>>>,
 }
 
 impl fmt::Debug for TestKit {
@@ -436,13 +438,17 @@ impl TestKit {
             api_sender.clone(),
         );
 
+        let external_messages = Arc::new(Mutex::new(Vec::new()));
         blockchain.initialize(genesis).unwrap();
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
 
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
             let mut blockchain = blockchain.clone();
+            let external_messages = external_messages.clone();
             Box::new(api_channel.1.and_then(move |event| {
+                external_messages.lock().unwrap().push(event.clone());
+
                 let guard = processing_lock_.lock().unwrap();
                 let fork = blockchain.fork();
                 let mut schema = CoreSchema::new(&fork);
@@ -473,6 +479,7 @@ impl TestKit {
             processing_lock,
             network,
             cfg_proposal: None,
+            external_messages,
         }
     }
 
@@ -1038,6 +1045,11 @@ impl TestKit {
                 .try_unwrap()
                 .expect("cannot retrieve database state"),
         }
+    }
+
+    /// Returns list of received external message.
+    pub fn received_messages(&self) -> Vec<ExternalMessage> {
+        self.external_messages.lock().unwrap().clone()
     }
 }
 
