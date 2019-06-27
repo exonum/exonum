@@ -12,10 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::{proto::{DeployArtifact, StartService}, schema::Schema};
+pub use self::{
+    errors::Error,
+    proto::{DeployArtifact, StartService},
+    schema::Schema,
+};
 
-use crate::runtime::rust::{RustArtifactId, Service, ServiceFactory};
+use crate::{
+    messages::ServiceInstanceId,
+    runtime::rust::{RustArtifactId, Service, ServiceFactory},
+};
 
+mod errors;
 mod proto;
 mod schema;
 mod transactions;
@@ -36,4 +44,9 @@ impl ServiceFactory for Supervisor {
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
+}
+
+impl Supervisor {
+    pub const BUILTIN_ID: ServiceInstanceId = 1;
+    pub const BUILTIN_NAME: &'static str = "supervisor";
 }

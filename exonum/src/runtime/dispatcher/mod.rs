@@ -72,15 +72,15 @@ impl Dispatcher {
     pub fn restore_state(&mut self, snapshot: impl IndexAccess) {
         let schema = Schema::new(snapshot);
         // Restores information about the deployed services.
-        for (name, runtime_id) in &schema.deployed_artifacts() {
+        for (name, runtime_id) in &schema.artifacts() {
             let artifact = ArtifactId { name, runtime_id };
             self.deploy_artifact(artifact)
                 .wait()
                 .expect("Unable to restore deployed artifact");
         }
         // Restarts active service instances.
-        for spec in schema.started_services().values() {
-            self.restart_service(&spec)
+        for instance in schema.service_instances().values() {
+            self.restart_service(&instance)
                 .expect("Unable to restart services");
         }
     }
@@ -152,7 +152,7 @@ impl Dispatcher {
     ) -> Result<(), DeployError> {
         // Ensures that artifact is successfully deployed.
         self.deploy_artifact(artifact.clone()).wait()?;
-        Schema::new(fork).add_deployed_artifact(artifact)
+        Schema::new(fork).add_artifact(artifact)
     }
 
     /// Registers service instance in the runtime lookup table.
@@ -199,7 +199,7 @@ impl Dispatcher {
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
-        Schema::new(context.fork).add_started_service(spec)?;
+        Schema::new(context.fork).add_service_instance(spec)?;
         Ok(())
     }
 
@@ -277,7 +277,7 @@ pub enum Action {
     },
     StartService {
         spec: InstanceSpec,
-        constructor: ServiceConfig,
+        config: ServiceConfig,
     },
 }
 
@@ -297,8 +297,8 @@ impl Action {
                 .register_artifact(context.fork, artifact)
                 .map_err(From::from),
 
-            Action::StartService { spec, constructor } => {
-                dispatcher.start_service(context, spec, &constructor)?;
+            Action::StartService { spec, config } => {
+                dispatcher.start_service(context, spec, &config)?;
                 dispatcher.restart_api();
                 Ok(())
             }

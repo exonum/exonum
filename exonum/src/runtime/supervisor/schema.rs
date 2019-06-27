@@ -21,9 +21,9 @@ use std::{
     io::{Cursor, Write},
 };
 
+use super::{DeployArtifact, StartService};
 use crate::{
     crypto::{self, Hash, PublicKey},
-    runtime::ArtifactId,
 };
 
 /// Service information schema.
@@ -42,19 +42,39 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         }
     }
 
-    pub fn pending_artifacts(&self) -> ProofMapIndex<T, ArtifactId, BinarySet<PublicKey>> {
+    pub fn pending_artifacts(&self) -> ProofMapIndex<T, DeployArtifact, BinarySet<PublicKey>> {
         ProofMapIndex::new(
             [self.instance_name, ".pending_artifacts"].concat(),
             self.access.clone(),
         )
     }
 
-    pub fn confirm_pending_artifact(&mut self, id: &ArtifactId, key: PublicKey) -> usize {
+    pub fn pending_instances(&self) -> ProofMapIndex<T, StartService, BinarySet<PublicKey>> {
+        ProofMapIndex::new(
+            [self.instance_name, ".pending_instances"].concat(),
+            self.access.clone(),
+        )
+    }
+
+    pub fn confirm_pending_artifact(&mut self, id: &DeployArtifact, author: PublicKey) -> usize {
         let mut pending_artifacts = self.pending_artifacts();
         let mut confirmations = pending_artifacts.get(&id).unwrap_or_default();
-        confirmations.0.insert(key);
+        confirmations.0.insert(author);
         let len = confirmations.0.len();
         pending_artifacts.put(&id, confirmations);
+        len
+    }
+
+    pub fn confirm_pending_instance(
+        &mut self,
+        instance_spec: &StartService,
+        author: PublicKey,
+    ) -> usize {
+        let mut pending_instances = self.pending_instances();
+        let mut confirmations = pending_instances.get(&instance_spec).unwrap_or_default();
+        confirmations.0.insert(author);
+        let len = confirmations.0.len();
+        pending_instances.put(&instance_spec, confirmations);
         len
     }
 }

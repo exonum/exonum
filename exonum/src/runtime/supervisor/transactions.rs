@@ -13,36 +13,17 @@
 // limitations under the License.
 
 use crate::{
-    blockchain::{self, ExecutionError, ExecutionResult},
+    blockchain::{self, ExecutionResult},
     runtime::{
         dispatcher::{self, Action},
         rust::TransactionContext,
+        InstanceSpec, ServiceConfig,
     },
 };
 
-use super::{DeployArtifact, Schema, StartService, Supervisor};
+use super::{DeployArtifact, Error, Schema, StartService, Supervisor};
 
-/// Common errors emitted by transactions during execution.
-#[derive(Debug, Fail)]
-#[repr(u8)]
-pub enum Error {
-    /// Artifact has been already deployed.
-    #[fail(display = "Artifact has been already deployed")]
-    AlreadyDeployed = 0,
-    /// Transaction author is not a validator.
-    #[fail(display = "Transaction author is not a validator")]
-    UnknownAuthor = 1,
-    /// Reached deadline for deploying artifact.
-    #[fail(display = "Reached deadline for deploying artifact")]
-    DeployDeadline = 2,
-}
-
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        let description = value.to_string();
-        ExecutionError::with_description(value as u8, description)
-    }
-}
+// TODO Implement generic helper module for multisig transactions [ECR-3222]
 
 /// Supervisor service transactions.
 #[service_interface(exonum(crate = "crate"))]
@@ -74,7 +55,7 @@ impl Transactions for Supervisor {
         }
         // Verifies that the artifact is not deployed yet.
         if dispatcher::Schema::new(context.fork())
-            .deployed_artifacts()
+            .artifacts()
             .contains(&artifact.id.name)
         {
             return Err(Error::AlreadyDeployed)?;
@@ -86,7 +67,7 @@ impl Transactions for Supervisor {
         }
 
         let confirmations = Schema::new(context.service_name(), context.fork())
-            .confirm_pending_artifact(&artifact.id, context.author());
+            .confirm_pending_artifact(&artifact, context.author());
         if confirmations == validator_keys.len() {
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
@@ -100,11 +81,50 @@ impl Transactions for Supervisor {
                 artifact: artifact.id,
             });
         }
+
         Ok(())
     }
 
-    fn start_service(&self, context: TransactionContext, arg: StartService) -> ExecutionResult {
-        unimplemented!()
+    fn start_service(&self, mut context: TransactionContext, service: StartService) -> ExecutionResult {
+        let blockchain_schema = blockchain::Schema::new(context.fork());
+        let dispatcher_schema = dispatcher::Schema::new(context.fork());
+
+        let validator_keys = blockchain_schema.actual_configuration().validator_keys;
+        // Verifies that transaction author is validator.
+        if !validator_keys
+            .iter()
+            .any(|validator| validator.service_key == context.author())
+        {
+            return Err(Error::UnknownAuthor)?;
+        }
+        // Verifies that the instance name does not exist.
+        if dispatcher_schema
+            .service_instances()
+            .contains(&service.name)
+        {
+            return Err(Error::InstanceExists)?;
+        }
+
+        let confirmations = Schema::new(context.service_name(), context.fork())
+            .confirm_pending_instance(&service, context.author());
+        if confirmations == validator_keys.len() {
+            // Assigns identifier for the new service instance.
+            let id = dispatcher_schema.vacant_instance_id();
+            // We have enough confirmations to start a new service instance,
+            // if this action fails this transaction will be canceled.
+            context.dispatch_action(Action::StartService {
+                spec: InstanceSpec {
+                    artifact: service.artifact,
+                    id,
+                    name: service.name,
+                },
+                config: ServiceConfig {
+                    data: service.config,
+                },
+            })
+        }
+
+        Ok(())
     }
 }
 

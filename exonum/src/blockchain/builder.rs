@@ -165,7 +165,7 @@ mod tests {
 
     use crate::{
         helpers::{generate_testnet_config, Height},
-        runtime::configuration_new::ConfigurationServiceFactory,
+        runtime::supervisor::Supervisor,
     };
 
     use super::*;
@@ -198,9 +198,9 @@ mod tests {
         Blockchain::new(
             TemporaryDB::new(),
             vec![
-                InstanceCollection::new(ConfigurationServiceFactory).with_instance(
-                    ConfigurationServiceFactory::BUILTIN_ID,
-                    ConfigurationServiceFactory::BUILTIN_NAME,
+                InstanceCollection::new(Supervisor).with_instance(
+                    Supervisor::BUILTIN_ID,
+                    Supervisor::BUILTIN_NAME,
                     (),
                 ),
             ],

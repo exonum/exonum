@@ -15,12 +15,12 @@
 pub use self::dispatcher::Dispatcher;
 pub use crate::messages::ServiceInstanceId;
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot, BinaryKey};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use futures::Future;
 use protobuf::well_known_types::Any;
 use serde_derive::{Deserialize, Serialize};
 
-use std::{fmt::Debug, mem};
+use std::{fmt::Debug};
 
 use crate::{
     api::ServiceApiBuilder,
@@ -34,7 +34,6 @@ use self::error::{DeployError, ExecutionError, StartError};
 
 #[macro_use]
 pub mod rust;
-pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
 pub mod supervisor;
@@ -62,8 +61,8 @@ impl ServiceConfig {
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
     pub id: ServiceInstanceId,
-    pub name: String,
     pub artifact: ArtifactId,
+    pub name: String,
 }
 
 // TODO Replace by more convienent solution [ECR-3222]
@@ -192,34 +191,4 @@ where
     fn from(runtime: T) -> Self {
         Box::new(runtime) as Self
     }
-}
-
-impl BinaryKey for ArtifactId {
-    fn size(&self) -> usize {
-        mem::size_of_val(&self.runtime_id) + self.name.len()
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        let len = buffer.len();
-        self.runtime_id.write(&mut buffer[0..4]);
-        self.name.write(&mut buffer[4..]);
-        len
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        let runtime_id = u32::read(&buffer[0..2]);
-        let name = String::read(&buffer[2..]);
-        Self { runtime_id, name }
-    }
-}
-
-#[test]
-fn test_artifact_id_binary_key() {
-    let artifact_id = ArtifactId::new(12, "foo.art");
-    
-    let mut buf = vec![0; artifact_id.size()];
-    artifact_id.write(&mut buf);
-    let artifact_id_2 = ArtifactId::read(&buf);
-
-    assert_eq!(artifact_id, artifact_id_2)
 }
