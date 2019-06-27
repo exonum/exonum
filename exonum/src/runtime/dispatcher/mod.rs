@@ -74,14 +74,16 @@ impl Dispatcher {
         // Restores information about the deployed services.
         for (name, runtime_id) in &schema.artifacts() {
             let artifact = ArtifactId { name, runtime_id };
-            self.deploy_artifact(artifact)
+            self.deploy_artifact(artifact.clone())
                 .wait()
                 .expect("Unable to restore deployed artifact");
+            trace!("Added deployed artifact: {:?}", artifact);
         }
         // Restarts active service instances.
         for instance in schema.service_instances().values() {
             self.restart_service(&instance)
                 .expect("Unable to restart services");
+            trace!("Restarted service: {:?}", instance);
         }
     }
 
@@ -152,7 +154,9 @@ impl Dispatcher {
     ) -> Result<(), DeployError> {
         // Ensures that artifact is successfully deployed.
         self.deploy_artifact(artifact.clone()).wait()?;
-        Schema::new(fork).add_artifact(artifact)
+        Schema::new(fork).add_artifact(artifact.clone())?;
+        info!("Registered artifact {} in runtime with id {}", artifact.name, artifact.runtime_id);
+        Ok(())
     }
 
     /// Registers service instance in the runtime lookup table.
@@ -199,6 +203,7 @@ impl Dispatcher {
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
+        info!("Registered service instance: {:?}", spec);
         Schema::new(context.fork).add_service_instance(spec)?;
         Ok(())
     }

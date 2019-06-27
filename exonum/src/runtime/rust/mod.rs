@@ -111,7 +111,7 @@ impl RustRuntime {
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact();
-        info!("Added available artifact {}", artifact);
+        trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
 
@@ -128,8 +128,6 @@ impl RustRuntime {
             .parse_artifact(&artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
-        trace!("Deployed artifact: {}", artifact);
-
         if self.deployed_artifacts.contains(&artifact) {
             return Ok(());
         }
@@ -137,8 +135,9 @@ impl RustRuntime {
         if !self.available_artifacts.contains_key(&artifact) {
             return Err(DeployError::FailedToDeploy);
         }
-        self.deployed_artifacts.insert(artifact);
 
+        trace!("Deployed artifact: {}", artifact);
+        self.deployed_artifacts.insert(artifact);
         Ok(())
     }
 }

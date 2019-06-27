@@ -21,7 +21,7 @@ use crate::{helpers::Height, proto::schema, runtime::ArtifactId};
 #[exonum(pb = "schema::supervisor::DeployArtifact", crate = "crate")]
 pub struct DeployArtifact {
     // Artifact identifier.
-    pub id: ArtifactId,
+    pub artifact: ArtifactId,
     // The height to which the deployment procedure should be completed.
     pub deadline_height: Height,
 }
