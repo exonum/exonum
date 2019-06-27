@@ -54,7 +54,7 @@ macro_rules! impl_binary_key_for_binary_value {
             }
 
             fn read(buffer: &[u8]) -> Self::Owned {
-                // `unwrap` is safe because only this code uses for 
+                // `unwrap` is safe because only this code uses for
                 // serialize and deserialize these keys.
                 <Self as exonum_merkledb::BinaryValue>::from_bytes(buffer.into()).unwrap()
             }

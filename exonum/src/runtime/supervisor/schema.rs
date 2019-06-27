@@ -22,9 +22,7 @@ use std::{
 };
 
 use super::{DeployArtifact, StartService};
-use crate::{
-    crypto::{self, Hash, PublicKey},
-};
+use crate::crypto::{self, Hash, PublicKey};
 
 /// Service information schema.
 #[derive(Debug)]

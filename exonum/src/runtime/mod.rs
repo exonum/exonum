@@ -20,7 +20,7 @@ use futures::Future;
 use protobuf::well_known_types::Any;
 use serde_derive::{Deserialize, Serialize};
 
-use std::{fmt::Debug};
+use std::fmt::Debug;
 
 use crate::{
     api::ServiceApiBuilder,

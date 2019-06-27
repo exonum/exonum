@@ -29,7 +29,7 @@ pub enum Error {
     DeployDeadline = 2,
     /// Instance with the given name already exists.
     #[fail(display = "Instance with the given name already exists")]
-    InstanceExists = 3,    
+    InstanceExists = 3,
 }
 
 impl From<Error> for ExecutionError {

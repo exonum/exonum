@@ -69,6 +69,7 @@ impl Transactions for Supervisor {
         let confirmations = Schema::new(context.service_name(), context.fork())
             .confirm_pending_artifact(&artifact, context.author());
         if confirmations == validator_keys.len() {
+            debug!("Register artifact {:?}", artifact.id);
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
             context.dispatch_action(Action::RegisterArtifact {
@@ -85,7 +86,11 @@ impl Transactions for Supervisor {
         Ok(())
     }
 
-    fn start_service(&self, mut context: TransactionContext, service: StartService) -> ExecutionResult {
+    fn start_service(
+        &self,
+        mut context: TransactionContext,
+        service: StartService,
+    ) -> ExecutionResult {
         let blockchain_schema = blockchain::Schema::new(context.fork());
         let dispatcher_schema = dispatcher::Schema::new(context.fork());
 
@@ -109,15 +114,16 @@ impl Transactions for Supervisor {
             .confirm_pending_instance(&service, context.author());
         if confirmations == validator_keys.len() {
             // Assigns identifier for the new service instance.
-            let id = dispatcher_schema.vacant_instance_id();
+            let spec = InstanceSpec {
+                artifact: service.artifact,
+                id: dispatcher_schema.vacant_instance_id(),
+                name: service.name,
+            };
+            debug!("Start service with spec {:?}", spec);
             // We have enough confirmations to start a new service instance,
             // if this action fails this transaction will be canceled.
             context.dispatch_action(Action::StartService {
-                spec: InstanceSpec {
-                    artifact: service.artifact,
-                    id,
-                    name: service.name,
-                },
+                spec,
                 config: ServiceConfig {
                     data: service.config,
                 },

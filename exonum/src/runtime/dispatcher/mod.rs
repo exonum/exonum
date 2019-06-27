@@ -268,13 +268,9 @@ pub enum Action {
     /// This action tries to deploy artifact on the current node without registration.
     /// In this way you can be sure that artifact is deployed in the corresponding runtime
     /// before register.
-    DeployArtifact {
-        artifact: ArtifactId,
-    },
+    DeployArtifact { artifact: ArtifactId },
     /// This action registers deployed artifact in the dispatcher.
-    RegisterArtifact {
-        artifact: ArtifactId,
-    },
+    RegisterArtifact { artifact: ArtifactId },
     StartService {
         spec: InstanceSpec,
         config: ServiceConfig,
