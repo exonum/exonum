@@ -69,13 +69,16 @@ pub use self::schema::{
     },
 };
 
+use std::borrow::Cow;
+
 pub mod schema;
 #[cfg(test)]
 mod tests;
 
 use chrono::{DateTime, TimeZone, Utc};
+use exonum_merkledb::BinaryValue;
 use failure::Error;
-use protobuf::well_known_types;
+use protobuf::{well_known_types, Message};
 
 use std::collections::HashMap;
 
@@ -374,4 +377,76 @@ impl_protobuf_convert_fixed_byte_array! {
     8, 16, 24, 32, 40, 48, 56, 64,
     72, 80, 88, 96, 104, 112, 120, 128,
     160, 256, 512, 1024, 2048
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Any(well_known_types::Any);
+
+impl ProtobufConvert for Any {
+    type ProtoStruct = well_known_types::Any;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        self.0.clone()
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        Ok(Self(pb))
+    }
+}
+
+impl BinaryValue for Any {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0
+            .write_to_bytes()
+            .expect("Failed to serialize in BinaryValue for `Any`")
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
+        inner.merge_from_bytes(bytes.as_ref())?;
+        ProtobufConvert::from_pb(inner)
+    }
+}
+
+impl Any {
+    pub fn new<T>(value: T) -> Self
+    where
+        T: ProtobufConvert,
+        <T as ProtobufConvert>::ProtoStruct: Message,
+    {
+        let pb = value.to_pb();
+
+        // See protobuf documentation for clarification.
+        // https://developers.google.com/protocol-buffers/docs/proto3#any
+        let type_url = ["google.protobuf.Any/", pb.descriptor().full_name()].concat();
+        let value = pb
+            .write_to_bytes()
+            .expect("Failed to serialize in BinaryValue for `Any`");
+
+        Self(well_known_types::Any {
+            type_url,
+            value,
+            ..Default::default()
+        })
+    }
+
+    pub fn try_into<T>(self) -> Result<T, failure::Error>
+    where
+        T: BinaryValue + ProtobufConvert,
+        <T as ProtobufConvert>::ProtoStruct: Message,
+    {
+        let type_url = [
+            "google.protobuf.Any/",
+            protobuf::reflect::MessageDescriptor::for_type::<<T as ProtobufConvert>::ProtoStruct>()
+                .full_name(),
+        ]
+        .concat();
+        ensure!(
+            self.0.type_url == type_url,
+            "Type url mismatch, actual {}, expected {}",
+            self.0.type_url,
+            type_url
+        );
+        T::from_bytes(self.0.value.into())
+    }
 }

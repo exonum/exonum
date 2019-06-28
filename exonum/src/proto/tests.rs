@@ -266,7 +266,7 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
+#[derive(Clone, Copy, Debug, PartialEq, ProtobufConvert)]
 #[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
 struct StructWithFixedArrays {
     fixed_array_8: [u8; 8],
@@ -299,3 +299,20 @@ fn test_struct_with_fixed_arrays_roundtrip() {
     let struct_encode_round_trip = StructWithFixedArrays::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, arr_struct);
 }
+
+#[test]
+fn test_message_any_roundtrip() {
+    let value = StructWithFixedArrays {
+        fixed_array_8: [1; 8],
+        fixed_array_16: [1; 16],
+        fixed_array_32: [1; 32],
+    };
+
+    let any = super::Any::new(value);
+    let value2 = any.try_into().unwrap();
+    assert_eq!(value, value2);
+}
+
+#[test]
+#[ignore = "TODO"]
+fn test_message_any_interop() {}
