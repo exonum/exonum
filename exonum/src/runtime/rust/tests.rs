@@ -15,17 +15,21 @@
 use exonum_derive::service_interface;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
 use futures::sync::mpsc;
-use protobuf::{well_known_types::Any, Message};
 use semver::Version;
+
+use std::convert::TryFrom;
 
 use crate::{
     crypto::{Hash, PublicKey},
     messages::{CallInfo, ServiceInstanceId},
-    proto::schema::tests::{TestServiceInit, TestServiceTx},
+    proto::{
+        schema::tests::{TestServiceInit, TestServiceTx},
+        Any,
+    },
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        InstanceSpec, RuntimeContext, ServiceConfig,
+        InstanceSpec, RuntimeContext,
     },
 };
 
@@ -101,9 +105,10 @@ impl Service for TestServiceImpl {
         &self,
         _descriptor: ServiceDescriptor,
         fork: &Fork,
-        arg: &Any,
+        arg: Any,
     ) -> Result<(), ExecutionError> {
-        let arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
+        let arg = Init::try_from(arg).map_err(|e| {
+            error!("{:?}", e);
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
 
@@ -158,16 +163,10 @@ fn test_basic_rust_runtime() {
             name: SERVICE_INSTANCE_NAME.to_owned(),
         };
 
-        let constructor = ServiceConfig {
-            data: {
-                let mut arg = TestServiceInit::new();
-                arg.set_msg("constructor_message".to_owned());
-
-                let mut pb_any = Any::new();
-                pb_any.set_value(arg.write_to_bytes().unwrap());
-                pb_any
-            },
-        };
+        let constructor = Init {
+            msg: "constructor_message".to_owned(),
+        }
+        .into();
 
         let fork = db.fork();
         let address = PublicKey::zero();
@@ -175,7 +174,7 @@ fn test_basic_rust_runtime() {
         let mut context = RuntimeContext::new(&fork, address, tx_hash);
 
         dispatcher
-            .start_service(&mut context, spec, &constructor)
+            .start_service(&mut context, spec, constructor)
             .unwrap();
         {
             let entry = Entry::new("constructor_entry", &fork);

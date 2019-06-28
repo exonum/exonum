@@ -14,7 +14,6 @@
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use failure::Error;
-use protobuf::well_known_types::Any;
 
 use std::fmt::{self, Debug};
 
@@ -26,6 +25,7 @@ use crate::{
     messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
     runtime::{dispatcher, error::ExecutionError, RuntimeContext},
+    proto::Any
 };
 
 use super::RustArtifactId;
@@ -44,7 +44,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         &self,
         _descriptor: ServiceDescriptor,
         _fork: &Fork,
-        _params: &Any,
+        _params: Any,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }

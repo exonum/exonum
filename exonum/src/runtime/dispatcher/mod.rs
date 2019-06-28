@@ -29,11 +29,12 @@ use crate::{
         crypto::{Hash, PublicKey, SecretKey},
         messages::CallInfo,
     },
+    proto::Any,
 };
 
 use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactId, InstanceSpec, Runtime, RuntimeContext, ServiceConfig, ServiceInstanceId,
+    ArtifactId, InstanceSpec, Runtime, RuntimeContext, ServiceInstanceId,
 };
 
 mod schema;
@@ -93,7 +94,7 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
-        constructor: ServiceConfig,
+        constructor: Any,
     ) {
         // Registers service's artifact in runtime.
         self.register_artifact(fork, spec.artifact.clone())
@@ -102,7 +103,7 @@ impl Dispatcher {
         self.start_service(
             &mut RuntimeContext::without_author(fork),
             spec,
-            &constructor,
+            constructor,
         )
         .expect("Unable to start builtin service instance");
     }
@@ -183,7 +184,7 @@ impl Dispatcher {
         &mut self,
         context: &mut RuntimeContext,
         spec: InstanceSpec,
-        constructor: &ServiceConfig,
+        constructor: Any,
     ) -> Result<(), StartError> {
         // Check that service doesn't use existing identifiers.
         if self.identifier_exists(spec.id) {
@@ -278,7 +279,7 @@ pub enum Action {
     RegisterArtifact { artifact: ArtifactId },
     StartService {
         spec: InstanceSpec,
-        config: ServiceConfig,
+        config: Any,
     },
 }
 
@@ -299,7 +300,7 @@ impl Action {
                 .map_err(From::from),
 
             Action::StartService { spec, config } => {
-                dispatcher.start_service(context, spec, &config)?;
+                dispatcher.start_service(context, spec, config)?;
                 dispatcher.restart_api();
                 Ok(())
             }
@@ -406,7 +407,7 @@ mod tests {
             &self,
             _fork: &Fork,
             spec: &InstanceSpec,
-            _parameters: &ServiceConfig,
+            _parameters: Any,
         ) -> Result<(), StartError> {
             if spec.artifact.runtime_id == self.runtime_type {
                 Ok(())
@@ -521,7 +522,7 @@ mod tests {
                     id: RUST_SERVICE_ID,
                     name: RUST_SERVICE_NAME.into(),
                 },
-                &ServiceConfig::default(),
+                Any::default(),
             )
             .expect("start_service failed for rust");
 
@@ -533,7 +534,7 @@ mod tests {
                     id: JAVA_SERVICE_ID,
                     name: JAVA_SERVICE_NAME.into(),
                 },
-                &ServiceConfig::default(),
+                Any::default(),
             )
             .expect("start_service failed for java");
 
@@ -610,7 +611,7 @@ mod tests {
                         id: RUST_SERVICE_ID,
                         name: RUST_SERVICE_NAME.into()
                     },
-                    &ServiceConfig::default()
+                    Any::default()
                 )
                 .expect_err("start service succeed"),
             StartError::WrongArtifact

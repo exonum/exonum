@@ -17,7 +17,7 @@ use crate::{
     runtime::{
         dispatcher::{self, Action},
         rust::TransactionContext,
-        InstanceSpec, ServiceConfig,
+        InstanceSpec,
     },
 };
 
@@ -125,9 +125,7 @@ impl Transactions for Supervisor {
             // if this action fails this transaction will be canceled.
             context.dispatch_action(Action::StartService {
                 spec,
-                config: ServiceConfig {
-                    data: service.config,
-                },
+                config: service.config,
             })
         }
 

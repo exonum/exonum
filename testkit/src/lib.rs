@@ -177,8 +177,9 @@ use exonum::{
     messages::{AnyTx, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
     runtime::{rust::ServiceFactory, ServiceInstanceId},
+    proto::Any
 };
-use exonum_merkledb::{BinaryValue, Database, ObjectHash, Patch, Snapshot, TemporaryDB};
+use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -229,7 +230,7 @@ impl TestKit {
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
         id: ServiceInstanceId,
-        constructor: impl BinaryValue,
+        constructor: impl Into<Any>,
     ) -> Self {
         TestKitBuilder::validator()
             .with_service(InstanceCollection::new(service_factory).with_instance(

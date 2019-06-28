@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Database};
+use exonum_merkledb::{ Database};
 use futures::sync::mpsc;
 
 use std::sync::Arc;
@@ -26,8 +26,9 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        InstanceSpec, Runtime, ServiceConfig,
+        InstanceSpec, Runtime,
     },
+    proto::Any,
 };
 
 // TODO Modern replacement for DispatcherBuilder [ECR-3275]
@@ -37,7 +38,7 @@ pub struct BlockchainBuilder {
     pub genesis_config: GenesisConfig,
     pub service_keypair: (PublicKey, SecretKey),
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
-    pub builtin_instances: Vec<(InstanceSpec, ServiceConfig)>,
+    pub builtin_instances: Vec<(InstanceSpec, Any)>,
 }
 
 impl BlockchainBuilder {
@@ -129,7 +130,7 @@ impl BlockchainBuilder {
 #[derive(Debug)]
 pub struct InstanceCollection {
     pub factory: Box<dyn ServiceFactory>,
-    pub instances: Vec<(InstanceSpec, ServiceConfig)>,
+    pub instances: Vec<(InstanceSpec, Any)>,
 }
 
 impl InstanceCollection {
@@ -146,14 +147,14 @@ impl InstanceCollection {
         mut self,
         id: ServiceInstanceId,
         name: impl Into<String>,
-        params: impl BinaryValue,
+        params: impl Into<Any>,
     ) -> Self {
         let spec = InstanceSpec {
             artifact: self.factory.artifact().into(),
             id,
             name: name.into(),
         };
-        let constructor = ServiceConfig::new(params);
+        let constructor = params.into();
         self.instances.push((spec, constructor));
         self
     }

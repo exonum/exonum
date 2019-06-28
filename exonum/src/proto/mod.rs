@@ -235,16 +235,6 @@ impl ProtobufConvert for ValidatorId {
     }
 }
 
-impl ProtobufConvert for well_known_types::Any {
-    type ProtoStruct = well_known_types::Any;
-    fn to_pb(&self) -> Self::ProtoStruct {
-        self.clone()
-    }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        Ok(pb)
-    }
-}
-
 impl ProtobufConvert for u16 {
     type ProtoStruct = u32;
     fn to_pb(&self) -> Self::ProtoStruct {
@@ -379,34 +369,8 @@ impl_protobuf_convert_fixed_byte_array! {
     160, 256, 512, 1024, 2048
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Any(well_known_types::Any);
-
-impl ProtobufConvert for Any {
-    type ProtoStruct = well_known_types::Any;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        self.0.clone()
-    }
-
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        Ok(Self(pb))
-    }
-}
-
-impl BinaryValue for Any {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.0
-            .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for `Any`")
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
-        inner.merge_from_bytes(bytes.as_ref())?;
-        ProtobufConvert::from_pb(inner)
-    }
-}
 
 impl Any {
     pub fn new<T>(value: T) -> Self
@@ -414,8 +378,10 @@ impl Any {
         T: ProtobufConvert,
         <T as ProtobufConvert>::ProtoStruct: Message,
     {
-        let pb = value.to_pb();
+        Self::from_pb_message(value.to_pb())
+    }
 
+    fn from_pb_message(pb: impl Message) -> Self {
         // See protobuf documentation for clarification.
         // https://developers.google.com/protocol-buffers/docs/proto3#any
         let type_url = ["google.protobuf.Any/", pb.descriptor().full_name()].concat();
@@ -448,5 +414,59 @@ impl Any {
             type_url
         );
         T::from_bytes(self.0.value.into())
+    }
+}
+
+impl ProtobufConvert for Any {
+    type ProtoStruct = well_known_types::Any;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        self.0.clone()
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        Ok(Self(pb))
+    }
+}
+
+impl BinaryValue for Any {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0
+            .write_to_bytes()
+            .expect("Failed to serialize in BinaryValue for `Any`")
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
+        inner.merge_from_bytes(bytes.as_ref())?;
+        ProtobufConvert::from_pb(inner)
+    }
+}
+
+impl From<well_known_types::Any> for Any {
+    fn from(v: well_known_types::Any) -> Self {
+        Self(v)
+    }
+}
+
+impl From<()> for Any {
+    fn from(_: ()) -> Self {
+        Self(well_known_types::Any::new())
+    }
+}
+
+impl From<String> for Any {
+    fn from(s: String) -> Self {
+        let mut v = well_known_types::StringValue::new();
+        v.set_value(s);
+        Self::from_pb_message(v)
+    }
+}
+
+impl From<Vec<u8>> for Any {
+    fn from(s: Vec<u8>) -> Self {
+        let mut v = well_known_types::BytesValue::new();
+        v.set_value(s);
+        Self::from_pb_message(v)
     }
 }

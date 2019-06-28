@@ -15,9 +15,8 @@
 pub use self::dispatcher::Dispatcher;
 pub use crate::messages::ServiceInstanceId;
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 use futures::Future;
-use protobuf::well_known_types::Any;
 use serde_derive::{Deserialize, Serialize};
 
 use std::fmt::Debug;
@@ -27,7 +26,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
     node::ApiSender,
-    proto::schema,
+    proto::{schema, Any},
 };
 
 use self::error::{DeployError, ExecutionError, StartError};
@@ -37,25 +36,6 @@ pub mod rust;
 pub mod dispatcher;
 pub mod error;
 pub mod supervisor;
-
-#[derive(Debug, Default)]
-pub struct ServiceConfig {
-    pub data: Any,
-}
-
-impl ServiceConfig {
-    pub fn new(data: impl BinaryValue) -> Self {
-        let bytes = data.into_bytes();
-
-        Self {
-            data: {
-                let mut data = Any::new();
-                data.set_value(bytes);
-                data
-            },
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
@@ -110,7 +90,7 @@ pub trait Runtime: Send + Debug + 'static {
         &self,
         context: &Fork,
         spec: &InstanceSpec,
-        parameters: &ServiceConfig,
+        parameters: Any,
     ) -> Result<(), StartError>;
 
     /// Stops existing service instance with the given specification.

@@ -42,10 +42,12 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
     impl_service_dispatcher,
+    proto::Any,
     runtime::rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
 };
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-use protobuf::well_known_types::Any;
+use exonum_merkledb::{Fork, Snapshot};
+
+use std::convert::TryFrom;
 
 use crate::{
     api::PublicApi as TimestampingApi,
@@ -63,9 +65,9 @@ impl Service for TimestampingService {
         &self,
         descriptor: ServiceDescriptor,
         fork: &Fork,
-        params: &Any,
+        params: Any,
     ) -> Result<(), ExecutionError> {
-        let config = Config::from_bytes(params.get_value().into())
+        let config = Config::try_from(params)
             .map_err(|e| ExecutionError::with_description(0, e.to_string()))?;
 
         Schema::new(descriptor.service_name(), fork)

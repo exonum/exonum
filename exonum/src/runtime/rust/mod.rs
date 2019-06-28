@@ -32,12 +32,13 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
     node::ApiSender,
+    proto::Any,
 };
 
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactId, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier, ServiceConfig,
+    ArtifactId, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
 };
 
 #[macro_use]
@@ -238,7 +239,7 @@ impl Runtime for RustRuntime {
         &self,
         fork: &Fork,
         spec: &InstanceSpec,
-        parameters: &ServiceConfig,
+        parameters: Any,
     ) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
@@ -256,7 +257,7 @@ impl Runtime for RustRuntime {
             .ok_or(StartError::NotStarted)?;
         service_instance
             .as_ref()
-            .configure(service_instance.descriptor(), fork, &parameters.data)
+            .configure(service_instance.descriptor(), fork, parameters)
             .map_err(StartError::ExecutionError)
     }
 

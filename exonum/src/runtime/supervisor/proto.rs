@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf::well_known_types::Any;
-
-use crate::{helpers::Height, proto::schema, runtime::ArtifactId};
+use crate::{helpers::Height, proto::{schema, Any}, runtime::ArtifactId};
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
@@ -35,7 +33,6 @@ pub struct StartService {
     /// Instance name.
     pub name: String,
     /// Instance configuration.
-    // TODO Write convienent wrapper [ECR-3222]
     pub config: Any,
 }
 
