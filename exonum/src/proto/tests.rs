@@ -16,7 +16,7 @@ use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
 use exonum_merkledb::BinaryValue;
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom};
 
 use super::{schema, ProtobufConvert};
 use crate::crypto::{self, Hash, PublicKey, Signature};
@@ -308,8 +308,8 @@ fn test_message_any_roundtrip() {
         fixed_array_32: [1; 32],
     };
 
-    let any = super::Any::new(value);
-    let value2 = any.try_into().unwrap();
+    let any = super::Any::from(value);
+    let value2 = StructWithFixedArrays::try_from(any).unwrap();
     assert_eq!(value, value2);
 }
 
