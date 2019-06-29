@@ -181,9 +181,9 @@ impl CounterApi {
             .endpoint("count", Self::count)
             .endpoint_mut("count", Self::increment);
 
-        // Check processing of custom HTTP headers. We test this using strawman authorization
+        // Check processing of custom HTTP headers. We test this using simple authorization
         // with a fixed bearer token; for practical apps, the tokens might
-        // be [JWTs](https://jwt.io/).
+        // be [JSON Web Tokens](https://jwt.io/).
         let handler = |request: HttpRequest| -> api::Result<u64> {
             let auth_header = request
                 .headers()
