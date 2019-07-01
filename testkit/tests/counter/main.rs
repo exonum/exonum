@@ -12,23 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate assert_matches;
-#[macro_use]
-extern crate exonum_testkit;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate pretty_assertions;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
-extern crate exonum_derive;
-
-use exonum_merkledb::HashTag;
-
+use assert_matches::assert_matches;
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
     blockchain::TransactionErrorType as ErrorType,
@@ -36,9 +20,10 @@ use exonum::{
     helpers::Height,
     messages::{self, RawTransaction, Signed},
 };
-use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use exonum_merkledb::HashTag;
+use exonum_testkit::{txvec, ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use hex::FromHex;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::counter::{
     CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY,
@@ -900,4 +885,42 @@ fn test_boxed_tx() {
         block[0].content().message().service_id(),
         counter::SERVICE_ID
     );
+}
+
+#[test]
+fn test_custom_headers_handling() {
+    use reqwest::header::AUTHORIZATION;
+
+    let (mut testkit, api) = init_testkit();
+    testkit.create_block_with_transaction({
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::sign(&pubkey, 5, &key)
+    });
+
+    let error = api
+        .public(ApiKind::Service("counter"))
+        .get::<u64>("v1/counter-with-auth")
+        .unwrap_err();
+    assert_matches!(error, ApiError::Unauthorized);
+
+    let error = api
+        .public(ApiKind::Service("counter"))
+        .with(|req| req.header(AUTHORIZATION, "None"))
+        .get::<u64>("v1/counter-with-auth")
+        .unwrap_err();
+    assert_matches!(error, ApiError::Unauthorized);
+
+    let error = api
+        .public(ApiKind::Service("counter"))
+        .with(|req| req.header(AUTHORIZATION, "Bearer foobar"))
+        .get::<u64>("v1/counter-with-auth")
+        .unwrap_err();
+    assert_matches!(error, ApiError::Unauthorized);
+
+    let counter: u64 = api
+        .public(ApiKind::Service("counter"))
+        .with(|req| req.header(AUTHORIZATION, "Bearer SUPER_SECRET_111"))
+        .get("v1/counter-with-auth")
+        .unwrap();
+    assert_eq!(counter, 5);
 }

@@ -13,18 +13,24 @@
 // limitations under the License.
 
 //! Sample counter service.
-use std::borrow::Cow;
 
-use exonum_merkledb::{Entry, IndexAccess, Snapshot};
-
+use actix_web::{http::Method, HttpResponse};
 use exonum::{
-    api,
+    api::backends::actix::{HttpRequest, RawHandler, RequestHandler},
+    api::{self, ServiceApiBackend},
     blockchain::{
         ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
 };
+use exonum_derive::*;
+use exonum_merkledb::{Entry, IndexAccess, Snapshot};
+use futures::{Future, IntoFuture};
+use log::trace;
+use serde_derive::*;
+
+use std::{borrow::Cow, sync::Arc};
 
 use super::proto;
 
@@ -174,6 +180,41 @@ impl CounterApi {
             .public_scope()
             .endpoint("count", Self::count)
             .endpoint_mut("count", Self::increment);
+
+        // Check processing of custom HTTP headers. We test this using simple authorization
+        // with a fixed bearer token; for practical apps, the tokens might
+        // be [JSON Web Tokens](https://jwt.io/).
+        let handler = |request: HttpRequest| -> api::Result<u64> {
+            let auth_header = request
+                .headers()
+                .get("Authorization")
+                .ok_or_else(|| api::Error::Unauthorized)?
+                .to_str()
+                .map_err(|_| api::Error::BadRequest("Malformed `Authorization`".to_owned()))?;
+            if auth_header != "Bearer SUPER_SECRET_111" {
+                return Err(api::Error::Unauthorized);
+            }
+
+            let state = request.state();
+            Self::count(&state, ())
+        };
+        let handler: Arc<RawHandler> = Arc::new(move |request| {
+            Box::new(
+                handler(request)
+                    .into_future()
+                    .from_err()
+                    .map(|v| HttpResponse::Ok().json(v)),
+            )
+        });
+
+        builder
+            .public_scope()
+            .web_backend()
+            .raw_handler(RequestHandler {
+                name: "v1/counter-with-auth".to_string(),
+                method: Method::GET,
+                inner: handler,
+            });
     }
 }
 
