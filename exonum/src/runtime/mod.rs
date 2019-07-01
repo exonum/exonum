@@ -108,7 +108,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn execute(
         &self,
         dispatcher: &dispatcher::Dispatcher,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -133,29 +133,51 @@ pub trait Runtime: Send + Debug + 'static {
     }
 }
 
+impl<T> From<T> for Box<dyn Runtime>
+where
+    T: Runtime,
+{
+    fn from(runtime: T) -> Self {
+        Box::new(runtime) as Self
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Caller {
+    Transaction { hash: Hash, author: PublicKey },
+    Blockchain,
+}
+
+impl Caller {
+    pub fn author(&self) -> Option<PublicKey> {
+        self.as_transaction().map(|(_hash, author)| *author)
+    }
+
+    pub fn txid(&self) -> Option<Hash> {
+        self.as_transaction().map(|(hash, _author)| *hash)
+    }
+
+    fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
+        if let Caller::Transaction { hash, author } = self {
+            Some((hash, author))
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug)]
-pub struct RuntimeContext<'a> {
-    fork: &'a Fork,
-    author: PublicKey,
-    tx_hash: Hash,
+pub struct ExecutionContext<'a> {
+    pub fork: &'a Fork,
+    pub caller: Caller,
     actions: Vec<dispatcher::Action>,
 }
 
-impl<'a> RuntimeContext<'a> {
-    pub fn new(fork: &'a Fork, author: PublicKey, tx_hash: Hash) -> Self {
+impl<'a> ExecutionContext<'a> {
+    pub fn new(fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
-            author,
-            tx_hash,
-            actions: Vec::new(),
-        }
-    }
-
-    pub fn without_author(fork: &'a Fork) -> Self {
-        Self {
-            fork,
-            author: PublicKey::zero(),
-            tx_hash: Hash::zero(),
+            caller,
             actions: Vec::new(),
         }
     }
@@ -168,14 +190,5 @@ impl<'a> RuntimeContext<'a> {
         let mut other = Vec::new();
         std::mem::swap(&mut self.actions, &mut other);
         other
-    }
-}
-
-impl<T> From<T> for Box<dyn Runtime>
-where
-    T: Runtime,
-{
-    fn from(runtime: T) -> Self {
-        Box::new(runtime) as Self
     }
 }

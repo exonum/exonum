@@ -20,7 +20,6 @@ use semver::Version;
 use std::convert::TryFrom;
 
 use crate::{
-    crypto::{Hash, PublicKey},
     messages::{CallInfo, ServiceInstanceId},
     proto::{
         schema::tests::{TestServiceInit, TestServiceTx},
@@ -29,7 +28,8 @@ use crate::{
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        InstanceSpec, RuntimeContext,
+        InstanceSpec, ExecutionContext,
+        Caller,
     },
 };
 
@@ -169,9 +169,7 @@ fn test_basic_rust_runtime() {
         .into();
 
         let fork = db.fork();
-        let address = PublicKey::zero();
-        let tx_hash = Hash::zero();
-        let mut context = RuntimeContext::new(&fork, address, tx_hash);
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         dispatcher
             .start_service(&mut context, spec, constructor)
@@ -193,7 +191,7 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let fork = db.fork();
-        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {
@@ -216,7 +214,7 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let fork = db.fork();
-        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {

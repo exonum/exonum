@@ -64,7 +64,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, supervisor::Supervisor, RuntimeContext},
+    runtime::{dispatcher::Dispatcher, supervisor::Supervisor, ExecutionContext},
 };
 
 mod block;
@@ -361,7 +361,7 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let signed_tx = {
+        let transaction = {
             let new_fork = &*fork;
             let snapshot = new_fork.snapshot();
             let schema = Schema::new(snapshot);
@@ -376,13 +376,10 @@ impl Blockchain {
 
         fork.flush();
 
-        let transaction = signed_tx.payload();
         let catch_result = {
             let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                let author = signed_tx.author();
-                let mut context = RuntimeContext::new(fork, author, tx_hash);
-                dispatcher.execute(&mut context, transaction)
+                dispatcher.execute(fork, tx_hash, &transaction)
             }))
         };
 

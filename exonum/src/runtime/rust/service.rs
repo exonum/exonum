@@ -24,7 +24,7 @@ use crate::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
-    runtime::{dispatcher, error::ExecutionError, RuntimeContext},
+    runtime::{dispatcher, error::ExecutionError, ExecutionContext},
     proto::Any
 };
 
@@ -100,7 +100,7 @@ impl<'a> ServiceDescriptor<'a> {
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
     pub(super) service_descriptor: ServiceDescriptor<'a>,
-    pub(super) runtime_context: &'a mut RuntimeContext<'b>,
+    pub(super) runtime_context: &'a mut ExecutionContext<'b>,
     pub(super) dispatcher: &'a super::dispatcher::Dispatcher,
 }
 
@@ -129,11 +129,11 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     pub fn tx_hash(&self) -> Hash {
-        self.runtime_context.tx_hash
+        self.runtime_context.caller.txid().unwrap()
     }
 
     pub fn author(&self) -> PublicKey {
-        self.runtime_context.author
+        self.runtime_context.caller.author().unwrap()
     }
 
     pub fn call(&mut self, call_info: CallInfo, payload: &[u8]) -> Result<(), ExecutionError> {

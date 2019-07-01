@@ -38,7 +38,7 @@ use crate::{
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactId, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
+    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
 };
 
 #[macro_use]
@@ -277,7 +277,7 @@ impl Runtime for RustRuntime {
     fn execute(
         &self,
         dispatcher: &super::dispatcher::Dispatcher,
-        runtime_context: &mut RuntimeContext,
+        runtime_context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -310,7 +310,7 @@ impl Runtime for RustRuntime {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 service.as_ref().before_commit(TransactionContext {
                     dispatcher,
-                    runtime_context: &mut RuntimeContext::without_author(fork),
+                    runtime_context: &mut ExecutionContext::new(fork, Caller::Blockchain),
                     service_descriptor: service.descriptor(),
                 })
             })) {

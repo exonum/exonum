@@ -23,18 +23,18 @@ use crate::{
     api::ServiceApiBuilder,
     blockchain::CORE_ID,
     events::InternalRequest,
-    messages::AnyTx,
+    messages::{AnyTx, Signed},
     node::ApiSender,
+    proto::Any,
     {
         crypto::{Hash, PublicKey, SecretKey},
         messages::CallInfo,
     },
-    proto::Any,
 };
 
 use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactId, InstanceSpec, Runtime, RuntimeContext, ServiceInstanceId,
+    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, ServiceInstanceId,
 };
 
 mod schema;
@@ -101,7 +101,7 @@ impl Dispatcher {
             .expect("Unable to register builtin artifact");
         // Starts builtin service instance.
         self.start_service(
-            &mut RuntimeContext::without_author(fork),
+            &mut ExecutionContext::new(fork, Caller::Blockchain),
             spec,
             constructor,
         )
@@ -156,7 +156,10 @@ impl Dispatcher {
         // Ensures that artifact is successfully deployed.
         self.deploy_artifact(artifact.clone()).wait()?;
         Schema::new(fork).add_artifact(artifact.clone())?;
-        info!("Registered artifact {} in runtime with id {}", artifact.name, artifact.runtime_id);
+        info!(
+            "Registered artifact {} in runtime with id {}",
+            artifact.name, artifact.runtime_id
+        );
         Ok(())
     }
 
@@ -182,7 +185,7 @@ impl Dispatcher {
     /// service instance to the dispatcher's information schema.
     pub(crate) fn start_service(
         &mut self,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), StartError> {
@@ -212,21 +215,29 @@ impl Dispatcher {
     /// Executes transaction. // TODO documentation [ECR-3275]
     pub(crate) fn execute(
         &mut self,
-        context: &mut RuntimeContext,
-        transaction: &AnyTx,
+        fork: &Fork,
+        txid: Hash,
+        tx: &Signed<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        self.call(context, transaction.call_info, &transaction.payload)?;
+        let mut context = ExecutionContext::new(
+            fork,
+            Caller::Transaction {
+                author: tx.author(),
+                hash: txid,
+            },
+        );
+        self.call(&mut context, tx.call_info, &tx.payload)?;
         // Executes pending dispatcher actions.
         context
             .take_actions()
             .into_iter()
-            .try_for_each(|action| action.execute(self, context))
+            .try_for_each(|action| action.execute(self, &mut context))
     }
 
     /// Calls the corresponding runtime method.
     pub(crate) fn call(
         &self,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -274,9 +285,13 @@ pub enum Action {
     /// This action tries to deploy artifact on the current node without registration.
     /// In this way you can be sure that artifact is deployed in the corresponding runtime
     /// before register.
-    DeployArtifact { artifact: ArtifactId },
+    DeployArtifact {
+        artifact: ArtifactId,
+    },
     /// This action registers deployed artifact in the dispatcher.
-    RegisterArtifact { artifact: ArtifactId },
+    RegisterArtifact {
+        artifact: ArtifactId,
+    },
     StartService {
         spec: InstanceSpec,
         config: Any,
@@ -287,7 +302,7 @@ impl Action {
     fn execute(
         self,
         dispatcher: &mut Dispatcher,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
     ) -> Result<(), ExecutionError> {
         match self {
             Action::DeployArtifact { artifact } => dispatcher
@@ -419,7 +434,7 @@ mod tests {
         fn execute(
             &self,
             _: &Dispatcher,
-            _: &mut RuntimeContext,
+            _: &mut ExecutionContext,
             call_info: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -512,7 +527,7 @@ mod tests {
             .expect("Deploy artifact failed for java");
 
         // Check if we can init services.
-        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         dispatcher
             .start_service(
@@ -600,7 +615,7 @@ mod tests {
 
         // Checks if we can start services.
         let fork = db.fork();
-        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         assert_eq!(
             dispatcher
