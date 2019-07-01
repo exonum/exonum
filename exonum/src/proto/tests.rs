@@ -314,5 +314,15 @@ fn test_message_any_roundtrip() {
 }
 
 #[test]
-#[ignore = "TODO"]
-fn test_message_any_interop() {}
+fn test_message_any_interop() {
+    let artifact_id_in_any_hex = hex::decode(
+        "0a2d747970652e676f6f676c65617069732e636f6d2f65786f6e756d2e72756e74696d652e417274696661637\
+         449641227122565786f6e756d2d63727970746f63757272656e63792d616476616e6365642f302e31312e30",
+    )
+    .unwrap();
+
+    let any = super::Any::from_bytes(artifact_id_in_any_hex.into()).unwrap();
+    let artifact_id = crate::runtime::ArtifactId::try_from(any).unwrap();
+    assert_eq!(artifact_id.runtime_id, 0);
+    assert_eq!(artifact_id.name, "exonum-cryptocurrency-advanced/0.11.0");
+}

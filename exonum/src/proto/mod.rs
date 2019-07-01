@@ -374,6 +374,8 @@ impl_protobuf_convert_fixed_byte_array! {
 pub struct Any(well_known_types::Any);
 
 impl Any {
+    const TYPE_URL: &'static str = "type.googleapis.com/";
+
     pub fn new<T>(value: T) -> Self
     where
         T: ProtobufConvert,
@@ -385,7 +387,7 @@ impl Any {
     fn from_pb_message(pb: impl Message) -> Self {
         // See protobuf documentation for clarification.
         // https://developers.google.com/protocol-buffers/docs/proto3#any
-        let type_url = ["google.protobuf.Any/", pb.descriptor().full_name()].concat();
+        let type_url = [Self::TYPE_URL, pb.descriptor().full_name()].concat();
         let value = pb
             .write_to_bytes()
             .expect("Failed to serialize in BinaryValue for `Any`");
@@ -403,7 +405,7 @@ impl Any {
         <T as ProtobufConvert>::ProtoStruct: Message,
     {
         let type_url = [
-            "google.protobuf.Any/",
+            Self::TYPE_URL,
             protobuf::reflect::MessageDescriptor::for_type::<<T as ProtobufConvert>::ProtoStruct>()
                 .full_name(),
         ]
