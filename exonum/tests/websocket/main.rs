@@ -55,12 +55,14 @@ fn create_ws_client(addr: &str) -> WebSocketResult<Client<TcpStream>> {
     Err(last_err.unwrap())?
 }
 
-fn recv_text_msg(client: &mut Client<TcpStream>) -> String {
-    let response = client.recv_message().unwrap();
-    match response {
-        OwnedMessage::Text(text) => text,
-        other => panic!("Incorrect response: {:?}", other),
+fn recv_text_msg(client: &mut Client<TcpStream>) -> Option<String> {
+    if let Ok(response) = client.recv_message() {
+        match response {
+            OwnedMessage::Text(text) => return Some(text),
+            other => panic!("Incorrect response: {:?}", other),
+        }
     }
+    None
 }
 
 #[test]
@@ -71,7 +73,7 @@ fn test_send_transaction() {
         create_ws_client("ws://localhost:8079/api/explorer/v1/ws").expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(60)))
+        .set_read_timeout(Some(Duration::from_secs(30)))
         .unwrap();
 
     // Check that no messages on start.
@@ -87,7 +89,7 @@ fn test_send_transaction() {
     client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
 
     // Check response on set message.
-    let resp_text = recv_text_msg(&mut client);
+    let resp_text = recv_text_msg(&mut client).unwrap();
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
         json!({
@@ -113,11 +115,11 @@ fn test_blocks_subscribe() {
         .expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(60)))
+        .set_read_timeout(Some(Duration::from_secs(30)))
         .unwrap();
 
     // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client);
+    let resp_text = recv_text_msg(&mut client).unwrap();
 
     // Try to parse incoming message into Block.
     let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
@@ -143,7 +145,7 @@ fn test_transactions_subscribe() {
         .expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(60)))
+        .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
 
     // Send transaction.
@@ -158,7 +160,7 @@ fn test_transactions_subscribe() {
         .unwrap();
 
     // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client);
+    let resp_text = recv_text_msg(&mut client).unwrap();
 
     // Try to parse incoming message into Block.
     let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
@@ -180,14 +182,175 @@ fn test_transactions_subscribe() {
 }
 
 #[test]
-fn test_subscribe() {
+fn test_transactions_subscribe_with_filter() {
     let node_handler = run_node(6333, 8082);
 
-    let mut client =
-        create_ws_client("ws://localhost:8082/api/explorer/v1/ws").expect("Cannot connect to node");
+    // Create client with filter
+    let mut client = create_ws_client(
+        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?service_id=0&message_id=0",
+    )
+    .expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(60)))
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+    let (pk, sk) = gen_keypair();
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Bob"), SERVICE_ID, pk, &sk);
+    let tx_json = json!({ "tx_body": tx });
+    let http_client = reqwest::Client::new();
+    let _res = http_client
+        .post("http://localhost:8082/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+
+    // Get one message and check that it is text.
+    let resp_text = recv_text_msg(&mut client).unwrap();
+
+    // Try to parse incoming message into Block.
+    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
+    match notification {
+        Notification::Transaction(_) => (),
+        other => panic!(
+            "Incorrect notification type (expected Transaction): {:?}",
+            other
+        ),
+    };
+
+    let (pk, sk) = gen_keypair();
+    let (to, _) = gen_keypair();
+    let tx = Message::sign_transaction(Transfer::new(&pk, &to, 10), SERVICE_ID, pk, &sk);
+    let tx_json = json!({ "tx_body": tx });
+    let _res = http_client
+        .post("http://localhost:8082/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+
+    // Try to get a one message and check that it is none in this case.
+    // Cause Transfer transaction has another message id.
+    assert!(recv_text_msg(&mut client).is_none());
+
+    // Shutdown node.
+    client.shutdown().unwrap();
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
+}
+
+#[test]
+fn test_transactions_subscribe_with_partial_filter() {
+    let node_handler = run_node(6334, 8083);
+
+    // Create client with filter
+    let mut client =
+        create_ws_client("ws://localhost:8083/api/explorer/v1/transactions/subscribe?service_id=0")
+            .expect("Cannot connect to node");
+    client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let (pk, sk) = gen_keypair();
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Bob"), SERVICE_ID, pk, &sk);
+    let tx_json = json!({ "tx_body": tx });
+    let http_client = reqwest::Client::new();
+    let _res = http_client
+        .post("http://localhost:8083/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+
+    // Get one message and check that it is text.
+    let resp_text = recv_text_msg(&mut client).unwrap();
+
+    // Try to parse incoming message into Block.
+    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
+    match notification {
+        Notification::Transaction(_) => (),
+        other => panic!(
+            "Incorrect notification type (expected Transaction): {:?}",
+            other
+        ),
+    };
+
+    let (pk, sk) = gen_keypair();
+    let (to, _) = gen_keypair();
+    let tx = Message::sign_transaction(Transfer::new(&pk, &to, 10), SERVICE_ID, pk, &sk);
+    let tx_json = json!({ "tx_body": tx });
+    let _res = http_client
+        .post("http://localhost:8083/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+
+    // Get one message and check that it is text.
+    let resp_text = recv_text_msg(&mut client).unwrap();
+
+    // Try to parse incoming message into Block.
+    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
+    match notification {
+        Notification::Transaction(_) => (),
+        other => panic!(
+            "Incorrect notification type (expected Transaction): {:?}",
+            other
+        ),
+    };
+
+    // Shutdown node.
+    client.shutdown().unwrap();
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
+}
+
+#[test]
+fn test_transactions_subscribe_with_bad_filter() {
+    let node_handler = run_node(6335, 8084);
+    // A service id is missing in filter !!!
+    let mut client =
+        create_ws_client("ws://localhost:8084/api/explorer/v1/transactions/subscribe?message_id=0")
+            .unwrap();
+
+    client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let (pk, sk) = gen_keypair();
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Bob"), SERVICE_ID, pk, &sk);
+    let tx_json = json!({ "tx_body": tx });
+    let http_client = reqwest::Client::new();
+    let _res = http_client
+        .post("http://localhost:8084/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+
+    // Get one message and check that it is text.
+    let resp_text = recv_text_msg(&mut client);
+    assert!(resp_text.is_none());
+
+    // Shutdown node.
+    client.shutdown().unwrap();
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
+}
+
+#[test]
+fn test_subscribe() {
+    let node_handler = run_node(6336, 8085);
+
+    let mut client =
+        create_ws_client("ws://localhost:8085/api/explorer/v1/ws").expect("Cannot connect to node");
+    client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(30)))
         .unwrap();
 
     // Check that no messages on start.
@@ -201,14 +364,14 @@ fn test_subscribe() {
     client.send_message(&OwnedMessage::Text(filters)).unwrap();
 
     // Check response on set message.
-    let resp_text = recv_text_msg(&mut client);
+    let resp_text = recv_text_msg(&mut client).unwrap();
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
         json!({"result": "success"})
     );
 
     // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client);
+    let resp_text = recv_text_msg(&mut client).unwrap();
 
     // Try to parse incoming message into Block.
     let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
@@ -228,15 +391,15 @@ fn test_subscribe() {
 
 #[test]
 fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
-    let node_handler = run_node(6334, 8083);
+    let node_handler = run_node(6337, 8086);
 
     let mut clients = (0..8)
         .map(|_| {
-            let client = create_ws_client("ws://localhost:8083/api/explorer/v1/ws")
+            let client = create_ws_client("ws://localhost:8086/api/explorer/v1/ws")
                 .expect("Cannot connect to node");
             client
                 .stream_ref()
-                .set_read_timeout(Some(Duration::from_secs(60)))
+                .set_read_timeout(Some(Duration::from_secs(30)))
                 .unwrap();
             client
         })
