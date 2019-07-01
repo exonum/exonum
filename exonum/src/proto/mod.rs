@@ -369,6 +369,7 @@ impl_protobuf_convert_fixed_byte_array! {
     160, 256, 512, 1024, 2048
 }
 
+// TODO Implement proper serialize deserialize [ECR-3222]
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Any(well_known_types::Any);
 

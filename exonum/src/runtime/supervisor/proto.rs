@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::Height, proto::{schema, Any}, runtime::ArtifactId};
+use std::str::FromStr;
+
+use crate::{
+    helpers::Height,
+    proto::{schema, Any},
+    runtime::ArtifactId,
+};
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
@@ -61,3 +67,24 @@ macro_rules! impl_binary_key_for_binary_value {
 
 impl_binary_key_for_binary_value! { DeployArtifact }
 impl_binary_key_for_binary_value! { StartService }
+
+macro_rules! impl_from_str_for_protobuf_convert {
+    ($type:ident) => {
+        impl FromStr for $type {
+            type Err = failure::Error;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                use protobuf::Message;
+                use $crate::proto::ProtobufConvert;
+
+                let bytes = hex::decode(s)?;
+                let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
+                inner.merge_from_bytes(bytes.as_ref())?;
+                Self::from_pb(inner)
+            }
+        }
+    };
+}
+
+impl_from_str_for_protobuf_convert! { DeployArtifact }
+impl_from_str_for_protobuf_convert! { StartService }

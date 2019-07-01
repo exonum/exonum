@@ -19,7 +19,7 @@ use super::{DeployArtifact, StartService};
 use crate::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     crypto::Hash,
-    messages::{ServiceInstanceId},
+    messages::ServiceInstanceId,
     runtime::rust::{ServiceDescriptor, Transaction},
 };
 
@@ -87,14 +87,16 @@ pub fn wire(descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
         .private_scope()
         .endpoint_mut("deploy-artifact", {
             let instance_name = instance_name.clone();
-            move |state: &ServiceApiState, query: DeployArtifact| {
-                ApiImpl::new(state, instance_id, &instance_name).deploy_artifact(query)
+            move |state: &ServiceApiState, query: String| {
+                let artifact = query.parse()?;
+                ApiImpl::new(state, instance_id, &instance_name).deploy_artifact(artifact)
             }
         })
         .endpoint_mut("start-service", {
             let instance_name = instance_name.clone();
-            move |state: &ServiceApiState, query: StartService| {
-                ApiImpl::new(state, instance_id, &instance_name).start_service(query)
+            move |state: &ServiceApiState, query: String| {
+                let service = query.parse()?;
+                ApiImpl::new(state, instance_id, &instance_name).start_service(service)
             }
         });
 }
