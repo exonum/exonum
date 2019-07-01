@@ -65,6 +65,10 @@ impl BlockchainBuilder {
             runtime.add_service_factory(service.factory);
             self.builtin_instances.extend(service.instances);
         }
+        self.with_additional_runtime(runtime)
+    }
+
+    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
     }

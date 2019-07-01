@@ -47,9 +47,16 @@ pub struct InstanceSpec {
 
 // TODO Replace by more convienent solution [ECR-3222]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[repr(u32)]
 pub enum RuntimeIdentifier {
     Rust = 0,
     Java = 1,
+}
+
+impl From<RuntimeIdentifier> for u32 {
+    fn from(id: RuntimeIdentifier) -> Self {
+        id as u32
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
@@ -61,9 +68,9 @@ pub struct ArtifactId {
 
 impl ArtifactId {
     /// Creates a new artifact identifier from the given runtime id and name.
-    pub fn new(runtime_id: u32, name: impl Into<String>) -> Self {
+    pub fn new(runtime_id: impl Into<u32>, name: impl Into<String>) -> Self {
         Self {
-            runtime_id,
+            runtime_id: runtime_id.into(),
             name: name.into(),
         }
     }
