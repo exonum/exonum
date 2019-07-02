@@ -314,7 +314,7 @@ fn test_message_any_roundtrip() {
 }
 
 #[test]
-fn test_message_any_interop() {
+fn test_convert_any_message() {
     let artifact_id_in_any_hex = hex::decode(
         "0a2d747970652e676f6f676c65617069732e636f6d2f65786f6e756d2e72756e74696d652e417274696661637\
          449641227122565786f6e756d2d63727970746f63757272656e63792d616476616e6365642f302e31312e30",

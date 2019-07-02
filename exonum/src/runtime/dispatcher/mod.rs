@@ -216,14 +216,14 @@ impl Dispatcher {
     pub(crate) fn execute(
         &mut self,
         fork: &Fork,
-        txid: Hash,
+        tx_id: Hash,
         tx: &Signed<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let mut context = ExecutionContext::new(
             fork,
             Caller::Transaction {
                 author: tx.author(),
-                hash: txid,
+                hash: tx_id,
             },
         );
         self.call(&mut context, tx.call_info, &tx.payload)?;

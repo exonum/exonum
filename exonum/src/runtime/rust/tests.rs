@@ -28,8 +28,7 @@ use crate::{
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        InstanceSpec, ExecutionContext,
-        Caller,
+        Caller, ExecutionContext, InstanceSpec,
     },
 };
 

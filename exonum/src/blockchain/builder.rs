@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{ Database};
+use exonum_merkledb::Database;
 use futures::sync::mpsc;
 
 use std::sync::Arc;
@@ -23,12 +23,12 @@ use crate::{
     events::InternalRequest,
     messages::ServiceInstanceId,
     node::ApiSender,
+    proto::Any,
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
         InstanceSpec, Runtime,
     },
-    proto::Any,
 };
 
 // TODO Modern replacement for DispatcherBuilder [ECR-3275]

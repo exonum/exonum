@@ -24,8 +24,8 @@ use crate::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
+    proto::Any,
     runtime::{dispatcher, error::ExecutionError, ExecutionContext},
-    proto::Any
 };
 
 use super::RustArtifactId;
@@ -129,7 +129,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     pub fn tx_hash(&self) -> Hash {
-        self.runtime_context.caller.txid().unwrap()
+        self.runtime_context.caller.transaction_id().unwrap()
     }
 
     pub fn author(&self) -> PublicKey {
