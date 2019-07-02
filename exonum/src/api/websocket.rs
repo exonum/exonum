@@ -214,7 +214,7 @@ impl Server {
         for (_, subscriber) in self.subscribers.iter_mut() {
             for recipient in subscriber.values_mut() {
                 if let Err(err) = recipient.do_send(Message::Close) {
-                    debug!("Can't send Close message to a websocket client: {:?}", err);
+                    warn!("Can't send Close message to a websocket client: {:?}", err);
                 }
             }
             subscriber.clear();

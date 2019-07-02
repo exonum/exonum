@@ -30,7 +30,7 @@ message DeployArtifact {
     uint64 deadline_height = 2;
 }
 
-// TODO Implement deploy succeed logic.
+// TODO Implement pending deploy succeed logic.
 
 // Request for the start service instance
 message StartService {
@@ -40,4 +40,6 @@ message StartService {
     string name = 2;
     // Instance configuration.
     google.protobuf.Any config = 3;
+    // The height to which the start service procedure should be completed.
+    uint64 deadline_height = 4;
 }

@@ -240,7 +240,6 @@ impl ExplorerApi {
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
-                debug!("{}", description);
                 ApiError::NotFound(description)
             })
     }

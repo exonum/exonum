@@ -40,6 +40,8 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         }
     }
 
+    // TODO Implement generic interface for multisig transactions.
+
     pub fn pending_artifacts(&self) -> ProofMapIndex<T, DeployArtifact, BinarySet<PublicKey>> {
         ProofMapIndex::new(
             [self.instance_name, ".pending_artifacts"].concat(),
