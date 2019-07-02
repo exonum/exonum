@@ -15,7 +15,7 @@
 pub use schema::Schema;
 
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
-use futures::{future::Future, sink::Sink, sync::mpsc};
+use futures::{future, sync::mpsc, Future, Sink};
 
 use std::collections::HashMap;
 
@@ -23,8 +23,9 @@ use crate::{
     api::ServiceApiBuilder,
     blockchain::CORE_ID,
     events::InternalRequest,
-    messages::AnyTx,
+    messages::{AnyTx, Signed},
     node::ApiSender,
+    proto::Any,
     {
         crypto::{Hash, PublicKey, SecretKey},
         messages::CallInfo,
@@ -33,8 +34,7 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactId, DeployStatus, InstanceSpec, Runtime, RuntimeContext, ServiceConfig,
-    ServiceInstanceId,
+    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, ServiceInstanceId,
 };
 
 mod schema;
@@ -73,20 +73,18 @@ impl Dispatcher {
     pub fn restore_state(&mut self, snapshot: impl IndexAccess) {
         let schema = Schema::new(snapshot);
         // Restores information about the deployed services.
-        for (name, runtime_id) in &schema.deployed_artifacts() {
+        for (name, runtime_id) in &schema.artifacts() {
             let artifact = ArtifactId { name, runtime_id };
-            let status = self
-                .deploy(&artifact)
-                .expect("Unable to restore deployed artifacts");
-            assert!(
-                status.is_deployed(),
-                "During the restart artifacts must be deployed instantly."
-            );
+            self.deploy_artifact(artifact.clone())
+                .wait()
+                .expect("Unable to restore deployed artifact");
+            trace!("Added deployed artifact: {:?}", artifact);
         }
         // Restarts active service instances.
-        for spec in schema.started_services().values() {
-            self.restart_service(&spec)
+        for instance in schema.service_instances().values() {
+            self.restart_service(&instance)
                 .expect("Unable to restart services");
+            trace!("Restarted service: {:?}", instance);
         }
     }
 
@@ -96,39 +94,18 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
-        constructor: ServiceConfig,
+        constructor: Any,
     ) {
-        // Registers service instance in runtime.
-        self.deploy(&spec.artifact)
-            .and_then(|status| {
-                assert_eq!(
-                    status,
-                    DeployStatus::Deployed,
-                    "Builtin artifacts must be deployed instantly."
-                );
-                Ok(())
-            })
-            .expect("Unable to deploy builtin service");
+        // Registers service's artifact in runtime.
         self.register_artifact(fork, spec.artifact.clone())
             .expect("Unable to register builtin artifact");
         // Starts builtin service instance.
         self.start_service(
-            &mut RuntimeContext::without_author(fork),
+            &mut ExecutionContext::new(fork, Caller::Blockchain),
             spec,
-            &constructor,
+            constructor,
         )
         .expect("Unable to start builtin service instance");
-    }
-
-    pub fn check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError> {
-        self.runtimes
-            .get(&artifact.runtime_id)
-            .ok_or(DeployError::WrongRuntime)
-            .and_then(|runtime| runtime.check_deploy_status(artifact, cancel_if_not_complete))
     }
 
     pub fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
@@ -159,20 +136,31 @@ impl Dispatcher {
     }
 
     // TODO Implement proper pending deploy logic [ECR-3291]
-    pub(crate) fn deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
-        self.runtimes
-            .get_mut(&artifact.runtime_id)
-            .ok_or(DeployError::WrongRuntime)
-            .and_then(|runtime| runtime.begin_deploy(artifact))
+    pub(crate) fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+    ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
+            runtime.deploy_artifact(artifact)
+        } else {
+            Box::new(future::err(DeployError::WrongRuntime))
+        }
     }
 
     /// Registers deployed artifact in the dispatcher's information schema.
     pub(crate) fn register_artifact(
-        &self,
+        &mut self,
         fork: &Fork,
         artifact: ArtifactId,
     ) -> Result<(), DeployError> {
-        Schema::new(fork).add_deployed_artifact(artifact)
+        // Ensures that artifact is successfully deployed.
+        self.deploy_artifact(artifact.clone()).wait()?;
+        Schema::new(fork).add_artifact(artifact.clone())?;
+        info!(
+            "Registered artifact {} in runtime with id {}",
+            artifact.name, artifact.runtime_id
+        );
+        Ok(())
     }
 
     /// Registers service instance in the runtime lookup table.
@@ -197,9 +185,9 @@ impl Dispatcher {
     /// service instance to the dispatcher's information schema.
     pub(crate) fn start_service(
         &mut self,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
         spec: InstanceSpec,
-        constructor: &ServiceConfig,
+        constructor: Any,
     ) -> Result<(), StartError> {
         // Check that service doesn't use existing identifiers.
         if self.identifier_exists(spec.id) {
@@ -219,28 +207,37 @@ impl Dispatcher {
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
-        Schema::new(context.fork).add_started_service(spec)?;
+        info!("Registered service instance: {:?}", spec);
+        Schema::new(context.fork).add_service_instance(spec)?;
         Ok(())
     }
 
     /// Executes transaction. // TODO documentation [ECR-3275]
     pub(crate) fn execute(
         &mut self,
-        context: &mut RuntimeContext,
-        transaction: &AnyTx,
+        fork: &Fork,
+        txid: Hash,
+        tx: &Signed<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        self.call(context, transaction.call_info, &transaction.payload)?;
+        let mut context = ExecutionContext::new(
+            fork,
+            Caller::Transaction {
+                author: tx.author(),
+                hash: txid,
+            },
+        );
+        self.call(&mut context, tx.call_info, &tx.payload)?;
         // Executes pending dispatcher actions.
         context
-            .take_dispatcher_actions()
+            .take_actions()
             .into_iter()
-            .try_for_each(|action| action.execute(self, context))
+            .try_for_each(|action| action.execute(self, &mut context))
     }
 
     /// Calls the corresponding runtime method.
     pub(crate) fn call(
         &self,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -277,7 +274,7 @@ impl Dispatcher {
         tx_sender: &ApiSender,
     ) {
         self.runtimes.values().for_each(|runtime| {
-            runtime.after_commit(self, snapshot.as_ref(), &service_keypair, &tx_sender)
+            runtime.after_commit(snapshot.as_ref(), &service_keypair, &tx_sender)
         });
     }
 }
@@ -285,12 +282,19 @@ impl Dispatcher {
 // TODO Update action names in according with changes in runtime. [ECR-3222]
 #[derive(Debug)]
 pub enum Action {
-    BeginDeploy {
+    /// This action tries to deploy artifact on the current node without registration.
+    /// In this way you can be sure that artifact is deployed in the corresponding runtime
+    /// before register.
+    DeployArtifact {
+        artifact: ArtifactId,
+    },
+    /// This action registers deployed artifact in the dispatcher.
+    RegisterArtifact {
         artifact: ArtifactId,
     },
     StartService {
         spec: InstanceSpec,
-        constructor: ServiceConfig,
+        config: Any,
     },
 }
 
@@ -298,20 +302,20 @@ impl Action {
     fn execute(
         self,
         dispatcher: &mut Dispatcher,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::BeginDeploy { artifact } => {
-                let status = dispatcher.deploy(&artifact)?;
-                // TODO Implement proper pending deploy logic [ECR-3291]
-                if status.is_deployed() {
-                    dispatcher.register_artifact(context.fork, artifact)?;
-                }
-                Ok(())
-            }
+            Action::DeployArtifact { artifact } => dispatcher
+                .deploy_artifact(artifact)
+                .wait()
+                .map_err(From::from),
 
-            Action::StartService { spec, constructor } => {
-                dispatcher.start_service(context, spec, &constructor)?;
+            Action::RegisterArtifact { artifact } => dispatcher
+                .register_artifact(context.fork, artifact)
+                .map_err(From::from),
+
+            Action::StartService { spec, config } => {
+                dispatcher.start_service(context, spec, config)?;
                 dispatcher.restart_api();
                 Ok(())
             }
@@ -322,6 +326,7 @@ impl Action {
 #[cfg(test)]
 mod tests {
     use exonum_merkledb::{Database, TemporaryDB};
+    use futures::IntoFuture;
 
     use crate::{
         crypto::{Hash, PublicKey},
@@ -383,24 +388,18 @@ mod tests {
     }
 
     impl Runtime for SampleRuntime {
-        fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
-            if artifact.runtime_id == self.runtime_type {
-                Ok(DeployStatus::Deployed)
-            } else {
-                Err(DeployError::WrongRuntime)
-            }
-        }
-
-        fn check_deploy_status(
-            &self,
-            artifact: &ArtifactId,
-            _: bool,
-        ) -> Result<DeployStatus, DeployError> {
-            if artifact.runtime_id == self.runtime_type {
-                Ok(DeployStatus::Deployed)
-            } else {
-                Err(DeployError::WrongRuntime)
-            }
+        fn deploy_artifact(
+            &mut self,
+            artifact: ArtifactId,
+        ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+            Box::new(
+                if artifact.runtime_id == self.runtime_type {
+                    Ok(())
+                } else {
+                    Err(DeployError::WrongRuntime)
+                }
+                .into_future(),
+            )
         }
 
         fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
@@ -423,7 +422,7 @@ mod tests {
             &self,
             _fork: &Fork,
             spec: &InstanceSpec,
-            _parameters: &ServiceConfig,
+            _parameters: Any,
         ) -> Result<(), StartError> {
             if spec.artifact.runtime_id == self.runtime_type {
                 Ok(())
@@ -435,7 +434,7 @@ mod tests {
         fn execute(
             &self,
             _: &Dispatcher,
-            _: &mut RuntimeContext,
+            _: &mut ExecutionContext,
             call_info: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -454,7 +453,6 @@ mod tests {
 
         fn after_commit(
             &self,
-            _dispatcher: &Dispatcher,
             _snapshot: &dyn Snapshot,
             _service_keypair: &(PublicKey, SecretKey),
             _tx_sender: &ApiSender,
@@ -519,38 +517,17 @@ mod tests {
             name: "second".into(),
         };
 
-        // Check deploy.
-        dispatcher
-            .deploy(&sample_rust_spec)
-            .expect("start_deploy failed for rust");
-        dispatcher
-            .deploy(&sample_java_spec)
-            .expect("start_deploy failed for java");
-
-        // Check deploy status
-        assert_eq!(
-            dispatcher
-                .check_deploy_status(&sample_rust_spec, false)
-                .unwrap(),
-            DeployStatus::Deployed
-        );
-        assert_eq!(
-            dispatcher
-                .check_deploy_status(&sample_java_spec, false)
-                .unwrap(),
-            DeployStatus::Deployed
-        );
-
+        // Check if we can deploy services.
         let fork = db.fork();
-        // Register artifacts
         dispatcher
             .register_artifact(&fork, sample_rust_spec.clone())
-            .unwrap();
+            .expect("Deploy artifact failed for rust");
         dispatcher
             .register_artifact(&fork, sample_java_spec.clone())
-            .unwrap();
+            .expect("Deploy artifact failed for java");
+
         // Check if we can init services.
-        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         dispatcher
             .start_service(
@@ -560,7 +537,7 @@ mod tests {
                     id: RUST_SERVICE_ID,
                     name: RUST_SERVICE_NAME.into(),
                 },
-                &ServiceConfig::default(),
+                Any::default(),
             )
             .expect("start_service failed for rust");
 
@@ -572,7 +549,7 @@ mod tests {
                     id: JAVA_SERVICE_ID,
                     name: JAVA_SERVICE_NAME.into(),
                 },
-                &ServiceConfig::default(),
+                Any::default(),
             )
             .expect("start_service failed for java");
 
@@ -630,21 +607,15 @@ mod tests {
         // Check deploy.
         assert_eq!(
             dispatcher
-                .deploy(&sample_rust_spec)
-                .expect_err("start_deploy succeed"),
-            DeployError::WrongArtifact
-        );
-
-        assert_eq!(
-            dispatcher
-                .check_deploy_status(&sample_rust_spec, false)
-                .expect_err("check_deploy_status succeed"),
+                .deploy_artifact(sample_rust_spec.clone())
+                .wait()
+                .expect_err("deploy artifact succeed"),
             DeployError::WrongArtifact
         );
 
         // Checks if we can start services.
         let fork = db.fork();
-        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         assert_eq!(
             dispatcher
@@ -655,9 +626,9 @@ mod tests {
                         id: RUST_SERVICE_ID,
                         name: RUST_SERVICE_NAME.into()
                     },
-                    &ServiceConfig::default()
+                    Any::default()
                 )
-                .expect_err("init_service succeed"),
+                .expect_err("start service succeed"),
             StartError::WrongArtifact
         );
 

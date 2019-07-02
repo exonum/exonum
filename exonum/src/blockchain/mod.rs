@@ -64,9 +64,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
     node::ApiSender,
-    runtime::{
-        configuration_new::ConfigurationServiceFactory, dispatcher::Dispatcher, RuntimeContext,
-    },
+    runtime::{dispatcher::Dispatcher, supervisor::Supervisor, ExecutionContext},
 };
 
 mod block;
@@ -110,14 +108,12 @@ impl Blockchain {
         dispatcher_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
         let mut services = services.into_iter().collect::<Vec<_>>();
-        // Adds builtin configuration service.
-        services.push(
-            InstanceCollection::new(ConfigurationServiceFactory).with_instance(
-                ConfigurationServiceFactory::BUILTIN_ID,
-                ConfigurationServiceFactory::BUILTIN_NAME,
-                (),
-            ),
-        );
+        // Adds builtin supervisor service.
+        services.push(InstanceCollection::new(Supervisor).with_instance(
+            Supervisor::BUILTIN_ID,
+            Supervisor::BUILTIN_NAME,
+            (),
+        ));
 
         BlockchainBuilder::new(database, config, service_keypair)
             .with_rust_runtime(services)
@@ -242,7 +238,7 @@ impl Blockchain {
     pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
         let service_id = tx.service_id();
 
-        // TODO check if service exists?
+        // TODO check if service exists? [ECR-3222]
 
         // if !self.dispatcher.services().contains_key(&service_id) {
         //     return Err(format_err!(
@@ -365,7 +361,7 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let signed_tx = {
+        let transaction = {
             let new_fork = &*fork;
             let snapshot = new_fork.snapshot();
             let schema = Schema::new(snapshot);
@@ -380,13 +376,10 @@ impl Blockchain {
 
         fork.flush();
 
-        let transaction = signed_tx.payload();
         let catch_result = {
             let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                let author = signed_tx.author();
-                let mut context = RuntimeContext::new(fork, author, tx_hash);
-                dispatcher.execute(&mut context, transaction)
+                dispatcher.execute(fork, tx_hash, &transaction)
             }))
         };
 

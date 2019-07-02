@@ -15,8 +15,8 @@
 pub use self::dispatcher::Dispatcher;
 pub use crate::messages::ServiceInstanceId;
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-use protobuf::well_known_types::Any;
+use exonum_merkledb::{Fork, Snapshot};
+use futures::Future;
 use serde_derive::{Deserialize, Serialize};
 
 use std::fmt::Debug;
@@ -26,73 +26,37 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
     node::ApiSender,
-    proto::schema,
+    proto::{schema, Any},
 };
 
 use self::error::{DeployError, ExecutionError, StartError};
 
 #[macro_use]
 pub mod rust;
-pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum DeployStatus {
-    DeployInProgress,
-    Deployed,
-}
-
-impl DeployStatus {
-    pub fn is_deployed(&self) -> bool {
-        if let DeployStatus::Deployed = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_pending(&self) -> bool {
-        if let DeployStatus::DeployInProgress = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct ServiceConfig {
-    pub data: Any,
-}
-
-impl ServiceConfig {
-    pub fn new(data: impl BinaryValue) -> Self {
-        let bytes = data.into_bytes();
-
-        Self {
-            data: {
-                let mut data = Any::new();
-                data.set_value(bytes);
-                data
-            },
-        }
-    }
-}
+pub mod supervisor;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
     pub id: ServiceInstanceId,
-    pub name: String,
     pub artifact: ArtifactId,
+    pub name: String,
 }
 
 // TODO Replace by more convienent solution [ECR-3222]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[repr(u32)]
 pub enum RuntimeIdentifier {
     Rust = 0,
     Java = 1,
+}
+
+impl From<RuntimeIdentifier> for u32 {
+    fn from(id: RuntimeIdentifier) -> Self {
+        id as u32
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
@@ -104,9 +68,9 @@ pub struct ArtifactId {
 
 impl ArtifactId {
     /// Creates a new artifact identifier from the given runtime id and name.
-    pub fn new(runtime_id: u32, name: impl Into<String>) -> Self {
+    pub fn new(runtime_id: impl Into<u32>, name: impl Into<String>) -> Self {
         Self {
-            runtime_id,
+            runtime_id: runtime_id.into(),
             name: name.into(),
         }
     }
@@ -118,15 +82,12 @@ impl ArtifactId {
 ///
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait Runtime: Send + Debug + 'static {
-    /// Begins deploy artifact with the given specification.
-    fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError>;
-
-    /// Checks deployment status.
-    fn check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError>;
+    /// Request to deploy artifact with the given identifier and additional specification.
+    /// It immediately returns true if artifact have already deployed.
+    fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+    ) -> Box<dyn Future<Item = (), Error = DeployError>>;
 
     /// Starts a new service instance with the given specification.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
@@ -136,7 +97,7 @@ pub trait Runtime: Send + Debug + 'static {
         &self,
         context: &Fork,
         spec: &InstanceSpec,
-        parameters: &ServiceConfig,
+        parameters: Any,
     ) -> Result<(), StartError>;
 
     /// Stops existing service instance with the given specification.
@@ -147,7 +108,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn execute(
         &self,
         dispatcher: &dispatcher::Dispatcher,
-        context: &mut RuntimeContext,
+        context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -162,7 +123,6 @@ pub trait Runtime: Send + Debug + 'static {
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(
         &self,
-        dispatcher: &dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
@@ -173,49 +133,62 @@ pub trait Runtime: Send + Debug + 'static {
     }
 }
 
-#[derive(Debug)]
-pub struct RuntimeContext<'a> {
-    fork: &'a Fork,
-    author: PublicKey,
-    tx_hash: Hash,
-    dispatcher_actions: Vec<dispatcher::Action>,
-}
-
-impl<'a> RuntimeContext<'a> {
-    pub fn new(fork: &'a Fork, author: PublicKey, tx_hash: Hash) -> Self {
-        Self {
-            fork,
-            author,
-            tx_hash,
-            dispatcher_actions: Vec::new(),
-        }
-    }
-
-    pub fn without_author(fork: &'a Fork) -> Self {
-        Self {
-            fork,
-            author: PublicKey::zero(),
-            tx_hash: Hash::zero(),
-            dispatcher_actions: Vec::new(),
-        }
-    }
-
-    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.dispatcher_actions.push(action);
-    }
-
-    pub(crate) fn take_dispatcher_actions(&mut self) -> Vec<dispatcher::Action> {
-        let mut other = Vec::new();
-        std::mem::swap(&mut self.dispatcher_actions, &mut other);
-        other
-    }
-}
-
 impl<T> From<T> for Box<dyn Runtime>
 where
     T: Runtime,
 {
     fn from(runtime: T) -> Self {
         Box::new(runtime) as Self
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Caller {
+    Transaction { hash: Hash, author: PublicKey },
+    Blockchain,
+}
+
+impl Caller {
+    pub fn author(&self) -> Option<PublicKey> {
+        self.as_transaction().map(|(_hash, author)| *author)
+    }
+
+    pub fn txid(&self) -> Option<Hash> {
+        self.as_transaction().map(|(hash, _author)| *hash)
+    }
+
+    fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
+        if let Caller::Transaction { hash, author } = self {
+            Some((hash, author))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ExecutionContext<'a> {
+    pub fork: &'a Fork,
+    pub caller: Caller,
+    actions: Vec<dispatcher::Action>,
+}
+
+impl<'a> ExecutionContext<'a> {
+    pub fn new(fork: &'a Fork, caller: Caller) -> Self {
+        Self {
+            fork,
+            caller,
+            actions: Vec::new(),
+        }
+    }
+
+    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
+        self.actions.push(action);
+    }
+
+    pub(crate) fn take_actions(&mut self) -> Vec<dispatcher::Action> {
+        let mut other = Vec::new();
+        std::mem::swap(&mut self.actions, &mut other);
+        other
     }
 }

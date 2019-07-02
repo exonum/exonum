@@ -16,7 +16,7 @@ use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
 use exonum_merkledb::BinaryValue;
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom};
 
 use super::{schema, ProtobufConvert};
 use crate::crypto::{self, Hash, PublicKey, Signature};
@@ -266,7 +266,7 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
+#[derive(Clone, Copy, Debug, PartialEq, ProtobufConvert)]
 #[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
 struct StructWithFixedArrays {
     fixed_array_8: [u8; 8],
@@ -298,4 +298,31 @@ fn test_struct_with_fixed_arrays_roundtrip() {
     let bytes = arr_struct.to_bytes();
     let struct_encode_round_trip = StructWithFixedArrays::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, arr_struct);
+}
+
+#[test]
+fn test_message_any_roundtrip() {
+    let value = StructWithFixedArrays {
+        fixed_array_8: [1; 8],
+        fixed_array_16: [1; 16],
+        fixed_array_32: [1; 32],
+    };
+
+    let any = super::Any::from(value);
+    let value2 = StructWithFixedArrays::try_from(any).unwrap();
+    assert_eq!(value, value2);
+}
+
+#[test]
+fn test_message_any_interop() {
+    let artifact_id_in_any_hex = hex::decode(
+        "0a2d747970652e676f6f676c65617069732e636f6d2f65786f6e756d2e72756e74696d652e417274696661637\
+         449641227122565786f6e756d2d63727970746f63757272656e63792d616476616e6365642f302e31312e30",
+    )
+    .unwrap();
+
+    let any = super::Any::from_bytes(artifact_id_in_any_hex.into()).unwrap();
+    let artifact_id = crate::runtime::ArtifactId::try_from(any).unwrap();
+    assert_eq!(artifact_id.runtime_id, 0);
+    assert_eq!(artifact_id.name, "exonum-cryptocurrency-advanced/0.11.0");
 }

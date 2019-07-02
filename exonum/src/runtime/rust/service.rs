@@ -14,7 +14,6 @@
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use failure::Error;
-use protobuf::well_known_types::Any;
 
 use std::fmt::{self, Debug};
 
@@ -23,13 +22,10 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, ServiceTransaction, Signed},
+    messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
-    runtime::{
-        dispatcher::{self, Dispatcher},
-        error::ExecutionError,
-        ArtifactId, DeployError, DeployStatus, RuntimeContext,
-    },
+    runtime::{dispatcher, error::ExecutionError, ExecutionContext},
+    proto::Any
 };
 
 use super::RustArtifactId;
@@ -48,7 +44,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         &self,
         _descriptor: ServiceDescriptor,
         _fork: &Fork,
-        _params: &Any,
+        _params: Any,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
@@ -104,7 +100,7 @@ impl<'a> ServiceDescriptor<'a> {
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
     pub(super) service_descriptor: ServiceDescriptor<'a>,
-    pub(super) runtime_context: &'a mut RuntimeContext<'b>,
+    pub(super) runtime_context: &'a mut ExecutionContext<'b>,
     pub(super) dispatcher: &'a super::dispatcher::Dispatcher,
 }
 
@@ -117,16 +113,27 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.service_descriptor.service_name()
     }
 
+    /// If the current node is a validator, returns its identifier, for other nodes return `None`.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        // TODO Perhaps we should optimize this method [ECR-3222]
+        CoreSchema::new(self.runtime_context.fork)
+            .actual_configuration()
+            .validator_keys
+            .iter()
+            .position(|validator| self.author() == validator.service_key)
+            .map(|id| ValidatorId(id as u16))
+    }
+
     pub fn fork(&self) -> &Fork {
         self.runtime_context.fork
     }
 
     pub fn tx_hash(&self) -> Hash {
-        self.runtime_context.tx_hash
+        self.runtime_context.caller.txid().unwrap()
     }
 
     pub fn author(&self) -> PublicKey {
-        self.runtime_context.author
+        self.runtime_context.caller.author().unwrap()
     }
 
     pub fn call(&mut self, call_info: CallInfo, payload: &[u8]) -> Result<(), ExecutionError> {
@@ -140,7 +147,6 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 }
 
 pub struct AfterCommitContext<'a> {
-    dispatcher: &'a Dispatcher,
     service_descriptor: ServiceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
     service_keypair: &'a (PublicKey, SecretKey),
@@ -150,14 +156,12 @@ pub struct AfterCommitContext<'a> {
 impl<'a> AfterCommitContext<'a> {
     /// Creates context for `after_commit` method.
     pub(crate) fn new(
-        dispatcher: &'a Dispatcher,
         service_descriptor: ServiceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            dispatcher,
             service_descriptor,
             snapshot,
             service_keypair,
@@ -211,16 +215,6 @@ impl<'a> AfterCommitContext<'a> {
             error!("Couldn't broadcast transaction {}.", e);
         }
     }
-
-    // TODO implement pending deployment logic [ECR-3291]
-    pub(crate) fn _check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError> {
-        self.dispatcher
-            .check_deploy_status(artifact, cancel_if_not_complete)
-    }
 }
 
 impl<'a> Debug for AfterCommitContext<'a> {
@@ -237,20 +231,20 @@ pub trait Transaction: BinaryValue {
     type Service;
     /// Identifier of service method which executes the given transaction.
     const METHOD_ID: MethodId;
-    /// Signs given data as service transaction with the specified instance identifier.
+
+    /// Creates unsigned service transaction from the value.
+    fn into_any_tx(self, service_id: ServiceInstanceId) -> AnyTx {
+        AnyTx::new(service_id as u16, Self::METHOD_ID as u16, self.into_bytes())
+    }
+
+    /// Signs value as service transaction with the specified instance identifier.
     fn sign(
         self,
         service_id: ServiceInstanceId,
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<AnyTx> {
-        let payload = Self::into_bytes(self);
-        Message::sign_transaction(
-            ServiceTransaction::from_raw_unchecked(Self::METHOD_ID as u16, payload),
-            service_id,
-            public_key,
-            secret_key,
-        )
+        Message::concrete(self.into_any_tx(service_id), public_key, secret_key)
     }
 }
 

@@ -18,6 +18,7 @@ pub use self::service::{
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
+use futures::{Future, IntoFuture};
 use semver::Version;
 
 use std::{
@@ -31,13 +32,13 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     messages::CallInfo,
     node::ApiSender,
+    proto::Any,
 };
 
 use super::{
     dispatcher,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactId, DeployStatus, InstanceSpec, Runtime, RuntimeContext, RuntimeIdentifier,
-    ServiceConfig,
+    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
 };
 
 #[macro_use]
@@ -111,7 +112,7 @@ impl RustRuntime {
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact();
-        info!("Added available artifact {}", artifact);
+        trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
 
@@ -121,6 +122,24 @@ impl RustRuntime {
     ) -> Self {
         self.add_service_factory(service_factory.into());
         self
+    }
+
+    fn deploy(&mut self, artifact: ArtifactId) -> Result<(), DeployError> {
+        let artifact = self
+            .parse_artifact(&artifact)
+            .ok_or(DeployError::WrongArtifact)?;
+
+        if self.deployed_artifacts.contains(&artifact) {
+            return Ok(());
+        }
+
+        if !self.available_artifacts.contains_key(&artifact) {
+            return Err(DeployError::FailedToDeploy);
+        }
+
+        trace!("Deployed artifact: {}", artifact);
+        self.deployed_artifacts.insert(artifact);
+        Ok(())
     }
 }
 
@@ -179,37 +198,11 @@ impl FromStr for RustArtifactId {
 }
 
 impl Runtime for RustRuntime {
-    fn begin_deploy(&mut self, artifact: &ArtifactId) -> Result<DeployStatus, DeployError> {
-        let artifact = self
-            .parse_artifact(&artifact)
-            .ok_or(DeployError::WrongArtifact)?;
-
-        trace!("Begin deploy artifact: {}", artifact);
-
-        if !self.available_artifacts.contains_key(&artifact) {
-            return Err(DeployError::FailedToDeploy);
-        }
-        if !self.deployed_artifacts.insert(artifact) {
-            return Err(DeployError::AlreadyDeployed);
-        }
-
-        Ok(DeployStatus::Deployed)
-    }
-
-    fn check_deploy_status(
-        &self,
-        artifact: &ArtifactId,
-        _cancel_if_not_complete: bool,
-    ) -> Result<DeployStatus, DeployError> {
-        let artifact = self
-            .parse_artifact(&artifact)
-            .ok_or(DeployError::WrongArtifact)?;
-
-        if self.deployed_artifacts.contains(&artifact) {
-            Ok(DeployStatus::Deployed)
-        } else {
-            Err(DeployError::FailedToDeploy)
-        }
+    fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+    ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+        Box::new(self.deploy(artifact).into_future())
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
@@ -246,7 +239,7 @@ impl Runtime for RustRuntime {
         &self,
         fork: &Fork,
         spec: &InstanceSpec,
-        parameters: &ServiceConfig,
+        parameters: Any,
     ) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
@@ -264,7 +257,7 @@ impl Runtime for RustRuntime {
             .ok_or(StartError::NotStarted)?;
         service_instance
             .as_ref()
-            .configure(service_instance.descriptor(), fork, &parameters.data)
+            .configure(service_instance.descriptor(), fork, parameters)
             .map_err(StartError::ExecutionError)
     }
 
@@ -284,7 +277,7 @@ impl Runtime for RustRuntime {
     fn execute(
         &self,
         dispatcher: &super::dispatcher::Dispatcher,
-        runtime_context: &mut RuntimeContext,
+        runtime_context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -317,7 +310,7 @@ impl Runtime for RustRuntime {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 service.as_ref().before_commit(TransactionContext {
                     dispatcher,
-                    runtime_context: &mut RuntimeContext::without_author(fork),
+                    runtime_context: &mut ExecutionContext::new(fork, Caller::Blockchain),
                     service_descriptor: service.descriptor(),
                 })
             })) {
@@ -338,14 +331,12 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
-        dispatcher: &super::dispatcher::Dispatcher,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
-                dispatcher,
                 service.descriptor(),
                 snapshot,
                 service_keypair,

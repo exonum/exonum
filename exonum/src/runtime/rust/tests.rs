@@ -15,17 +15,21 @@
 use exonum_derive::service_interface;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
 use futures::sync::mpsc;
-use protobuf::{well_known_types::Any, Message};
 use semver::Version;
 
+use std::convert::TryFrom;
+
 use crate::{
-    crypto::{Hash, PublicKey},
     messages::{CallInfo, ServiceInstanceId},
-    proto::schema::tests::{TestServiceInit, TestServiceTx},
+    proto::{
+        schema::tests::{TestServiceInit, TestServiceTx},
+        Any,
+    },
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        DeployStatus, InstanceSpec, RuntimeContext, ServiceConfig,
+        InstanceSpec, ExecutionContext,
+        Caller,
     },
 };
 
@@ -101,9 +105,10 @@ impl Service for TestServiceImpl {
         &self,
         _descriptor: ServiceDescriptor,
         fork: &Fork,
-        arg: &Any,
+        arg: Any,
     ) -> Result<(), ExecutionError> {
-        let arg: Init = BinaryValue::from_bytes(arg.get_value().into()).map_err(|e| {
+        let arg = Init::try_from(arg).map_err(|e| {
+            error!("{:?}", e);
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
 
@@ -145,11 +150,6 @@ fn test_basic_rust_runtime() {
 
     // Deploy service.
     let fork = db.fork();
-    dispatcher.deploy(&artifact).unwrap();
-    assert_eq!(
-        dispatcher.check_deploy_status(&artifact, false).unwrap(),
-        DeployStatus::Deployed
-    );
     dispatcher
         .register_artifact(&fork, artifact.clone())
         .unwrap();
@@ -163,24 +163,16 @@ fn test_basic_rust_runtime() {
             name: SERVICE_INSTANCE_NAME.to_owned(),
         };
 
-        let constructor = ServiceConfig {
-            data: {
-                let mut arg = TestServiceInit::new();
-                arg.set_msg("constructor_message".to_owned());
+        let constructor = Init {
+            msg: "constructor_message".to_owned(),
+        }
+        .into();
 
-                let mut pb_any = Any::new();
-                pb_any.set_value(arg.write_to_bytes().unwrap());
-                pb_any
-            },
-        };
-
-        let mut fork = db.fork();
-        let address = PublicKey::zero();
-        let tx_hash = Hash::zero();
-        let mut context = RuntimeContext::new(&fork, address, tx_hash);
+        let fork = db.fork();
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         dispatcher
-            .start_service(&mut context, spec, &constructor)
+            .start_service(&mut context, spec, constructor)
             .unwrap();
         {
             let entry = Entry::new("constructor_entry", &fork);
@@ -198,8 +190,8 @@ fn test_basic_rust_runtime() {
             method_id: 0,
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
-        let mut fork = db.fork();
-        let mut context = RuntimeContext::new(&fork, PublicKey::zero(), Hash::zero());
+        let fork = db.fork();
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {
@@ -221,8 +213,8 @@ fn test_basic_rust_runtime() {
             method_id: 1,
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
-        let mut fork = db.fork();
-        let mut context = RuntimeContext::new(&mut fork, PublicKey::zero(), Hash::zero());
+        let fork = db.fork();
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher.call(&mut context, call_info, &payload).unwrap();
 
         {

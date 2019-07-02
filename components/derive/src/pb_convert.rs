@@ -83,6 +83,7 @@ fn implement_protobuf_convert_trait(
     name: &Ident,
     pb_name: &Path,
     field_names: &[Ident],
+    cr: &dyn quote::ToTokens,
 ) -> impl quote::ToTokens {
     let to_pb_fn = implement_protobuf_convert_to_pb(field_names);
     let from_pb_fn = implement_protobuf_convert_from_pb(field_names);
@@ -93,6 +94,20 @@ fn implement_protobuf_convert_trait(
 
             #to_pb_fn
             #from_pb_fn
+        }
+
+        impl From<#name> for #cr::proto::Any {
+            fn from(v: #name) -> Self {
+                Self::new(v)
+            }
+        }
+
+        impl std::convert::TryFrom<#cr::proto::Any> for #name {
+            type Error = failure::Error;
+
+            fn try_from(v: #cr::proto::Any) -> Result<Self, Self::Error> {
+                v.try_into()
+            }
         }
     }
 }
@@ -165,7 +180,7 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
 
     let field_names = get_field_names(&input);
     let protobuf_convert =
-        implement_protobuf_convert_trait(&name, &proto_struct_name, &field_names);
+        implement_protobuf_convert_trait(&name, &proto_struct_name, &field_names, &cr);
     let storage_traits = implement_storage_traits(&name, &cr);
 
     let serde_traits = {

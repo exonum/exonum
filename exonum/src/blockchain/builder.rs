@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Database};
+use exonum_merkledb::{ Database};
 use futures::sync::mpsc;
 
 use std::sync::Arc;
@@ -26,17 +26,19 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        InstanceSpec, Runtime, ServiceConfig,
+        InstanceSpec, Runtime,
     },
+    proto::Any,
 };
 
 // TODO Modern replacement for DispatcherBuilder [ECR-3275]
+#[derive(Debug)]
 pub struct BlockchainBuilder {
     pub database: Arc<dyn Database>,
     pub genesis_config: GenesisConfig,
     pub service_keypair: (PublicKey, SecretKey),
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
-    pub builtin_instances: Vec<(InstanceSpec, ServiceConfig)>,
+    pub builtin_instances: Vec<(InstanceSpec, Any)>,
 }
 
 impl BlockchainBuilder {
@@ -63,6 +65,10 @@ impl BlockchainBuilder {
             runtime.add_service_factory(service.factory);
             self.builtin_instances.extend(service.instances);
         }
+        self.with_additional_runtime(runtime)
+    }
+
+    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
     }
@@ -128,7 +134,7 @@ impl BlockchainBuilder {
 #[derive(Debug)]
 pub struct InstanceCollection {
     pub factory: Box<dyn ServiceFactory>,
-    pub instances: Vec<(InstanceSpec, ServiceConfig)>,
+    pub instances: Vec<(InstanceSpec, Any)>,
 }
 
 impl InstanceCollection {
@@ -145,14 +151,14 @@ impl InstanceCollection {
         mut self,
         id: ServiceInstanceId,
         name: impl Into<String>,
-        params: impl BinaryValue,
+        params: impl Into<Any>,
     ) -> Self {
         let spec = InstanceSpec {
             artifact: self.factory.artifact().into(),
             id,
             name: name.into(),
         };
-        let constructor = ServiceConfig::new(params);
+        let constructor = params.into();
         self.instances.push((spec, constructor));
         self
     }
@@ -164,7 +170,7 @@ mod tests {
 
     use crate::{
         helpers::{generate_testnet_config, Height},
-        runtime::configuration_new::ConfigurationServiceFactory,
+        runtime::supervisor::Supervisor,
     };
 
     use super::*;
@@ -196,13 +202,11 @@ mod tests {
 
         Blockchain::new(
             TemporaryDB::new(),
-            vec![
-                InstanceCollection::new(ConfigurationServiceFactory).with_instance(
-                    ConfigurationServiceFactory::BUILTIN_ID,
-                    ConfigurationServiceFactory::BUILTIN_NAME,
-                    (),
-                ),
-            ],
+            vec![InstanceCollection::new(Supervisor).with_instance(
+                Supervisor::BUILTIN_ID,
+                Supervisor::BUILTIN_NAME,
+                (),
+            )],
             config.genesis,
             service_keypair,
             ApiSender::new(mpsc::unbounded().0),
