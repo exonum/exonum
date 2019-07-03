@@ -48,7 +48,7 @@ impl Transactions for Supervisor {
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
-        }        
+        }
         // Verifies that transaction author is validator.
         let validator_keys = blockchain_schema.actual_configuration().validator_keys;
         if !validator_keys
@@ -96,7 +96,7 @@ impl Transactions for Supervisor {
         // Verifies that we doesn't reach deadline height.
         if service.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
-        }             
+        }
         // Verifies that transaction author is validator.
         let validator_keys = blockchain_schema.actual_configuration().validator_keys;
         if !validator_keys

@@ -41,7 +41,7 @@ pub struct StartService {
     /// Instance configuration.
     pub config: Any,
     /// The height until which the start service procedure should be completed.
-    pub deadline_height: Height,    
+    pub deadline_height: Height,
 }
 
 // Think about bincode instead of protobuf. [ECR-3222]

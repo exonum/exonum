@@ -59,6 +59,16 @@ pub struct Transfer {
     pub amount: u64,
 }
 
+impl Transfer {
+    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
+        Self {
+            from: *from,
+            to: *to,
+            amount,
+        }
+    }
+}
+
 #[service_interface]
 pub trait MyServiceInterface {
     fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult;

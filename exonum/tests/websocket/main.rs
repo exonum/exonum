@@ -24,7 +24,10 @@ extern crate serde_derive;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
+use exonum::{
+    api::websocket::*, crypto::gen_keypair, node::ExternalMessage,
+    runtime::rust::service::Transaction,
+};
 use exonum_merkledb::ObjectHash;
 use std::{
     thread::sleep,
@@ -186,7 +189,7 @@ fn test_transactions_subscribe_with_filter() {
 
     // Create client with filter
     let mut client = create_ws_client(
-        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?service_id=0&message_id=0",
+        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?service_id=118&message_id=0",
     )
     .expect("Cannot connect to node");
     client
@@ -194,7 +197,7 @@ fn test_transactions_subscribe_with_filter() {
         .set_read_timeout(Some(Duration::from_secs(10)))
         .unwrap();
     let (pk, sk) = gen_keypair();
-    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Bob"), SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(&pk, "Bob").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -218,7 +221,7 @@ fn test_transactions_subscribe_with_filter() {
 
     let (pk, sk) = gen_keypair();
     let (to, _) = gen_keypair();
-    let tx = Message::sign_transaction(Transfer::new(&pk, &to, 10), SERVICE_ID, pk, &sk);
+    let tx = Transfer::new(&pk, &to, 10).sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8082/api/explorer/v1/transactions")
@@ -244,15 +247,16 @@ fn test_transactions_subscribe_with_partial_filter() {
     let node_handler = run_node(6334, 8083);
 
     // Create client with filter
-    let mut client =
-        create_ws_client("ws://localhost:8083/api/explorer/v1/transactions/subscribe?service_id=0")
-            .expect("Cannot connect to node");
+    let mut client = create_ws_client(
+        "ws://localhost:8083/api/explorer/v1/transactions/subscribe?service_id=118",
+    )
+    .expect("Cannot connect to node");
     client
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
     let (pk, sk) = gen_keypair();
-    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Bob"), SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(&pk, "Bob").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -276,7 +280,7 @@ fn test_transactions_subscribe_with_partial_filter() {
 
     let (pk, sk) = gen_keypair();
     let (to, _) = gen_keypair();
-    let tx = Message::sign_transaction(Transfer::new(&pk, &to, 10), SERVICE_ID, pk, &sk);
+    let tx = Transfer::new(&pk, &to, 10).sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8083/api/explorer/v1/transactions")
@@ -319,7 +323,7 @@ fn test_transactions_subscribe_with_bad_filter() {
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
     let (pk, sk) = gen_keypair();
-    let tx = Message::sign_transaction(CreateWallet::new(&pk, "Bob"), SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(&pk, "Bob").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client

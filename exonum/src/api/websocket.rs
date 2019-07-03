@@ -342,9 +342,9 @@ impl Handler<Transaction> for Server {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let buf: Vec<u8> = hex::decode(tx.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_raw_buffer(buf)?;
-        let tx_hash = signed.hash();
-        let signed = RawTransaction::try_from(ExonumMessage::deserialize(signed)?)
+        let signed = SignedMessage::from_bytes(buf.into()).and_then(SignedMessage::verify)?;
+        let tx_hash = signed.object_hash();
+        let signed = AnyTx::try_from(ExonumMessage::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
         let _ = self
             .service_api_state
