@@ -47,7 +47,7 @@ use exonum::{
 };
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
-use rand::{Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempdir::TempDir;
 
 use std::{iter, sync::Arc};

@@ -321,13 +321,17 @@ impl ExplorerApi {
             service_api_state.clone(),
             shared_node_state.clone(),
             |request| {
-                Ok(Query::from_request(request, &Default::default())
-                    .map(
-                        move |query: Query<TransactionFilter>| SubscriptionType::Transactions {
+                if request.query().is_empty() {
+                    return Ok(SubscriptionType::Transactions { filter: None });
+                }
+
+                Query::from_request(request, &Default::default())
+                    .map(|query: Query<TransactionFilter>| {
+                        Ok(SubscriptionType::Transactions {
                             filter: Some(query.into_inner()),
-                        },
-                    )
-                    .unwrap_or(SubscriptionType::Transactions { filter: None }))
+                        })
+                    })
+                    .unwrap_or(Ok(SubscriptionType::None))
             },
         );
         // Default websocket connection.
