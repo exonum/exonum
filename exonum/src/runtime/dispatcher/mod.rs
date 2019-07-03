@@ -55,7 +55,7 @@ impl std::fmt::Debug for Dispatcher {
 
 impl Dispatcher {
     /// Creates a new dispatcher with the specified runtimes.
-    pub fn with_runtimes(
+    pub(crate) fn with_runtimes(
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
         inner_requests_tx: mpsc::Sender<InternalRequest>,
     ) -> Self {
@@ -70,7 +70,7 @@ impl Dispatcher {
     ///
     /// # Panics
     /// TODO [ECR-3275]
-    pub fn restore_state(&mut self, snapshot: impl IndexAccess) {
+    pub(crate) fn restore_state(&mut self, snapshot: impl IndexAccess) {
         let schema = Schema::new(snapshot);
         // Restores information about the deployed services.
         for (name, runtime_id) in &schema.artifacts() {
@@ -108,7 +108,7 @@ impl Dispatcher {
         .expect("Unable to start builtin service instance");
     }
 
-    pub fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+    pub(crate) fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
         self.runtimes
             .iter()
             .map(|(_, runtime)| runtime.state_hashes(snapshot))
@@ -123,16 +123,6 @@ impl Dispatcher {
                 api.append(&mut runtime.services_api());
                 api
             })
-    }
-
-    /// Sends restart API message.
-    fn restart_api(&self) {
-        let _ = self
-            .inner_requests_tx
-            .clone()
-            .send(InternalRequest::RestartApi)
-            .wait()
-            .map_err(|e| error!("Failed to request API restart: {}", e));
     }
 
     // TODO Implement proper pending deploy logic [ECR-3291]
@@ -161,24 +151,6 @@ impl Dispatcher {
             artifact.name, artifact.runtime_id
         );
         Ok(())
-    }
-
-    /// Registers service instance in the runtime lookup table.
-    fn register_running_service(&mut self, spec: &InstanceSpec) {
-        self.runtime_lookup
-            .insert(spec.id, spec.artifact.runtime_id);
-    }
-
-    /// Just starts a new service instance.
-    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
-        self.runtimes
-            .get_mut(&spec.artifact.runtime_id)
-            .ok_or(StartError::WrongRuntime)
-            .and_then(|runtime| runtime.start_service(spec))
-    }
-
-    fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
-        id == u32::from(CORE_ID) || self.runtime_lookup.contains_key(&id)
     }
 
     /// Starts and configures a new service instance. After that it writes information about
@@ -277,6 +249,34 @@ impl Dispatcher {
             runtime.after_commit(snapshot.as_ref(), &service_keypair, &tx_sender)
         });
     }
+
+    /// Sends restart API message.
+    fn restart_api(&self) {
+        let _ = self
+            .inner_requests_tx
+            .clone()
+            .send(InternalRequest::RestartApi)
+            .wait()
+            .map_err(|e| error!("Failed to request API restart: {}", e));
+    }
+
+    /// Registers service instance in the runtime lookup table.
+    fn register_running_service(&mut self, spec: &InstanceSpec) {
+        self.runtime_lookup
+            .insert(spec.id, spec.artifact.runtime_id);
+    }
+
+    /// Just starts a new service instance.
+    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
+        self.runtimes
+            .get_mut(&spec.artifact.runtime_id)
+            .ok_or(StartError::WrongRuntime)
+            .and_then(|runtime| runtime.start_service(spec))
+    }
+
+    fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
+        id == u32::from(CORE_ID) || self.runtime_lookup.contains_key(&id)
+    }    
 }
 
 // TODO Update action names in according with changes in runtime. [ECR-3222]

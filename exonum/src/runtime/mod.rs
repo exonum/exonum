@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::dispatcher::Dispatcher;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Fork, Snapshot};
@@ -72,6 +71,15 @@ impl ArtifactId {
         Self {
             runtime_id: runtime_id.into(),
             name: name.into(),
+        }
+    }
+}
+
+impl From<(String, u32)> for ArtifactId {
+    fn from(v: (String, u32)) -> Self {
+        Self {
+            runtime_id: v.1,
+            name: v.0,
         }
     }
 }
