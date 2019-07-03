@@ -139,7 +139,7 @@
 //! }
 //! ```
 
-#![warn(missing_debug_implementations, missing_docs)]
+//#![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
 #[cfg_attr(test, macro_use)]
@@ -176,8 +176,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
+    proto::Any,
     runtime::{rust::ServiceFactory, ServiceInstanceId},
-    proto::Any
 };
 use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};

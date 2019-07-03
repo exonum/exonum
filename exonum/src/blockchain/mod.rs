@@ -64,7 +64,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, supervisor::Supervisor, ExecutionContext},
+    runtime::{dispatcher::Dispatcher, supervisor::Supervisor},
 };
 
 mod block;

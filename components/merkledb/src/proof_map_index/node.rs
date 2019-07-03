@@ -33,6 +33,7 @@ pub enum Node {
 }
 
 #[derive(Clone, PartialEq)]
+/// Branch node.
 pub struct BranchNode {
     raw: Vec<u8>,
 }

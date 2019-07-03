@@ -59,6 +59,7 @@ impl ConnectedPeerAddr {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(Vec<u8>),

@@ -55,6 +55,7 @@ exonumhub
 fsync
 fuzzer
 gitter
+googleapis
 hashable
 hasher
 healthcheck
@@ -86,6 +87,7 @@ mpsc
 msgs
 multiproof
 multiproofs
+multisig
 mutex
 nacl
 nanos

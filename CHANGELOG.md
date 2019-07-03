@@ -116,7 +116,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-crypto
 
-- Removed deprecated `CryptoHash` trait, use `exonum-merkledb::ObjectHash` instad (#1361)
+- Removed deprecated `CryptoHash` trait, use `exonum-merkledb::ObjectHash`
+  instead (#1361)
 
 ### New features
 

@@ -241,6 +241,7 @@ impl ServiceApiBuilder {
         }
     }
 
+    #[allow(dead_code)]
     fn with_blockchain(blockchain: Blockchain) -> Self {
         Self {
             blockchain: Some(blockchain),

@@ -34,6 +34,7 @@ pub struct Info {
 
 impl Info {
     /// Creates a new `Info` instance.
+    #[allow(dead_code)]
     pub fn new(services: Vec<String>) -> Self {
         Self { services }
     }

@@ -105,6 +105,7 @@ use crate::{TestKit, TestNetwork};
 /// // Other test code
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     validator_count: Option<u16>,

@@ -21,10 +21,10 @@ pub use self::{
 use exonum_merkledb::Snapshot;
 
 use crate::{
-    crypto::Hash,
     api::ServiceApiBuilder,
+    crypto::Hash,
     messages::ServiceInstanceId,
-    runtime::rust::{RustArtifactId, Service, ServiceFactory, ServiceDescriptor},
+    runtime::rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
 };
 
 mod api;

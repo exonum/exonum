@@ -45,7 +45,7 @@ pub struct InstanceSpec {
     pub name: String,
 }
 
-// TODO Replace by more convienent solution [ECR-3222]
+// TODO Replace by more convenient solution [ECR-3222]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]
 pub enum RuntimeIdentifier {
@@ -153,8 +153,8 @@ impl Caller {
         self.as_transaction().map(|(_hash, author)| *author)
     }
 
-    pub fn txid(&self) -> Option<Hash> {
-        self.as_transaction().map(|(hash, _author)| *hash)
+    pub fn transaction_id(&self) -> Option<Hash> {
+        self.as_transaction().map(|(hash, _)| *hash)
     }
 
     fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {

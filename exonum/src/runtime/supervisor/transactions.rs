@@ -25,8 +25,8 @@ use super::{DeployArtifact, Error, Schema, StartService, Supervisor};
 
 // TODO Implement generic helper module for multisig transactions [ECR-3222]
 
-/// Supervisor service transactions.
 #[service_interface(exonum(crate = "crate"))]
+/// Supervisor service transactions.
 pub trait Transactions {
     /// Requests artifact deploy.
     fn deploy_artifact(
