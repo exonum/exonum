@@ -26,7 +26,7 @@ import "google/protobuf/any.proto";
 message DeployArtifact {
     // Artifact identifier.
     exonum.runtime.ArtifactId artifact = 1;
-    // The height to which the deployment procedure should be completed.
+    // The height until which the deployment procedure should be completed.
     uint64 deadline_height = 2;
 }
 
@@ -40,6 +40,6 @@ message StartService {
     string name = 2;
     // Instance configuration.
     google.protobuf.Any config = 3;
-    // The height to which the start service procedure should be completed.
+    // The height until which the start service procedure should be completed.
     uint64 deadline_height = 4;
 }

@@ -24,8 +24,8 @@ pub enum Error {
     /// Transaction author is not a validator.
     #[fail(display = "Transaction author is not a validator")]
     UnknownAuthor = 1,
-    /// Deadline exceeded for the current transaction..
-    #[fail(display = "deadline exceeded for the current transaction.")]
+    /// Deadline exceeded for the current transaction.
+    #[fail(display = "Deadline exceeded for the current transaction")]
     DeadlineExceeded = 2,
     /// Instance with the given name already exists.
     #[fail(display = "Instance with the given name already exists")]

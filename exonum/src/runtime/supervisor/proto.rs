@@ -26,7 +26,7 @@ use crate::{
 pub struct DeployArtifact {
     // Artifact identifier.
     pub artifact: ArtifactId,
-    /// The height to which the deployment procedure should be completed.
+    /// The height until which the deployment procedure should be completed.
     pub deadline_height: Height,
 }
 
@@ -40,7 +40,7 @@ pub struct StartService {
     pub name: String,
     /// Instance configuration.
     pub config: Any,
-    /// The height to which the start service procedure should be completed.
+    /// The height until which the start service procedure should be completed.
     pub deadline_height: Height,    
 }
 
