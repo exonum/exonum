@@ -75,7 +75,6 @@ impl ApiManager {
         runtime_config: ApiRuntimeConfig,
         aggregator: ApiAggregator,
     ) -> io::Result<Addr<Server>> {
-        debug!("Runtime: {:?}", runtime_config);
         let access = runtime_config.access;
         let listen_address = runtime_config.listen_address;
         info!("Starting {} web api on {}", access, listen_address);

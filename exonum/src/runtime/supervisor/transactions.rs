@@ -45,8 +45,12 @@ impl Transactions for Supervisor {
         deploy: DeployArtifact,
     ) -> ExecutionResult {
         let blockchain_schema = blockchain::Schema::new(context.fork());
-        let validator_keys = blockchain_schema.actual_configuration().validator_keys;
+        // Verifies that we doesn't reach deadline height.
+        if deploy.deadline_height < blockchain_schema.height() {
+            return Err(Error::DeadlineExceeded)?;
+        }        
         // Verifies that transaction author is validator.
+        let validator_keys = blockchain_schema.actual_configuration().validator_keys;
         if !validator_keys
             .iter()
             .any(|validator| validator.service_key == context.author())
@@ -59,11 +63,6 @@ impl Transactions for Supervisor {
             .contains(&deploy.artifact.name)
         {
             return Err(Error::AlreadyDeployed)?;
-        }
-
-        // Verifies that we doesn't reach deadline height.
-        if deploy.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeployDeadline)?;
         }
 
         let confirmations = Schema::new(context.service_name(), context.fork())
@@ -94,9 +93,12 @@ impl Transactions for Supervisor {
     ) -> ExecutionResult {
         let blockchain_schema = blockchain::Schema::new(context.fork());
         let dispatcher_schema = dispatcher::Schema::new(context.fork());
-
-        let validator_keys = blockchain_schema.actual_configuration().validator_keys;
+        // Verifies that we doesn't reach deadline height.
+        if service.deadline_height < blockchain_schema.height() {
+            return Err(Error::DeadlineExceeded)?;
+        }             
         // Verifies that transaction author is validator.
+        let validator_keys = blockchain_schema.actual_configuration().validator_keys;
         if !validator_keys
             .iter()
             .any(|validator| validator.service_key == context.author())

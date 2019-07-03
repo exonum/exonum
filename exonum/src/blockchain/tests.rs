@@ -87,7 +87,6 @@ impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
     fn before_commit(&self, context: TransactionContext) {
-        debug!("ServiceGood: before commit");
         let mut index = ListIndex::new(IDX_NAME, context.fork());
         index.push(1);
     }

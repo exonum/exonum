@@ -1219,7 +1219,6 @@ mod tests {
 
     impl Service for AfterCommitService {
         fn after_commit(&self, context: AfterCommitContext) {
-            debug!("After commit");
             let tx = TxAfterCommit::new_with_height(context.height());
             context.broadcast_signed_transaction(tx);
         }
