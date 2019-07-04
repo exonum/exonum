@@ -29,6 +29,7 @@ use crate::{
 
 mod api;
 mod errors;
+pub mod multisig;
 mod proto;
 mod schema;
 mod transactions;

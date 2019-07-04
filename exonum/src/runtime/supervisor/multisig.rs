@@ -12,56 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Helper module for multisignature transactions.
+
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use exonum_merkledb::{BinaryValue, IndexAccess, ObjectHash};
+use exonum_merkledb::{BinaryKey, BinaryValue, IndexAccess, ObjectHash, ProofMapIndex};
 
 use std::{
     borrow::Cow,
     collections::BTreeSet,
     io::{Cursor, Write},
+    marker::PhantomData,
 };
 
-use super::{multisig::ValidatorMultisig, DeployArtifact, StartService};
-use crate::crypto::{self, Hash};
-
-/// Service information schema.
-#[derive(Debug)]
-pub struct Schema<'a, T> {
-    access: T,
-    instance_name: &'a str,
-}
-
-impl<'a, T: IndexAccess> Schema<'a, T> {
-    /// Constructs schema for the given `access`.
-    pub fn new(instance_name: &'a str, access: T) -> Self {
-        Self {
-            instance_name,
-            access,
-        }
-    }
-
-    pub fn pending_artifacts(&self) -> ValidatorMultisig<T, DeployArtifact> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".pending_artifacts"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn pending_instances(&self) -> ValidatorMultisig<T, StartService> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".pending_instances"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    /// Returns hashes for tables with proofs.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.pending_artifacts().object_hash(),
-            self.pending_instances().object_hash(),
-        ]
-    }
-}
+use crate::{
+    blockchain::{self, ValidatorKeys},
+    crypto::{self, Hash, PublicKey},
+    helpers::ValidatorId,
+};
 
 /// A set of binary values.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord)]
@@ -109,6 +76,70 @@ impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
 impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
     fn object_hash(&self) -> Hash {
         crypto::hash(&self.to_bytes())
+    }
+}
+
+#[derive(Debug)]
+pub struct ValidatorMultisig<I, V>
+where
+    I: IndexAccess,
+{
+    index_name: String,
+    // List of validators' public keys.
+    validator_keys: Vec<ValidatorKeys>,
+    access: I,
+    _v: PhantomData<V>,
+}
+
+impl<I, V> ValidatorMultisig<I, V>
+where
+    I: IndexAccess,
+    V: BinaryKey + ObjectHash,
+{
+    pub fn new(index_name: impl Into<String>, access: I) -> Self {
+        let validator_keys = blockchain::Schema::new(access.clone())
+            .actual_configuration()
+            .validator_keys;
+        Self {
+            index_name: index_name.into(),
+            access,
+            validator_keys,
+            _v: PhantomData,
+        }
+    }
+
+    pub fn validators_len(&self) -> usize {
+        self.validator_keys.len()
+    }
+
+    pub fn validator_id(&self, author: PublicKey) -> Option<ValidatorId> {
+        self.validator_keys
+            .iter()
+            .position(|validator| validator.service_key == author)
+            .map(|id| ValidatorId(id as u16))
+    }
+
+    pub fn confirm(&mut self, id: &V, author: PublicKey) -> usize {
+        let mut multisig_index = self.multisig_index();
+        let mut confirmations = multisig_index.get(id).unwrap_or_default();
+        confirmations.0.insert(author);
+        let len = confirmations.0.len();
+        multisig_index.put(id, confirmations);
+        len
+    }
+
+    fn multisig_index(&self) -> ProofMapIndex<I, V, BinarySet<PublicKey>> {
+        ProofMapIndex::new(self.index_name.clone(), self.access.clone())
+    }
+}
+
+impl<I, V> ObjectHash for ValidatorMultisig<I, V>
+where
+    I: IndexAccess,
+    V: BinaryKey + ObjectHash,
+{
+    fn object_hash(&self) -> Hash {
+        self.multisig_index().object_hash()
     }
 }
 

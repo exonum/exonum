@@ -18,7 +18,7 @@ pub use self::service::{
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
-use futures::{Future, IntoFuture, future};
+use futures::{future, Future, IntoFuture};
 use semver::Version;
 
 use std::{
