@@ -14,9 +14,14 @@
 
 //! Public system API.
 
-use crate::api::{ServiceApiScope, ServiceApiState};
-use crate::blockchain::{Schema, SharedNodeState};
-use crate::helpers::user_agent;
+use exonum_merkledb::IndexAccess;
+
+use crate::{
+    api::{ServiceApiScope, ServiceApiState},
+    blockchain::{Schema, SharedNodeState},
+    helpers::user_agent,
+    runtime::{dispatcher, ArtifactId, InstanceSpec},
+};
 
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -49,28 +54,43 @@ pub struct HealthCheckInfo {
     pub connected_peers: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct ServiceInfo {
-    name: String,
-    id: u16,
-}
-
 /// Services info response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ServicesResponse {
-    services: Vec<ServiceInfo>,
+pub struct DispatcherInfo {
+    /// List of deployed artifacts.
+    pub artifacts: Vec<ArtifactId>,
+    /// List of services.
+    pub services: Vec<InstanceSpec>,
+}
+
+impl DispatcherInfo {
+    /// Loads dispatcher information from database.
+    pub fn from_db(access: impl IndexAccess) -> Self {
+        let schema = dispatcher::Schema::new(access);
+        Self {
+            artifacts: schema.artifacts().into_iter().map(From::from).collect(),
+            services: schema.service_instances().values().collect(),
+        }
+    }
 }
 
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
     shared_api_state: SharedNodeState,
+    dispatcher_info: DispatcherInfo,
 }
 
 impl SystemApi {
     /// Creates a new `public::SystemApi` instance.
-    pub fn new(shared_api_state: SharedNodeState) -> Self {
-        Self { shared_api_state }
+    ///
+    /// This method loads from the specified access item persistent information like
+    /// list of services to optimize IO.
+    pub fn new(dispatcher_info: DispatcherInfo, shared_api_state: SharedNodeState) -> Self {
+        Self {
+            shared_api_state,
+            dispatcher_info,
+        }
     }
 
     fn handle_stats_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
@@ -105,23 +125,13 @@ impl SystemApi {
 
     fn handle_list_services_info(
         self,
-        _name: &'static str,
-        _api_scope: &mut ServiceApiScope,
+        name: &'static str,
+        api_scope: &mut ServiceApiScope,
     ) -> Self {
-        // TODO rewrite this method with new API.
-
-        // api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
-        //     let blockchain = state.blockchain();
-        //     let services = blockchain
-        //         .service_map()
-        //         .iter()
-        //         .map(|(&id, service)| ServiceInfo {
-        //             name: service.service_name().to_string(),
-        //             id,
-        //         })
-        //         .collect::<Vec<_>>();
-        //     Ok(ServicesResponse { services })
-        // });
+        api_scope.endpoint(name, {
+            let dispatcher_info = self.dispatcher_info.clone();
+            move |_state: &ServiceApiState, _query: ()| Ok(dispatcher_info.clone())
+        });
         self
     }
 
