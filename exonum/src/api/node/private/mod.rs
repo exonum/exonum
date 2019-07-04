@@ -25,8 +25,9 @@ use crate::{
     crypto::PublicKey,
     messages::ServiceInstanceId,
     node::{ConnectInfo, ExternalMessage},
-    runtime::rust::ServiceDescriptor,
 };
+
+use super::public::system::DispatcherInfo;
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -42,23 +43,17 @@ pub struct ServiceInfo {
 pub struct NodeInfo {
     /// Version of the `exonum` crate.
     pub core_version: Option<String>,
-    /// List of services.
-    pub services: Vec<ServiceInfo>,
+    /// Dispatcher info.
+    pub dispatcher_info: DispatcherInfo,
 }
 
 impl NodeInfo {
     /// Creates new `NodeInfo` from services list.
-    pub fn new<'a, I>(services: impl IntoIterator<Item = ServiceDescriptor<'a>>) -> Self {
+    pub fn new(dispatcher_info: DispatcherInfo) -> Self {
         let core_version = option_env!("CARGO_PKG_VERSION").map(ToOwned::to_owned);
         Self {
             core_version,
-            services: services
-                .into_iter()
-                .map(|s| ServiceInfo {
-                    name: s.service_name().to_owned(),
-                    id: s.service_id(),
-                })
-                .collect(),
+            dispatcher_info
         }
     }
 }

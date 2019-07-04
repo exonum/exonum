@@ -24,7 +24,13 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use std::{collections::BTreeMap, fmt};
 
-use self::{backends::actix, node::public::ExplorerApi};
+use self::{
+    backends::actix,
+    node::{
+        private::NodeInfo,
+        public::{system::DispatcherInfo, ExplorerApi},
+    },
+};
 use crate::{
     blockchain::{Blockchain, SharedNodeState},
     crypto::PublicKey,
@@ -390,22 +396,18 @@ impl ApiAggregator {
         builder
     }
 
-    fn system_api(
-        _blockchain: &Blockchain,
-        _shared_api_state: SharedNodeState,
-    ) -> ServiceApiBuilder {
-        // let builder =
-        ServiceApiBuilder::new()
+    fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
+        let access = blockchain.snapshot();
+        let dispatcher_info = DispatcherInfo::from_db(access.as_ref());
 
-        // TODO Update NodeInfo endpoint.
-
-        // let node_info = self::node::private::NodeInfo::new(
-        //     blockchain.service_map().iter().map(|(_, service)| service),
-        // );
-        // self::node::private::SystemApi::new(node_info, shared_api_state.clone())
-        //     .wire(builder.private_scope());
-        // self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
-
-        // builder
+        let mut builder = ServiceApiBuilder::new();
+        self::node::private::SystemApi::new(
+            NodeInfo::new(dispatcher_info.clone()),
+            shared_api_state.clone(),
+        )
+        .wire(builder.private_scope());
+        self::node::public::SystemApi::new(dispatcher_info, shared_api_state)
+            .wire(builder.public_scope());
+        builder
     }
 }

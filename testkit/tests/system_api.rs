@@ -72,7 +72,7 @@ fn network() {
 
     let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
     assert!(info.core_version.is_some());
-    assert!(info.services.is_empty());
+    assert_eq!(info.dispatcher_info.services.len(), 1);
 }
 
 #[test]
