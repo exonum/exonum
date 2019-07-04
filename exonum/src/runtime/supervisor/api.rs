@@ -15,7 +15,7 @@
 use exonum_merkledb::ObjectHash;
 use failure::Fail;
 
-use super::{DeployArtifact, StartService};
+use super::{DeployRequest, StartService};
 use crate::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     crypto::Hash,
@@ -29,7 +29,7 @@ pub trait PrivateApi {
     type Error: Fail;
     /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
     /// by the current node, and returns its hash.
-    fn deploy_artifact(&self, artifact: DeployArtifact) -> Result<Hash, Self::Error>;
+    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
     /// Creates and broadcasts the `StartService` transaction, which is signed
     /// by the current node, and returns its hash.    
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
@@ -70,7 +70,7 @@ impl<'a> ApiImpl<'a> {
 impl<'a> PrivateApi for ApiImpl<'a> {
     type Error = api::Error;
 
-    fn deploy_artifact(&self, artifact: DeployArtifact) -> Result<Hash, Self::Error> {
+    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
         self.broadcast_transaction(artifact).map_err(From::from)
     }
 

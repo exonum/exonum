@@ -169,6 +169,12 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
+    /// Returns the current database snapshot. This snapshot is used to
+    /// retrieve schema information from the database.
+    pub fn snapshot(&self) -> &dyn Snapshot {
+        self.snapshot
+    }    
+
     /// Returns the current service instance identifier.
     pub fn service_id(&self) -> ServiceInstanceId {
         self.service_descriptor.service_id()
@@ -189,6 +195,16 @@ impl<'a> AfterCommitContext<'a> {
             .position(|validator| self.service_keypair.0 == validator.service_key)
             .map(|id| ValidatorId(id as u16))
     }
+
+    /// Returns the public key of the current node.
+    pub fn public_key(&self) -> &PublicKey {
+        &self.service_keypair.0
+    }
+
+    /// Returns the secret key of the current node.
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.service_keypair.1
+    }    
 
     /// Returns the current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {

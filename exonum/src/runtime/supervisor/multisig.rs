@@ -112,6 +112,19 @@ where
         self.validator_keys.len()
     }
 
+    pub fn confirmed_by(&self, id: &V, author: &PublicKey) -> bool {
+        self.multisig_index()
+            .get(id)
+            .and_then(|set| {
+                if set.0.contains(&author) {
+                    Some(())
+                } else {
+                    None
+                }
+            })
+            .is_some()
+    }
+
     pub fn validator_id(&self, author: PublicKey) -> Option<ValidatorId> {
         self.validator_keys
             .iter()

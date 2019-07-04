@@ -22,8 +22,20 @@ use crate::{
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::supervisor::DeployArtifact", crate = "crate")]
-pub struct DeployArtifact {
+#[exonum(pb = "schema::supervisor::DeployRequest", crate = "crate")]
+pub struct DeployRequest {
+    // Artifact identifier.
+    pub artifact: ArtifactId,
+    /// Additional information for Runtime to deploy.
+    pub spec: Any,
+    /// The height until which the deployment procedure should be completed.
+    pub deadline_height: Height,
+}
+
+// Request for the artifact deployment.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[exonum(pb = "schema::supervisor::DeployConfirmation", crate = "crate")]
+pub struct DeployConfirmation {
     // Artifact identifier.
     pub artifact: ArtifactId,
     /// Additional information for Runtime to deploy.
@@ -46,7 +58,8 @@ pub struct StartService {
     pub deadline_height: Height,
 }
 
-impl_binary_key_for_binary_value! { DeployArtifact }
+impl_binary_key_for_binary_value! { DeployRequest }
+impl_binary_key_for_binary_value! { DeployConfirmation }
 impl_binary_key_for_binary_value! { StartService }
 
 macro_rules! impl_from_str_for_protobuf_convert {
@@ -67,5 +80,15 @@ macro_rules! impl_from_str_for_protobuf_convert {
     };
 }
 
-impl_from_str_for_protobuf_convert! { DeployArtifact }
+impl_from_str_for_protobuf_convert! { DeployRequest }
 impl_from_str_for_protobuf_convert! { StartService }
+
+impl From<DeployRequest> for DeployConfirmation {
+    fn from(v: DeployRequest) -> Self {
+        Self {
+            artifact: v.artifact,
+            deadline_height: v.deadline_height,
+            spec: v.spec,
+        }
+    }
+}
