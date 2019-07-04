@@ -43,9 +43,9 @@ pub struct CreateWallet {
 }
 
 impl CreateWallet {
-    pub fn new(pubkey: &PublicKey, name: &str) -> Self {
+    pub fn new(pubkey: PublicKey, name: &str) -> Self {
         Self {
-            pubkey: *pubkey,
+            pubkey,
             name: name.to_owned(),
         }
     }
@@ -60,12 +60,8 @@ pub struct Transfer {
 }
 
 impl Transfer {
-    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
-        Self {
-            from: *from,
-            to: *to,
-            amount,
-        }
+    pub fn new(from: PublicKey, to: PublicKey, amount: u64) -> Self {
+        Self { from, to, amount }
     }
 }
 

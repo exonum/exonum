@@ -83,7 +83,7 @@ fn test_send_transaction() {
 
     // Send transaction.
     let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(&pk, "Alice").sign(SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(pk, "Alice").sign(SERVICE_ID, pk, &sk);
     let tx_hash = tx.object_hash();
     let tx_json =
         serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
@@ -152,7 +152,7 @@ fn test_transactions_subscribe() {
 
     // Send transaction.
     let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(&pk, "Alice").sign(SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(pk, "Alice").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -197,7 +197,7 @@ fn test_transactions_subscribe_with_filter() {
         .set_read_timeout(Some(Duration::from_secs(10)))
         .unwrap();
     let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(&pk, "Bob").sign(SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -221,7 +221,7 @@ fn test_transactions_subscribe_with_filter() {
 
     let (pk, sk) = gen_keypair();
     let (to, _) = gen_keypair();
-    let tx = Transfer::new(&pk, &to, 10).sign(SERVICE_ID, pk, &sk);
+    let tx = Transfer::new(pk, to, 10).sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8082/api/explorer/v1/transactions")
@@ -256,7 +256,7 @@ fn test_transactions_subscribe_with_partial_filter() {
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
     let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(&pk, "Bob").sign(SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -280,7 +280,7 @@ fn test_transactions_subscribe_with_partial_filter() {
 
     let (pk, sk) = gen_keypair();
     let (to, _) = gen_keypair();
-    let tx = Transfer::new(&pk, &to, 10).sign(SERVICE_ID, pk, &sk);
+    let tx = Transfer::new(pk, to, 10).sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8083/api/explorer/v1/transactions")
@@ -323,7 +323,7 @@ fn test_transactions_subscribe_with_bad_filter() {
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
     let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(&pk, "Bob").sign(SERVICE_ID, pk, &sk);
+    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID, pk, &sk);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client

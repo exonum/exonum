@@ -31,7 +31,7 @@ use exonum_merkledb::{Entry, IndexAccess, ObjectHash};
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use super::proto;
 
