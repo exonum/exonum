@@ -73,9 +73,8 @@ impl Dispatcher {
     pub(crate) fn restore_state(&mut self, snapshot: impl IndexAccess) {
         let schema = Schema::new(snapshot);
         // Restores information about the deployed services.
-        for (name, runtime_id) in &schema.artifacts() {
-            let artifact = ArtifactId { name, runtime_id };
-            self.deploy_artifact(artifact.clone())
+        for (artifact, spec) in schema.artifacts_with_spec() {
+            self.deploy_artifact(artifact.clone(), spec)
                 .wait()
                 .expect("Unable to restore deployed artifact");
             trace!("Added deployed artifact: {:?}", artifact);
@@ -96,8 +95,10 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: Any,
     ) {
+        // Builtin services should not have additional specification.
+        let artifact_spec = Any::default();
         // Registers service's artifact in runtime.
-        self.register_artifact(fork, spec.artifact.clone())
+        self.register_artifact(fork, spec.artifact.clone(), artifact_spec)
             .expect("Unable to register builtin artifact");
         // Starts builtin service instance.
         self.start_service(
@@ -108,7 +109,10 @@ impl Dispatcher {
         .expect("Unable to start builtin service instance");
     }
 
-    pub(crate) fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+    pub(crate) fn state_hashes(
+        &self,
+        snapshot: &dyn Snapshot,
+    ) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
         self.runtimes
             .iter()
             .map(|(_, runtime)| runtime.state_hashes(snapshot))
@@ -129,9 +133,10 @@ impl Dispatcher {
     pub(crate) fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
+        spec: impl Into<Any>,
     ) -> Box<dyn Future<Item = (), Error = DeployError>> {
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            runtime.deploy_artifact(artifact)
+            runtime.deploy_artifact(artifact, spec.into())
         } else {
             Box::new(future::err(DeployError::WrongRuntime))
         }
@@ -142,10 +147,15 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         artifact: ArtifactId,
+        spec: impl Into<Any>,
     ) -> Result<(), DeployError> {
+        let spec = spec.into();
         // Ensures that artifact is successfully deployed.
-        self.deploy_artifact(artifact.clone()).wait()?;
-        Schema::new(fork).add_artifact(artifact.clone())?;
+        // FIXME It seems that this call is excess [ECR-3222]
+        self.deploy_artifact(artifact.clone(), spec.clone())
+            .wait()?;
+
+        Schema::new(fork).add_artifact(artifact.clone(), spec)?;
         info!(
             "Registered artifact {} in runtime with id {}",
             artifact.name, artifact.runtime_id
@@ -276,7 +286,7 @@ impl Dispatcher {
 
     fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
         id == u32::from(CORE_ID) || self.runtime_lookup.contains_key(&id)
-    }    
+    }
 }
 
 // TODO Update action names in according with changes in runtime. [ECR-3222]
@@ -287,10 +297,12 @@ pub enum Action {
     /// before register.
     DeployArtifact {
         artifact: ArtifactId,
+        spec: Any,
     },
     /// This action registers deployed artifact in the dispatcher.
     RegisterArtifact {
         artifact: ArtifactId,
+        spec: Any,
     },
     StartService {
         spec: InstanceSpec,
@@ -305,13 +317,13 @@ impl Action {
         context: &mut ExecutionContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::DeployArtifact { artifact } => dispatcher
-                .deploy_artifact(artifact)
+            Action::DeployArtifact { artifact, spec } => dispatcher
+                .deploy_artifact(artifact, spec)
                 .wait()
                 .map_err(From::from),
 
-            Action::RegisterArtifact { artifact } => dispatcher
-                .register_artifact(context.fork, artifact)
+            Action::RegisterArtifact { artifact, spec } => dispatcher
+                .register_artifact(context.fork, artifact, spec)
                 .map_err(From::from),
 
             Action::StartService { spec, config } => {
@@ -391,6 +403,7 @@ mod tests {
         fn deploy_artifact(
             &mut self,
             artifact: ArtifactId,
+            _spec: Any,
         ) -> Box<dyn Future<Item = (), Error = DeployError>> {
             Box::new(
                 if artifact.runtime_id == self.runtime_type {
@@ -520,10 +533,10 @@ mod tests {
         // Check if we can deploy services.
         let fork = db.fork();
         dispatcher
-            .register_artifact(&fork, sample_rust_spec.clone())
+            .register_artifact(&fork, sample_rust_spec.clone(), Any::default())
             .expect("Deploy artifact failed for rust");
         dispatcher
-            .register_artifact(&fork, sample_java_spec.clone())
+            .register_artifact(&fork, sample_java_spec.clone(), Any::default())
             .expect("Deploy artifact failed for java");
 
         // Check if we can init services.
@@ -607,7 +620,7 @@ mod tests {
         // Check deploy.
         assert_eq!(
             dispatcher
-                .deploy_artifact(sample_rust_spec.clone())
+                .deploy_artifact(sample_rust_spec.clone(), Any::default())
                 .wait()
                 .expect_err("deploy artifact succeed"),
             DeployError::WrongArtifact

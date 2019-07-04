@@ -48,7 +48,7 @@ impl Transactions for Supervisor {
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
-        }        
+        }
         // Verifies that transaction author is validator.
         let validator_keys = blockchain_schema.actual_configuration().validator_keys;
         if !validator_keys
@@ -73,6 +73,7 @@ impl Transactions for Supervisor {
             // if this action fails this transaction will be canceled.
             context.dispatch_action(Action::RegisterArtifact {
                 artifact: deploy.artifact,
+                spec: deploy.spec,
             });
         } else {
             trace!("Request deploy artifact {:?}", deploy.artifact);
@@ -80,6 +81,7 @@ impl Transactions for Supervisor {
             // this transaction will be canceled.
             context.dispatch_action(Action::DeployArtifact {
                 artifact: deploy.artifact,
+                spec: deploy.spec,
             });
         }
 
@@ -96,7 +98,7 @@ impl Transactions for Supervisor {
         // Verifies that we doesn't reach deadline height.
         if service.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
-        }             
+        }
         // Verifies that transaction author is validator.
         let validator_keys = blockchain_schema.actual_configuration().validator_keys;
         if !validator_keys

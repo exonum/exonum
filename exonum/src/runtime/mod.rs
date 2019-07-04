@@ -75,6 +75,8 @@ impl ArtifactId {
     }
 }
 
+impl_binary_key_for_binary_value! { ArtifactId }
+
 impl From<(String, u32)> for ArtifactId {
     fn from(v: (String, u32)) -> Self {
         Self {
@@ -95,6 +97,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
+        spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>>;
 
     /// Starts a new service instance with the given specification.

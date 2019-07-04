@@ -18,7 +18,7 @@ pub use self::service::{
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
-use futures::{Future, IntoFuture};
+use futures::{Future, IntoFuture, future};
 use semver::Version;
 
 use std::{
@@ -201,7 +201,12 @@ impl Runtime for RustRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
+        spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+        if spec != Any::default() {
+            // Spec for rust artifacts should be emtpy.
+            return Box::new(future::err(DeployError::WrongArtifact));
+        }
         Box::new(self.deploy(artifact).into_future())
     }
 
