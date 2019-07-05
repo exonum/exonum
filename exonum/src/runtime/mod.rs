@@ -28,7 +28,10 @@ use crate::{
     proto::{schema, Any},
 };
 
-use self::{error::{DeployError, ExecutionError, StartError}, dispatcher::{Dispatcher, DispatcherSender}};
+use self::{
+    dispatcher::{Dispatcher, DispatcherSender},
+    error::{DeployError, ExecutionError, StartError},
+};
 
 #[macro_use]
 pub mod rust;

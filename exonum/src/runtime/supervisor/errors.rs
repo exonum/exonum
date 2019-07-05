@@ -35,7 +35,7 @@ pub enum Error {
     DeployRequestAlreadyRegistered = 4,
     /// Deploy request has not been registered.
     #[fail(display = "Deploy request has not been registered")]
-    DeployRequestNotRegistered = 5,    
+    DeployRequestNotRegistered = 5,
 }
 
 impl From<Error> for ExecutionError {

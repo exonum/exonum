@@ -88,7 +88,7 @@ impl Service for Supervisor {
             .for_each(|unconfirmed_request| {
                 let artifact = unconfirmed_request.artifact.clone();
                 let spec = unconfirmed_request.spec.clone();
-                // A callback that will broadcast the `ArtifactDeployConfirmation` transaction 
+                // A callback that will broadcast the `ArtifactDeployConfirmation` transaction
                 // if the request for deployment completes successfully.
                 let and_then = {
                     let tx_sender = context.transaction_broadcaster();

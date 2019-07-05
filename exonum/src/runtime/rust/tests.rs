@@ -26,10 +26,10 @@ use crate::{
         Any,
     },
     runtime::{
+        dispatcher::Dispatcher,
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
         Caller, ExecutionContext, InstanceSpec,
-        dispatcher::Dispatcher,
     },
 };
 

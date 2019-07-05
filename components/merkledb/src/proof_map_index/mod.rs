@@ -14,7 +14,6 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
-#[doc(hidden)]
 pub use self::node::{BranchNode, Node};
 pub use self::{
     key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},

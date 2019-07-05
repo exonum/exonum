@@ -25,7 +25,11 @@ use crate::{
     messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
     proto::Any,
-    runtime::{dispatcher::{Dispatcher, DispatcherSender, self}, error::ExecutionError, ExecutionContext},
+    runtime::{
+        dispatcher::{self, Dispatcher, DispatcherSender},
+        error::ExecutionError,
+        ExecutionContext,
+    },
 };
 
 use super::RustArtifactId;
@@ -176,7 +180,7 @@ impl<'a> AfterCommitContext<'a> {
     /// retrieve schema information from the database.
     pub fn snapshot(&self) -> &dyn Snapshot {
         self.snapshot
-    }    
+    }
 
     /// Returns the current service instance identifier.
     pub fn service_id(&self) -> ServiceInstanceId {
@@ -207,7 +211,7 @@ impl<'a> AfterCommitContext<'a> {
     /// Returns the secret key of the current node.
     pub fn secret_key(&self) -> &SecretKey {
         &self.service_keypair.1
-    }    
+    }
 
     /// Returns the current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {
