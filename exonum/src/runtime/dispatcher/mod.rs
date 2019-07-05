@@ -333,13 +333,14 @@ impl Action {
         context: &mut ExecutionContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::RegisterArtifact { artifact, spec } => dispatcher
-                .register_artifact(context.fork, artifact, spec)
-                .map_err(From::from),
+            Action::RegisterArtifact { artifact, spec } => {
+                dispatcher.register_artifact(context.fork, artifact, spec)?;
+                dispatcher.restart_api();
+                Ok(())
+            }
 
             Action::StartService { spec, config } => {
                 dispatcher.start_service(context, spec, config)?;
-                dispatcher.restart_api();
                 Ok(())
             }
         }

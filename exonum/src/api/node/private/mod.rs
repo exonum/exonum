@@ -27,8 +27,6 @@ use crate::{
     node::{ConnectInfo, ExternalMessage},
 };
 
-use super::public::system::DispatcherInfo;
-
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ServiceInfo {
@@ -43,18 +41,19 @@ pub struct ServiceInfo {
 pub struct NodeInfo {
     /// Version of the `exonum` crate.
     pub core_version: Option<String>,
-    /// Dispatcher info.
-    pub dispatcher_info: DispatcherInfo,
 }
 
 impl NodeInfo {
     /// Creates new `NodeInfo` from services list.
-    pub fn new(dispatcher_info: DispatcherInfo) -> Self {
+    pub fn new() -> Self {
         let core_version = option_env!("CARGO_PKG_VERSION").map(ToOwned::to_owned);
-        Self {
-            core_version,
-            dispatcher_info,
-        }
+        Self { core_version }
+    }
+}
+
+impl Default for NodeInfo {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
