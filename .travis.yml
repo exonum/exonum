@@ -89,7 +89,6 @@ jobs:
     - mkdir -p target/std/string
     - touch target/doc/exonum/blockchain/trait.Transaction.html
     - touch target/doc/exonum/blockchain/trait.Service.html
-    - touch target/doc/exonum_merkledb/proof_map_index/node/struct.BranchNode.html
     # https://github.com/deadlinks/cargo-deadlinks/issues/37
     - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc
