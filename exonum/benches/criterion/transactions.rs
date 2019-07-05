@@ -197,6 +197,7 @@ impl MessageVerifier {
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
     b.iter_with_setup(
@@ -209,6 +210,7 @@ fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     )
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
 

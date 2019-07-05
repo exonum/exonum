@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! Helper module for multisignature transactions.
+// TODO move out from supervisor [ECR-3222]
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
 use exonum_merkledb::{BinaryKey, BinaryValue, IndexAccess, ObjectHash, ProofMapIndex};

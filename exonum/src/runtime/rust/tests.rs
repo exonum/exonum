@@ -14,7 +14,7 @@
 
 use exonum_derive::service_interface;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
-use futures::{sync::mpsc};
+use futures::sync::mpsc;
 use semver::Version;
 
 use std::convert::TryFrom;

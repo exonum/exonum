@@ -130,7 +130,7 @@ impl RustRuntime {
             .ok_or(DeployError::WrongArtifact)?;
 
         if self.deployed_artifacts.contains(&artifact) {
-            return Ok(());
+            return Err(DeployError::AlreadyDeployed);
         }
 
         if !self.available_artifacts.contains_key(&artifact) {
@@ -204,7 +204,7 @@ impl Runtime for RustRuntime {
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>> {
         if spec != Any::default() {
-            // Spec for rust artifacts should be emtpy.
+            // Spec for rust artifacts should be empty.
             return Box::new(future::err(DeployError::WrongArtifact));
         }
         Box::new(self.deploy(artifact).into_future())

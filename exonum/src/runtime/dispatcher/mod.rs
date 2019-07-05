@@ -272,7 +272,7 @@ impl Dispatcher {
             {
                 Ok(_) => request.completed(),
                 Err(e) => warn!(
-                    "An error during deploy artifact {:?} occured {:?}",
+                    "An error during deploy artifact {:?} occurred {:?}",
                     request.artifact, e
                 ),
             }
