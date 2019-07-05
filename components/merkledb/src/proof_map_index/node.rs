@@ -32,8 +32,8 @@ pub enum Node {
     Branch(BranchNode),
 }
 
-#[derive(Clone, PartialEq)]
 /// Branch node.
+#[derive(Clone, PartialEq)]
 pub struct BranchNode {
     raw: Vec<u8>,
 }

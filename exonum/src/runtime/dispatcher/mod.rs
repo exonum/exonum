@@ -108,7 +108,10 @@ impl Dispatcher {
         .expect("Unable to start builtin service instance");
     }
 
-    pub(crate) fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+    pub(crate) fn state_hashes(
+        &self,
+        snapshot: &dyn Snapshot,
+    ) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
         self.runtimes
             .iter()
             .map(|(_, runtime)| runtime.state_hashes(snapshot))
@@ -276,7 +279,7 @@ impl Dispatcher {
 
     fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
         id == u32::from(CORE_ID) || self.runtime_lookup.contains_key(&id)
-    }    
+    }
 }
 
 // TODO Update action names in according with changes in runtime. [ECR-3222]

@@ -113,7 +113,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///     // ...
     /// }
     /// # fn main() {}
-    fn execute<'a>(&self, context: TransactionContext<'a>) -> ExecutionResult;
+    fn execute(&self, context: TransactionContext) -> ExecutionResult;
 }
 
 //TODO: Add doc/examples.

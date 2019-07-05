@@ -53,7 +53,7 @@ impl NodeInfo {
         let core_version = option_env!("CARGO_PKG_VERSION").map(ToOwned::to_owned);
         Self {
             core_version,
-            dispatcher_info
+            dispatcher_info,
         }
     }
 }
