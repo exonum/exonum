@@ -17,7 +17,7 @@ pub use schema::Schema;
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future, sync::mpsc, Future, Sink};
 
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     api::ServiceApiBuilder,
@@ -77,13 +77,11 @@ impl Dispatcher {
             self.deploy_artifact(artifact.clone(), spec)
                 .wait()
                 .expect("Unable to restore deployed artifact");
-            trace!("Added deployed artifact: {:?}", artifact);
         }
         // Restarts active service instances.
         for instance in schema.service_instances().values() {
             self.restart_service(&instance)
                 .expect("Unable to restart services");
-            trace!("Restarted service: {:?}", instance);
         }
     }
 
@@ -95,9 +93,12 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: Any,
     ) {
-        // Builtin services should not have additional specification.
+        // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
         // Registers service's artifact in runtime.
+        self.deploy_artifact(spec.artifact.clone(), artifact_spec.clone())
+            .wait()
+            .expect("Unable to deploy builtin artifact");
         self.register_artifact(fork, spec.artifact.clone(), artifact_spec)
             .expect("Unable to register builtin artifact");
         // Starts builtin service instance.
@@ -129,7 +130,7 @@ impl Dispatcher {
             })
     }
 
-    // TODO Implement proper pending deploy logic [ECR-3291]
+    /// Initiates deploy artifact procedure in the corresponding runtime.
     pub(crate) fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
@@ -143,19 +144,15 @@ impl Dispatcher {
     }
 
     /// Registers deployed artifact in the dispatcher's information schema.
+    ///
+    /// Make sure that you successfully complete the deploy artifact procedure.
     pub(crate) fn register_artifact(
         &mut self,
         fork: &Fork,
         artifact: ArtifactId,
         spec: impl Into<Any>,
     ) -> Result<(), DeployError> {
-        let spec = spec.into();
-        // Ensures that artifact is successfully deployed.
-        // FIXME It seems that this call is excess [ECR-3222]
-        self.deploy_artifact(artifact.clone(), spec.clone())
-            .wait()?;
-
-        Schema::new(fork).add_artifact(artifact.clone(), spec)?;
+        Schema::new(fork).add_artifact(artifact.clone(), spec.into())?;
         info!(
             "Registered artifact {} in runtime with id {}",
             artifact.name, artifact.runtime_id
@@ -189,7 +186,6 @@ impl Dispatcher {
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
-        info!("Registered service instance: {:?}", spec);
         Schema::new(context.fork).add_service_instance(spec)?;
         Ok(())
     }
@@ -250,14 +246,28 @@ impl Dispatcher {
     }
 
     pub(crate) fn after_commit(
-        &self,
+        &mut self,
         snapshot: Box<dyn Snapshot>,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
+        let channel = DispatcherSender::new();
         self.runtimes.values().for_each(|runtime| {
-            runtime.after_commit(snapshot.as_ref(), &service_keypair, &tx_sender)
+            runtime.after_commit(&channel, snapshot.as_ref(), &service_keypair, &tx_sender)
         });
+
+        for request in channel.take_deploy_requests() {
+            match self
+                .deploy_artifact(request.artifact.clone(), request.spec.clone())
+                .wait()
+            {
+                Ok(_) => request.completed(),
+                Err(e) => warn!(
+                    "An error during deploy artifact {:?} occured {:?}",
+                    request.artifact, e
+                ),
+            }
+        }
     }
 
     /// Sends restart API message.
@@ -271,17 +281,20 @@ impl Dispatcher {
     }
 
     /// Registers service instance in the runtime lookup table.
-    fn register_running_service(&mut self, spec: &InstanceSpec) {
+    fn register_running_service(&mut self, instance: &InstanceSpec) {
+        info!("Running service instance {:?}", instance);
         self.runtime_lookup
-            .insert(spec.id, spec.artifact.runtime_id);
+            .insert(instance.id, instance.artifact.runtime_id);
     }
 
     /// Just starts a new service instance.
-    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
+    fn restart_service(&mut self, instance: &InstanceSpec) -> Result<(), StartError> {
         self.runtimes
-            .get_mut(&spec.artifact.runtime_id)
+            .get_mut(&instance.artifact.runtime_id)
             .ok_or(StartError::WrongRuntime)
-            .and_then(|runtime| runtime.start_service(spec))
+            .and_then(|runtime| runtime.start_service(instance))?;
+        self.register_running_service(&instance);
+        Ok(())
     }
 
     fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
@@ -289,17 +302,11 @@ impl Dispatcher {
     }
 }
 
-// TODO Update action names in according with changes in runtime. [ECR-3222]
 #[derive(Debug)]
-pub enum Action {
-    /// This action tries to deploy artifact on the current node without registration.
-    /// In this way you can be sure that artifact is deployed in the corresponding runtime
-    /// before register.
-    DeployArtifact {
-        artifact: ArtifactId,
-        spec: Any,
-    },
+pub(crate) enum Action {
     /// This action registers deployed artifact in the dispatcher.
+    ///
+    /// Make sure that you successfully complete the deploy artifact procedure.
     RegisterArtifact {
         artifact: ArtifactId,
         spec: Any,
@@ -317,11 +324,6 @@ impl Action {
         context: &mut ExecutionContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::DeployArtifact { artifact, spec } => dispatcher
-                .deploy_artifact(artifact, spec)
-                .wait()
-                .map_err(From::from),
-
             Action::RegisterArtifact { artifact, spec } => dispatcher
                 .register_artifact(context.fork, artifact, spec)
                 .map_err(From::from),
@@ -332,6 +334,65 @@ impl Action {
                 Ok(())
             }
         }
+    }
+}
+
+struct DeployArtifactRequest {
+    artifact: ArtifactId,
+    spec: Any,
+    /// The operation to be performed if this request was successfully processed.
+    and_then: Box<dyn FnOnce() + 'static>,
+}
+
+impl DeployArtifactRequest {
+    /// Invokes request callback.
+    fn completed(self) {
+        (self.and_then)();
+    }
+}
+
+impl std::fmt::Debug for DeployArtifactRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("DeployArtifactRequest")
+            .field(&self.artifact)
+            .finish()
+    }
+}
+
+// TODO Implement proper pending deploy logic [ECR-3291]
+
+/// Channel to communicate with the dispatcher.
+#[derive(Debug)]
+pub struct DispatcherSender {
+    deploy_request: RefCell<Vec<DeployArtifactRequest>>,
+}
+
+impl DispatcherSender {
+    /// Creates a new instance.
+    fn new() -> Self {
+        Self {
+            deploy_request: RefCell::default(),
+        }
+    }
+
+    /// Requests an artifact deployment and invokes the callback if the deployment
+    /// was successfully completed.
+    pub(super) fn request_deploy_artifact<F>(&self, artifact: ArtifactId, spec: Any, and_then: F)
+    where
+        F: FnOnce() + 'static,
+    {
+        self.deploy_request
+            .borrow_mut()
+            .push(DeployArtifactRequest {
+                artifact,
+                spec,
+                and_then: Box::new(and_then),
+            })
+    }
+
+    /// Takes requests from this channel.
+    fn take_deploy_requests(self) -> Vec<DeployArtifactRequest> {
+        self.deploy_request.into_inner()
     }
 }
 
@@ -466,6 +527,7 @@ mod tests {
 
         fn after_commit(
             &self,
+            _dispatcher: &DispatcherSender,
             _snapshot: &dyn Snapshot,
             _service_keypair: &(PublicKey, SecretKey),
             _tx_sender: &ApiSender,
@@ -532,12 +594,20 @@ mod tests {
 
         // Check if we can deploy services.
         let fork = db.fork();
-        dispatcher
-            .register_artifact(&fork, sample_rust_spec.clone(), Any::default())
-            .expect("Deploy artifact failed for rust");
-        dispatcher
-            .register_artifact(&fork, sample_java_spec.clone(), Any::default())
-            .expect("Deploy artifact failed for java");
+
+        let mut deploy_and_register_artifact = |artifact: ArtifactId| {
+            let spec = Any::default();
+            dispatcher
+                .deploy_artifact(artifact.clone(), spec.clone())
+                .wait()
+                .unwrap();
+            dispatcher
+                .register_artifact(&fork, artifact, spec)
+                .expect("Deploy artifact failed");
+        };
+
+        deploy_and_register_artifact(sample_rust_spec.clone());
+        deploy_and_register_artifact(sample_java_spec.clone());
 
         // Check if we can init services.
         let mut context = ExecutionContext::new(&fork, Caller::Blockchain);

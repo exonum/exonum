@@ -461,7 +461,7 @@ impl Blockchain {
         };
         self.merge(patch)?;
         // Invokes `after_commit` for each service in order of their identifiers
-        let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
+        let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
         dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
 
         Ok(())

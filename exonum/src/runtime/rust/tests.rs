@@ -29,11 +29,11 @@ use crate::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
         Caller, ExecutionContext, InstanceSpec,
+        dispatcher::Dispatcher,
     },
 };
 
 use super::{
-    dispatcher::Dispatcher,
     service::{Service, ServiceFactory},
     ArtifactId, RustArtifactId, RustRuntime, TransactionContext,
 };

@@ -27,7 +27,7 @@ use crate::{
     messages::ServiceInstanceId,
     runtime::rust::{
         AfterCommitContext, RustArtifactId, Service, ServiceDescriptor, ServiceFactory,
-        TransactionContext,
+        Transaction, TransactionContext,
     },
 };
 
@@ -86,13 +86,33 @@ impl Service for Supervisor {
                     .confirmed_by(&confirmation, context.public_key())
             })
             .for_each(|unconfirmed_request| {
-                // TODO request deploy in dispatcher.
-                
+                let artifact = unconfirmed_request.artifact.clone();
+                let spec = unconfirmed_request.spec.clone();
+                // A callback that will broadcast the `ArtifactDeployConfirmation` transaction 
+                // if the request for deployment completes successfully.
+                let and_then = {
+                    let tx_sender = context.transaction_broadcaster();
+                    let keypair = (*context.public_key(), context.secret_key().clone());
+                    let service_id = context.service_id();
+                    move || {
+                        trace!(
+                            "Sent confirmation for deployment request {:?}",
+                            unconfirmed_request
+                        );
 
-                trace!("Sent confirmation for deployment request {:?}", unconfirmed_request);
-               
-                let transaction = DeployConfirmation::from(unconfirmed_request);
-                context.broadcast_transaction(transaction);
+                        let transaction = DeployConfirmation::from(unconfirmed_request);
+                        tx_sender
+                            .broadcast_transaction(
+                                transaction.sign(service_id, keypair.0, &keypair.1),
+                            )
+                            .map_err(|e| error!("Couldn't broadcast transaction {}.", e))
+                            .ok();
+                    }
+                };
+                // TODO Rewrite on async await syntax. [ECR-3222]
+                context
+                    .dispatcher_channel()
+                    .request_deploy_artifact(artifact, spec, and_then);
             })
     }
 }

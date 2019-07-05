@@ -36,7 +36,7 @@ use crate::{
 };
 
 use super::{
-    dispatcher,
+    dispatcher::DispatcherSender,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
     ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
 };
@@ -336,12 +336,14 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
+        dispatcher: &DispatcherSender,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
+                dispatcher,
                 service.descriptor(),
                 snapshot,
                 service_keypair,
