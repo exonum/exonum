@@ -14,7 +14,7 @@
 
 use exonum_derive::service_interface;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
-use futures::sync::mpsc;
+use futures::{sync::mpsc};
 use semver::Version;
 
 use std::convert::TryFrom;
@@ -150,7 +150,7 @@ fn test_basic_rust_runtime() {
     // Deploy service.
     let fork = db.fork();
     dispatcher
-        .register_artifact(&fork, artifact.clone(), Any::default())
+        .deploy_and_register_artifact(&fork, artifact.clone(), Any::default())
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 

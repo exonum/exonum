@@ -96,10 +96,7 @@ impl Dispatcher {
         // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
         // Registers service's artifact in runtime.
-        self.deploy_artifact(spec.artifact.clone(), artifact_spec.clone())
-            .wait()
-            .expect("Unable to deploy builtin artifact");
-        self.register_artifact(fork, spec.artifact.clone(), artifact_spec)
+        self.deploy_and_register_artifact(fork, spec.artifact.clone(), artifact_spec)
             .expect("Unable to register builtin artifact");
         // Starts builtin service instance.
         self.start_service(
@@ -158,6 +155,18 @@ impl Dispatcher {
             artifact.name, artifact.runtime_id
         );
         Ok(())
+    }
+
+    pub(crate) fn deploy_and_register_artifact(
+        &mut self,
+        fork: &Fork,
+        artifact: ArtifactId,
+        spec: impl Into<Any>,
+    ) -> Result<(), DeployError> {
+        let spec = spec.into();
+        self.deploy_artifact(artifact.clone(), spec.clone())
+            .wait()?;
+        self.register_artifact(fork, artifact, spec)
     }
 
     /// Starts and configures a new service instance. After that it writes information about
@@ -594,24 +603,15 @@ mod tests {
 
         // Check if we can deploy services.
         let fork = db.fork();
-
-        let mut deploy_and_register_artifact = |artifact: ArtifactId| {
-            let spec = Any::default();
-            dispatcher
-                .deploy_artifact(artifact.clone(), spec.clone())
-                .wait()
-                .unwrap();
-            dispatcher
-                .register_artifact(&fork, artifact, spec)
-                .expect("Deploy artifact failed");
-        };
-
-        deploy_and_register_artifact(sample_rust_spec.clone());
-        deploy_and_register_artifact(sample_java_spec.clone());
+        dispatcher
+            .deploy_and_register_artifact(&fork, sample_rust_spec.clone(), Any::default())
+            .unwrap();
+        dispatcher
+            .deploy_and_register_artifact(&fork, sample_java_spec.clone(), Any::default())
+            .unwrap();
 
         // Check if we can init services.
         let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
-
         dispatcher
             .start_service(
                 &mut context,
@@ -623,7 +623,6 @@ mod tests {
                 Any::default(),
             )
             .expect("start_service failed for rust");
-
         dispatcher
             .start_service(
                 &mut context,
