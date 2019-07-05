@@ -326,7 +326,10 @@ impl ApiAggregator {
     pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
         let mut inner = BTreeMap::new();
         // Adds built-in APIs.
-        inner.insert("system".to_owned(), Self::system_api(node_state.clone()));
+        inner.insert(
+            "system".to_owned(),
+            Self::system_api(&blockchain, node_state.clone()),
+        );
         inner.insert(
             "explorer".to_owned(),
             Self::explorer_api(&blockchain, node_state.clone()),
@@ -390,11 +393,16 @@ impl ApiAggregator {
         builder
     }
 
-    fn system_api(shared_api_state: SharedNodeState) -> ServiceApiBuilder {
+    fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
+        // Waits until dispatcher will be unlocked to get fresh info.
+        let _dispatcher = blockchain.dispatcher();
+        let snapshot = blockchain.snapshot();
+
         let mut builder = ServiceApiBuilder::new();
         self::node::private::SystemApi::new(NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
+        self::node::public::SystemApi::new(snapshot.as_ref(), shared_api_state)
+            .wire(builder.public_scope());
         builder
     }
 }

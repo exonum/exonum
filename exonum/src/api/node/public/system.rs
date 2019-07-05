@@ -78,6 +78,7 @@ impl DispatcherInfo {
 #[derive(Clone, Debug)]
 pub struct SystemApi {
     shared_api_state: SharedNodeState,
+    dispatcher_info: DispatcherInfo,
 }
 
 impl SystemApi {
@@ -85,8 +86,11 @@ impl SystemApi {
     ///
     /// This method loads from the specified access item persistent information like
     /// list of services to optimize IO.
-    pub fn new(shared_api_state: SharedNodeState) -> Self {
-        Self { shared_api_state }
+    pub fn new(access: impl IndexAccess, shared_api_state: SharedNodeState) -> Self {
+        Self {
+            shared_api_state,
+            dispatcher_info: DispatcherInfo::load(access),
+        }
     }
 
     fn handle_stats_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {

@@ -100,7 +100,7 @@ impl Dispatcher {
             .expect("Unable to register builtin artifact");
         // Starts builtin service instance.
         self.start_service(
-            &mut ExecutionContext::new(fork, Caller::Blockchain),
+            &ExecutionContext::new(fork, Caller::Blockchain),
             spec,
             constructor,
         )
@@ -173,7 +173,7 @@ impl Dispatcher {
     /// service instance to the dispatcher's information schema.
     pub(crate) fn start_service(
         &mut self,
-        context: &mut ExecutionContext,
+        context: &ExecutionContext,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), StartError> {
@@ -214,11 +214,18 @@ impl Dispatcher {
             },
         );
         self.call(&mut context, tx.call_info, &tx.payload)?;
+        let actions = context.take_actions();
+        // Invokes restart actix web server if actions are not empty.
+        let need_restart = !actions.is_empty();
         // Executes pending dispatcher actions.
-        context
-            .take_actions()
-            .into_iter()
-            .try_for_each(|action| action.execute(self, &mut context))
+        for action in actions {
+            action.execute(self, &context)?;
+        }
+        if need_restart {
+            self.restart_api();
+        }
+
+        Ok(())
     }
 
     /// Calls the corresponding runtime method.
@@ -330,19 +337,16 @@ impl Action {
     fn execute(
         self,
         dispatcher: &mut Dispatcher,
-        context: &mut ExecutionContext,
+        context: &ExecutionContext,
     ) -> Result<(), ExecutionError> {
         match self {
-            Action::RegisterArtifact { artifact, spec } => {
-                dispatcher.register_artifact(context.fork, artifact, spec)?;
-                dispatcher.restart_api();
-                Ok(())
-            }
+            Action::RegisterArtifact { artifact, spec } => dispatcher
+                .register_artifact(context.fork, artifact, spec)
+                .map_err(From::from),
 
-            Action::StartService { spec, config } => {
-                dispatcher.start_service(context, spec, config)?;
-                Ok(())
-            }
+            Action::StartService { spec, config } => dispatcher
+                .start_service(context, spec, config)
+                .map_err(From::from),
         }
     }
 }
@@ -615,7 +619,7 @@ mod tests {
         let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher
             .start_service(
-                &mut context,
+                &context,
                 InstanceSpec {
                     artifact: sample_rust_spec.clone(),
                     id: RUST_SERVICE_ID,
@@ -626,7 +630,7 @@ mod tests {
             .expect("start_service failed for rust");
         dispatcher
             .start_service(
-                &mut context,
+                &context,
                 InstanceSpec {
                     artifact: sample_java_spec.clone(),
                     id: JAVA_SERVICE_ID,
@@ -703,7 +707,7 @@ mod tests {
         assert_eq!(
             dispatcher
                 .start_service(
-                    &mut context,
+                    &context,
                     InstanceSpec {
                         artifact: sample_rust_spec.clone(),
                         id: RUST_SERVICE_ID,

@@ -168,10 +168,10 @@ fn test_basic_rust_runtime() {
         .into();
 
         let fork = db.fork();
-        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
+        let context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         dispatcher
-            .start_service(&mut context, spec, constructor)
+            .start_service(&context, spec, constructor)
             .unwrap();
         {
             let entry = Entry::new("constructor_entry", &fork);
