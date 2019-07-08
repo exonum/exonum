@@ -13,14 +13,16 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    Entry, IndexAccess, KeySetIndex, ListIndex, MapIndex, MapProof, ObjectHash, ProofListIndex,
-    ProofMapIndex,
+    BinaryKey, Entry, IndexAccess, KeySetIndex, ListIndex, MapIndex, MapProof, ObjectHash,
+    ProofListIndex, ProofMapIndex,
 };
+
+use std::mem;
 
 use crate::{
     crypto::{Hash, PublicKey},
     helpers::{Height, Round},
-    messages::{AnyTx, Connect, Message, Precommit, Signed},
+    messages::{AnyTx, Connect, Message, Precommit, ServiceInstanceId, Signed},
     proto,
 };
 
@@ -509,5 +511,110 @@ where
     /// Its value is equal to "height of the latest committed block" + 1.
     fn next_height(&self) -> Height {
         Height(self.block_hashes_by_height().len())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum IndexKind {
+    /// This index is part of dispatcher schema.
+    Dispatcher,
+    /// This index is a part of runtime schema.
+    Runtime,
+    /// This index is a part of some service schema.
+    Service(ServiceInstanceId),
+}
+
+impl IndexKind {
+    /// Returns the corresponding tag.
+    fn tag(&self) -> IndexTag {
+        match self {
+            IndexKind::Dispatcher => IndexTag::Dispatcher,
+            IndexKind::Runtime => IndexTag::Runtime,
+            IndexKind::Service { .. } => IndexTag::Service,
+        }
+    }
+
+    /// Returns the corresponding group id.
+    fn group_id(&self) -> u32 {
+        if let IndexKind::Service(instance_id) = self {
+            *instance_id
+        } else {
+            0
+        }
+    }
+}
+
+/// Binary value for the corresponding index kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u16)]
+enum IndexTag {
+    Dispatcher = 0,
+    Runtime = 1,
+    Service = 2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct IndexCoordinates {
+    tag: u16,
+    group_id: u32,
+    index_id: u16,
+}
+
+impl IndexCoordinates {
+    /// Creates index coordinated for the index with the specified kind and identifier.
+    pub fn new(kind: IndexKind, index_id: u16) -> Self {
+        Self {
+            tag: kind.tag() as u16,
+            group_id: kind.group_id(),
+            index_id,
+        }
+    }
+}
+
+impl BinaryKey for IndexCoordinates {
+    fn size(&self) -> usize {
+        mem::size_of_val(self)
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        let mut pos = 0;
+        pos += self.tag.write(&mut buffer[pos..]);
+        pos += self.group_id.write(&mut buffer[pos..]);
+        pos += self.index_id.write(&mut buffer[pos..]);
+        pos
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        let tag = u16::read(&buffer[0..2]);
+        let group_id = u32::read(&buffer[2..6]);
+        let index_id = u16::read(&buffer[6..8]);
+        Self {
+            tag,
+            group_id,
+            index_id,
+        }
+    }
+}
+
+#[test]
+fn test_index_coordinates_binary_key_round_trip() {
+    let index_kinds = vec![
+        (IndexKind::Dispatcher, 0),
+        (IndexKind::Dispatcher, 1),
+        (IndexKind::Runtime, 0),
+        (IndexKind::Runtime, 5),
+        (IndexKind::Service(2), 0),
+        (IndexKind::Service(2), 1),
+        (IndexKind::Service(0), 0),
+        (IndexKind::Service(0), 1),
+    ];
+
+    for (kind, id) in index_kinds {
+        let coordinate = IndexCoordinates::new(kind, id);
+        let mut buf = vec![0; coordinate.size()];
+        coordinate.write(&mut buf);
+
+        let coordinate2 = IndexCoordinates::read(&buf);
+        assert_eq!(coordinate, coordinate2);        
     }
 }
