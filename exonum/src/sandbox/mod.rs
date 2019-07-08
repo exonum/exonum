@@ -28,8 +28,9 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, IndexCoordinates, IndexOwner,
-        InstanceCollection, Schema, SharedNodeState, StoredConfiguration, ValidatorKeys,
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, IndexCoordinates,
+        IndexOwner, InstanceCollection, Schema, SharedNodeState, StoredConfiguration,
+        ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -695,7 +696,11 @@ impl Sandbox {
         *Schema::new(&fork).last_block().state_hash()
     }
 
-    pub fn get_proof_to_index(&self, kind: IndexOwner, id: u16) -> MapProof<IndexCoordinates, Hash> {
+    pub fn get_proof_to_index(
+        &self,
+        kind: IndexOwner,
+        id: u16,
+    ) -> MapProof<IndexCoordinates, Hash> {
         let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema
