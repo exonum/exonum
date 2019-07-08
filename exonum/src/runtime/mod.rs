@@ -89,6 +89,12 @@ impl From<(String, u32)> for ArtifactId {
     }
 }
 
+#[derive(Debug, PartialEq, Default)]
+pub struct StateHashAggregator {
+    pub runtime: Vec<Hash>,
+    pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
+}
+
 // TODO Think about runtime methods' names. [ECR-3222]
 
 /// Runtime environment for services.
@@ -128,7 +134,7 @@ pub trait Runtime: Send + Debug + 'static {
     ) -> Result<(), ExecutionError>;
 
     /// Gets state hashes of the every contained service.
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)>;
+    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
 
     /// Calls `before_commit` for all the services stored in the runtime.
     fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);

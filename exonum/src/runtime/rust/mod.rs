@@ -39,6 +39,7 @@ use super::{
     dispatcher::DispatcherSender,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
     ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
+    StateHashAggregator,
 };
 
 #[macro_use]
@@ -303,11 +304,15 @@ impl Runtime for RustRuntime {
             })?
     }
 
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-        self.started_services
-            .iter()
-            .map(|(_, service)| service.state_hash(snapshot))
-            .collect()
+    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
+        StateHashAggregator {
+            runtime: Vec::new(),
+            instances: self
+                .started_services
+                .values()
+                .map(|service| service.state_hash(snapshot))
+                .collect(),
+        }
     }
 
     fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {

@@ -36,7 +36,7 @@ pub use self::{
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
-    schema::{Schema, TxLocation},
+    schema::{IndexCoordinates, IndexKind, Schema, TxLocation},
     service::SharedNodeState,
     transaction::{
         ExecutionError, ExecutionResult, TransactionError, TransactionErrorType, TransactionResult,
@@ -213,26 +213,6 @@ impl Blockchain {
         Ok(())
     }
 
-    /// Helper function to map a tuple (`u16`, `u16`) of service table coordinates
-    /// to a 32-byte value to be used as the `ProofMapIndex` key (it currently
-    /// supports only fixed size keys). The `hash` function is used to distribute
-    /// keys uniformly (compared to padding).
-    /// # Arguments
-    ///
-    /// * `service_id` - `service_id` as returned by instance of type of
-    /// `Service` trait
-    /// * `table_idx` - index of service table in `Vec`, returned by the
-    /// `state_hash` method of instance of type of `Service` trait
-    // also, it was the first idea around, to use `hash`
-    pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
-        debug_assert!(table_idx <= u16::max_value() as usize);
-        let size = mem::size_of::<u16>();
-        let mut vec = vec![0; 2 * size];
-        LittleEndian::write_u16(&mut vec[0..size], service_id);
-        LittleEndian::write_u16(&mut vec[size..2 * size], table_idx as u16);
-        crypto::hash(&vec)
-    }
-
     // This method is needed for EJB.
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
@@ -281,8 +261,6 @@ impl Blockchain {
                     .expect("Transaction execution error.");
             }
 
-            // Invoke execute method for all services.
-
             // Skip execution for genesis block.
             if height > Height(0) {
                 dispatcher.before_commit(&mut fork);
@@ -290,35 +268,23 @@ impl Blockchain {
 
             // Get tx & state hash.
             let (tx_hash, state_hash) = {
-                let state_hashes = {
-                    let schema = Schema::new(&fork);
-
-                    let vec_core_state = schema.core_state_hash();
-                    let mut state_hashes = Vec::new();
-
-                    for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
-                        let key = Self::service_table_unique_key(CORE_ID, idx);
-                        state_hashes.push((key, core_table_hash));
-                    }
-
-                    for (service_id, vec_service_state) in
-                        dispatcher.state_hashes((&fork).snapshot())
-                    {
-                        for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                            let key = Self::service_table_unique_key(service_id as u16, idx);
-                            state_hashes.push((key, service_table_hash));
-                        }
-                    }
-
-                    state_hashes
-                };
-
                 let schema = Schema::new(&fork);
-
                 let state_hash = {
                     let mut sum_table = schema.state_hash_aggregator();
-                    for (key, hash) in state_hashes {
-                        sum_table.put(&key, hash)
+                    // Clear old state hash.
+                    sum_table.clear();
+                    // Collect all state hashes.
+                    let state_hashes = dispatcher
+                        .state_hash(fork.as_ref())
+                        .into_iter()
+                        // Add state hash of core table.
+                        .chain(IndexCoordinates::collect(
+                            IndexKind::Core,
+                            schema.state_hash(),
+                        ));
+                    // Insert state hashes into the aggregator table.
+                    for (coordinate, hash) in state_hashes {
+                        sum_table.put(&coordinate, hash);
                     }
                     sum_table.object_hash()
                 };

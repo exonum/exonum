@@ -13,20 +13,20 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    BinaryKey, Entry, IndexAccess, KeySetIndex, ListIndex, MapIndex, MapProof, ObjectHash,
-    ProofListIndex, ProofMapIndex,
+    BinaryKey, Entry, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex,
+    ProofMapIndex,
 };
 
 use std::mem;
 
 use crate::{
-    crypto::{Hash, PublicKey},
+    crypto::{self, Hash, PublicKey},
     helpers::{Height, Round},
     messages::{AnyTx, Connect, Message, Precommit, ServiceInstanceId, Signed},
     proto,
 };
 
-use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
+use super::{config::StoredConfiguration, Block, BlockProof, TransactionResult};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -229,14 +229,13 @@ where
     /// scattered across distinct services and their tables. Sum is performed by
     /// means of computing the root hash of this table.
     ///
-    /// - Table **key** is 32 bytes of normalized coordinates of a service
-    /// table, as returned by the `service_table_unique_key` helper function.
+    /// - Table **key** is  normalized coordinates of a service.
     /// - Table **value** is the root hash of a service table, which contributes
     /// to the `state_hash` of the resulting block.
     ///
     /// Core tables participate in the resulting state_hash with `CORE_ID`
     /// service_id. Their vector is returned by the `core_state_hash` method.
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, Hash, Hash> {
+    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, IndexCoordinates, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())
     }
 
@@ -371,44 +370,11 @@ where
     }
 
     /// Returns the `state_hash` table for core tables.
-    pub fn core_state_hash(&self) -> Vec<Hash> {
+    pub fn state_hash(&self) -> Vec<Hash> {
         vec![
             self.configs().object_hash(),
             self.transaction_results().object_hash(),
         ]
-    }
-
-    /// Constructs a proof of inclusion of a root hash of a specific service
-    /// table into the block `state_hash`.
-    ///
-    /// The `service_id` and `table_idx` are automatically combined to form the key of the
-    /// required service table; this key serves as a search query for the method.
-    /// The service table key is uniquely identified by a `(u16, u16)` tuple
-    /// of table coordinates.
-    ///
-    /// If found, the method returns the root hash as a value of the proof leaf
-    /// corresponding to the required service table key. Otherwise, a partial
-    /// path to the service table key is returned, which proves its exclusion.
-    ///
-    /// The resulting proof can be used as a component of proof of state of an
-    /// entity stored in the blockchain state at a specific height. The proof is
-    /// tied to the `state_hash` of the corresponding `Block`. State of some meta tables
-    /// of core and services isn't tracked.
-    ///
-    /// # Arguments
-    ///
-    /// * `service_id` - `service_id` as returned by instance of type of
-    /// `Service` trait.
-    /// * `table_idx` - index of the service table in `Vec`, returned by the
-    /// `state_hash` method of an instance of a type of the `Service` trait.
-    pub fn get_proof_to_service_table(
-        &self,
-        service_id: u16,
-        table_idx: usize,
-    ) -> MapProof<Hash, Hash> {
-        let key = Blockchain::service_table_unique_key(service_id, table_idx);
-        let sum_table = self.state_hash_aggregator();
-        sum_table.get_proof(key)
     }
 
     /// Saves the given consensus round value into the storage.
@@ -516,30 +482,33 @@ where
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IndexKind {
+    /// This index is part of core schema.
+    Core,
     /// This index is part of dispatcher schema.
     Dispatcher,
     /// This index is a part of runtime schema.
-    Runtime,
+    Runtime(u32),
     /// This index is a part of some service schema.
     Service(ServiceInstanceId),
 }
 
 impl IndexKind {
     /// Returns the corresponding tag.
-    fn tag(&self) -> IndexTag {
+    fn tag(self) -> IndexTag {
         match self {
+            IndexKind::Core => IndexTag::Core,
             IndexKind::Dispatcher => IndexTag::Dispatcher,
-            IndexKind::Runtime => IndexTag::Runtime,
+            IndexKind::Runtime { .. } => IndexTag::Runtime,
             IndexKind::Service { .. } => IndexTag::Service,
         }
     }
 
     /// Returns the corresponding group id.
-    fn group_id(&self) -> u32 {
-        if let IndexKind::Service(instance_id) = self {
-            *instance_id
-        } else {
-            0
+    fn group_id(self) -> u32 {
+        match self {
+            IndexKind::Service(instance_id) => instance_id,
+            IndexKind::Runtime(runtime_id) => runtime_id,
+            IndexKind::Core | IndexKind::Dispatcher => 0,
         }
     }
 }
@@ -548,9 +517,10 @@ impl IndexKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 enum IndexTag {
-    Dispatcher = 0,
-    Runtime = 1,
-    Service = 2,
+    Core = 0,
+    Dispatcher = 1,
+    Runtime = 2,
+    Service = 3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -567,6 +537,26 @@ impl IndexCoordinates {
             tag: kind.tag() as u16,
             group_id: kind.group_id(),
             index_id,
+        }
+    }
+
+    pub fn collect(
+        kind: IndexKind,
+        object_hashes: impl IntoIterator<Item = Hash>,
+    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
+        object_hashes
+            .into_iter()
+            .enumerate()
+            .map(move |(id, hash)| (IndexCoordinates::new(kind, id as u16), hash))
+    }
+
+    pub fn kind(self) -> IndexKind {
+        match self.tag {
+            0 => IndexKind::Core,
+            1 => IndexKind::Dispatcher,
+            2 => IndexKind::Runtime(self.group_id),
+            3 => IndexKind::Service(self.group_id),
+            other => panic!("Unknown index kind: {}!", other),
         }
     }
 }
@@ -596,13 +586,23 @@ impl BinaryKey for IndexCoordinates {
     }
 }
 
+impl ObjectHash for IndexCoordinates {
+    fn object_hash(&self) -> Hash {
+        let mut bytes = vec![0; self.size()];
+        self.write(&mut bytes);
+        crypto::hash(&bytes)
+    }
+}
+
 #[test]
 fn test_index_coordinates_binary_key_round_trip() {
     let index_kinds = vec![
         (IndexKind::Dispatcher, 0),
         (IndexKind::Dispatcher, 1),
-        (IndexKind::Runtime, 0),
-        (IndexKind::Runtime, 5),
+        (IndexKind::Runtime(0), 0),
+        (IndexKind::Runtime(0), 5),
+        (IndexKind::Runtime(1), 0),
+        (IndexKind::Runtime(1), 2),
         (IndexKind::Service(2), 0),
         (IndexKind::Service(2), 1),
         (IndexKind::Service(0), 0),
@@ -615,6 +615,7 @@ fn test_index_coordinates_binary_key_round_trip() {
         coordinate.write(&mut buf);
 
         let coordinate2 = IndexCoordinates::read(&buf);
-        assert_eq!(coordinate, coordinate2);        
+        assert_eq!(coordinate, coordinate2);
+        assert_eq!(coordinate2.kind(), kind);
     }
 }
