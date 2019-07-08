@@ -8,7 +8,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY owner, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -481,7 +481,7 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum IndexKind {
+pub enum IndexOwner {
     /// This index is part of core schema.
     Core,
     /// This index is part of dispatcher schema.
@@ -492,8 +492,8 @@ pub enum IndexKind {
     Service(ServiceInstanceId),
 }
 
-impl IndexKind {
-    /// Creates index coordinated for the given kind of index.
+impl IndexOwner {
+    /// Creates index coordinate for the current owner.
     pub fn coordinate_for(self, index_id: u16) -> IndexCoordinates {
         IndexCoordinates::new(self, index_id)
     }
@@ -501,24 +501,24 @@ impl IndexKind {
     /// Returns the corresponding tag.
     fn tag(self) -> IndexTag {
         match self {
-            IndexKind::Core => IndexTag::Core,
-            IndexKind::Dispatcher => IndexTag::Dispatcher,
-            IndexKind::Runtime { .. } => IndexTag::Runtime,
-            IndexKind::Service { .. } => IndexTag::Service,
+            IndexOwner::Core => IndexTag::Core,
+            IndexOwner::Dispatcher => IndexTag::Dispatcher,
+            IndexOwner::Runtime { .. } => IndexTag::Runtime,
+            IndexOwner::Service { .. } => IndexTag::Service,
         }
     }
 
     /// Returns the corresponding group id.
     fn group_id(self) -> u32 {
         match self {
-            IndexKind::Service(instance_id) => instance_id,
-            IndexKind::Runtime(runtime_id) => runtime_id,
-            IndexKind::Core | IndexKind::Dispatcher => 0,
+            IndexOwner::Service(instance_id) => instance_id,
+            IndexOwner::Runtime(runtime_id) => runtime_id,
+            IndexOwner::Core | IndexOwner::Dispatcher => 0,
         }
     }
 }
 
-/// Binary value for the corresponding index kind.
+/// Binary value for the corresponding index owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(u16)]
 enum IndexTag {
@@ -536,32 +536,32 @@ pub struct IndexCoordinates {
 }
 
 impl IndexCoordinates {
-    /// Creates index coordinated for the index with the specified kind and identifier.
-    pub fn new(kind: IndexKind, index_id: u16) -> Self {
+    /// Creates index coordinated for the index with the specified owner and identifier.
+    pub fn new(owner: IndexOwner, index_id: u16) -> Self {
         Self {
-            tag: kind.tag() as u16,
-            group_id: kind.group_id(),
+            tag: owner.tag() as u16,
+            group_id: owner.group_id(),
             index_id,
         }
     }
 
-    pub fn collect(
-        kind: IndexKind,
+    pub fn locate(
+        owner: IndexOwner,
         object_hashes: impl IntoIterator<Item = Hash>,
     ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
         object_hashes
             .into_iter()
             .enumerate()
-            .map(move |(id, hash)| (kind.coordinate_for(id as u16), hash))
+            .map(move |(id, hash)| (owner.coordinate_for(id as u16), hash))
     }
 
-    pub fn kind(self) -> IndexKind {
+    pub fn owner(self) -> IndexOwner {
         match self.tag {
-            0 => IndexKind::Core,
-            1 => IndexKind::Dispatcher,
-            2 => IndexKind::Runtime(self.group_id),
-            3 => IndexKind::Service(self.group_id),
-            other => panic!("Unknown index kind: {}!", other),
+            0 => IndexOwner::Core,
+            1 => IndexOwner::Dispatcher,
+            2 => IndexOwner::Runtime(self.group_id),
+            3 => IndexOwner::Service(self.group_id),
+            other => panic!("Unknown index owner: {}!", other),
         }
     }
 }
@@ -601,26 +601,26 @@ impl ObjectHash for IndexCoordinates {
 
 #[test]
 fn test_index_coordinates_binary_key_round_trip() {
-    let index_kinds = vec![
-        (IndexKind::Dispatcher, 0),
-        (IndexKind::Dispatcher, 1),
-        (IndexKind::Runtime(0), 0),
-        (IndexKind::Runtime(0), 5),
-        (IndexKind::Runtime(1), 0),
-        (IndexKind::Runtime(1), 2),
-        (IndexKind::Service(2), 0),
-        (IndexKind::Service(2), 1),
-        (IndexKind::Service(0), 0),
-        (IndexKind::Service(0), 1),
+    let index_owners = vec![
+        (IndexOwner::Dispatcher, 0),
+        (IndexOwner::Dispatcher, 1),
+        (IndexOwner::Runtime(0), 0),
+        (IndexOwner::Runtime(0), 5),
+        (IndexOwner::Runtime(1), 0),
+        (IndexOwner::Runtime(1), 2),
+        (IndexOwner::Service(2), 0),
+        (IndexOwner::Service(2), 1),
+        (IndexOwner::Service(0), 0),
+        (IndexOwner::Service(0), 1),
     ];
 
-    for (kind, id) in index_kinds {
-        let coordinate = IndexCoordinates::new(kind, id);
+    for (owner, id) in index_owners {
+        let coordinate = IndexCoordinates::new(owner, id);
         let mut buf = vec![0; coordinate.size()];
         coordinate.write(&mut buf);
 
         let coordinate2 = IndexCoordinates::read(&buf);
         assert_eq!(coordinate, coordinate2);
-        assert_eq!(coordinate2.kind(), kind);
+        assert_eq!(coordinate2.owner(), owner);
     }
 }

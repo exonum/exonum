@@ -17,7 +17,7 @@ use exonum_merkledb::MapProof;
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, IndexCoordinates, IndexKind},
+    blockchain::{self, BlockProof, IndexCoordinates, IndexOwner},
     crypto::Hash,
     runtime::rust::{ServiceDescriptor, ServiceInstanceId},
 };
@@ -91,7 +91,7 @@ impl PublicApi {
                 .unwrap();
             let state_proof = blockchain_schema
                 .state_hash_aggregator()
-                .get_proof(IndexKind::Service(self.service_id).coordinate_for(0));
+                .get_proof(IndexOwner::Service(self.service_id).coordinate_for(0));
             (state_proof, block_proof)
         };
         let schema = Schema::new(&self.service_name, &snapshot);

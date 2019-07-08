@@ -21,7 +21,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     api::ServiceApiBuilder,
-    blockchain::{IndexCoordinates, IndexKind},
+    blockchain::{IndexCoordinates, IndexOwner},
     events::InternalRequest,
     messages::{AnyTx, Signed},
     node::ApiSender,
@@ -114,19 +114,19 @@ impl Dispatcher {
         let mut aggregator = HashMap::new();
         aggregator.extend(
             // Inserts state hashes for the dispatcher.
-            IndexCoordinates::collect(IndexKind::Dispatcher, Schema::new(access).state_hash()),
+            IndexCoordinates::locate(IndexOwner::Dispatcher, Schema::new(access).state_hash()),
         );
         // Inserts state hashes for the runtimes.
         for (runtime_id, runtime) in &self.runtimes {
             let state = runtime.state_hashes(access);
             aggregator.extend(
                 // Runtime state hash.
-                IndexCoordinates::collect(IndexKind::Runtime(*runtime_id), state.runtime),
+                IndexCoordinates::locate(IndexOwner::Runtime(*runtime_id), state.runtime),
             );
             for (instance_id, instance_hashes) in state.instances {
                 aggregator.extend(
                     // Instance state hashes.
-                    IndexCoordinates::collect(IndexKind::Service(instance_id), instance_hashes),
+                    IndexCoordinates::locate(IndexOwner::Service(instance_id), instance_hashes),
                 );
             }
         }

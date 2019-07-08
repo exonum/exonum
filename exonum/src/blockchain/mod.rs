@@ -36,7 +36,7 @@ pub use self::{
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
-    schema::{IndexCoordinates, IndexKind, Schema, TxLocation},
+    schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
     service::SharedNodeState,
     transaction::{
         ExecutionError, ExecutionResult, TransactionError, TransactionErrorType, TransactionResult,
@@ -274,8 +274,8 @@ impl Blockchain {
                         .state_hash(fork.as_ref())
                         .into_iter()
                         // Add state hash of core table.
-                        .chain(IndexCoordinates::collect(
-                            IndexKind::Core,
+                        .chain(IndexCoordinates::locate(
+                            IndexOwner::Core,
                             schema.state_hash(),
                         ));
                     // Insert state hashes into the aggregator table.
