@@ -18,7 +18,7 @@ pub use self::service::{
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
-use futures::{Future, IntoFuture};
+use futures::{future, Future, IntoFuture};
 use semver::Version;
 
 use std::{
@@ -36,7 +36,7 @@ use crate::{
 };
 
 use super::{
-    dispatcher,
+    dispatcher::DispatcherSender,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
     ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
 };
@@ -130,7 +130,7 @@ impl RustRuntime {
             .ok_or(DeployError::WrongArtifact)?;
 
         if self.deployed_artifacts.contains(&artifact) {
-            return Ok(());
+            return Err(DeployError::AlreadyDeployed);
         }
 
         if !self.available_artifacts.contains_key(&artifact) {
@@ -201,7 +201,12 @@ impl Runtime for RustRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
+        spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+        if spec != Any::default() {
+            // Spec for rust artifacts should be empty.
+            return Box::new(future::err(DeployError::WrongArtifact));
+        }
         Box::new(self.deploy(artifact).into_future())
     }
 
@@ -331,12 +336,14 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
+        dispatcher: &DispatcherSender,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
+                dispatcher,
                 service.descriptor(),
                 snapshot,
                 service_keypair,

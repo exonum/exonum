@@ -25,7 +25,11 @@ use crate::{
     messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
     node::ApiSender,
     proto::Any,
-    runtime::{dispatcher, error::ExecutionError, ExecutionContext},
+    runtime::{
+        dispatcher::{self, Dispatcher, DispatcherSender},
+        error::ExecutionError,
+        ExecutionContext,
+    },
 };
 
 use super::RustArtifactId;
@@ -101,7 +105,7 @@ impl<'a> ServiceDescriptor<'a> {
 pub struct TransactionContext<'a, 'b> {
     pub(super) service_descriptor: ServiceDescriptor<'a>,
     pub(super) runtime_context: &'a mut ExecutionContext<'b>,
-    pub(super) dispatcher: &'a super::dispatcher::Dispatcher,
+    pub(super) dispatcher: &'a Dispatcher,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
@@ -147,6 +151,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 }
 
 pub struct AfterCommitContext<'a> {
+    dispatcher: &'a DispatcherSender,
     service_descriptor: ServiceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
     service_keypair: &'a (PublicKey, SecretKey),
@@ -156,17 +161,25 @@ pub struct AfterCommitContext<'a> {
 impl<'a> AfterCommitContext<'a> {
     /// Creates context for `after_commit` method.
     pub(crate) fn new(
+        dispatcher: &'a DispatcherSender,
         service_descriptor: ServiceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
+            dispatcher,
             service_descriptor,
             snapshot,
             service_keypair,
             tx_sender,
         }
+    }
+
+    /// Returns the current database snapshot. This snapshot is used to
+    /// retrieve schema information from the database.
+    pub fn snapshot(&self) -> &dyn Snapshot {
+        self.snapshot
     }
 
     /// Returns the current service instance identifier.
@@ -188,6 +201,16 @@ impl<'a> AfterCommitContext<'a> {
             .iter()
             .position(|validator| self.service_keypair.0 == validator.service_key)
             .map(|id| ValidatorId(id as u16))
+    }
+
+    /// Returns the public key of the current node.
+    pub fn public_key(&self) -> &PublicKey {
+        &self.service_keypair.0
+    }
+
+    /// Returns the secret key of the current node.
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.service_keypair.1
     }
 
     /// Returns the current blockchain height. This height is "height of the last committed block".
@@ -214,6 +237,16 @@ impl<'a> AfterCommitContext<'a> {
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }
+    }
+
+    /// Returns reference to communication channel with dispatcher.
+    pub(crate) fn dispatcher_channel(&self) -> &DispatcherSender {
+        self.dispatcher
+    }
+
+    /// Returns a transaction broadcaster.
+    pub fn transaction_broadcaster(&self) -> ApiSender {
+        self.tx_sender.clone()
     }
 }
 

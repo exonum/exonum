@@ -16,21 +16,30 @@ syntax = "proto3";
 
 package exonum.service.supervisor;
 
-import "helpers.proto";
 import "runtime.proto";
 import "google/protobuf/any.proto";
 
 // Transactions
 
 // Request for the artifact deployment.
-message DeployArtifact {
+message DeployRequest {
     // Artifact identifier.
     exonum.runtime.ArtifactId artifact = 1;
+    // Additional information for Runtime to deploy.
+    google.protobuf.Any spec = 2;
     // The height until which the deployment procedure should be completed.
-    uint64 deadline_height = 2;
+    uint64 deadline_height = 3;
 }
 
-// TODO Implement pending deploy succeed logic.
+// Confirmation that the artifact was successfully deployed by the validator.
+message DeployConfirmation {
+    // Artifact identifier.
+    exonum.runtime.ArtifactId artifact = 1;
+    // Additional information for Runtime to deploy.
+    google.protobuf.Any spec = 2;
+    // The height until which the deployment procedure should be completed.
+    uint64 deadline_height = 3;
+}
 
 // Request for the start service instance
 message StartService {

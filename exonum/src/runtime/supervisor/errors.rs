@@ -30,6 +30,12 @@ pub enum Error {
     /// Instance with the given name already exists.
     #[fail(display = "Instance with the given name already exists")]
     InstanceExists = 3,
+    /// Deploy request has been already registered.
+    #[fail(display = "Deploy request has been already registered")]
+    DeployRequestAlreadyRegistered = 4,
+    /// Deploy request has not been registered.
+    #[fail(display = "Deploy request has not been registered")]
+    DeployRequestNotRegistered = 5,
 }
 
 impl From<Error> for ExecutionError {

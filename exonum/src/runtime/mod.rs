@@ -28,7 +28,10 @@ use crate::{
     proto::{schema, Any},
 };
 
-use self::error::{DeployError, ExecutionError, StartError};
+use self::{
+    dispatcher::{Dispatcher, DispatcherSender},
+    error::{DeployError, ExecutionError, StartError},
+};
 
 #[macro_use]
 pub mod rust;
@@ -75,6 +78,8 @@ impl ArtifactId {
     }
 }
 
+impl_binary_key_for_binary_value! { ArtifactId }
+
 impl From<(String, u32)> for ArtifactId {
     fn from(v: (String, u32)) -> Self {
         Self {
@@ -95,6 +100,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
+        spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>>;
 
     /// Starts a new service instance with the given specification.
@@ -125,12 +131,13 @@ pub trait Runtime: Send + Debug + 'static {
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)>;
 
     /// Calls `before_commit` for all the services stored in the runtime.
-    fn before_commit(&self, dispatcher: &dispatcher::Dispatcher, fork: &mut Fork);
+    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
 
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(
         &self,
+        dispatcher: &DispatcherSender,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,

@@ -26,6 +26,7 @@ use crate::{
         Any,
     },
     runtime::{
+        dispatcher::Dispatcher,
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
         Caller, ExecutionContext, InstanceSpec,
@@ -33,7 +34,6 @@ use crate::{
 };
 
 use super::{
-    dispatcher::Dispatcher,
     service::{Service, ServiceFactory},
     ArtifactId, RustArtifactId, RustRuntime, TransactionContext,
 };
@@ -150,7 +150,7 @@ fn test_basic_rust_runtime() {
     // Deploy service.
     let fork = db.fork();
     dispatcher
-        .register_artifact(&fork, artifact.clone())
+        .deploy_and_register_artifact(&fork, artifact.clone(), Any::default())
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 
@@ -168,10 +168,10 @@ fn test_basic_rust_runtime() {
         .into();
 
         let fork = db.fork();
-        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
+        let context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         dispatcher
-            .start_service(&mut context, spec, constructor)
+            .start_service(&context, spec, constructor)
             .unwrap();
         {
             let entry = Entry::new("constructor_entry", &fork);

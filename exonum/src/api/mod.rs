@@ -26,10 +26,7 @@ use std::{collections::BTreeMap, fmt};
 
 use self::{
     backends::actix,
-    node::{
-        private::NodeInfo,
-        public::{system::DispatcherInfo, ExplorerApi},
-    },
+    node::{private::NodeInfo, public::ExplorerApi},
 };
 use crate::{
     blockchain::{Blockchain, SharedNodeState},
@@ -397,16 +394,14 @@ impl ApiAggregator {
     }
 
     fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
-        let access = blockchain.snapshot();
-        let dispatcher_info = DispatcherInfo::from_db(access.as_ref());
+        // Waits until dispatcher will be unlocked to get fresh info.
+        let _dispatcher = blockchain.dispatcher();
+        let snapshot = blockchain.snapshot();
 
         let mut builder = ServiceApiBuilder::new();
-        self::node::private::SystemApi::new(
-            NodeInfo::new(dispatcher_info.clone()),
-            shared_api_state.clone(),
-        )
-        .wire(builder.private_scope());
-        self::node::public::SystemApi::new(dispatcher_info, shared_api_state)
+        self::node::private::SystemApi::new(NodeInfo::new(), shared_api_state.clone())
+            .wire(builder.private_scope());
+        self::node::public::SystemApi::new(snapshot.as_ref(), shared_api_state)
             .wire(builder.public_scope());
         builder
     }

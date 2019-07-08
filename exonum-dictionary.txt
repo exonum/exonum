@@ -24,8 +24,8 @@ codecov
 compat
 concat
 consts
-Cors
 cors
+Cors
 counterintuitive
 cryptocurrency
 cryptographically
@@ -88,6 +88,7 @@ msgs
 multiproof
 multiproofs
 multisig
+multisignature
 mutex
 nacl
 nanos

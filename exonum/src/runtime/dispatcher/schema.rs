@@ -14,10 +14,10 @@
 
 //! Information schema for the runtimes dispatcher.
 
-use exonum_merkledb::{IndexAccess, KeySetIndex, ProofMapIndex};
+use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ProofMapIndex};
 
 use super::{ArtifactId, DeployError, InstanceSpec, StartError};
-use crate::messages::ServiceInstanceId;
+use crate::{messages::ServiceInstanceId, proto::Any};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -35,6 +35,11 @@ impl<T: IndexAccess> Schema<T> {
         ProofMapIndex::new("core.dispatcher.artifacts", self.access.clone())
     }
 
+    /// Additional information needed to deploy artifacts.
+    pub fn artifact_specs(&self) -> MapIndex<T, ArtifactId, Any> {
+        MapIndex::new("core.dispatcher.artifact_specs", self.access.clone())
+    }
+
     /// Set of service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
     pub fn service_instances(&self) -> ProofMapIndex<T, String, InstanceSpec> {
@@ -47,13 +52,14 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds artifact specification to the set of deployed artifacts.
-    pub fn add_artifact(&mut self, artifact: ArtifactId) -> Result<(), DeployError> {
+    pub fn add_artifact(&mut self, artifact: ArtifactId, spec: Any) -> Result<(), DeployError> {
         // Checks that we have not already deployed this artifact.
         if self.artifacts().contains(&artifact.name) {
             return Err(DeployError::AlreadyDeployed);
         }
 
         self.artifacts().put(&artifact.name, artifact.runtime_id);
+        self.artifact_specs().put(&artifact, spec);
         Ok(())
     }
 
@@ -91,5 +97,10 @@ impl<T: IndexAccess> Schema<T> {
             .last()
             .unwrap_or_default();
         latest_known_id + 1
+    }
+
+    pub fn artifacts_with_spec(&self) -> impl IntoIterator<Item = (ArtifactId, Any)> {
+        // TODO remove reallocation [ECR-3222]
+        self.artifact_specs().into_iter().collect::<Vec<_>>()
     }
 }

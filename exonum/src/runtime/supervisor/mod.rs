@@ -14,7 +14,7 @@
 
 pub use self::{
     errors::Error,
-    proto::{DeployArtifact, StartService},
+    proto::{DeployConfirmation, DeployRequest, StartService},
     schema::Schema,
 };
 
@@ -22,13 +22,18 @@ use exonum_merkledb::Snapshot;
 
 use crate::{
     api::ServiceApiBuilder,
+    blockchain,
     crypto::Hash,
     messages::ServiceInstanceId,
-    runtime::rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
+    runtime::rust::{
+        AfterCommitContext, RustArtifactId, Service, ServiceDescriptor, ServiceFactory,
+        Transaction, TransactionContext,
+    },
 };
 
 mod api;
 mod errors;
+pub mod multisig;
 mod proto;
 mod schema;
 mod transactions;
@@ -43,6 +48,72 @@ impl Service for Supervisor {
 
     fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
         api::wire(descriptor, builder)
+    }
+
+    fn before_commit(&self, context: TransactionContext) {
+        let schema = Schema::new(context.service_name(), context.fork());
+        let height = blockchain::Schema::new(context.fork()).height();
+
+        // Removes pending deploy requests for which deadline was exceeded.
+        let requests_to_remove = schema
+            .pending_deployments()
+            .values()
+            .filter(|request| request.deadline_height < height)
+            .collect::<Vec<_>>();
+
+        for request in requests_to_remove {
+            schema.pending_deployments().remove(&request.artifact);
+
+            trace!("Removed outdated deployment request {:?}", request);
+        }
+    }
+
+    fn after_commit(&self, context: AfterCommitContext) {
+        if context.validator_id().is_none() {
+            return;
+        }
+
+        let schema = Schema::new(context.service_name(), context.snapshot());
+        let pending_deployments = schema.pending_deployments();
+
+        // Sends confirmation transaction for unconfirmed deployment requests.
+        pending_deployments
+            .values()
+            .filter(|request| {
+                let confirmation = DeployConfirmation::from(request.clone());
+                !schema
+                    .deploy_confirmations()
+                    .confirmed_by(&confirmation, context.public_key())
+            })
+            .for_each(|unconfirmed_request| {
+                let artifact = unconfirmed_request.artifact.clone();
+                let spec = unconfirmed_request.spec.clone();
+                // A callback that will broadcast the `ArtifactDeployConfirmation` transaction
+                // if the request for deployment completes successfully.
+                let and_then = {
+                    let tx_sender = context.transaction_broadcaster();
+                    let keypair = (*context.public_key(), context.secret_key().clone());
+                    let service_id = context.service_id();
+                    move || {
+                        trace!(
+                            "Sent confirmation for deployment request {:?}",
+                            unconfirmed_request
+                        );
+
+                        let transaction = DeployConfirmation::from(unconfirmed_request);
+                        tx_sender
+                            .broadcast_transaction(
+                                transaction.sign(service_id, keypair.0, &keypair.1),
+                            )
+                            .map_err(|e| error!("Couldn't broadcast transaction {}.", e))
+                            .ok();
+                    }
+                };
+                // TODO Rewrite on async await syntax. [ECR-3222]
+                context
+                    .dispatcher_channel()
+                    .request_deploy_artifact(artifact, spec, and_then);
+            })
     }
 }
 

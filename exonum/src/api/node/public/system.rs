@@ -65,7 +65,7 @@ pub struct DispatcherInfo {
 
 impl DispatcherInfo {
     /// Loads dispatcher information from database.
-    pub fn from_db(access: impl IndexAccess) -> Self {
+    pub fn load(access: impl IndexAccess) -> Self {
         let schema = dispatcher::Schema::new(access);
         Self {
             artifacts: schema.artifacts().into_iter().map(From::from).collect(),
@@ -86,10 +86,10 @@ impl SystemApi {
     ///
     /// This method loads from the specified access item persistent information like
     /// list of services to optimize IO.
-    pub fn new(dispatcher_info: DispatcherInfo, shared_api_state: SharedNodeState) -> Self {
+    pub fn new(access: impl IndexAccess, shared_api_state: SharedNodeState) -> Self {
         Self {
             shared_api_state,
-            dispatcher_info,
+            dispatcher_info: DispatcherInfo::load(access),
         }
     }
 
@@ -129,8 +129,8 @@ impl SystemApi {
         api_scope: &mut ServiceApiScope,
     ) -> Self {
         api_scope.endpoint(name, {
-            let dispatcher_info = self.dispatcher_info.clone();
-            move |_state: &ServiceApiState, _query: ()| Ok(dispatcher_info.clone())
+            // TODO cache Dispatcher info.
+            move |state: &ServiceApiState, _query: ()| Ok(DispatcherInfo::load(&state.snapshot()))
         });
         self
     }

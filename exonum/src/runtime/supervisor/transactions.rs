@@ -21,42 +21,60 @@ use crate::{
     },
 };
 
-use super::{DeployArtifact, Error, Schema, StartService, Supervisor};
-
-// TODO Implement generic helper module for multisig transactions [ECR-3222]
+use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor};
 
 #[service_interface(exonum(crate = "crate"))]
 /// Supervisor service transactions.
 pub trait Transactions {
     /// Requests artifact deploy.
-    fn deploy_artifact(
+    ///
+    /// This request should be sent by the each of validators.
+    /// After that, the supervisor will try to deploy the artifact, and if this procedure
+    /// will be successful it will send `confirm_artifact_deploy` transaction.
+    fn request_artifact_deploy(
         &self,
         context: TransactionContext,
-        artifact: DeployArtifact,
+        artifact: DeployRequest,
+    ) -> ExecutionResult;
+    /// Confirmation that the artifact was successfully deployed by the validator.
+    ///
+    /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
+    fn confirm_artifact_deploy(
+        &self,
+        context: TransactionContext,
+        artifact: DeployConfirmation,
     ) -> ExecutionResult;
     /// Requests start service.
+    ///
+    /// Service will be started if all of validators will send this confirmation.
     fn start_service(&self, context: TransactionContext, service: StartService) -> ExecutionResult;
 }
 
 impl Transactions for Supervisor {
-    fn deploy_artifact(
+    fn request_artifact_deploy(
         &self,
-        mut context: TransactionContext,
-        deploy: DeployArtifact,
+        context: TransactionContext,
+        deploy: DeployRequest,
     ) -> ExecutionResult {
         let blockchain_schema = blockchain::Schema::new(context.fork());
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
         }
-        // Verifies that transaction author is validator.
-        let validator_keys = blockchain_schema.actual_configuration().validator_keys;
-        if !validator_keys
-            .iter()
-            .any(|validator| validator.service_key == context.author())
-        {
-            return Err(Error::UnknownAuthor)?;
+        let schema = Schema::new(context.service_name(), context.fork());
+
+        // Verifies that the deployment request is not yet registered.
+        if schema.pending_deployments().contains(&deploy.artifact) {
+            return Err(Error::DeployRequestAlreadyRegistered)?;
         }
+
+        // Verifies that transaction author is validator.
+        let mut deploy_requests = schema.deploy_requests();
+        let author = context.author();
+        deploy_requests
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
         // Verifies that the artifact is not deployed yet.
         if dispatcher::Schema::new(context.fork())
             .artifacts()
@@ -65,21 +83,58 @@ impl Transactions for Supervisor {
             return Err(Error::AlreadyDeployed)?;
         }
 
-        let confirmations = Schema::new(context.service_name(), context.fork())
-            .confirm_pending_artifact(&deploy, context.author());
-        if confirmations == validator_keys.len() {
-            trace!("Request register artifact {:?}", deploy.artifact);
+        let confirmations = deploy_requests.confirm(&deploy, author);
+        if confirmations == deploy_requests.validators_len() {
+            trace!("Deploy artifact request accepted {:?}", deploy.artifact);
+
+            let artifact = deploy.artifact.clone();
+            schema.pending_deployments().put(&artifact, deploy);
+        }
+        Ok(())
+    }
+
+    fn confirm_artifact_deploy(
+        &self,
+        mut context: TransactionContext,
+        confirmation: DeployConfirmation,
+    ) -> ExecutionResult {
+        let blockchain_schema = blockchain::Schema::new(context.fork());
+
+        // Verifies that we doesn't reach deadline height.
+        if confirmation.deadline_height < blockchain_schema.height() {
+            return Err(Error::DeadlineExceeded)?;
+        }
+        let schema = Schema::new(context.service_name(), context.fork());
+
+        // Verifies that transaction author is validator.
+        let mut deploy_confirmations = schema.deploy_confirmations();
+        let author = context.author();
+        deploy_confirmations
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
+        // Verifies that this deployment is registered.
+        if !schema
+            .pending_deployments()
+            .contains(&confirmation.artifact)
+        {
+            return Err(Error::DeployRequestNotRegistered)?;
+        }
+
+        let confirmations = deploy_confirmations.confirm(&confirmation, author);
+        if confirmations == deploy_confirmations.validators_len() {
+            trace!(
+                "Registering deployed artifact in dispatcher {:?}",
+                confirmation.artifact
+            );
+
+            // Removes artifact from pending deployments.
+            schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
             context.dispatch_action(Action::RegisterArtifact {
-                artifact: deploy.artifact,
-            });
-        } else {
-            trace!("Request deploy artifact {:?}", deploy.artifact);
-            // Verifies that we can deploy an artifact, if this action fails,
-            // this transaction will be canceled.
-            context.dispatch_action(Action::DeployArtifact {
-                artifact: deploy.artifact,
+                artifact: confirmation.artifact,
+                spec: confirmation.spec,
             });
         }
 
@@ -93,18 +148,20 @@ impl Transactions for Supervisor {
     ) -> ExecutionResult {
         let blockchain_schema = blockchain::Schema::new(context.fork());
         let dispatcher_schema = dispatcher::Schema::new(context.fork());
+
         // Verifies that we doesn't reach deadline height.
         if service.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
         }
+        let mut pending_instances =
+            Schema::new(context.service_name(), context.fork()).pending_instances();
+        let author = context.author();
+
         // Verifies that transaction author is validator.
-        let validator_keys = blockchain_schema.actual_configuration().validator_keys;
-        if !validator_keys
-            .iter()
-            .any(|validator| validator.service_key == context.author())
-        {
-            return Err(Error::UnknownAuthor)?;
-        }
+        pending_instances
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
         // Verifies that the instance name does not exist.
         if dispatcher_schema
             .service_instances()
@@ -113,9 +170,8 @@ impl Transactions for Supervisor {
             return Err(Error::InstanceExists)?;
         }
 
-        let confirmations = Schema::new(context.service_name(), context.fork())
-            .confirm_pending_instance(&service, context.author());
-        if confirmations == validator_keys.len() {
+        let confirmations = pending_instances.confirm(&service, author);
+        if confirmations == pending_instances.validators_len() {
             // Assigns identifier for the new service instance.
             let spec = InstanceSpec {
                 artifact: service.artifact,

@@ -266,6 +266,7 @@ impl Blockchain {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
+        let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
         // Create fork
         let mut fork = self.fork();
 
@@ -274,7 +275,7 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions.
             for (index, hash) in tx_hashes.iter().enumerate() {
-                self.execute_transaction(*hash, height, index, &mut fork)
+                Self::execute_transaction(&mut dispatcher, *hash, height, index, &mut fork)
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
                     .expect("Transaction execution error.");
@@ -284,7 +285,6 @@ impl Blockchain {
 
             // Skip execution for genesis block.
             if height > Height(0) {
-                let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
                 dispatcher.before_commit(&mut fork);
             }
 
@@ -300,8 +300,6 @@ impl Blockchain {
                         let key = Self::service_table_unique_key(CORE_ID, idx);
                         state_hashes.push((key, core_table_hash));
                     }
-
-                    let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
 
                     for (service_id, vec_service_state) in
                         dispatcher.state_hashes((&fork).snapshot())
@@ -355,7 +353,7 @@ impl Blockchain {
     }
 
     fn execute_transaction(
-        &self,
+        dispatcher: &mut MutexGuard<Dispatcher>,
         tx_hash: Hash,
         height: Height,
         index: usize,
@@ -377,7 +375,6 @@ impl Blockchain {
         fork.flush();
 
         let catch_result = {
-            let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 dispatcher.execute(fork, tx_hash, &transaction)
             }))
@@ -461,7 +458,7 @@ impl Blockchain {
         };
         self.merge(patch)?;
         // Invokes `after_commit` for each service in order of their identifiers
-        let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
+        let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
         dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
 
         Ok(())

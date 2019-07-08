@@ -22,10 +22,24 @@ use crate::{
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::supervisor::DeployArtifact", crate = "crate")]
-pub struct DeployArtifact {
+#[exonum(pb = "schema::supervisor::DeployRequest", crate = "crate")]
+pub struct DeployRequest {
     // Artifact identifier.
     pub artifact: ArtifactId,
+    /// Additional information for Runtime to deploy.
+    pub spec: Any,
+    /// The height until which the deployment procedure should be completed.
+    pub deadline_height: Height,
+}
+
+// Request for the artifact deployment.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[exonum(pb = "schema::supervisor::DeployConfirmation", crate = "crate")]
+pub struct DeployConfirmation {
+    // Artifact identifier.
+    pub artifact: ArtifactId,
+    /// Additional information for Runtime to deploy.
+    pub spec: Any,
     /// The height until which the deployment procedure should be completed.
     pub deadline_height: Height,
 }
@@ -44,30 +58,8 @@ pub struct StartService {
     pub deadline_height: Height,
 }
 
-// Think about bincode instead of protobuf. [ECR-3222]
-macro_rules! impl_binary_key_for_binary_value {
-    ($type:ident) => {
-        impl exonum_merkledb::BinaryKey for $type {
-            fn size(&self) -> usize {
-                exonum_merkledb::BinaryValue::to_bytes(self).len()
-            }
-
-            fn write(&self, buffer: &mut [u8]) -> usize {
-                let bytes = exonum_merkledb::BinaryValue::to_bytes(self);
-                buffer.copy_from_slice(&bytes);
-                bytes.len()
-            }
-
-            fn read(buffer: &[u8]) -> Self::Owned {
-                // `unwrap` is safe because only this code uses for
-                // serialize and deserialize these keys.
-                <Self as exonum_merkledb::BinaryValue>::from_bytes(buffer.into()).unwrap()
-            }
-        }
-    };
-}
-
-impl_binary_key_for_binary_value! { DeployArtifact }
+impl_binary_key_for_binary_value! { DeployRequest }
+impl_binary_key_for_binary_value! { DeployConfirmation }
 impl_binary_key_for_binary_value! { StartService }
 
 macro_rules! impl_from_str_for_protobuf_convert {
@@ -88,5 +80,15 @@ macro_rules! impl_from_str_for_protobuf_convert {
     };
 }
 
-impl_from_str_for_protobuf_convert! { DeployArtifact }
+impl_from_str_for_protobuf_convert! { DeployRequest }
 impl_from_str_for_protobuf_convert! { StartService }
+
+impl From<DeployRequest> for DeployConfirmation {
+    fn from(v: DeployRequest) -> Self {
+        Self {
+            artifact: v.artifact,
+            deadline_height: v.deadline_height,
+            spec: v.spec,
+        }
+    }
+}
