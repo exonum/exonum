@@ -23,8 +23,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::{self, Display};
 
 use exonum::{
-    api::{self, ApiAggregator, ServiceApiState},
-    blockchain::SharedNodeState,
+    api::{self, node::SharedNodeState, ApiAggregator, ServiceApiState},
     messages::{AnyTx, Signed},
     node::ApiSender,
 };

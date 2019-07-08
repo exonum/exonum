@@ -37,7 +37,6 @@ pub use self::{
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
-    service::SharedNodeState,
     transaction::{
         ExecutionError, ExecutionResult, TransactionError, TransactionErrorType, TransactionResult,
     },
@@ -70,7 +69,6 @@ mod block;
 mod builder;
 mod genesis;
 mod schema;
-mod service;
 #[macro_use]
 mod transaction;
 #[cfg(test)]

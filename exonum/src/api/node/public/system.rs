@@ -17,8 +17,8 @@
 use exonum_merkledb::IndexAccess;
 
 use crate::{
-    api::{ServiceApiScope, ServiceApiState},
-    blockchain::{Schema, SharedNodeState},
+    api::{node::SharedNodeState, ServiceApiScope, ServiceApiState},
+    blockchain::Schema,
     helpers::user_agent,
     runtime::{dispatcher, ArtifactId, InstanceSpec},
 };

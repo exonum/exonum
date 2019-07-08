@@ -27,10 +27,10 @@ use std::{
 };
 
 use crate::{
+    api::node::SharedNodeState,
     blockchain::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, IndexCoordinates,
-        IndexOwner, InstanceCollection, Schema, SharedNodeState, StoredConfiguration,
-        ValidatorKeys,
+        IndexOwner, InstanceCollection, Schema, StoredConfiguration, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{

@@ -47,11 +47,11 @@ use crate::{
         backends::actix::{
             AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntime, SystemRuntimeConfig,
         },
+        node::SharedNodeState,
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema, SharedNodeState,
-        ValidatorKeys,
+        Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema, ValidatorKeys,
     },
     crypto::{self, read_keys_from_file, Hash, PublicKey, SecretKey},
     events::{

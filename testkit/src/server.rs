@@ -13,8 +13,10 @@
 // limitations under the License.
 
 use exonum::{
-    api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::SharedNodeState,
+    api::{
+        self, node::SharedNodeState, ApiAggregator, ServiceApiBuilder, ServiceApiScope,
+        ServiceApiState,
+    },
     crypto::Hash,
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
