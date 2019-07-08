@@ -45,7 +45,6 @@ pub use self::{
 
 pub mod config;
 
-use byteorder::{ByteOrder, LittleEndian};
 use exonum_merkledb::{
     Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch, Result as StorageResult,
     Snapshot,
@@ -54,12 +53,12 @@ use futures::sync::mpsc;
 
 use std::{
     collections::HashMap,
-    iter, mem, panic,
+    iter, panic,
     sync::{Arc, Mutex, MutexGuard},
 };
 
 use crate::{
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
@@ -79,9 +78,6 @@ mod tests;
 
 /// Transaction message shortcut.
 pub type TransactionMessage = Signed<AnyTx>;
-
-/// Id of core information schema.
-pub const CORE_ID: u16 = 0;
 
 /// Exonum blockchain instance with a certain services set and data storage.
 ///

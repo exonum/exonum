@@ -14,10 +14,10 @@
 
 //! Information schema for the runtimes dispatcher.
 
-use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ProofMapIndex, ObjectHash};
+use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
 use super::{ArtifactId, DeployError, InstanceSpec, StartError};
-use crate::{messages::ServiceInstanceId, proto::Any, crypto::Hash};
+use crate::{crypto::Hash, messages::ServiceInstanceId, proto::Any};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -110,5 +110,5 @@ impl<T: IndexAccess> Schema<T> {
             self.artifacts().object_hash(),
             self.service_instances().object_hash(),
         ]
-    }    
+    }
 }

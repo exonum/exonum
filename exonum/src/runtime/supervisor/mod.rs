@@ -131,6 +131,6 @@ impl ServiceFactory for Supervisor {
 }
 
 impl Supervisor {
-    pub const BUILTIN_ID: ServiceInstanceId = 1;
+    pub const BUILTIN_ID: ServiceInstanceId = 0;
     pub const BUILTIN_NAME: &'static str = "supervisor";
 }

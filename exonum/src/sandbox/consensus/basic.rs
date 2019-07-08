@@ -22,7 +22,7 @@ use rand::{thread_rng, Rng};
 use std::collections::BTreeMap;
 
 use crate::{
-    blockchain::{Blockchain, IndexKind, IndexCoordinates, Schema, CORE_ID},
+    blockchain::{IndexCoordinates, IndexKind, Schema},
     crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Signed},
@@ -185,8 +185,10 @@ fn test_query_state_hash() {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
         let configs_key = IndexCoordinates::new(IndexKind::Core, 0);
-        let timestamp_t1_key = IndexCoordinates::new(IndexKind::Service(TimestampingService::ID), 0);
-        let timestamp_t2_key = IndexCoordinates::new(IndexKind::Service(TimestampingService::ID), 1);
+        let timestamp_t1_key =
+            IndexCoordinates::new(IndexKind::Service(TimestampingService::ID), 0);
+        let timestamp_t2_key =
+            IndexCoordinates::new(IndexKind::Service(TimestampingService::ID), 1);
 
         let proof_configs = sandbox.get_proof_to_index(IndexKind::Core, 0);
         let proof = proof_configs.check().unwrap();

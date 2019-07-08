@@ -21,7 +21,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     api::ServiceApiBuilder,
-    blockchain::{IndexCoordinates, IndexKind, CORE_ID},
+    blockchain::{IndexCoordinates, IndexKind},
     events::InternalRequest,
     messages::{AnyTx, Signed},
     node::ApiSender,
@@ -329,7 +329,7 @@ impl Dispatcher {
     }
 
     fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
-        id == u32::from(CORE_ID) || self.runtime_lookup.contains_key(&id)
+        self.runtime_lookup.contains_key(&id)
     }
 }
 

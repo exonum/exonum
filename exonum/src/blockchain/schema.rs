@@ -493,6 +493,11 @@ pub enum IndexKind {
 }
 
 impl IndexKind {
+    /// Creates index coordinated for the given kind of index.
+    pub fn coordinate_for(self, index_id: u16) -> IndexCoordinates {
+        IndexCoordinates::new(self, index_id)
+    }
+
     /// Returns the corresponding tag.
     fn tag(self) -> IndexTag {
         match self {
@@ -514,7 +519,7 @@ impl IndexKind {
 }
 
 /// Binary value for the corresponding index kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(u16)]
 enum IndexTag {
     Core = 0,
@@ -523,7 +528,7 @@ enum IndexTag {
     Service = 3,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct IndexCoordinates {
     tag: u16,
     group_id: u32,
@@ -547,7 +552,7 @@ impl IndexCoordinates {
         object_hashes
             .into_iter()
             .enumerate()
-            .map(move |(id, hash)| (IndexCoordinates::new(kind, id as u16), hash))
+            .map(move |(id, hash)| (kind.coordinate_for(id as u16), hash))
     }
 
     pub fn kind(self) -> IndexKind {

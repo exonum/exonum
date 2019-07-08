@@ -17,7 +17,7 @@ use exonum_merkledb::MapProof;
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof},
+    blockchain::{self, BlockProof, IndexCoordinates, IndexKind},
     crypto::Hash,
     runtime::rust::{ServiceDescriptor, ServiceInstanceId},
 };
@@ -44,7 +44,7 @@ pub struct TimestampProof {
     /// Proof of the last block.
     pub block_info: BlockProof,
     /// Actual state hashes of the timestamping service with their proofs.
-    pub state_proof: MapProof<Hash, Hash>,
+    pub state_proof: MapProof<IndexCoordinates, Hash>,
     /// Actual state of the timestamping database with proofs.
     pub timestamp_proof: MapProof<Hash, TimestampEntry>,
 }
@@ -84,10 +84,14 @@ impl PublicApi {
     ) -> api::Result<TimestampProof> {
         let snapshot = state.snapshot();
         let (state_proof, block_info) = {
-            let core_schema = blockchain::Schema::new(&snapshot);
+            let blockchain_schema = blockchain::Schema::new(&snapshot);
             let last_block_height = state.blockchain().last_block().height();
-            let block_proof = core_schema.block_and_precommits(last_block_height).unwrap();
-            let state_proof = core_schema.get_proof_to_service_table(self.service_id as u16, 0);
+            let block_proof = blockchain_schema
+                .block_and_precommits(last_block_height)
+                .unwrap();
+            let state_proof = blockchain_schema
+                .state_hash_aggregator()
+                .get_proof(IndexKind::Service(self.service_id).coordinate_for(0));
             (state_proof, block_proof)
         };
         let schema = Schema::new(&self.service_name, &snapshot);
