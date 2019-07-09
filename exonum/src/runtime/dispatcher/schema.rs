@@ -14,10 +14,10 @@
 
 //! Information schema for the runtimes dispatcher.
 
-use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ProofMapIndex};
+use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
 use super::{ArtifactId, DeployError, InstanceSpec, StartError};
-use crate::{messages::ServiceInstanceId, proto::Any};
+use crate::{crypto::Hash, messages::ServiceInstanceId, proto::Any};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -102,5 +102,13 @@ impl<T: IndexAccess> Schema<T> {
     pub fn artifacts_with_spec(&self) -> impl IntoIterator<Item = (ArtifactId, Any)> {
         // TODO remove reallocation [ECR-3222]
         self.artifact_specs().into_iter().collect::<Vec<_>>()
+    }
+
+    /// Returns the `state_hash` table for this information schema.
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![
+            self.artifacts().object_hash(),
+            self.service_instances().object_hash(),
+        ]
     }
 }

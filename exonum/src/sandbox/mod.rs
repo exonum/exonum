@@ -27,9 +27,10 @@ use std::{
 };
 
 use crate::{
+    api::node::SharedNodeState,
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema,
-        SharedNodeState, StoredConfiguration, ValidatorKeys,
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, IndexCoordinates,
+        IndexOwner, InstanceCollection, Schema, StoredConfiguration, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -695,14 +696,16 @@ impl Sandbox {
         *Schema::new(&fork).last_block().state_hash()
     }
 
-    pub fn get_proof_to_service_table(
+    pub fn get_proof_to_index(
         &self,
-        service_id: u16,
-        table_idx: usize,
-    ) -> MapProof<Hash, Hash> {
+        kind: IndexOwner,
+        id: u16,
+    ) -> MapProof<IndexCoordinates, Hash> {
         let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.get_proof_to_service_table(service_id, table_idx)
+        schema
+            .state_hash_aggregator()
+            .get_proof(IndexCoordinates::new(kind, id))
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {

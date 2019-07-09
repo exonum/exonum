@@ -22,7 +22,7 @@ use rand::{thread_rng, Rng};
 use std::collections::BTreeMap;
 
 use crate::{
-    blockchain::{Blockchain, Schema, CORE_ID},
+    blockchain::{IndexCoordinates, IndexOwner, Schema},
     crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Signed},
@@ -184,13 +184,13 @@ fn test_query_state_hash() {
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
-        let configs_key = Blockchain::service_table_unique_key(CORE_ID, 0);
+        let configs_key = IndexCoordinates::new(IndexOwner::Core, 0);
         let timestamp_t1_key =
-            Blockchain::service_table_unique_key(TimestampingService::ID as u16, 0);
+            IndexCoordinates::new(IndexOwner::Service(TimestampingService::ID), 0);
         let timestamp_t2_key =
-            Blockchain::service_table_unique_key(TimestampingService::ID as u16, 1);
+            IndexCoordinates::new(IndexOwner::Service(TimestampingService::ID), 1);
 
-        let proof_configs = sandbox.get_proof_to_service_table(CORE_ID, 0);
+        let proof_configs = sandbox.get_proof_to_index(IndexOwner::Core, 0);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.root_hash(), state_hash);
         assert_ne!(configs_rh, Hash::zero());
@@ -199,7 +199,8 @@ fn test_query_state_hash() {
             vec![(&configs_key, &configs_rh)]
         );
 
-        let proof_configs = sandbox.get_proof_to_service_table(TimestampingService::ID as u16, 0);
+        let proof_configs =
+            sandbox.get_proof_to_index(IndexOwner::Service(TimestampingService::ID), 0);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.root_hash(), state_hash);
         assert_eq!(
@@ -207,7 +208,8 @@ fn test_query_state_hash() {
             vec![(&timestamp_t1_key, &Hash::new([127; HASH_SIZE]))]
         );
 
-        let proof_configs = sandbox.get_proof_to_service_table(TimestampingService::ID as u16, 1);
+        let proof_configs =
+            sandbox.get_proof_to_index(IndexOwner::Service(TimestampingService::ID), 1);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.root_hash(), state_hash);
         assert_eq!(

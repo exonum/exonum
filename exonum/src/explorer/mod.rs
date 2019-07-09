@@ -463,7 +463,7 @@ impl CommittedTransaction {
 ///
 /// Use of the custom type parameter for deserialization:
 ///
-/// ```
+/// ```ignore [ECR-3275]
 /// # extern crate exonum;
 /// use std::borrow::Cow;
 /// # #[macro_use] extern crate exonum_derive;

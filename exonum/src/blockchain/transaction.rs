@@ -14,15 +14,13 @@
 
 //! `Transaction` related types.
 
-use exonum_merkledb::{BinaryValue, Fork, ObjectHash};
+use exonum_merkledb::{BinaryValue, ObjectHash};
 use protobuf::Message;
-use serde::{de::DeserializeOwned, Serialize};
 
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crate::{
-    crypto::{Hash, PublicKey},
-    messages::{AnyTx, Signed},
+    crypto::Hash,
     proto::{self, ProtobufConvert},
 };
 
@@ -41,130 +39,6 @@ pub type ExecutionResult = Result<(), ExecutionError>;
 /// framework) that can be obtained through `Schema::transaction_results` method.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TransactionResult(pub Result<(), TransactionError>);
-
-impl ::serde::Serialize for dyn Transaction {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ::serde::Serializer,
-    {
-        ::erased_serde::serialize(self, serializer)
-    }
-}
-
-/// Transaction processing functionality for `Signed`s allowing to apply authenticated, atomic,
-/// constraint-preserving groups of changes to the blockchain storage.
-///
-/// A transaction in Exonum is a group of sequential operations with the data.
-/// Transaction processing rules are defined in services; these rules determine
-/// the business logic of any Exonum-powered blockchain.
-///
-/// See also [the documentation page on transactions][doc:transactions].
-///
-/// [doc:transactions]: https://exonum.com/doc/version/latest/architecture/transactions/
-pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Serialize {
-    /// Receives a `TransactionContext` witch contain fork
-    /// of the current blockchain state and can modify it depending on the contents
-    /// of the transaction.
-    ///
-    /// # Notes
-    ///
-    /// - Transaction itself is considered committed regardless whether `Ok` or `Err` has been
-    ///   returned or even if panic occurs during execution.
-    /// - Changes made by the transaction are discarded if `Err` is returned or panic occurs.
-    /// - A transaction execution status (see `ExecutionResult` and `TransactionResult` for the
-    ///   details) is stored in the blockchain and can be accessed through API.
-    /// - Blockchain state hash is affected by the transactions execution status.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate exonum;
-    /// # #[macro_use] extern crate exonum_derive;
-    /// # #[macro_use] extern crate serde_derive;
-    /// #
-    /// use std::borrow::Cow;
-    /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
-    /// use exonum::crypto::PublicKey;
-    /// use exonum_merkledb::Fork;
-    ///
-    /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-    /// #[exonum(pb = "exonum::proto::schema::doc_tests::MyTransaction")]
-    /// struct MyTransaction {
-    ///     // Transaction definition...
-    ///     public_key: PublicKey,
-    /// }
-    ///
-    ///
-    /// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-    /// enum MyTransactions {
-    ///     MyTransaction(MyTransaction),
-    /// }
-    ///
-    /// impl Transaction for MyTransaction {
-    ///     fn execute(&self, _: TransactionContext) -> ExecutionResult {
-    ///         // Read and/or write into storage.
-    ///         // ...
-    ///
-    ///         // Return execution status.
-    ///         Ok(())
-    ///     }
-    ///
-    ///     // Other methods...
-    ///     // ...
-    /// }
-    /// # fn main() {}
-    fn execute(&self, context: TransactionContext) -> ExecutionResult;
-}
-
-//TODO: Add doc/examples.
-/// Wrapper around database and tx hash.
-#[derive(Debug)]
-pub struct TransactionContext<'a> {
-    fork: &'a Fork,
-    service_id: u16,
-    service_name: &'a str,
-    tx_hash: Hash,
-    author: PublicKey,
-}
-
-impl<'a> TransactionContext<'a> {
-    #[doc(hidden)]
-    pub fn new(fork: &'a Fork, service_name: &'a str, raw_message: &Signed<AnyTx>) -> Self {
-        TransactionContext {
-            fork,
-            service_id: raw_message.service_id(),
-            service_name,
-            tx_hash: raw_message.object_hash(),
-            author: raw_message.author(),
-        }
-    }
-
-    /// Returns fork of current blockchain state.
-    pub fn fork(&self) -> &Fork {
-        self.fork
-    }
-
-    /// Returns an id of the service that own this transaction.
-    pub fn service_id(&self) -> u16 {
-        self.service_id
-    }
-
-    /// Returns a name of the service that own this transaction.
-    pub fn service_name(&self) -> &str {
-        self.service_name
-    }
-
-    /// Returns transaction author public key
-    pub fn author(&self) -> PublicKey {
-        self.author
-    }
-
-    /// Returns current transaction message hash.
-    /// This hash could be used to link some data in storage for external usage.
-    pub fn tx_hash(&self) -> Hash {
-        self.tx_hash
-    }
-}
 
 /// Result of unsuccessful transaction execution.
 ///
@@ -295,12 +169,6 @@ impl TransactionError {
     }
 }
 
-impl<'a, T: Transaction> From<T> for Box<dyn Transaction + 'a> {
-    fn from(tx: T) -> Self {
-        Box::new(tx) as Self
-    }
-}
-
 impl fmt::Display for TransactionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.error_type {
@@ -389,17 +257,6 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
     }
 }
 
-/// `TransactionSet` trait describes a type which is an `enum` of several transactions.
-/// The implementation of this trait is generated automatically by the `#[derive(TransactionSet)]`
-/// attribute.
-/// This attribute is used on the enum which has transactions as its variants.
-pub trait TransactionSet:
-    Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
-{
-    /// Parses a transaction from this set from a `RawTransaction`.
-    fn tx_from_raw(raw: AnyTx) -> Result<Self, failure::Error>;
-}
-
 /// Tries to get a meaningful description from the given panic.
 fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
     if let Some(s) = any.downcast_ref::<&str>() {
@@ -416,7 +273,7 @@ fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
 // TODO move error tests to runtime module [ECR-3236]
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::{Database, Entry, TemporaryDB};
+    use exonum_merkledb::{Database, Entry, Fork, TemporaryDB};
     use futures::sync::mpsc;
     use semver::Version;
 

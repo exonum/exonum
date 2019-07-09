@@ -21,11 +21,12 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
     api::{Error as ApiError, ServiceApiScope, ServiceApiState},
-    blockchain::SharedNodeState,
     crypto::PublicKey,
     messages::ServiceInstanceId,
     node::{ConnectInfo, ExternalMessage},
 };
+
+use super::SharedNodeState;
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

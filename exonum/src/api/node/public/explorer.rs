@@ -31,10 +31,11 @@ use crate::{
         backends::actix::{
             self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
         },
+        node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
     },
-    blockchain::{Block, SharedNodeState},
+    blockchain::Block,
     crypto::Hash,
     events::error::into_failure,
     explorer::{self, BlockchainExplorer, TransactionInfo},

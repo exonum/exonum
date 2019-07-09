@@ -18,7 +18,7 @@ use exonum_merkledb::{ListProof, MapProof};
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, TransactionMessage},
+    blockchain::{self, BlockProof, IndexCoordinates, IndexOwner, TransactionMessage},
     crypto::{Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
@@ -38,7 +38,7 @@ pub struct WalletQuery {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletProof {
     /// Proof of the whole database table.
-    pub to_table: MapProof<Hash, Hash>,
+    pub to_table: MapProof<IndexCoordinates, Hash>,
     /// Proof of the specific wallet in this table.
     pub to_wallet: MapProof<PublicKey, Wallet>,
 }
@@ -86,19 +86,20 @@ impl PublicApi {
         pub_key: PublicKey,
     ) -> api::Result<WalletInfo> {
         let snapshot = state.snapshot();
-        let general_schema = blockchain::Schema::new(&snapshot);
+        let blockchain_schema = blockchain::Schema::new(&snapshot);
         let currency_schema = Schema::new(&self.service_name, &snapshot);
 
-        let max_height = general_schema.block_hashes_by_height().len() - 1;
+        let max_height = blockchain_schema.block_hashes_by_height().len() - 1;
 
-        let block_proof = general_schema
+        let block_proof = blockchain_schema
             .block_and_precommits(Height(max_height))
             .unwrap();
 
-        let to_table: MapProof<Hash, Hash> =
-            general_schema.get_proof_to_service_table(self.service_id as u16, 0);
+        let to_table = blockchain_schema
+            .state_hash_aggregator()
+            .get_proof(IndexOwner::Service(self.service_id).coordinate_for(0));
 
-        let to_wallet: MapProof<PublicKey, Wallet> = currency_schema.wallets().get_proof(pub_key);
+        let to_wallet = currency_schema.wallets().get_proof(pub_key);
 
         let wallet_proof = WalletProof {
             to_table,

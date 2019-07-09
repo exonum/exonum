@@ -21,7 +21,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     api::ServiceApiBuilder,
-    blockchain::CORE_ID,
+    blockchain::{IndexCoordinates, IndexOwner},
     events::InternalRequest,
     messages::{AnyTx, Signed},
     node::ApiSender,
@@ -107,15 +107,30 @@ impl Dispatcher {
         .expect("Unable to start builtin service instance");
     }
 
-    pub(crate) fn state_hashes(
+    pub fn state_hash(
         &self,
-        snapshot: &dyn Snapshot,
-    ) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-        self.runtimes
-            .iter()
-            .map(|(_, runtime)| runtime.state_hashes(snapshot))
-            .flatten()
-            .collect::<Vec<_>>()
+        access: &dyn Snapshot,
+    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
+        let mut aggregator = HashMap::new();
+        aggregator.extend(
+            // Inserts state hashes for the dispatcher.
+            IndexCoordinates::locate(IndexOwner::Dispatcher, Schema::new(access).state_hash()),
+        );
+        // Inserts state hashes for the runtimes.
+        for (runtime_id, runtime) in &self.runtimes {
+            let state = runtime.state_hashes(access);
+            aggregator.extend(
+                // Runtime state hash.
+                IndexCoordinates::locate(IndexOwner::Runtime(*runtime_id), state.runtime),
+            );
+            for (instance_id, instance_hashes) in state.instances {
+                aggregator.extend(
+                    // Instance state hashes.
+                    IndexCoordinates::locate(IndexOwner::Service(instance_id), instance_hashes),
+                );
+            }
+        }
+        aggregator
     }
 
     pub(crate) fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
@@ -314,7 +329,7 @@ impl Dispatcher {
     }
 
     fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
-        id == u32::from(CORE_ID) || self.runtime_lookup.contains_key(&id)
+        self.runtime_lookup.contains_key(&id)
     }
 }
 
@@ -416,9 +431,9 @@ mod tests {
     use futures::IntoFuture;
 
     use crate::{
-        crypto::{Hash, PublicKey},
+        crypto::PublicKey,
         messages::{MethodId, ServiceInstanceId},
-        runtime::{rust::RustRuntime, RuntimeIdentifier},
+        runtime::{rust::RustRuntime, RuntimeIdentifier, StateHashAggregator},
     };
 
     use super::*;
@@ -533,8 +548,8 @@ mod tests {
             }
         }
 
-        fn state_hashes(&self, _snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-            vec![]
+        fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
+            StateHashAggregator::default()
         }
 
         fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
