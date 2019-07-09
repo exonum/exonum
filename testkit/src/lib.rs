@@ -243,7 +243,7 @@ impl TestKit {
 
     fn assemble(
         database: TemporaryDB,
-        service_factories: Vec<InstanceCollection>,
+        service_factories: impl IntoIterator<Item = InstanceCollection>,
         network: TestNetwork,
         genesis: GenesisConfig,
     ) -> Self {
@@ -952,23 +952,30 @@ impl StoppedTestKit {
 
     /// Resumes the operation of the testkit.
     ///
-    /// Note that `services` may differ from the vector of services initially passed to
+    /// Note that `available_services` may differ from the vector of services initially passed to
     /// the `TestKit` (which is also what may happen with real Exonum apps).
-    pub fn resume(self, _services: Vec<InstanceCollection>) -> TestKit {
-        unimplemented!();
-        // let genesis = {
-        //     let snapshot = self.db.snapshot();
-        //     let schema = CoreSchema::new(&snapshot);
-        //     GenesisConfig::new(
-        //         schema
-        //             .configuration_by_height(Height(0))
-        //             .validator_keys
-        //             .into_iter(),
-        //     )
-        // };
-        // let mut testkit = TestKit::assemble(self.db, services, self.network, genesis);
-        // testkit.cfg_proposal = self.cfg_proposal;
-        // testkit
+    pub fn resume(
+        self,
+        available_services: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
+    ) -> TestKit {
+        let genesis = {
+            let snapshot = self.db.snapshot();
+            let schema = CoreSchema::new(&snapshot);
+            GenesisConfig::new(
+                schema
+                    .configuration_by_height(Height(0))
+                    .validator_keys
+                    .into_iter(),
+            )
+        };
+        let mut testkit = TestKit::assemble(
+            self.db,
+            available_services.into_iter().map(InstanceCollection::new),
+            self.network,
+            genesis,
+        );
+        testkit.cfg_proposal = self.cfg_proposal;
+        testkit
     }
 }
 
