@@ -74,7 +74,7 @@ use crate::{TestKit, TestNetwork};
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore [ECR-3275]
 /// # extern crate exonum;
 /// # extern crate exonum_testkit;
 /// # extern crate failure;
@@ -112,30 +112,6 @@ pub struct TestKitBuilder {
     service_instances: Vec<InstanceCollection>,
     logger: bool,
 }
-
-// impl fmt::Debug for TestKitBuilder {
-//     #[cfg_attr(feature = "cargo-clippy", allow(clippy::redundant_closure))]
-//     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-//         f.debug_struct("TestKitBuilder")
-//             .field(
-//                 "us",
-//                 &self
-//                     .our_validator_id
-//                     .map_or("Auditor".to_string(), |id| format!("Validator #{}", id.0)),
-//             )
-//             .field("validator_count", &self.validator_count)
-//             .field(
-//                 "services",
-//                 &self
-//                     .services
-//                     .iter()
-//                     .map(|service| service.service_name())
-//                     .collect::<Vec<_>>(),
-//             )
-//             .field("logger", &self.logger)
-//             .finish()
-//     }
-// }
 
 impl TestKitBuilder {
     /// Creates testkit for the validator node.

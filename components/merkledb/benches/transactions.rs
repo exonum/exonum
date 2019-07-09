@@ -240,7 +240,6 @@ impl Block {
 fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> Vec<Block> {
     let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let users = (0..wallets_count)
-        .into_iter()
         .map(|idx| {
             let mut base = [0; PUBLIC_KEY_LENGTH];
             rng.fill_bytes(&mut base);
@@ -254,7 +253,6 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
     };
 
     (0..blocks)
-        .into_iter()
         .map(move |_| {
             let transactions = (0..txs_count)
                 .map(|_| Transaction {

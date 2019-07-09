@@ -34,12 +34,12 @@ pub fn bench_refs(c: &mut Criterion) {
     c.bench_function("refs/index/create/default", move |b| {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        bench_fn(b, &fork, |fork| bench_with_index_access(fork));
+        bench_fn(b, &fork, bench_with_index_access);
     });
 
     c.bench_function("refs/index/create/get_or_create", move |b| {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        bench_fn(b, &fork, |fork| bench_with_object_access(fork));
+        bench_fn(b, &fork, bench_with_object_access);
     });
 }

@@ -60,11 +60,12 @@ fn test_after_commit() {
 }
 
 #[test]
-#[ignore = "TODO: Rewrite restart services business logic [ECR-3260]"]
 fn restart_testkit() {
+    let service = AfterCommitService::new();
+
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(after_commit_service_instances(AfterCommitService::new()))
+        .with_service(after_commit_service_instances(service.clone()))
         .create();
     testkit.create_blocks_until(Height(5));
 
@@ -72,9 +73,7 @@ fn restart_testkit() {
     assert_eq!(stopped.height(), Height(5));
     assert_eq!(stopped.network().validators().len(), 3);
     let service = AfterCommitService::new();
-    let mut testkit = stopped.resume(vec![
-    // service.clone().into()
-    ]);
+    let mut testkit = stopped.resume(vec![service.clone()]);
     for _ in 0..3 {
         testkit.create_block();
     }
@@ -103,7 +102,6 @@ fn restart_testkit() {
 }
 
 #[test]
-#[ignore = "TODO: Rewrite restart services business logic [ECR-3260]"]
 fn tx_pool_is_retained_on_restart() {
     let mut testkit = TestKitBuilder::validator()
         .with_service(after_commit_service_instances(AfterCommitService::new()))
@@ -121,9 +119,7 @@ fn tx_pool_is_retained_on_restart() {
         .collect();
 
     let stopped = testkit.stop();
-    let testkit = stopped.resume(vec![
-        // AfterCommitService::new().into()
-    ]);
+    let testkit = stopped.resume(vec![AfterCommitService::new()]);
     assert!(tx_hashes
         .iter()
         .all(|tx_hash| testkit.is_tx_in_pool(tx_hash)));

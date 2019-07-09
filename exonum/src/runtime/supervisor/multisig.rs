@@ -159,8 +159,6 @@ where
 
 #[test]
 fn test_validator_values_binary_value() {
-    let _ = crate::helpers::init_logger();
-
     let mut set = BinarySet::default();
     let data = vec![
         b"abacaba1224634abcfdfdfca353".to_vec(),
