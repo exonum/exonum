@@ -1002,10 +1002,6 @@ impl SandboxBuilder {
     }
 
     pub fn build(self) -> Sandbox {
-        let _ = env_logger::Builder::from_default_env()
-            .target(env_logger::Target::Stdout)
-            .try_init();
-
         let mut sandbox = sandbox_with_services_uninitialized(
             self.services,
             self.consensus_config,

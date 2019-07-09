@@ -375,7 +375,6 @@ fn test_network_big_message() {
 }
 #[test]
 fn test_network_max_message_len() {
-    let _ = env_logger::try_init();
     let first = "127.0.0.1:17202".parse().unwrap();
     let second = "127.0.0.1:17303".parse().unwrap();
 
