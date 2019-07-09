@@ -232,9 +232,11 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///
 /// ```
 /// # use serde_json::{self, json};
-/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, HashTag};
-/// # use exonum_merkledb::proof_map_index::ProofPath;
-/// # use exonum_crypto::{hash, CryptoHash};
+/// # use exonum_merkledb::{
+/// #    Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, HashTag, 
+/// #    proof_map_index::ProofPath
+/// # };
+/// # use exonum_crypto::hash;
 /// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &fork);

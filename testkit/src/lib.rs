@@ -16,7 +16,7 @@
 //! and in the same process as the testkit.
 //!
 //! # Example
-//! ```
+//! ```ignore [ECR-3275]
 //! extern crate exonum;
 //! #[macro_use]
 //! extern crate exonum_derive;
@@ -338,7 +338,7 @@ impl TestKit {
     /// Rollbacks are useful in testing alternative scenarios (e.g., transactions executed
     /// in different order and/or in different blocks) that require an expensive setup:
     ///
-    /// ```
+    /// ```ignore [ECR-3275]
     /// # extern crate exonum;
     /// # #[macro_use] extern crate exonum_derive;
     /// # #[macro_use] extern crate serde_derive;
@@ -742,7 +742,7 @@ impl TestKit {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore Implement configuration change logic [ECR-3306]
     /// extern crate exonum;
     /// extern crate exonum_testkit;
     /// extern crate serde;
@@ -873,7 +873,7 @@ impl TestKit {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore [ECR-3275]
 /// # use exonum::{
 /// #   blockchain::{Service, Transaction, ServiceContext},
 /// #   helpers::Height, messages::RawTransaction, crypto::Hash,
