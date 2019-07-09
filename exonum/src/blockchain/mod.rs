@@ -14,7 +14,6 @@
 
 //! The module containing building blocks for creating blockchains powered by the Exonum framework.
 
-
 pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
