@@ -125,11 +125,12 @@ jobs:
     - cargo test --all
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
-    - cargo run -p exonum-testkit --example configuration_change
+    # - cargo run -p exonum-testkit --example configuration_change TODO enable after [ECR-3306]
     - cargo run -p exonum-time --example simple_service
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
+    # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308] 
+    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+    # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
 
  # Clippy linting.
   - name: clippy
