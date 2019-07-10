@@ -64,7 +64,7 @@ impl ServiceFactory for TestServiceImpl {
     }
 
     fn artifact_info(&self) -> ArtifactInfo {
-        unimplemented!()
+        ArtifactInfo::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

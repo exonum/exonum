@@ -569,7 +569,7 @@ mod tests {
         }
 
         fn artifact_info(&self, _id: &ArtifactId) -> Option<ArtifactInfo> {
-            None
+            Some(ArtifactInfo::default())
         }
     }
 

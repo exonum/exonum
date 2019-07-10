@@ -35,7 +35,7 @@ pub mod wallet;
 use exonum::{
     api::ServiceApiBuilder,
     impl_service_dispatcher,
-    runtime::rust::{ArtifactInfo, RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
+    runtime::rust::{Service, ServiceDescriptor},
 };
 
 use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
@@ -44,7 +44,8 @@ use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInt
 pub const INITIAL_BALANCE: u64 = 100;
 
 /// Cryptocurrency service implementation.
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(proto_sources = "proto")]
 pub struct CryptocurrencyService;
 
 impl_service_dispatcher!(CryptocurrencyService, CryptocurrencyInterface);
@@ -52,21 +53,5 @@ impl_service_dispatcher!(CryptocurrencyService, CryptocurrencyInterface);
 impl Service for CryptocurrencyService {
     fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::new(descriptor).wire(builder);
-    }
-}
-
-impl ServiceFactory for CryptocurrencyService {
-    fn artifact_id(&self) -> RustArtifactId {
-        exonum::artifact_spec_from_crate!()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }

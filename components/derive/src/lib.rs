@@ -17,6 +17,7 @@
 extern crate proc_macro;
 
 mod pb_convert;
+mod service_factory;
 mod service_interface;
 
 use proc_macro::TokenStream;
@@ -28,6 +29,9 @@ use syn::{Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 const CRATE_PATH_ATTRIBUTE: &str = "crate";
 const PB_CONVERT_ATTRIBUTE: &str = "pb";
 const SERDE_PB_CONVERT_ATTRIBUTE: &str = "serde_pb_convert";
+const ARTIFACT_NAME: &str = "artifact_name";
+const ARTIFACT_VERSION: &str = "artifact_version";
+const PROTO_SOURCES: &str = "proto_sources";
 
 /// Derives `ProtobufConvert` trait.
 ///
@@ -63,6 +67,11 @@ const SERDE_PB_CONVERT_ATTRIBUTE: &str = "serde_pb_convert";
 #[proc_macro_derive(ProtobufConvert, attributes(exonum))]
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
     pb_convert::implement_protobuf_convert(input)
+}
+
+#[proc_macro_derive(ServiceFactory, attributes(exonum))]
+pub fn generate_service_factory(input: TokenStream) -> TokenStream {
+    service_factory::implement_service_factory(input)
 }
 
 #[proc_macro_attribute]
