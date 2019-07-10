@@ -214,11 +214,11 @@ mod tests {
     impl Service for SampleService {}
 
     impl ServiceFactory for SampleService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "sample-service/1.0.0".parse().unwrap()
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

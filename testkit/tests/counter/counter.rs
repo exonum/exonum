@@ -224,11 +224,11 @@ impl Service for CounterService {
 }
 
 impl ServiceFactory for CounterService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         "counter-service/1.0.0".parse().unwrap()
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

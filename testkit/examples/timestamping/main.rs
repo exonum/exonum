@@ -66,10 +66,10 @@ impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 impl Service for TimestampingService {}
 
 impl ServiceFactory for TimestampingService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         "timestamping/1.0.0".parse().unwrap()
     }
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

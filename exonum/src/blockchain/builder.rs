@@ -154,7 +154,7 @@ impl InstanceCollection {
         params: impl Into<Any>,
     ) -> Self {
         let spec = InstanceSpec {
-            artifact: self.factory.artifact().into(),
+            artifact: self.factory.artifact_id().into(),
             id,
             name: name.into(),
         };

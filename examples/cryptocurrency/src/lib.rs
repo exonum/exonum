@@ -297,11 +297,11 @@ pub mod contracts {
     }
 
     impl ServiceFactory for CryptocurrencyService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             exonum::artifact_spec_from_crate!()
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

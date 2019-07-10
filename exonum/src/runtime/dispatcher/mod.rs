@@ -433,7 +433,7 @@ mod tests {
     use crate::{
         crypto::PublicKey,
         messages::{MethodId, ServiceInstanceId},
-        runtime::{rust::RustRuntime, RuntimeIdentifier, StateHashAggregator},
+        runtime::{rust::RustRuntime, RuntimeIdentifier, StateHashAggregator, ArtifactInfo},
     };
 
     use super::*;
@@ -561,6 +561,10 @@ mod tests {
             _service_keypair: &(PublicKey, SecretKey),
             _tx_sender: &ApiSender,
         ) {
+        }
+
+        fn artifact_info(&self, _id: &ArtifactId) -> Option<ArtifactInfo> {
+            None
         }
     }
 

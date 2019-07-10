@@ -89,14 +89,6 @@ impl From<(String, u32)> for ArtifactId {
     }
 }
 
-#[derive(Debug, PartialEq, Default)]
-pub struct StateHashAggregator {
-    pub runtime: Vec<Hash>,
-    pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
-}
-
-// TODO Think about runtime methods' names. [ECR-3222]
-
 /// Runtime environment for services.
 ///
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
@@ -108,6 +100,10 @@ pub trait Runtime: Send + Debug + 'static {
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>>;
+
+    /// Returns additional information about artifact with the specified id,
+    /// if it is deployed.
+    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
     /// Starts a new service instance with the given specification.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
@@ -161,6 +157,17 @@ where
     fn from(runtime: T) -> Self {
         Box::new(runtime) as Self
     }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ArtifactInfo<'a> {
+    pub(crate) proto_sources: &'a [(&'a str, &'a str)],
+}
+
+#[derive(Debug, PartialEq, Default)]
+pub struct StateHashAggregator {
+    pub runtime: Vec<Hash>,
+    pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
 }
 
 #[derive(Debug, PartialEq)]

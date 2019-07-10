@@ -142,10 +142,10 @@ mod timestamping {
     impl Service for Timestamping {}
 
     impl ServiceFactory for Timestamping {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "timestamping/0.0.1".parse().unwrap()
         }
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }
@@ -290,10 +290,10 @@ mod cryptocurrency {
     impl Service for Cryptocurrency {}
 
     impl ServiceFactory for Cryptocurrency {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "cryptocurrency/0.0.1".parse().unwrap()
         }
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

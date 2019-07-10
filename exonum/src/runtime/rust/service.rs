@@ -28,7 +28,7 @@ use crate::{
     runtime::{
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        ExecutionContext,
+        ExecutionContext, ArtifactInfo,
     },
 };
 
@@ -66,8 +66,15 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 }
 
 pub trait ServiceFactory: Send + Debug + 'static {
-    fn artifact(&self) -> RustArtifactId;
-    fn new_instance(&self) -> Box<dyn Service>;
+    fn artifact_id(&self) -> RustArtifactId;
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        const SRC: [(&str, &str); 0] = [];
+
+        ArtifactInfo {  proto_sources: &SRC }
+    }
+
+    fn create_instance(&self) -> Box<dyn Service>;
 }
 
 impl<T> From<T> for Box<dyn ServiceFactory>

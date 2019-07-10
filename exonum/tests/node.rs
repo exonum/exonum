@@ -52,11 +52,11 @@ impl Service for CommitWatcherService {
 }
 
 impl ServiceFactory for CommitWatcherService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         "after-commit/1.0.0".parse().unwrap()
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self(RefCell::new(self.0.borrow_mut().take())))
     }
 }
@@ -77,11 +77,11 @@ impl Service for StartCheckerService {}
 struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
 
 impl ServiceFactory for StartCheckerServiceFactory {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         "configure/1.0.0".parse().unwrap()
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         *self.0.lock().unwrap() += 1;
         Box::new(StartCheckerService)
     }

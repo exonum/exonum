@@ -1184,11 +1184,11 @@ mod tests {
     impl Service for TestService {}
 
     impl ServiceFactory for TestService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "test-service/0.1.0".parse().unwrap()
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

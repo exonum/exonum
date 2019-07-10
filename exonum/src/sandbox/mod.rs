@@ -1224,14 +1224,14 @@ mod tests {
     }
 
     impl ServiceFactory for AfterCommitService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             RustArtifactId {
                 name: "after_commit".into(),
                 version: Version::new(0, 1, 0),
             }
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

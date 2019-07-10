@@ -96,14 +96,14 @@ impl_service_dispatcher!(MyService, ExplorerTransactions);
 impl Service for MyService {}
 
 impl ServiceFactory for MyService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "my-service".into(),
             version: Version::new(1, 0, 0),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

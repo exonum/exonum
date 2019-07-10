@@ -118,14 +118,14 @@ impl Service for Supervisor {
 }
 
 impl ServiceFactory for Supervisor {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "exonum-supervisor".to_owned(),
             version: env!("CARGO_PKG_VERSION").parse().unwrap(),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

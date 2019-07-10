@@ -208,11 +208,11 @@ impl Service for CurrencyService {
 }
 
 impl ServiceFactory for CurrencyService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         "cryptocurrency/1.0.0".parse().unwrap()
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

@@ -123,11 +123,11 @@ impl_service_dispatcher!(MarkerService, MarkerInterface);
 impl Service for MarkerService {}
 
 impl ServiceFactory for MarkerService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         "marker/0.1.0".parse().unwrap()
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

@@ -55,14 +55,14 @@ impl Service for TimestampingService {
 }
 
 impl ServiceFactory for TimestampingService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "timestamping".into(),
             version: Version::new(0, 1, 0),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

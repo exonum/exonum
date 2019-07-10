@@ -51,14 +51,14 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
 impl Service for ConfigUpdaterService {}
 
 impl ServiceFactory for ConfigUpdaterService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "config_updater".into(),
             version: Version::new(0, 1, 0),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

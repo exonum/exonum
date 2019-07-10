@@ -38,7 +38,7 @@ use crate::{
 use super::{
     dispatcher::DispatcherSender,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
+    ArtifactId, ArtifactInfo, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
     StateHashAggregator,
 };
 
@@ -112,7 +112,7 @@ impl RustRuntime {
     }
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
-        let artifact = service_factory.artifact();
+        let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
@@ -211,6 +211,12 @@ impl Runtime for RustRuntime {
         Box::new(self.deploy(artifact).into_future())
     }
 
+    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
+        self.available_artifacts
+            .get(&self.parse_artifact(id)?)
+            .map(|service_factory| service_factory.artifact_info())
+    }
+
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
         let artifact = self
             .parse_artifact(&spec.artifact)
@@ -236,7 +242,7 @@ impl Runtime for RustRuntime {
             .available_artifacts
             .get(&artifact)
             .unwrap()
-            .new_instance();
+            .create_instance();
         self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
         Ok(())
     }

@@ -121,14 +121,14 @@ impl Service for TestServiceImpl {
 struct TestServiceFactory;
 
 impl ServiceFactory for TestServiceFactory {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "test_service".to_owned(),
             version: Version::new(0, 1, 0),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(TestServiceImpl)
     }
 }
@@ -141,7 +141,7 @@ fn test_basic_rust_runtime() {
     let mut runtime = RustRuntime::new();
 
     let service_factory = Box::new(TestServiceFactory);
-    let artifact: ArtifactId = service_factory.artifact().into();
+    let artifact: ArtifactId = service_factory.artifact_id().into();
     runtime.add_service_factory(service_factory);
 
     // Create dummy dispatcher.

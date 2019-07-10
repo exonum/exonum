@@ -113,11 +113,11 @@ impl Default for TimeServiceFactory {
 }
 
 impl ServiceFactory for TimeServiceFactory {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         exonum::artifact_spec_from_crate!()
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(TimeService {
             time: self.time_provider.clone(),
         })
