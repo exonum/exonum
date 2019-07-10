@@ -30,7 +30,9 @@ use exonum::{
     helpers::Height,
     impl_service_dispatcher,
     messages::{AnyTx, ServiceInstanceId, Signed},
-    runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+    runtime::rust::{
+        ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+    },
 };
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
 use exonum_time::{
@@ -125,6 +127,12 @@ impl Service for MarkerService {}
 impl ServiceFactory for MarkerService {
     fn artifact_id(&self) -> RustArtifactId {
         "marker/0.1.0".parse().unwrap()
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: proto::PROTO_SOURCES.as_ref(),
+        }
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

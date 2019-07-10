@@ -43,7 +43,7 @@ use exonum::{
     crypto::Hash,
     impl_service_dispatcher,
     proto::Any,
-    runtime::rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
+    runtime::rust::{ArtifactInfo, RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
 };
 use exonum_merkledb::{Fork, Snapshot};
 
@@ -51,6 +51,7 @@ use std::convert::TryFrom;
 
 use crate::{
     api::PublicApi as TimestampingApi,
+    proto::PROTO_SOURCES,
     schema::{Schema, TimestampEntry},
     transactions::{Config, TimestampingInterface},
 };
@@ -91,7 +92,13 @@ impl ServiceFactory for TimestampingService {
         exonum::artifact_spec_from_crate!()
     }
 
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: PROTO_SOURCES.as_ref(),
+        }
+    }
+
     fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(TimestampingService)
+        Box::new(Self)
     }
 }

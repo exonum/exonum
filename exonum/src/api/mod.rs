@@ -22,11 +22,17 @@ pub use self::{
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use self::{
     backends::actix,
-    node::{private::NodeInfo, public::ExplorerApi},
+    node::{
+        private::NodeInfo,
+        public::{
+            system::{DispatcherInfo, ProtoSource},
+            ExplorerApi,
+        },
+    },
 };
 use crate::{
     api::node::SharedNodeState, blockchain::Blockchain, crypto::PublicKey, node::ApiSender,
@@ -310,30 +316,35 @@ pub trait ExtendApiBackend {
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
 }
 
+type ApiBuilderFactory = dyn Fn() -> ServiceApiBuilder + Send + 'static + Sync;
+
 /// Exonum node API aggregator. This structure enables several API backends to
 /// operate simultaneously. Currently, only HTTP v1 backend is available.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ApiAggregator {
     blockchain: Blockchain,
     node_state: SharedNodeState,
-    inner: BTreeMap<String, ServiceApiBuilder>,
+    api_builders: BTreeMap<String, Arc<ApiBuilderFactory>>,
 }
 
 impl ApiAggregator {
     /// Aggregates API for the given blockchain and node state.
     pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
-        let mut inner = BTreeMap::new();
+        let mut api_builders = BTreeMap::new();
         // Adds built-in APIs.
-        inner.insert(
-            "system".to_owned(),
-            Self::system_api(&blockchain, node_state.clone()),
-        );
-        inner.insert(
-            "explorer".to_owned(),
-            Self::explorer_api(&blockchain, node_state.clone()),
-        );
+        Self::add_api_builder(&mut api_builders, "system", {
+            let blockchain = blockchain.clone();
+            let node_state = node_state.clone();
+            move || Self::system_api(&blockchain.clone(), node_state.clone())
+        });
+        Self::add_api_builder(&mut api_builders, "explorer", {
+            let blockchain = blockchain.clone();
+            let node_state = node_state.clone();
+            move || Self::explorer_api(&blockchain.clone(), node_state.clone())
+        });
+
         Self {
-            inner,
+            api_builders,
             blockchain,
             node_state,
         }
@@ -346,11 +357,15 @@ impl ApiAggregator {
 
     /// Extends the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
-        let mut inner = self.inner.clone();
+        let mut api = self
+            .api_builders
+            .iter()
+            .map(|(name, builder)| (name.clone(), builder()))
+            .collect::<BTreeMap<String, ServiceApiBuilder>>();
 
         let blockchain = self.blockchain.clone();
         let dispatcher = self.blockchain.dispatcher();
-        inner.extend(
+        api.extend(
             dispatcher
                 .services_api()
                 .into_iter()
@@ -360,25 +375,35 @@ impl ApiAggregator {
                 }),
         );
 
-        trace!("Create actix-web worker with api: {:#?}", inner);
+        trace!("Create actix-web worker with api: {:#?}", api);
 
         match access {
             ApiAccess::Public => backend.extend(
-                inner
-                    .iter()
+                api.iter()
                     .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
             ),
             ApiAccess::Private => backend.extend(
-                inner
-                    .iter()
+                api.iter()
                     .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
             ),
         }
     }
 
+    fn add_api_builder(
+        into: &mut BTreeMap<String, Arc<ApiBuilderFactory>>,
+        name: impl Into<String>,
+        builder: impl Fn() -> ServiceApiBuilder + Send + 'static + Sync,
+    ) {
+        into.insert(name.into(), Arc::new(builder));
+    }
+
     /// Adds API factory with the given prefix to the aggregator.
-    pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
-        self.inner.insert(prefix.into(), builder);
+    pub fn insert(
+        &mut self,
+        prefix: impl Into<String>,
+        builder: impl Fn() -> ServiceApiBuilder + Send + 'static + Sync,
+    ) {
+        Self::add_api_builder(&mut self.api_builders, prefix, builder);
     }
 
     fn explorer_api(
@@ -392,15 +417,38 @@ impl ApiAggregator {
     }
 
     fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
-        // Waits until dispatcher will be unlocked to get fresh info.
-        let _dispatcher = blockchain.dispatcher();
-        let snapshot = blockchain.snapshot();
-
         let mut builder = ServiceApiBuilder::new();
         self::node::private::SystemApi::new(NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        self::node::public::SystemApi::new(snapshot.as_ref(), shared_api_state)
+
+        // Waits until dispatcher will be unlocked to get fresh info.
+        let dispatcher = blockchain.dispatcher();
+        let snapshot = blockchain.snapshot();
+        let dispatcher_info = DispatcherInfo::load(snapshot.as_ref());
+        let artifact_sources =
+            dispatcher_info
+                .artifacts
+                .clone()
+                .into_iter()
+                .filter_map(|artifact_id| {
+                    dispatcher.artifact_info(&artifact_id).map(|info| {
+                        (
+                            artifact_id,
+                            info.proto_sources.iter().map(ProtoSource::from).collect(),
+                        )
+                    })
+                });
+        self::node::public::SystemApi::new(dispatcher_info, artifact_sources, shared_api_state)
             .wire(builder.public_scope());
         builder
+    }
+}
+
+impl std::fmt::Debug for ApiAggregator {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("ApiAggregator")
+            .field("blockchain", &self.blockchain)
+            .field("shared_node_state", &self.node_state)
+            .finish()
     }
 }

@@ -15,6 +15,7 @@
 pub use self::service::{
     AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction, TransactionContext,
 };
+pub use super::ArtifactInfo;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
@@ -38,7 +39,7 @@ use crate::{
 use super::{
     dispatcher::DispatcherSender,
     error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactId, ArtifactInfo, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
+    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
     StateHashAggregator,
 };
 
@@ -193,7 +194,7 @@ impl FromStr for RustArtifactId {
                     version,
                 })
             },
-            _ => Err(failure::format_err!("Wrong artifact spec format, in should be in form \"artifact_name/artifact_version\""))
+            _ => Err(failure::format_err!("Wrong rust artifact name format, in should be in form \"artifact_name/artifact_version\""))
         }
     }
 }
@@ -389,6 +390,6 @@ macro_rules! artifact_spec_from_crate {
 }
 
 #[test]
-fn parse_artifact_id_correct() {
+fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service/1.0.0").unwrap();
 }

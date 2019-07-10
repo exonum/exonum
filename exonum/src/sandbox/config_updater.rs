@@ -25,8 +25,11 @@ use crate::{
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, ServiceInstanceId, Signed},
-    proto::ProtobufConvert,
-    runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+    proto::{schema::PROTO_SOURCES, ProtobufConvert},
+    runtime::{
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        ArtifactInfo,
+    },
 };
 
 #[service_interface(exonum(crate = "crate"))]
@@ -55,6 +58,12 @@ impl ServiceFactory for ConfigUpdaterService {
         RustArtifactId {
             name: "config_updater".into(),
             version: Version::new(0, 1, 0),
+        }
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: PROTO_SOURCES.as_ref(),
         }
     }
 

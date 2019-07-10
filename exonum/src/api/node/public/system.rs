@@ -16,10 +16,13 @@
 
 use exonum_merkledb::IndexAccess;
 
+use std::{collections::BTreeMap, sync::Arc};
+
 use crate::{
-    api::{node::SharedNodeState, ServiceApiScope, ServiceApiState},
+    api::{self, node::SharedNodeState, ServiceApiScope, ServiceApiState},
     blockchain::Schema,
     helpers::user_agent,
+    proto::schema::PROTO_SOURCES as EXONUM_PROTO_SOURCES,
     runtime::{dispatcher, ArtifactId, InstanceSpec},
 };
 
@@ -74,22 +77,51 @@ impl DispatcherInfo {
     }
 }
 
+/// Protobuf source file.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProtoSource {
+    /// Source file name.
+    pub name: String,
+    /// Source file content.
+    pub content: String,
+}
+
+impl<'a> From<&'a (&'a str, &'a str)> for ProtoSource {
+    fn from(v: &'a (&'a str, &'a str)) -> Self {
+        Self {
+            name: v.0.to_owned(),
+            content: v.1.to_owned(),
+        }
+    }
+}
+
+/// Protobuf sources query parameters.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProtoSourcesQuery {
+    /// Artifact identifier, if specified, query returns the source files of the artifact,
+    /// otherwise it returns source files of `exonum` itself.
+    pub artifact: Option<String>,
+}
+
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
     shared_api_state: SharedNodeState,
     dispatcher_info: DispatcherInfo,
+    artifact_sources: Arc<BTreeMap<ArtifactId, Vec<ProtoSource>>>,
 }
 
 impl SystemApi {
     /// Creates a new `public::SystemApi` instance.
-    ///
-    /// This method loads from the specified access item persistent information like
-    /// list of services to optimize IO.
-    pub fn new(access: impl IndexAccess, shared_api_state: SharedNodeState) -> Self {
+    pub fn new(
+        dispatcher_info: DispatcherInfo,
+        artifact_sources: impl IntoIterator<Item = (ArtifactId, Vec<ProtoSource>)>,
+        shared_api_state: SharedNodeState,
+    ) -> Self {
         Self {
             shared_api_state,
-            dispatcher_info: DispatcherInfo::load(access),
+            dispatcher_info,
+            artifact_sources: Arc::new(artifact_sources.into_iter().collect()),
         }
     }
 
@@ -129,8 +161,32 @@ impl SystemApi {
         api_scope: &mut ServiceApiScope,
     ) -> Self {
         api_scope.endpoint(name, {
-            // TODO cache Dispatcher info.
-            move |state: &ServiceApiState, _query: ()| Ok(DispatcherInfo::load(&state.snapshot()))
+            let dispatcher_info = self.dispatcher_info.clone();
+            move |_state: &ServiceApiState, _query: ()| Ok(dispatcher_info.clone())
+        });
+        self
+    }
+
+    fn handle_proto_source(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        api_scope.endpoint(name, {
+            let artifact_sources = self.artifact_sources.clone();
+            move |_state: &ServiceApiState, query: ProtoSourcesQuery| {
+                if let Some(artifact_id) = query.artifact {
+                    let artifact_id: ArtifactId = artifact_id.parse()?;
+                    artifact_sources.get(&artifact_id).cloned().ok_or_else(|| {
+                        api::Error::NotFound(format!(
+                            "Unable to find sources for artifact {}",
+                            artifact_id
+                        ))
+                    })
+                } else {
+                    Ok(EXONUM_PROTO_SOURCES
+                        .as_ref()
+                        .iter()
+                        .map(ProtoSource::from)
+                        .collect::<Vec<_>>())
+                }
+            }
         });
         self
     }
@@ -160,7 +216,8 @@ impl SystemApi {
         self.handle_stats_info("v1/stats", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)
             .handle_user_agent_info("v1/user_agent", api_scope)
-            .handle_list_services_info("v1/services", api_scope);
+            .handle_list_services_info("v1/services", api_scope)
+            .handle_proto_source("v1/proto-sources", api_scope);
         api_scope
     }
 }

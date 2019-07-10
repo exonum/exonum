@@ -35,7 +35,7 @@ pub mod wallet;
 use exonum::{
     api::ServiceApiBuilder,
     impl_service_dispatcher,
-    runtime::rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
+    runtime::rust::{ArtifactInfo, RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
 };
 
 use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
@@ -58,6 +58,12 @@ impl Service for CryptocurrencyService {
 impl ServiceFactory for CryptocurrencyService {
     fn artifact_id(&self) -> RustArtifactId {
         exonum::artifact_spec_from_crate!()
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: proto::PROTO_SOURCES.as_ref(),
+        }
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

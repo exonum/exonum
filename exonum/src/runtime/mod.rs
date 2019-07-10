@@ -18,7 +18,10 @@ use exonum_merkledb::{Fork, Snapshot};
 use futures::Future;
 use serde_derive::{Deserialize, Serialize};
 
-use std::fmt::Debug;
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 use crate::{
     api::ServiceApiBuilder,
@@ -61,7 +64,9 @@ impl From<RuntimeIdentifier> for u32 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord,
+)]
 #[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
 pub struct ArtifactId {
     pub runtime_id: u32,
@@ -89,6 +94,29 @@ impl From<(String, u32)> for ArtifactId {
     }
 }
 
+impl Display for ArtifactId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}:{}", self.runtime_id, self.name)
+    }
+}
+
+impl FromStr for ArtifactId {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let split = s.split(':').take(2).collect::<Vec<_>>();
+        match &split[..] {
+            [runtime_id, name] => Ok(Self {
+                runtime_id: runtime_id.parse()?,
+                name: name.to_string(),
+            }),
+            _ => Err(failure::format_err!(
+                "Wrong artifact id format, in should be in form \"runtime_id:artifact_name\""
+            )),
+        }
+    }
+}
+
 /// Runtime environment for services.
 ///
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
@@ -101,8 +129,7 @@ pub trait Runtime: Send + Debug + 'static {
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>>;
 
-    /// Returns additional information about artifact with the specified id,
-    /// if it is deployed.
+    /// Returns additional information about artifact with the specified id if it is deployed.
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
     /// Starts a new service instance with the given specification.
@@ -161,7 +188,18 @@ where
 
 #[derive(Debug, PartialEq)]
 pub struct ArtifactInfo<'a> {
-    pub(crate) proto_sources: &'a [(&'a str, &'a str)],
+    pub proto_sources: &'a [(&'a str, &'a str)],
+}
+
+impl<'a> Default for ArtifactInfo<'a> {
+    /// Creates blank artifact information without any proto sources.
+    fn default() -> Self {
+        const EMPTY_SOURCE: [(&str, &str); 0] = [];
+
+        Self {
+            proto_sources: EMPTY_SOURCE.as_ref(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -219,4 +257,9 @@ impl<'a> ExecutionContext<'a> {
         std::mem::swap(&mut self.actions, &mut other);
         other
     }
+}
+
+#[test]
+fn parse_artifact_id_correct() {
+    ArtifactId::from_str("0:my-service/1.0.0").unwrap();
 }

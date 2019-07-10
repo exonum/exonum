@@ -14,7 +14,6 @@
 
 use exonum_derive::service_interface;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
-use futures::sync::mpsc;
 use semver::Version;
 
 use std::convert::TryFrom;
@@ -22,14 +21,17 @@ use std::convert::TryFrom;
 use crate::{
     messages::{CallInfo, ServiceInstanceId},
     proto::{
-        schema::tests::{TestServiceInit, TestServiceTx},
+        schema::{
+            tests::{TestServiceInit, TestServiceTx},
+            PROTO_SOURCES,
+        },
         Any,
     },
     runtime::{
         dispatcher::Dispatcher,
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        Caller, ExecutionContext, InstanceSpec,
+        ArtifactInfo, Caller, ExecutionContext, InstanceSpec,
     },
 };
 
@@ -131,6 +133,12 @@ impl ServiceFactory for TestServiceFactory {
     fn create_instance(&self) -> Box<dyn Service> {
         Box::new(TestServiceImpl)
     }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: PROTO_SOURCES.as_ref(),
+        }
+    }
 }
 
 #[test]
@@ -145,7 +153,7 @@ fn test_basic_rust_runtime() {
     runtime.add_service_factory(service_factory);
 
     // Create dummy dispatcher.
-    let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()], mpsc::channel(0).0);
+    let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()]);
 
     // Deploy service.
     let fork = db.fork();

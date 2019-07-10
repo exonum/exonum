@@ -1155,7 +1155,7 @@ mod tests {
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ServiceInstanceId,
+            ArtifactInfo, ServiceInstanceId,
         },
     };
 
@@ -1186,6 +1186,10 @@ mod tests {
     impl ServiceFactory for TestService {
         fn artifact_id(&self) -> RustArtifactId {
             "test-service/0.1.0".parse().unwrap()
+        }
+
+        fn artifact_info(&self) -> ArtifactInfo {
+            ArtifactInfo::default()
         }
 
         fn create_instance(&self) -> Box<dyn Service> {

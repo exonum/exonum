@@ -45,7 +45,8 @@ use exonum::{
     crypto::Hash,
     impl_service_dispatcher,
     runtime::rust::{
-        AfterCommitContext, RustArtifactId, Service, ServiceDescriptor, ServiceFactory,
+        AfterCommitContext, ArtifactInfo, RustArtifactId, Service, ServiceDescriptor,
+        ServiceFactory,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -115,6 +116,12 @@ impl Default for TimeServiceFactory {
 impl ServiceFactory for TimeServiceFactory {
     fn artifact_id(&self) -> RustArtifactId {
         exonum::artifact_spec_from_crate!()
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: proto::PROTO_SOURCES.as_ref(),
+        }
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

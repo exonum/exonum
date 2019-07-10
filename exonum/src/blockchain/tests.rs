@@ -25,7 +25,10 @@ use crate::{
     messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
-    runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+    runtime::{
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        ArtifactInfo,
+    },
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -58,6 +61,10 @@ impl_service_dispatcher!(TestServiceImpl, TestService);
 impl ServiceFactory for TestServiceImpl {
     fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId::new("test_service", 1, 0, 0)
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        unimplemented!()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -99,6 +106,10 @@ impl ServiceFactory for ServiceGoodImpl {
         RustArtifactId::new("good_service", 1, 0, 0)
     }
 
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
     fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
@@ -125,6 +136,10 @@ impl ServiceFactory for ServicePanicImpl {
         RustArtifactId::new("panic_service", 1, 0, 0)
     }
 
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
     fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
@@ -149,6 +164,10 @@ impl_service_dispatcher!(ServicePanicStorageErrorImpl, ServicePanicStorageError)
 impl ServiceFactory for ServicePanicStorageErrorImpl {
     fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId::new("storage_error_service", 1, 0, 0)
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

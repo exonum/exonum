@@ -31,7 +31,7 @@ use exonum_merkledb::{
     Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch, Result as StorageResult,
     Snapshot,
 };
-use futures::sync::mpsc;
+use futures::{sync::mpsc, Future, Sink};
 
 use std::{
     collections::HashMap,
@@ -71,6 +71,7 @@ pub struct Blockchain {
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
     dispatcher: Arc<Mutex<Dispatcher>>,
+    internal_requests: mpsc::Sender<InternalRequest>,
 }
 
 impl Blockchain {
@@ -82,7 +83,7 @@ impl Blockchain {
         config: GenesisConfig,
         service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
-        dispatcher_requests: mpsc::Sender<InternalRequest>,
+        internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
         let mut services = services.into_iter().collect::<Vec<_>>();
         // Adds builtin supervisor service.
@@ -94,7 +95,7 @@ impl Blockchain {
 
         BlockchainBuilder::new(database, config, service_keypair)
             .with_rust_runtime(services)
-            .finalize(api_sender, dispatcher_requests)
+            .finalize(api_sender, internal_requests)
             .expect("Unable to create blockchain instance")
     }
 
@@ -105,12 +106,14 @@ impl Blockchain {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
+        internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
             db: db.into(),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
             dispatcher: Arc::new(Mutex::new(dispatcher)),
+            internal_requests,
         }
     }
 
@@ -403,7 +406,15 @@ impl Blockchain {
         // Invokes `after_commit` for each service in order of their identifiers
         let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
         dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
-
+        // Sends `RestartApi` request if dispatcher state was been modified.
+        if dispatcher.take_modified_state() {
+            self.internal_requests
+                .clone()
+                .send(InternalRequest::RestartApi)
+                .wait()
+                .map_err(|e| error!("Failed to request API restart: {}", e))
+                .ok();
+        }
         Ok(())
     }
 

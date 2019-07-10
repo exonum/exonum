@@ -23,7 +23,7 @@ use exonum::{
     messages::{AnyTx, Signed},
     runtime::{
         rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ServiceInstanceId,
+        ArtifactInfo, ServiceInstanceId,
     },
 };
 use exonum_derive::{service_interface, ProtobufConvert};
@@ -226,6 +226,12 @@ impl Service for CounterService {
 impl ServiceFactory for CounterService {
     fn artifact_id(&self) -> RustArtifactId {
         "counter-service/1.0.0".parse().unwrap()
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: proto::PROTO_SOURCES.as_ref(),
+        }
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
