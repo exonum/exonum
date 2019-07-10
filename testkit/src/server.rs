@@ -152,7 +152,9 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
         testkit.read().unwrap().blockchain().clone(),
         SharedNodeState::new(10_000),
     );
-    aggregator.insert("testkit", create_testkit_handlers(testkit));
+
+    let testkit = testkit.clone();
+    aggregator.insert("testkit", move || create_testkit_handlers(&testkit.clone()));
     aggregator
 }
 
