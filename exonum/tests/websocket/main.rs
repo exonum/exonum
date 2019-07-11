@@ -402,7 +402,7 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
                 .expect("Cannot connect to node");
             client
                 .stream_ref()
-                .set_read_timeout(Some(Duration::from_secs(30)))
+                .set_read_timeout(Some(Duration::from_secs(10)))
                 .unwrap();
             client
         })

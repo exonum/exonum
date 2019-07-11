@@ -16,8 +16,6 @@
 
 use exonum_merkledb::IndexAccess;
 
-use std::{collections::BTreeMap, sync::Arc};
-
 use crate::{
     api::{self, node::SharedNodeState, ServiceApiScope, ServiceApiState},
     blockchain::Schema,
@@ -58,7 +56,7 @@ pub struct HealthCheckInfo {
 }
 
 /// Services info response.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct DispatcherInfo {
     /// List of deployed artifacts.
     pub artifacts: Vec<ArtifactId>,
@@ -107,22 +105,12 @@ pub struct ProtoSourcesQuery {
 #[derive(Clone, Debug)]
 pub struct SystemApi {
     shared_api_state: SharedNodeState,
-    dispatcher_info: DispatcherInfo,
-    artifact_sources: Arc<BTreeMap<ArtifactId, Vec<ProtoSource>>>,
 }
 
 impl SystemApi {
     /// Creates a new `public::SystemApi` instance.
-    pub fn new(
-        dispatcher_info: DispatcherInfo,
-        artifact_sources: impl IntoIterator<Item = (ArtifactId, Vec<ProtoSource>)>,
-        shared_api_state: SharedNodeState,
-    ) -> Self {
-        Self {
-            shared_api_state,
-            dispatcher_info,
-            artifact_sources: Arc::new(artifact_sources.into_iter().collect()),
-        }
+    pub fn new(shared_api_state: SharedNodeState) -> Self {
+        Self { shared_api_state }
     }
 
     fn handle_stats_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
@@ -160,25 +148,26 @@ impl SystemApi {
         name: &'static str,
         api_scope: &mut ServiceApiScope,
     ) -> Self {
-        api_scope.endpoint(name, {
-            let dispatcher_info = self.dispatcher_info.clone();
-            move |_state: &ServiceApiState, _query: ()| Ok(dispatcher_info.clone())
+        let api_state = self.shared_api_state.clone();
+        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
+            Ok(api_state.dispatcher_info())
         });
         self
     }
 
     fn handle_proto_source(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        let api_state = self.shared_api_state.clone();
         api_scope.endpoint(name, {
-            let artifact_sources = self.artifact_sources.clone();
             move |_state: &ServiceApiState, query: ProtoSourcesQuery| {
                 if let Some(artifact_id) = query.artifact {
-                    let artifact_id: ArtifactId = artifact_id.parse()?;
-                    artifact_sources.get(&artifact_id).cloned().ok_or_else(|| {
-                        api::Error::NotFound(format!(
-                            "Unable to find sources for artifact {}",
-                            artifact_id
-                        ))
-                    })
+                    api_state
+                        .artifact_sources(&artifact_id.parse()?)
+                        .ok_or_else(|| {
+                            api::Error::NotFound(format!(
+                                "Unable to find sources for artifact {}",
+                                artifact_id
+                            ))
+                        })
                 } else {
                     Ok(EXONUM_PROTO_SOURCES
                         .as_ref()

@@ -25,12 +25,15 @@ use std::{
 
 use crate::{
     api::websocket,
-    blockchain::ValidatorKeys,
+    blockchain::{Blockchain, ValidatorKeys},
     crypto::Hash,
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
+    runtime::ArtifactId,
 };
+
+use self::public::system::{DispatcherInfo, ProtoSource};
 
 pub mod private;
 pub mod public;
@@ -46,6 +49,12 @@ pub struct ApiNodeState {
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
     broadcast_server_address: Option<Addr<websocket::Server>>,
+}
+
+#[derive(Debug, Default)]
+pub struct DispatcherState {
+    info: DispatcherInfo,
+    artifact_sources: HashMap<ArtifactId, Vec<ProtoSource>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -72,12 +81,13 @@ impl ApiNodeState {
 }
 
 /// Shared part of the context, used to take some values from the `Node`
-/// `State`. As there is no way to directly access
+/// `State` and `Dispatcher`. As there is no way to directly access
 /// the node state, this entity is regularly updated with information about the
 /// node and transfers this information to API.
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
-    state: Arc<RwLock<ApiNodeState>>,
+    node: Arc<RwLock<ApiNodeState>>,
+    dispatcher: Arc<RwLock<DispatcherState>>,
     /// Timeout to update API state.
     pub state_update_timeout: Milliseconds,
 }
@@ -86,13 +96,14 @@ impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
     pub fn new(state_update_timeout: Milliseconds) -> Self {
         Self {
-            state: Arc::new(RwLock::new(ApiNodeState::new())),
+            node: Arc::new(RwLock::new(ApiNodeState::new())),
+            dispatcher: Arc::new(RwLock::new(DispatcherState::default())),
             state_update_timeout,
         }
     }
     /// Returns a list of connected addresses of other nodes.
     pub fn incoming_connections(&self) -> Vec<ConnectInfo> {
-        self.state
+        self.node
             .read()
             .expect("Expected read lock.")
             .incoming_connections
@@ -100,9 +111,10 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
+
     /// Returns a list of our connection sockets.
     pub fn outgoing_connections(&self) -> Vec<ConnectInfo> {
-        self.state
+        self.node
             .read()
             .expect("Expected read lock.")
             .outgoing_connections
@@ -110,11 +122,12 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
+
     /// Returns a list of other nodes to which the connection has failed
     /// and a reconnect attempt is required. The method also indicates the time
     /// after which a new connection attempt is performed.
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
-        self.state
+        self.node
             .read()
             .expect("Expected read lock.")
             .reconnects_timeout
@@ -123,9 +136,60 @@ impl SharedNodeState {
             .collect()
     }
 
+    /// Returns a boolean value which indicates whether the consensus is achieved.
+    pub fn consensus_status(&self) -> bool {
+        let lock = self.node.read().expect("Expected read lock.");
+        let mut active_validators = lock
+            .incoming_connections
+            .iter()
+            .chain(lock.outgoing_connections.iter())
+            .filter(|ci| {
+                lock.validators
+                    .iter()
+                    .any(|v| v.consensus_key == ci.public_key)
+            })
+            .count();
+
+        if lock.node_role.is_validator() {
+            // Peers list doesn't include current node address, so we have to increment its length.
+            // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
+            active_validators += 1;
+        }
+
+        // Just after Node is started (node status isn't updated) majority_count = 0,
+        // so we have to check that majority count is greater than 0.
+        active_validators >= lock.majority_count && lock.majority_count > 0
+    }
+
+    /// Returns a boolean value which indicates whether the node is enabled
+    /// or not.
+    pub fn is_enabled(&self) -> bool {
+        let state = self.node.read().expect("Expected read lock.");
+        state.is_enabled
+    }
+
+    /// Returns actual summary information about dispatcher.
+    pub fn dispatcher_info(&self) -> DispatcherInfo {
+        self.dispatcher
+            .read()
+            .expect("Expected read lock")
+            .info
+            .clone()
+    }
+
+    /// Returns the source files of the artifact with the specified identifier.
+    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<Vec<ProtoSource>> {
+        self.dispatcher
+            .read()
+            .expect("Expected read lock")
+            .artifact_sources
+            .get(id)
+            .cloned()
+    }
+
     /// Updates internal state, from `State` of a blockchain node.
-    pub fn update_node_state(&self, state: &State) {
-        let mut lock = self.state.write().expect("Expected write lock.");
+    pub(crate) fn update_node_state(&self, state: &State) {
+        let mut lock = self.node.write().expect("Expected write lock.");
 
         lock.incoming_connections.clear();
         lock.outgoing_connections.clear();
@@ -153,48 +217,39 @@ impl SharedNodeState {
         }
     }
 
-    /// Returns a boolean value which indicates whether the consensus is achieved.
-    pub fn consensus_status(&self) -> bool {
-        let lock = self.state.read().expect("Expected read lock.");
-        let mut active_validators = lock
-            .incoming_connections
-            .iter()
-            .chain(lock.outgoing_connections.iter())
-            .filter(|ci| {
-                lock.validators
-                    .iter()
-                    .any(|v| v.consensus_key == ci.public_key)
+    /// Updates dispatcher state, from `Dispatcher` of a blockchain node.
+    pub(crate) fn update_dispatcher_state(&self, blockchain: &Blockchain) {
+        let dispatcher = blockchain.dispatcher();
+        let snapshot = blockchain.snapshot();
+
+        let mut dispatcher_state = self.dispatcher.write().expect("Expected write lock");
+        dispatcher_state.info = DispatcherInfo::load(snapshot.as_ref());
+        dispatcher_state.artifact_sources = dispatcher_state
+            .info
+            .artifacts
+            .clone()
+            .into_iter()
+            .filter_map(|artifact_id| {
+                dispatcher.artifact_info(&artifact_id).map(|info| {
+                    (
+                        artifact_id,
+                        info.proto_sources.iter().map(ProtoSource::from).collect(),
+                    )
+                })
             })
-            .count();
-
-        if lock.node_role.is_validator() {
-            // Peers list doesn't include current node address, so we have to increment its length.
-            // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
-            active_validators += 1;
-        }
-
-        // Just after Node is started (node status isn't updated) majority_count = 0,
-        // so we have to check that majority count is greater than 0.
-        active_validators >= lock.majority_count && lock.majority_count > 0
-    }
-
-    /// Returns a boolean value which indicates whether the node is enabled
-    /// or not.
-    pub fn is_enabled(&self) -> bool {
-        let state = self.state.read().expect("Expected read lock.");
-        state.is_enabled
+            .collect();
     }
 
     /// Transfers information to the node that the consensus process on the node
     /// should halt.
-    pub fn set_enabled(&self, is_enabled: bool) {
-        let mut state = self.state.write().expect("Expected write lock.");
-        state.is_enabled = is_enabled;
+    pub(crate) fn set_enabled(&self, is_enabled: bool) {
+        let mut node = self.node.write().expect("Expected write lock.");
+        node.is_enabled = is_enabled;
     }
 
     pub(crate) fn set_node_role(&self, role: NodeRole) {
-        let mut state = self.state.write().expect("Expected write lock.");
-        state.node_role = role;
+        let mut node = self.node.write().expect("Expected write lock.");
+        node.node_role = role;
     }
 
     /// Returns the value of the `state_update_timeout`.
@@ -208,7 +263,7 @@ impl SharedNodeState {
         addr: SocketAddr,
         timeout: Milliseconds,
     ) -> Option<Milliseconds> {
-        self.state
+        self.node
             .write()
             .expect("Expected write lock")
             .reconnects_timeout
@@ -217,7 +272,7 @@ impl SharedNodeState {
 
     /// Removes the reconnect timeout and returns the previous value.
     pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
-        self.state
+        self.node
             .write()
             .expect("Expected write lock")
             .reconnects_timeout
@@ -225,14 +280,14 @@ impl SharedNodeState {
     }
 
     pub(crate) fn set_broadcast_server_address(&self, address: Addr<websocket::Server>) {
-        let mut state = self.state.write().expect("Expected write lock");
-        state.broadcast_server_address = Some(address);
+        let mut node = self.node.write().expect("Expected write lock");
+        node.broadcast_server_address = Some(address);
     }
 
     /// Broadcast message to all subscribers.
     pub(crate) fn broadcast(&self, block_hash: &Hash) {
         if let Some(ref address) = self
-            .state
+            .node
             .read()
             .expect("Expected read lock")
             .broadcast_server_address
@@ -244,7 +299,7 @@ impl SharedNodeState {
     }
 
     pub(crate) fn shutdown_broadcast_server(&self) {
-        let state = self.state.read().expect("Expected read lock");
+        let state = self.node.read().expect("Expected read lock");
         if let Some(server) = state.broadcast_server_address.as_ref() {
             server.do_send(websocket::Terminate);
         }

@@ -226,7 +226,7 @@ impl Blockchain {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
-        let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
+        let mut dispatcher = self.dispatcher();
         // Create fork
         let mut fork = self.fork();
 
@@ -404,7 +404,7 @@ impl Blockchain {
         };
         self.merge(patch)?;
         // Invokes `after_commit` for each service in order of their identifiers
-        let mut dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
+        let mut dispatcher = self.dispatcher();
         dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
         // Sends `RestartApi` request if dispatcher state was been modified.
         if dispatcher.take_modified_state() {

@@ -1060,11 +1060,8 @@ impl Node {
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
-
         // Stop ws server.
         api_state.shutdown_broadcast_server();
-
-        info!("Exonum node stopped");
         Ok(())
     }
 
