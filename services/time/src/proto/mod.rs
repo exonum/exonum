@@ -15,8 +15,7 @@
 //! Module of the rust-protobuf generated files.
 
 #![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
 
-pub use self::time::TxTime;
+pub use self::service::TxTime;
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));

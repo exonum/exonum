@@ -14,10 +14,10 @@
 
 //! Module of the rust-protobuf generated files.
 
+// For protobuf generated files.
 #![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
 
-pub use self::cryptocurrency::{CreateWallet, Issue, Transfer, Wallet};
+pub use self::service::{CreateWallet, Issue, Transfer, Wallet};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
