@@ -54,7 +54,7 @@ macro_rules! literal_or_default {
         } else {
             quote! { $default }
         };
-    }
+    };
 }
 
 pub fn implement_service_factory(input: TokenStream) -> TokenStream {
@@ -70,7 +70,8 @@ pub fn implement_service_factory(input: TokenStream) -> TokenStream {
     let proto_sources_mod = get_protobuf_sources_mod_path(&meta_attrs);
 
     let artifact_name = literal_or_default!(&meta_attrs, ARTIFACT_NAME, env!("CARGO_PKG_NAME"));
-    let artifact_version = literal_or_default!(&meta_attrs, ARTIFACT_VERSION, env!("CARGO_PKG_VERSION"));
+    let artifact_version =
+        literal_or_default!(&meta_attrs, ARTIFACT_VERSION, env!("CARGO_PKG_VERSION"));
 
     let expanded = quote! {
         impl #cr::runtime::rust::ServiceFactory for #name {

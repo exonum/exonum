@@ -14,11 +14,9 @@
 
 use std::str::FromStr;
 
-use crate::{
-    helpers::Height,
-    proto::{schema, Any},
-    runtime::ArtifactId,
-};
+use crate::{helpers::Height, proto::Any, runtime::ArtifactId};
+
+pub mod schema;
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]

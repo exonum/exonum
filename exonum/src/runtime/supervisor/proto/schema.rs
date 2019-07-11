@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module with protobuf generated files from `schema/exonum`.
-
-// For rust-protobuf generated files.
 #![allow(bare_trait_objects)]
 
-include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
+include!(concat!(env!("OUT_DIR"), "/exonum_supervisor_mod.rs"));
+
+use crate::proto::schema::*;

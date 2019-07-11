@@ -206,10 +206,7 @@ pub mod contracts {
         api::ServiceApiBuilder,
         blockchain::ExecutionResult,
         impl_service_dispatcher,
-        runtime::rust::{
-            Service, ServiceDescriptor,
-            TransactionContext,
-        },
+        runtime::rust::{Service, ServiceDescriptor, TransactionContext},
     };
 
     use crate::{

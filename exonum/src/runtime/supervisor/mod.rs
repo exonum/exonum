@@ -25,13 +25,8 @@ use crate::{
     blockchain,
     crypto::Hash,
     messages::ServiceInstanceId,
-    proto::schema::PROTO_SOURCES,
-    runtime::{
-        rust::{
-            AfterCommitContext, RustArtifactId, Service, ServiceDescriptor, ServiceFactory,
-            Transaction, TransactionContext,
-        },
-        ArtifactInfo,
+    runtime::rust::{
+        AfterCommitContext, Service, ServiceDescriptor, Transaction, TransactionContext,
     },
 };
 
@@ -42,7 +37,12 @@ mod proto;
 mod schema;
 mod transactions;
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    proto_sources = "proto::schema",
+    artifact_name = "exonum-supervisor"
+)]
 pub struct Supervisor;
 
 impl Service for Supervisor {
@@ -118,25 +118,6 @@ impl Service for Supervisor {
                     .dispatcher_channel()
                     .request_deploy_artifact(artifact, spec, and_then);
             })
-    }
-}
-
-impl ServiceFactory for Supervisor {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId {
-            name: "exonum-supervisor".to_owned(),
-            version: env!("CARGO_PKG_VERSION").parse().unwrap(),
-        }
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }
 

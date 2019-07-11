@@ -163,6 +163,21 @@ where
     generate_mod_rs(&out_dir, &proto_files, &mod_file_name.as_ref());
 
     let includes = includes.into_iter().collect::<Vec<_>>();
+    // Converts paths to strings and adds input dir to includes.
+    let mut includes = includes
+        .iter()
+        .map(|s| {
+            s.as_ref()
+                .to_str()
+                .expect("Include dir name is not convertible to &str")
+        })
+        .collect::<Vec<_>>();
+    includes.push(
+        input_dir
+            .as_ref()
+            .to_str()
+            .expect("Input dir name is not convertible to &str"),
+    );
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: out_dir
@@ -172,14 +187,7 @@ where
             .iter()
             .map(|s| s.to_str().expect("File name is not convertible to &str"))
             .collect::<Vec<_>>(),
-        includes: &includes
-            .iter()
-            .map(|s| {
-                s.as_ref()
-                    .to_str()
-                    .expect("Include dir name is not convertible to &str")
-            })
-            .collect::<Vec<_>>(),
+        includes: &includes,
         customize: Customize {
             serde_derive: Some(true),
             ..Default::default()

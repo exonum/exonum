@@ -45,14 +45,21 @@ fn main() {
     // Exonum external tests.
     protobuf_generate(
         "tests/explorer/blockchain/proto",
-        &["tests/explorer/blockchain/proto", "src/proto/schema/exonum"],
+        &["src/proto/schema/exonum"],
         "exonum_tests_proto_mod.rs",
+    );
+
+    // Supervisor service.
+    protobuf_generate(
+        "src/runtime/supervisor/proto",
+        &["src/proto/schema/exonum"],
+        "exonum_supervisor_mod.rs",
     );
 
     // Exonum benchmarks.
     protobuf_generate(
         "benches/criterion/proto",
-        &["benches/criterion/proto", "src/proto/schema/exonum"],
+        &["src/proto/schema/exonum"],
         "exonum_benches_proto_mod.rs",
     );
 }
