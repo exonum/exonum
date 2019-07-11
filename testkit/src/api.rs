@@ -73,7 +73,10 @@ impl TestKitApi {
     /// Creates a new instance of API.
     pub fn new(testkit: &TestKit) -> Self {
         Self::from_raw_parts(
-            ApiAggregator::new(testkit.blockchain().clone(), SharedNodeState::new(10_000)),
+            ApiAggregator::new(
+                testkit.blockchain().clone(),
+                SharedNodeState::new(testkit.blockchain(), 10_000),
+            ),
             testkit.api_sender.clone(),
         )
     }

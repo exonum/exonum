@@ -57,6 +57,33 @@ pub struct DispatcherState {
     artifact_sources: HashMap<ArtifactId, Vec<ProtoSource>>,
 }
 
+impl DispatcherState {
+    fn load(blockchain: &Blockchain) -> Self {
+        let snapshot = blockchain.snapshot();
+        let dispatcher = blockchain.dispatcher();
+
+        let info = DispatcherInfo::load(snapshot.as_ref());
+        let artifact_sources = info
+            .artifacts
+            .clone()
+            .into_iter()
+            .filter_map(|artifact_id| {
+                dispatcher.artifact_info(&artifact_id).map(|info| {
+                    (
+                        artifact_id,
+                        info.proto_sources.iter().map(ProtoSource::from).collect(),
+                    )
+                })
+            })
+            .collect();
+
+        Self {
+            info,
+            artifact_sources,
+        }
+    }
+}
+
 impl fmt::Debug for ApiNodeState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ApiNodeState")
@@ -94,10 +121,10 @@ pub struct SharedNodeState {
 
 impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
-    pub fn new(state_update_timeout: Milliseconds) -> Self {
+    pub fn new(blockchain: &Blockchain, state_update_timeout: Milliseconds) -> Self {
         Self {
             node: Arc::new(RwLock::new(ApiNodeState::new())),
-            dispatcher: Arc::new(RwLock::new(DispatcherState::default())),
+            dispatcher: Arc::new(RwLock::new(DispatcherState::load(blockchain))),
             state_update_timeout,
         }
     }
@@ -219,25 +246,8 @@ impl SharedNodeState {
 
     /// Updates dispatcher state, from `Dispatcher` of a blockchain node.
     pub(crate) fn update_dispatcher_state(&self, blockchain: &Blockchain) {
-        let dispatcher = blockchain.dispatcher();
-        let snapshot = blockchain.snapshot();
-
         let mut dispatcher_state = self.dispatcher.write().expect("Expected write lock");
-        dispatcher_state.info = DispatcherInfo::load(snapshot.as_ref());
-        dispatcher_state.artifact_sources = dispatcher_state
-            .info
-            .artifacts
-            .clone()
-            .into_iter()
-            .filter_map(|artifact_id| {
-                dispatcher.artifact_info(&artifact_id).map(|info| {
-                    (
-                        artifact_id,
-                        info.proto_sources.iter().map(ProtoSource::from).collect(),
-                    )
-                })
-            })
-            .collect();
+        *dispatcher_state = DispatcherState::load(blockchain);
     }
 
     /// Transfers information to the node that the consensus process on the node

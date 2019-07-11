@@ -16,4 +16,6 @@
 
 include!(concat!(env!("OUT_DIR"), "/exonum_supervisor_mod.rs"));
 
+pub use self::service::*;
+
 use crate::proto::schema::*;

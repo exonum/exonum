@@ -1115,7 +1115,7 @@ fn sandbox_with_services_uninitialized(
         node_sender,
         Box::new(system_state),
         config.clone(),
-        SharedNodeState::new(5000),
+        SharedNodeState::new(&blockchain, 5000),
         None,
     );
     handler.initialize();
