@@ -194,7 +194,7 @@ impl FromStr for RustArtifactId {
                     version,
                 })
             },
-            _ => Err(failure::format_err!("Wrong rust artifact name format, in should be in form \"artifact_name/artifact_version\""))
+            _ => Err(failure::format_err!("Wrong rust artifact name format, it should be in form \"artifact_name/artifact_version\""))
         }
     }
 }

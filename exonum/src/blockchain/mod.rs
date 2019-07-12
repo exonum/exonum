@@ -412,7 +412,7 @@ impl Blockchain {
                 .clone()
                 .send(InternalRequest::RestartApi)
                 .wait()
-                .map_err(|e| error!("Failed to request API restart: {}", e))
+                .map_err(|e| error!("Failed to make a request for API restart: {}", e))
                 .ok();
         }
         Ok(())

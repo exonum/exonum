@@ -111,7 +111,7 @@ impl FromStr for ArtifactId {
                 name: name.to_string(),
             }),
             _ => Err(failure::format_err!(
-                "Wrong artifact id format, in should be in form \"runtime_id:artifact_name\""
+                "Wrong artifact id format, it should be in form \"runtime_id:artifact_name\""
             )),
         }
     }
@@ -194,7 +194,7 @@ pub struct ArtifactInfo<'a> {
 impl<'a> Default for ArtifactInfo<'a> {
     /// Creates blank artifact information without any proto sources.
     fn default() -> Self {
-        const EMPTY_SOURCE: [(&str, &str); 0] = [];
+        const EMPTY_SOURCES: [(&str, &str); 0] = [];
 
         Self {
             proto_sources: EMPTY_SOURCE.as_ref(),
