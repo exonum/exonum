@@ -552,7 +552,7 @@ impl NodeHandler {
 //        info!("tx_cache size {}", self.state.tx_cache.len());
 
 //        let tx_limit = self.state.config().consensus.txs_block_limit as u64;
-        let tx_limit = 200;
+        let tx_limit = 300;
 
         if tx_pool_len < tx_limit {
             let fork = self.blockchain.fork();
