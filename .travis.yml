@@ -65,13 +65,15 @@ env:
 
 jobs:
   include:
-  # Formatting & other lints that do not require compilation.
+  # Formatting & other lints.
   - name: lints
     install:
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
     - rustup component add rustfmt
     - rustfmt -V
+    - rustup component add clippy
+    - cargo clippy --version    
     - nvm install 8 && nvm use 8
     - npm install
     - ./node_modules/.bin/cspell --version
@@ -79,8 +81,9 @@ jobs:
     script:
     - npm run cspell
     - npm run md
-    # Force build.rs execution.
-    - cargo check -p exonum
+    # Clippy lints.
+    - cargo clippy --all --benches --features "long_benchmarks"
+    # Other cargo lints.
     - cargo fmt --all -- --check
     - cargo clean --doc
     - cargo doc --no-deps
@@ -114,34 +117,26 @@ jobs:
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
-  # Tests.
-  - name: test
-    install:
-    - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
+  # Unit tests.
+  - name: unit-test
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
     # - cargo run -p exonum-testkit --example configuration_change TODO enable after [ECR-3306]
     - cargo run -p exonum-time --example simple_service
+
+  # Integration tests.
+  - name: integration-tests
+    install:
+    - nvm install 8 && nvm use 8
+    - cd $TRAVIS_BUILD_DIR/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
+    script:
+    - echo "TODO"
     # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308] 
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
-
- # Clippy linting.
-  - name: clippy
-    install:
-    - rustup component add clippy
-    - cargo clippy --version
-    script:
-    - cargo clippy --all --tests --examples -- -D warnings
-
-  # Benchmarks (compilation only).
-  - name: benchmarks
-    script:
-    - RUST_LOG=off cargo check --benches --features "long_benchmarks"
 
 before_cache:
   - |

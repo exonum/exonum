@@ -103,7 +103,9 @@ mod timestamping {
         crypto::Hash,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        runtime::rust::{
+            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+        },
     };
     use exonum_merkledb::ObjectHash;
     use rand::rngs::StdRng;
@@ -142,10 +144,15 @@ mod timestamping {
     impl Service for Timestamping {}
 
     impl ServiceFactory for Timestamping {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "timestamping/0.0.1".parse().unwrap()
         }
-        fn new_instance(&self) -> Box<dyn Service> {
+
+        fn artifact_info(&self) -> ArtifactInfo {
+            ArtifactInfo::default()
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }
@@ -195,7 +202,9 @@ mod cryptocurrency {
         crypto::PublicKey,
         impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        runtime::rust::{
+            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+        },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
     use rand::{rngs::StdRng, seq::SliceRandom};
@@ -290,10 +299,15 @@ mod cryptocurrency {
     impl Service for Cryptocurrency {}
 
     impl ServiceFactory for Cryptocurrency {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "cryptocurrency/0.0.1".parse().unwrap()
         }
-        fn new_instance(&self) -> Box<dyn Service> {
+
+        fn artifact_info(&self) -> ArtifactInfo {
+            ArtifactInfo::default()
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

@@ -15,6 +15,7 @@
 pub use self::service::{
     AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction, TransactionContext,
 };
+pub use super::ArtifactInfo;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
@@ -112,7 +113,7 @@ impl RustRuntime {
     }
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
-        let artifact = service_factory.artifact();
+        let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
@@ -193,7 +194,7 @@ impl FromStr for RustArtifactId {
                     version,
                 })
             },
-            _ => Err(failure::format_err!("Wrong artifact spec format, in should be in form \"artifact_name/artifact_version\""))
+            _ => Err(failure::format_err!("Wrong rust artifact name format, it should be in form \"artifact_name/artifact_version\""))
         }
     }
 }
@@ -209,6 +210,12 @@ impl Runtime for RustRuntime {
             return Box::new(future::err(DeployError::WrongArtifact));
         }
         Box::new(self.deploy(artifact).into_future())
+    }
+
+    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
+        self.available_artifacts
+            .get(&self.parse_artifact(id)?)
+            .map(|service_factory| service_factory.artifact_info())
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
@@ -236,7 +243,7 @@ impl Runtime for RustRuntime {
             .available_artifacts
             .get(&artifact)
             .unwrap()
-            .new_instance();
+            .create_instance();
         self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
         Ok(())
     }
@@ -383,6 +390,6 @@ macro_rules! artifact_spec_from_crate {
 }
 
 #[test]
-fn parse_artifact_id_correct() {
+fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service/1.0.0").unwrap();
 }

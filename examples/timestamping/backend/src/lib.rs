@@ -43,7 +43,7 @@ use exonum::{
     crypto::Hash,
     impl_service_dispatcher,
     proto::Any,
-    runtime::rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory},
+    runtime::rust::{Service, ServiceDescriptor},
 };
 use exonum_merkledb::{Fork, Snapshot};
 
@@ -55,7 +55,8 @@ use crate::{
     transactions::{Config, TimestampingInterface},
 };
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(proto_sources = "proto")]
 pub struct TimestampingService;
 
 impl_service_dispatcher!(TimestampingService, TimestampingInterface);
@@ -83,15 +84,5 @@ impl Service for TimestampingService {
     fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(descriptor.service_name(), snapshot);
         schema.state_hash()
-    }
-}
-
-impl ServiceFactory for TimestampingService {
-    fn artifact(&self) -> RustArtifactId {
-        exonum::artifact_spec_from_crate!()
-    }
-
-    fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(TimestampingService)
     }
 }

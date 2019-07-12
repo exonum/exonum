@@ -23,7 +23,7 @@ exonum-crypto = { version = "0.11.0", path = "../../../components/crypto" }
 serde = "1.0.0"
 serde_derive = "1.0.0"
 failure = "0.1.5"
-protobuf = "2.6.0"
+protobuf = "2.7.0"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.11.0", path = "../../../testkit" }

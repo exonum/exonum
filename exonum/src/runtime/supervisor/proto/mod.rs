@@ -14,15 +14,13 @@
 
 use std::str::FromStr;
 
-use crate::{
-    helpers::Height,
-    proto::{schema, Any},
-    runtime::ArtifactId,
-};
+use crate::{helpers::Height, proto::Any, runtime::ArtifactId};
+
+pub mod schema;
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::supervisor::DeployRequest", crate = "crate")]
+#[exonum(pb = "schema::DeployRequest", crate = "crate")]
 pub struct DeployRequest {
     // Artifact identifier.
     pub artifact: ArtifactId,
@@ -34,7 +32,7 @@ pub struct DeployRequest {
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::supervisor::DeployConfirmation", crate = "crate")]
+#[exonum(pb = "schema::DeployConfirmation", crate = "crate")]
 pub struct DeployConfirmation {
     // Artifact identifier.
     pub artifact: ArtifactId,
@@ -46,7 +44,7 @@ pub struct DeployConfirmation {
 
 // Request for the artifact deployment.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::supervisor::StartService", crate = "crate")]
+#[exonum(pb = "schema::StartService", crate = "crate")]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,

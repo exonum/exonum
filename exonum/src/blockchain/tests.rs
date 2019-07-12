@@ -25,7 +25,10 @@ use crate::{
     messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
-    runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+    runtime::{
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        ArtifactInfo,
+    },
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -56,11 +59,15 @@ impl Service for TestServiceImpl {}
 impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl ServiceFactory for TestServiceImpl {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId::new("test_service", 1, 0, 0)
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(TestServiceImpl)
     }
 }
@@ -95,11 +102,15 @@ impl Service for ServiceGoodImpl {
 impl_service_dispatcher!(ServiceGoodImpl, ServiceGood);
 
 impl ServiceFactory for ServiceGoodImpl {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId::new("good_service", 1, 0, 0)
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }
@@ -121,11 +132,15 @@ impl Service for ServicePanicImpl {
 impl_service_dispatcher!(ServicePanicImpl, ServicePanic);
 
 impl ServiceFactory for ServicePanicImpl {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId::new("panic_service", 1, 0, 0)
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }
@@ -147,11 +162,15 @@ impl Service for ServicePanicStorageErrorImpl {
 impl_service_dispatcher!(ServicePanicStorageErrorImpl, ServicePanicStorageError);
 
 impl ServiceFactory for ServicePanicStorageErrorImpl {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId::new("storage_error_service", 1, 0, 0)
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

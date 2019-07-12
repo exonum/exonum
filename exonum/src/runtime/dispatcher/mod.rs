@@ -15,14 +15,13 @@
 pub use schema::Schema;
 
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
-use futures::{future, sync::mpsc, Future, Sink};
+use futures::{future, Future};
 
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     api::ServiceApiBuilder,
     blockchain::{IndexCoordinates, IndexOwner},
-    events::InternalRequest,
     messages::{AnyTx, Signed},
     node::ApiSender,
     proto::Any,
@@ -34,15 +33,16 @@ use crate::{
 
 use super::{
     error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, ServiceInstanceId,
+    ArtifactId, ArtifactInfo, Caller, ExecutionContext, InstanceSpec, Runtime, ServiceInstanceId,
 };
 
 mod schema;
 
+#[derive(Default)]
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn Runtime>>,
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
-    inner_requests_tx: mpsc::Sender<InternalRequest>,
+    modified: Option<()>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -57,12 +57,11 @@ impl Dispatcher {
     /// Creates a new dispatcher with the specified runtimes.
     pub(crate) fn with_runtimes(
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
-        inner_requests_tx: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
             runtimes: runtimes.into_iter().collect(),
             runtime_lookup: Default::default(),
-            inner_requests_tx,
+            modified: None,
         }
     }
 
@@ -107,7 +106,7 @@ impl Dispatcher {
         .expect("Unable to start builtin service instance");
     }
 
-    pub fn state_hash(
+    pub(crate) fn state_hash(
         &self,
         access: &dyn Snapshot,
     ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
@@ -164,6 +163,11 @@ impl Dispatcher {
         artifact: ArtifactId,
         spec: impl Into<Any>,
     ) -> Result<(), DeployError> {
+        debug_assert!(
+            self.artifact_info(&artifact).is_some(),
+            "An attempt to register artifact which is not be deployed: {:?}",
+            artifact
+        );
         Schema::new(fork).add_artifact(artifact.clone(), spec.into())?;
         info!(
             "Registered artifact {} in runtime with id {}",
@@ -193,7 +197,7 @@ impl Dispatcher {
         constructor: Any,
     ) -> Result<(), StartError> {
         // Check that service doesn't use existing identifiers.
-        if self.identifier_exists(spec.id) {
+        if self.runtime_lookup.contains_key(&spec.id) {
             return Err(StartError::ServiceIdExists);
         }
         // Tries to start and configure service instance.
@@ -230,16 +234,16 @@ impl Dispatcher {
         );
         self.call(&mut context, tx.call_info, &tx.payload)?;
         let actions = context.take_actions();
-        // Invokes restart actix web server if actions are not empty.
-        let need_restart = !actions.is_empty();
+        // Marks dispatcher as modified if actions are not empty.
+        let is_modified = !actions.is_empty();
         // Executes pending dispatcher actions.
         for action in actions {
             action.execute(self, &context)?;
         }
-        if need_restart {
-            self.restart_api();
-        }
 
+        if is_modified {
+            self.mark_as_modified();
+        }
         Ok(())
     }
 
@@ -301,14 +305,19 @@ impl Dispatcher {
         }
     }
 
-    /// Sends restart API message.
-    fn restart_api(&self) {
-        let _ = self
-            .inner_requests_tx
-            .clone()
-            .send(InternalRequest::RestartApi)
-            .wait()
-            .map_err(|e| error!("Failed to request API restart: {}", e));
+    /// Returns additional information about artifact with the specified id if it is deployed.
+    pub(crate) fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
+        self.runtimes.get(&id.runtime_id)?.artifact_info(id)
+    }
+
+    pub(crate) fn take_modified_state(&mut self) -> bool {
+        self.modified.take().is_some()
+    }
+
+    /// Marks dispatcher as modified.
+    fn mark_as_modified(&mut self) {
+        trace!("Dispatcher state is modified");
+        self.modified = Some(());
     }
 
     /// Registers service instance in the runtime lookup table.
@@ -326,10 +335,6 @@ impl Dispatcher {
             .and_then(|runtime| runtime.start_service(instance))?;
         self.register_running_service(&instance);
         Ok(())
-    }
-
-    fn identifier_exists(&self, id: ServiceInstanceId) -> bool {
-        self.runtime_lookup.contains_key(&id)
     }
 }
 
@@ -433,7 +438,7 @@ mod tests {
     use crate::{
         crypto::PublicKey,
         messages::{MethodId, ServiceInstanceId},
-        runtime::{rust::RustRuntime, RuntimeIdentifier, StateHashAggregator},
+        runtime::{rust::RustRuntime, ArtifactInfo, RuntimeIdentifier, StateHashAggregator},
     };
 
     use super::*;
@@ -451,7 +456,7 @@ mod tests {
     impl DispatcherBuilder {
         fn new() -> Self {
             Self {
-                dispatcher: Dispatcher::with_runtimes(Vec::new(), mpsc::channel(0).0),
+                dispatcher: Dispatcher::default(),
             }
         }
 
@@ -561,6 +566,10 @@ mod tests {
             _service_keypair: &(PublicKey, SecretKey),
             _tx_sender: &ApiSender,
         ) {
+        }
+
+        fn artifact_info(&self, _id: &ArtifactId) -> Option<ArtifactInfo> {
+            Some(ArtifactInfo::default())
         }
     }
 

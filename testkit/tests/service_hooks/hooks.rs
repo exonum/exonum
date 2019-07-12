@@ -20,7 +20,7 @@ use exonum::{
     impl_service_dispatcher,
     runtime::{
         rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ServiceInstanceId,
+        ArtifactInfo, ServiceInstanceId,
     },
 };
 use exonum_derive::{service_interface, ProtobufConvert};
@@ -90,11 +90,17 @@ impl Service for AfterCommitService {
 impl_service_dispatcher!(AfterCommitService, AfterCommitInterface);
 
 impl ServiceFactory for AfterCommitService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         "after-commit/1.0.0".parse().unwrap()
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: proto::PROTO_SOURCES.as_ref(),
+        }
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(self.clone())
     }
 }

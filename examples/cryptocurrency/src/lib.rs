@@ -206,9 +206,7 @@ pub mod contracts {
         api::ServiceApiBuilder,
         blockchain::ExecutionResult,
         impl_service_dispatcher,
-        runtime::rust::{
-            RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext,
-        },
+        runtime::rust::{Service, ServiceDescriptor, TransactionContext},
     };
 
     use crate::{
@@ -231,7 +229,8 @@ pub mod contracts {
     }
 
     /// Cryptocurrency service implementation.
-    #[derive(Debug)]
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(proto_sources = "crate::proto")]
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {
@@ -293,16 +292,6 @@ pub mod contracts {
     impl Service for CryptocurrencyService {
         fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
             CryptocurrencyApi::new(descriptor.service_name()).wire(builder);
-        }
-    }
-
-    impl ServiceFactory for CryptocurrencyService {
-        fn artifact(&self) -> RustArtifactId {
-            exonum::artifact_spec_from_crate!()
-        }
-
-        fn new_instance(&self) -> Box<dyn Service> {
-            Box::new(Self)
         }
     }
 }

@@ -318,7 +318,6 @@ impl SystemRuntimeConfig {
 }
 
 impl SystemRuntime {
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_ret_no_self))]
     pub(crate) fn new(config: SystemRuntimeConfig) -> result::Result<Self, failure::Error> {
         // Creates a system thread.
         let (system_tx, system_rx) = mpsc::channel();

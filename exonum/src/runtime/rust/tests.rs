@@ -14,7 +14,6 @@
 
 use exonum_derive::service_interface;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
-use futures::sync::mpsc;
 use semver::Version;
 
 use std::convert::TryFrom;
@@ -22,14 +21,17 @@ use std::convert::TryFrom;
 use crate::{
     messages::{CallInfo, ServiceInstanceId},
     proto::{
-        schema::tests::{TestServiceInit, TestServiceTx},
+        schema::{
+            tests::{TestServiceInit, TestServiceTx},
+            PROTO_SOURCES,
+        },
         Any,
     },
     runtime::{
         dispatcher::Dispatcher,
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::ServiceDescriptor,
-        Caller, ExecutionContext, InstanceSpec,
+        ArtifactInfo, Caller, ExecutionContext, InstanceSpec,
     },
 };
 
@@ -121,15 +123,21 @@ impl Service for TestServiceImpl {
 struct TestServiceFactory;
 
 impl ServiceFactory for TestServiceFactory {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "test_service".to_owned(),
             version: Version::new(0, 1, 0),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(TestServiceImpl)
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo {
+            proto_sources: PROTO_SOURCES.as_ref(),
+        }
     }
 }
 
@@ -141,11 +149,11 @@ fn test_basic_rust_runtime() {
     let mut runtime = RustRuntime::new();
 
     let service_factory = Box::new(TestServiceFactory);
-    let artifact: ArtifactId = service_factory.artifact().into();
+    let artifact: ArtifactId = service_factory.artifact_id().into();
     runtime.add_service_factory(service_factory);
 
     // Create dummy dispatcher.
-    let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()], mpsc::channel(0).0);
+    let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()]);
 
     // Deploy service.
     let fork = db.fork();

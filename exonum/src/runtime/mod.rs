@@ -18,7 +18,10 @@ use exonum_merkledb::{Fork, Snapshot};
 use futures::Future;
 use serde_derive::{Deserialize, Serialize};
 
-use std::fmt::Debug;
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 use crate::{
     api::ServiceApiBuilder,
@@ -61,7 +64,9 @@ impl From<RuntimeIdentifier> for u32 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord,
+)]
 #[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
 pub struct ArtifactId {
     pub runtime_id: u32,
@@ -89,13 +94,28 @@ impl From<(String, u32)> for ArtifactId {
     }
 }
 
-#[derive(Debug, PartialEq, Default)]
-pub struct StateHashAggregator {
-    pub runtime: Vec<Hash>,
-    pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
+impl Display for ArtifactId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}:{}", self.runtime_id, self.name)
+    }
 }
 
-// TODO Think about runtime methods' names. [ECR-3222]
+impl FromStr for ArtifactId {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let split = s.split(':').take(2).collect::<Vec<_>>();
+        match &split[..] {
+            [runtime_id, name] => Ok(Self {
+                runtime_id: runtime_id.parse()?,
+                name: name.to_string(),
+            }),
+            _ => Err(failure::format_err!(
+                "Wrong artifact id format, it should be in form \"runtime_id:artifact_name\""
+            )),
+        }
+    }
+}
 
 /// Runtime environment for services.
 ///
@@ -108,6 +128,9 @@ pub trait Runtime: Send + Debug + 'static {
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = DeployError>>;
+
+    /// Returns additional information about artifact with the specified id if it is deployed.
+    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
     /// Starts a new service instance with the given specification.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
@@ -164,6 +187,28 @@ where
 }
 
 #[derive(Debug, PartialEq)]
+pub struct ArtifactInfo<'a> {
+    pub proto_sources: &'a [(&'a str, &'a str)],
+}
+
+impl<'a> Default for ArtifactInfo<'a> {
+    /// Creates blank artifact information without any proto sources.
+    fn default() -> Self {
+        const EMPTY_SOURCES: [(&str, &str); 0] = [];
+
+        Self {
+            proto_sources: EMPTY_SOURCES.as_ref(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Default)]
+pub struct StateHashAggregator {
+    pub runtime: Vec<Hash>,
+    pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Caller {
     Transaction { hash: Hash, author: PublicKey },
     Blockchain,
@@ -212,4 +257,9 @@ impl<'a> ExecutionContext<'a> {
         std::mem::swap(&mut self.actions, &mut other);
         other
     }
+}
+
+#[test]
+fn parse_artifact_id_correct() {
+    ArtifactId::from_str("0:my-service/1.0.0").unwrap();
 }

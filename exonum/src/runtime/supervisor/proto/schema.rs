@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module of the rust-protobuf generated files.
-
-// For protobuf generated files.
 #![allow(bare_trait_objects)]
 
-pub use self::service::{CreateWallet, Issue, Transfer, Wallet};
+include!(concat!(env!("OUT_DIR"), "/exonum_supervisor_mod.rs"));
 
-include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+pub use self::service::*;
 
-use exonum::proto::schema::*;
+use crate::proto::schema::*;

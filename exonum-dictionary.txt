@@ -24,8 +24,8 @@ codecov
 compat
 concat
 consts
-cors
 Cors
+cors
 counterintuitive
 cryptocurrency
 cryptographically
@@ -152,12 +152,15 @@ signum
 smallvec
 socketaddr
 sodiumoxide
+stateful
 stringify
 struct
 structfield
 structs
 subcommand
 subcommands
+subfolders
+submodules
 subprefix
 subsec
 supermajority
@@ -192,6 +195,7 @@ uuids
 validator
 validator's
 validators
+walkdir
 websockets
 whitelisted
 writeln

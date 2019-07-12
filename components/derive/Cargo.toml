@@ -24,6 +24,6 @@ exonum = { version = "0.11.0", path = "../../exonum" }
 # TODO: Remove when merkledb becomes public [ECR-3134]
 exonum-merkledb = { version = "0.11.0", path = "../merkledb" }
 failure = "0.1.5"
-protobuf = "2.6.0"
+protobuf = "2.7.0"
 serde = "1.0"
 serde_derive = "1.0"

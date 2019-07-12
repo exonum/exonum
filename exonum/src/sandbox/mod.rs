@@ -1115,7 +1115,7 @@ fn sandbox_with_services_uninitialized(
         node_sender,
         Box::new(system_state),
         config.clone(),
-        SharedNodeState::new(5000),
+        SharedNodeState::new(&blockchain, 5000),
         None,
     );
     handler.initialize();
@@ -1186,10 +1186,13 @@ mod tests {
         blockchain::ExecutionResult,
         crypto::{gen_keypair_from_seed, Seed},
         messages::{AnyTx, ServiceInstanceId},
-        proto::schema::tests::TxAfterCommit,
-        runtime::rust::{
-            AfterCommitContext, RustArtifactId, Service, ServiceFactory, Transaction,
-            TransactionContext,
+        proto::schema::{tests::TxAfterCommit, PROTO_SOURCES},
+        runtime::{
+            rust::{
+                AfterCommitContext, RustArtifactId, Service, ServiceFactory, Transaction,
+                TransactionContext,
+            },
+            ArtifactInfo,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1224,14 +1227,20 @@ mod tests {
     }
 
     impl ServiceFactory for AfterCommitService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             RustArtifactId {
                 name: "after_commit".into(),
                 version: Version::new(0, 1, 0),
             }
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn artifact_info(&self) -> ArtifactInfo {
+            ArtifactInfo {
+                proto_sources: PROTO_SOURCES.as_ref(),
+            }
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

@@ -84,9 +84,9 @@ impl BlockchainBuilder {
     pub fn finalize(
         self,
         api_sender: ApiSender,
-        dispatcher_requests: mpsc::Sender<InternalRequest>,
+        internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Result<Blockchain, failure::Error> {
-        let mut dispatcher = Dispatcher::with_runtimes(self.runtimes, dispatcher_requests);
+        let mut dispatcher = Dispatcher::with_runtimes(self.runtimes);
         // If genesis block had been already created just restores dispatcher state from database
         // otherwise creates genesis block with the given specification.
         let has_genesis_block = {
@@ -105,6 +105,7 @@ impl BlockchainBuilder {
                 self.service_keypair.0,
                 self.service_keypair.1,
                 api_sender,
+                internal_requests,
             )
         } else {
             // Creates blockchain with the new genesis block.
@@ -114,6 +115,7 @@ impl BlockchainBuilder {
                 self.service_keypair.0,
                 self.service_keypair.1,
                 api_sender,
+                internal_requests,
             );
             // Adds builtin services.
             blockchain.merge({
@@ -154,7 +156,7 @@ impl InstanceCollection {
         params: impl Into<Any>,
     ) -> Self {
         let spec = InstanceSpec {
-            artifact: self.factory.artifact().into(),
+            artifact: self.factory.artifact_id().into(),
             id,
             name: name.into(),
         };

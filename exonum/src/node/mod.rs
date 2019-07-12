@@ -947,7 +947,7 @@ impl Node {
             peer_discovery: peers,
         };
 
-        let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
+        let api_state = SharedNodeState::new(&blockchain, node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
 
@@ -1060,11 +1060,8 @@ impl Node {
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
-
         // Stop ws server.
         api_state.shutdown_broadcast_server();
-
-        info!("Exonum node stopped");
         Ok(())
     }
 
@@ -1155,7 +1152,7 @@ mod tests {
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ServiceInstanceId,
+            ArtifactInfo, ServiceInstanceId,
         },
     };
 
@@ -1184,11 +1181,15 @@ mod tests {
     impl Service for TestService {}
 
     impl ServiceFactory for TestService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "test-service/0.1.0".parse().unwrap()
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn artifact_info(&self) -> ArtifactInfo {
+            ArtifactInfo::default()
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

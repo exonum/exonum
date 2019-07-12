@@ -287,7 +287,10 @@ mod tests {
         messages::ServiceInstanceId,
         node::ApiSender,
         proto::schema::tests::TestServiceTx,
-        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        runtime::{
+            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+            ArtifactInfo,
+        },
     };
 
     use super::*;
@@ -325,14 +328,18 @@ mod tests {
     impl Service for TxResultCheckService {}
 
     impl ServiceFactory for TxResultCheckService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             RustArtifactId {
                 name: "tx_result_check_service".into(),
                 version: Version::new(1, 0, 0),
             }
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn artifact_info(&self) -> ArtifactInfo {
+            ArtifactInfo::default()
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

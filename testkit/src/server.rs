@@ -148,11 +148,11 @@ pub fn create_testkit_handlers(inner: &Arc<RwLock<TestKit>>) -> ServiceApiBuilde
 
 /// Creates an ApiAggregator with the testkit server specific handlers.
 pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggregator {
-    let mut aggregator = ApiAggregator::new(
-        testkit.read().unwrap().blockchain().clone(),
-        SharedNodeState::new(10_000),
-    );
-    aggregator.insert("testkit", create_testkit_handlers(testkit));
+    let blockchain = testkit.read().unwrap().blockchain().clone();
+    let node_state = SharedNodeState::new(&blockchain, 10_000);
+    let mut aggregator = ApiAggregator::new(blockchain, node_state);
+
+    aggregator.insert("testkit", create_testkit_handlers(&testkit));
     aggregator
 }
 
@@ -166,7 +166,9 @@ mod tests {
         helpers::Height,
         impl_service_dispatcher,
         messages::{AnyTx, Signed},
-        runtime::rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        runtime::rust::{
+            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+        },
     };
     use exonum_merkledb::ObjectHash;
 
@@ -214,11 +216,15 @@ mod tests {
     impl Service for SampleService {}
 
     impl ServiceFactory for SampleService {
-        fn artifact(&self) -> RustArtifactId {
+        fn artifact_id(&self) -> RustArtifactId {
             "sample-service/1.0.0".parse().unwrap()
         }
 
-        fn new_instance(&self) -> Box<dyn Service> {
+        fn artifact_info(&self) -> ArtifactInfo {
+            ArtifactInfo::default()
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
             Box::new(Self)
         }
     }

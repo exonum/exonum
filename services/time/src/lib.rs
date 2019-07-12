@@ -44,9 +44,7 @@ use exonum::{
     api::ServiceApiBuilder,
     crypto::Hash,
     impl_service_dispatcher,
-    runtime::rust::{
-        AfterCommitContext, RustArtifactId, Service, ServiceDescriptor, ServiceFactory,
-    },
+    runtime::rust::{AfterCommitContext, Service, ServiceDescriptor},
 };
 use exonum_merkledb::Snapshot;
 
@@ -92,7 +90,11 @@ impl Service for TimeService {
 }
 
 /// Time oracle service factory implementation.
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    proto_sources = "proto",
+    with_constructor = "TimeServiceFactory::create_instance"
+)]
 pub struct TimeServiceFactory {
     time_provider: Arc<dyn TimeProvider>,
 }
@@ -104,22 +106,16 @@ impl TimeServiceFactory {
             time_provider: time_provider.into(),
         }
     }
+
+    fn create_instance(&self) -> Box<dyn Service> {
+        Box::new(TimeService {
+            time: self.time_provider.clone(),
+        })
+    }
 }
 
 impl Default for TimeServiceFactory {
     fn default() -> Self {
         Self::with_provider(SystemTimeProvider)
-    }
-}
-
-impl ServiceFactory for TimeServiceFactory {
-    fn artifact(&self) -> RustArtifactId {
-        exonum::artifact_spec_from_crate!()
-    }
-
-    fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(TimeService {
-            time: self.time_provider.clone(),
-        })
     }
 }

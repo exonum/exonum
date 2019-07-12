@@ -21,7 +21,10 @@ use exonum::{
     impl_service_dispatcher,
     messages::{AnyTx, Message, ServiceInstanceId, Signed},
     node::ApiSender,
-    runtime::rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
+    runtime::{
+        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
+        ArtifactInfo,
+    },
 };
 use exonum_merkledb::{ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
@@ -96,14 +99,18 @@ impl_service_dispatcher!(MyService, ExplorerTransactions);
 impl Service for MyService {}
 
 impl ServiceFactory for MyService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "my-service".into(),
             version: Version::new(1, 0, 0),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

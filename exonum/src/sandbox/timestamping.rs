@@ -25,8 +25,12 @@ use crate::{
     blockchain::ExecutionResult,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::{AnyTx, ServiceInstanceId, Signed},
-    runtime::rust::{
-        RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction, TransactionContext,
+    runtime::{
+        rust::{
+            RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
+            TransactionContext,
+        },
+        ArtifactInfo,
     },
 };
 
@@ -55,14 +59,18 @@ impl Service for TimestampingService {
 }
 
 impl ServiceFactory for TimestampingService {
-    fn artifact(&self) -> RustArtifactId {
+    fn artifact_id(&self) -> RustArtifactId {
         RustArtifactId {
             name: "timestamping".into(),
             version: Version::new(0, 1, 0),
         }
     }
 
-    fn new_instance(&self) -> Box<dyn Service> {
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
         Box::new(Self)
     }
 }

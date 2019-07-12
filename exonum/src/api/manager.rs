@@ -127,6 +127,7 @@ impl Handler<StartServer> for ApiManager {
     fn handle(&mut self, msg: StartServer, _ctx: &mut Context<Self>) -> Self::Result {
         info!("Handling start server");
         let aggregator = self.runtime_config.api_aggregator.clone();
+        aggregator.refresh();
         let addr = Self::start_server(msg.config.clone(), aggregator).unwrap();
         self.api_runtime_addresses.insert(addr, msg.config);
     }
