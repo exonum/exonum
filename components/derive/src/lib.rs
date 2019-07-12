@@ -114,7 +114,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// Typical usage.
-/// ```no_run
+/// ```ignore
 /// #[derive(ServiceFactory)]
 /// #[exonum(proto_sources = "crate::proto")]
 /// pub struct MyService;
@@ -122,7 +122,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 ///
 /// But if you have complex logic in service factory you can use custom constructor to create a
 /// new service instances.
-/// ```no_run
+/// ```ignore
 /// // Imagine that you have a stateful service like this
 /// #[derive(Debug)]
 /// pub struct TimeService {
@@ -142,7 +142,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 ///     time_provider: Arc<dyn TimeProvider>,
 /// }
 ///
-/// // Custom constructor implementation.
+/// // Arbitrary constructor implementation.
 /// impl TimeServiceFactory {
 ///     fn create_instance(&self) -> Box<dyn Service> {
 ///         Box::new(TimeService {
