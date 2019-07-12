@@ -197,7 +197,7 @@ impl<'a> Default for ArtifactInfo<'a> {
         const EMPTY_SOURCES: [(&str, &str); 0] = [];
 
         Self {
-            proto_sources: EMPTY_SOURCE.as_ref(),
+            proto_sources: EMPTY_SOURCES.as_ref(),
         }
     }
 }

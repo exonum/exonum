@@ -17,8 +17,8 @@ use quote::quote;
 use syn::{DeriveInput, Lit, Meta, Path};
 
 use super::{
-    get_exonum_name_value_attributes, get_exonum_types_prefix, ARTIFACT_NAME, ARTIFACT_VERSION,
-    PROTO_SOURCES,
+    find_attribute_path, get_exonum_name_value_attributes, get_exonum_types_prefix, ARTIFACT_NAME,
+    ARTIFACT_VERSION, PROTO_SOURCES, SERVICE_CONSTRUCTOR,
 };
 
 fn find_exonum_literal_attribute(meta_attrs: &[Meta], ident_name: &str) -> Option<Lit> {
@@ -72,6 +72,12 @@ pub fn implement_service_factory(input: TokenStream) -> TokenStream {
     let artifact_name = literal_or_default!(&meta_attrs, ARTIFACT_NAME, env!("CARGO_PKG_NAME"));
     let artifact_version =
         literal_or_default!(&meta_attrs, ARTIFACT_VERSION, env!("CARGO_PKG_VERSION"));
+    let service_constructor =
+        if let Some(path) = find_attribute_path(&meta_attrs, SERVICE_CONSTRUCTOR) {
+            quote! { #path(self) }
+        } else {
+            quote! { Box::new(Self) }
+        };
 
     let expanded = quote! {
         impl #cr::runtime::rust::ServiceFactory for #name {
@@ -86,7 +92,7 @@ pub fn implement_service_factory(input: TokenStream) -> TokenStream {
             }
 
             fn create_instance(&self) -> Box<dyn #cr::runtime::rust::Service> {
-                Box::new(Self)
+                #service_constructor
             }
         }
     };

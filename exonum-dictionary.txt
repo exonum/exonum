@@ -24,8 +24,8 @@ codecov
 compat
 concat
 consts
-cors
 Cors
+cors
 counterintuitive
 cryptocurrency
 cryptographically
@@ -158,6 +158,8 @@ structfield
 structs
 subcommand
 subcommands
+subfolders
+submodules
 subprefix
 subsec
 supermajority
@@ -192,6 +194,7 @@ uuids
 validator
 validator's
 validators
+walkdir
 websockets
 whitelisted
 writeln

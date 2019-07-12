@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore walkdir, subfolders, submodules
-
 //! This crate simplifies writing build.rs for exonum and exonum services.
+
+#![deny(unsafe_code, bare_trait_objects)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 use proc_macro2::{Ident, Span};
 use protoc_rust::Customize;

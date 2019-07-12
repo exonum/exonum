@@ -15,28 +15,12 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{Data, DeriveInput, Lit, Meta, Path};
+use syn::{Data, DeriveInput, Path};
 
 use super::{
-    find_exonum_word_attribute, get_exonum_name_value_attributes, get_exonum_types_prefix,
-    PB_CONVERT_ATTRIBUTE, SERDE_PB_CONVERT_ATTRIBUTE,
+    find_attribute_path, find_exonum_word_attribute, get_exonum_types_prefix, PB_CONVERT_ATTRIBUTE,
+    SERDE_PB_CONVERT_ATTRIBUTE,
 };
-
-fn get_protobuf_struct_path(meta_attrs: &[Meta]) -> Path {
-    let map_attrs = get_exonum_name_value_attributes(meta_attrs);
-    let struct_path = map_attrs.into_iter().find_map(|nv| {
-        if nv.ident == PB_CONVERT_ATTRIBUTE {
-            match nv.lit {
-                Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    });
-
-    struct_path.unwrap_or_else(|| panic!("{} attribute is not set properly.", PB_CONVERT_ATTRIBUTE))
-}
 
 fn get_field_names(input: &DeriveInput) -> Vec<Ident> {
     let data = match &input.data {
@@ -173,7 +157,8 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
         .collect::<Vec<_>>();
 
     let name = input.ident.clone();
-    let proto_struct_name = get_protobuf_struct_path(&meta_attrs);
+    let proto_struct_name = find_attribute_path(&meta_attrs, PB_CONVERT_ATTRIBUTE)
+        .unwrap_or_else(|| panic!("{} attribute is not set properly.", PB_CONVERT_ATTRIBUTE));
     let cr = get_exonum_types_prefix(&meta_attrs);
 
     let mod_name = Ident::new(&format!("pb_convert_impl_{}", name), Span::call_site());
