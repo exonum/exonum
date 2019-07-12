@@ -21,7 +21,6 @@ use crate::{
     blockchain::{Blockchain, ExecutionResult, InstanceCollection, Schema},
     crypto::gen_keypair,
     helpers::{generate_testnet_config, Height, ValidatorId},
-    impl_service_dispatcher,
     messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
@@ -34,7 +33,7 @@ use crate::{
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: ServiceInstanceId = 255;
 
-#[service_interface(exonum(crate = "crate"))]
+#[service_interface(exonum(crate = "crate", dispatcher = "TestServiceImpl"))]
 trait TestService {
     fn tx(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
 }
@@ -55,8 +54,6 @@ impl TestService for TestServiceImpl {
 }
 
 impl Service for TestServiceImpl {}
-
-impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl ServiceFactory for TestServiceImpl {
     fn artifact_id(&self) -> RustArtifactId {
@@ -84,7 +81,7 @@ impl Tx {
     }
 }
 
-#[service_interface(exonum(crate = "crate"))]
+#[service_interface(exonum(crate = "crate", dispatcher = "ServiceGoodImpl"))]
 trait ServiceGood {}
 
 #[derive(Debug)]
@@ -98,8 +95,6 @@ impl Service for ServiceGoodImpl {
         index.push(1);
     }
 }
-
-impl_service_dispatcher!(ServiceGoodImpl, ServiceGood);
 
 impl ServiceFactory for ServiceGoodImpl {
     fn artifact_id(&self) -> RustArtifactId {
@@ -115,7 +110,7 @@ impl ServiceFactory for ServiceGoodImpl {
     }
 }
 
-#[service_interface(exonum(crate = "crate"))]
+#[service_interface(exonum(crate = "crate", dispatcher = "ServicePanicImpl"))]
 trait ServicePanic {}
 
 #[derive(Debug)]
@@ -128,8 +123,6 @@ impl Service for ServicePanicImpl {
         panic!("42");
     }
 }
-
-impl_service_dispatcher!(ServicePanicImpl, ServicePanic);
 
 impl ServiceFactory for ServicePanicImpl {
     fn artifact_id(&self) -> RustArtifactId {
@@ -145,7 +138,7 @@ impl ServiceFactory for ServicePanicImpl {
     }
 }
 
-#[service_interface(exonum(crate = "crate"))]
+#[service_interface(exonum(crate = "crate", dispatcher = "ServicePanicStorageErrorImpl"))]
 trait ServicePanicStorageError {}
 
 #[derive(Debug)]
@@ -158,8 +151,6 @@ impl Service for ServicePanicStorageErrorImpl {
         panic!(StorageError::new("42"));
     }
 }
-
-impl_service_dispatcher!(ServicePanicStorageErrorImpl, ServicePanicStorageError);
 
 impl ServiceFactory for ServicePanicStorageErrorImpl {
     fn artifact_id(&self) -> RustArtifactId {

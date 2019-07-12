@@ -101,7 +101,6 @@ mod timestamping {
     use exonum::{
         blockchain::{ExecutionResult, InstanceCollection},
         crypto::Hash,
-        impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
         runtime::rust::{
             ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
@@ -115,7 +114,7 @@ mod timestamping {
 
     const TIMESTAMPING_SERVICE_ID: ServiceInstanceId = 254;
 
-    #[service_interface]
+    #[service_interface(exonum(dispatcher = "Timestamping"))]
     pub trait TimestampingInterface {
         fn timestamp(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
 
@@ -138,8 +137,6 @@ mod timestamping {
             panic!("panic text");
         }
     }
-
-    impl_service_dispatcher!(Timestamping, TimestampingInterface);
 
     impl Service for Timestamping {}
 
@@ -200,7 +197,6 @@ mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, InstanceCollection},
         crypto::PublicKey,
-        impl_service_dispatcher,
         messages::{AnyTx, ServiceInstanceId, Signed},
         runtime::rust::{
             ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
@@ -219,7 +215,7 @@ mod cryptocurrency {
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    #[service_interface]
+    #[service_interface(exonum(dispatcher = "Cryptocurrency"))]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
         fn transfer(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
@@ -293,8 +289,6 @@ mod cryptocurrency {
             }
         }
     }
-
-    impl_service_dispatcher!(Cryptocurrency, CryptocurrencyInterface);
 
     impl Service for Cryptocurrency {}
 

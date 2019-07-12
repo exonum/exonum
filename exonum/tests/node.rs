@@ -16,7 +16,7 @@
 
 use exonum::{
     blockchain::InstanceCollection,
-    helpers, impl_service_dispatcher,
+    helpers,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory},
@@ -36,15 +36,13 @@ use std::{
     time::Duration,
 };
 
-#[service_interface]
+#[service_interface(exonum(dispatcher = "CommitWatcherService"))]
 trait CommitWatcherInterface {}
 
 #[derive(Debug)]
 struct CommitWatcherService(pub RefCell<Option<oneshot::Sender<()>>>);
 
 impl CommitWatcherInterface for CommitWatcherService {}
-
-impl_service_dispatcher!(CommitWatcherService, CommitWatcherInterface);
 
 impl Service for CommitWatcherService {
     fn after_commit(&self, _context: AfterCommitContext) {
@@ -68,15 +66,13 @@ impl ServiceFactory for CommitWatcherService {
     }
 }
 
-#[service_interface]
+#[service_interface(exonum(dispatcher = "StartCheckerService"))]
 trait StartCheckerInterface {}
 
 #[derive(Debug)]
 struct StartCheckerService;
 
 impl StartCheckerInterface for StartCheckerService {}
-
-impl_service_dispatcher!(StartCheckerService, StartCheckerInterface);
 
 impl Service for StartCheckerService {}
 

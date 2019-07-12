@@ -17,7 +17,6 @@ use super::proto;
 use exonum::{
     blockchain::ExecutionResult,
     helpers::Height,
-    impl_service_dispatcher,
     runtime::{
         rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory, TransactionContext},
         ArtifactInfo, ServiceInstanceId,
@@ -39,7 +38,7 @@ pub struct TxAfterCommit {
     pub height: Height,
 }
 
-#[service_interface]
+#[service_interface(exonum(dispatcher = "AfterCommitService"))]
 pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,
@@ -86,8 +85,6 @@ impl Service for AfterCommitService {
         context.broadcast_transaction(tx);
     }
 }
-
-impl_service_dispatcher!(AfterCommitService, AfterCommitInterface);
 
 impl ServiceFactory for AfterCommitService {
     fn artifact_id(&self) -> RustArtifactId {

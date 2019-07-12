@@ -17,7 +17,7 @@
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, InstanceCollection},
     crypto::PublicKey,
-    helpers, impl_service_dispatcher,
+    helpers,
     node::{ApiSender, Node},
     runtime::{
         rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
@@ -65,7 +65,7 @@ impl Transfer {
     }
 }
 
-#[service_interface]
+#[service_interface(exonum(dispatcher = "MyService"))]
 pub trait MyServiceInterface {
     fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult;
     fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult;
@@ -89,8 +89,6 @@ impl MyServiceInterface for MyService {
         panic!("oops")
     }
 }
-
-impl_service_dispatcher!(MyService, MyServiceInterface);
 
 impl Service for MyService {}
 

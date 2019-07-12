@@ -17,7 +17,6 @@ use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Schema as CoreSchema},
     crypto::PublicKey,
     helpers::Height,
-    impl_service_dispatcher,
     runtime::{
         rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ArtifactInfo, ServiceInstanceId,
@@ -117,7 +116,7 @@ pub struct TxTransfer {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
-#[service_interface]
+#[service_interface(exonum(dispatcher = "CurrencyService"))]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
     fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
@@ -197,8 +196,6 @@ impl CryptocurrencyApi {
 /// Define the service.
 #[derive(Debug)]
 pub struct CurrencyService;
-
-impl_service_dispatcher!(CurrencyService, CurrencyInterface);
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {

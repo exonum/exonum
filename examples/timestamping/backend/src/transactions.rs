@@ -61,7 +61,7 @@ pub struct Config {
     pub time_service_id: ServiceInstanceId,
 }
 
-#[service_interface]
+#[service_interface(exonum(dispatcher = "TimestampingService"))]
 pub trait TimestampingInterface {
     fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
 }

@@ -28,7 +28,6 @@ use exonum::{
     blockchain::ExecutionResult,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
-    impl_service_dispatcher,
     messages::{AnyTx, ServiceInstanceId, Signed},
     runtime::rust::{
         ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
@@ -96,12 +95,17 @@ impl TxMarker {
     }
 }
 
-#[service_interface]
+#[service_interface(exonum(dispatcher = "MarkerService"))]
 pub trait MarkerInterface {
     fn mark(&self, context: TransactionContext, arg: TxMarker) -> ExecutionResult;
 }
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "marker",
+    artifact_version = "0.1.0",
+    proto_sources = "proto"
+)]
 struct MarkerService;
 
 impl MarkerInterface for MarkerService {
@@ -120,25 +124,7 @@ impl MarkerInterface for MarkerService {
     }
 }
 
-impl_service_dispatcher!(MarkerService, MarkerInterface);
-
 impl Service for MarkerService {}
-
-impl ServiceFactory for MarkerService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "marker/0.1.0".parse().unwrap()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
 
 fn main() {
     let mock_provider = Arc::new(MockTimeProvider::default());

@@ -76,6 +76,25 @@ fn implement_transaction_for_methods(
     }
 }
 
+fn implement_service_dispatcher(
+    trait_name: &Ident,
+    dispatcher: &dyn ToTokens,
+    cr: &dyn ToTokens,
+) -> impl ToTokens {
+    quote! {
+        impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
+            fn call(
+                &self,
+                method: #cr::messages::MethodId,
+                ctx: #cr::runtime::rust::service::TransactionContext,
+                payload: &[u8],
+            ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+                <#dispatcher as #trait_name>::_dispatch(self, ctx, method, payload)
+            }
+        }
+    }
+}
+
 pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut trait_item = parse_macro_input!(item as ItemTrait);
     let args = parse_macro_input!(attr as AttributeArgs);
@@ -87,6 +106,9 @@ pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStre
         })
         .collect::<Vec<_>>();
     let cr = super::get_exonum_types_prefix(&meta_attrs);
+    let dispatcher = super::find_attribute_path(&meta_attrs, super::SERVICE_DISPATCHER).expect(
+        "Expected dispatcher attribute declaration in form (dispatcher = \"path::to::service\")",
+    );
 
     let methods = trait_item
         .items
@@ -142,10 +164,12 @@ pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStre
     trait_item.items.push(TraitItem::Method(dispatch_method));
 
     let txs_for_methods = implement_transaction_for_methods(&trait_item.ident, &methods, &cr);
+    let impl_service_dispatcher = implement_service_dispatcher(&trait_item.ident, &dispatcher, &cr);
 
     let expanded = quote! {
         #trait_item
         #txs_for_methods
+        #impl_service_dispatcher
     };
     expanded.into()
 }

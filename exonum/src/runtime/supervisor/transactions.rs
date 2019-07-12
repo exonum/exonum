@@ -23,7 +23,7 @@ use crate::{
 
 use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor};
 
-#[service_interface(exonum(crate = "crate"))]
+#[service_interface(exonum(crate = "crate", dispatcher = "super::Supervisor"))]
 /// Supervisor service transactions.
 pub trait Transactions {
     /// Requests artifact deploy.
@@ -190,5 +190,3 @@ impl Transactions for Supervisor {
         Ok(())
     }
 }
-
-impl_service_dispatcher!(Supervisor, Transactions);

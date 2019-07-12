@@ -132,7 +132,7 @@ impl TxTime {
 }
 
 /// Time oracle service transaction.
-#[service_interface]
+#[service_interface(exonum(dispatcher = "TimeService"))]
 pub trait TimeOracleInterface {
     /// Receives a new time from one of validators.
     fn time(&self, ctx: TransactionContext, arg: TxTime) -> ExecutionResult;

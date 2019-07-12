@@ -34,11 +34,10 @@ pub mod wallet;
 
 use exonum::{
     api::ServiceApiBuilder,
-    impl_service_dispatcher,
     runtime::rust::{Service, ServiceDescriptor},
 };
 
-use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
+use crate::api::PublicApi as CryptocurrencyApi;
 
 /// Initial balance of the wallet.
 pub const INITIAL_BALANCE: u64 = 100;
@@ -47,8 +46,6 @@ pub const INITIAL_BALANCE: u64 = 100;
 #[derive(Debug, ServiceFactory)]
 #[exonum(proto_sources = "proto")]
 pub struct CryptocurrencyService;
-
-impl_service_dispatcher!(CryptocurrencyService, CryptocurrencyInterface);
 
 impl Service for CryptocurrencyService {
     fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {

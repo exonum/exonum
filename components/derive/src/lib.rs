@@ -37,6 +37,7 @@ const ARTIFACT_NAME: &str = "artifact_name";
 const ARTIFACT_VERSION: &str = "artifact_version";
 const PROTO_SOURCES: &str = "proto_sources";
 const SERVICE_CONSTRUCTOR: &str = "with_constructor";
+const SERVICE_DISPATCHER: &str = "dispatcher";
 
 /// Derives `ProtobufConvert` trait.
 ///

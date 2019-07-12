@@ -283,19 +283,3 @@ pub trait Transaction: BinaryValue {
         Message::concrete(self.into_any_tx(service_id), public_key, secret_key)
     }
 }
-
-#[macro_export]
-macro_rules! impl_service_dispatcher {
-    ($struct_name:ident, $interface:ident) => {
-        impl $crate::runtime::rust::service::ServiceDispatcher for $struct_name {
-            fn call(
-                &self,
-                method: $crate::messages::MethodId,
-                ctx: $crate::runtime::rust::service::TransactionContext,
-                payload: &[u8],
-            ) -> Result<Result<(), $crate::runtime::error::ExecutionError>, failure::Error> {
-                <$struct_name as $interface>::_dispatch(self, ctx, method, payload)
-            }
-        }
-    };
-}

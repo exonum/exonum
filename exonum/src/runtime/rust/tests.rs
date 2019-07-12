@@ -61,7 +61,7 @@ struct TxB {
     value: u64,
 }
 
-#[service_interface(exonum(crate = "crate"))]
+#[service_interface(exonum(crate = "crate", dispatcher = "TestServiceImpl"))]
 trait TestService {
     fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
     fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
@@ -98,8 +98,6 @@ impl TestService for TestServiceImpl {
         Ok(())
     }
 }
-
-impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl Service for TestServiceImpl {
     fn configure(
