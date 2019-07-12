@@ -533,7 +533,10 @@ impl NodeHandler {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
-        if Schema::new(&snapshot).transactions().contains(&hash) {
+
+        let schema = Schema::new(&snapshot);
+
+        if schema.transactions().contains(&hash) {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
@@ -542,14 +545,31 @@ impl NodeHandler {
             bail!("Received malicious transaction.")
         }
 
-        let fork = self.blockchain.fork();
-        {
-            let mut schema = Schema::new(&fork);
-            schema.add_transaction_into_pool(msg);
+        let tx_pool_len = schema.transactions_pool_len();
+        self.state.tx_cache.push(msg);
+
+//        info!("tx_pool_len {}", tx_pool_len);
+//        info!("tx_cache size {}", self.state.tx_cache.len());
+
+//        let tx_limit = self.state.config().consensus.txs_block_limit as u64;
+        let tx_limit = 200;
+
+        if tx_pool_len < tx_limit {
+            let fork = self.blockchain.fork();
+            {
+                let mut schema = Schema::new(&fork);
+
+                for tx in self.state.tx_cache.iter() {
+                    schema.add_transaction_into_pool(tx.clone());
+                }
+            }
+
+            self.blockchain
+                .merge(fork.into_patch())
+                .expect("Unable to save transaction to persistent pool.");
+
+            self.state.tx_cache.clear();
         }
-        self.blockchain
-            .merge(fork.into_patch())
-            .expect("Unable to save transaction to persistent pool.");
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();
