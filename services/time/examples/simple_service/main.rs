@@ -29,9 +29,7 @@ use exonum::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, ServiceInstanceId, Signed},
-    runtime::rust::{
-        ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
-    },
+    runtime::rust::{Service, Transaction, TransactionContext},
 };
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
 use exonum_time::{
