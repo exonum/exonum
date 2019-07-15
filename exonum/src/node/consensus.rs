@@ -480,7 +480,7 @@ impl NodeHandler {
             // FIXME: Avoid of clone here. (ECR-171)
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
-                .commit(block_state.patch(), block_hash, precommits)
+                .commit(block_state.patch(), block_hash, precommits, &mut self.state.tx_cache)
                 .unwrap();
             // Update node state.
             self.state
@@ -545,25 +545,7 @@ impl NodeHandler {
             bail!("Received malicious transaction.")
         }
 
-        let tx_pool_len = schema.transactions_pool_len();
         self.state.tx_cache.push(msg);
-
-        let tx_limit = 300;
-
-        if tx_pool_len < tx_limit {
-            let fork = self.blockchain.fork();
-            {
-                let mut schema = Schema::new(&fork);
-
-                while let Some(tx) = self.state.tx_cache.pop() {
-                    schema.add_transaction_into_pool(tx);
-                }
-            }
-
-            self.blockchain
-                .merge(fork.into_patch())
-                .expect("Unable to save transaction to persistent pool.");
-        }
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();
