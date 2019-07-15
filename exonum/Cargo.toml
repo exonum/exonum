@@ -71,7 +71,7 @@ pretty_assertions = "0.6.1"
 proptest = "0.9.1"
 tempdir = "0.3.7"
 tempfile = "3"
-websocket = "0.22"
+websocket = "0.23"
 reqwest = "0.9"
 
 [[bench]]
