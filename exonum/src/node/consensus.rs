@@ -548,10 +548,6 @@ impl NodeHandler {
         let tx_pool_len = schema.transactions_pool_len();
         self.state.tx_cache.push(msg);
 
-//        info!("tx_pool_len {}", tx_pool_len);
-//        info!("tx_cache size {}", self.state.tx_cache.len());
-
-//        let tx_limit = self.state.config().consensus.txs_block_limit as u64;
         let tx_limit = 300;
 
         if tx_pool_len < tx_limit {
