@@ -23,7 +23,6 @@ use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{ExecutionResult, Schema},
     crypto::gen_keypair,
-    impl_service_dispatcher,
     runtime::rust::{
         ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
     },
@@ -49,7 +48,7 @@ impl TxTimestamp {
     }
 }
 
-#[service_interface]
+#[exonum_service(dispatcher = "TimestampingService")]
 trait TimestampingInterface {
     fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
 }
@@ -62,8 +61,6 @@ impl TimestampingInterface for TimestampingService {
         Ok(())
     }
 }
-
-impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
 impl Service for TimestampingService {}
 

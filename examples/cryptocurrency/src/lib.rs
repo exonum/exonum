@@ -205,7 +205,6 @@ pub mod contracts {
     use exonum::{
         api::ServiceApiBuilder,
         blockchain::ExecutionResult,
-        impl_service_dispatcher,
         runtime::rust::{Service, ServiceDescriptor, TransactionContext},
     };
 
@@ -220,7 +219,7 @@ pub mod contracts {
     const INIT_BALANCE: u64 = 100;
 
     /// Cryptocurrency service transactions.
-    #[service_interface]
+    #[exonum_service(dispatcher = "CryptocurrencyService")]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
         fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
@@ -286,8 +285,6 @@ pub mod contracts {
             }
         }
     }
-
-    impl_service_dispatcher!(CryptocurrencyService, CryptocurrencyInterface);
 
     impl Service for CryptocurrencyService {
         fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {

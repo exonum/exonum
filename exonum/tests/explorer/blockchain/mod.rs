@@ -18,7 +18,6 @@ use exonum::{
     blockchain::{Blockchain, ExecutionError, ExecutionResult, InstanceCollection, Schema},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
-    impl_service_dispatcher,
     messages::{AnyTx, Message, ServiceInstanceId, Signed},
     node::ApiSender,
     runtime::{
@@ -71,7 +70,7 @@ impl Transfer {
     }
 }
 
-#[service_interface]
+#[exonum_service(dispatcher = "MyService")]
 pub trait ExplorerTransactions {
     fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult;
     fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult;
@@ -93,8 +92,6 @@ impl ExplorerTransactions for MyService {
         panic!("oops");
     }
 }
-
-impl_service_dispatcher!(MyService, ExplorerTransactions);
 
 impl Service for MyService {}
 

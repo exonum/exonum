@@ -43,7 +43,6 @@ pub mod transactions;
 use exonum::{
     api::ServiceApiBuilder,
     crypto::Hash,
-    impl_service_dispatcher,
     runtime::rust::{AfterCommitContext, Service, ServiceDescriptor},
 };
 use exonum_merkledb::Snapshot;
@@ -53,7 +52,7 @@ use std::sync::Arc;
 use crate::{
     schema::TimeSchema,
     time_provider::{SystemTimeProvider, TimeProvider},
-    transactions::{TimeOracleInterface, TxTime},
+    transactions::TxTime,
 };
 
 // TODO there is no way to provide provider for now.
@@ -65,8 +64,6 @@ pub struct TimeService {
     /// Current time.
     time: Arc<dyn TimeProvider>,
 }
-
-impl_service_dispatcher!(TimeService, TimeOracleInterface);
 
 impl Service for TimeService {
     fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {

@@ -1199,15 +1199,13 @@ mod tests {
 
     use super::*;
 
-    #[service_interface(exonum(crate = "crate"))]
+    #[exonum_service(crate = "crate", dispatcher = "AfterCommitService")]
     pub trait AfterCommitInterface {
         fn after_commit(&self, context: TransactionContext, arg: TxAfterCommit) -> ExecutionResult;
     }
 
     #[derive(Debug)]
     pub struct AfterCommitService;
-
-    impl_service_dispatcher!(AfterCommitService, AfterCommitInterface);
 
     impl AfterCommitInterface for AfterCommitService {
         fn after_commit(

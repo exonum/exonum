@@ -19,14 +19,13 @@ use exonum::{
     api::{self, ServiceApiBackend},
     blockchain::{ExecutionError, ExecutionResult},
     crypto::Hash,
-    impl_service_dispatcher,
     messages::{AnyTx, Signed},
     runtime::{
         rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ArtifactInfo, ServiceInstanceId,
     },
 };
-use exonum_derive::{service_interface, ProtobufConvert};
+use exonum_derive::{exonum_service, ProtobufConvert};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash};
 use futures::{Future, IntoFuture};
 use log::trace;
@@ -94,7 +93,7 @@ impl TxIncrement {
     }
 }
 
-#[service_interface]
+#[exonum_service(dispatcher = "CounterService")]
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
@@ -214,8 +213,6 @@ impl CounterApi {
 
 #[derive(Debug)]
 pub struct CounterService;
-
-impl_service_dispatcher!(CounterService, CounterServiceInterface);
 
 impl Service for CounterService {
     fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut api::ServiceApiBuilder) {

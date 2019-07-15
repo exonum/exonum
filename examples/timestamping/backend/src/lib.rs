@@ -41,7 +41,6 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::ExecutionError,
     crypto::Hash,
-    impl_service_dispatcher,
     proto::Any,
     runtime::rust::{Service, ServiceDescriptor},
 };
@@ -52,14 +51,12 @@ use std::convert::TryFrom;
 use crate::{
     api::PublicApi as TimestampingApi,
     schema::{Schema, TimestampEntry},
-    transactions::{Config, TimestampingInterface},
+    transactions::Config,
 };
 
 #[derive(Debug, ServiceFactory)]
 #[exonum(proto_sources = "proto")]
 pub struct TimestampingService;
-
-impl_service_dispatcher!(TimestampingService, TimestampingInterface);
 
 impl Service for TimestampingService {
     fn configure(

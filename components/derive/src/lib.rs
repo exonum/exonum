@@ -14,15 +14,17 @@
 
 //! This crate provides macros for deriving some useful methods and traits for the exonum services.
 
+// TODO Rewrite on top of darling. https://github.com/TedDriggs/darling [ECR-3343]
+
 #![recursion_limit = "256"]
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
 extern crate proc_macro;
 
+mod exonum_service;
 mod pb_convert;
 mod service_factory;
-mod service_interface;
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -37,6 +39,7 @@ const ARTIFACT_NAME: &str = "artifact_name";
 const ARTIFACT_VERSION: &str = "artifact_version";
 const PROTO_SOURCES: &str = "proto_sources";
 const SERVICE_CONSTRUCTOR: &str = "with_constructor";
+const SERVICE_DISPATCHER: &str = "dispatcher";
 
 /// Derives `ProtobufConvert` trait.
 ///
@@ -158,8 +161,8 @@ pub fn generate_service_factory(input: TokenStream) -> TokenStream {
 
 /// TODO [ECR-3275]
 #[proc_macro_attribute]
-pub fn service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
-    service_interface::impl_service_interface(attr, item)
+pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
+    exonum_service::impl_service_interface(attr, item)
 }
 
 /// Exonum types should be imported with `crate::` prefix if inside crate

@@ -16,14 +16,14 @@
 
 use exonum::{
     blockchain::InstanceCollection,
-    helpers, impl_service_dispatcher,
+    helpers,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory},
         ArtifactInfo,
     },
 };
-use exonum_derive::service_interface;
+use exonum_derive::exonum_service;
 use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::oneshot, Future, IntoFuture};
 use tokio::util::FutureExt;
@@ -36,15 +36,13 @@ use std::{
     time::Duration,
 };
 
-#[service_interface]
+#[exonum_service(dispatcher = "CommitWatcherService")]
 trait CommitWatcherInterface {}
 
 #[derive(Debug)]
 struct CommitWatcherService(pub RefCell<Option<oneshot::Sender<()>>>);
 
 impl CommitWatcherInterface for CommitWatcherService {}
-
-impl_service_dispatcher!(CommitWatcherService, CommitWatcherInterface);
 
 impl Service for CommitWatcherService {
     fn after_commit(&self, _context: AfterCommitContext) {
@@ -68,15 +66,13 @@ impl ServiceFactory for CommitWatcherService {
     }
 }
 
-#[service_interface]
+#[exonum_service(dispatcher = "StartCheckerService")]
 trait StartCheckerInterface {}
 
 #[derive(Debug)]
 struct StartCheckerService;
 
 impl StartCheckerInterface for StartCheckerService {}
-
-impl_service_dispatcher!(StartCheckerService, StartCheckerInterface);
 
 impl Service for StartCheckerService {}
 

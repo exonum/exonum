@@ -283,7 +283,6 @@ mod tests {
         blockchain::{Blockchain, ExecutionResult, InstanceCollection, Schema},
         crypto,
         helpers::{generate_testnet_config, Height, ValidatorId},
-        impl_service_dispatcher,
         messages::ServiceInstanceId,
         node::ApiSender,
         proto::schema::tests::TestServiceTx,
@@ -310,12 +309,10 @@ mod tests {
     #[derive(Debug)]
     struct TxResultCheckService;
 
-    #[service_interface(exonum(crate = "crate"))]
+    #[exonum_service(crate = "crate", dispatcher = "TxResultCheckService")]
     trait TxResultCheckInterface {
         fn tx_result(&self, context: TransactionContext, arg: TxResult) -> ExecutionResult;
     }
-
-    impl_service_dispatcher!(TxResultCheckService, TxResultCheckInterface);
 
     impl TxResultCheckInterface for TxResultCheckService {
         fn tx_result(&self, context: TransactionContext, arg: TxResult) -> ExecutionResult {

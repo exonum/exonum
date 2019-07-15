@@ -1147,7 +1147,7 @@ mod tests {
         blockchain::{ExecutionResult, Schema},
         crypto::gen_keypair,
         events::EventHandler,
-        helpers, impl_service_dispatcher,
+        helpers,
         messages::AnyTx,
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
@@ -1162,7 +1162,7 @@ mod tests {
 
     impl_binary_value_for_message! { TxSimple }
 
-    #[service_interface(exonum(crate = "crate"))]
+    #[exonum_service(crate = "crate", dispatcher = "TestService")]
     pub trait TestInterface {
         fn simple(&self, context: TransactionContext, arg: TxSimple) -> ExecutionResult;
     }
@@ -1175,8 +1175,6 @@ mod tests {
             Ok(())
         }
     }
-
-    impl_service_dispatcher!(TestService, TestInterface);
 
     impl Service for TestService {}
 

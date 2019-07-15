@@ -164,7 +164,6 @@ mod tests {
         crypto::{gen_keypair, Hash},
         explorer::BlockWithTransactions,
         helpers::Height,
-        impl_service_dispatcher,
         messages::{AnyTx, Signed},
         runtime::rust::{
             ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
@@ -200,12 +199,10 @@ mod tests {
     #[derive(Debug)]
     struct SampleService;
 
-    #[service_interface]
+    #[exonum_service(dispatcher = "SampleService")]
     trait SampleServiceInterface {
         fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
     }
-
-    impl_service_dispatcher!(SampleService, SampleServiceInterface);
 
     impl SampleServiceInterface for SampleService {
         fn timestamp(&self, _context: TransactionContext, _arg: TxTimestamp) -> ExecutionResult {
