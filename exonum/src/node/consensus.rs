@@ -555,16 +555,14 @@ impl NodeHandler {
             {
                 let mut schema = Schema::new(&fork);
 
-                for tx in self.state.tx_cache.iter() {
-                    schema.add_transaction_into_pool(tx.clone());
+                while let Some(tx) = self.state.tx_cache.pop() {
+                    schema.add_transaction_into_pool(tx);
                 }
             }
 
             self.blockchain
                 .merge(fork.into_patch())
                 .expect("Unable to save transaction to persistent pool.");
-
-            self.state.tx_cache.clear();
         }
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
