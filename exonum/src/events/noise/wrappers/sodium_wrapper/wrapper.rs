@@ -18,7 +18,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use snow::{Builder, Session};
+use snow::{Builder, HandshakeState, TransportState};
 
 use std::fmt::{self, Error, Formatter};
 
@@ -37,9 +37,9 @@ pub const MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
 static PARAMS: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
-/// Wrapper around noise session to provide latter convenient interface.
+/// Wrapper around noise handshake state to provide latter convenient interface.
 pub struct NoiseWrapper {
-    pub session: Session,
+    pub state: HandshakeState,
 }
 
 impl NoiseWrapper {
@@ -48,10 +48,10 @@ impl NoiseWrapper {
             let builder: Builder = Self::noise_builder()
                 .local_private_key(params.secret_key.as_ref())
                 .remote_public_key(remote_key.as_ref());
-            let session = builder
+            let state = builder
                 .build_initiator()
                 .expect("Noise session initiator failed to initialize");
-            return Self { session };
+            return Self { state };
         } else {
             panic!("Remote public key is not specified")
         }
@@ -60,12 +60,12 @@ impl NoiseWrapper {
     pub fn responder(params: &HandshakeParams) -> Self {
         let builder: Builder = Self::noise_builder();
 
-        let session = builder
+        let state = builder
             .local_private_key(params.secret_key.as_ref())
             .build_responder()
             .expect("Noise session responder failed to initialize");
 
-        Self { session }
+        Self { state }
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<Vec<u8>, NoiseError> {
@@ -74,24 +74,45 @@ impl NoiseWrapper {
         }
 
         let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
-        let len = self.read(input, &mut buf)?;
+        let len = self.state.read_message(input, &mut buf)?;
         buf.truncate(len);
         Ok(buf)
     }
 
     pub fn write_handshake_msg(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
-        let len = self.write(msg, &mut buf)?;
+        let len = self.state.write_message(msg, &mut buf)?;
         buf.truncate(len);
         Ok(buf)
     }
 
-    pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
+    pub fn into_transport_wrapper(self) -> Result<TransportWrapper, NoiseError> {
         // Transition into transport mode after handshake is finished.
-        let session = self.session.into_transport_mode()?;
-        Ok(Self { session })
+        let state = self.state.into_transport_mode()?;
+        Ok(TransportWrapper { state })
     }
 
+    fn noise_builder<'a>() -> Builder<'a> {
+        Builder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
+    }
+}
+
+impl fmt::Debug for NoiseWrapper {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(
+            f,
+            "NoiseWrapper {{ handshake finished: {} }}",
+            self.state.is_handshake_finished()
+        )
+    }
+}
+
+/// Wrapper around noise transport state to provide latter convenient interface.
+pub struct TransportWrapper {
+    pub state: TransportState,
+}
+
+impl TransportWrapper {
     /// Decrypts `msg` using Noise session.
     ///
     /// Decryption consists of the following steps:
@@ -112,7 +133,7 @@ impl NoiseWrapper {
 
         let mut read = vec![0_u8; MAX_MESSAGE_LENGTH];
         for (i, msg) in data.chunks(MAX_MESSAGE_LENGTH).enumerate() {
-            let len = self.read(msg, &mut read)?;
+            let len = self.state.read_message(msg, &mut read)?;
             let start = i * (MAX_MESSAGE_LENGTH - TAG_LENGTH);
             let end = start + len;
 
@@ -139,7 +160,7 @@ impl NoiseWrapper {
 
         let mut written = vec![0_u8; MAX_MESSAGE_LENGTH];
         for (i, msg) in msg.chunks(CHUNK_LENGTH).enumerate() {
-            let len = self.write(msg, &mut written)?;
+            let len = self.state.write_message(msg, &mut written)?;
             let start = HEADER_LENGTH + i * MAX_MESSAGE_LENGTH;
             let end = start + len;
 
@@ -148,20 +169,6 @@ impl NoiseWrapper {
 
         buf.extend_from_slice(&encrypted_message);
         Ok(())
-    }
-
-    fn read(&mut self, input: &[u8], buf: &mut [u8]) -> Result<usize, NoiseError> {
-        let len = self.session.read_message(input, buf)?;
-        Ok(len)
-    }
-
-    fn write(&mut self, msg: &[u8], buf: &mut [u8]) -> Result<usize, NoiseError> {
-        let len = self.session.write_message(msg, buf)?;
-        Ok(len)
-    }
-
-    fn noise_builder<'a>() -> Builder<'a> {
-        Builder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
     }
 }
 
@@ -187,12 +194,12 @@ fn div_ceil(lhs: usize, rhs: usize) -> usize {
     }
 }
 
-impl fmt::Debug for NoiseWrapper {
+impl fmt::Debug for TransportWrapper {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(
             f,
-            "NoiseWrapper {{ handshake finished: {} }}",
-            self.session.is_handshake_finished()
+            "TransportWrapper {{ is initiator: {} }}",
+            self.state.is_initiator()
         )
     }
 }
