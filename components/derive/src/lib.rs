@@ -14,6 +14,8 @@
 
 //! This crate provides macros for deriving some useful methods and traits for the exonum services.
 
+// TODO Rewrite on top of darling. https://github.com/TedDriggs/darling [ECR-3343]
+
 #![recursion_limit = "256"]
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
