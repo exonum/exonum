@@ -40,6 +40,7 @@ use self::{
 pub mod rust;
 pub mod dispatcher;
 pub mod error;
+pub mod error_ng;
 pub mod supervisor;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]

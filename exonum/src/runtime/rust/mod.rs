@@ -43,6 +43,7 @@ use super::{
     StateHashAggregator,
 };
 
+pub mod error;
 #[macro_use]
 pub mod service;
 #[cfg(test)]
