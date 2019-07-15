@@ -22,7 +22,7 @@ use exonum::{
         ArtifactInfo, ServiceInstanceId,
     },
 };
-use exonum_derive::{service_interface, ProtobufConvert};
+use exonum_derive::{exonum_service, ProtobufConvert};
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -38,7 +38,7 @@ pub struct TxAfterCommit {
     pub height: Height,
 }
 
-#[service_interface(exonum(dispatcher = "AfterCommitService"))]
+#[exonum_service(dispatcher = "AfterCommitService")]
 pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,

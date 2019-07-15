@@ -93,7 +93,7 @@ impl TxMarker {
     }
 }
 
-#[service_interface(exonum(dispatcher = "MarkerService"))]
+#[exonum_service(dispatcher = "MarkerService")]
 pub trait MarkerInterface {
     fn mark(&self, context: TransactionContext, arg: TxMarker) -> ExecutionResult;
 }

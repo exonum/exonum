@@ -114,7 +114,7 @@ mod timestamping {
 
     const TIMESTAMPING_SERVICE_ID: ServiceInstanceId = 254;
 
-    #[service_interface(exonum(dispatcher = "Timestamping"))]
+    #[exonum_service(dispatcher = "Timestamping")]
     pub trait TimestampingInterface {
         fn timestamp(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
 
@@ -215,7 +215,7 @@ mod cryptocurrency {
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    #[service_interface(exonum(dispatcher = "Cryptocurrency"))]
+    #[exonum_service(dispatcher = "Cryptocurrency")]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
         fn transfer(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;

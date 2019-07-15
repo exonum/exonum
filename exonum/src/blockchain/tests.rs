@@ -33,7 +33,7 @@ use crate::{
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: ServiceInstanceId = 255;
 
-#[service_interface(exonum(crate = "crate", dispatcher = "TestServiceImpl"))]
+#[exonum_service(crate = "crate", dispatcher = "TestServiceImpl")]
 trait TestService {
     fn tx(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
 }
@@ -81,7 +81,7 @@ impl Tx {
     }
 }
 
-#[service_interface(exonum(crate = "crate", dispatcher = "ServiceGoodImpl"))]
+#[exonum_service(crate = "crate", dispatcher = "ServiceGoodImpl")]
 trait ServiceGood {}
 
 #[derive(Debug)]
@@ -110,7 +110,7 @@ impl ServiceFactory for ServiceGoodImpl {
     }
 }
 
-#[service_interface(exonum(crate = "crate", dispatcher = "ServicePanicImpl"))]
+#[exonum_service(crate = "crate", dispatcher = "ServicePanicImpl")]
 trait ServicePanic {}
 
 #[derive(Debug)]
@@ -138,7 +138,7 @@ impl ServiceFactory for ServicePanicImpl {
     }
 }
 
-#[service_interface(exonum(crate = "crate", dispatcher = "ServicePanicStorageErrorImpl"))]
+#[exonum_service(crate = "crate", dispatcher = "ServicePanicStorageErrorImpl")]
 trait ServicePanicStorageError {}
 
 #[derive(Debug)]

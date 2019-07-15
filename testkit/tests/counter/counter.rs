@@ -25,7 +25,7 @@ use exonum::{
         ArtifactInfo, ServiceInstanceId,
     },
 };
-use exonum_derive::{service_interface, ProtobufConvert};
+use exonum_derive::{exonum_service, ProtobufConvert};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash};
 use futures::{Future, IntoFuture};
 use log::trace;
@@ -93,7 +93,7 @@ impl TxIncrement {
     }
 }
 
-#[service_interface(exonum(dispatcher = "CounterService"))]
+#[exonum_service(dispatcher = "CounterService")]
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.

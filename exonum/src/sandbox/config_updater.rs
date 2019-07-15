@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-#[service_interface(exonum(crate = "crate", dispatcher = "ConfigUpdaterService"))]
+#[exonum_service(crate = "crate", dispatcher = "ConfigUpdaterService")]
 pub trait ConfigUpdaterInterface {
     fn update_config(&self, context: TransactionContext, arg: TxConfig) -> ExecutionResult;
 }

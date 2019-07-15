@@ -65,7 +65,7 @@ impl Transfer {
     }
 }
 
-#[service_interface(exonum(dispatcher = "MyService"))]
+#[exonum_service(dispatcher = "MyService")]
 pub trait MyServiceInterface {
     fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult;
     fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult;

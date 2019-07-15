@@ -1162,7 +1162,7 @@ mod tests {
 
     impl_binary_value_for_message! { TxSimple }
 
-    #[service_interface(exonum(crate = "crate", dispatcher = "TestService"))]
+    #[exonum_service(crate = "crate", dispatcher = "TestService")]
     pub trait TestInterface {
         fn simple(&self, context: TransactionContext, arg: TxSimple) -> ExecutionResult;
     }

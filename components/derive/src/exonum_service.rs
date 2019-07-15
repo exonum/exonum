@@ -15,8 +15,8 @@
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, TraitItem,
-    TraitItemMethod, Type,
+    parse_macro_input, AttributeArgs, FnArg, Ident, ItemTrait, Lit, Meta, NestedMeta, Path,
+    TraitItem, TraitItemMethod, Type,
 };
 
 struct ServiceMethodDescriptor {
@@ -95,6 +95,30 @@ fn implement_service_dispatcher(
     }
 }
 
+// TODO: Optimize: collect all attributes by the single pass [ECR-3222]
+
+fn find_attribute_path(attrs: &[Meta], name: &str) -> Option<Path> {
+    attrs
+        .iter()
+        .find_map(|meta| match meta {
+            Meta::NameValue(nv) if meta.name() == name => Some(nv),
+            _ => None,
+        })
+        .and_then(|nv| {
+            if nv.ident == name {
+                match nv.lit {
+                    Lit::Str(ref path) => Some(
+                        path.parse::<Path>()
+                            .expect("Unable to parse Path attribute"),
+                    ),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        })
+}
+
 pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut trait_item = parse_macro_input!(item as ItemTrait);
     let args = parse_macro_input!(attr as AttributeArgs);
@@ -105,8 +129,9 @@ pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStre
             _ => None,
         })
         .collect::<Vec<_>>();
-    let cr = super::get_exonum_types_prefix(&meta_attrs);
-    let dispatcher = super::find_attribute_path(&meta_attrs, super::SERVICE_DISPATCHER).expect(
+    let cr = find_attribute_path(&meta_attrs, super::CRATE_PATH_ATTRIBUTE)
+        .unwrap_or_else(|| syn::parse_str("exonum").unwrap());
+    let dispatcher = find_attribute_path(&meta_attrs, super::SERVICE_DISPATCHER).expect(
         "Expected dispatcher attribute declaration in form (dispatcher = \"path::to::service\")",
     );
 

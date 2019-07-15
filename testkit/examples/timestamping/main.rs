@@ -48,7 +48,7 @@ impl TxTimestamp {
     }
 }
 
-#[service_interface(exonum(dispatcher = "TimestampingService"))]
+#[exonum_service(dispatcher = "TimestampingService")]
 trait TimestampingInterface {
     fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
 }

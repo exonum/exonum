@@ -219,7 +219,7 @@ pub mod contracts {
     const INIT_BALANCE: u64 = 100;
 
     /// Cryptocurrency service transactions.
-    #[service_interface(exonum(dispatcher = "CryptocurrencyService"))]
+    #[exonum_service(dispatcher = "CryptocurrencyService")]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
         fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;

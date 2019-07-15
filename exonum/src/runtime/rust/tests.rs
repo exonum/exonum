@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_derive::service_interface;
+use exonum_derive::exonum_service;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
 use semver::Version;
 
@@ -61,7 +61,7 @@ struct TxB {
     value: u64,
 }
 
-#[service_interface(exonum(crate = "crate", dispatcher = "TestServiceImpl"))]
+#[exonum_service(crate = "crate", dispatcher = "TestServiceImpl")]
 trait TestService {
     fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
     fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;

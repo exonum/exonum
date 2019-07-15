@@ -23,7 +23,7 @@ use exonum::{
         ArtifactInfo,
     },
 };
-use exonum_derive::service_interface;
+use exonum_derive::exonum_service;
 use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::oneshot, Future, IntoFuture};
 use tokio::util::FutureExt;
@@ -36,7 +36,7 @@ use std::{
     time::Duration,
 };
 
-#[service_interface(exonum(dispatcher = "CommitWatcherService"))]
+#[exonum_service(dispatcher = "CommitWatcherService")]
 trait CommitWatcherInterface {}
 
 #[derive(Debug)]
@@ -66,7 +66,7 @@ impl ServiceFactory for CommitWatcherService {
     }
 }
 
-#[service_interface(exonum(dispatcher = "StartCheckerService"))]
+#[exonum_service(dispatcher = "StartCheckerService")]
 trait StartCheckerInterface {}
 
 #[derive(Debug)]

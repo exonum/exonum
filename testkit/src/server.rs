@@ -199,7 +199,7 @@ mod tests {
     #[derive(Debug)]
     struct SampleService;
 
-    #[service_interface(exonum(dispatcher = "SampleService"))]
+    #[exonum_service(dispatcher = "SampleService")]
     trait SampleServiceInterface {
         fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
     }

@@ -36,7 +36,7 @@ use crate::{
 
 pub const DATA_SIZE: usize = 64;
 
-#[service_interface(exonum(crate = "crate", dispatcher = "TimestampingService"))]
+#[exonum_service(crate = "crate", dispatcher = "TimestampingService")]
 pub trait TimestampingInterface {
     fn timestamp(&self, context: TransactionContext, arg: TimestampTx) -> ExecutionResult;
 }

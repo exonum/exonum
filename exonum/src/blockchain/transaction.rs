@@ -309,7 +309,7 @@ mod tests {
     #[derive(Debug)]
     struct TxResultCheckService;
 
-    #[service_interface(exonum(crate = "crate", dispatcher = "TxResultCheckService"))]
+    #[exonum_service(crate = "crate", dispatcher = "TxResultCheckService")]
     trait TxResultCheckInterface {
         fn tx_result(&self, context: TransactionContext, arg: TxResult) -> ExecutionResult;
     }

@@ -51,7 +51,7 @@ use std::convert::TryFrom;
 use crate::{
     api::PublicApi as TimestampingApi,
     schema::{Schema, TimestampEntry},
-    transactions::{Config, TimestampingInterface},
+    transactions::Config,
 };
 
 #[derive(Debug, ServiceFactory)]

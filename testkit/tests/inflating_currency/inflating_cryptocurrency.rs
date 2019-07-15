@@ -22,7 +22,7 @@ use exonum::{
         ArtifactInfo, ServiceInstanceId,
     },
 };
-use exonum_derive::{service_interface, ProtobufConvert};
+use exonum_derive::{exonum_service, ProtobufConvert};
 use exonum_merkledb::{IndexAccess, MapIndex};
 use serde_derive::{Deserialize, Serialize};
 
@@ -116,7 +116,7 @@ pub struct TxTransfer {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
-#[service_interface(exonum(dispatcher = "CurrencyService"))]
+#[exonum_service(dispatcher = "CurrencyService")]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
     fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
