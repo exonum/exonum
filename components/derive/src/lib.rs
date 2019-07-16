@@ -23,6 +23,7 @@ extern crate proc_macro;
 mod exonum_service;
 mod pb_convert;
 mod service_factory;
+mod execution_error;
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -161,6 +162,12 @@ pub fn generate_service_factory(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_service::impl_service_interface(attr, item)
+}
+
+/// TODO [ECR-3275]
+#[proc_macro_derive(IntoExecutionError, attributes(exonum))]
+pub fn generate_into_execution_error(input: TokenStream) -> TokenStream {
+    execution_error::implement_execution_error(input)
 }
 
 /// Exonum types should be imported with `crate::` prefix if inside crate

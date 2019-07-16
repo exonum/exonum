@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use schema::Schema;
+pub use {schema::Schema, error::Error};
 
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future, Future};
@@ -37,6 +37,7 @@ use super::{
 };
 
 mod schema;
+mod error;
 
 #[derive(Default)]
 pub struct Dispatcher {
