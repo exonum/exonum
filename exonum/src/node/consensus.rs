@@ -480,7 +480,13 @@ impl NodeHandler {
             // FIXME: Avoid of clone here. (ECR-171)
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
-                .commit(block_state.patch(), block_hash, precommits, &mut self.state.tx_cache)
+                .commit(
+                    block_state.patch(),
+                    block_hash,
+                    precommits,
+                    self.state.config().consensus.txs_block_limit,
+                    &mut self.state.tx_cache,
+                )
                 .unwrap();
             // Update node state.
             self.state

@@ -193,6 +193,12 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
     );
 
     blockchain
-        .commit(&patch, block_hash, vec![precommit].into_iter(), &mut Vec::new())
+        .commit(
+            &patch,
+            block_hash,
+            vec![precommit].into_iter(),
+            1,
+            &mut Vec::new(),
+        )
         .unwrap();
 }

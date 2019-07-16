@@ -659,7 +659,7 @@ impl TestKit {
 
         let guard = self.processing_lock.lock().unwrap();
         self.blockchain
-            .commit(&patch, block_hash, precommits.into_iter(), &mut Vec::new())
+            .commit(&patch, block_hash, precommits.into_iter(), 1, &mut Vec::new())
             .unwrap();
         drop(guard);
 

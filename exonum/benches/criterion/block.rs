@@ -476,7 +476,7 @@ fn prepare_blockchain(
         // We make use of the fact that `Blockchain::commit()` doesn't check
         // precommits in any way (they are checked beforehand by the consensus algorithm).
         blockchain
-            .commit(&patch, block_hash, iter::empty(), &mut Vec::new())
+            .commit(&patch, block_hash, iter::empty(), 1, &mut Vec::new())
             .unwrap();
     }
 }
