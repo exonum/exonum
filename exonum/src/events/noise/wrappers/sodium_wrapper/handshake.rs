@@ -133,7 +133,7 @@ impl NoiseHandshake {
             // `remote_static_key` on final step of handshake.
             let rs = self
                 .noise
-                .session
+                .state
                 .get_remote_static()
                 .expect("Remote static key is not present!");
             x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
@@ -143,7 +143,7 @@ impl NoiseHandshake {
             bail!("peer is not in ConnectList")
         }
 
-        let noise = self.noise.into_transport_mode()?;
+        let noise = self.noise.into_transport_wrapper()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
         Ok((framed, message))
     }
