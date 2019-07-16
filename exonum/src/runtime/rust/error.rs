@@ -14,7 +14,7 @@
 
 //! The set of specific for the Rust runtime implementation errors.
 
-use crate::runtime::error_ng::{ErrorKind, ExecutionError};
+use crate::runtime::{error::{ErrorKind, ExecutionError}};
 
 /// Result of unsuccessful transaction execution.
 ///
@@ -57,4 +57,18 @@ impl From<TransactionError> for ExecutionError {
             description: inner.description.unwrap_or_default(),
         }
     }
+}
+
+/// List of possible Rust runtime errors.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
+#[exonum(crate = "crate", kind = "runtime")]
+pub enum Error {
+    /// Unable to parse artifact identifier or specified artifact has non-empty spec.
+    IncorrectArtifactId = 0,
+    /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
+    UnableToDeploy = 1,
+    /// Unable to parse service configuration.
+    ConfigParseError = 2,
+    /// Unspecified error during the call invocation.
+    UnspecifiedError = 3,
 }

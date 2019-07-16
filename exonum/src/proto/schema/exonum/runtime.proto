@@ -16,6 +16,8 @@ syntax = "proto3";
 
 package exonum.runtime;
 
+import "google/protobuf/empty.proto";
+
 message CallInfo {
   uint32 instance_id = 1;
   uint32 method_id = 2;
@@ -45,4 +47,12 @@ message ExecutionError {
   uint32 code = 2;
   /// Optional description which doesn't affect `object_hash`.
   string description = 3;
+}
+
+/// Result of runtime execution.
+message ExecutionResult {
+  oneof result {
+     google.protobuf.Empty ok = 1;
+     ExecutionError error = 2;
+  }
 }

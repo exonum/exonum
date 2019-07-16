@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
-use super::{ArtifactId, DeployError, InstanceSpec, StartError};
+use super::{ArtifactId, InstanceSpec, Error};
 use crate::{crypto::Hash, messages::ServiceInstanceId, proto::Any};
 
 #[derive(Debug, Clone)]
@@ -52,10 +52,10 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds artifact specification to the set of deployed artifacts.
-    pub fn add_artifact(&mut self, artifact: ArtifactId, spec: Any) -> Result<(), DeployError> {
+    pub fn add_artifact(&mut self, artifact: ArtifactId, spec: Any) -> Result<(), Error> {
         // Checks that we have not already deployed this artifact.
         if self.artifacts().contains(&artifact.name) {
-            return Err(DeployError::AlreadyDeployed);
+            return Err(Error::ArtifactAlreadyDeployed);
         }
 
         self.artifacts().put(&artifact.name, artifact.runtime_id);
@@ -64,22 +64,22 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds information about started service instance to the schema.
-    pub fn add_service_instance(&mut self, spec: InstanceSpec) -> Result<(), StartError> {
+    pub fn add_service_instance(&mut self, spec: InstanceSpec) -> Result<(), Error> {
         let runtime_id = self
             .artifacts()
             .get(&spec.artifact.name)
-            .ok_or(StartError::NotDeployed)?;
+            .ok_or(Error::ArtifactNotDeployed)?;
         // Checks that runtime identifier is proper in instance.
         if runtime_id != spec.artifact.runtime_id {
-            return Err(StartError::WrongRuntime);
+            return Err(Error::IncorrectRuntime);
         }
         // Checks that instance name doesn't exist.
         if self.service_instances().contains(&spec.name) {
-            return Err(StartError::ServiceNameExists);
+            return Err(Error::ServiceNameExists);
         }
         // Checks that instance identifier doesn't exist.
         if self.service_instance_ids().contains(&spec.id) {
-            return Err(StartError::ServiceIdExists);
+            return Err(Error::ServiceIdExists);
         }
 
         let name = spec.name.clone();

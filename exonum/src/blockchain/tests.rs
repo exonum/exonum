@@ -18,7 +18,7 @@ use exonum_merkledb::{Database, Error as StorageError, ListIndex, ObjectHash, Te
 use futures::sync::mpsc;
 
 use crate::{
-    blockchain::{Blockchain, ExecutionResult, InstanceCollection, Schema},
+    blockchain::{Blockchain, InstanceCollection, Schema},
     crypto::gen_keypair,
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::ServiceInstanceId,
@@ -33,16 +33,22 @@ use crate::{
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: ServiceInstanceId = 255;
 
+#[derive(IntoExecutionError)]
+#[exonum(crate = "crate")]
+enum Error {
+    Dummy = 0,
+}
+
 #[exonum_service(crate = "crate", dispatcher = "TestServiceImpl")]
 trait TestService {
-    fn tx(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
+    fn tx(&self, context: TransactionContext, arg: Tx) -> Result<(), Error>;
 }
 
 #[derive(Debug)]
 struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
-    fn tx(&self, context: TransactionContext, arg: Tx) -> ExecutionResult {
+    fn tx(&self, context: TransactionContext, arg: Tx) -> Result<(), Error> {
         if arg.value == 42 {
             panic!(StorageError::new("42"))
         }

@@ -12,44 +12,389 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// TODO: Use two level error codes for ExecutionError, first level is runtime errors [ECR-3236]
-// second level is service errors.
+//! The set of errors for the Runtime module.
 
-pub use crate::blockchain::ExecutionError;
+use exonum_merkledb::{BinaryValue, ObjectHash};
+use protobuf::Message;
 
-// TODO: summarize error codes/simplify error creation
+use std::{any::Any, convert::TryFrom, fmt::Display};
 
-pub const DISPATCH_ERROR: u8 = 255;
-pub const WRONG_ARG_ERROR: u8 = 254;
-pub const WRONG_RUNTIME: u8 = 253;
+use crate::{
+    crypto::{self, Hash},
+    proto::{schema::runtime, ProtobufConvert},
+};
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum DeployError {
-    WrongRuntime,
-    WrongArtifact,
-    FailedToDeploy,
-    AlreadyDeployed,
+/// Kind of execution error, indicates in which module error occurred.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub enum ErrorKind {
+    // Operation execution has been finished with panic.
+    Panic,
+    // An error in dispatcher during the execution occurred.
+    Dispatcher {
+        /// Error code.
+        code: u8,
+    },
+    // An error in the runtime occurred.
+    Runtime {
+        /// User-defined error code.
+        /// Error codes can have different meanings for the different runtimes.
+        code: u8,
+    },
+    // An error during the service's transaction execution occurred.
+    Service {
+        /// User-defined error code.
+        /// Error codes can have different meanings for the different transactions
+        /// and services.        
+        code: u8,
+    },
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum StartError {
-    WrongRuntime,
-    WrongArtifact,
-    NotDeployed,
-    NotStarted,
-    ServiceIdExists,
-    ServiceNameExists,
-    ExecutionError(ExecutionError),
-}
+impl ErrorKind {
+    /// Creates dispatcher error with the specified code.
+    pub fn dispatcher(code: impl Into<u8>) -> Self {
+        ErrorKind::Dispatcher { code: code.into() }
+    }
 
-impl From<DeployError> for ExecutionError {
-    fn from(deploy: DeployError) -> Self {
-        ExecutionError::with_description(128, format!("Deploy failed because: {:?}", deploy))
+    /// Creates runtime error with the specified code.
+    pub fn runtime(code: impl Into<u8>) -> Self {
+        ErrorKind::Runtime { code: code.into() }
+    }
+
+    /// Creates service error with the specified code.
+    pub fn service(code: impl Into<u8>) -> Self {
+        ErrorKind::Service { code: code.into() }
+    }
+
+    fn into_raw(self) -> (u8, u8) {
+        match self {
+            ErrorKind::Panic => (0, 0),
+            ErrorKind::Dispatcher { code } => (1, code),
+            ErrorKind::Runtime { code } => (2, code),
+            ErrorKind::Service { code } => (3, code),
+        }
+    }
+
+    fn from_raw(kind: u8, code: u8) -> Result<Self, failure::Error> {
+        match kind {
+            0 => {
+                ensure!(code != 0, "Error code for panic should be zero");
+                Ok(ErrorKind::Panic)
+            }
+            1 => Ok(ErrorKind::Dispatcher { code }),
+            2 => Ok(ErrorKind::Runtime { code }),
+            3 => Ok(ErrorKind::Service { code }),
+            _ => bail!("Unknown error kind"),
+        }
     }
 }
 
-impl From<StartError> for ExecutionError {
-    fn from(init: StartError) -> Self {
-        ExecutionError::with_description(129, format!("Start failed because: {:?}", init))
+/// Result of unsuccessful runtime execution.
+///
+/// An execution error consists of an error kind and optional description.
+/// The error code affects the blockchain state hash, while the description does not.
+/// Therefore descriptions are mostly used for developer purposes, not for interaction of
+/// the system with users.
+///
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct ExecutionError {
+    /// The kind of error that indicates in which module and with which code the error occurred.
+    pub kind: ErrorKind,
+    /// Optional description which doesn't affect `object_hash`.
+    pub description: String,
+}
+
+impl ExecutionError {
+    /// Creates a new execution error instance with the specified kind and optional description.
+    pub fn new(kind: ErrorKind, description: impl Into<String>) -> Self {
+        Self {
+            kind,
+            description: description.into(),
+        }
+    }
+
+    /// Creates an execution error from the panic description.
+    pub(crate) fn from_panic(any: &(dyn Any + Send)) -> Self {
+        // Tries to get a meaningful description from the given panic.
+        let description = {
+            if let Some(s) = any.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = any.downcast_ref::<String>() {
+                s.clone()
+            } else if let Some(error) = any.downcast_ref::<Box<dyn std::error::Error + Send>>() {
+                error.description().to_string()
+            } else {
+                String::new()
+            }
+        };
+        Self {
+            kind: ErrorKind::Panic,
+            description,
+        }
+    }
+}
+
+impl<E, T> From<(E, T)> for ExecutionError
+where
+    T: Display,
+    E: Into<ErrorKind>,
+{
+    fn from(inner: (E, T)) -> Self {
+        ExecutionError::new(inner.0.into(), inner.1.to_string())
+    }
+}
+
+impl ProtobufConvert for ExecutionError {
+    type ProtoStruct = runtime::ExecutionError;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut inner = Self::ProtoStruct::default();
+        let (kind, code) = self.kind.into_raw();
+        inner.set_kind(u32::from(kind));
+        inner.set_code(u32::from(code));
+        inner
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let kind = u8::try_from(pb.get_kind())?;
+        let code = u8::try_from(pb.get_code())?;
+        Ok(Self {
+            kind: ErrorKind::from_raw(kind, code)?,
+            description: pb.take_description(),
+        })
+    }
+}
+
+impl BinaryValue for ExecutionError {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.to_pb()
+            .write_to_bytes()
+            .expect("Failed to serialize in BinaryValue for ExecutionError")
+    }
+
+    fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
+        inner.merge_from_bytes(value.as_ref())?;
+        ProtobufConvert::from_pb(inner)
+    }
+}
+
+// String content (`ExecutionError::description`) is intentionally excluded from the hash
+// calculation because user can be tempted to use error description from a third-party libraries
+// which aren't stable across the versions.
+impl ObjectHash for ExecutionError {
+    fn object_hash(&self) -> Hash {
+        let (kind, code) = self.kind.into_raw();
+        crypto::hash(&[kind, code])
+    }
+}
+
+/// Returns a result of the dispatcher execution.
+/// This result may be either an empty unit type, in case of success,
+/// or an `ExecutionError`, if execution has failed.
+/// Errors consist of an error code and an optional description.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExecutionResult(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
+
+impl From<Result<(), ExecutionError>> for ExecutionResult {
+    fn from(inner: Result<(), ExecutionError>) -> Self {
+        ExecutionResult(inner)
+    }
+}
+
+impl ProtobufConvert for ExecutionResult {
+    type ProtoStruct = runtime::ExecutionResult;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut inner = Self::ProtoStruct::default();
+        match &self.0 {
+            Result::Ok(_) => inner.set_ok(protobuf::well_known_types::Empty::new()),
+            Result::Err(e) => inner.set_error(e.to_pb()),
+        }
+        inner
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let inner = if pb.has_error() {
+            ensure!(!pb.has_ok(), "ExecutionResult has both of variants.");
+            Err(ExecutionError::from_pb(pb.take_error())?)
+        } else {
+            Ok(())
+        };
+        Ok(Self(inner))
+    }
+}
+
+impl BinaryValue for ExecutionResult {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.to_pb()
+            .write_to_bytes()
+            .expect("Failed to serialize in BinaryValue for ExecutionResult")
+    }
+
+    fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
+        inner.merge_from_bytes(value.as_ref())?;
+        ProtobufConvert::from_pb(inner)
+    }
+}
+
+impl ObjectHash for ExecutionResult {
+    fn object_hash(&self) -> Hash {
+        match &self.0 {
+            Err(e) => e.object_hash(),
+            Ok(_) => Hash::zero(),
+        }
+    }
+}
+
+/// More convenient serde format for ExecutionResult
+mod execution_result {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::{ErrorKind, ExecutionError};
+
+    #[serde(tag = "type", rename_all = "kebab-case")]
+    #[derive(Debug, Serialize, Deserialize)]
+    enum ExecutionResult<'a> {
+        Success,
+        Panic { description: &'a str },
+        Dispatcher { description: &'a str, code: u8 },
+        Runtime { description: &'a str, code: u8 },
+        Service { description: &'a str, code: u8 },
+    }
+
+    impl<'a> From<&'a Result<(), ExecutionError>> for ExecutionResult<'a> {
+        fn from(inner: &'a Result<(), ExecutionError>) -> Self {
+            if let Err(err) = &inner {
+                let description = &err.description;
+                match err.kind {
+                    ErrorKind::Panic => ExecutionResult::Panic { description },
+                    ErrorKind::Dispatcher { code } => {
+                        ExecutionResult::Dispatcher { code, description }
+                    }
+                    ErrorKind::Runtime { code } => ExecutionResult::Runtime { code, description },
+                    ErrorKind::Service { code } => ExecutionResult::Service { code, description },
+                }
+            } else {
+                ExecutionResult::Success
+            }
+        }
+    }
+
+    impl<'a> From<ExecutionResult<'a>> for Result<(), ExecutionError> {
+        fn from(inner: ExecutionResult<'a>) -> Self {
+            match inner {
+                ExecutionResult::Success => Ok(()),
+                ExecutionResult::Panic { description } => {
+                    Err(ExecutionError::new(ErrorKind::Panic, description))
+                }
+                ExecutionResult::Dispatcher { description, code } => Err(ExecutionError::new(
+                    ErrorKind::Dispatcher { code },
+                    description,
+                )),
+                ExecutionResult::Runtime { description, code } => Err(ExecutionError::new(
+                    ErrorKind::Runtime { code },
+                    description,
+                )),
+                ExecutionResult::Service { description, code } => Err(ExecutionError::new(
+                    ErrorKind::Service { code },
+                    description,
+                )),
+            }
+        }
+    }
+
+    pub fn serialize<S>(
+        inner: &Result<(), ExecutionError>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        ExecutionResult::from(inner).serialize(serializer)
+    }
+
+    pub fn deserialize<'a, D>(deserializer: D) -> Result<Result<(), ExecutionError>, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        ExecutionResult::deserialize(deserializer).map(From::from)
+    }
+
+}
+
+#[test]
+fn execution_error_binary_value_round_trip() {
+    let values = vec![
+        (ErrorKind::Panic, "AAAA"),
+        (ErrorKind::Dispatcher { code: 0 }, ""),
+        (ErrorKind::Dispatcher { code: 0 }, "b"),
+        (ErrorKind::Runtime { code: 1 }, "c"),
+        (ErrorKind::Service { code: 18 }, "ddc"),
+    ];
+
+    for (kind, description) in values {
+        let err = ExecutionError {
+            kind,
+            description: description.to_owned(),
+        };
+
+        let bytes = err.to_bytes();
+        let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
+        assert_eq!(err, err2);
+    }
+}
+
+#[test]
+fn execution_error_binary_value_wrong_kind() {
+    let bytes = {
+        let mut inner = runtime::ExecutionError::default();
+        inner.set_kind(117);
+        inner.set_code(2);
+        inner.write_to_bytes().unwrap()
+    };
+
+    assert_eq!(
+        ExecutionError::from_bytes(bytes.into())
+            .unwrap_err()
+            .to_string(),
+        "Unknown error kind"
+    )
+}
+
+#[test]
+fn execution_error_object_hash_description() {
+    let first_err = ExecutionError {
+        kind: ErrorKind::Service { code: 5 },
+        description: "foo".to_owned(),
+    };
+
+    let second_err = ExecutionError {
+        kind: ErrorKind::Service { code: 5 },
+        description: "foo bar".to_owned(),
+    };
+
+    assert_eq!(first_err.object_hash(), second_err.object_hash());
+}
+
+#[test]
+fn execution_result_serde_roundtrip() {
+    let values = vec![
+        Err((ErrorKind::Panic, "AAAA")),
+        Err((ErrorKind::Dispatcher { code: 0 }, "")),
+        Err((ErrorKind::Dispatcher { code: 0 }, "b")),
+        Err((ErrorKind::Runtime { code: 1 }, "c")),
+        Err((ErrorKind::Service { code: 18 }, "ddc")),
+        Ok(()),
+    ];
+
+    for value in values {
+        let res = ExecutionResult(value.map_err(|(kind, description)| ExecutionError {
+            kind,
+            description: description.to_owned(),
+        }));
+        let body = serde_json::to_string_pretty(&res).unwrap();
+        let res2 = serde_json::from_str(&body).unwrap();
+        assert_eq!(res, res2);
     }
 }

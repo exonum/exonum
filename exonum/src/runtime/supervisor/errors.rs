@@ -12,35 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::blockchain::ExecutionError;
-
 /// Common errors emitted by transactions during execution.
-#[derive(Debug, Fail)]
-#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
+#[exonum(crate = "crate")]
 pub enum Error {
     /// Artifact has been already deployed.
-    #[fail(display = "Artifact has been already deployed")]
     AlreadyDeployed = 0,
     /// Transaction author is not a validator.
-    #[fail(display = "Transaction author is not a validator")]
     UnknownAuthor = 1,
     /// Deadline exceeded for the current transaction.
-    #[fail(display = "Deadline exceeded for the current transaction")]
     DeadlineExceeded = 2,
     /// Instance with the given name already exists.
-    #[fail(display = "Instance with the given name already exists")]
     InstanceExists = 3,
     /// Deploy request has been already registered.
-    #[fail(display = "Deploy request has been already registered")]
     DeployRequestAlreadyRegistered = 4,
     /// Deploy request has not been registered.
-    #[fail(display = "Deploy request has not been registered")]
     DeployRequestNotRegistered = 5,
-}
-
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        let description = value.to_string();
-        ExecutionError::with_description(value as u8, description)
-    }
 }

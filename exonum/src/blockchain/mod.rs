@@ -20,10 +20,8 @@ pub use self::{
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
-    transaction::{
-        ExecutionError, ExecutionResult, TransactionError, TransactionErrorType, TransactionResult,
-    },
 };
+pub use crate::runtime::{ExecutionResult, ExecutionError};
 
 pub mod config;
 
@@ -326,7 +324,7 @@ impl Blockchain {
             }))
         };
 
-        let tx_result = TransactionResult(match catch_result {
+        let tx_result = match catch_result {
             Ok(execution_result) => {
                 match execution_result {
                     Ok(()) => {
@@ -339,7 +337,7 @@ impl Blockchain {
                         fork.rollback();
                     }
                 }
-                execution_result.map_err(TransactionError::from)
+                execution_result
             }
             Err(err) => {
                 if err.is::<StorageError>() {
@@ -352,12 +350,12 @@ impl Blockchain {
                     transaction, err
                 );
 
-                Err(TransactionError::from_panic(&err))
+                Err(ExecutionError::from_panic(&err))
             }
-        });
+        };
 
         let mut schema = Schema::new(&*fork);
-        schema.transaction_results().put(&tx_hash, tx_result);
+        schema.transaction_results().put(&tx_hash, ExecutionResult(tx_result));
         schema.commit_transaction(&tx_hash);
         schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);

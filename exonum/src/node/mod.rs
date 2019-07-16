@@ -1144,7 +1144,7 @@ mod tests {
     use std::borrow::Cow;
 
     use crate::{
-        blockchain::{ExecutionResult, Schema},
+        blockchain::Schema,
         crypto::gen_keypair,
         events::EventHandler,
         helpers,
@@ -1152,7 +1152,7 @@ mod tests {
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ArtifactInfo, ServiceInstanceId,
+            ArtifactInfo, ServiceInstanceId, ExecutionError
         },
     };
 
@@ -1164,14 +1164,14 @@ mod tests {
 
     #[exonum_service(crate = "crate", dispatcher = "TestService")]
     pub trait TestInterface {
-        fn simple(&self, context: TransactionContext, arg: TxSimple) -> ExecutionResult;
+        fn simple(&self, context: TransactionContext, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug)]
     struct TestService;
 
     impl TestInterface for TestService {
-        fn simple(&self, _context: TransactionContext, _arg: TxSimple) -> ExecutionResult {
+        fn simple(&self, _context: TransactionContext, _arg: TxSimple) -> Result<(), ExecutionError> {
             Ok(())
         }
     }

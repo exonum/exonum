@@ -26,7 +26,7 @@ use crate::{
     proto,
 };
 
-use super::{config::StoredConfiguration, Block, BlockProof, TransactionResult};
+use super::{config::StoredConfiguration, Block, BlockProof, ExecutionResult};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -149,7 +149,7 @@ where
     ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
-    pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, TransactionResult> {
+    pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, ExecutionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.access.clone())
     }
 

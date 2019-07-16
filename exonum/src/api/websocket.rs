@@ -32,10 +32,9 @@ use crate::{
         node::public::explorer::{TransactionHex, TransactionResponse},
         ServiceApiState,
     },
-    blockchain::{Block, Schema, TransactionResult, TxLocation},
+    blockchain::{Block, Schema, ExecutionResult, TxLocation},
     crypto::Hash,
     events::error::into_failure,
-    explorer::TxStatus,
     messages::{AnyTx, BinaryValue, Message as ExonumMessage, ProtocolMessage, SignedMessage},
 };
 
@@ -92,8 +91,7 @@ pub struct CommittedTransactionSummary {
     pub service_id: u16,
     /// ID of transaction in service.
     pub message_id: u16,
-    #[serde(with = "TxStatus")]
-    status: TransactionResult,
+    status: ExecutionResult,
     location: TxLocation,
     proof: ListProof<Hash>,
 }

@@ -60,7 +60,7 @@
 //! ```
 
 pub use self::schema::{
-    blockchain::{Block, ConfigReference, TransactionResult, TxLocation},
+    blockchain::{Block, ConfigReference, TxLocation},
     helpers::{BitVec, Hash, PublicKey, Signature},
     protocol::{
         AnyTx, BlockRequest, BlockResponse, CallInfo, Connect, ExonumMessage, PeersRequest,

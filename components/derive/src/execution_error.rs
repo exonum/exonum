@@ -56,12 +56,12 @@ impl ParsedVariant {
     fn from_variant(variant: &Variant) -> Self {
         assert!(
             variant.fields.iter().len() == 0,
-            "Each enum variant should not have fields inside."
+            "IntoExecutionError: Each enum variant should not have fields inside."
         );
         let discriminant = variant
             .discriminant
             .clone()
-            .expect("Each enum variant should have an explicit discriminant declaration")
+            .expect("IntoExecutionError: Each enum variant should have an explicit discriminant declaration")
             .1;
         // TODO parse discriminant.
         let id = discriminant;
@@ -143,7 +143,10 @@ impl FromDeriveInput for IntoExecutionError {
             .variants
             .iter()
             .map(ParsedVariant::from_variant)
-            .collect();
+            .collect::<Vec<_>>();
+        if variants.is_empty() {
+            return Err(darling::Error::too_few_items(1));
+        }
 
         Ok(Self {
             name: input.ident.clone(),
@@ -181,13 +184,34 @@ impl IntoExecutionError {
             let ident = &variant.ident;
             let id = &variant.id;
             quote! { #name::#ident => {
-                let kind = #cr::runtime::error_ng::ErrorKind::#kind(#id);
-                #cr::runtime::error_ng::ExecutionError::new(kind, inner.to_string())
+                let kind = #cr::runtime::error::ErrorKind::#kind(#id);
+                #cr::runtime::error::ExecutionError::new(kind, inner.to_string())
             } }
         });
 
         quote! {
-            impl From<#name> for #cr::runtime::error_ng::ExecutionError {
+            impl From<#name> for #cr::runtime::error::ExecutionError {
+                fn from(inner: #name) -> Self {
+                    match inner {
+                        #( #match_arms )*
+                    }
+                }
+            }
+        }
+    }
+
+    fn implement_into_error_kind(&self) -> impl ToTokens {
+        let name = &self.name;
+        let cr = &self.attrs.cr;
+        let kind = &self.attrs.kind;
+        let match_arms = self.variants.iter().map(|variant| {
+            let ident = &variant.ident;
+            let id = &variant.id;
+            quote! { #name::#ident => #cr::runtime::error::ErrorKind::#kind(#id), }
+        });
+
+        quote! {
+            impl From<#name> for #cr::runtime::error::ErrorKind {
                 fn from(inner: #name) -> Self {
                     match inner {
                         #( #match_arms )*
@@ -202,15 +226,19 @@ impl ToTokens for IntoExecutionError {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let display_impl = self.implement_display();
         let into_execution_error_impl = self.implement_into_execution_error();
+        let into_error_kind_impl = self.implement_into_error_kind();
+
         tokens.extend(quote! {
             #display_impl
             #into_execution_error_impl
+            #into_error_kind_impl
         })
     }
 }
 
 pub fn implement_execution_error(input: TokenStream) -> TokenStream {
-    let input = IntoExecutionError::from_derive_input(&syn::parse(input).unwrap()).unwrap();
+    let input = IntoExecutionError::from_derive_input(&syn::parse(input).unwrap())
+        .unwrap_or_else(|e| panic!("IntoExecutionError: {}", e));
     let tokens = quote! {#input};
     tokens.into()
 }

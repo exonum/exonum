@@ -18,8 +18,18 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 #[exonum(crate = "crate", kind = "dispatcher")]
 pub enum Error {
-    /// Runtime identifier is unknown.
-    UnknownRuntime = 0,
+    /// Runtime identifier is incorrect in this context.
+    IncorrectRuntime = 0,
     /// Artifact identifier is unknown.
     UnknownArtifactId = 1,
+    /// Artifact with the given identifier is already deployed.
+    ArtifactAlreadyDeployed = 2,
+    /// Artifact with the given identifier is not deployed.
+    ArtifactNotDeployed = 3,    
+    /// Specified service name is already used.
+    ServiceNameExists = 4,
+    /// Specified service identifier is already used.
+    ServiceIdExists = 5,
+    /// Specified service does not started.
+    ServiceNotStarted = 6,
 }
