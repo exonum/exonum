@@ -1177,7 +1177,7 @@ mod tests {
     use crate::messages::RawTransaction;
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+    use exonum_merkledb::{BinaryValue, Snapshot};
     use protobuf::Message as PbMessage;
     use std::borrow::Cow;
 
