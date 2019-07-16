@@ -32,7 +32,7 @@ use crate::{
         node::public::explorer::{TransactionHex, TransactionResponse},
         ServiceApiState,
     },
-    blockchain::{Block, Schema, ExecutionResult, TxLocation},
+    blockchain::{Block, ExecutionResult, Schema, TxLocation},
     crypto::Hash,
     events::error::into_failure,
     messages::{AnyTx, BinaryValue, Message as ExonumMessage, ProtocolMessage, SignedMessage},

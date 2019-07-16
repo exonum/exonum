@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::error::{ExecutionError, ExecutionResult};
+pub use self::error::ExecutionError;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Fork, Snapshot};
@@ -32,9 +32,7 @@ use crate::{
     proto::{schema, Any},
 };
 
-use self::{
-    dispatcher::{Dispatcher, DispatcherSender},
-};
+use self::dispatcher::{Dispatcher, DispatcherSender};
 
 #[macro_use]
 pub mod rust;

@@ -14,7 +14,7 @@
 
 //! The set of specific for the Rust runtime implementation errors.
 
-use crate::runtime::{error::{ErrorKind, ExecutionError}};
+use crate::runtime::error::{ErrorKind, ExecutionError};
 
 /// Result of unsuccessful transaction execution.
 ///

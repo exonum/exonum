@@ -30,8 +30,7 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, Blockchain, Schema, TransactionMessage,
-        TxLocation, ExecutionResult, ExecutionError
+        Block, Blockchain, ExecutionError, ExecutionResult, Schema, TransactionMessage, TxLocation,
     },
     crypto::Hash,
     helpers::Height,

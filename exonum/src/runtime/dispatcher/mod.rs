@@ -481,10 +481,10 @@ mod tests {
         method_id: MethodId,
     }
 
-    #[derive(IntoExecutionError)]
+    #[derive(Debug, IntoExecutionError)]
     #[exonum(crate = "crate")]
     enum SampleError {
-        Foo = 15
+        Foo = 15,
     }
 
     impl SampleRuntime {

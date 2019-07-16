@@ -25,7 +25,7 @@ pub enum Error {
     /// Artifact with the given identifier is already deployed.
     ArtifactAlreadyDeployed = 2,
     /// Artifact with the given identifier is not deployed.
-    ArtifactNotDeployed = 3,    
+    ArtifactNotDeployed = 3,
     /// Specified service name is already used.
     ServiceNameExists = 4,
     /// Specified service identifier is already used.

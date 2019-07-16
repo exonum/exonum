@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
-use super::{ArtifactId, InstanceSpec, Error};
+use super::{ArtifactId, Error, InstanceSpec};
 use crate::{crypto::Hash, messages::ServiceInstanceId, proto::Any};
 
 #[derive(Debug, Clone)]

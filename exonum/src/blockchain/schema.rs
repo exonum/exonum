@@ -444,6 +444,7 @@ where
     }
 
     /// Removes transaction from the persistent pool.
+    // TODO move to sandbox
     #[cfg(test)]
     pub(crate) fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool().contains(hash);

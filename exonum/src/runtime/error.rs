@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Kind of execution error, indicates in which module error occurred.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
     // Operation execution has been finished with panic.
     Panic,
@@ -95,7 +95,7 @@ impl ErrorKind {
 /// Therefore descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
 ///
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ExecutionError {
     /// The kind of error that indicates in which module and with which code the error occurred.
     pub kind: ErrorKind,
@@ -323,78 +323,126 @@ mod execution_result {
 
 }
 
-#[test]
-fn execution_error_binary_value_round_trip() {
-    let values = vec![
-        (ErrorKind::Panic, "AAAA"),
-        (ErrorKind::Dispatcher { code: 0 }, ""),
-        (ErrorKind::Dispatcher { code: 0 }, "b"),
-        (ErrorKind::Runtime { code: 1 }, "c"),
-        (ErrorKind::Service { code: 18 }, "ddc"),
-    ];
+#[cfg(test)]
+mod tests {
+    use std::panic;
 
-    for (kind, description) in values {
-        let err = ExecutionError {
-            kind,
-            description: description.to_owned(),
+    use super::*;
+
+    fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
+        panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
+    }
+
+    #[test]
+    fn execution_error_binary_value_round_trip() {
+        let values = vec![
+            (ErrorKind::Panic, "AAAA"),
+            (ErrorKind::Dispatcher { code: 0 }, ""),
+            (ErrorKind::Dispatcher { code: 0 }, "b"),
+            (ErrorKind::Runtime { code: 1 }, "c"),
+            (ErrorKind::Service { code: 18 }, "ddc"),
+        ];
+
+        for (kind, description) in values {
+            let err = ExecutionError {
+                kind,
+                description: description.to_owned(),
+            };
+
+            let bytes = err.to_bytes();
+            let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
+            assert_eq!(err, err2);
+        }
+    }
+
+    #[test]
+    fn execution_error_binary_value_wrong_kind() {
+        let bytes = {
+            let mut inner = runtime::ExecutionError::default();
+            inner.set_kind(117);
+            inner.set_code(2);
+            inner.write_to_bytes().unwrap()
         };
 
-        let bytes = err.to_bytes();
-        let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
-        assert_eq!(err, err2);
+        assert_eq!(
+            ExecutionError::from_bytes(bytes.into())
+                .unwrap_err()
+                .to_string(),
+            "Unknown error kind"
+        )
     }
-}
 
-#[test]
-fn execution_error_binary_value_wrong_kind() {
-    let bytes = {
-        let mut inner = runtime::ExecutionError::default();
-        inner.set_kind(117);
-        inner.set_code(2);
-        inner.write_to_bytes().unwrap()
-    };
+    #[test]
+    fn execution_error_object_hash_description() {
+        let first_err = ExecutionError {
+            kind: ErrorKind::Service { code: 5 },
+            description: "foo".to_owned(),
+        };
 
-    assert_eq!(
-        ExecutionError::from_bytes(bytes.into())
-            .unwrap_err()
-            .to_string(),
-        "Unknown error kind"
-    )
-}
+        let second_err = ExecutionError {
+            kind: ErrorKind::Service { code: 5 },
+            description: "foo bar".to_owned(),
+        };
 
-#[test]
-fn execution_error_object_hash_description() {
-    let first_err = ExecutionError {
-        kind: ErrorKind::Service { code: 5 },
-        description: "foo".to_owned(),
-    };
-
-    let second_err = ExecutionError {
-        kind: ErrorKind::Service { code: 5 },
-        description: "foo bar".to_owned(),
-    };
-
-    assert_eq!(first_err.object_hash(), second_err.object_hash());
-}
-
-#[test]
-fn execution_result_serde_roundtrip() {
-    let values = vec![
-        Err((ErrorKind::Panic, "AAAA")),
-        Err((ErrorKind::Dispatcher { code: 0 }, "")),
-        Err((ErrorKind::Dispatcher { code: 0 }, "b")),
-        Err((ErrorKind::Runtime { code: 1 }, "c")),
-        Err((ErrorKind::Service { code: 18 }, "ddc")),
-        Ok(()),
-    ];
-
-    for value in values {
-        let res = ExecutionResult(value.map_err(|(kind, description)| ExecutionError {
-            kind,
-            description: description.to_owned(),
-        }));
-        let body = serde_json::to_string_pretty(&res).unwrap();
-        let res2 = serde_json::from_str(&body).unwrap();
-        assert_eq!(res, res2);
+        assert_eq!(first_err.object_hash(), second_err.object_hash());
     }
+
+    #[test]
+    fn execution_result_serde_roundtrip() {
+        let values = vec![
+            Err((ErrorKind::Panic, "AAAA")),
+            Err((ErrorKind::Dispatcher { code: 0 }, "")),
+            Err((ErrorKind::Dispatcher { code: 0 }, "b")),
+            Err((ErrorKind::Runtime { code: 1 }, "c")),
+            Err((ErrorKind::Service { code: 18 }, "ddc")),
+            Ok(()),
+        ];
+
+        for value in values {
+            let res = ExecutionResult(value.map_err(|(kind, description)| ExecutionError {
+                kind,
+                description: description.to_owned(),
+            }));
+            let body = serde_json::to_string_pretty(&res).unwrap();
+            let res2 = serde_json::from_str(&body).unwrap();
+            assert_eq!(res, res2);
+        }
+    }
+
+    #[test]
+    fn str_panic() {
+        let static_str = "Static string (&str)";
+        let panic = make_panic(static_str);
+        assert_eq!(ExecutionError::from_panic(&panic).description, static_str);
+    }
+
+    #[test]
+    fn string_panic() {
+        let string = "Owned string (String)".to_owned();
+        let panic = make_panic(string.clone());
+        assert_eq!(ExecutionError::from_panic(&panic).description, string);
+    }
+
+    #[test]
+    fn box_error_panic() {
+        let error: Box<dyn std::error::Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
+        let description = error.description().to_owned();
+        let panic = make_panic(error);
+        assert_eq!(ExecutionError::from_panic(&panic).description, description);
+    }
+
+    #[test]
+    fn box_failure_panic() {
+        let error = format_err!("Failure panic");
+        let description = error.to_string().to_owned();
+        let panic = make_panic(error);
+        assert_eq!(ExecutionError::from_panic(&panic).description, description);
+    }
+
+    #[test]
+    fn unknown_panic() {
+        let panic = make_panic(1);
+        assert_eq!(ExecutionError::from_panic(&panic).description, "");
+    }
+
 }

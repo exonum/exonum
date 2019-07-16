@@ -21,7 +21,7 @@ pub use self::{
     genesis::GenesisConfig,
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
 };
-pub use crate::runtime::{ExecutionResult, ExecutionError};
+pub use crate::runtime::{error::ExecutionResult, ExecutionError};
 
 pub mod config;
 
@@ -50,8 +50,6 @@ mod block;
 mod builder;
 mod genesis;
 mod schema;
-#[macro_use]
-mod transaction;
 #[cfg(test)]
 mod tests;
 
@@ -355,7 +353,9 @@ impl Blockchain {
         };
 
         let mut schema = Schema::new(&*fork);
-        schema.transaction_results().put(&tx_hash, ExecutionResult(tx_result));
+        schema
+            .transaction_results()
+            .put(&tx_hash, ExecutionResult(tx_result));
         schema.commit_transaction(&tx_hash);
         schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
@@ -415,6 +415,8 @@ impl Blockchain {
         }
         Ok(())
     }
+
+    // TODO move such methods into separate module. [ECR-3222]
 
     /// Saves the `Connect` message from a peer to the cache.
     pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Signed<Connect>) {

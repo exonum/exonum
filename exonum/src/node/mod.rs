@@ -1152,7 +1152,7 @@ mod tests {
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ArtifactInfo, ServiceInstanceId, ExecutionError
+            ArtifactInfo, ExecutionError, ServiceInstanceId,
         },
     };
 
@@ -1171,7 +1171,11 @@ mod tests {
     struct TestService;
 
     impl TestInterface for TestService {
-        fn simple(&self, _context: TransactionContext, _arg: TxSimple) -> Result<(), ExecutionError> {
+        fn simple(
+            &self,
+            _context: TransactionContext,
+            _arg: TxSimple,
+        ) -> Result<(), ExecutionError> {
             Ok(())
         }
     }
