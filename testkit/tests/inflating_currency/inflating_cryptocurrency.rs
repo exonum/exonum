@@ -14,7 +14,7 @@
 
 use exonum::{
     api,
-    blockchain::{ExecutionError, ExecutionResult, Schema as CoreSchema},
+    blockchain::Schema as CoreSchema,
     crypto::PublicKey,
     helpers::Height,
     runtime::{
@@ -22,7 +22,7 @@ use exonum::{
         ArtifactInfo, ServiceInstanceId,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert};
+use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
 use exonum_merkledb::{IndexAccess, MapIndex};
 use serde_derive::{Deserialize, Serialize};
 
@@ -116,17 +116,23 @@ pub struct TxTransfer {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
+#[derive(Debug, IntoExecutionError)]
+pub enum Error {
+    /// Dummy
+    Foo = 0,
+}
+
 #[exonum_service(dispatcher = "CurrencyService")]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
+    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> Result<(), Error>;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> ExecutionResult;
+    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error>;
 }
 
 impl CurrencyInterface for CurrencyService {
-    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> ExecutionResult {
+    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> Result<(), Error> {
         let author = context.author();
         let view = context.fork();
         let height = CoreSchema::new(view).height();
@@ -138,10 +144,10 @@ impl CurrencyInterface for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
+    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error> {
         let author = context.author();
         if author == arg.to {
-            Err(ExecutionError::new(0))?
+            Err(Error::Foo)?;
         }
         let view = context.fork();
         let height = CoreSchema::new(view).height();

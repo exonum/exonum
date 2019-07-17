@@ -26,8 +26,6 @@
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
-extern crate failure;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
@@ -42,7 +40,10 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
     proto::Any,
-    runtime::rust::{Service, ServiceDescriptor},
+    runtime::{
+        dispatcher,
+        rust::{Service, ServiceDescriptor},
+    },
 };
 use exonum_merkledb::{Fork, Snapshot};
 
@@ -51,7 +52,7 @@ use std::convert::TryFrom;
 use crate::{
     api::PublicApi as TimestampingApi,
     schema::{Schema, TimestampEntry},
-    transactions::Config,
+    transactions::{Config, Error},
 };
 
 #[derive(Debug, ServiceFactory)]
@@ -65,8 +66,13 @@ impl Service for TimestampingService {
         fork: &Fork,
         params: Any,
     ) -> Result<(), ExecutionError> {
-        let config = Config::try_from(params)
-            .map_err(|e| ExecutionError::with_description(0, e.to_string()))?;
+        let config = Config::try_from(params).map_err(|e| (Error::ConfigParseError, e))?;
+        if !dispatcher::Schema::new(fork)
+            .service_instances()
+            .contains(&config.time_service_name)
+        {
+            return Err(Error::TimeServiceNotFound.into());
+        }
 
         Schema::new(descriptor.service_name(), fork)
             .config()

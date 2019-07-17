@@ -41,6 +41,4 @@ message TxTimestamp { Timestamp content = 1; }
 message Config {
   // Time oracle service name.
   string time_service_name = 1;
-  // Time oracle service id.
-  uint32 time_service_id = 2;
 }

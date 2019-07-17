@@ -19,7 +19,7 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
-    blockchain::TransactionErrorType as ErrorType,
+    blockchain::{ExecutionError, ExecutionErrorKind},
     crypto::{self, PublicKey},
     helpers::Height,
     messages::{self, AnyTx, Signed},
@@ -828,7 +828,6 @@ fn test_explorer_transaction_info() {
 
 #[test]
 fn test_explorer_transaction_statuses() {
-    use exonum::blockchain::TransactionResult;
     use exonum::explorer::TransactionInfo;
 
     let (mut testkit, api) = init_testkit();
@@ -852,17 +851,17 @@ fn test_explorer_transaction_statuses() {
         panicking_tx.clone(),
     ]);
 
-    fn check_statuses(statuses: &[TransactionResult]) {
-        assert!(statuses[0].0.is_ok());
+    fn check_statuses(statuses: &[Result<(), ExecutionError>]) {
+        assert!(statuses[0].is_ok());
         assert_matches!(
             statuses[1],
-            TransactionResult(Err(ref err)) if err.error_type() == ErrorType::Code(0)
-                && err.description() == Some("Adding zero does nothing!")
+            Err(ref err) if err.kind == ExecutionErrorKind::service(0)
+                && err.description == "Adding zero does nothing!"
         );
         assert_matches!(
             statuses[2],
-            TransactionResult(Err(ref err)) if err.error_type() == ErrorType::Panic
-                && err.description() == Some("attempt to add with overflow")
+            Err(ref err) if err.kind == ExecutionErrorKind::panic()
+                && err.description == "attempt to add with overflow"
         );
     }
 
@@ -870,7 +869,7 @@ fn test_explorer_transaction_statuses() {
     let statuses: Vec<_> = block
         .transactions
         .iter()
-        .map(|tx| TransactionResult(tx.status().map_err(Clone::clone)))
+        .map(|tx| tx.status().map_err(Clone::clone))
         .collect();
     check_statuses(&statuses);
 
@@ -887,7 +886,7 @@ fn test_explorer_transaction_statuses() {
             .query(&TransactionQuery::new(*hash))
             .get("v1/transactions")
             .unwrap();
-        TransactionResult(info.as_committed().unwrap().status().map_err(Clone::clone))
+        info.as_committed().unwrap().status().map_err(Clone::clone)
     })
     .collect();
     check_statuses(&statuses);

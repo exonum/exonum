@@ -14,50 +14,33 @@
 
 //! Cryptocurrency transactions.
 
-use exonum::{
-    blockchain::{ExecutionError, ExecutionResult},
-    crypto::PublicKey,
-    runtime::rust::TransactionContext,
-};
+use exonum::{crypto::PublicKey, runtime::rust::TransactionContext};
 
 use super::{proto, schema::Schema, CryptocurrencyService};
 
-const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
-
 /// Error codes emitted by wallet transactions during execution.
-#[derive(Debug, Fail)]
-#[repr(u8)]
+#[derive(Debug, IntoExecutionError)]
 pub enum Error {
     /// Wallet already exists.
     ///
     /// Can be emitted by `CreateWallet`.
-    #[fail(display = "Wallet already exists")]
     WalletAlreadyExists = 0,
-
     /// Sender doesn't exist.
     ///
     /// Can be emitted by `Transfer`.
-    #[fail(display = "Sender doesn't exist")]
     SenderNotFound = 1,
-
     /// Receiver doesn't exist.
     ///
     /// Can be emitted by `Transfer` or `Issue`.
-    #[fail(display = "Receiver doesn't exist")]
     ReceiverNotFound = 2,
-
     /// Insufficient currency amount.
     ///
     /// Can be emitted by `Transfer`.
-    #[fail(display = "Insufficient currency amount")]
     InsufficientCurrencyAmount = 3,
-}
-
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        let description = format!("{}", value);
-        ExecutionError::with_description(value as u8, description)
-    }
+    /// Sender are same as receiver.
+    ///
+    /// Can be emitted by 'Transfer`.
+    SenderSameAsReceiver = 4,
 }
 
 /// Transfer `amount` of the currency from one wallet to another.
@@ -98,15 +81,15 @@ pub struct CreateWallet {
 #[exonum_service(dispatcher = "CryptocurrencyService")]
 pub trait CryptocurrencyInterface {
     /// Transfers `amount` of the currency from one wallet to another.
-    fn transfer(&self, ctx: TransactionContext, arg: Transfer) -> ExecutionResult;
+    fn transfer(&self, ctx: TransactionContext, arg: Transfer) -> Result<(), Error>;
     /// Issues `amount` of the currency to the `wallet`.
-    fn issue(&self, ctx: TransactionContext, arg: Issue) -> ExecutionResult;
+    fn issue(&self, ctx: TransactionContext, arg: Issue) -> Result<(), Error>;
     /// Creates wallet with the given `name`.
-    fn create_wallet(&self, ctx: TransactionContext, arg: CreateWallet) -> ExecutionResult;
+    fn create_wallet(&self, ctx: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
 }
 
 impl CryptocurrencyInterface for CryptocurrencyService {
-    fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult {
+    fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error> {
         let from = &context.author();
         let hash = context.tx_hash();
 
@@ -116,7 +99,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         let amount = arg.amount;
 
         if from == to {
-            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER));
+            Err(Error::SenderSameAsReceiver)?;
         }
 
         let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
@@ -133,7 +116,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         Ok(())
     }
 
-    fn issue(&self, context: TransactionContext, arg: Issue) -> ExecutionResult {
+    fn issue(&self, context: TransactionContext, arg: Issue) -> Result<(), Error> {
         let pub_key = &context.author();
         let hash = context.tx_hash();
 
@@ -148,7 +131,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult {
+    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error> {
         let pub_key = &context.author();
         let hash = context.tx_hash();
 

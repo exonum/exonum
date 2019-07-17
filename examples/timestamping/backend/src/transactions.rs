@@ -14,11 +14,7 @@
 
 //! Timestamping transactions.
 
-use exonum::{
-    blockchain::{ExecutionError, ExecutionResult},
-    messages::ServiceInstanceId,
-    runtime::rust::TransactionContext,
-};
+use exonum::runtime::rust::TransactionContext;
 use exonum_time::schema::TimeSchema;
 
 use crate::{
@@ -28,19 +24,14 @@ use crate::{
 };
 
 /// Error codes emitted by wallet transactions during execution.
-#[derive(Debug, Fail)]
-#[repr(u8)]
+#[derive(Debug, IntoExecutionError)]
 pub enum Error {
     /// Content hash already exists.
-    #[fail(display = "Content hash already exists")]
     HashAlreadyExists = 0,
-}
-
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        let description = value.to_string();
-        ExecutionError::with_description(value as u8, description)
-    }
+    /// Unable to parse service configuration.
+    ConfigParseError = 1,
+    /// Time service with the specified name doesn't exist.
+    TimeServiceNotFound = 2,
 }
 
 /// Timestamping transaction.
@@ -57,17 +48,15 @@ pub struct TxTimestamp {
 pub struct Config {
     /// Time oracle service name.
     pub time_service_name: String,
-    /// Time oracle service id.
-    pub time_service_id: ServiceInstanceId,
 }
 
 #[exonum_service(dispatcher = "TimestampingService")]
 pub trait TimestampingInterface {
-    fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
+    fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> Result<(), Error>;
 }
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult {
+    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> Result<(), Error> {
         let tx_hash = context.tx_hash();
 
         let schema = Schema::new(context.service_name(), context.fork());

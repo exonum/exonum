@@ -53,7 +53,6 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
             SERVICE_NAME,
             Config {
                 time_service_name: TIME_SERVICE_NAME.to_owned(),
-                time_service_id: TIME_SERVICE_ID,
             },
         ))
         .create();

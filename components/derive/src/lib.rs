@@ -20,10 +20,10 @@
 
 extern crate proc_macro;
 
+mod execution_error;
 mod exonum_service;
 mod pb_convert;
 mod service_factory;
-mod execution_error;
 
 use proc_macro::TokenStream;
 use quote::quote;

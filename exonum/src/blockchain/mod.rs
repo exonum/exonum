@@ -21,7 +21,10 @@ pub use self::{
     genesis::GenesisConfig,
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
 };
-pub use crate::runtime::{error::ExecutionOutcome, ExecutionError};
+pub use crate::runtime::{
+    error::{ErrorKind as ExecutionErrorKind, ExecutionOutcome},
+    ExecutionError,
+};
 
 pub mod config;
 

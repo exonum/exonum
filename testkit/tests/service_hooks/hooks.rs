@@ -15,7 +15,7 @@
 //! A special service which generates transactions on `after_commit` events.
 use super::proto;
 use exonum::{
-    blockchain::ExecutionResult,
+    blockchain::ExecutionError,
     helpers::Height,
     runtime::{
         rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory, TransactionContext},
@@ -44,7 +44,7 @@ pub trait AfterCommitInterface {
         &self,
         context: TransactionContext,
         arg: TxAfterCommit,
-    ) -> ExecutionResult;
+    ) -> Result<(), ExecutionError>;
 }
 
 impl TxAfterCommit {
@@ -63,7 +63,7 @@ impl AfterCommitInterface for AfterCommitService {
         &self,
         _context: TransactionContext,
         _arg: TxAfterCommit,
-    ) -> ExecutionResult {
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

@@ -13,33 +13,18 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Schema},
-    crypto::PublicKey,
-    runtime::rust::TransactionContext,
-};
+use exonum::{blockchain::Schema, crypto::PublicKey, runtime::rust::TransactionContext};
 use exonum_merkledb::{Fork, Snapshot};
 
 use crate::{proto, schema::TimeSchema, TimeService};
 
 /// Common errors emitted by transactions during execution.
-#[derive(Debug, Fail)]
-#[repr(u8)]
+#[derive(Debug, IntoExecutionError)]
 pub enum Error {
     /// The sender of the transaction is not among the active validators.
-    #[fail(display = "Not authored by a validator")]
     UnknownSender = 0,
-
     /// The validator time that is stored in storage is greater than the proposed one.
-    #[fail(display = "The validator time is greater than the proposed one")]
     ValidatorTimeIsGreater = 1,
-}
-
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        let description = value.to_string();
-        ExecutionError::with_description(value as u8, description)
-    }
 }
 
 /// Transaction that is sent by the validator after the commit of the block.
@@ -62,7 +47,7 @@ impl TxTime {
         &self,
         snapshot: &dyn Snapshot,
         author: &PublicKey,
-    ) -> ExecutionResult {
+    ) -> Result<(), Error> {
         let keys = Schema::new(snapshot).actual_configuration().validator_keys;
         let signed = keys.iter().any(|k| k.service_key == *author);
         if !signed {
@@ -77,7 +62,7 @@ impl TxTime {
         service_name: &str,
         fork: &Fork,
         author: &PublicKey,
-    ) -> ExecutionResult {
+    ) -> Result<(), Error> {
         let schema = TimeSchema::new(service_name, fork);
         let mut validators_times = schema.validators_times();
         match validators_times.get(author) {
@@ -135,11 +120,11 @@ impl TxTime {
 #[exonum_service(dispatcher = "TimeService")]
 pub trait TimeOracleInterface {
     /// Receives a new time from one of validators.
-    fn time(&self, ctx: TransactionContext, arg: TxTime) -> ExecutionResult;
+    fn time(&self, ctx: TransactionContext, arg: TxTime) -> Result<(), Error>;
 }
 
 impl TimeOracleInterface for TimeService {
-    fn time(&self, context: TransactionContext, arg: TxTime) -> ExecutionResult {
+    fn time(&self, context: TransactionContext, arg: TxTime) -> Result<(), Error> {
         let author = context.author();
         let view = context.fork();
         let service_name = context.service_name();

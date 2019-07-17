@@ -21,7 +21,7 @@ use exonum_merkledb::{IndexAccess, Snapshot};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::{Schema, TransactionErrorType, TransactionResult},
+    blockchain::{ExecutionErrorKind, ExecutionOutcome, Schema},
     crypto::{gen_keypair, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, ServiceInstanceId, Signed},
@@ -76,14 +76,14 @@ fn assert_transaction_result<S: IndexAccess>(
     snapshot: S,
     transaction: &Signed<AnyTx>,
     expected_code: u8,
-) -> Option<String> {
+) -> String {
     let result = Schema::new(snapshot)
         .transaction_results()
         .get(&transaction.object_hash());
     match result {
-        Some(TransactionResult(Err(e))) => {
-            assert_eq!(e.error_type(), TransactionErrorType::Code(expected_code));
-            e.description().map(str::to_string)
+        Some(ExecutionOutcome(Err(e))) => {
+            assert_eq!(e.kind, ExecutionErrorKind::service(expected_code));
+            e.description
         }
         _ => {
             panic!("Expected Err(), found None or Ok()");
@@ -300,7 +300,7 @@ fn test_exonum_time_service_with_7_validators() {
             Schema::new(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.object_hash()),
-            Some(TransactionResult(Ok(())))
+            Some(ExecutionOutcome::ok())
         );
 
         validators_times[i] = Some(times[i]);
@@ -403,7 +403,7 @@ fn test_selected_time_less_than_time_in_storage() {
             Schema::new(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.object_hash()),
-            Some(TransactionResult(Ok(())))
+            Some(ExecutionOutcome::ok())
         );
     }
 
@@ -454,7 +454,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
         Schema::new(&testkit.snapshot())
             .transaction_results()
             .get(&tx0.object_hash()),
-        Some(TransactionResult(Ok(())))
+        Some(ExecutionOutcome::ok())
     );
 
     let schema = TimeSchema::new(INSTANCE_NAME, Rc::from(testkit.snapshot()));

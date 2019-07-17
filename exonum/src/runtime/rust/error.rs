@@ -14,51 +14,6 @@
 
 //! The set of specific for the Rust runtime implementation errors.
 
-use crate::runtime::error::{ErrorKind, ExecutionError};
-
-/// Result of unsuccessful transaction execution.
-///
-/// A transaction error consists of an error code and optional description.
-/// The error code affects the blockchain state hash, while the description does not.
-/// Therefore descriptions are mostly used for developer purposes, not for interaction of
-/// the system with users.
-///
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TransactionError {
-    /// User-defined error code. Error codes can have different meanings for the
-    /// different transactions and services.
-    pub code: u8,
-    /// Optional error description.
-    pub description: Option<String>,
-}
-
-impl TransactionError {
-    /// Constructs a new error instance with the given error code.
-    pub fn new(code: u8) -> Self {
-        Self {
-            code,
-            description: None,
-        }
-    }
-
-    /// Constructs a new error instance with the given error code and description.
-    pub fn with_description(code: u8, description: impl Into<String>) -> Self {
-        Self {
-            code,
-            description: Some(description.into()),
-        }
-    }
-}
-
-impl From<TransactionError> for ExecutionError {
-    fn from(inner: TransactionError) -> Self {
-        ExecutionError {
-            kind: ErrorKind::service(inner.code),
-            description: inner.description.unwrap_or_default(),
-        }
-    }
-}
-
 /// List of possible Rust runtime errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 #[exonum(crate = "crate", kind = "runtime")]

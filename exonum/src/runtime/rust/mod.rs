@@ -13,7 +13,7 @@
 // limitations under the License.
 
 pub use self::{
-    error::{Error, TransactionError},
+    error::Error,
     service::{
         AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction,
         TransactionContext,

@@ -21,7 +21,7 @@ extern crate exonum_derive;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::{ExecutionResult, Schema},
+    blockchain::{ExecutionError, Schema},
     crypto::gen_keypair,
     runtime::rust::{
         ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
@@ -50,14 +50,22 @@ impl TxTimestamp {
 
 #[exonum_service(dispatcher = "TimestampingService")]
 trait TimestampingInterface {
-    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
+    fn timestamp(
+        &self,
+        context: TransactionContext,
+        arg: TxTimestamp,
+    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
 struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, _context: TransactionContext, _arg: TxTimestamp) -> ExecutionResult {
+    fn timestamp(
+        &self,
+        _context: TransactionContext,
+        _arg: TxTimestamp,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

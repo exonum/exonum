@@ -19,11 +19,13 @@
 //!
 //! [docs:time]: https://exonum.com/doc/version/latest/advanced/time
 
-#![deny(unsafe_code, bare_trait_objects)]
-#![warn(missing_docs, missing_debug_implementations)]
+#![deny(
+    unsafe_code,
+    bare_trait_objects,
+    missing_docs,
+    missing_debug_implementations
+)]
 
-#[macro_use]
-extern crate failure;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]

@@ -50,6 +50,11 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
+    /// Creates panic error.
+    pub fn panic() -> Self {
+        ErrorKind::Panic
+    }
+
     /// Creates dispatcher error with the specified code.
     pub fn dispatcher(code: impl Into<u8>) -> Self {
         ErrorKind::Dispatcher { code: code.into() }
@@ -205,6 +210,18 @@ impl ObjectHash for ExecutionError {
 /// Errors consist of an error code and an optional description.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExecutionOutcome(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
+
+impl ExecutionOutcome {
+    /// Creates outcome for the successful execution.
+    pub fn ok() -> Self {
+        Self(Ok(()))
+    }
+
+    /// Creates outcome for the failed execution.
+    pub fn err(err: impl Into<ExecutionError>) -> Self {
+        Self(Err(err.into()))
+    }
+}
 
 impl From<Result<(), ExecutionError>> for ExecutionOutcome {
     fn from(inner: Result<(), ExecutionError>) -> Self {
