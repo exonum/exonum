@@ -435,7 +435,10 @@ mod tests {
     use crate::{
         crypto::PublicKey,
         messages::{MethodId, ServiceInstanceId},
-        runtime::{rust::RustRuntime, ArtifactInfo, RuntimeIdentifier, StateHashAggregator},
+        runtime::{
+            rust::{Error as RustRuntimeError, RustRuntime},
+            ArtifactInfo, RuntimeIdentifier, StateHashAggregator,
+        },
     };
 
     use super::*;
@@ -716,7 +719,7 @@ mod tests {
             .with_runtime(RuntimeIdentifier::Rust as u32, RustRuntime::default())
             .finalize();
 
-        let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo");
+        let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo/1.0.0");
 
         // Check deploy.
         assert_eq!(
@@ -724,7 +727,7 @@ mod tests {
                 .deploy_artifact(sample_rust_spec.clone(), Any::default())
                 .wait()
                 .expect_err("deploy artifact succeed"),
-            Error::IncorrectRuntime.into()
+            RustRuntimeError::UnableToDeploy.into()
         );
 
         // Checks if we can start services.
@@ -743,7 +746,7 @@ mod tests {
                     Any::default()
                 )
                 .expect_err("start service succeed"),
-            Error::IncorrectRuntime.into()
+            Error::ArtifactNotDeployed.into()
         );
 
         // Check if we can execute transactions.

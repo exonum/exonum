@@ -73,7 +73,7 @@ impl Transfer {
 #[derive(Debug, IntoExecutionError)]
 pub enum Error {
     /// Not allowed
-    NotAllowed = 0
+    NotAllowed = 0,
 }
 
 #[exonum_service(dispatcher = "MyService")]

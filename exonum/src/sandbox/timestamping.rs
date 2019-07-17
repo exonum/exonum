@@ -38,14 +38,22 @@ pub const DATA_SIZE: usize = 64;
 
 #[exonum_service(crate = "crate", dispatcher = "TimestampingService")]
 pub trait TimestampingInterface {
-    fn timestamp(&self, context: TransactionContext, arg: TimestampTx) -> Result<(), ExecutionError>;
+    fn timestamp(
+        &self,
+        context: TransactionContext,
+        arg: TimestampTx,
+    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
 pub struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, _context: TransactionContext, _arg: TimestampTx) -> Result<(), ExecutionError> {
+    fn timestamp(
+        &self,
+        _context: TransactionContext,
+        _arg: TimestampTx,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

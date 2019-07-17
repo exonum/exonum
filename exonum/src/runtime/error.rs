@@ -113,16 +113,26 @@ impl ExecutionError {
     }
 
     /// Creates an execution error from the panic description.
-    pub(crate) fn from_panic(any: &(dyn Any + Send)) -> Self {
+    pub(crate) fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
+        let any = any.as_ref();
         // Tries to get a meaningful description from the given panic.
         let description = {
+            // Strings
             if let Some(s) = any.downcast_ref::<&str>() {
                 s.to_string()
             } else if let Some(s) = any.downcast_ref::<String>() {
                 s.clone()
-            } else if let Some(error) = any.downcast_ref::<&(dyn std::error::Error + Send)>() {
+            }
+            // std::error::Error
+            else if let Some(error) = any.downcast_ref::<Box<(dyn std::error::Error + Send)>>() {
                 error.description().to_string()
-            } else {
+            }
+            // Failure errors
+            else if let Some(error) = any.downcast_ref::<failure::Error>() {
+                error.to_string()
+            }
+            // Other
+            else {
                 String::new()
             }
         };
@@ -254,14 +264,14 @@ mod execution_result {
 
     use super::{ErrorKind, ExecutionError};
 
-    #[serde(tag = "type", rename_all = "kebab-case")]
+    #[serde(tag = "type", rename_all = "snake_case")]
     #[derive(Debug, Serialize, Deserialize)]
     enum ExecutionOutcome<'a> {
         Success,
         Panic { description: &'a str },
-        Dispatcher { description: &'a str, code: u8 },
-        Runtime { description: &'a str, code: u8 },
-        Service { description: &'a str, code: u8 },
+        DispatcherError { description: &'a str, code: u8 },
+        RuntimeError { description: &'a str, code: u8 },
+        ServiceError { description: &'a str, code: u8 },
     }
 
     impl<'a> From<&'a Result<(), ExecutionError>> for ExecutionOutcome<'a> {
@@ -271,10 +281,14 @@ mod execution_result {
                 match err.kind {
                     ErrorKind::Panic => ExecutionOutcome::Panic { description },
                     ErrorKind::Dispatcher { code } => {
-                        ExecutionOutcome::Dispatcher { code, description }
+                        ExecutionOutcome::DispatcherError { code, description }
                     }
-                    ErrorKind::Runtime { code } => ExecutionOutcome::Runtime { code, description },
-                    ErrorKind::Service { code } => ExecutionOutcome::Service { code, description },
+                    ErrorKind::Runtime { code } => {
+                        ExecutionOutcome::RuntimeError { code, description }
+                    }
+                    ErrorKind::Service { code } => {
+                        ExecutionOutcome::ServiceError { code, description }
+                    }
                 }
             } else {
                 ExecutionOutcome::Success
@@ -289,15 +303,14 @@ mod execution_result {
                 ExecutionOutcome::Panic { description } => {
                     Err(ExecutionError::new(ErrorKind::Panic, description))
                 }
-                ExecutionOutcome::Dispatcher { description, code } => Err(ExecutionError::new(
-                    ErrorKind::Dispatcher { code },
-                    description,
-                )),
-                ExecutionOutcome::Runtime { description, code } => Err(ExecutionError::new(
+                ExecutionOutcome::DispatcherError { description, code } => Err(
+                    ExecutionError::new(ErrorKind::Dispatcher { code }, description),
+                ),
+                ExecutionOutcome::RuntimeError { description, code } => Err(ExecutionError::new(
                     ErrorKind::Runtime { code },
                     description,
                 )),
-                ExecutionOutcome::Service { description, code } => Err(ExecutionError::new(
+                ExecutionOutcome::ServiceError { description, code } => Err(ExecutionError::new(
                     ErrorKind::Service { code },
                     description,
                 )),
@@ -388,7 +401,7 @@ mod tests {
                 .to_string(),
             "Error code for panic should be zero"
         )
-    }    
+    }
 
     #[test]
     fn execution_error_object_hash_description() {
@@ -431,14 +444,14 @@ mod tests {
     fn str_panic() {
         let static_str = "Static string (&str)";
         let panic = make_panic(static_str);
-        assert_eq!(ExecutionError::from_panic(&panic).description, static_str);
+        assert_eq!(ExecutionError::from_panic(panic).description, static_str);
     }
 
     #[test]
     fn string_panic() {
         let string = "Owned string (String)".to_owned();
         let panic = make_panic(string.clone());
-        assert_eq!(ExecutionError::from_panic(&panic).description, string);
+        assert_eq!(ExecutionError::from_panic(panic).description, string);
     }
 
     #[test]
@@ -446,21 +459,21 @@ mod tests {
         let error: Box<dyn std::error::Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
         let description = error.description().to_owned();
         let panic = make_panic(error);
-        assert_eq!(ExecutionError::from_panic(&panic).description, description);
+        assert_eq!(ExecutionError::from_panic(panic).description, description);
     }
 
     #[test]
-    fn box_failure_panic() {
+    fn failure_panic() {
         let error = format_err!("Failure panic");
         let description = error.to_string().to_owned();
         let panic = make_panic(error);
-        assert_eq!(ExecutionError::from_panic(&panic).description, description);
+        assert_eq!(ExecutionError::from_panic(panic).description, description);
     }
 
     #[test]
     fn unknown_panic() {
         let panic = make_panic(1);
-        assert_eq!(ExecutionError::from_panic(&panic).description, "");
+        assert_eq!(ExecutionError::from_panic(panic).description, "");
     }
 
 }

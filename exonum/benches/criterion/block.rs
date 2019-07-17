@@ -118,8 +118,11 @@ mod timestamping {
     pub trait TimestampingInterface {
         fn timestamp(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
 
-        fn timestamp_panic(&self, context: TransactionContext, arg: PanickingTx)
-            -> Result<(), ExecutionError>;
+        fn timestamp_panic(
+            &self,
+            context: TransactionContext,
+            arg: PanickingTx,
+        ) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug)]
@@ -199,7 +202,8 @@ mod cryptocurrency {
         crypto::PublicKey,
         messages::{AnyTx, ServiceInstanceId, Signed},
         runtime::rust::{
-            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext, ErrorKind
+            ArtifactInfo, ErrorKind, RustArtifactId, Service, ServiceFactory, Transaction,
+            TransactionContext,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
