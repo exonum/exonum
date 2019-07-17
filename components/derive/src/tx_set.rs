@@ -205,7 +205,7 @@ fn implement_transaction_set_trait(
         let id = variant.id;
         let source_type = variant.source_type();
         quote! {
-            #id => #source_type::from_bytes(Cow::from(&vec)).map(#name::from),
+            #id => #source_type::from_bytes(std::borrow::Cow::from(&vec)).map(#name::from),
         }
     });
 

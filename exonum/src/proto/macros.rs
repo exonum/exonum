@@ -17,16 +17,15 @@
 #[macro_export]
 macro_rules! impl_binary_value_for_pb_message {
     ($( $type:ty ),*) => {
-        use std::borrow::Cow;
-        use protobuf::Message as PbMessage;
-
         $(
             impl BinaryValue for $type {
                 fn to_bytes(&self) -> Vec<u8> {
+                    use protobuf::Message;
                     self.write_to_bytes().expect("Error while serializing value")
                 }
 
-                fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+                fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+                    use protobuf::Message;
                     let mut pb = Self::new();
                     pb.merge_from_bytes(bytes.as_ref())?;
                     Ok(pb)
