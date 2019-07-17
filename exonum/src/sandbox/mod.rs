@@ -1178,8 +1178,6 @@ mod tests {
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use exonum_merkledb::{BinaryValue, Snapshot};
-    use protobuf::Message as PbMessage;
-    use std::borrow::Cow;
 
     const SERVICE_ID: u16 = 1;
 

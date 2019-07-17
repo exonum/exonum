@@ -17,6 +17,9 @@
 #[macro_export]
 macro_rules! impl_binary_value_for_pb_message {
     ($( $type:ty ),*) => {
+        use std::borrow::Cow;
+        use protobuf::Message as PbMessage;
+
         $(
             impl BinaryValue for $type {
                 fn to_bytes(&self) -> Vec<u8> {

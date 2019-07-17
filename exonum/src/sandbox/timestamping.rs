@@ -16,15 +16,12 @@ pub use crate::proto::schema::tests::TimestampTx;
 
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
-use std::borrow::Cow;
-
 use crate::blockchain::{
     ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use crate::messages::{Message, RawTransaction, Signed};
 use exonum_merkledb::{BinaryValue, Snapshot};
-use protobuf::Message as PbMessage;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;

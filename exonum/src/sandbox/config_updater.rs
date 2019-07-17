@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
-
 pub use crate::proto::schema::tests::TxConfig;
 
 use crate::blockchain::{
@@ -25,7 +23,6 @@ use crate::helpers::Height;
 use crate::messages::{Message, RawTransaction, Signed};
 use crate::proto::ProtobufConvert;
 use exonum_merkledb::{BinaryValue, Snapshot};
-use protobuf::Message as PbMessage;
 
 pub const CONFIG_SERVICE: u16 = 1;
 

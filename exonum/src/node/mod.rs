@@ -1111,8 +1111,6 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
     use super::*;
     use crate::blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
@@ -1122,7 +1120,6 @@ mod tests {
     use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
     use exonum_merkledb::{BinaryValue, Database, Snapshot, TemporaryDB};
-    use protobuf::Message as ProtobufMessage;
 
     const SERVICE_ID: u16 = 0;
 
