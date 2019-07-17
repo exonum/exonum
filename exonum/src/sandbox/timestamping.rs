@@ -41,7 +41,7 @@ impl Transaction for TimestampTx {
     }
 }
 
-impl_binary_value_for_message! { TimestampTx }
+impl_binary_value_for_pb_message! { TimestampTx }
 
 #[derive(Default)]
 pub struct TimestampingService {}

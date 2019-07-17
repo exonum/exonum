@@ -1198,7 +1198,7 @@ mod tests {
         }
     }
 
-    impl_binary_value_for_message! { TxAfterCommit }
+    impl_binary_value_for_pb_message! { TxAfterCommit }
 
     impl Transaction for TxAfterCommit {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

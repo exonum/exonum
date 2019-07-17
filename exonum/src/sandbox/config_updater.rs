@@ -68,7 +68,7 @@ impl Transaction for TxConfig {
     }
 }
 
-impl_binary_value_for_message! { TxConfig }
+impl_binary_value_for_pb_message! { TxConfig }
 
 impl Service for ConfigUpdateService {
     fn service_name(&self) -> &str {

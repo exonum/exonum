@@ -1132,7 +1132,7 @@ mod tests {
         TxSimple(TxSimple),
     }
 
-    impl_binary_value_for_message! { TxSimple }
+    impl_binary_value_for_pb_message! { TxSimple }
 
     impl Transaction for TxSimple {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

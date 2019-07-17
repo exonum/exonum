@@ -15,7 +15,7 @@
 
 /// Implement `BinaryValue` trait for type that implements `Protobuf::Message`.
 #[macro_export]
-macro_rules! impl_binary_value_for_message {
+macro_rules! impl_binary_value_for_pb_message {
     ($( $type:ty ),*) => {
         $(
             impl BinaryValue for $type {
