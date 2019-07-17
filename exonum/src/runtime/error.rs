@@ -77,7 +77,7 @@ impl ErrorKind {
     fn from_raw(kind: u8, code: u8) -> Result<Self, failure::Error> {
         match kind {
             0 => {
-                ensure!(code != 0, "Error code for panic should be zero");
+                ensure!(code == 0, "Error code for panic should be zero");
                 Ok(ErrorKind::Panic)
             }
             1 => Ok(ErrorKind::Dispatcher { code }),
@@ -120,7 +120,7 @@ impl ExecutionError {
                 s.to_string()
             } else if let Some(s) = any.downcast_ref::<String>() {
                 s.clone()
-            } else if let Some(error) = any.downcast_ref::<Box<dyn std::error::Error + Send>>() {
+            } else if let Some(error) = any.downcast_ref::<&(dyn std::error::Error + Send)>() {
                 error.description().to_string()
             } else {
                 String::new()
@@ -151,6 +151,7 @@ impl ProtobufConvert for ExecutionError {
         let (kind, code) = self.kind.into_raw();
         inner.set_kind(u32::from(kind));
         inner.set_code(u32::from(code));
+        inner.set_description(self.description.clone());
         inner
     }
 
@@ -188,21 +189,21 @@ impl ObjectHash for ExecutionError {
     }
 }
 
-/// Returns a result of the dispatcher execution.
+/// Returns an outcome of the dispatcher execution.
 /// This result may be either an empty unit type, in case of success,
 /// or an `ExecutionError`, if execution has failed.
 /// Errors consist of an error code and an optional description.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ExecutionResult(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
+pub struct ExecutionOutcome(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
 
-impl From<Result<(), ExecutionError>> for ExecutionResult {
+impl From<Result<(), ExecutionError>> for ExecutionOutcome {
     fn from(inner: Result<(), ExecutionError>) -> Self {
-        ExecutionResult(inner)
+        Self(inner)
     }
 }
 
-impl ProtobufConvert for ExecutionResult {
-    type ProtoStruct = runtime::ExecutionResult;
+impl ProtobufConvert for ExecutionOutcome {
+    type ProtoStruct = runtime::ExecutionOutcome;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();
@@ -215,7 +216,7 @@ impl ProtobufConvert for ExecutionResult {
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let inner = if pb.has_error() {
-            ensure!(!pb.has_ok(), "ExecutionResult has both of variants.");
+            ensure!(!pb.has_ok(), "ExecutionOutcome has both of variants.");
             Err(ExecutionError::from_pb(pb.take_error())?)
         } else {
             Ok(())
@@ -224,11 +225,11 @@ impl ProtobufConvert for ExecutionResult {
     }
 }
 
-impl BinaryValue for ExecutionResult {
+impl BinaryValue for ExecutionOutcome {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_pb()
             .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for ExecutionResult")
+            .expect("Failed to serialize in BinaryValue for ExecutionOutcome")
     }
 
     fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
@@ -238,7 +239,7 @@ impl BinaryValue for ExecutionResult {
     }
 }
 
-impl ObjectHash for ExecutionResult {
+impl ObjectHash for ExecutionOutcome {
     fn object_hash(&self) -> Hash {
         match &self.0 {
             Err(e) => e.object_hash(),
@@ -255,7 +256,7 @@ mod execution_result {
 
     #[serde(tag = "type", rename_all = "kebab-case")]
     #[derive(Debug, Serialize, Deserialize)]
-    enum ExecutionResult<'a> {
+    enum ExecutionOutcome<'a> {
         Success,
         Panic { description: &'a str },
         Dispatcher { description: &'a str, code: u8 },
@@ -263,40 +264,40 @@ mod execution_result {
         Service { description: &'a str, code: u8 },
     }
 
-    impl<'a> From<&'a Result<(), ExecutionError>> for ExecutionResult<'a> {
+    impl<'a> From<&'a Result<(), ExecutionError>> for ExecutionOutcome<'a> {
         fn from(inner: &'a Result<(), ExecutionError>) -> Self {
             if let Err(err) = &inner {
                 let description = &err.description;
                 match err.kind {
-                    ErrorKind::Panic => ExecutionResult::Panic { description },
+                    ErrorKind::Panic => ExecutionOutcome::Panic { description },
                     ErrorKind::Dispatcher { code } => {
-                        ExecutionResult::Dispatcher { code, description }
+                        ExecutionOutcome::Dispatcher { code, description }
                     }
-                    ErrorKind::Runtime { code } => ExecutionResult::Runtime { code, description },
-                    ErrorKind::Service { code } => ExecutionResult::Service { code, description },
+                    ErrorKind::Runtime { code } => ExecutionOutcome::Runtime { code, description },
+                    ErrorKind::Service { code } => ExecutionOutcome::Service { code, description },
                 }
             } else {
-                ExecutionResult::Success
+                ExecutionOutcome::Success
             }
         }
     }
 
-    impl<'a> From<ExecutionResult<'a>> for Result<(), ExecutionError> {
-        fn from(inner: ExecutionResult<'a>) -> Self {
+    impl<'a> From<ExecutionOutcome<'a>> for Result<(), ExecutionError> {
+        fn from(inner: ExecutionOutcome<'a>) -> Self {
             match inner {
-                ExecutionResult::Success => Ok(()),
-                ExecutionResult::Panic { description } => {
+                ExecutionOutcome::Success => Ok(()),
+                ExecutionOutcome::Panic { description } => {
                     Err(ExecutionError::new(ErrorKind::Panic, description))
                 }
-                ExecutionResult::Dispatcher { description, code } => Err(ExecutionError::new(
+                ExecutionOutcome::Dispatcher { description, code } => Err(ExecutionError::new(
                     ErrorKind::Dispatcher { code },
                     description,
                 )),
-                ExecutionResult::Runtime { description, code } => Err(ExecutionError::new(
+                ExecutionOutcome::Runtime { description, code } => Err(ExecutionError::new(
                     ErrorKind::Runtime { code },
                     description,
                 )),
-                ExecutionResult::Service { description, code } => Err(ExecutionError::new(
+                ExecutionOutcome::Service { description, code } => Err(ExecutionError::new(
                     ErrorKind::Service { code },
                     description,
                 )),
@@ -311,14 +312,14 @@ mod execution_result {
     where
         S: Serializer,
     {
-        ExecutionResult::from(inner).serialize(serializer)
+        ExecutionOutcome::from(inner).serialize(serializer)
     }
 
     pub fn deserialize<'a, D>(deserializer: D) -> Result<Result<(), ExecutionError>, D::Error>
     where
         D: Deserializer<'a>,
     {
-        ExecutionResult::deserialize(deserializer).map(From::from)
+        ExecutionOutcome::deserialize(deserializer).map(From::from)
     }
 
 }
@@ -373,6 +374,23 @@ mod tests {
     }
 
     #[test]
+    fn execution_error_binary_value_panic_with_code() {
+        let bytes = {
+            let mut inner = runtime::ExecutionError::default();
+            inner.set_kind(0);
+            inner.set_code(2);
+            inner.write_to_bytes().unwrap()
+        };
+
+        assert_eq!(
+            ExecutionError::from_bytes(bytes.into())
+                .unwrap_err()
+                .to_string(),
+            "Error code for panic should be zero"
+        )
+    }    
+
+    #[test]
     fn execution_error_object_hash_description() {
         let first_err = ExecutionError {
             kind: ErrorKind::Service { code: 5 },
@@ -399,7 +417,7 @@ mod tests {
         ];
 
         for value in values {
-            let res = ExecutionResult(value.map_err(|(kind, description)| ExecutionError {
+            let res = ExecutionOutcome(value.map_err(|(kind, description)| ExecutionError {
                 kind,
                 description: description.to_owned(),
             }));

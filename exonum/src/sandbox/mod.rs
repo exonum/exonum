@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use bit_vec::BitVec;
-use exonum_merkledb::{BinaryValue, HashTag, MapProof, ObjectHash, TemporaryDB};
+use exonum_merkledb::{BinaryValue, HashTag, IndexAccess, MapProof, ObjectHash, TemporaryDB};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -1018,6 +1018,23 @@ impl SandboxBuilder {
     }
 }
 
+impl<T: IndexAccess> Schema<T> {
+    /// Removes transaction from the persistent pool.
+    fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
+        let contains = self.transactions_pool().contains(hash);
+        self.transactions_pool().remove(hash);
+        self.transactions().remove(hash);
+
+        if contains {
+            let x = self.transactions_pool_len_index().get().unwrap();
+            self.transactions_pool_len_index().set(x - 1);
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
 fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     let addr = Ipv4Addr::new(idx, idx, idx, idx);
     SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
@@ -1183,7 +1200,7 @@ mod tests {
     use std::borrow::Cow;
 
     use crate::{
-        blockchain::ExecutionResult,
+        blockchain::ExecutionError,
         crypto::{gen_keypair_from_seed, Seed},
         messages::{AnyTx, ServiceInstanceId},
         proto::schema::{tests::TxAfterCommit, PROTO_SOURCES},
@@ -1201,7 +1218,11 @@ mod tests {
 
     #[exonum_service(crate = "crate", dispatcher = "AfterCommitService")]
     pub trait AfterCommitInterface {
-        fn after_commit(&self, context: TransactionContext, arg: TxAfterCommit) -> ExecutionResult;
+        fn after_commit(
+            &self,
+            context: TransactionContext,
+            arg: TxAfterCommit,
+        ) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug)]
@@ -1212,7 +1233,7 @@ mod tests {
             &self,
             _context: TransactionContext,
             _arg: TxAfterCommit,
-        ) -> ExecutionResult {
+        ) -> Result<(), ExecutionError> {
             Ok(())
         }
     }

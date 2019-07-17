@@ -30,7 +30,7 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, Blockchain, ExecutionError, ExecutionResult, Schema, TransactionMessage, TxLocation,
+        Block, Blockchain, ExecutionError, ExecutionOutcome, Schema, TransactionMessage, TxLocation,
     },
     crypto::Hash,
     helpers::Height,
@@ -343,7 +343,7 @@ pub struct CommittedTransaction {
     content: TransactionMessage,
     location: TxLocation,
     location_proof: ListProof<Hash>,
-    status: ExecutionResult,
+    status: ExecutionOutcome,
 }
 
 impl CommittedTransaction {

@@ -15,7 +15,7 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, ExecutionError, ExecutionResult, InstanceCollection, Schema},
+    blockchain::{Blockchain, InstanceCollection, Schema},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::{AnyTx, Message, ServiceInstanceId, Signed},
@@ -70,25 +70,28 @@ impl Transfer {
     }
 }
 
+#[derive(Debug, IntoExecutionError)]
+pub enum Error {
+    /// Not allowed
+    NotAllowed = 0
+}
+
 #[exonum_service(dispatcher = "MyService")]
 pub trait ExplorerTransactions {
-    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult;
-    fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult;
+    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
+    fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error>;
 }
 
 impl ExplorerTransactions for MyService {
-    fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> ExecutionResult {
+    fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
-            Err(ExecutionError::with_description(
-                1,
-                "Not allowed".to_string(),
-            ))
+            Err(Error::NotAllowed)
         }
     }
 
-    fn transfer(&self, _context: TransactionContext, _arg: Transfer) -> ExecutionResult {
+    fn transfer(&self, _context: TransactionContext, _arg: Transfer) -> Result<(), Error> {
         panic!("oops");
     }
 }

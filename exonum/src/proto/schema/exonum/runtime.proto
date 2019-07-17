@@ -50,7 +50,7 @@ message ExecutionError {
 }
 
 /// Result of runtime execution.
-message ExecutionResult {
+message ExecutionOutcome {
   oneof result {
      google.protobuf.Empty ok = 1;
      ExecutionError error = 2;

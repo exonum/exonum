@@ -32,7 +32,7 @@ use crate::{
         node::public::explorer::{TransactionHex, TransactionResponse},
         ServiceApiState,
     },
-    blockchain::{Block, ExecutionResult, Schema, TxLocation},
+    blockchain::{Block, ExecutionOutcome, Schema, TxLocation},
     crypto::Hash,
     events::error::into_failure,
     messages::{AnyTx, BinaryValue, Message as ExonumMessage, ProtocolMessage, SignedMessage},
@@ -86,14 +86,18 @@ impl TransactionFilter {
 /// Summary about a particular transaction in the blockchain (without transaction content).
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct CommittedTransactionSummary {
-    tx_hash: Hash,
+    /// Transaction identifier.
+    pub tx_hash: Hash,
     /// ID of service.
     pub service_id: u16,
     /// ID of transaction in service.
     pub message_id: u16,
-    status: ExecutionResult,
-    location: TxLocation,
-    proof: ListProof<Hash>,
+    /// Result of transaction execution.
+    pub status: ExecutionOutcome,
+    /// Transaction location in the blockchain.
+    pub location: TxLocation,
+    /// Proof of existence.
+    pub proof: ListProof<Hash>,
 }
 
 impl CommittedTransactionSummary {

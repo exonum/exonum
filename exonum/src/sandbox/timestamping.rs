@@ -22,7 +22,7 @@ use semver::Version;
 use std::borrow::Cow;
 
 use crate::{
-    blockchain::ExecutionResult,
+    blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::{AnyTx, ServiceInstanceId, Signed},
     runtime::{
@@ -38,14 +38,14 @@ pub const DATA_SIZE: usize = 64;
 
 #[exonum_service(crate = "crate", dispatcher = "TimestampingService")]
 pub trait TimestampingInterface {
-    fn timestamp(&self, context: TransactionContext, arg: TimestampTx) -> ExecutionResult;
+    fn timestamp(&self, context: TransactionContext, arg: TimestampTx) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
 pub struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, _context: TransactionContext, _arg: TimestampTx) -> ExecutionResult {
+    fn timestamp(&self, _context: TransactionContext, _arg: TimestampTx) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

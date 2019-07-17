@@ -24,7 +24,7 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{Blockchain, Schema, TransactionError},
+    blockchain::{Blockchain, Schema},
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
@@ -127,7 +127,7 @@ fn main() {
     let content = tx.content();
     println!("{:?}", content);
     // ...and transaction status as well
-    let status: Result<(), &TransactionError> = tx.status();
+    let status = tx.status();
     assert!(status.is_ok());
 
     // `CommittedTransaction` JSON presentation
