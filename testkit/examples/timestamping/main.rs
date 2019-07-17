@@ -19,8 +19,6 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use std::borrow::Cow;
-
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{

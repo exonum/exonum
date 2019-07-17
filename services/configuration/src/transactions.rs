@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //! Transaction definitions for the configuration service.
-use std::borrow::Cow;
-
 use exonum_merkledb::{Fork, ObjectHash, Snapshot};
 
 use exonum::{
