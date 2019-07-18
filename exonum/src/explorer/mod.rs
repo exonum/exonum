@@ -303,7 +303,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// ## `status` field
 ///
-/// The `status` field is a more readable version of the [`TransactionResult`] type.
+/// The `status` field is a more readable representation of the [`ExecutionOutcome`] type.
 ///
 /// For successfully executed transactions, `status` is equal to
 ///
@@ -316,7 +316,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`Flow`] / [`TypeScript`] notation:
 ///
 /// ```javascript
-/// { type: 'error', code: number, description?: string }
+/// { type: 'service_error', code: number, description?: string }
 /// ```
 ///
 /// For transactions that have resulted in a panic, `status` contains an optional description
@@ -330,8 +330,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
 /// [`ListProof`]: ../../exonum_merkledb/enum.ListProof.html
 /// [`Hash`]: ../../exonum_crypto/struct.Hash.html
-/// [`TransactionResult`]: ../blockchain/struct.TransactionResult.html
-/// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
+/// [`ExecutionOutcome`]: ../runtime/error/struct.ExecutionOutcome.html
+/// [`ExecutionError`]: ../runtime/error/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
 ///

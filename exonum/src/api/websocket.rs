@@ -97,7 +97,7 @@ pub struct CommittedTransactionSummary {
     /// Transaction location in the blockchain.
     pub location: TxLocation,
     /// Proof of existence.
-    pub proof: ListProof<Hash>,
+    pub location_proof: ListProof<Hash>,
 }
 
 impl CommittedTransactionSummary {
@@ -119,7 +119,7 @@ impl CommittedTransactionSummary {
             message_id: tx_id,
             status: tx_result,
             location,
-            proof: location_proof,
+            location_proof,
         })
     }
 }

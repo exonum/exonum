@@ -154,7 +154,7 @@ fn main() {
         serde_json::to_value(&erroneous_tx).unwrap(),
         json!({
             "status": {
-                "type": "error",
+                "type": "service_error",
                 "code": 1,
                 "description": "Not allowed",
             },

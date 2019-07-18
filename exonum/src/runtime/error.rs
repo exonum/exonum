@@ -27,20 +27,22 @@ use crate::{
 /// Kind of execution error, indicates in which module error occurred.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
-    // Operation execution has been finished with panic.
+    /// Operation execution has been finished with panic.
     Panic,
-    // An error in dispatcher during the execution occurred.
+    /// An error in dispatcher during the execution occurred.
     Dispatcher {
-        /// Error code.
+        /// Error code, available values ​​can be found in the [description] of the dispatcher's errors.
+        ///
+        /// [description]: ../dispatcher/error/enum.Error.html
         code: u8,
     },
-    // An error in the runtime occurred.
+    /// An error in the runtime occurred.
     Runtime {
         /// User-defined error code.
         /// Error codes can have different meanings for the different runtimes.
         code: u8,
     },
-    // An error during the service's transaction execution occurred.
+    /// An error during the service's transaction execution occurred.
     Service {
         /// User-defined error code.
         /// Error codes can have different meanings for the different transactions
