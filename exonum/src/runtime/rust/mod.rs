@@ -372,17 +372,6 @@ impl Runtime for RustRuntime {
     }
 }
 
-/// Creates `RustArtifactId` by using `CARGO_PKG_NAME` and `CARGO_PKG_VERSION`
-/// variables.
-#[macro_export]
-macro_rules! artifact_spec_from_crate {
-    () => {
-        concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))
-            .parse::<$crate::runtime::rust::RustArtifactId>()
-            .unwrap()
-    };
-}
-
 #[test]
 fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service/1.0.0").unwrap();
