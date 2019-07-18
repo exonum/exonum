@@ -152,6 +152,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - A channel for api requests has been changed to unbounded. (#1308)
 
+- Endpoints `explorer/v1/block` and `explorer/v1/transactions` were extended
+  with adding additional fields `service_id` and `time`. (#1386)
+
 #### exonum-merkledb
 
 - Updated `ProofMapIndex` data layout. (#1293)

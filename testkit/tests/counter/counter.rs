@@ -223,16 +223,16 @@ impl CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
+    fn service_id(&self) -> u16 {
+        SERVICE_ID
+    }
+
     fn service_name(&self) -> &str {
         "counter"
     }
 
     fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
-    }
-
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
     }
 
     /// Implement a method to deserialize transactions coming to the node.

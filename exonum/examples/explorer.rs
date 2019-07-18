@@ -86,7 +86,7 @@ pub fn sample_blockchain() -> Blockchain {
     let fork = blockchain.fork();
     {
         let mut schema = Schema::new(&fork);
-        schema.add_transaction_into_pool(mempool_transaction().clone());
+        schema.add_transaction_into_pool(mempool_transaction());
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
@@ -160,6 +160,7 @@ fn main() {
             "location_proof": tx.location_proof(),
             // Execution status
             "status": { "type": "success" },
+            "time": tx.time(),
         })
     );
 
@@ -177,6 +178,7 @@ fn main() {
             "content": serde_json::to_value(erroneous_tx.content()).unwrap(),
             "location": erroneous_tx.location(),
             "location_proof": erroneous_tx.location_proof(),
+            "time": erroneous_tx.time(),
         })
     );
 
@@ -190,6 +192,7 @@ fn main() {
             "content": serde_json::to_value(panicked_tx.content()).unwrap(),
             "location": panicked_tx.location(),
             "location_proof": panicked_tx.location_proof(),
+            "time": panicked_tx.time(),
         })
     );
 
@@ -212,6 +215,7 @@ fn main() {
             "status": { "type": "success" },
             "location": tx_ref.location(),
             "location_proof": tx_ref.location_proof(),
+            "time": tx_ref.time(),
         })
     );
 
