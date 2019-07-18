@@ -731,18 +731,18 @@ pub type ServiceInstanceId = u32;
 /// Method id type.
 pub type MethodId = u32;
 
-/// Transaction call info.
+/// Unique service transaction identifier.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CallInfo", crate = "crate")]
 pub struct CallInfo {
-    /// Service instance id.
+    /// Service instance identifier.
     pub instance_id: ServiceInstanceId,
-    /// Service method id.
+    /// Identifier of method in service interface to call.
     pub method_id: MethodId,
 }
 
 impl CallInfo {
-    /// New `CallInfo`.
+    /// Creates a new `CallInfo` instance.
     pub fn new(instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
         Self {
             instance_id,

@@ -12,16 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// The messages collection for the default Exonum consensus implementation.
+
 syntax = "proto3";
 
-package exonum.protocol;
+package exonum.consensus;
 
 import "helpers.proto";
 import "blockchain.proto";
+import "runtime.proto";
 import "google/protobuf/timestamp.proto";
 
+// Container for the signed messages.
+//
+// Keep in mind, that:
+// hash(SignedMessage) = hash(exonum_msg || key.bytes || sign.bytes)
+message Signed {
+  // Message payload.
+  bytes payload = 1;
+  // Message author.
+  exonum.PublicKey author = 2;
+  // Digital signature.
+  exonum.Signature signature = 3;
+}
+
+// List of consensus messages
+
 message Connect {
-  string pub_addr = 1;
+  string host = 1;
   google.protobuf.Timestamp time = 2;
   string user_agent = 3;
 }
@@ -94,19 +112,9 @@ message BlockRequest {
   uint64 height = 2;
 }
 
-message CallInfo {
-  uint32 instance_id = 1;
-  uint32 method_id = 2;
-}
-
-message AnyTx {
-  CallInfo call_info = 1;
-  bytes payload = 2;
-}
-
-message ExonumMessage {
+message Consensus {
   oneof message {
-    AnyTx transaction = 1;
+    exonum.runtime.AnyTx transaction = 1;
     Connect connect = 2;
     Status status = 3;
 
@@ -123,11 +131,4 @@ message ExonumMessage {
     PeersRequest peers_req = 12;
     BlockRequest block_req = 13;
   }
-}
-
-// WARNING: hash(SignedMessage) = hash(exonum_msg || key.bytes || sign.bytes)
-message SignedMessage {
-  bytes exonum_msg = 1;
-  exonum.PublicKey key = 2;
-  exonum.Signature sign = 3;
 }

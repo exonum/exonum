@@ -50,6 +50,8 @@ pub(crate) use self::helpers::HexStringRepresentation;
 
 mod authorization;
 mod helpers;
+mod types;
+mod signed;
 mod protocol;
 #[cfg(test)]
 mod tests;
