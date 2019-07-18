@@ -60,6 +60,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-merkledb
 
+- Added restrictions to index names. Allowable characters in index name: ASCII
+  characters, digits, underscores and dashes. (#)
+
 - Added `Debug` implementation for `Database`, `Snapshot`, `Iterator` dynamic
   traits (#1363)
 
