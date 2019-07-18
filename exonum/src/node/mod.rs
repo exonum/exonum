@@ -331,13 +331,13 @@ impl<T> NodeConfig<T> {
         }
         // Sanity checks for cases of accidental negative overflows.
         let sanity_max = 2_usize.pow(16);
-        if capacity.internal_events_capacity > sanity_max {
+        if capacity.internal_events_capacity >= sanity_max {
             panic!(
                 "internal_events_capacity({}) must be smaller than {}",
                 capacity.internal_events_capacity, sanity_max,
             );
         }
-        if capacity.network_requests_capacity > sanity_max {
+        if capacity.network_requests_capacity >= sanity_max {
             panic!(
                 "network_requests_capacity({}) must be smaller than {}",
                 capacity.network_requests_capacity, sanity_max,
