@@ -32,7 +32,7 @@ use crate::{
         node::public::explorer::{TransactionHex, TransactionResponse},
         ServiceApiState,
     },
-    blockchain::{Block, ExecutionOutcome, Schema, TxLocation},
+    blockchain::{Block, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
     events::error::into_failure,
     messages::{AnyTx, BinaryValue, Message as ExonumMessage, ProtocolMessage, SignedMessage},
@@ -93,7 +93,7 @@ pub struct CommittedTransactionSummary {
     /// ID of transaction in service.
     pub message_id: u16,
     /// Result of transaction execution.
-    pub status: ExecutionOutcome,
+    pub status: ExecutionStatus,
     /// Transaction location in the blockchain.
     pub location: TxLocation,
     /// Proof of existence.

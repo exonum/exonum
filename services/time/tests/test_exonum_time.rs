@@ -21,7 +21,7 @@ use exonum_merkledb::{IndexAccess, Snapshot};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::{ExecutionErrorKind, ExecutionOutcome, Schema},
+    blockchain::{ExecutionErrorKind, ExecutionStatus, Schema},
     crypto::{gen_keypair, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, ServiceInstanceId, Signed},
@@ -81,7 +81,7 @@ fn assert_transaction_result<S: IndexAccess>(
         .transaction_results()
         .get(&transaction.object_hash());
     match result {
-        Some(ExecutionOutcome(Err(e))) => {
+        Some(ExecutionStatus(Err(e))) => {
             assert_eq!(e.kind, ExecutionErrorKind::service(expected_code));
             e.description
         }
@@ -300,7 +300,7 @@ fn test_exonum_time_service_with_7_validators() {
             Schema::new(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.object_hash()),
-            Some(ExecutionOutcome::ok())
+            Some(ExecutionStatus::ok())
         );
 
         validators_times[i] = Some(times[i]);
@@ -403,7 +403,7 @@ fn test_selected_time_less_than_time_in_storage() {
             Schema::new(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.object_hash()),
-            Some(ExecutionOutcome::ok())
+            Some(ExecutionStatus::ok())
         );
     }
 
@@ -454,7 +454,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
         Schema::new(&testkit.snapshot())
             .transaction_results()
             .get(&tx0.object_hash()),
-        Some(ExecutionOutcome::ok())
+        Some(ExecutionStatus::ok())
     );
 
     let schema = TimeSchema::new(INSTANCE_NAME, Rc::from(testkit.snapshot()));

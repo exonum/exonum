@@ -206,33 +206,33 @@ impl ObjectHash for ExecutionError {
     }
 }
 
-/// Returns an outcome of the dispatcher execution.
+/// Returns an status of the dispatcher execution.
 /// This result may be either an empty unit type, in case of success,
 /// or an `ExecutionError`, if execution has failed.
 /// Errors consist of an error code and an optional description.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ExecutionOutcome(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
+pub struct ExecutionStatus(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
 
-impl ExecutionOutcome {
-    /// Creates outcome for the successful execution.
+impl ExecutionStatus {
+    /// Creates status for the successful execution.
     pub fn ok() -> Self {
         Self(Ok(()))
     }
 
-    /// Creates outcome for the failed execution.
+    /// Creates status for the failed execution.
     pub fn err(err: impl Into<ExecutionError>) -> Self {
         Self(Err(err.into()))
     }
 }
 
-impl From<Result<(), ExecutionError>> for ExecutionOutcome {
+impl From<Result<(), ExecutionError>> for ExecutionStatus {
     fn from(inner: Result<(), ExecutionError>) -> Self {
         Self(inner)
     }
 }
 
-impl ProtobufConvert for ExecutionOutcome {
-    type ProtoStruct = runtime::ExecutionOutcome;
+impl ProtobufConvert for ExecutionStatus {
+    type ProtoStruct = runtime::ExecutionStatus;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();
@@ -245,7 +245,7 @@ impl ProtobufConvert for ExecutionOutcome {
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let inner = if pb.has_error() {
-            ensure!(!pb.has_ok(), "ExecutionOutcome has both of variants.");
+            ensure!(!pb.has_ok(), "ExecutionStatus has both of variants.");
             Err(ExecutionError::from_pb(pb.take_error())?)
         } else {
             Ok(())
@@ -254,11 +254,11 @@ impl ProtobufConvert for ExecutionOutcome {
     }
 }
 
-impl BinaryValue for ExecutionOutcome {
+impl BinaryValue for ExecutionStatus {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_pb()
             .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for ExecutionOutcome")
+            .expect("Failed to serialize in BinaryValue for ExecutionStatus")
     }
 
     fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
@@ -268,7 +268,7 @@ impl BinaryValue for ExecutionOutcome {
     }
 }
 
-impl ObjectHash for ExecutionOutcome {
+impl ObjectHash for ExecutionStatus {
     fn object_hash(&self) -> Hash {
         match &self.0 {
             Err(e) => e.object_hash(),
@@ -285,7 +285,7 @@ mod execution_result {
 
     #[serde(tag = "type", rename_all = "snake_case")]
     #[derive(Debug, Serialize, Deserialize)]
-    enum ExecutionOutcome<'a> {
+    enum ExecutionStatus<'a> {
         Success,
         Panic { description: &'a str },
         DispatcherError { description: &'a str, code: u8 },
@@ -293,43 +293,43 @@ mod execution_result {
         ServiceError { description: &'a str, code: u8 },
     }
 
-    impl<'a> From<&'a Result<(), ExecutionError>> for ExecutionOutcome<'a> {
+    impl<'a> From<&'a Result<(), ExecutionError>> for ExecutionStatus<'a> {
         fn from(inner: &'a Result<(), ExecutionError>) -> Self {
             if let Err(err) = &inner {
                 let description = &err.description;
                 match err.kind {
-                    ErrorKind::Panic => ExecutionOutcome::Panic { description },
+                    ErrorKind::Panic => ExecutionStatus::Panic { description },
                     ErrorKind::Dispatcher { code } => {
-                        ExecutionOutcome::DispatcherError { code, description }
+                        ExecutionStatus::DispatcherError { code, description }
                     }
                     ErrorKind::Runtime { code } => {
-                        ExecutionOutcome::RuntimeError { code, description }
+                        ExecutionStatus::RuntimeError { code, description }
                     }
                     ErrorKind::Service { code } => {
-                        ExecutionOutcome::ServiceError { code, description }
+                        ExecutionStatus::ServiceError { code, description }
                     }
                 }
             } else {
-                ExecutionOutcome::Success
+                ExecutionStatus::Success
             }
         }
     }
 
-    impl<'a> From<ExecutionOutcome<'a>> for Result<(), ExecutionError> {
-        fn from(inner: ExecutionOutcome<'a>) -> Self {
+    impl<'a> From<ExecutionStatus<'a>> for Result<(), ExecutionError> {
+        fn from(inner: ExecutionStatus<'a>) -> Self {
             match inner {
-                ExecutionOutcome::Success => Ok(()),
-                ExecutionOutcome::Panic { description } => {
+                ExecutionStatus::Success => Ok(()),
+                ExecutionStatus::Panic { description } => {
                     Err(ExecutionError::new(ErrorKind::Panic, description))
                 }
-                ExecutionOutcome::DispatcherError { description, code } => Err(
+                ExecutionStatus::DispatcherError { description, code } => Err(
                     ExecutionError::new(ErrorKind::Dispatcher { code }, description),
                 ),
-                ExecutionOutcome::RuntimeError { description, code } => Err(ExecutionError::new(
+                ExecutionStatus::RuntimeError { description, code } => Err(ExecutionError::new(
                     ErrorKind::Runtime { code },
                     description,
                 )),
-                ExecutionOutcome::ServiceError { description, code } => Err(ExecutionError::new(
+                ExecutionStatus::ServiceError { description, code } => Err(ExecutionError::new(
                     ErrorKind::Service { code },
                     description,
                 )),
@@ -344,14 +344,14 @@ mod execution_result {
     where
         S: Serializer,
     {
-        ExecutionOutcome::from(inner).serialize(serializer)
+        ExecutionStatus::from(inner).serialize(serializer)
     }
 
     pub fn deserialize<'a, D>(deserializer: D) -> Result<Result<(), ExecutionError>, D::Error>
     where
         D: Deserializer<'a>,
     {
-        ExecutionOutcome::deserialize(deserializer).map(From::from)
+        ExecutionStatus::deserialize(deserializer).map(From::from)
     }
 
 }
@@ -449,7 +449,7 @@ mod tests {
         ];
 
         for value in values {
-            let res = ExecutionOutcome(value.map_err(|(kind, description)| ExecutionError {
+            let res = ExecutionStatus(value.map_err(|(kind, description)| ExecutionError {
                 kind,
                 description: description.to_owned(),
             }));

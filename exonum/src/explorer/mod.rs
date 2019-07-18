@@ -30,7 +30,7 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, Blockchain, ExecutionError, ExecutionOutcome, Schema, TransactionMessage, TxLocation,
+        Block, Blockchain, ExecutionError, ExecutionStatus, Schema, TransactionMessage, TxLocation,
     },
     crypto::Hash,
     helpers::Height,
@@ -303,7 +303,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// ## `status` field
 ///
-/// The `status` field is a more readable representation of the [`ExecutionOutcome`] type.
+/// The `status` field is a more readable representation of the [`ExecutionStatus`] type.
 ///
 /// For successfully executed transactions, `status` is equal to
 ///
@@ -330,7 +330,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
 /// [`ListProof`]: ../../exonum_merkledb/enum.ListProof.html
 /// [`Hash`]: ../../exonum_crypto/struct.Hash.html
-/// [`ExecutionOutcome`]: ../runtime/error/struct.ExecutionOutcome.html
+/// [`ExecutionStatus`]: ../runtime/error/struct.ExecutionStatus.html
 /// [`ExecutionError`]: ../runtime/error/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
@@ -343,7 +343,7 @@ pub struct CommittedTransaction {
     content: TransactionMessage,
     location: TxLocation,
     location_proof: ListProof<Hash>,
-    status: ExecutionOutcome,
+    status: ExecutionStatus,
 }
 
 impl CommittedTransaction {

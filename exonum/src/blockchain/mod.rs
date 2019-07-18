@@ -22,7 +22,7 @@ pub use self::{
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
 };
 pub use crate::runtime::{
-    error::{ErrorKind as ExecutionErrorKind, ExecutionOutcome},
+    error::{ErrorKind as ExecutionErrorKind, ExecutionStatus},
     ExecutionError,
 };
 
@@ -358,7 +358,7 @@ impl Blockchain {
         let mut schema = Schema::new(&*fork);
         schema
             .transaction_results()
-            .put(&tx_hash, ExecutionOutcome(tx_result));
+            .put(&tx_hash, ExecutionStatus(tx_result));
         schema.commit_transaction(&tx_hash);
         schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
