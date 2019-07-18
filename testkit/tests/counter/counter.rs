@@ -30,7 +30,7 @@ use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::*;
 
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use super::proto;
 

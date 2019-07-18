@@ -15,7 +15,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Trait `BinaryForm` has been replaced by `BinaryValue`. (#1298)
 
   To implement `BinaryValue` for types that implements `Protobuf::Message` use
-  `impl_binary_value_for_message` macros from `exonum-merkledb` crate.
+  `impl_binary_value_for_pb_message` macros.
 
 - Module `storage` has been replaced by `exonum-merkledb` crate. See related section
   in changelog for details. (#1293)

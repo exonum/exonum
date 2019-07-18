@@ -163,7 +163,6 @@ mod tests {
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction, Signed};
     use exonum_merkledb::Snapshot;
-    use std::borrow::Cow;
 
     use super::{super::proto, *};
     use crate::{TestKitApi, TestKitBuilder};

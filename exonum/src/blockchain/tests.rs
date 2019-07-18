@@ -16,8 +16,6 @@
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
-use std::borrow::Cow;
-
 use crate::blockchain::{
     Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionContext,
     TransactionSet,
@@ -170,7 +168,6 @@ mod transactions_tests {
     use crate::crypto::gen_keypair;
     use crate::messages::Message;
     use crate::proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
-    use std::borrow::Cow;
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
