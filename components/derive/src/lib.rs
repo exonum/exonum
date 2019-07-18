@@ -165,12 +165,12 @@ pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Derives `Into<ExecutionError>` conversion for the specified enumeration.
-/// 
-/// Enumeration should have an explicit discriminant for each variant. 
+///
+/// Enumeration should have an explicit discriminant for each variant.
 /// Also this macro derives `Display` trait using documentation comments of each variant.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```ignore
 /// /// Error codes emitted by wallet transactions during execution.
 /// #[derive(Debug, IntoExecutionError)]
@@ -183,7 +183,7 @@ pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     TimeServiceNotFound = 2,
 /// }
 /// ```
-/// 
+///
 #[proc_macro_derive(IntoExecutionError, attributes(exonum))]
 pub fn generate_into_execution_error(input: TokenStream) -> TokenStream {
     execution_error::implement_execution_error(input)

@@ -155,7 +155,7 @@ fn main() {
         json!({
             "status": {
                 "type": "service_error",
-                "code": 1,
+                "code": 0,
                 "description": "Not allowed",
             },
             // Other fields...

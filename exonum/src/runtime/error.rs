@@ -322,9 +322,10 @@ mod execution_result {
                 ExecutionStatus::Panic { description } => {
                     Err(ExecutionError::new(ErrorKind::Panic, description))
                 }
-                ExecutionStatus::DispatcherError { description, code } => Err(
-                    ExecutionError::new(ErrorKind::Dispatcher { code }, description),
-                ),
+                ExecutionStatus::DispatcherError { description, code } => Err(ExecutionError::new(
+                    ErrorKind::Dispatcher { code },
+                    description,
+                )),
                 ExecutionStatus::RuntimeError { description, code } => Err(ExecutionError::new(
                     ErrorKind::Runtime { code },
                     description,
