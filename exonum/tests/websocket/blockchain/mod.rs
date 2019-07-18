@@ -15,7 +15,6 @@
 //! Simplified node emulation for testing websockets.
 
 use std::{
-    borrow::Cow,
     net::SocketAddr,
     thread::{self, JoinHandle},
 };

@@ -1177,9 +1177,7 @@ mod tests {
     use crate::messages::RawTransaction;
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
-    use protobuf::Message as PbMessage;
-    use std::borrow::Cow;
+    use exonum_merkledb::{BinaryValue, Snapshot};
 
     const SERVICE_ID: u16 = 1;
 
@@ -1198,7 +1196,7 @@ mod tests {
         }
     }
 
-    impl_binary_value_for_message! { TxAfterCommit }
+    impl_binary_value_for_pb_message! { TxAfterCommit }
 
     impl Transaction for TxAfterCommit {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

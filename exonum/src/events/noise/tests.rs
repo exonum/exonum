@@ -34,7 +34,7 @@ use crate::events::{
     noise::{
         wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
         Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
-        NoiseWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
+        NoiseWrapper, TransportWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
     },
     tests::raw_message,
 };
@@ -150,11 +150,11 @@ fn noise_encrypt_decrypt_bogus_message() {
 
     // Wrong length.
     let res = responder.decrypt_msg(len - 1, &mut buffer_msg);
-    assert!(res.unwrap_err().to_string().contains("decryption failed"));
+    assert!(res.unwrap_err().to_string().contains("decrypt error"));
 
     // Wrong message.
     let res = responder.decrypt_msg(len, &mut BytesMut::from(vec![0_u8; len + HEADER_LENGTH]));
-    assert!(res.unwrap_err().to_string().contains("decryption failed"));
+    assert!(res.unwrap_err().to_string().contains("decrypt error"));
 }
 
 fn check_encrypt_decrypt_message(msg_size: usize) {
@@ -174,7 +174,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     assert_eq!(message.raw(), &res);
 }
 
-fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
+fn create_noise_sessions() -> (TransportWrapper, TransportWrapper) {
     let params = HandshakeParams::with_default_params();
 
     let mut initiator = NoiseWrapper::initiator(&params);
@@ -190,11 +190,11 @@ fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
 
     (
         initiator
-            .into_transport_mode()
-            .expect("transit to transport mode"),
+            .into_transport_wrapper()
+            .expect("convert to transport wrapper"),
         responder
-            .into_transport_mode()
-            .expect("transit to transport mode"),
+            .into_transport_wrapper()
+            .expect("convert to transport wrapper"),
     )
 }
 

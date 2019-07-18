@@ -67,6 +67,9 @@ pub use self::schema::protocol::{
 };
 
 pub mod schema;
+
+#[macro_use]
+mod macros;
 #[cfg(test)]
 mod tests;
 
