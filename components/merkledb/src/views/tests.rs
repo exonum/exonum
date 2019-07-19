@@ -867,7 +867,7 @@ fn valid_index_name() {
         "\u{438}\u{43d}\u{434}\u{435}\u{43a}\u{441}_name_"
     ));
     assert!(!check_valid_name("core.index_\u{438}\u{43c}\u{44f}3"));
-    assert!(!check_valid_name("1in!dex_Namez"));
+    assert!(!check_valid_name("1in!dex_Name"));
     assert!(!check_valid_name("space name"));
     assert!(!check_valid_name(" space "));
 }
