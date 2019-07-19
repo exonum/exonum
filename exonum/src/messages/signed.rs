@@ -12,51 +12,179 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf::Message;
+use exonum_merkledb::BinaryValue;
+use hex::{FromHex, ToHex};
+use serde::{de::{Deserialize, Deserializer}, ser::{Serialize, Serializer}};
 
-use std::convert::TryFrom;
+use std::{borrow::Cow, convert::TryFrom, fmt, str::FromStr};
 
-use crate::{
-    crypto::{self, Signature},
-    proto::ProtobufConvert,
-};
+use crate::crypto::{self, PublicKey, SecretKey};
 
-use super::types::{Connect, Signed};
+use super::types::{ProtocolMessage, SignedMessage};
+
+impl SignedMessage {
+    /// Creates a new signed message.
+    pub fn new(payload: Cow<[u8]>, author: PublicKey, secret_key: &SecretKey) -> Self {
+        let signature = crypto::sign(payload.as_ref(), secret_key);
+        SignedMessage {
+            payload: payload.into_owned(),
+            author,
+            signature,
+        }
+    }
+
+    /// Signs protocol message.
+    pub fn from_protocol(
+        msg: impl Into<ProtocolMessage>,
+        author: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Self {
+        let payload = Cow::Owned(msg.into().into_bytes());
+        Self::new(payload, author, secret_key)
+    }
+
+    /// Verifies message signature and returns the corresponding checked message.
+    pub fn verify<T>(self) -> Result<Verified<T>, failure::Error>
+    where
+        T: TryFrom<ProtocolMessage>,
+    {
+        // Verifies message signature
+        ensure!(
+            crypto::verify(&self.signature, &self.payload, &self.author),
+            "Failed to verify signature."
+        );
+        // Deserializes message.
+        let protocol_message = ProtocolMessage::from_bytes(Cow::Borrowed(&self.payload))?;
+        let payload = T::try_from(protocol_message)
+            .map_err(|_| failure::format_err!("Failed to decode ProtocolMessage."))?;
+
+        Ok(Verified { raw: self, payload })
+    }
+}
+
+impl ToHex for SignedMessage {
+    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        self.to_bytes().write_hex(w)
+    }
+
+    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        self.to_bytes().write_hex_upper(w)
+    }
+}
+
+impl FromHex for SignedMessage {
+    type Error = failure::Error;
+
+    fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
+        let bytes = Vec::<u8>::from_hex(v)?;
+        Self::from_bytes(bytes.into()).map_err(From::from)
+    }
+}
+
+impl fmt::Display for SignedMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.write_hex(f)
+    }
+}
+
+impl FromStr for SignedMessage {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_hex(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for SignedMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        serde_str::deserialize(deserializer)
+    }
+}
+
+impl Serialize for SignedMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serde_str::serialize(self, serializer)
+    }
+}
+
 
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
-pub struct Verified<T: ProtobufConvert> {
-    raw: Signed,
+pub struct Verified<T> {
+    raw: SignedMessage,
     payload: T,
 }
 
-// impl<T> TryFrom<Signed> for Verified<T>
-// where
-//     T: ProtobufConvert,
-//     T::ProtoStruct: Message + Default,
-// {
-//     type Error = failure::Error;
+impl<T> BinaryValue for Verified<T>
+where
+    T: TryFrom<ProtocolMessage>,
+{
+    fn to_bytes(&self) -> Vec<u8> {
+        self.raw.to_bytes()
+    }
 
-//     fn try_from(raw: Signed) -> Result<Self, Self::Error> {
-//         // Verifies message signature
-//         ensure!(
-//             crypto::verify(&raw.signature, &raw.payload, &raw.author),
-//             "Failed to verify signature."
-//         );
-//         // Deserializes message.
-//         let mut inner = <T::ProtoStruct>::default();
-//         inner.merge_from_bytes(&raw.payload)?;
-//         let payload = T::from_pb(inner)?;
-//         Ok(Self { raw, payload })
-//     }
-// }
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let raw = SignedMessage::from_bytes(bytes)?;
+        let protocol_message = ProtocolMessage::from_bytes(Cow::Borrowed(&raw.payload))?;
+        let payload = T::try_from(protocol_message).map_err(|_| failure::format_err!("Noo"))?;
+        Ok(Self { raw, payload })
+    }
+}
 
-// impl TryFrom<Protocol> for Connect {
-//     type Error = failure::Error;
+impl<T> AsRef<T> for Verified<T> {
+    fn as_ref(&self) -> &T { &self.payload }
+}
 
-//     fn try_from(value: Protocol) -> Result<Self, Self::Error> {
-//         match value.message {
-//             Some(Protocol_oneof_message::connect(inner)) => Self::from_pb(inner),
-//             _ => Err(format_err!("Unknown message"))
-//         }
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        crypto::{self, Hash},
+        helpers::Height,
+        messages::types::{Precommit, Status},
+    };
+
+    #[test]
+    fn test_verified_from_signed_correct_signature() {
+        let keypair = crypto::gen_keypair();
+
+        let msg = Status {
+            height: Height(0),
+            last_hash: Hash::zero(),
+        };
+        let protocol_message = ProtocolMessage::from(msg.clone());
+        let signed = SignedMessage::from_protocol(protocol_message.clone(), keypair.0, &keypair.1);
+
+        let verified_protocol = signed.clone().verify::<ProtocolMessage>().unwrap();
+        assert_eq!(verified_protocol.payload, protocol_message);
+
+        let verified_status = signed.clone().verify::<Status>().unwrap();
+        assert_eq!(verified_status.payload, msg);
+
+        // Wrong variant
+        let err = signed.verify::<Precommit>().unwrap_err();
+        assert_eq!(err.to_string(), "Failed to decode ProtocolMessage.");
+    }
+
+    #[test]
+    fn test_verified_from_signed_incorrect_signature() {
+        let keypair = crypto::gen_keypair();
+
+        let msg = Status {
+            height: Height(0),
+            last_hash: Hash::zero(),
+        };
+        let protocol_message = ProtocolMessage::from(msg.clone());
+        let mut signed =
+            SignedMessage::from_protocol(protocol_message.clone(), keypair.0, &keypair.1);
+        // Update author
+        signed.author = crypto::gen_keypair().0;
+        let err = signed.clone().verify::<ProtocolMessage>().unwrap_err();
+        assert_eq!(err.to_string(), "Failed to verify signature.");
+    }
+}

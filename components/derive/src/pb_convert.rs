@@ -151,7 +151,7 @@ impl ToTokens for ProtobufConvertStruct {
             impl ProtobufConvert for #name {
                 type ProtoStruct = #pb_name;
 
-                fn from_pb(mut pb: Self::ProtoStruct) -> std::result::Result<Self, _FailureError> {
+                fn from_pb(mut pb: Self::ProtoStruct) -> std::result::Result<Self, failure::Error> {
                     #from_pb_impl
                 }
 
@@ -217,7 +217,7 @@ impl ProtobufConvertEnum {
             quote! {
                 match pb.#oneof {
                     #( #match_arms )*
-                    None => Err(_failure::format_err!("Failed to decode #name from protobuf"))
+                    None => Err(failure::format_err!("Failed to decode #name from protobuf"))
                 }
             }
         };
@@ -243,7 +243,7 @@ impl ProtobufConvertEnum {
             impl ProtobufConvert for #name {
                 type ProtoStruct = #pb_name;
 
-                fn from_pb(mut pb: Self::ProtoStruct) -> std::result::Result<Self, _FailureError> {
+                fn from_pb(mut pb: Self::ProtoStruct) -> std::result::Result<Self, failure::Error> {
                     #from_pb_impl
                 }
 
@@ -265,13 +265,13 @@ impl ProtobufConvertEnum {
                 }
 
                 impl std::convert::TryFrom<#name> for #variant {
-                    type Error = _FailureError;
+                    type Error = failure::Error;
 
                     fn try_from(msg: #name) -> Result<Self, Self::Error> {
                         if let #name::#variant(inner) = msg {
                             Ok(inner)
                         } else {
-                            Err(format_err!(
+                            Err(failure::format_err!(
                                 "Expected #variant variant, but got {:?}",
                                 msg
                             ))
@@ -372,7 +372,7 @@ impl ProtobufConvert {
                     )
                 }
 
-                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, _FailureError> {
+                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
                     let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
                     block.merge_from_bytes(value.as_ref())?;
                     ProtobufConvert::from_pb(block)
@@ -424,7 +424,7 @@ impl ProtobufConvert {
             }
 
             impl std::convert::TryFrom<#cr::proto::Any> for #name {
-                type Error = _FailureError;
+                type Error = failure::Error;
 
                 fn try_from(v: #cr::proto::Any) -> Result<Self, Self::Error> {
                     v.try_into()
@@ -454,13 +454,9 @@ impl ToTokens for ProtobufConvert {
 
         let expanded = quote! {
             mod #mod_name {
-                extern crate protobuf as _protobuf_crate;
-                extern crate failure as _failure;
-
                 use super::*;
 
-                use self::_protobuf_crate::Message as _ProtobufMessage;
-                use self::_failure::{bail, Error as _FailureError, format_err};
+                use protobuf::Message as _ProtobufMessage;
                 use #cr::proto::ProtobufConvert;
 
                 #protobuf_convert

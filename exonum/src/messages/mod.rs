@@ -54,7 +54,7 @@ mod protocol;
 mod signed;
 #[cfg(test)]
 mod tests;
-mod types;
+pub mod types;
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
 /// This type is used inside `#[derive(TransactionSet)]`

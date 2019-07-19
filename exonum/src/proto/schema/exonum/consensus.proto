@@ -27,7 +27,7 @@ import "google/protobuf/timestamp.proto";
 //
 // Keep in mind, that:
 // hash(SignedMessage) = hash(exonum_msg || key.bytes || sign.bytes)
-message Signed {
+message SignedMessage {
   // Message payload.
   bytes payload = 1;
   // Message author.

@@ -22,16 +22,13 @@ use crate::{
     blockchain::Block,
     crypto::{Hash, PublicKey, Signature},
     helpers::{Height, Round, ValidatorId},
-    proto::{
-        schema::{consensus, runtime},
-        ProtobufConvert,
-    },
+    proto::schema::{consensus, runtime},
 };
 
 /// Container for the signed messages.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::Signed", crate = "crate")]
-pub struct Signed {
+#[exonum(pb = "consensus::SignedMessage", crate = "crate")]
+pub struct SignedMessage {
     /// Message payload.
     pub(super) payload: Vec<u8>,
     /// Message author.
