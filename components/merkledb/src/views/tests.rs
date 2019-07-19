@@ -858,7 +858,7 @@ fn valid_index_name() {
     assert!(check_valid_name("AinDex_name_"));
     assert!(check_valid_name("core.index_name1Z"));
     assert!(check_valid_name("configuration.indeX_1namE"));
-    assert!(check_valid_name("1index_Namez"));
+    assert!(check_valid_name("1index_Name"));
     assert!(check_valid_name("index-name"));
     assert!(check_valid_name("_index-name"));
     assert!(check_valid_name("indeX_1namE-"));
