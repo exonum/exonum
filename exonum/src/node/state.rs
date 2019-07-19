@@ -31,7 +31,7 @@ use crate::{
     helpers::{Height, Milliseconds, Round, ValidatorId},
     messages::{
         AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
-        Signed,
+        Verified,
     },
     node::{
         connect_list::{ConnectList, PeerAddress},
@@ -54,7 +54,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
-    our_connect_message: Signed<Connect>,
+    our_connect_message: Verified<Connect>,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -64,7 +64,7 @@ pub struct State {
     config: StoredConfiguration,
     connect_list: SharedConnectList,
 
-    peers: HashMap<PublicKey, Signed<Connect>>,
+    peers: HashMap<PublicKey, Verified<Connect>>,
     connections: HashMap<PublicKey, ConnectedPeerAddr>,
     height_start_time: SystemTime,
     height: Height,
@@ -77,8 +77,8 @@ pub struct State {
     // Messages.
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
-    prevotes: HashMap<(Round, Hash), Votes<Signed<Prevote>>>,
-    precommits: HashMap<(Round, Hash), Votes<Signed<Precommit>>>,
+    prevotes: HashMap<(Round, Hash), Votes<Verified<Prevote>>>,
+    precommits: HashMap<(Round, Hash), Votes<Verified<Precommit>>>,
 
     queued: Vec<ConsensusMessage>,
 
@@ -100,8 +100,8 @@ pub struct State {
 #[derive(Debug, Clone)]
 pub struct ValidatorState {
     id: ValidatorId,
-    our_prevotes: HashMap<Round, Signed<Prevote>>,
-    our_precommits: HashMap<Round, Signed<Precommit>>,
+    our_prevotes: HashMap<Round, Verified<Prevote>>,
+    our_precommits: HashMap<Round, Verified<Precommit>>,
 }
 
 /// `RequestData` represents a request for some data to other nodes. Each enum variant will be
@@ -132,7 +132,7 @@ struct RequestState {
 #[derive(Debug)]
 /// transactions.
 pub struct ProposeState {
-    propose: Signed<Propose>,
+    propose: Verified<Propose>,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
     // Whether the message has been saved to the consensus messages' cache or not.
@@ -152,7 +152,7 @@ pub struct BlockState {
 /// Incomplete block.
 #[derive(Clone, Debug)]
 pub struct IncompleteBlock {
-    msg: Signed<BlockResponse>,
+    msg: Verified<BlockResponse>,
     unknown_txs: HashSet<Hash>,
 }
 
@@ -162,13 +162,13 @@ pub trait VoteMessage: Clone {
     fn validator(&self) -> ValidatorId;
 }
 
-impl VoteMessage for Signed<Precommit> {
+impl VoteMessage for Verified<Precommit> {
     fn validator(&self) -> ValidatorId {
         self.deref().validator()
     }
 }
 
-impl VoteMessage for Signed<Prevote> {
+impl VoteMessage for Verified<Prevote> {
     fn validator(&self) -> ValidatorId {
         self.deref().validator()
     }
@@ -311,7 +311,7 @@ impl ProposeState {
     }
 
     /// Returns propose-message.
-    pub fn message(&self) -> &Signed<Propose> {
+    pub fn message(&self) -> &Verified<Propose> {
         &self.propose
     }
 
@@ -370,7 +370,7 @@ impl BlockState {
 
 impl IncompleteBlock {
     /// Returns `BlockResponse` message.
-    pub fn message(&self) -> &Signed<BlockResponse> {
+    pub fn message(&self) -> &Verified<BlockResponse> {
         &self.msg
     }
 
@@ -443,8 +443,8 @@ impl State {
         service_secret_key: SecretKey,
         connect_list: ConnectList,
         stored: StoredConfiguration,
-        connect: Signed<Connect>,
-        peers: HashMap<PublicKey, Signed<Connect>>,
+        connect: Verified<Connect>,
+        peers: HashMap<PublicKey, Verified<Connect>>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -574,7 +574,7 @@ impl State {
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
-    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Signed<Connect>) -> bool {
+    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Verified<Connect>) -> bool {
         self.peers.insert(pubkey, msg).is_none()
     }
 
@@ -585,7 +585,7 @@ impl State {
 
     /// Removes a peer by the socket address. Returns `Some` (connect message) of the peer if it was
     /// indeed connected or `None` if there was no connection with given socket address.
-    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Signed<Connect>> {
+    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Verified<Connect>> {
         self.connections.remove(key);
         if let Some(c) = self.peers.remove(key) {
             Some(c)
@@ -608,7 +608,7 @@ impl State {
     }
 
     /// Returns the keys of known peers with their `Connect` messages.
-    pub fn peers(&self) -> &HashMap<PublicKey, Signed<Connect>> {
+    pub fn peers(&self) -> &HashMap<PublicKey, Verified<Connect>> {
         &self.peers
     }
 
@@ -865,14 +865,14 @@ impl State {
     }
 
     /// Returns pre-votes for the specified round and propose hash.
-    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Signed<Prevote>] {
+    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Verified<Prevote>] {
         self.prevotes
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns pre-commits for the specified round and propose hash.
-    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Signed<Precommit>] {
+    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Verified<Precommit>] {
         self.precommits
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
@@ -893,7 +893,7 @@ impl State {
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
     /// cannot contain unknown transactions. Returns hash of the propose.
-    pub fn add_self_propose(&mut self, msg: Signed<Propose>) -> Hash {
+    pub fn add_self_propose(&mut self, msg: Verified<Propose>) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.object_hash();
         self.proposes.insert(
@@ -915,8 +915,8 @@ impl State {
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
     pub fn add_propose<S: IndexAccess>(
         &mut self,
-        msg: Signed<Propose>,
-        transactions: &MapIndex<S, Hash, Signed<AnyTx>>,
+        msg: Verified<Propose>,
+        transactions: &MapIndex<S, Hash, Verified<AnyTx>>,
         transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.object_hash();
@@ -983,8 +983,8 @@ impl State {
     /// - Received block has already committed transaction.
     pub fn create_incomplete_block<S: IndexAccess>(
         &mut self,
-        msg: &Signed<BlockResponse>,
-        txs: &MapIndex<S, Hash, Signed<AnyTx>>,
+        msg: &Verified<BlockResponse>,
+        txs: &MapIndex<S, Hash, Verified<AnyTx>>,
         txs_pool: &KeySetIndex<S, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
@@ -1016,7 +1016,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Prevote` for the same round.
-    pub fn add_prevote(&mut self, msg: Signed<Prevote>) -> bool {
+    pub fn add_prevote(&mut self, msg: Verified<Prevote>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -1074,7 +1074,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Precommit` for the same round.
-    pub fn add_precommit(&mut self, msg: Signed<Precommit>) -> bool {
+    pub fn add_precommit(&mut self, msg: Verified<Precommit>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -1188,12 +1188,12 @@ impl State {
     }
 
     /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &Signed<Connect> {
+    pub fn our_connect_message(&self) -> &Verified<Connect> {
         &self.our_connect_message
     }
 
     /// Updates the `Connect` message of the current node.
-    pub fn set_our_connect_message(&mut self, msg: Signed<Connect>) {
+    pub fn set_our_connect_message(&mut self, msg: Verified<Connect>) {
         self.our_connect_message = msg;
     }
 

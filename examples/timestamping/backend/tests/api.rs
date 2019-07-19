@@ -61,7 +61,7 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
 }
 
 /// Assert transaction status
-fn assert_status(api: &TestKitApi, tx: &Signed<AnyTx>, expected_status: &serde_json::Value) {
+fn assert_status(api: &TestKitApi, tx: &Verified<AnyTx>, expected_status: &serde_json::Value) {
     let content: serde_json::Value = api
         .public(ApiKind::Explorer)
         .query(&TransactionQuery::new(tx.object_hash()))

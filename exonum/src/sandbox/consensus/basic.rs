@@ -25,7 +25,7 @@ use crate::{
     blockchain::{IndexCoordinates, IndexOwner, Schema},
     crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
-    messages::{Precommit, Signed},
+    messages::{Precommit, Verified},
     sandbox::{
         self,
         sandbox_tests_helper::*,
@@ -237,7 +237,7 @@ fn test_retrieve_block_and_precommits() {
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
     let block = block_proof.block;
-    let precommits: Vec<Signed<Precommit>> = block_proof.precommits;
+    let precommits: Vec<Verified<Precommit>> = block_proof.precommits;
     let expected_height = target_height.previous();
     let expected_block_hash = block.object_hash();
 

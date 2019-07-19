@@ -32,7 +32,7 @@
 
 // mod api;
 
-// pub fn new_tx_config_propose(node: &TestNode, cfg_proposal: StoredConfiguration) -> Signed<AnyTx> {
+// pub fn new_tx_config_propose(node: &TestNode, cfg_proposal: StoredConfiguration) -> Verified<AnyTx> {
 //     let keypair = node.service_keypair();
 //     Propose::sign(
 //         keypair.0,
@@ -41,12 +41,12 @@
 //     )
 // }
 
-// pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Signed<AnyTx> {
+// pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Verified<AnyTx> {
 //     let keypair = node.service_keypair();
 //     Vote::sign(keypair.0, &cfg_proposal_hash, keypair.1)
 // }
 
-// pub fn new_tx_config_vote_against(node: &TestNode, cfg_proposal_hash: Hash) -> Signed<AnyTx> {
+// pub fn new_tx_config_vote_against(node: &TestNode, cfg_proposal_hash: Hash) -> Verified<AnyTx> {
 //     let keypair = node.service_keypair();
 //     VoteAgainst::sign(keypair.0, &cfg_proposal_hash, keypair.1)
 // }

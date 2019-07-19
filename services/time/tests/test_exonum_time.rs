@@ -74,7 +74,7 @@ fn assert_storage_times_eq<T: IndexAccess>(
 
 fn assert_transaction_result<S: IndexAccess>(
     snapshot: S,
-    transaction: &Signed<AnyTx>,
+    transaction: &Verified<AnyTx>,
     expected_code: u8,
 ) -> String {
     let result = Schema::new(snapshot)

@@ -35,7 +35,6 @@ pub use self::{signed::Verified, types::*};
 pub use exonum_merkledb::BinaryValue;
 
 use exonum_merkledb::ObjectHash;
-use serde::Deserialize;
 
 use std::borrow::Cow;
 
@@ -100,9 +99,9 @@ pub enum Consensus {
 impl Consensus {
     fn signed_message(&self) -> &SignedMessage {
         match self {
-            Consensus::Precommit(ref msg) => msg.signed_message(),
-            Consensus::Propose(ref msg) => msg.signed_message(),
-            Consensus::Prevote(ref msg) => msg.signed_message(),
+            Consensus::Precommit(ref msg) => msg.as_raw(),
+            Consensus::Propose(ref msg) => msg.as_raw(),
+            Consensus::Prevote(ref msg) => msg.as_raw(),
         }
     }
 }
@@ -119,9 +118,21 @@ pub enum Responses {
 impl Responses {
     fn signed_message(&self) -> &SignedMessage {
         match self {
-            Responses::TransactionsResponse(ref msg) => msg.signed_message(),
-            Responses::BlockResponse(ref msg) => msg.signed_message(),
+            Responses::TransactionsResponse(ref msg) => msg.as_raw(),
+            Responses::BlockResponse(ref msg) => msg.as_raw(),
         }
+    }
+}
+
+impl From<Verified<TransactionsResponse>> for Responses {
+    fn from(msg: Verified<TransactionsResponse>) -> Self {
+        Responses::TransactionsResponse(msg)
+    }
+}
+
+impl From<Verified<BlockResponse>> for Responses {
+    fn from(msg: Verified<BlockResponse>) -> Self {
+        Responses::BlockResponse(msg)
     }
 }
 
@@ -143,11 +154,11 @@ pub enum Requests {
 impl Requests {
     fn signed_message(&self) -> &SignedMessage {
         match self {
-            Requests::ProposeRequest(ref msg) => msg.signed_message(),
-            Requests::TransactionsRequest(ref msg) => msg.signed_message(),
-            Requests::PrevotesRequest(ref msg) => msg.signed_message(),
-            Requests::PeersRequest(ref msg) => msg.signed_message(),
-            Requests::BlockRequest(ref msg) => msg.signed_message(),
+            Requests::ProposeRequest(ref msg) => msg.as_raw(),
+            Requests::TransactionsRequest(ref msg) => msg.as_raw(),
+            Requests::PrevotesRequest(ref msg) => msg.as_raw(),
+            Requests::PeersRequest(ref msg) => msg.as_raw(),
+            Requests::BlockRequest(ref msg) => msg.as_raw(),
         }
     }
 }
@@ -168,31 +179,7 @@ pub enum Message {
 impl Message {
     /// Deserialize message from signed message.
     pub fn from_signed(signed: SignedMessage) -> Result<Self, failure::Error> {
-        match signed.verify::<ExonumMessage>()? {
-            // Service
-            ExonumMessage::AnyTx(msg) => Message::Service(Service::AnyTx(msg)),
-            ExonumMessage::Connect(msg) => Message::Service(Service::Connect(msg)),
-            ExonumMessage::Status(msg) => Message::Service(Service::Status(msg)),
-            // Consensus
-            ExonumMessage::Precommit(msg) => Message::Consensus(Consensus::Precommit(msg)),
-            ExonumMessage::Prevote(msg) => Message::Consensus(Consensus::Prevote(msg)),
-            ExonumMessage::Propose(msg) => Message::Consensus(Consensus::Propose(msg)),
-            // Responses
-            ExonumMessage::BlockResponse(msg) => Message::Responses(Responses::BlockResponse(msg)),
-            ExonumMessage::TransactionsResponse(msg) => {
-                Message::Responses(Responses::TransactionsResponse(msg))
-            }
-            // Requests
-            ExonumMessage::BlockRequest(msg) => Message::Requests(Requests::BlockRequest(msg)),
-            ExonumMessage::PeersRequest(msg) => Message::Requests(Requests::PeersRequest(msg)),
-            ExonumMessage::PrevotesRequest(msg) => {
-                Message::Requests(Requests::PrevotesRequest(msg))
-            }
-            ExonumMessage::ProposeRequest(msg) => Message::Requests(Requests::ProposeRequest(msg)),
-            ExonumMessage::TransactionsRequest(msg) => {
-                Message::Requests(Requests::TransactionsRequest(msg))
-            }
-        }
+        signed.verify::<ExonumMessage>().map(From::from)
     }
 
     /// Get inner SignedMessage.
@@ -207,31 +194,72 @@ impl Message {
 
     /// Checks buffer and return instance of `Message`.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
-        let signed = SignedMessage::from_bytes(buffer.into())?;
-        Self::deserialize(signed)
+        SignedMessage::from_bytes(buffer.into()).and_then(Self::from_signed)
     }
+}
+
+macro_rules! impl_message_from_verified {
+    ( $($concrete:ident: $category:ident),* ) => {
+        $(
+            impl From<Verified<$concrete>> for Message {
+                fn from(msg: Verified<$concrete>) -> Self {
+                    Message::$category($category::$concrete(msg))
+                }
+            }
+        )*
+
+        impl From<Verified<ExonumMessage>> for Message {
+            fn from(msg: Verified<ExonumMessage>) -> Self {
+                let raw = msg.raw;
+                match msg.inner {
+                    $(
+                        ExonumMessage::$concrete(inner) => {
+                            let inner = Verified::<$concrete> { raw, inner };
+                            Message::from(inner)
+                        }
+                    )*
+                }
+            }
+        }
+    };
+}
+
+impl_message_from_verified! {
+    AnyTx: Service,
+    Connect: Service,
+    Status: Service,
+    Precommit: Consensus,
+    Prevote: Consensus,
+    Propose: Consensus,
+    BlockResponse: Responses,
+    TransactionsResponse: Responses,
+    BlockRequest: Requests,
+    PeersRequest: Requests,
+    PrevotesRequest: Requests,
+    ProposeRequest: Requests,
+    TransactionsRequest: Requests
 }
 
 impl Requests {
     /// Returns public key of the message recipient.
     pub fn to(&self) -> PublicKey {
         *match *self {
-            Requests::ProposeRequest(ref msg) => msg.to(),
-            Requests::TransactionsRequest(ref msg) => msg.to(),
-            Requests::PrevotesRequest(ref msg) => msg.to(),
-            Requests::PeersRequest(ref msg) => msg.to(),
-            Requests::BlockRequest(ref msg) => msg.to(),
+            Requests::ProposeRequest(ref msg) => msg.as_ref().to(),
+            Requests::TransactionsRequest(ref msg) => msg.as_ref().to(),
+            Requests::PrevotesRequest(ref msg) => msg.as_ref().to(),
+            Requests::PeersRequest(ref msg) => msg.as_ref().to(),
+            Requests::BlockRequest(ref msg) => msg.as_ref().to(),
         }
     }
 
     /// Returns author public key of the message sender.
     pub fn author(&self) -> PublicKey {
         match *self {
-            Requests::ProposeRequest(ref msg) => msg.author(),
-            Requests::TransactionsRequest(ref msg) => msg.author(),
-            Requests::PrevotesRequest(ref msg) => msg.author(),
-            Requests::PeersRequest(ref msg) => msg.author(),
-            Requests::BlockRequest(ref msg) => msg.author(),
+            Requests::ProposeRequest(ref msg) => msg.as_raw().author,
+            Requests::TransactionsRequest(ref msg) => msg.as_raw().author,
+            Requests::PrevotesRequest(ref msg) => msg.as_raw().author,
+            Requests::PeersRequest(ref msg) => msg.as_raw().author,
+            Requests::BlockRequest(ref msg) => msg.as_raw().author,
         }
     }
 }
@@ -240,36 +268,36 @@ impl Consensus {
     /// Returns author public key of the message sender.
     pub fn author(&self) -> PublicKey {
         match *self {
-            Consensus::Propose(ref msg) => msg.author(),
-            Consensus::Prevote(ref msg) => msg.author(),
-            Consensus::Precommit(ref msg) => msg.author(),
+            Consensus::Propose(ref msg) => msg.as_raw().author,
+            Consensus::Prevote(ref msg) => msg.as_raw().author,
+            Consensus::Precommit(ref msg) => msg.as_raw().author,
         }
     }
 
     /// Returns validator id of the message sender.
     pub fn validator(&self) -> ValidatorId {
         match *self {
-            Consensus::Propose(ref msg) => msg.validator(),
-            Consensus::Prevote(ref msg) => msg.validator(),
-            Consensus::Precommit(ref msg) => msg.validator(),
+            Consensus::Propose(ref msg) => msg.as_ref().validator(),
+            Consensus::Prevote(ref msg) => msg.as_ref().validator(),
+            Consensus::Precommit(ref msg) => msg.as_ref().validator(),
         }
     }
 
     /// Returns height of the message.
     pub fn height(&self) -> Height {
         match *self {
-            Consensus::Propose(ref msg) => msg.height(),
-            Consensus::Prevote(ref msg) => msg.height(),
-            Consensus::Precommit(ref msg) => msg.height(),
+            Consensus::Propose(ref msg) => msg.as_ref().height(),
+            Consensus::Prevote(ref msg) => msg.as_ref().height(),
+            Consensus::Precommit(ref msg) => msg.as_ref().height(),
         }
     }
 
     /// Returns round of the message.
     pub fn round(&self) -> Round {
         match *self {
-            Consensus::Propose(ref msg) => msg.round(),
-            Consensus::Prevote(ref msg) => msg.round(),
-            Consensus::Precommit(ref msg) => msg.round(),
+            Consensus::Propose(ref msg) => msg.as_ref().round(),
+            Consensus::Prevote(ref msg) => msg.as_ref().round(),
+            Consensus::Precommit(ref msg) => msg.as_ref().round(),
         }
     }
 }
@@ -281,8 +309,7 @@ impl BinaryValue for Message {
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_bytes(value)?;
-        // TODO: Remove additional deserialization. [ECR-2315]
-        Message::deserialize(message)
+        Message::from_signed(message)
     }
 }
 

@@ -41,7 +41,7 @@ use crate::blockchain::{
 mod blockchain;
 
 /// Creates a transaction for the mempool.
-pub fn mempool_transaction() -> Signed<AnyTx> {
+pub fn mempool_transaction() -> Verified<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();

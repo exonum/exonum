@@ -22,7 +22,7 @@ use std::{collections::HashMap, net::SocketAddr};
 use crate::{
     api::{Error as ApiError, ServiceApiScope, ServiceApiState},
     crypto::PublicKey,
-    messages::ServiceInstanceId,
+    runtime::ServiceInstanceId,
     node::{ConnectInfo, ExternalMessage},
 };
 

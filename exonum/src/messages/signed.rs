@@ -19,7 +19,7 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 
-use std::{borrow::Cow, convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Cow, convert::TryFrom, fmt, str::FromStr, ops::Deref};
 
 use crate::crypto::{self, Hash, PublicKey, SecretKey};
 
@@ -120,8 +120,8 @@ impl Serialize for SignedMessage {
 /// It for performance reasons skips signature verification.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct Verified<T> {
-    raw: SignedMessage,
-    inner: T,
+    pub(in super) raw: SignedMessage,
+    pub(in super) inner: T,
 }
 
 impl<T> Verified<T>
@@ -174,7 +174,7 @@ where
     {
         SignedMessage::deserialize(deserializer)?
             .verify::<T>()
-            .map_err(From::from)
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -216,7 +216,7 @@ where
 
 impl<T> AsRef<T> for Verified<T> {
     fn as_ref(&self) -> &T {
-        &self.payload
+        &self.inner
     }
 }
 

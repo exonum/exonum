@@ -35,7 +35,7 @@ use crate::{
     blockchain::{Block, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
     events::error::into_failure,
-    messages::{AnyTx, BinaryValue, Message as ExonumMessage, ProtocolMessage, SignedMessage},
+    messages::{AnyTx, BinaryValue, Message as ExonumMessage, SignedMessage},
 };
 
 /// Message, coming from websocket connection.

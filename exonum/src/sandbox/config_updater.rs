@@ -24,9 +24,10 @@ use crate::{
     blockchain::{ExecutionError, Schema, StoredConfiguration},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, ServiceInstanceId, Signed},
+    messages::{AnyTx, Verified},
     proto::{schema::PROTO_SOURCES, ProtobufConvert},
     runtime::{
+        ServiceInstanceId,
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
         ArtifactInfo,
     },
@@ -88,7 +89,7 @@ impl TxConfig {
         config: &[u8],
         actual_from: Height,
         signer: &SecretKey,
-    ) -> Signed<AnyTx> {
+    ) -> Verified<AnyTx> {
         let mut msg = TxConfig::new();
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());

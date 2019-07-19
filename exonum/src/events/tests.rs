@@ -35,7 +35,7 @@ use crate::{
         NetworkEvent, NetworkRequest,
     },
     helpers::user_agent,
-    messages::{BinaryValue, Connect, Message, Signed, SignedMessage},
+    messages::{BinaryValue, Connect, Message, Verified, SignedMessage},
     node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel},
 };
 
@@ -81,7 +81,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn connect_with(&self, key: PublicKey, connect: Signed<Connect>) {
+    pub fn connect_with(&self, key: PublicKey, connect: Verified<Connect>) {
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(key, connect.into()))
@@ -97,7 +97,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn wait_for_connect(&mut self) -> Signed<Connect> {
+    pub fn wait_for_connect(&mut self) -> Verified<Connect> {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
@@ -162,7 +162,7 @@ impl TestEvents {
     pub fn spawn(
         self,
         handshake_params: &HandshakeParams,
-        connect: Signed<Connect>,
+        connect: Verified<Connect>,
     ) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
@@ -175,7 +175,7 @@ impl TestEvents {
         handler_part
     }
 
-    fn into_reactor(self, connect: Signed<Connect>) -> (TestHandler, NetworkPart) {
+    fn into_reactor(self, connect: Verified<Connect>) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
@@ -200,7 +200,7 @@ pub fn connect_message(
     addr: SocketAddr,
     public_key: &PublicKey,
     secret_key: &SecretKey,
-) -> Signed<Connect> {
+) -> Verified<Connect> {
     let time = time::UNIX_EPOCH;
     Message::concrete(
         Connect::new(&addr.to_string(), time.into(), &user_agent::get()),
@@ -217,7 +217,7 @@ pub fn raw_message(payload_len: usize) -> SignedMessage {
 
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub connect: Signed<Connect>,
+    pub connect: Verified<Connect>,
     pub connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,

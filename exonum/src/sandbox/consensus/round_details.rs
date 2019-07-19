@@ -24,7 +24,7 @@ use std::{collections::HashSet, time::Duration};
 
 use crate::{
     helpers::{Height, Round, ValidatorId},
-    messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest},
+    messages::{PrevotesRequest, TransactionsRequest},
     node::state::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },

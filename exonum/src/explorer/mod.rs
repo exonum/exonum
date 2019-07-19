@@ -34,7 +34,7 @@ use crate::{
     },
     crypto::Hash,
     helpers::Height,
-    messages::{Precommit, Signed},
+    messages::{Precommit, Verified},
 };
 
 /// Ending height of the range (exclusive), given the a priori max height.
@@ -69,7 +69,7 @@ fn end_height(bound: Bound<&Height>, max: Height) -> Height {
 pub struct BlockInfo<'a> {
     header: Block,
     explorer: &'a BlockchainExplorer,
-    precommits: RefCell<Option<Vec<Signed<Precommit>>>>,
+    precommits: RefCell<Option<Vec<Verified<Precommit>>>>,
     txs: RefCell<Option<Vec<Hash>>>,
 }
 
@@ -124,7 +124,7 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Returns a list of precommits for this block.
-    pub fn precommits(&self) -> Ref<[Signed<Precommit>]> {
+    pub fn precommits(&self) -> Ref<[Verified<Precommit>]> {
         if self.precommits.borrow().is_none() {
             let precommits = self.explorer.precommits(&self.header);
             *self.precommits.borrow_mut() = Some(precommits);
@@ -234,7 +234,7 @@ pub struct BlockWithTransactions {
     #[serde(rename = "block")]
     pub header: Block,
     /// Precommits.
-    pub precommits: Vec<Signed<Precommit>>,
+    pub precommits: Vec<Verified<Precommit>>,
     /// Transactions in the order they appear in the block.
     pub transactions: Vec<CommittedTransaction>,
 }
@@ -296,7 +296,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// | Name | Equivalent type | Description |
 /// |------|-------|--------|
-/// | `content` | `Signed<AnyTx>` | Transaction as recorded in the blockchain |
+/// | `content` | `Verified<AnyTx>` | Transaction as recorded in the blockchain |
 /// | `location` | [`TxLocation`] | Location of the transaction in the block |
 /// | `location_proof` | [`ListProof`]`<`[`Hash`]`>` | Proof of transaction inclusion into a block |
 /// | `status` | (custom; see below) | Execution status |
@@ -537,7 +537,7 @@ impl BlockchainExplorer {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
-    fn precommits(&self, block: &Block) -> Vec<Signed<Precommit>> {
+    fn precommits(&self, block: &Block) -> Vec<Verified<Precommit>> {
         let schema = Schema::new(&self.snapshot);
         let precommits_table = schema.precommits(&block.object_hash());
         let precommits = precommits_table.iter().collect();

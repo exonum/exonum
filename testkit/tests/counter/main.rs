@@ -46,7 +46,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn inc_count(api: &TestKitApi, by: u64) -> Signed<AnyTx> {
+fn inc_count(api: &TestKitApi, by: u64) -> Verified<AnyTx> {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxIncrement::new(by).sign(SERVICE_ID, pubkey, &key);

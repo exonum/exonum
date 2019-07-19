@@ -138,7 +138,7 @@ struct CounterApi;
 impl CounterApi {
     fn increment(
         state: &api::ServiceApiState,
-        transaction: Signed<AnyTx>,
+        transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
 
@@ -155,7 +155,7 @@ impl CounterApi {
 
     fn reset(
         state: &api::ServiceApiState,
-        transaction: Signed<AnyTx>,
+        transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
 

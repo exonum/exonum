@@ -49,7 +49,7 @@ fn init_testkit() -> TestKit {
         .create()
 }
 
-fn create_wallet(api: &TestKitApi, name: &str) -> (Signed<AnyTx>, SecretKey) {
+fn create_wallet(api: &TestKitApi, name: &str) -> (Verified<AnyTx>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxCreateWallet {

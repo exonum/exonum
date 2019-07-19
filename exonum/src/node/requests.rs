@@ -18,7 +18,7 @@ use crate::{
     blockchain::Schema,
     messages::{
         BinaryValue, BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests,
-        Signed, TransactionsRequest, TransactionsResponse, TX_RES_EMPTY_SIZE,
+        Verified, TransactionsRequest, TransactionsResponse, TX_RES_EMPTY_SIZE,
         TX_RES_PB_OVERHEAD_PAYLOAD,
     },
 };
@@ -55,7 +55,7 @@ impl NodeHandler {
     }
 
     /// Handles `ProposeRequest` message. For details see the message documentation.
-    pub fn handle_request_propose(&mut self, msg: &Signed<ProposeRequest>) {
+    pub fn handle_request_propose(&mut self, msg: &Verified<ProposeRequest>) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -75,7 +75,7 @@ impl NodeHandler {
     }
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
-    pub fn handle_request_txs(&mut self, msg: &Signed<TransactionsRequest>) {
+    pub fn handle_request_txs(&mut self, msg: &Verified<TransactionsRequest>) {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -110,7 +110,7 @@ impl NodeHandler {
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: &Signed<PrevotesRequest>) {
+    pub fn handle_request_prevotes(&mut self, msg: &Verified<PrevotesRequest>) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -131,7 +131,7 @@ impl NodeHandler {
     }
 
     /// Handles `BlockRequest` message. For details see the message documentation.
-    pub fn handle_request_block(&mut self, msg: &Signed<BlockRequest>) {
+    pub fn handle_request_block(&mut self, msg: &Verified<BlockRequest>) {
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),

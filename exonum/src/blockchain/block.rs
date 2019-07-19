@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::crypto::Hash;
-use crate::helpers::{Height, ValidatorId};
-use crate::messages::{Precommit, Signed};
-use crate::proto;
+use crate::{
+    crypto::Hash,
+    helpers::{Height, ValidatorId},
+    messages::{Precommit, Verified},
+    proto,
+};
 
 /// Exonum block header data structure.
 ///
@@ -101,7 +103,7 @@ pub struct BlockProof {
     /// in the block, etc.
     pub block: Block,
     /// List of `Precommit` messages for the block.
-    pub precommits: Vec<Signed<Precommit>>,
+    pub precommits: Vec<Verified<Precommit>>,
 }
 
 #[cfg(test)]

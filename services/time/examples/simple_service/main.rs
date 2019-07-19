@@ -88,7 +88,7 @@ impl TxMarker {
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<AnyTx> {
+    ) -> Verified<AnyTx> {
         Self { mark, time }.sign(SERVICE_ID, *public_key, secret_key)
     }
 }

@@ -203,7 +203,7 @@ fn test_explorer_pool_transaction() {
     );
 }
 
-fn tx_generator() -> Box<dyn Iterator<Item = Signed<AnyTx>>> {
+fn tx_generator() -> Box<dyn Iterator<Item = Verified<AnyTx>>> {
     Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
         CreateWallet::new(&pk, &format!("Alice #{}", i)).sign(SERVICE_ID, pk, &key)

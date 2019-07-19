@@ -22,8 +22,9 @@ use std::mem;
 use crate::{
     crypto::{self, Hash, PublicKey},
     helpers::{Height, Round},
-    messages::{AnyTx, Connect, Message, Precommit, ServiceInstanceId, Signed, Verified},
+    messages::{AnyTx, Connect, Message, Precommit, Verified},
     proto,
+    runtime::ServiceInstanceId,
 };
 
 use super::{config::StoredConfiguration, Block, BlockProof, ExecutionStatus};

@@ -32,11 +32,11 @@ use crate::{
 #[exonum(pb = "consensus::SignedMessage", crate = "crate")]
 pub struct SignedMessage {
     /// Message payload.
-    pub(super) payload: Vec<u8>,
+    pub payload: Vec<u8>,
     /// Message author.
-    pub(super) author: PublicKey,
+    pub author: PublicKey,
     /// Digital signature.
-    pub(super) signature: Signature,
+    pub signature: Signature,
 }
 
 /// Connect to a node.

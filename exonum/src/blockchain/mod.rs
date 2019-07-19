@@ -44,7 +44,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
-    messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, SignedMessage, Verified},
+    messages::{AnyTx, Connect, Message, Precommit, SignedMessage, Verified},
     node::ApiSender,
     runtime::{dispatcher::Dispatcher, supervisor::Supervisor},
 };
@@ -438,7 +438,7 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Verified<T>) {
+    pub(crate) fn save_message<T: Into<Message>>(&mut self, round: Round, raw: Verified<T>) {
         self.save_messages(round, iter::once(raw.into()));
     }
 

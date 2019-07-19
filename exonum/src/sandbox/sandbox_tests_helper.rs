@@ -23,7 +23,7 @@ use crate::{
     blockchain::Block,
     crypto::{Hash, HASH_SIZE},
     helpers::{Height, Milliseconds, Round, ValidatorId},
-    messages::{AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Signed},
+    messages::{AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Verified},
 };
 
 use super::{
@@ -161,7 +161,7 @@ impl<'a> ProposeBuilder<'a> {
         self
     }
 
-    pub fn build(&self) -> Signed<Propose> {
+    pub fn build(&self) -> Verified<Propose> {
         self.sandbox.create_propose(
             self.validator_id
                 .unwrap_or_else(|| self.sandbox.current_leader()),
@@ -217,7 +217,7 @@ pub fn add_round_with_transactions(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Option<Signed<Propose>> {
+) -> Option<Verified<Propose>> {
     try_add_round_with_transactions(sandbox, sandbox_state, transactions).unwrap()
 }
 
@@ -225,7 +225,7 @@ pub fn try_add_round_with_transactions(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Result<Option<Signed<Propose>>, String> {
+) -> Result<Option<Verified<Propose>>, String> {
     let mut res = None;
     let round_timeout = sandbox.current_round_timeout(); //use local var to save long code call
 
@@ -259,7 +259,7 @@ pub fn try_add_round_with_transactions(
     Ok(res)
 }
 
-pub fn gen_timestamping_tx() -> Signed<AnyTx> {
+pub fn gen_timestamping_tx() -> Verified<AnyTx> {
     let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
     tx_gen.next().unwrap()
 }
@@ -276,7 +276,7 @@ pub fn add_one_height_with_transactions<'a, I>(
     txs: I,
 ) -> Vec<Hash>
 where
-    I: IntoIterator<Item = &'a Signed<AnyTx>>,
+    I: IntoIterator<Item = &'a Verified<AnyTx>>,
 {
     try_add_one_height_with_transactions(sandbox, sandbox_state, txs).unwrap()
 }
@@ -300,14 +300,14 @@ pub fn try_add_one_height_with_transactions<'a, I>(
     txs: I,
 ) -> Result<Vec<Hash>, String>
 where
-    I: IntoIterator<Item = &'a Signed<AnyTx>>,
+    I: IntoIterator<Item = &'a Verified<AnyTx>>,
 {
     // sort transaction in order accordingly their hashes
     let txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.object_hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[Signed<AnyTx>] = raw_txs.as_ref();
+    let txs: &[Verified<AnyTx>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
@@ -428,13 +428,13 @@ where
 pub fn add_one_height_with_transactions_from_other_validator(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
-    txs: &[Signed<AnyTx>],
+    txs: &[Verified<AnyTx>],
 ) -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.iter().map(|tx| (tx.object_hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[Signed<AnyTx>] = raw_txs.as_ref();
+    let txs: &[Verified<AnyTx>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
@@ -525,7 +525,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 fn get_propose_with_transactions(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
-) -> Signed<Propose> {
+) -> Verified<Propose> {
     get_propose_with_transactions_for_validator(sandbox, transactions, ValidatorId(0))
 }
 
@@ -533,7 +533,7 @@ fn get_propose_with_transactions_for_validator(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
     validator: ValidatorId,
-) -> Signed<Propose> {
+) -> Verified<Propose> {
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
     sandbox.create_propose(
         validator,
@@ -553,7 +553,7 @@ fn check_and_broadcast_propose_and_prevote(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Option<Signed<Propose>> {
+) -> Option<Verified<Propose>> {
     try_check_and_broadcast_propose_and_prevote(sandbox, sandbox_state, transactions).unwrap()
 }
 
@@ -561,7 +561,7 @@ fn try_check_and_broadcast_propose_and_prevote(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Result<Option<Signed<Propose>>, String> {
+) -> Result<Option<Verified<Propose>>, String> {
     if *sandbox_state.time_millis_since_round_start.borrow() > PROPOSE_TIMEOUT {
         return Ok(None);
     }
@@ -610,7 +610,7 @@ fn try_check_and_broadcast_propose_and_prevote(
 pub fn receive_valid_propose_with_transactions(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
-) -> Signed<Propose> {
+) -> Verified<Propose> {
     let propose = sandbox.create_propose(
         sandbox.current_leader(),
         sandbox.current_height(),
@@ -626,7 +626,7 @@ pub fn receive_valid_propose_with_transactions(
 pub fn make_request_propose_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> Signed<ProposeRequest> {
+) -> Verified<ProposeRequest> {
     sandbox.create_propose_request(
         &sandbox.public_key(ValidatorId(0)),
         &sandbox.public_key(precommit.validator()),
@@ -639,7 +639,7 @@ pub fn make_request_propose_from_precommit(
 pub fn make_request_prevote_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> Signed<PrevotesRequest> {
+) -> Verified<PrevotesRequest> {
     let validators = BitVec::from_elem(sandbox.validators().len(), false);
     sandbox.create_prevote_request(
         &sandbox.public_key(ValidatorId(0)),
@@ -656,8 +656,8 @@ pub fn make_request_prevote_from_precommit(
 /// locked round is set to 0; may be need to take it from somewhere (from sandbox?)
 pub fn make_prevote_from_propose(
     sandbox: &TimestampingSandbox,
-    propose: &Signed<Propose>,
-) -> Signed<Prevote> {
+    propose: &Verified<Propose>,
+) -> Verified<Prevote> {
     sandbox.create_prevote(
         ValidatorId(0),
         propose.height(),

@@ -66,7 +66,7 @@ use crate::{
         fabric::{NodePrivateConfig, NodePublicConfig},
         user_agent, Height, Milliseconds, Round, ValidatorId,
     },
-    messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage},
+    messages::{AnyTx, Connect, Message, Verified, SignedMessage},
     node::state::SharedConnectList,
 };
 
@@ -82,7 +82,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Signed<AnyTx>),
+    Transaction(Verified<AnyTx>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -519,12 +519,13 @@ impl NodeHandler {
         }
     }
 
-    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Signed<T> {
-        Message::concrete(
-            message,
-            *self.state.consensus_public_key(),
-            self.state.consensus_secret_key(),
-        )
+    fn sign_message<T>(&self, message: T) -> Verified<T> {
+        unimplemented!();
+        // Message::concrete(
+        //     message,
+        //     *self.state.consensus_public_key(),
+        //     self.state.consensus_secret_key(),
+        // )
     }
 
     /// Return internal `SharedNodeState`
@@ -805,7 +806,7 @@ impl ApiSender {
     }
 
     /// Broadcast transaction to other node.
-    pub fn broadcast_transaction(&self, tx: Signed<AnyTx>) -> Result<(), Error> {
+    pub fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
@@ -1196,7 +1197,7 @@ mod tests {
         }
     }
 
-    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<AnyTx> {
+    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
         msg.set_msg("Hello, World!".to_owned());

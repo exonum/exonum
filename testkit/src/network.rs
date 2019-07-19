@@ -170,7 +170,7 @@ impl TestNode {
         height: Height,
         last_hash: &crypto::Hash,
         tx_hashes: &[crypto::Hash],
-    ) -> Signed<Propose> {
+    ) -> Verified<Propose> {
         Message::concrete(
             Propose::new(
                 self.validator_id
@@ -190,7 +190,7 @@ impl TestNode {
         &self,
         propose: &Propose,
         block_hash: &crypto::Hash,
-    ) -> Signed<Precommit> {
+    ) -> Verified<Precommit> {
         use std::time::SystemTime;
 
         Message::concrete(

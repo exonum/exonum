@@ -242,7 +242,7 @@ impl CryptocurrencyApi {
     /// within the response).
     /// Note that the transaction is not immediately added to the blockchain, but rather is put
     /// to the pool of unconfirmed transactions.
-    fn create_wallet(&self, name: &str) -> (Signed<AnyTx>, SecretKey) {
+    fn create_wallet(&self, name: &str) -> (Verified<AnyTx>, SecretKey) {
         let (pubkey, key) = crypto::gen_keypair();
         // Create a pre-signed transaction
         let tx = TxCreateWallet {
@@ -261,7 +261,7 @@ impl CryptocurrencyApi {
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
-    fn transfer(&self, tx: &Signed<AnyTx>) {
+    fn transfer(&self, tx: &Verified<AnyTx>) {
         let data = messages::to_hex_string(&tx);
         let tx_info: serde_json::Value = self
             .inner
