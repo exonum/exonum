@@ -20,7 +20,7 @@ use std::{borrow::Cow, convert::TryFrom, fmt, str::FromStr};
 
 use crate::crypto::{self, PublicKey, SecretKey};
 
-use super::types::{ProtocolMessage, SignedMessage};
+use super::types::{ExonumMessage2, SignedMessage};
 
 impl SignedMessage {
     /// Creates a new signed message.
@@ -34,8 +34,8 @@ impl SignedMessage {
     }
 
     /// Signs protocol message.
-    pub fn from_protocol(
-        msg: impl Into<ProtocolMessage>,
+    pub fn from_protocol_msg(
+        msg: impl Into<ExonumMessage2>,
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> Self {
@@ -46,7 +46,7 @@ impl SignedMessage {
     /// Verifies message signature and returns the corresponding checked message.
     pub fn verify<T>(self) -> Result<Verified<T>, failure::Error>
     where
-        T: TryFrom<ProtocolMessage>,
+        T: TryFrom<ExonumMessage2>,
     {
         // Verifies message signature
         ensure!(
@@ -54,7 +54,7 @@ impl SignedMessage {
             "Failed to verify signature."
         );
         // Deserializes message.
-        let protocol_message = ProtocolMessage::from_bytes(Cow::Borrowed(&self.payload))?;
+        let protocol_message = ExonumMessage2::from_bytes(Cow::Borrowed(&self.payload))?;
         let payload = T::try_from(protocol_message)
             .map_err(|_| failure::format_err!("Failed to decode ProtocolMessage."))?;
 
@@ -120,9 +120,20 @@ pub struct Verified<T> {
     payload: T,
 }
 
+impl<T> Verified<T> 
+where
+    T: TryFrom<ExonumMessage2>,
+{
+    pub fn from_raw<V>(bytes: V) -> Result<Self, failure::Error> 
+        where for<'a> V: Into<Cow<'a, [u8]>>
+    {
+        SignedMessage::from_bytes(bytes.into())?.verify()
+    }
+}
+
 impl<T> BinaryValue for Verified<T>
 where
-    T: TryFrom<ProtocolMessage>,
+    T: TryFrom<ExonumMessage2>,
 {
     fn to_bytes(&self) -> Vec<u8> {
         self.raw.to_bytes()
@@ -130,7 +141,7 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let raw = SignedMessage::from_bytes(bytes)?;
-        let protocol_message = ProtocolMessage::from_bytes(Cow::Borrowed(&raw.payload))?;
+        let protocol_message = ExonumMessage2::from_bytes(Cow::Borrowed(&raw.payload))?;
         let payload = T::try_from(protocol_message).map_err(|_| failure::format_err!("Noo"))?;
         Ok(Self { raw, payload })
     }
@@ -157,10 +168,10 @@ mod tests {
             height: Height(0),
             last_hash: Hash::zero(),
         };
-        let protocol_message = ProtocolMessage::from(msg.clone());
-        let signed = SignedMessage::from_protocol(protocol_message.clone(), keypair.0, &keypair.1);
+        let protocol_message = ExonumMessage2::from(msg.clone());
+        let signed = SignedMessage::from_protocol_msg(protocol_message.clone(), keypair.0, &keypair.1);
 
-        let verified_protocol = signed.clone().verify::<ProtocolMessage>().unwrap();
+        let verified_protocol = signed.clone().verify::<ExonumMessage2>().unwrap();
         assert_eq!(verified_protocol.payload, protocol_message);
 
         let verified_status = signed.clone().verify::<Status>().unwrap();
@@ -179,12 +190,12 @@ mod tests {
             height: Height(0),
             last_hash: Hash::zero(),
         };
-        let protocol_message = ProtocolMessage::from(msg.clone());
+        let protocol_message = ExonumMessage2::from(msg.clone());
         let mut signed =
-            SignedMessage::from_protocol(protocol_message.clone(), keypair.0, &keypair.1);
+            SignedMessage::from_protocol_msg(protocol_message.clone(), keypair.0, &keypair.1);
         // Update author
         signed.author = crypto::gen_keypair().0;
-        let err = signed.clone().verify::<ProtocolMessage>().unwrap_err();
+        let err = signed.clone().verify::<ExonumMessage2>().unwrap_err();
         assert_eq!(err.to_string(), "Failed to verify signature.");
     }
 }

@@ -239,7 +239,7 @@ impl Sandbox {
         last_hash: &Hash,
         secret_key: &SecretKey,
     ) -> Signed<Status> {
-        Message::concrete(Status::new(height, last_hash), *author, secret_key)
+        Message::concrete(Status::new(height, *last_hash), *author, secret_key)
     }
 
     /// Creates a `BlockResponse` message signed by this validator.

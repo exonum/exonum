@@ -183,7 +183,7 @@ mod test {
 
         let raw = {
             let (pk, sk) = gen_keypair();
-            let msg = Message::concrete(Status::new(Height(0), &Hash::zero()), pk, &sk);
+            let msg = Message::concrete(Status::new(Height(0), Hash::zero()), pk, &sk);
             msg.signed_message().clone()
         };
         let data = raw.to_bytes();

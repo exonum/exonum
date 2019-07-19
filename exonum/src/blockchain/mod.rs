@@ -195,8 +195,6 @@ impl Blockchain {
     // This method is needed for EJB.
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
-        let service_id = tx.service_id();
-
         // TODO check if service exists? [ECR-3222]
 
         // if !self.dispatcher.services().contains_key(&service_id) {
@@ -206,9 +204,8 @@ impl Blockchain {
         //     ));
         // }
 
-        let msg = Message::sign_transaction(
-            tx.service_transaction(),
-            u32::from(service_id),
+        let msg = Message::concrete(
+            tx,
             self.service_keypair.0,
             &self.service_keypair.1,
         );

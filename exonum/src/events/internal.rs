@@ -162,7 +162,7 @@ mod tests {
 
     fn get_signed_message() -> SignedMessage {
         let (pk, sk) = gen_keypair();
-        let msg = Message::concrete(Status::new(Height(0), &Hash::zero()), pk, &sk);
+        let msg = Message::concrete(Status::new(Height(0), Hash::zero()), pk, &sk);
         msg.signed_message().clone()
     }
 

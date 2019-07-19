@@ -112,7 +112,7 @@ message BlockRequest {
   uint64 height = 2;
 }
 
-message ProtocolMessage {
+message ExonumMessage {
   oneof message {
     exonum.runtime.AnyTx any_tx = 1;
     Connect connect = 2;

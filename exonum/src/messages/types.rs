@@ -14,15 +14,14 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{BinaryValue, HashTag};
-
-use std::borrow::Cow;
+use exonum_merkledb::{HashTag};
 
 use crate::{
     blockchain::Block,
     crypto::{Hash, PublicKey, Signature},
     helpers::{Height, Round, ValidatorId},
-    proto::schema::{consensus, runtime},
+    proto::schema::{consensus},
+    runtime::AnyTx
 };
 
 /// Container for the signed messages.
@@ -690,60 +689,9 @@ impl BlockResponse {
     }
 }
 
-// TODO Move to runtime module
-
-/// Unique service transaction identifier.
-#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "runtime::CallInfo", crate = "crate")]
-pub struct CallInfo {
-    /// Service instance identifier.
-    pub instance_id: u32,
-    /// Identifier of method in service interface to call.
-    pub method_id: u32,
-}
-
-impl CallInfo {
-    /// Creates a new `CallInfo` instance.
-    pub fn new(instance_id: u32, method_id: u32) -> Self {
-        Self {
-            instance_id,
-            method_id,
-        }
-    }
-}
-
-/// Transaction with call info.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "runtime::AnyTx", crate = "crate")]
-pub struct AnyTx {
-    /// Dispatch info.
-    pub call_info: CallInfo,
-    /// Serialized transaction.
-    pub payload: Vec<u8>,
-}
-
-impl AnyTx {
-    /// Method for compatibility with old transactions.
-    /// Creates equivalent of `RawTransaction`.
-    pub fn new(service_id: u16, tx_id: u16, payload: Vec<u8>) -> Self {
-        Self {
-            call_info: CallInfo {
-                instance_id: u32::from(service_id),
-                method_id: u32::from(tx_id),
-            },
-            payload,
-        }
-    }
-
-    /// Parses transaction content as concrete type.
-    pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
-        T::from_bytes(Cow::Borrowed(&self.payload))
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::ProtocolMessage", crate = "crate")]
-pub enum ProtocolMessage {
+#[exonum(pb = "consensus::ExonumMessage", crate = "crate")]
+pub enum ExonumMessage2 {
     AnyTx(AnyTx),
     Connect(Connect),
     Status(Status),

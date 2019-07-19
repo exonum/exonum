@@ -229,7 +229,7 @@ impl NodeHandler {
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash();
-        let status = Status::new(self.state.height(), &hash);
+        let status = Status::new(self.state.height(), hash);
         trace!("Broadcast status: {:?}", status);
 
         let message = self.sign_message(status);

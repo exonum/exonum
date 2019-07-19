@@ -24,7 +24,7 @@ use crate::{
     messages::{
         AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, Signed, SignedMessage, TransactionsRequest,
-        TransactionsResponse,
+        TransactionsResponse, Verified
     },
     node::{NodeHandler, RequestData},
 };
@@ -192,7 +192,7 @@ impl NodeHandler {
         let precommits: Result<Vec<_>, _> = msg
             .precommits()
             .into_iter()
-            .map(Precommit::verify_precommit)
+            .map(Verified::<Precommit>::from_raw)
             .collect();
         self.verify_precommits(&precommits?, &block_hash, block.height())?;
 
@@ -230,7 +230,7 @@ impl NodeHandler {
             let precommits: Result<Vec<_>, _> = msg
                 .precommits()
                 .into_iter()
-                .map(Precommit::verify_precommit)
+                .map(Verified::<Precommit>::from_raw)
                 .collect();
 
             self.commit(block_hash, precommits?.into_iter(), None);
@@ -306,7 +306,7 @@ impl NodeHandler {
         let precommits: Result<Vec<_>, _> = msg
             .precommits()
             .into_iter()
-            .map(Precommit::verify_precommit)
+            .map(Verified::<Precommit>::from_raw)
             .collect();
 
         self.commit(block_hash, precommits?.into_iter(), None);

@@ -31,7 +31,7 @@
 //!              (drop)                           (drop)
 //! ```
 
-pub use self::{authorization::SignedMessage, helpers::to_hex_string, protocol::*};
+pub use self::{authorization::SignedMessage, helpers::to_hex_string, protocol::*, signed::Verified};
 pub use exonum_merkledb::BinaryValue;
 
 use exonum_merkledb::ObjectHash;
