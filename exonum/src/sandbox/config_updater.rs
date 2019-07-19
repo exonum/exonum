@@ -21,7 +21,7 @@ use semver::Version;
 use std::borrow::Cow;
 
 use crate::{
-    blockchain::{ExecutionResult, Schema, StoredConfiguration},
+    blockchain::{ExecutionError, Schema, StoredConfiguration},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, ServiceInstanceId, Signed},
@@ -34,14 +34,22 @@ use crate::{
 
 #[exonum_service(crate = "crate", dispatcher = "ConfigUpdaterService")]
 pub trait ConfigUpdaterInterface {
-    fn update_config(&self, context: TransactionContext, arg: TxConfig) -> ExecutionResult;
+    fn update_config(
+        &self,
+        context: TransactionContext,
+        arg: TxConfig,
+    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
 pub struct ConfigUpdaterService;
 
 impl ConfigUpdaterInterface for ConfigUpdaterService {
-    fn update_config(&self, context: TransactionContext, arg: TxConfig) -> ExecutionResult {
+    fn update_config(
+        &self,
+        context: TransactionContext,
+        arg: TxConfig,
+    ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(context.fork());
         schema
             .commit_configuration(StoredConfiguration::try_deserialize(arg.get_config()).unwrap());

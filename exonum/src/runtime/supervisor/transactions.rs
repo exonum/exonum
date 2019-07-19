@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    blockchain::{self, ExecutionResult},
+    blockchain,
     runtime::{
         dispatcher::{self, Action},
         rust::TransactionContext,
@@ -23,8 +23,8 @@ use crate::{
 
 use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor};
 
-#[exonum_service(crate = "crate", dispatcher = "super::Supervisor")]
 /// Supervisor service transactions.
+#[exonum_service(crate = "crate", dispatcher = "super::Supervisor")]
 pub trait Transactions {
     /// Requests artifact deploy.
     ///
@@ -35,7 +35,7 @@ pub trait Transactions {
         &self,
         context: TransactionContext,
         artifact: DeployRequest,
-    ) -> ExecutionResult;
+    ) -> Result<(), Error>;
     /// Confirmation that the artifact was successfully deployed by the validator.
     ///
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
@@ -43,11 +43,15 @@ pub trait Transactions {
         &self,
         context: TransactionContext,
         artifact: DeployConfirmation,
-    ) -> ExecutionResult;
+    ) -> Result<(), Error>;
     /// Requests start service.
     ///
     /// Service will be started if all of validators will send this confirmation.
-    fn start_service(&self, context: TransactionContext, service: StartService) -> ExecutionResult;
+    fn start_service(
+        &self,
+        context: TransactionContext,
+        service: StartService,
+    ) -> Result<(), Error>;
 }
 
 impl Transactions for Supervisor {
@@ -55,7 +59,7 @@ impl Transactions for Supervisor {
         &self,
         context: TransactionContext,
         deploy: DeployRequest,
-    ) -> ExecutionResult {
+    ) -> Result<(), Error> {
         let blockchain_schema = blockchain::Schema::new(context.fork());
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
@@ -97,7 +101,7 @@ impl Transactions for Supervisor {
         &self,
         mut context: TransactionContext,
         confirmation: DeployConfirmation,
-    ) -> ExecutionResult {
+    ) -> Result<(), Error> {
         let blockchain_schema = blockchain::Schema::new(context.fork());
 
         // Verifies that we doesn't reach deadline height.
@@ -145,7 +149,7 @@ impl Transactions for Supervisor {
         &self,
         mut context: TransactionContext,
         service: StartService,
-    ) -> ExecutionResult {
+    ) -> Result<(), Error> {
         let blockchain_schema = blockchain::Schema::new(context.fork());
         let dispatcher_schema = dispatcher::Schema::new(context.fork());
 

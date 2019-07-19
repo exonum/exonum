@@ -53,7 +53,6 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
             SERVICE_NAME,
             Config {
                 time_service_name: TIME_SERVICE_NAME.to_owned(),
-                time_service_id: TIME_SERVICE_ID,
             },
         ))
         .create();
@@ -185,6 +184,10 @@ fn test_api_can_not_add_same_content_hash() {
     assert_status(
         &api,
         &tx_err,
-        &json!({ "type": "error", "code": 0, "description": "Content hash already exists" }),
+        &json!({
+            "type": "service_error",
+            "code": 0,
+            "description": "Content hash already exists."
+        }),
     );
 }

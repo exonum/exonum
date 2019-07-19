@@ -25,12 +25,12 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{Schema, TransactionErrorType, TxLocation},
+    blockchain::{Schema, TxLocation},
     crypto::{self, Hash},
     explorer::*,
     helpers::Height,
     messages::{self, AnyTx, Signed},
-    runtime::rust::Transaction,
+    runtime::{error::ErrorKind, rust::Transaction},
 };
 use exonum_merkledb::ObjectHash;
 
@@ -133,8 +133,8 @@ fn test_explorer_basics() {
 
     let tx_info = block.transaction(0).unwrap();
     let err = tx_info.status().unwrap_err();
-    assert_eq!(err.error_type(), TransactionErrorType::Code(1));
-    assert_eq!(err.description(), Some("Not allowed"));
+    assert_eq!(err.kind, ErrorKind::service(0));
+    assert_eq!(err.description, "Not allowed");
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
@@ -145,8 +145,8 @@ fn test_explorer_basics() {
             },
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {
-                "type": "error",
-                "code": 1,
+                "type": "service_error",
+                "code": 0,
                 "description": "Not allowed",
             },
         })
@@ -154,8 +154,8 @@ fn test_explorer_basics() {
 
     let tx_info = block.transaction(1).unwrap();
     let err = tx_info.status().unwrap_err();
-    assert_eq!(err.error_type(), TransactionErrorType::Panic);
-    assert_eq!(err.description(), Some("oops"));
+    assert_eq!(err.kind, ErrorKind::Panic);
+    assert_eq!(err.description, "oops");
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({

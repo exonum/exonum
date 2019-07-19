@@ -18,7 +18,7 @@
 //! See the `explorer` example in the crate for examples of usage.
 
 use exonum_merkledb::{ListProof, ObjectHash, Snapshot};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 
 use std::{
     cell::{Ref, RefCell},
@@ -30,8 +30,7 @@ use std::{
 
 use crate::{
     blockchain::{
-        Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
-        TransactionResult, TxLocation,
+        Block, Blockchain, ExecutionError, ExecutionStatus, Schema, TransactionMessage, TxLocation,
     },
     crypto::Hash,
     helpers::Height,
@@ -304,7 +303,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// ## `status` field
 ///
-/// The `status` field is a more readable version of the [`TransactionResult`] type.
+/// The `status` field is a more readable representation of the [`ExecutionStatus`] type.
 ///
 /// For successfully executed transactions, `status` is equal to
 ///
@@ -317,7 +316,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`Flow`] / [`TypeScript`] notation:
 ///
 /// ```javascript
-/// { type: 'error', code: number, description?: string }
+/// { type: 'service_error', code: number, description?: string }
 /// ```
 ///
 /// For transactions that have resulted in a panic, `status` contains an optional description
@@ -331,8 +330,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
 /// [`ListProof`]: ../../exonum_merkledb/enum.ListProof.html
 /// [`Hash`]: ../../exonum_crypto/struct.Hash.html
-/// [`TransactionResult`]: ../blockchain/struct.TransactionResult.html
-/// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
+/// [`ExecutionStatus`]: ../runtime/error/struct.ExecutionStatus.html
+/// [`ExecutionError`]: ../runtime/error/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
 ///
@@ -344,72 +343,7 @@ pub struct CommittedTransaction {
     content: TransactionMessage,
     location: TxLocation,
     location_proof: ListProof<Hash>,
-    #[serde(with = "TxStatus")]
-    status: TransactionResult,
-}
-
-/// Transaction execution status. Simplified version of `TransactionResult`.
-#[serde(tag = "type", rename_all = "kebab-case")]
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum TxStatus<'a> {
-    Success,
-    Panic { description: &'a str },
-    Error { code: u8, description: &'a str },
-}
-
-impl<'a> TxStatus<'a> {
-    pub(crate) fn serialize<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let status = TxStatus::from(result);
-        status.serialize(serializer)
-    }
-
-    pub(crate) fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
-    where
-        D: Deserializer<'a>,
-    {
-        let tx_status = <Self as Deserialize>::deserialize(deserializer)?;
-        Ok(TransactionResult::from(tx_status))
-    }
-}
-
-impl<'a> From<&'a TransactionResult> for TxStatus<'a> {
-    fn from(result: &'a TransactionResult) -> TxStatus {
-        use self::TransactionErrorType::*;
-
-        match (*result).0 {
-            Ok(()) => TxStatus::Success,
-            Err(ref e) => {
-                let description = e.description().unwrap_or_default();
-                match e.error_type() {
-                    Panic => TxStatus::Panic { description },
-                    Code(code) => TxStatus::Error { code, description },
-                }
-            }
-        }
-    }
-}
-
-impl<'a> From<TxStatus<'a>> for TransactionResult {
-    fn from(status: TxStatus<'a>) -> Self {
-        fn to_option(s: &str) -> Option<String> {
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_owned())
-            }
-        };
-
-        TransactionResult(match status {
-            TxStatus::Success => Ok(()),
-            TxStatus::Panic { description } => Err(TransactionError::panic(to_option(description))),
-            TxStatus::Error { code, description } => {
-                Err(TransactionError::code(code, to_option(description)))
-            }
-        })
-    }
+    status: ExecutionStatus,
 }
 
 impl CommittedTransaction {
@@ -429,8 +363,8 @@ impl CommittedTransaction {
     }
 
     /// Returns the status of the transaction execution.
-    pub fn status(&self) -> Result<(), &TransactionError> {
-        self.status.0.as_ref().map(|_| ())
+    pub fn status(&self) -> Result<(), &ExecutionError> {
+        self.status.0.as_ref().map(drop)
     }
 }
 

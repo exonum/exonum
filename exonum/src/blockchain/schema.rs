@@ -26,7 +26,7 @@ use crate::{
     proto,
 };
 
-use super::{config::StoredConfiguration, Block, BlockProof, TransactionResult};
+use super::{config::StoredConfiguration, Block, BlockProof, ExecutionStatus};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -149,7 +149,7 @@ where
     ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
-    pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, TransactionResult> {
+    pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, ExecutionStatus> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.access.clone())
     }
 
@@ -441,22 +441,6 @@ where
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
-    }
-
-    /// Removes transaction from the persistent pool.
-    #[cfg(test)]
-    pub(crate) fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
-        let contains = self.transactions_pool().contains(hash);
-        self.transactions_pool().remove(hash);
-        self.transactions().remove(hash);
-
-        if contains {
-            let x = self.transactions_pool_len_index().get().unwrap();
-            self.transactions_pool_len_index().set(x - 1);
-            Ok(())
-        } else {
-            Err(())
-        }
     }
 
     fn find_configurations_index_by_height(&self, height: Height) -> u64 {

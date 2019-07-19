@@ -32,7 +32,7 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
             quote! {
                 #id => {
                     let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(payload.into())?;
-                    Ok(self.#name(ctx,arg))
+                    Ok(self.#name(ctx,arg).map_err(From::from))
                 }
             }
         });

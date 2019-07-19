@@ -58,6 +58,7 @@ macro_rules! impl_object_hash_for_binary_value {
     };
 }
 
+// FIXME Move out from this crate [ECR-3222]
 #[macro_export]
 macro_rules! impl_binary_value_for_message {
     ($( $type:ty ),*) => {

@@ -14,14 +14,13 @@
 
 //! This crate provides macros for deriving some useful methods and traits for the exonum services.
 
-// TODO Rewrite on top of darling. https://github.com/TedDriggs/darling [ECR-3343]
-
 #![recursion_limit = "256"]
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
 extern crate proc_macro;
 
+mod execution_error;
 mod exonum_service;
 mod pb_convert;
 mod service_factory;
@@ -163,6 +162,31 @@ pub fn generate_service_factory(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_service::impl_service_interface(attr, item)
+}
+
+/// Derives `Into<ExecutionError>` conversion for the specified enumeration.
+///
+/// Enumeration should have an explicit discriminant for each variant.
+/// Also this macro derives `Display` trait using documentation comments of each variant.
+///
+/// # Examples
+///
+/// ```ignore
+/// /// Error codes emitted by wallet transactions during execution.
+/// #[derive(Debug, IntoExecutionError)]
+/// pub enum Error {
+///     /// Content hash already exists.
+///     HashAlreadyExists = 0,
+///     /// Unable to parse service configuration.
+///     ConfigParseError = 1,
+///     /// Time service with the specified name doesn't exist.
+///     TimeServiceNotFound = 2,
+/// }
+/// ```
+///
+#[proc_macro_derive(IntoExecutionError, attributes(exonum))]
+pub fn generate_into_execution_error(input: TokenStream) -> TokenStream {
+    execution_error::implement_execution_error(input)
 }
 
 /// Exonum types should be imported with `crate::` prefix if inside crate

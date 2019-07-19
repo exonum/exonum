@@ -108,10 +108,9 @@ fn implement_storage_traits(name: &Ident, cr: &dyn quote::ToTokens) -> impl quot
         // This trait assumes that we work with trusted data so we can unwrap here.
         impl exonum_merkledb::BinaryValue for #name {
             fn to_bytes(&self) -> Vec<u8> {
-                self.to_pb().write_to_bytes().expect(&format!(
-                    "Failed to serialize in BinaryValue for {}",
-                    stringify!(#name)
-                ))
+                self.to_pb().write_to_bytes().expect(
+                    concat!("Failed to serialize in BinaryValue for ", stringify!(#name))
+                )
             }
 
             fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {

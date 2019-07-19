@@ -99,7 +99,7 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, P
 
 mod timestamping {
     use exonum::{
-        blockchain::{ExecutionResult, InstanceCollection},
+        blockchain::{ExecutionError, InstanceCollection},
         crypto::Hash,
         messages::{AnyTx, ServiceInstanceId, Signed},
         runtime::rust::{
@@ -116,24 +116,27 @@ mod timestamping {
 
     #[exonum_service(dispatcher = "Timestamping")]
     pub trait TimestampingInterface {
-        fn timestamp(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
+        fn timestamp(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
 
-        fn timestamp_panic(&self, context: TransactionContext, arg: PanickingTx)
-            -> ExecutionResult;
+        fn timestamp_panic(
+            &self,
+            context: TransactionContext,
+            arg: PanickingTx,
+        ) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug)]
     pub struct Timestamping;
 
     impl TimestampingInterface for Timestamping {
-        fn timestamp(&self, _context: TransactionContext, _arg: Tx) -> ExecutionResult {
+        fn timestamp(&self, _context: TransactionContext, _arg: Tx) -> Result<(), ExecutionError> {
             Ok(())
         }
         fn timestamp_panic(
             &self,
             _context: TransactionContext,
             _arg: PanickingTx,
-        ) -> ExecutionResult {
+        ) -> Result<(), ExecutionError> {
             panic!("panic text");
         }
     }
@@ -195,11 +198,12 @@ mod timestamping {
 
 mod cryptocurrency {
     use exonum::{
-        blockchain::{ExecutionError, ExecutionResult, InstanceCollection},
+        blockchain::{ExecutionError, InstanceCollection},
         crypto::PublicKey,
         messages::{AnyTx, ServiceInstanceId, Signed},
         runtime::rust::{
-            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+            ArtifactInfo, ErrorKind, RustArtifactId, Service, ServiceFactory, Transaction,
+            TransactionContext,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
@@ -218,26 +222,26 @@ mod cryptocurrency {
     #[exonum_service(dispatcher = "Cryptocurrency")]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
-        fn transfer(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
+        fn transfer(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
         /// Same as `Tx`, but without cryptographic proofs in `execute`.
         fn transfer_without_proof(
             &self,
             context: TransactionContext,
             arg: SimpleTx,
-        ) -> ExecutionResult;
+        ) -> Result<(), ExecutionError>;
         /// Same as `SimpleTx`, but signals an error 50% of the time.
         fn transfer_error_sometimes(
             &self,
             context: TransactionContext,
             arg: RollbackTx,
-        ) -> ExecutionResult;
+        ) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug)]
     pub struct Cryptocurrency;
 
     impl CryptocurrencyInterface for Cryptocurrency {
-        fn transfer(&self, context: TransactionContext, arg: Tx) -> ExecutionResult {
+        fn transfer(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.author();
             let mut index = ProofMapIndex::new("provable_balances", context.fork());
 
@@ -253,7 +257,7 @@ mod cryptocurrency {
             &self,
             context: TransactionContext,
             arg: SimpleTx,
-        ) -> ExecutionResult {
+        ) -> Result<(), ExecutionError> {
             let from = context.author();
 
             let mut index = MapIndex::new("balances", context.fork());
@@ -270,7 +274,7 @@ mod cryptocurrency {
             &self,
             context: TransactionContext,
             arg: RollbackTx,
-        ) -> ExecutionResult {
+        ) -> Result<(), ExecutionError> {
             let from = context.author();
 
             let mut index = MapIndex::new("balances", context.fork());
@@ -285,7 +289,7 @@ mod cryptocurrency {
             if arg.seed % 2 == 0 {
                 Ok(())
             } else {
-                Err(ExecutionError::new(1))
+                Err(ExecutionError::new(ErrorKind::service(15), ""))
             }
         }
     }

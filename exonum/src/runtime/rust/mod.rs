@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::service::{
-    AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction, TransactionContext,
+pub use self::{
+    error::Error,
+    service::{
+        AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction,
+        TransactionContext,
+    },
 };
-pub use super::ArtifactInfo;
+pub use super::{dispatcher, error::ErrorKind, ArtifactInfo};
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
@@ -37,12 +41,11 @@ use crate::{
 };
 
 use super::{
-    dispatcher::DispatcherSender,
-    error::{DeployError, ExecutionError, StartError, DISPATCH_ERROR},
-    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
-    StateHashAggregator,
+    dispatcher::DispatcherSender, error::ExecutionError, ArtifactId, Caller, ExecutionContext,
+    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
+pub mod error;
 #[macro_use]
 pub mod service;
 #[cfg(test)]
@@ -99,11 +102,14 @@ impl RustRuntime {
         Self::default()
     }
 
-    fn parse_artifact(&self, artifact: &ArtifactId) -> Option<RustArtifactId> {
+    fn parse_artifact(&self, artifact: &ArtifactId) -> Result<RustArtifactId, ExecutionError> {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
-            return None;
+            return Err(Error::IncorrectArtifactId.into());
         }
-        artifact.name.parse().ok()
+        artifact
+            .name
+            .parse()
+            .map_err(|inner| (Error::IncorrectArtifactId, inner).into())
     }
 
     fn add_started_service(&mut self, instance: Instance) {
@@ -126,17 +132,15 @@ impl RustRuntime {
         self
     }
 
-    fn deploy(&mut self, artifact: ArtifactId) -> Result<(), DeployError> {
-        let artifact = self
-            .parse_artifact(&artifact)
-            .ok_or(DeployError::WrongArtifact)?;
+    fn deploy(&mut self, artifact: ArtifactId) -> Result<(), ExecutionError> {
+        let artifact = self.parse_artifact(&artifact)?;
 
         if self.deployed_artifacts.contains(&artifact) {
-            return Err(DeployError::AlreadyDeployed);
+            return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
 
         if !self.available_artifacts.contains_key(&artifact) {
-            return Err(DeployError::FailedToDeploy);
+            return Err(Error::UnableToDeploy.into());
         }
 
         trace!("Deployed artifact: {}", artifact);
@@ -204,39 +208,35 @@ impl Runtime for RustRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Any,
-    ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if spec != Any::default() {
             // Spec for rust artifacts should be empty.
-            return Box::new(future::err(DeployError::WrongArtifact));
+            return Box::new(future::err(Error::IncorrectArtifactId.into()));
         }
         Box::new(self.deploy(artifact).into_future())
     }
 
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
         self.available_artifacts
-            .get(&self.parse_artifact(id)?)
+            .get(&self.parse_artifact(id).ok()?)
             .map(|service_factory| service_factory.artifact_info())
     }
 
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
-        let artifact = self
-            .parse_artifact(&spec.artifact)
-            .ok_or(StartError::WrongArtifact)?;
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        let artifact = self.parse_artifact(&spec.artifact)?;
 
         trace!("New service {} instance with id: {}", artifact, spec.id);
 
         // Implement ensure like macro to reduce amount of boiler-plate code. [ECR-3222]
 
         if !self.deployed_artifacts.contains(&artifact) {
-            return Err(StartError::NotDeployed);
+            return Err(dispatcher::Error::ArtifactNotDeployed.into());
         }
-
         if self.started_services.contains_key(&spec.id) {
-            return Err(StartError::ServiceIdExists);
+            return Err(dispatcher::Error::ServiceIdExists.into());
         }
-
         if self.started_services_by_name.contains_key(&spec.name) {
-            return Err(StartError::ServiceNameExists);
+            return Err(dispatcher::Error::ServiceNameExists.into());
         }
 
         let service = self
@@ -253,10 +253,8 @@ impl Runtime for RustRuntime {
         fork: &Fork,
         spec: &InstanceSpec,
         parameters: Any,
-    ) -> Result<(), StartError> {
-        let artifact = self
-            .parse_artifact(&spec.artifact)
-            .ok_or(StartError::WrongArtifact)?;
+    ) -> Result<(), ExecutionError> {
+        let artifact = self.parse_artifact(&spec.artifact)?;
 
         trace!(
             "Configure service {} instance with id: {}",
@@ -267,24 +265,22 @@ impl Runtime for RustRuntime {
         let service_instance = self
             .started_services
             .get(&spec.id)
-            .ok_or(StartError::NotStarted)?;
+            .ok_or(dispatcher::Error::ServiceNotStarted)?;
         service_instance
             .as_ref()
             .configure(service_instance.descriptor(), fork, parameters)
-            .map_err(StartError::ExecutionError)
     }
 
-    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
-        let artifact = self
-            .parse_artifact(&spec.artifact)
-            .ok_or(StartError::WrongArtifact)?;
+    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        let artifact = self.parse_artifact(&spec.artifact)?;
 
         trace!("Stop service {} instance with id: {}", artifact, spec.id);
 
         self.started_services
             .remove(&spec.id)
-            .ok_or(StartError::NotStarted)
+            .ok_or(dispatcher::Error::ServiceNotStarted)
             .map(drop)
+            .map_err(From::from)
     }
 
     fn execute(
@@ -306,9 +302,7 @@ impl Runtime for RustRuntime {
                 },
                 payload,
             )
-            .map_err(|e| {
-                ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
-            })?
+            .map_err(|e| (Error::UnspecifiedError, e))?
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
@@ -376,17 +370,6 @@ impl Runtime for RustRuntime {
             })
             .collect()
     }
-}
-
-/// Creates `RustArtifactId` by using `CARGO_PKG_NAME` and `CARGO_PKG_VERSION`
-/// variables.
-#[macro_export]
-macro_rules! artifact_spec_from_crate {
-    () => {
-        concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))
-            .parse::<$crate::runtime::rust::RustArtifactId>()
-            .unwrap()
-    };
 }
 
 #[test]

@@ -14,19 +14,24 @@
 
 #![allow(dead_code, unsafe_code)]
 
-use exonum_merkledb::{Database, Error as StorageError, ListIndex, ObjectHash, TemporaryDB};
+use exonum_merkledb::{
+    Database, Entry, Error as StorageError, Fork, ListIndex, ObjectHash, TemporaryDB,
+};
 use futures::sync::mpsc;
 
+use std::sync::Mutex;
+
 use crate::{
-    blockchain::{Blockchain, ExecutionResult, InstanceCollection, Schema},
-    crypto::gen_keypair,
+    blockchain::{Blockchain, InstanceCollection, Schema},
+    crypto,
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
+        error::ErrorKind,
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo,
+        ArtifactInfo, ExecutionError,
     },
 };
 
@@ -35,14 +40,14 @@ const TEST_SERVICE_ID: ServiceInstanceId = 255;
 
 #[exonum_service(crate = "crate", dispatcher = "TestServiceImpl")]
 trait TestService {
-    fn tx(&self, context: TransactionContext, arg: Tx) -> ExecutionResult;
+    fn tx(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
 struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
-    fn tx(&self, context: TransactionContext, arg: Tx) -> ExecutionResult {
+    fn tx(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError> {
         if arg.value == 42 {
             panic!(StorageError::new("42"))
         }
@@ -166,6 +171,54 @@ impl ServiceFactory for ServicePanicStorageErrorImpl {
     }
 }
 
+const TX_CHECK_RESULT_SERVICE_ID: ServiceInstanceId = 255;
+
+lazy_static! {
+    static ref EXECUTION_STATUS: Mutex<Result<(), ExecutionError>> = Mutex::new(Ok(()));
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "TestServiceTx", crate = "crate")]
+struct TxResult {
+    value: u64,
+}
+
+#[derive(Debug)]
+struct TxResultCheckService;
+
+#[exonum_service(crate = "crate", dispatcher = "TxResultCheckService")]
+trait TxResultCheckInterface {
+    fn tx_result(&self, context: TransactionContext, arg: TxResult) -> Result<(), ExecutionError>;
+}
+
+impl TxResultCheckInterface for TxResultCheckService {
+    fn tx_result(&self, context: TransactionContext, arg: TxResult) -> Result<(), ExecutionError> {
+        let mut entry = create_entry(context.fork());
+        entry.set(arg.value);
+        EXECUTION_STATUS.lock().unwrap().clone()
+    }
+}
+
+impl Service for TxResultCheckService {}
+
+impl ServiceFactory for TxResultCheckService {
+    fn artifact_id(&self) -> RustArtifactId {
+        RustArtifactId::new("good_service", 1, 0, 0)
+    }
+
+    fn artifact_info(&self) -> ArtifactInfo {
+        ArtifactInfo::default()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
+        Box::new(Self)
+    }
+}
+
+fn create_entry(fork: &Fork) -> Entry<&Fork, u64> {
+    Entry::new("transaction_status_test", fork)
+}
+
 fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
@@ -211,7 +264,7 @@ fn create_blockchain_with_service(
 fn handling_tx_panic_error() {
     let mut blockchain = create_blockchain();
 
-    let (pk, sec_key) = gen_keypair();
+    let (pk, sec_key) = crypto::gen_keypair();
     let tx_ok1 = Tx::new(3).sign(TEST_SERVICE_ID, pk, &sec_key);
     let tx_ok2 = Tx::new(4).sign(TEST_SERVICE_ID, pk, &sec_key);
     let tx_failed = Tx::new(0).sign(TEST_SERVICE_ID, pk, &sec_key);
@@ -272,7 +325,7 @@ fn handling_tx_panic_error() {
 fn handling_tx_panic_storage_error() {
     let mut blockchain = create_blockchain();
 
-    let (pk, sec_key) = gen_keypair();
+    let (pk, sec_key) = crypto::gen_keypair();
     let tx_ok1 = Tx::new(3).sign(TEST_SERVICE_ID, pk, &sec_key);
     let tx_ok2 = Tx::new(4).sign(TEST_SERVICE_ID, pk, &sec_key);
     let tx_failed = Tx::new(0).sign(TEST_SERVICE_ID, pk, &sec_key);
@@ -322,4 +375,52 @@ fn service_execute_panic_storage_error() {
         create_blockchain_with_service(ServicePanicStorageErrorImpl, 5, "service_execute_error");
     let mut db = TemporaryDB::new();
     assert_service_execute_panic(&blockchain, &mut db);
+}
+
+#[test]
+fn error_discards_transaction_changes() {
+    let statuses = [
+        Err(ExecutionError::new(ErrorKind::service(0), "")),
+        Err(ExecutionError::new(ErrorKind::dispatcher(5), "Foo")),
+        Err(ExecutionError::new(ErrorKind::runtime(0), "Strange bar")),
+        Err(ExecutionError::new(ErrorKind::Panic, "PANIC")),
+        Ok(()),
+    ];
+
+    let (pk, sec_key) = crypto::gen_keypair();
+    let mut blockchain = create_blockchain_with_service(
+        TxResultCheckService,
+        TX_CHECK_RESULT_SERVICE_ID,
+        "check_result",
+    );
+    let db = TemporaryDB::new();
+
+    for (index, status) in statuses.iter().enumerate() {
+        let index = index as u64;
+
+        *EXECUTION_STATUS.lock().unwrap() = status.clone();
+
+        let transaction = TxResult { value: index }.sign(TX_CHECK_RESULT_SERVICE_ID, pk, &sec_key);
+        let hash = transaction.object_hash();
+        {
+            let fork = blockchain.fork();
+            {
+                let mut schema = Schema::new(&fork);
+                schema.add_transaction_into_pool(transaction.clone());
+            }
+            blockchain.merge(fork.into_patch()).unwrap();
+        }
+
+        let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(index), &[hash]);
+
+        db.merge(patch).unwrap();
+
+        let fork = db.fork();
+        let entry = create_entry(&fork);
+        if status.is_err() {
+            assert_eq!(None, entry.get());
+        } else {
+            assert_eq!(Some(index), entry.get());
+        }
+    }
 }

@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Common errors emitted by transactions during execution.
+//! The set of specific for the Rust runtime implementation errors.
+
+/// List of possible Rust runtime errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(crate = "crate")]
+#[exonum(crate = "crate", kind = "runtime")]
 pub enum Error {
-    /// Artifact has been already deployed.
-    AlreadyDeployed = 0,
-    /// Transaction author is not a validator.
-    UnknownAuthor = 1,
-    /// Deadline exceeded for the current transaction.
-    DeadlineExceeded = 2,
-    /// Instance with the given name already exists.
-    InstanceExists = 3,
-    /// Deploy request has been already registered.
-    DeployRequestAlreadyRegistered = 4,
-    /// Deploy request has not been registered.
-    DeployRequestNotRegistered = 5,
+    /// Unable to parse artifact identifier or specified artifact has non-empty spec.
+    IncorrectArtifactId = 0,
+    /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
+    UnableToDeploy = 1,
+    /// Unable to parse service configuration.
+    ConfigParseError = 2,
+    /// Unspecified error during the call invocation.
+    UnspecifiedError = 3,
 }

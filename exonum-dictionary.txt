@@ -156,6 +156,7 @@ stateful
 stringify
 struct
 structfield
+structopt
 structs
 subcommand
 subcommands

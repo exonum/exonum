@@ -160,7 +160,7 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 mod tests {
     use exonum::{
         api,
-        blockchain::ExecutionResult,
+        blockchain::ExecutionError,
         crypto::{gen_keypair, Hash},
         explorer::BlockWithTransactions,
         helpers::Height,
@@ -201,11 +201,19 @@ mod tests {
 
     #[exonum_service(dispatcher = "SampleService")]
     trait SampleServiceInterface {
-        fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
+        fn timestamp(
+            &self,
+            context: TransactionContext,
+            arg: TxTimestamp,
+        ) -> Result<(), ExecutionError>;
     }
 
     impl SampleServiceInterface for SampleService {
-        fn timestamp(&self, _context: TransactionContext, _arg: TxTimestamp) -> ExecutionResult {
+        fn timestamp(
+            &self,
+            _context: TransactionContext,
+            _arg: TxTimestamp,
+        ) -> Result<(), ExecutionError> {
             Ok(())
         }
     }

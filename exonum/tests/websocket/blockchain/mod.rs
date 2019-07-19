@@ -15,7 +15,7 @@
 //! Simplified node emulation for testing websockets.
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, InstanceCollection},
+    blockchain::InstanceCollection,
     crypto::PublicKey,
     helpers,
     node::{ApiSender, Node},
@@ -65,27 +65,30 @@ impl Transfer {
     }
 }
 
+#[derive(Debug, IntoExecutionError)]
+pub enum Error {
+    /// Not allowed
+    NotAllowed = 0,
+}
+
 #[exonum_service(dispatcher = "MyService")]
 pub trait MyServiceInterface {
-    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> ExecutionResult;
-    fn transfer(&self, context: TransactionContext, arg: Transfer) -> ExecutionResult;
+    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
+    fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error>;
 }
 
 #[derive(Debug)]
 struct MyService;
 
 impl MyServiceInterface for MyService {
-    fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> ExecutionResult {
+    fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
-            Err(ExecutionError::with_description(
-                1,
-                "Not allowed".to_string(),
-            ))
+            Err(Error::NotAllowed)
         }
     }
-    fn transfer(&self, _context: TransactionContext, _arg: Transfer) -> ExecutionResult {
+    fn transfer(&self, _context: TransactionContext, _arg: Transfer) -> Result<(), Error> {
         panic!("oops")
     }
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use schema::Schema;
+pub use {error::Error, schema::Schema};
 
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future, Future};
@@ -32,10 +32,11 @@ use crate::{
 };
 
 use super::{
-    error::{DeployError, ExecutionError, StartError, WRONG_RUNTIME},
-    ArtifactId, ArtifactInfo, Caller, ExecutionContext, InstanceSpec, Runtime, ServiceInstanceId,
+    error::ExecutionError, ArtifactId, ArtifactInfo, Caller, ExecutionContext, InstanceSpec,
+    Runtime, ServiceInstanceId,
 };
 
+mod error;
 mod schema;
 
 #[derive(Default)]
@@ -146,11 +147,11 @@ impl Dispatcher {
         &mut self,
         artifact: ArtifactId,
         spec: impl Into<Any>,
-    ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             runtime.deploy_artifact(artifact, spec.into())
         } else {
-            Box::new(future::err(DeployError::WrongRuntime))
+            Box::new(future::err(Error::IncorrectRuntime.into()))
         }
     }
 
@@ -162,7 +163,7 @@ impl Dispatcher {
         fork: &Fork,
         artifact: ArtifactId,
         spec: impl Into<Any>,
-    ) -> Result<(), DeployError> {
+    ) -> Result<(), ExecutionError> {
         debug_assert!(
             self.artifact_info(&artifact).is_some(),
             "An attempt to register artifact which is not be deployed: {:?}",
@@ -181,7 +182,7 @@ impl Dispatcher {
         fork: &Fork,
         artifact: ArtifactId,
         spec: impl Into<Any>,
-    ) -> Result<(), DeployError> {
+    ) -> Result<(), ExecutionError> {
         let spec = spec.into();
         self.deploy_artifact(artifact.clone(), spec.clone())
             .wait()?;
@@ -195,15 +196,16 @@ impl Dispatcher {
         context: &ExecutionContext,
         spec: InstanceSpec,
         constructor: Any,
-    ) -> Result<(), StartError> {
+    ) -> Result<(), ExecutionError> {
         // Check that service doesn't use existing identifiers.
         if self.runtime_lookup.contains_key(&spec.id) {
-            return Err(StartError::ServiceIdExists);
+            return Err(Error::ServiceIdExists.into());
         }
         // Tries to start and configure service instance.
         self.runtimes
             .get_mut(&spec.artifact.runtime_id)
-            .ok_or(StartError::WrongRuntime)
+            .ok_or(Error::IncorrectRuntime)
+            .map_err(ExecutionError::from)
             .and_then(|runtime| {
                 runtime.start_service(&spec)?;
                 // Tries to configure a started instance of the service, otherwise it stops.
@@ -257,20 +259,14 @@ impl Dispatcher {
         let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
 
         if runtime_id.is_none() {
-            return Err(ExecutionError::with_description(
-                WRONG_RUNTIME,
-                "Wrong runtime",
-            ));
+            return Err(Error::IncorrectRuntime.into());
         }
 
         if let Some(runtime) = self.runtimes.get(&runtime_id.unwrap()) {
             runtime.execute(self, context, call_info, payload)?;
             Ok(())
         } else {
-            Err(ExecutionError::with_description(
-                WRONG_RUNTIME,
-                "Wrong runtime",
-            ))
+            return Err(Error::IncorrectRuntime.into());
         }
     }
 
@@ -328,11 +324,12 @@ impl Dispatcher {
     }
 
     /// Just starts a new service instance.
-    fn restart_service(&mut self, instance: &InstanceSpec) -> Result<(), StartError> {
-        self.runtimes
+    fn restart_service(&mut self, instance: &InstanceSpec) -> Result<(), ExecutionError> {
+        let runtime = self
+            .runtimes
             .get_mut(&instance.artifact.runtime_id)
-            .ok_or(StartError::WrongRuntime)
-            .and_then(|runtime| runtime.start_service(instance))?;
+            .ok_or(Error::IncorrectRuntime)?;
+        runtime.start_service(instance)?;
         self.register_running_service(&instance);
         Ok(())
     }
@@ -438,7 +435,10 @@ mod tests {
     use crate::{
         crypto::PublicKey,
         messages::{MethodId, ServiceInstanceId},
-        runtime::{rust::RustRuntime, ArtifactInfo, RuntimeIdentifier, StateHashAggregator},
+        runtime::{
+            rust::{Error as RustRuntimeError, RustRuntime},
+            ArtifactInfo, RuntimeIdentifier, StateHashAggregator,
+        },
     };
 
     use super::*;
@@ -484,6 +484,12 @@ mod tests {
         method_id: MethodId,
     }
 
+    #[derive(Debug, IntoExecutionError)]
+    #[exonum(crate = "crate")]
+    enum SampleError {
+        Foo = 15,
+    }
+
     impl SampleRuntime {
         fn new(runtime_type: u32, instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
             Self {
@@ -499,30 +505,30 @@ mod tests {
             &mut self,
             artifact: ArtifactId,
             _spec: Any,
-        ) -> Box<dyn Future<Item = (), Error = DeployError>> {
+        ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
             Box::new(
                 if artifact.runtime_id == self.runtime_type {
                     Ok(())
                 } else {
-                    Err(DeployError::WrongRuntime)
+                    Err(Error::IncorrectRuntime.into())
                 }
                 .into_future(),
             )
         }
 
-        fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
+        fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
             if spec.artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
-                Err(StartError::WrongRuntime)
+                Err(Error::IncorrectRuntime.into())
             }
         }
 
-        fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError> {
+        fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
             if spec.artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
-                Err(StartError::WrongRuntime)
+                Err(Error::IncorrectRuntime.into())
             }
         }
 
@@ -531,11 +537,11 @@ mod tests {
             _fork: &Fork,
             spec: &InstanceSpec,
             _parameters: Any,
-        ) -> Result<(), StartError> {
+        ) -> Result<(), ExecutionError> {
             if spec.artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
-                Err(StartError::WrongRuntime)
+                Err(Error::IncorrectRuntime.into())
             }
         }
 
@@ -549,7 +555,7 @@ mod tests {
             if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
                 Ok(())
             } else {
-                Err(ExecutionError::new(0xFF_u8))
+                Err(SampleError::Foo.into())
             }
         }
 
@@ -713,7 +719,7 @@ mod tests {
             .with_runtime(RuntimeIdentifier::Rust as u32, RustRuntime::default())
             .finalize();
 
-        let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo");
+        let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo/1.0.0");
 
         // Check deploy.
         assert_eq!(
@@ -721,7 +727,7 @@ mod tests {
                 .deploy_artifact(sample_rust_spec.clone(), Any::default())
                 .wait()
                 .expect_err("deploy artifact succeed"),
-            DeployError::WrongArtifact
+            RustRuntimeError::UnableToDeploy.into()
         );
 
         // Checks if we can start services.
@@ -740,7 +746,7 @@ mod tests {
                     Any::default()
                 )
                 .expect_err("start service succeed"),
-            StartError::WrongArtifact
+            Error::ArtifactNotDeployed.into()
         );
 
         // Check if we can execute transactions.

@@ -25,7 +25,7 @@ use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::ExecutionResult,
+    blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, ServiceInstanceId, Signed},
@@ -95,7 +95,7 @@ impl TxMarker {
 
 #[exonum_service(dispatcher = "MarkerService")]
 pub trait MarkerInterface {
-    fn mark(&self, context: TransactionContext, arg: TxMarker) -> ExecutionResult;
+    fn mark(&self, context: TransactionContext, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -107,7 +107,7 @@ pub trait MarkerInterface {
 struct MarkerService;
 
 impl MarkerInterface for MarkerService {
-    fn mark(&self, context: TransactionContext, arg: TxMarker) -> ExecutionResult {
+    fn mark(&self, context: TransactionContext, arg: TxMarker) -> Result<(), ExecutionError> {
         let author = context.author();
         let view = context.fork();
         let time = TimeSchema::new(TIME_SERVICE_NAME, view).time().get();

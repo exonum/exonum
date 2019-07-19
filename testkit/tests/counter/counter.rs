@@ -17,7 +17,6 @@ use actix_web::{http::Method, HttpResponse};
 use exonum::{
     api::backends::actix::{HttpRequest, RawHandler, RequestHandler},
     api::{self, ServiceApiBackend},
-    blockchain::{ExecutionError, ExecutionResult},
     crypto::Hash,
     messages::{AnyTx, Signed},
     runtime::{
@@ -25,7 +24,7 @@ use exonum::{
         ArtifactInfo, ServiceInstanceId,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert};
+use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash};
 use futures::{Future, IntoFuture};
 use log::trace;
@@ -93,22 +92,25 @@ impl TxIncrement {
     }
 }
 
+#[derive(Debug, IntoExecutionError)]
+pub enum Error {
+    /// Adding zero does nothing!
+    AddingZero = 0,
+}
+
 #[exonum_service(dispatcher = "CounterService")]
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> ExecutionResult;
+    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> Result<(), Error>;
 
-    fn reset(&self, context: TransactionContext, arg: TxReset) -> ExecutionResult;
+    fn reset(&self, context: TransactionContext, arg: TxReset) -> Result<(), Error>;
 }
 
 impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> ExecutionResult {
+    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> Result<(), Error> {
         if arg.by == 0 {
-            Err(ExecutionError::with_description(
-                0,
-                "Adding zero does nothing!".to_string(),
-            ))?;
+            return Err(Error::AddingZero);
         }
 
         let mut schema = CounterSchema::new(context.fork());
@@ -116,7 +118,7 @@ impl CounterServiceInterface for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: TransactionContext, _arg: TxReset) -> ExecutionResult {
+    fn reset(&self, context: TransactionContext, _arg: TxReset) -> Result<(), Error> {
         let mut schema = CounterSchema::new(context.fork());
         schema.set_count(0);
         Ok(())

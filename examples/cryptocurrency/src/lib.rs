@@ -29,8 +29,6 @@
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
-extern crate failure;
-#[macro_use]
 extern crate serde_derive;
 
 pub mod proto;
@@ -155,48 +153,29 @@ pub mod transactions {
 
 /// Contract errors.
 pub mod errors {
-    use exonum::blockchain::ExecutionError;
-
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
-    #[derive(Debug, Fail)]
-    #[repr(u8)]
+    #[derive(Debug, IntoExecutionError)]
     pub enum Error {
         /// Wallet already exists.
         ///
         /// Can be emitted by `TxCreateWallet`.
-        #[fail(display = "Wallet already exists")]
         WalletAlreadyExists = 0,
-
         /// Sender doesn't exist.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Sender doesn't exist")]
         SenderNotFound = 1,
-
         /// Receiver doesn't exist.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Receiver doesn't exist")]
         ReceiverNotFound = 2,
-
         /// Insufficient currency amount.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Insufficient currency amount")]
         InsufficientCurrencyAmount = 3,
-
         /// Sender same as receiver.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Sender same as receiver")]
         SenderSameAsReceiver = 4,
-    }
-
-    impl From<Error> for ExecutionError {
-        fn from(value: Error) -> ExecutionError {
-            let description = format!("{}", value);
-            ExecutionError::with_description(value as u8, description)
-        }
     }
 }
 
@@ -204,7 +183,6 @@ pub mod errors {
 pub mod contracts {
     use exonum::{
         api::ServiceApiBuilder,
-        blockchain::ExecutionResult,
         runtime::rust::{Service, ServiceDescriptor, TransactionContext},
     };
 
@@ -222,9 +200,9 @@ pub mod contracts {
     #[exonum_service(dispatcher = "CryptocurrencyService")]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
-        fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
+        fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> Result<(), Error>;
         /// Transfers `amount` of the currency from one wallet to another.
-        fn transfer(&self, ctx: TransactionContext, arg: TxTransfer) -> ExecutionResult;
+        fn transfer(&self, ctx: TransactionContext, arg: TxTransfer) -> Result<(), Error>;
     }
 
     /// Cryptocurrency service implementation.
@@ -237,7 +215,7 @@ pub mod contracts {
             &self,
             context: TransactionContext,
             arg: TxCreateWallet,
-        ) -> ExecutionResult {
+        ) -> Result<(), Error> {
             let author = context.author();
             let view = context.fork();
             let schema = CurrencySchema::new(context.service_name(), view);
@@ -251,7 +229,7 @@ pub mod contracts {
             }
         }
 
-        fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
+        fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error> {
             let author = context.author();
             let view = context.fork();
 

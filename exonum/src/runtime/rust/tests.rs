@@ -28,16 +28,14 @@ use crate::{
         Any,
     },
     runtime::{
-        dispatcher::Dispatcher,
-        error::{ExecutionError, WRONG_ARG_ERROR},
-        rust::ServiceDescriptor,
-        ArtifactInfo, Caller, ExecutionContext, InstanceSpec,
+        dispatcher::Dispatcher, error::ExecutionError, rust::ServiceDescriptor, ArtifactInfo,
+        Caller, ExecutionContext, InstanceSpec,
     },
 };
 
 use super::{
     service::{Service, ServiceFactory},
-    ArtifactId, RustArtifactId, RustRuntime, TransactionContext,
+    ArtifactId, Error, RustArtifactId, RustRuntime, TransactionContext,
 };
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
@@ -106,10 +104,7 @@ impl Service for TestServiceImpl {
         fork: &Fork,
         arg: Any,
     ) -> Result<(), ExecutionError> {
-        let arg = Init::try_from(arg).map_err(|e| {
-            error!("{:?}", e);
-            ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
-        })?;
+        let arg = Init::try_from(arg).map_err(|e| (Error::ConfigParseError, e))?;
 
         let mut entry = Entry::new("constructor_entry", fork);
         entry.set(arg.msg);

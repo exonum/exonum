@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use self::error::ExecutionError;
 pub use crate::messages::ServiceInstanceId;
 
 use exonum_merkledb::{Fork, Snapshot};
@@ -31,10 +32,7 @@ use crate::{
     proto::{schema, Any},
 };
 
-use self::{
-    dispatcher::{Dispatcher, DispatcherSender},
-    error::{DeployError, ExecutionError, StartError},
-};
+use self::dispatcher::{Dispatcher, DispatcherSender};
 
 #[macro_use]
 pub mod rust;
@@ -127,13 +125,13 @@ pub trait Runtime: Send + Debug + 'static {
         &mut self,
         artifact: ArtifactId,
         spec: Any,
-    ) -> Box<dyn Future<Item = (), Error = DeployError>>;
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
     /// Returns additional information about artifact with the specified id if it is deployed.
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
     /// Starts a new service instance with the given specification.
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
     /// Configures a service instance with the given parameters.
     fn configure_service(
@@ -141,10 +139,10 @@ pub trait Runtime: Send + Debug + 'static {
         context: &Fork,
         spec: &InstanceSpec,
         parameters: Any,
-    ) -> Result<(), StartError>;
+    ) -> Result<(), ExecutionError>;
 
     /// Stops existing service instance with the given specification.
-    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), StartError>;
+    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
     /// Execute transaction.
     // TODO Do not use dispatcher struct directly.
