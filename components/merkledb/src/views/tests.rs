@@ -876,7 +876,7 @@ fn valid_index_name() {
 fn valid_name_for_url() {
     assert_valid_name_url("service_name");
     assert_valid_name_url("service_name\\");
-    assert_valid_name_url("sarvice_name");
+    assert_valid_name_url("service name");
     assert_valid_name_url("/service_name");
     assert_valid_name_url("1Service_name");
     assert_valid_name_url("core.service_name");
