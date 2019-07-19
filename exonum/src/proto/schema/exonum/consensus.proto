@@ -122,13 +122,13 @@ message ProtocolMessage {
     Propose propose = 5;
     Prevote prevote = 6;
 
-    TransactionsResponse txs_response = 7;
+    TransactionsResponse transactions_response = 7;
     BlockResponse block_response = 8;
 
-    ProposeRequest propose_req = 9;
-    TransactionsRequest txs_req = 10;
-    PrevotesRequest prevotes_req = 11;
-    PeersRequest peers_req = 12;
-    BlockRequest block_req = 13;
+    ProposeRequest propose_request = 9;
+    TransactionsRequest transactions_request = 10;
+    PrevotesRequest prevotes_request = 11;
+    PeersRequest peers_request = 12;
+    BlockRequest block_request = 13;
   }
 }

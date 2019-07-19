@@ -13,10 +13,11 @@
 // limitations under the License.
 
 use darling::{FromDeriveInput, FromMeta};
+use heck::SnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
-use syn::{Attribute, Data, DataStruct, DeriveInput, NestedMeta, Path};
+use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, NestedMeta, Path};
 
 use std::convert::TryFrom;
 
@@ -59,7 +60,7 @@ struct ProtobufConvertEnumAttrs {
     cr: Path,
     pb: Option<Path>,
     serde_pb_convert: bool,
-    oneof_name: String,
+    oneof_field: Ident,
 }
 
 impl Default for ProtobufConvertEnumAttrs {
@@ -67,7 +68,7 @@ impl Default for ProtobufConvertEnumAttrs {
         Self {
             cr: syn::parse_str("exonum").unwrap(),
             pb: None,
-            oneof_name: "message".to_owned(),
+            oneof_field: syn::parse_str("message").unwrap(),
             serde_pb_convert: false,
         }
     }
@@ -116,7 +117,6 @@ impl ProtobufConvertStruct {
 
 impl ToTokens for ProtobufConvertStruct {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let cr = &self.attrs.cr;
         let name = &self.name;
         let pb_name = &self.attrs.pb;
         let from_pb_impl = {
@@ -141,7 +141,7 @@ impl ToTokens for ProtobufConvertStruct {
             let fields = self.fields.to_vec();
 
             quote! {
-                let mut msg = Self::ProtoStruct::new();
+                let mut msg = Self::ProtoStruct::default();
                 #( msg.#setters(ProtobufConvert::to_pb(&self.#fields).into()); )*
                 msg
             }
@@ -159,23 +159,7 @@ impl ToTokens for ProtobufConvertStruct {
                     #to_pb_impl
                 }
             }
-
-            impl From<#name> for #cr::proto::Any {
-                fn from(v: #name) -> Self {
-                    Self::new(v)
-                }
-            }
-
-            impl std::convert::TryFrom<#cr::proto::Any> for #name {
-                type Error = failure::Error;
-
-                fn try_from(v: #cr::proto::Any) -> Result<Self, Self::Error> {
-                    v.try_into()
-                }
-            }
         };
-        println!("{}", expanded);
-
         tokens.extend(expanded);
     }
 }
@@ -187,9 +171,131 @@ struct ProtobufConvertEnum {
     attrs: ProtobufConvertEnumAttrs,
 }
 
+impl ProtobufConvertEnum {
+    fn from_derive_input(
+        name: Ident,
+        data: &DataEnum,
+        attrs: &[Attribute],
+    ) -> Result<Self, darling::Error> {
+        let attrs = ProtobufConvertEnumAttrs::try_from(attrs)?;
+        let variants = data.variants.iter().map(|v| v.ident.clone()).collect();
+
+        Ok(Self {
+            name,
+            attrs,
+            variants,
+        })
+    }
+
+    fn impl_protobuf_convert(&self) -> impl ToTokens {
+        let pb_oneof_enum = {
+            let mut pb = self.attrs.pb.clone().unwrap();
+            let oneof = pb.segments.pop().unwrap().value().ident.clone();
+            let oneof_enum = Ident::new(
+                &format!("{}_oneof_{}", oneof, &self.attrs.oneof_field),
+                Span::call_site(),
+            );
+            quote! { #pb #oneof_enum }
+        };
+        let name = &self.name;
+        let pb_name = &self.attrs.pb;
+        let oneof = &self.attrs.oneof_field;
+
+        let from_pb_impl = {
+            let match_arms = self.variants.iter().map(|variant| {
+                let pb_variant = Ident::new(
+                    variant.to_string().to_snake_case().as_ref(),
+                    Span::call_site(),
+                );
+                quote! {
+                    Some(#pb_oneof_enum::#pb_variant(pb)) => {
+                        #variant::from_pb(pb).map(#name::#variant)
+                    }
+                }
+            });
+
+            quote! {
+                match pb.#oneof {
+                    #( #match_arms )*
+                    None => Err(_failure::format_err!("Failed to decode #name from protobuf"))
+                }
+            }
+        };
+        let to_pb_impl = {
+            let match_arms = self.variants.iter().map(|variant| {
+                let pb_variant = variant.to_string().to_snake_case();
+                let setter = Ident::new(&format!("set_{}", pb_variant), Span::call_site());
+                quote! {
+                    #name::#variant(msg) => inner.#setter(msg.to_pb()),
+                }
+            });
+
+            quote! {
+                let mut inner = Self::ProtoStruct::new();
+                match self {
+                    #( #match_arms )*
+                }
+                inner
+            }
+        };
+
+        quote! {
+            impl ProtobufConvert for #name {
+                type ProtoStruct = #pb_name;
+
+                fn from_pb(mut pb: Self::ProtoStruct) -> std::result::Result<Self, _FailureError> {
+                    #from_pb_impl
+                }
+
+                fn to_pb(&self) -> Self::ProtoStruct {
+                    #to_pb_impl
+                }
+            }
+        }
+    }
+
+    fn impl_enum_conversions(&self) -> impl ToTokens {
+        let name = &self.name;
+        let conversions = self.variants.iter().map(|variant| {
+            quote! {
+                impl From<#variant> for #name {
+                    fn from(variant: #variant) -> Self {
+                        #name::#variant(variant)
+                    }
+                }
+
+                impl std::convert::TryFrom<#name> for #variant {
+                    type Error = _FailureError;
+
+                    fn try_from(msg: #name) -> Result<Self, Self::Error> {
+                        if let #name::#variant(inner) = msg {
+                            Ok(inner)
+                        } else {
+                            Err(format_err!(
+                                "Expected #variant variant, but got {:?}",
+                                msg
+                            ))
+                        }
+                    }
+                }
+            }
+        });
+
+        quote! {
+            #( #conversions )*
+        }
+    }
+}
+
 impl ToTokens for ProtobufConvertEnum {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let expanded = quote! {};
+        let pb_convert = self.impl_protobuf_convert();
+        let conversions = self.impl_enum_conversions();
+
+        let expanded = quote! {
+            #pb_convert
+            #conversions
+        };
         tokens.extend(expanded)
     }
 }
@@ -210,7 +316,13 @@ impl FromDeriveInput for ProtobufConvert {
                     input.attrs.as_ref(),
                 )?,
             )),
-            Data::Enum(data) => unimplemented!(),
+            Data::Enum(data) => Ok(ProtobufConvert::Enum(
+                ProtobufConvertEnum::from_derive_input(
+                    input.ident.clone(),
+                    data,
+                    input.attrs.as_ref(),
+                )?,
+            )),
             _ => Err(darling::Error::unsupported_shape(
                 "Only for enums and structs.",
             )),
@@ -260,7 +372,7 @@ impl ProtobufConvert {
                     )
                 }
 
-                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, _FailureError> {
                     let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
                     block.merge_from_bytes(value.as_ref())?;
                     ProtobufConvert::from_pb(block)
@@ -299,6 +411,27 @@ impl ProtobufConvert {
             ProtobufConvert::Struct(data) => quote! { #data },
         }
     }
+
+    fn implement_any_conversion(&self) -> impl ToTokens {
+        let name = self.name();
+        let cr = self.cr();
+
+        quote! {
+            impl From<#name> for #cr::proto::Any {
+                fn from(v: #name) -> Self {
+                    Self::new(v)
+                }
+            }
+
+            impl std::convert::TryFrom<#cr::proto::Any> for #name {
+                type Error = _FailureError;
+
+                fn try_from(v: #cr::proto::Any) -> Result<Self, Self::Error> {
+                    v.try_into()
+                }
+            }
+        }
+    }
 }
 
 impl ToTokens for ProtobufConvert {
@@ -311,6 +444,7 @@ impl ToTokens for ProtobufConvert {
 
         let protobuf_convert = self.implement_protobuf_convert();
         let merkledb_traits = self.implement_merkledb_traits();
+        let any_conversion = self.implement_any_conversion();
         let serde_traits = if self.serde_needed() {
             let serde = self.implement_serde_protobuf_convert();
             quote! { #serde }
@@ -326,12 +460,13 @@ impl ToTokens for ProtobufConvert {
                 use super::*;
 
                 use self::_protobuf_crate::Message as _ProtobufMessage;
-                use self::_failure::{bail, Error as _FailureError};
+                use self::_failure::{bail, Error as _FailureError, format_err};
                 use #cr::proto::ProtobufConvert;
 
                 #protobuf_convert
                 #merkledb_traits
                 #serde_traits
+                #any_conversion
             }
         };
         tokens.extend(expanded)

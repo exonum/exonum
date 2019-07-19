@@ -744,7 +744,8 @@ impl AnyTx {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[exonum(pb = "consensus::ProtocolMessage", crate = "crate")]
 pub enum ProtocolMessage {
     AnyTx(AnyTx),
     Connect(Connect),
@@ -760,70 +761,3 @@ pub enum ProtocolMessage {
     PeersRequest(PeersRequest),
     BlockRequest(BlockRequest),
 }
-
-macro_rules! impl_protocol_message {
-    ( $($name:ident : $into_pb:expr, $from_pb:expr)* ) => {
-        impl ProtobufConvert for ProtocolMessage {
-            type ProtoStruct = consensus::ProtocolMessage;
-
-            fn to_pb(&self) -> Self::ProtoStruct {
-                let mut inner = Self::ProtoStruct::default();
-                match self {
-                    $( ProtocolMessage::$name(msg) => unimplemented!(), )*
-                }
-                inner
-            }
-
-            fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-                unimplemented!()
-            }
-        }
-    }
-}
-
-impl_protocol_message! {
-    AnyTx: set_any_tx, any_tx
-    Connect: set_connect, connect
-    Status: set_status, status
-    Precommit: set_precommit, precommits
-    Propose: set_propose, propose
-    Prevote: set_prevote, prevote
-    TransactionsResponse: set_txs_response, txs_response
-    BlockResponse: set_block_response, block_response
-    ProposeRequest: set_propose_req, propose_req
-    TransactionsRequest: set_txs_req, txs_req
-    PrevotesRequest: set_prevotes_req, prevotes_req
-    PeersRequest: set_peers_req, peers_req
-    BlockRequest: set_block_req, block_req
-}
-
-// Implement #[derive(ProtobufConvert)]
-use crate::proto::schema::consensus::ProtocolMessage_oneof_message as ProtocolMessagePb;
-
-// impl ProtobufConvert for ProtocolMessage {
-//     type ProtoStruct = consensus::ProtocolMessage;
-
-//     fn to_pb(&self) -> Self::ProtoStruct {
-//         let mut inner = Self::ProtoStruct::default();
-//         match self {
-//             ProtocolMessage::AnyTx(msg) => inner.set_any_tx(msg.to_pb()),
-//             ProtocolMessage::Connect(msg) => inner.set_connect(msg),
-//             ProtocolMessage::Status(msg) => inner.set_status(msg),
-//             ProtocolMessage::Precommit(msg) => inner.set_precommit(msg),
-//             ProtocolMessage::Propose(msg) => inner.set_propose(msg),
-//             ProtocolMessage::Prevote(msg) => inner.set_prevote(msg),
-//             ProtocolMessage::TransactionsResponse(msg) => inner.set_txs_response(msg),
-//             ProtocolMessage::BlockResponse(msg) => inner.set_block_response(msg),
-//             ProtocolMessage::ProposeRequest(msg) => inner.set_any_tx(msg),
-//             ProtocolMessage::TransactionsRequest(msg) => inner.set_any_tx(msg),
-//             ProtocolMessage::PrevotesRequest(msg) => inner.set_any_tx(msg),
-//             ProtocolMessage::PeersRequest(msg) => inner.set_any_tx(msg),
-//             ProtocolMessage::BlockRequest(msg) => inner.set_any_tx(msg),
-//         }
-//         inner
-//     }
-
-//     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-//         unimplemented!()
-//     }
-// }
