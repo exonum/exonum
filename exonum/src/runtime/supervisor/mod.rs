@@ -24,9 +24,9 @@ use crate::{
     api::ServiceApiBuilder,
     blockchain,
     crypto::Hash,
-    messages::ServiceInstanceId,
-    runtime::rust::{
-        AfterCommitContext, Service, ServiceDescriptor, Transaction, TransactionContext,
+    runtime::{
+        rust::{AfterCommitContext, Service, ServiceDescriptor, Transaction, TransactionContext},
+        ServiceInstanceId,
     },
 };
 

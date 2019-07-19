@@ -48,10 +48,10 @@ impl SignedMessage {
             "Failed to verify signature."
         );
         // Deserializes message.
-        let payload = T::try_from(self)
+        let inner = T::try_from(self)
             .map_err(|_| failure::format_err!("Failed to decode message from payload."))?;
 
-        Ok(Verified { raw: self, payload })
+        Ok(Verified { raw: self, inner })
     }
 }
 
@@ -121,14 +121,14 @@ impl Serialize for SignedMessage {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct Verified<T> {
     raw: SignedMessage,
-    payload: T,
+    inner: T,
 }
 
 impl<T> Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    /// Creates verified message from the raw buffer.
+    /// Creates a verified message from the raw buffer.
     pub fn from_raw<V>(bytes: V) -> Result<Self, failure::Error>
     where
         for<'a> V: Into<Cow<'a, [u8]>>,
@@ -148,7 +148,18 @@ where
 
     /// Takes the underlying verified message.
     pub fn into_inner(self) -> T {
-        self.payload
+        self.inner
+    }
+}
+
+impl<T> Verified<T>
+where
+    T: TryFrom<SignedMessage> + BinaryValue,
+{
+    /// Creates a new verified message.
+    pub fn new(inner: T, public_key: PublicKey, secret_key: &SecretKey) -> Self {
+        let raw = SignedMessage::new(inner.to_bytes(), public_key, secret_key);
+        Self { raw, inner }
     }
 }
 
@@ -189,8 +200,8 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let raw = SignedMessage::from_bytes(bytes)?;
-        let payload = T::try_from(raw).map_err(|_| failure::format_err!("Noo"))?;
-        Ok(Self { raw, payload })
+        let inner = T::try_from(raw).map_err(|_| failure::format_err!("Noo"))?;
+        Ok(Self { raw, inner })
     }
 }
 

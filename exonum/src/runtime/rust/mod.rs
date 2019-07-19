@@ -19,8 +19,7 @@ pub use self::{
         TransactionContext,
     },
 };
-pub use super::{dispatcher, error::ErrorKind, ArtifactInfo};
-pub use crate::messages::ServiceInstanceId;
+pub use super::{dispatcher, error::ErrorKind, ArtifactInfo, CallInfo, ServiceInstanceId};
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
@@ -35,7 +34,6 @@ use std::{
 use crate::{
     api::ServiceApiBuilder,
     crypto::{Hash, PublicKey, SecretKey},
-    messages::CallInfo,
     node::ApiSender,
     proto::Any,
 };

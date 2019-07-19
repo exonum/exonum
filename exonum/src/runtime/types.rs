@@ -17,7 +17,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
-use crate::proto::{schema};
+use crate::proto::schema;
 
 /// Service id type.
 pub type ServiceInstanceId = u32;
@@ -55,18 +55,6 @@ pub struct AnyTx {
 }
 
 impl AnyTx {
-    /// Method for compatibility with old transactions.
-    /// Creates equivalent of `RawTransaction`.
-    pub fn new(service_id: u16, tx_id: u16, payload: Vec<u8>) -> Self {
-        Self {
-            call_info: CallInfo {
-                instance_id: u32::from(service_id),
-                method_id: u32::from(tx_id),
-            },
-            payload,
-        }
-    }
-
     /// Parses transaction content as concrete type.
     pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
         T::from_bytes(Cow::Borrowed(&self.payload))

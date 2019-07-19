@@ -26,7 +26,7 @@ pub mod supervisor;
 use exonum_merkledb::{Fork, Snapshot};
 use futures::Future;
 
-use std::{fmt::Debug};
+use std::fmt::Debug;
 
 use crate::{
     api::ServiceApiBuilder,

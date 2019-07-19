@@ -205,11 +205,7 @@ impl Blockchain {
         //     ));
         // }
 
-        let msg = Message::concrete(
-            tx,
-            self.service_keypair.0,
-            &self.service_keypair.1,
-        );
+        let msg = Message::concrete(tx, self.service_keypair.0, &self.service_keypair.1);
 
         self.api_sender.broadcast_transaction(msg)
     }

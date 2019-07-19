@@ -24,7 +24,7 @@ use crate::{
     messages::{
         AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, Signed, SignedMessage, TransactionsRequest,
-        TransactionsResponse, Verified
+        TransactionsResponse, Verified,
     },
     node::{NodeHandler, RequestData},
 };

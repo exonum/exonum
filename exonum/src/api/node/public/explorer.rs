@@ -40,7 +40,7 @@ use crate::{
     events::error::into_failure,
     explorer::{self, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Message, Precommit, Verified, SignedMessage},
+    messages::{AnyTx, BinaryValue, Message, Precommit, SignedMessage, Verified},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way

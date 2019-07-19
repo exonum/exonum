@@ -22,13 +22,13 @@ use crate::{
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, CallInfo, Message, MethodId, ServiceInstanceId, Signed},
+    messages::Verified,
     node::ApiSender,
     proto::Any,
     runtime::{
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        ArtifactInfo, ExecutionContext,
+        AnyTx, ArtifactInfo, CallInfo, ExecutionContext, MethodId, ServiceInstanceId,
     },
 };
 
@@ -236,7 +236,7 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Broadcast transaction to other nodes in the network.
     /// This transaction should be signed externally.
-    pub fn broadcast_signed_transaction(&self, msg: Signed<AnyTx>) {
+    pub fn broadcast_signed_transaction(&self, msg: Verified<AnyTx>) {
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }
@@ -269,17 +269,23 @@ pub trait Transaction: BinaryValue {
     const METHOD_ID: MethodId;
 
     /// Creates unsigned service transaction from the value.
-    fn into_any_tx(self, service_id: ServiceInstanceId) -> AnyTx {
-        AnyTx::new(service_id as u16, Self::METHOD_ID as u16, self.into_bytes())
+    fn into_any_tx(self, instance_id: ServiceInstanceId) -> AnyTx {
+        AnyTx {
+            call_info: CallInfo {
+                instance_id,
+                method_id: Self::METHOD_ID,
+            },
+            payload: self.into_bytes(),
+        }
     }
 
-    /// Signs value as service transaction with the specified instance identifier.
+    /// Signs value as transaction with the specified instance identifier.
     fn sign(
         self,
         service_id: ServiceInstanceId,
         public_key: PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<AnyTx> {
-        Message::concrete(self.into_any_tx(service_id), public_key, secret_key)
+    ) -> Verified<AnyTx> {
+        Verified::new(self.into_any_tx(service_id), public_key, secret_key)
     }
 }

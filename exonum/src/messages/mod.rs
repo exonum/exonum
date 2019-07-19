@@ -35,9 +35,9 @@ pub use self::{signed::Verified, types::*};
 pub use exonum_merkledb::BinaryValue;
 
 use exonum_merkledb::ObjectHash;
-use serde::{Deserialize};
+use serde::Deserialize;
 
-use std::{borrow::Cow};
+use std::borrow::Cow;
 
 use crate::{
     crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH},
