@@ -50,11 +50,11 @@ pub(crate) use self::helpers::HexStringRepresentation;
 
 mod authorization;
 mod helpers;
-mod types;
-mod signed;
 mod protocol;
+mod signed;
 #[cfg(test)]
 mod tests;
+mod types;
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
 /// This type is used inside `#[derive(TransactionSet)]`

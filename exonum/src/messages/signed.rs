@@ -18,7 +18,7 @@ use std::convert::TryFrom;
 
 use crate::{
     crypto::{self, Signature},
-    proto::{schema::consensus::{Consensus, Consensus_oneof_message}, ProtobufConvert},
+    proto::ProtobufConvert,
 };
 
 use super::types::{Connect, Signed};
@@ -29,34 +29,34 @@ pub struct Verified<T: ProtobufConvert> {
     payload: T,
 }
 
-impl<T> TryFrom<Signed> for Verified<T>
-where
-    T: ProtobufConvert,
-    T::ProtoStruct: Message + Default,
-{
-    type Error = failure::Error;
+// impl<T> TryFrom<Signed> for Verified<T>
+// where
+//     T: ProtobufConvert,
+//     T::ProtoStruct: Message + Default,
+// {
+//     type Error = failure::Error;
 
-    fn try_from(raw: Signed) -> Result<Self, Self::Error> {
-        // Verifies message signature
-        ensure!(
-            crypto::verify(&raw.signature, &raw.payload, &raw.author),
-            "Failed to verify signature."
-        );
-        // Deserializes message.
-        let mut inner = <T::ProtoStruct>::default();
-        inner.merge_from_bytes(&raw.payload)?;
-        let payload = T::from_pb(inner)?;
-        Ok(Self { raw, payload })
-    }
-}
+//     fn try_from(raw: Signed) -> Result<Self, Self::Error> {
+//         // Verifies message signature
+//         ensure!(
+//             crypto::verify(&raw.signature, &raw.payload, &raw.author),
+//             "Failed to verify signature."
+//         );
+//         // Deserializes message.
+//         let mut inner = <T::ProtoStruct>::default();
+//         inner.merge_from_bytes(&raw.payload)?;
+//         let payload = T::from_pb(inner)?;
+//         Ok(Self { raw, payload })
+//     }
+// }
 
-impl TryFrom<Consensus> for Connect {
-    type Error = failure::Error;
+// impl TryFrom<Protocol> for Connect {
+//     type Error = failure::Error;
 
-    fn try_from(value: Consensus) -> Result<Self, Self::Error> {
-        match value.message {
-            Some(Consensus_oneof_message::connect(inner)) => Self::from_pb(inner),
-            _ => Err(format_err!("Unknown message"))
-        }
-    }
-}
+//     fn try_from(value: Protocol) -> Result<Self, Self::Error> {
+//         match value.message {
+//             Some(Protocol_oneof_message::connect(inner)) => Self::from_pb(inner),
+//             _ => Err(format_err!("Unknown message"))
+//         }
+//     }
+// }
