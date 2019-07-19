@@ -207,7 +207,7 @@ impl WorkingPatch {
     ///
     /// # Panics
     ///
-    /// If two indices with the same `address` exist in `Fork` that uses this patch.
+    /// If an index with the `address` already exists in `Fork` that uses this patch.
     pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
