@@ -22,7 +22,7 @@ use std::mem;
 use crate::{
     crypto::{self, Hash, PublicKey},
     helpers::{Height, Round},
-    messages::{AnyTx, Connect, Message, Precommit, ServiceInstanceId, Signed},
+    messages::{AnyTx, Connect, Message, Precommit, ServiceInstanceId, Signed, Verified},
     proto,
 };
 
@@ -140,7 +140,7 @@ where
 
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
-    pub fn transactions(&self) -> MapIndex<T, Hash, Signed<AnyTx>> {
+    pub fn transactions(&self) -> MapIndex<T, Hash, Verified<AnyTx>> {
         MapIndex::new(TRANSACTIONS, self.access.clone())
     }
 
@@ -204,7 +204,7 @@ where
     }
 
     /// Returns a table that keeps a list of precommits for the block with the given hash.
-    pub fn precommits(&self, hash: &Hash) -> ListIndex<T, Signed<Precommit>> {
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<T, Verified<Precommit>> {
         ListIndex::new_in_family(PRECOMMITS, hash, self.access.clone())
     }
 
@@ -241,7 +241,7 @@ where
 
     /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn peers_cache(&self) -> MapIndex<T, PublicKey, Signed<Connect>> {
+    pub(crate) fn peers_cache(&self) -> MapIndex<T, PublicKey, Verified<Connect>> {
         MapIndex::new(PEERS_CACHE, self.access.clone())
     }
 
@@ -424,7 +424,7 @@ where
     /// This method increment `transactions_pool_len_index`,
     /// be sure to decrement it when transaction committed.
     #[doc(hidden)]
-    pub fn add_transaction_into_pool(&mut self, tx: Signed<AnyTx>) {
+    pub fn add_transaction_into_pool(&mut self, tx: Verified<AnyTx>) {
         self.transactions_pool().insert(tx.object_hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index().set(x + 1);

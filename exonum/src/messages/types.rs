@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use crate::runtime::AnyTx;
+
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{HashTag};
+use exonum_merkledb::{BinaryValue, HashTag};
+
+use std::convert::TryFrom;
 
 use crate::{
     blockchain::Block,
     crypto::{Hash, PublicKey, Signature},
     helpers::{Height, Round, ValidatorId},
-    proto::schema::{consensus},
-    runtime::AnyTx
+    proto::schema::consensus,
 };
 
 /// Container for the signed messages.
@@ -691,7 +694,7 @@ impl BlockResponse {
 
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "consensus::ExonumMessage", crate = "crate")]
-pub enum ExonumMessage2 {
+pub enum ExonumMessage {
     AnyTx(AnyTx),
     Connect(Connect),
     Status(Status),
@@ -705,4 +708,33 @@ pub enum ExonumMessage2 {
     PrevotesRequest(PrevotesRequest),
     PeersRequest(PeersRequest),
     BlockRequest(BlockRequest),
+}
+
+impl TryFrom<SignedMessage> for ExonumMessage {
+    type Error = failure::Error;
+
+    fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
+        ExonumMessage::from_bytes(value.payload.into())
+    }
+}
+
+macro_rules! impl_exonum_msg_try_from_signed {
+    ( $( $name:ident ),* ) => {
+        $(
+            impl TryFrom<SignedMessage> for $name {
+                type Error = failure::Error;
+
+                fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
+                    ExonumMessage::try_from(value).and_then(Self::try_from)
+                }
+            }
+        )*
+    }
+}
+
+impl_exonum_msg_try_from_signed! {
+    AnyTx, Connect, Status, Precommit,
+    Propose, Prevote, TransactionsResponse,
+    BlockResponse, ProposeRequest, TransactionsRequest,
+    PrevotesRequest, PeersRequest, BlockRequest
 }

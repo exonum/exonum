@@ -10,8 +10,8 @@ use crate::{
 };
 
 use super::{
-    BinaryValue, BlockResponse, Message, Precommit, ProtocolMessage, Signed, SignedMessage, Status,
-    TransactionsResponse, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
+    BinaryValue, BlockResponse, Message, Precommit, SignedMessage, Status, TransactionsResponse,
+    Verified, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
 };
 
 #[test]
@@ -180,10 +180,10 @@ fn test_block() {
     assert_eq!(block.precommits(), precommits_buf);
     assert_eq!(block.transactions().to_vec(), transactions);
 
-    let block2: Signed<BlockResponse> = ProtocolMessage::try_from(
-        Message::deserialize(SignedMessage::from_bytes(block.to_bytes().into()).unwrap()).unwrap(),
-    )
-    .unwrap();
+    let block2: Verified<BlockResponse> = SignedMessage::from_bytes(block.to_bytes().into())
+        .unwrap()
+        .verify()
+        .unwrap();
 
     assert_eq!(block2.author(), pub_key);
     assert_eq!(block2.to(), &pub_key);
@@ -218,7 +218,7 @@ fn test_precommit_serde_correct() {
     );
 
     let precommit_json = serde_json::to_string(&precommit).unwrap();
-    let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+    let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
     assert_eq!(precommit2, precommit);
 }
 
@@ -246,6 +246,6 @@ fn test_precommit_serde_wrong_signature() {
         *sign = Signature::zero();
     }
     let precommit_json = serde_json::to_string(&precommit).unwrap();
-    let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+    let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
     assert_eq!(precommit2, precommit);
 }

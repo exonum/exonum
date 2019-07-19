@@ -31,210 +31,263 @@
 //!              (drop)                           (drop)
 //! ```
 
-pub use self::{authorization::SignedMessage, helpers::to_hex_string, protocol::*, signed::Verified};
+pub use self::{signed::Verified, types::*};
 pub use exonum_merkledb::BinaryValue;
 
 use exonum_merkledb::ObjectHash;
-use failure::Error;
-use hex::{FromHex, ToHex};
-use serde::{
-    de::{self, Deserialize, Deserializer},
-    ser::{Serialize, Serializer},
+use serde::{Deserialize};
+
+use std::{borrow::Cow};
+
+use crate::{
+    crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH},
+    helpers::{Height, Round, ValidatorId},
 };
 
-use std::{borrow::Cow, fmt, ops::Deref};
-
-use crate::crypto::{Hash, PublicKey, Signature};
-
-pub(crate) use self::helpers::HexStringRepresentation;
-
-mod authorization;
-mod helpers;
-mod protocol;
 mod signed;
 #[cfg(test)]
 mod tests;
-pub mod types;
+mod types;
 
-/// Concrete raw transaction transaction inside `TransactionSet`.
-/// This type is used inside `#[derive(TransactionSet)]`
-/// to return raw transaction payload as part of service transaction set.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct ServiceTransaction {
-    transaction_id: u16,
-    payload: Vec<u8>,
+/// Lower bound on the size of the correct `SignedMessage`.
+/// Size of message fields + protobuf overhead.
+#[doc(hidden)]
+pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 8;
+
+#[doc(hidden)]
+pub const TX_RES_EMPTY_SIZE: usize = SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH + 8;
+
+/// When we add transaction to TransactionResponse message we will add some overhead
+/// to the message size due to protobuf.
+/// This is higher bound on this overhead.
+/// Tx response message size <= TX_RES_EMPTY_SIZE + (tx1 size + TX_RES_PB_OVERHEAD_PAYLOAD) +
+///                             + (tx2 size + TX_RES_PB_OVERHEAD_PAYLOAD) + ...
+#[doc(hidden)]
+pub const TX_RES_PB_OVERHEAD_PAYLOAD: usize = 8;
+
+/// Service messages.
+#[derive(Debug, PartialEq)]
+pub enum Service {
+    /// Transaction message.
+    AnyTx(Verified<AnyTx>),
+    /// Connect message.
+    Connect(Verified<Connect>),
+    /// Status message.
+    Status(Verified<Status>),
 }
 
-impl ServiceTransaction {
-    /// Creates `ServiceTransaction` from unchecked raw data.
-    pub fn from_raw_unchecked(transaction_id: u16, payload: Vec<u8>) -> Self {
-        ServiceTransaction {
-            transaction_id,
-            payload,
+impl Service {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Service::AnyTx(ref msg) => msg.as_raw(),
+            Service::Connect(ref msg) => msg.as_raw(),
+            Service::Status(ref msg) => msg.as_raw(),
+        }
+    }
+}
+
+/// Consensus messages.
+#[derive(Debug, PartialEq)]
+pub enum Consensus {
+    /// Precommit message.
+    Precommit(Verified<Precommit>),
+    /// Propose message.
+    Propose(Verified<Propose>),
+    /// Prevote message.
+    Prevote(Verified<Prevote>),
+}
+
+impl Consensus {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Consensus::Precommit(ref msg) => msg.signed_message(),
+            Consensus::Propose(ref msg) => msg.signed_message(),
+            Consensus::Prevote(ref msg) => msg.signed_message(),
+        }
+    }
+}
+
+/// Response messages.
+#[derive(Debug, PartialEq)]
+pub enum Responses {
+    /// Transactions response message.
+    TransactionsResponse(Verified<TransactionsResponse>),
+    /// Block response message.
+    BlockResponse(Verified<BlockResponse>),
+}
+
+impl Responses {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Responses::TransactionsResponse(ref msg) => msg.signed_message(),
+            Responses::BlockResponse(ref msg) => msg.signed_message(),
+        }
+    }
+}
+
+/// Request messages.
+#[derive(Debug, PartialEq)]
+pub enum Requests {
+    /// Propose request message.
+    ProposeRequest(Verified<ProposeRequest>),
+    /// Transactions request message.
+    TransactionsRequest(Verified<TransactionsRequest>),
+    /// Prevotes request message.
+    PrevotesRequest(Verified<PrevotesRequest>),
+    /// Peers request message.
+    PeersRequest(Verified<PeersRequest>),
+    /// Block request message.
+    BlockRequest(Verified<BlockRequest>),
+}
+
+impl Requests {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Requests::ProposeRequest(ref msg) => msg.signed_message(),
+            Requests::TransactionsRequest(ref msg) => msg.signed_message(),
+            Requests::PrevotesRequest(ref msg) => msg.signed_message(),
+            Requests::PeersRequest(ref msg) => msg.signed_message(),
+            Requests::BlockRequest(ref msg) => msg.signed_message(),
+        }
+    }
+}
+
+/// Exonum protocol messages.
+#[derive(Debug, PartialEq)]
+pub enum Message {
+    /// Service messages.
+    Service(Service),
+    /// Consensus messages.
+    Consensus(Consensus),
+    /// Responses messages.
+    Responses(Responses),
+    /// Requests messages.
+    Requests(Requests),
+}
+
+impl Message {
+    /// Deserialize message from signed message.
+    pub fn from_signed(signed: SignedMessage) -> Result<Self, failure::Error> {
+        match signed.verify::<ExonumMessage>()? {
+            // Service
+            ExonumMessage::AnyTx(msg) => Message::Service(Service::AnyTx(msg)),
+            ExonumMessage::Connect(msg) => Message::Service(Service::Connect(msg)),
+            ExonumMessage::Status(msg) => Message::Service(Service::Status(msg)),
+            // Consensus
+            ExonumMessage::Precommit(msg) => Message::Consensus(Consensus::Precommit(msg)),
+            ExonumMessage::Prevote(msg) => Message::Consensus(Consensus::Prevote(msg)),
+            ExonumMessage::Propose(msg) => Message::Consensus(Consensus::Propose(msg)),
+            // Responses
+            ExonumMessage::BlockResponse(msg) => Message::Responses(Responses::BlockResponse(msg)),
+            ExonumMessage::TransactionsResponse(msg) => {
+                Message::Responses(Responses::TransactionsResponse(msg))
+            }
+            // Requests
+            ExonumMessage::BlockRequest(msg) => Message::Requests(Requests::BlockRequest(msg)),
+            ExonumMessage::PeersRequest(msg) => Message::Requests(Requests::PeersRequest(msg)),
+            ExonumMessage::PrevotesRequest(msg) => {
+                Message::Requests(Requests::PrevotesRequest(msg))
+            }
+            ExonumMessage::ProposeRequest(msg) => Message::Requests(Requests::ProposeRequest(msg)),
+            ExonumMessage::TransactionsRequest(msg) => {
+                Message::Requests(Requests::TransactionsRequest(msg))
+            }
         }
     }
 
-    /// Converts `ServiceTransaction` back to raw data.
-    pub fn into_raw_parts(self) -> (u16, Vec<u8>) {
-        (self.transaction_id, self.payload)
-    }
-}
-
-impl fmt::Debug for ServiceTransaction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Transaction")
-            .field("message_id", &self.transaction_id)
-            .field("payload_len", &self.payload.len())
-            .finish()
-    }
-}
-
-/// Wraps a `Payload` together with the corresponding `SignedMessage`.
-///
-/// Usually one wants to work with fully parsed messages (i.e., `Payload`). However, occasionally
-/// we need to retransmit the message into the network or save its serialized form. We could
-/// serialize the `Payload` back, but Protobuf does not have a canonical form so the resulting
-/// payload may have different binary representation (thus invalidating the message signature).
-///
-/// So we use `Signed` to keep the original byte buffer around with the parsed `Payload`.
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Signed<T> {
-    // TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
-    // if our serialization format allows us (ECR-2315).
-    payload: T,
-    message: SignedMessage,
-}
-
-impl<T> Signed<T> {
-    /// Creates a new instance of the message.
-    pub(in crate::messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
-        Signed { payload, message }
-    }
-}
-
-impl<T> Signed<T> {
-    /// Returns public key of the message creator.
-    pub fn author(&self) -> PublicKey {
-        *self.message.key()
-    }
-
-    /// Returns reference to the payload.
-    pub fn payload(&self) -> &T {
-        &self.payload
-    }
-
-    /// Returns a reference to the signed message.
+    /// Get inner SignedMessage.
     pub fn signed_message(&self) -> &SignedMessage {
-        &self.message
+        match self {
+            Message::Service(ref msg) => msg.signed_message(),
+            Message::Consensus(ref msg) => msg.signed_message(),
+            Message::Requests(ref msg) => msg.signed_message(),
+            Message::Responses(ref msg) => msg.signed_message(),
+        }
     }
 
-    /// Returns reference to the signed message.
-    #[cfg(test)]
-    pub fn signed_message_mut(&mut self) -> &mut SignedMessage {
-        &mut self.message
-    }
-
-    /// Returns a signature of the message.
-    pub fn signature(&self) -> Signature {
-        *self.message.signature()
-    }
-}
-
-impl<T> ToHex for Signed<T> {
-    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.write_hex(w)
-    }
-
-    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.write_hex_upper(w)
+    /// Checks buffer and return instance of `Message`.
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
+        let signed = SignedMessage::from_bytes(buffer.into())?;
+        Self::deserialize(signed)
     }
 }
 
-/// Warning: This implementation checks signature which is slow operation.
-impl<X: ProtocolMessage> FromHex for Signed<X> {
-    type Error = Error;
+impl Requests {
+    /// Returns public key of the message recipient.
+    pub fn to(&self) -> PublicKey {
+        *match *self {
+            Requests::ProposeRequest(ref msg) => msg.to(),
+            Requests::TransactionsRequest(ref msg) => msg.to(),
+            Requests::PrevotesRequest(ref msg) => msg.to(),
+            Requests::PeersRequest(ref msg) => msg.to(),
+            Requests::BlockRequest(ref msg) => msg.to(),
+        }
+    }
 
-    fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
-        let bytes = Vec::<u8>::from_hex(v)?;
-        let protocol = SignedMessage::from_bytes(bytes.into())
-            .and_then(SignedMessage::verify)
-            .and_then(Message::deserialize)?;
-        ProtocolMessage::try_from(protocol)
-            .map_err(|_| format_err!("Couldn't deserialize message."))
+    /// Returns author public key of the message sender.
+    pub fn author(&self) -> PublicKey {
+        match *self {
+            Requests::ProposeRequest(ref msg) => msg.author(),
+            Requests::TransactionsRequest(ref msg) => msg.author(),
+            Requests::PrevotesRequest(ref msg) => msg.author(),
+            Requests::PeersRequest(ref msg) => msg.author(),
+            Requests::BlockRequest(ref msg) => msg.author(),
+        }
     }
 }
 
-impl<T: ProtocolMessage> AsRef<SignedMessage> for Signed<T> {
-    fn as_ref(&self) -> &SignedMessage {
-        &self.message
+impl Consensus {
+    /// Returns author public key of the message sender.
+    pub fn author(&self) -> PublicKey {
+        match *self {
+            Consensus::Propose(ref msg) => msg.author(),
+            Consensus::Prevote(ref msg) => msg.author(),
+            Consensus::Precommit(ref msg) => msg.author(),
+        }
+    }
+
+    /// Returns validator id of the message sender.
+    pub fn validator(&self) -> ValidatorId {
+        match *self {
+            Consensus::Propose(ref msg) => msg.validator(),
+            Consensus::Prevote(ref msg) => msg.validator(),
+            Consensus::Precommit(ref msg) => msg.validator(),
+        }
+    }
+
+    /// Returns height of the message.
+    pub fn height(&self) -> Height {
+        match *self {
+            Consensus::Propose(ref msg) => msg.height(),
+            Consensus::Prevote(ref msg) => msg.height(),
+            Consensus::Precommit(ref msg) => msg.height(),
+        }
+    }
+
+    /// Returns round of the message.
+    pub fn round(&self) -> Round {
+        match *self {
+            Consensus::Propose(ref msg) => msg.round(),
+            Consensus::Prevote(ref msg) => msg.round(),
+            Consensus::Precommit(ref msg) => msg.round(),
+        }
     }
 }
 
-impl<T: ProtocolMessage> AsRef<T> for Signed<T> {
-    fn as_ref(&self) -> &T {
-        &self.payload
-    }
-}
-
-impl<T> From<Signed<T>> for SignedMessage {
-    fn from(message: Signed<T>) -> Self {
-        message.message
-    }
-}
-
-impl<T> Deref for Signed<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        &self.payload
-    }
-}
-
-impl<T: ProtocolMessage> BinaryValue for Signed<T> {
+impl BinaryValue for Message {
     fn to_bytes(&self) -> Vec<u8> {
-        self.message.to_bytes()
+        self.signed_message().to_bytes()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_bytes(value)?;
-        let msg = Message::deserialize(message).unwrap();
-        Ok(T::try_from(msg).unwrap())
+        // TODO: Remove additional deserialization. [ECR-2315]
+        Message::deserialize(message)
     }
 }
 
-impl<T: ProtocolMessage> ObjectHash for Signed<T> {
+impl ObjectHash for Message {
     fn object_hash(&self) -> Hash {
-        self.message.object_hash()
-    }
-}
-
-impl<T> Serialize for Signed<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        HexStringRepresentation::serialize(&self.message, serializer)
-    }
-}
-
-/// Warning: This implementation checks signature which is slow operation.
-impl<'de, T> Deserialize<'de> for Signed<T>
-where
-    T: ProtocolMessage,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let signed_message: SignedMessage = HexStringRepresentation::deserialize(deserializer)?;
-        Message::deserialize(signed_message)
-            .map_err(|e| de::Error::custom(format!("Unable to deserialize signed message: {}", e)))
-            .and_then(|msg| {
-                T::try_from(msg).map_err(|e| {
-                    de::Error::custom(format!(
-                        "Unable to decode signed message into payload: {:?}",
-                        e
-                    ))
-                })
-            })
+        self.signed_message().object_hash()
     }
 }

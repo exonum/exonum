@@ -40,7 +40,7 @@ use crate::{
     events::error::into_failure,
     explorer::{self, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Message, Precommit, ProtocolMessage, Signed, SignedMessage},
+    messages::{AnyTx, BinaryValue, Message, Precommit, Verified, SignedMessage},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -65,7 +65,7 @@ pub struct BlockInfo {
 
     /// Precommits authorizing the block.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub precommits: Option<Vec<Signed<Precommit>>>,
+    pub precommits: Option<Vec<Verified<Precommit>>>,
 
     /// Hashes of transactions in the block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -362,7 +362,7 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
     }
 }
 
-fn median_precommits_time(precommits: &[Signed<Precommit>]) -> DateTime<Utc> {
+fn median_precommits_time(precommits: &[Verified<Precommit>]) -> DateTime<Utc> {
     if precommits.is_empty() {
         UNIX_EPOCH.into()
     } else {

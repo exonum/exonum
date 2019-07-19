@@ -44,7 +44,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
-    messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
+    messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, SignedMessage, Verified},
     node::ApiSender,
     runtime::{dispatcher::Dispatcher, supervisor::Supervisor},
 };
@@ -57,7 +57,8 @@ mod schema;
 mod tests;
 
 /// Transaction message shortcut.
-pub type TransactionMessage = Signed<AnyTx>;
+#[deprecated]
+pub type TransactionMessage = SignedMessage;
 
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
@@ -374,7 +375,7 @@ impl Blockchain {
         precommits: I,
     ) -> Result<(), failure::Error>
     where
-        I: Iterator<Item = Signed<Precommit>>,
+        I: Iterator<Item = Verified<Precommit>>,
     {
         let patch = {
             let fork = {
@@ -419,7 +420,7 @@ impl Blockchain {
     // TODO move such methods into separate module. [ECR-3222]
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Signed<Connect>) {
+    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Verified<Connect>) {
         let fork = self.fork();
         Schema::new(&fork).peers_cache().put(pubkey, peer);
         self.merge(fork.into_patch())
@@ -435,13 +436,13 @@ impl Blockchain {
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
         let snapshot = self.snapshot();
         Schema::new(&snapshot).peers_cache().iter().collect()
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Signed<T>) {
+    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Verified<T>) {
         self.save_messages(round, iter::once(raw.into()));
     }
 
