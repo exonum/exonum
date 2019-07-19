@@ -314,6 +314,38 @@ impl NodeConfig<PathBuf> {
     }
 }
 
+impl<T> NodeConfig<T> {
+    fn validate_or_panic(&self) {
+        let capacity = &self.mempool.events_pool_capacity;
+        if capacity.internal_events_capacity < 3 {
+            panic!(
+                "internal_events_capacity({}) must be strictly larger than 2",
+                capacity.internal_events_capacity
+            );
+        }
+        if capacity.network_requests_capacity == 0 {
+            panic!(
+                "network_requests_capacity({}) must be strictly larger than 0",
+                capacity.network_requests_capacity
+            );
+        }
+        // Sanity checks for cases of accidental negative overflows.
+        let sanity_max = 2_usize.pow(16);
+        if capacity.internal_events_capacity >= sanity_max {
+            panic!(
+                "internal_events_capacity({}) must be smaller than {}",
+                capacity.internal_events_capacity, sanity_max,
+            );
+        }
+        if capacity.network_requests_capacity >= sanity_max {
+            panic!(
+                "network_requests_capacity({}) must be smaller than {}",
+                capacity.network_requests_capacity, sanity_max,
+            );
+        }
+    }
+}
+
 /// Configuration for the `NodeHandler`.
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -897,6 +929,8 @@ impl Node {
     ) -> Self {
         crypto::init();
 
+        node_cfg.validate_or_panic();
+
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
             db,
@@ -1217,5 +1251,59 @@ mod tests {
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
+    fn test_bad_internal_events_capacity_too_small() {
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        node_cfg
+            .mempool
+            .events_pool_capacity
+            .internal_events_capacity = 0;
+        let _ = Node::new(db, services, node_cfg, None);
+    }
+
+    #[test]
+    #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
+    fn test_bad_network_requests_capacity_too_small() {
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        node_cfg
+            .mempool
+            .events_pool_capacity
+            .network_requests_capacity = 0;
+        let _ = Node::new(db, services, node_cfg, None);
+    }
+
+    #[test]
+    #[should_panic(expected = "must be smaller than 65536")]
+    fn test_bad_internal_events_capacity_too_large() {
+        let accidental_large_value = 0_usize.overflowing_sub(1).0;
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        node_cfg
+            .mempool
+            .events_pool_capacity
+            .internal_events_capacity = accidental_large_value;
+        let _ = Node::new(db, services, node_cfg, None);
+    }
+
+    #[test]
+    #[should_panic(expected = "must be smaller than 65536")]
+    fn test_bad_network_requests_capacity_too_large() {
+        let accidental_large_value = 0_usize.overflowing_sub(1).0;
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        node_cfg
+            .mempool
+            .events_pool_capacity
+            .network_requests_capacity = accidental_large_value;
+        let _ = Node::new(db, services, node_cfg, None);
     }
 }
