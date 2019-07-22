@@ -211,7 +211,7 @@ where
 
 impl<T> BinaryValue for Verified<T>
 where
-    T: TryFrom<SignedMessage>,
+    for<'a> T: TryFrom<&'a SignedMessage>,
 {
     fn to_bytes(&self) -> Vec<u8> {
         self.raw.to_bytes()
@@ -219,7 +219,7 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let raw = SignedMessage::from_bytes(bytes)?;
-        let inner = T::try_from(raw.clone())
+        let inner = T::try_from(&raw)
             .map_err(|_| failure::format_err!("Unable to decode message"))?;
         Ok(Self { raw, inner })
     }
@@ -227,7 +227,7 @@ where
 
 impl<T> ObjectHash for Verified<T>
 where
-    T: TryFrom<SignedMessage>,
+    for<'a> T: TryFrom<&'a SignedMessage>,
 {
     fn object_hash(&self) -> Hash {
         self.raw.object_hash()

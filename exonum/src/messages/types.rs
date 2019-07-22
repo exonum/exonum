@@ -737,6 +737,14 @@ macro_rules! impl_exonum_msg_try_from_signed {
                     ExonumMessage::try_from(value).and_then(Self::try_from)
                 }
             }
+
+            impl TryFrom<&SignedMessage> for $name {
+                type Error = failure::Error;
+
+                fn try_from(value: &SignedMessage) -> Result<Self, Self::Error> {
+                    ExonumMessage::try_from(value).and_then(Self::try_from)
+                }
+            }            
         )*
     }
 }
