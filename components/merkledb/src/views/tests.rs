@@ -11,11 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use url::form_urlencoded::byte_serialize;
+
+use std::panic;
 
 use crate::{
     db,
-    views::{IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
-    Database, DbOptions, Fork, RocksDB, TemporaryDB,
+    views::{is_valid_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
+    Database, DbOptions, Fork, ListIndex, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -846,4 +849,63 @@ fn multiple_patch() {
     let index = list_index(&snapshot);
     let iter = index.iter();
     assert_eq!(index.len() as usize, iter.count());
+}
+
+#[test]
+fn valid_index_name() {
+    assert!(check_valid_name("index_name"));
+    assert!(check_valid_name("_index_name"));
+    assert!(check_valid_name("AinDex_name_"));
+    assert!(check_valid_name("core.index_name1Z"));
+    assert!(check_valid_name("configuration.indeX_1namE"));
+    assert!(check_valid_name("1index_Name"));
+    assert!(check_valid_name("index-name"));
+    assert!(check_valid_name("_index-name"));
+    assert!(check_valid_name("indeX_1namE-"));
+
+    assert!(!check_valid_name(
+        "\u{438}\u{43d}\u{434}\u{435}\u{43a}\u{441}_name_"
+    ));
+    assert!(!check_valid_name("core.index_\u{438}\u{43c}\u{44f}3"));
+    assert!(!check_valid_name("1in!dex_Name"));
+    assert!(!check_valid_name("space name"));
+    assert!(!check_valid_name(" space "));
+}
+
+#[test]
+fn valid_name_for_url() {
+    assert_valid_name_url("service_name");
+    assert_valid_name_url("service_name\\");
+    assert_valid_name_url("service name");
+    assert_valid_name_url("/service_name");
+    assert_valid_name_url("1Service_name");
+    assert_valid_name_url("core.service_name");
+}
+
+#[test]
+#[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
+fn invalid_name_panic() {
+    let db = TemporaryDB::new();
+    let snapshot = db.snapshot();
+    let _: ListIndex<_, u8> = ListIndex::new("ind\u{435}x-name", &snapshot);
+}
+
+fn assert_valid_name_url(name: &str) {
+    let urlencoded: String = byte_serialize(name.as_bytes()).collect();
+    assert_eq!(is_valid_name(name), name == urlencoded)
+}
+
+fn check_valid_name<S: AsRef<str>>(name: S) -> bool {
+    check_index_name(name).is_ok()
+}
+
+fn check_index_name<S: AsRef<str>>(name: S) -> Result<(), ()> {
+    let db = TemporaryDB::new();
+    let snapshot = db.snapshot();
+
+    let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let _: ListIndex<_, u8> = ListIndex::new(name.as_ref(), &snapshot);
+    }));
+
+    catch_result.map_err(|_| ())
 }

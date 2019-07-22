@@ -204,6 +204,10 @@ impl WorkingPatch {
     }
 
     /// Returns a mutable reference to the changes corresponding to a certain index.
+    ///
+    /// # Panics
+    ///
+    /// If an index with the `address` already exists in `Fork` that uses this patch.
     pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
@@ -381,6 +385,22 @@ pub enum Change {
 ///
 /// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
 /// to a full key (a string column family name + key as an array of bytes within the family).
+///
+/// **Note.** It is possible to create only one instance of index with the specified name based on a
+/// single fork. This restriction is due to impossibility to obtain multiple mutable references to
+/// the same change set inside the fork.
+///
+/// For example the code below will panic at runtime.
+///
+/// ```rust, no_run
+/// use exonum_merkledb::{TemporaryDB, ListIndex, Database};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+///
+/// let index1: ListIndex<_, u8> = ListIndex::new("index", &fork);
+/// // This code will panic at runtime.
+/// let index2: ListIndex<_, u8> = ListIndex::new("index", &fork);
+/// ```
 ///
 /// [`Snapshot`]: trait.Snapshot.html
 /// [`put`]: #method.put
