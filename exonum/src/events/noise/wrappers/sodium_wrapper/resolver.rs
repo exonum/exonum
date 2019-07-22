@@ -135,7 +135,6 @@ impl Dh for SodiumDh25519 {
         let mut privkey_bytes = [0; x25519::SECRET_KEY_LENGTH];
         rng.fill_bytes(&mut privkey_bytes);
         x25519::convert_to_private_key(&mut privkey_bytes);
-
         self.set(&privkey_bytes);
     }
 

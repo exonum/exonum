@@ -16,13 +16,10 @@
 
 use actix::*;
 use actix_web::ws;
-
-use rand::{rngs::ThreadRng, Rng};
-
+use chrono::{DateTime, Utc};
 use futures::Future;
-
 use log::error;
-
+use rand::{rngs::ThreadRng, Rng};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
@@ -36,7 +33,7 @@ use crate::api::{
 use crate::blockchain::{Block, Schema, TransactionResult, TxLocation};
 use crate::crypto::Hash;
 use crate::events::error::into_failure;
-use crate::explorer::TxStatus;
+use crate::explorer::{median_precommits_time, TxStatus};
 use crate::messages::{Message as ExonumMessage, ProtocolMessage, RawTransaction, SignedMessage};
 
 use exonum_merkledb::{IndexAccess, ListProof, Snapshot};
@@ -90,14 +87,15 @@ impl TransactionFilter {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct CommittedTransactionSummary {
     tx_hash: Hash,
-    /// ID of service.
+    /// Service id of the transaction.
     pub service_id: u16,
-    /// ID of transaction in service.
+    /// ID of the transaction.
     pub message_id: u16,
     #[serde(with = "TxStatus")]
     status: TransactionResult,
     location: TxLocation,
-    proof: ListProof<Hash>,
+    location_proof: ListProof<Hash>,
+    time: DateTime<Utc>,
 }
 
 impl CommittedTransactionSummary {
@@ -107,19 +105,26 @@ impl CommittedTransactionSummary {
     {
         let tx = schema.transactions().get(tx_hash)?;
         let service_id = tx.payload().service_id();
-        let tx_id = tx.payload().transaction_id();
-        let tx_result = schema.transaction_results().get(tx_hash)?;
+        let message_id = tx.payload().transaction_id();
+        let status = schema.transaction_results().get(tx_hash)?;
         let location = schema.transactions_locations().get(tx_hash)?;
         let location_proof = schema
             .block_transactions(location.block_height())
             .get_proof(location.position_in_block());
+        let time = median_precommits_time(
+            &schema
+                .block_and_precommits(location.block_height())
+                .unwrap()
+                .precommits,
+        );
         Some(Self {
             tx_hash: *tx_hash,
             service_id,
-            message_id: tx_id,
-            status: tx_result,
+            message_id,
+            status,
             location,
-            proof: location_proof,
+            location_proof,
+            time,
         })
     }
 }

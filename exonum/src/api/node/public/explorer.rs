@@ -21,7 +21,6 @@ use futures::{Future, IntoFuture};
 
 use std::ops::{Bound, Range};
 use std::sync::{Arc, Mutex};
-use std::time::UNIX_EPOCH;
 
 use crate::{
     api::{
@@ -33,7 +32,7 @@ use crate::{
     },
     blockchain::{Block, SharedNodeState},
     crypto::Hash,
-    explorer::{self, BlockchainExplorer, TransactionInfo},
+    explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
     messages::{Message, Precommit, RawTransaction, Signed, SignedMessage},
 };
@@ -51,6 +50,13 @@ pub struct BlocksRange {
     pub blocks: Vec<BlockInfo>,
 }
 
+/// Information about a transaction included in the block.
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct TxInfo {
+    tx_hash: Hash,
+    service_id: u16,
+}
+
 /// Information about a block in the blockchain.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct BlockInfo {
@@ -62,9 +68,9 @@ pub struct BlockInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub precommits: Option<Vec<Signed<Precommit>>>,
 
-    /// Hashes of transactions in the block.
+    /// Info of transactions in the block.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub txs: Option<Vec<Hash>>,
+    pub txs: Option<Vec<TxInfo>>,
 
     /// Median time from the block precommits.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -352,21 +358,24 @@ impl ExplorerApi {
 
 impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
     fn from(inner: explorer::BlockInfo<'a>) -> Self {
+        let txs = inner
+            .transaction_hashes()
+            .iter()
+            .enumerate()
+            .map(|(idx, hash)| {
+                let service_id = inner.transaction(idx).unwrap().content().service_id();
+                TxInfo {
+                    tx_hash: *hash,
+                    service_id,
+                }
+            })
+            .collect::<Vec<TxInfo>>();
+
         Self {
             block: inner.header().clone(),
             precommits: Some(inner.precommits().to_vec()),
-            txs: Some(inner.transaction_hashes().to_vec()),
+            txs: Some(txs),
             time: Some(median_precommits_time(&inner.precommits())),
         }
-    }
-}
-
-fn median_precommits_time(precommits: &[Signed<Precommit>]) -> DateTime<Utc> {
-    if precommits.is_empty() {
-        UNIX_EPOCH.into()
-    } else {
-        let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
-        times.sort();
-        times[times.len() / 2]
     }
 }

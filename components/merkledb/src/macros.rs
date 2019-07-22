@@ -57,22 +57,3 @@ macro_rules! impl_object_hash_for_binary_value {
         )*
     };
 }
-
-#[macro_export]
-macro_rules! impl_binary_value_for_message {
-    ($( $type:ty ),*) => {
-        $(
-            impl BinaryValue for $type {
-                fn to_bytes(&self) -> Vec<u8> {
-                    self.write_to_bytes().expect("Error while serializing value")
-                }
-
-                fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-                    let mut pb = Self::new();
-                    pb.merge_from_bytes(bytes.as_ref())?;
-                    Ok(pb)
-                }
-            }
-        )*
-    };
-}

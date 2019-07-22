@@ -72,6 +72,7 @@ extern crate test;
 
 pub use exonum_crypto as crypto;
 
+#[macro_use]
 pub mod proto;
 #[macro_use]
 pub mod messages;

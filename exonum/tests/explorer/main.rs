@@ -104,7 +104,8 @@ fn test_explorer_basics() {
             json!({
                 "content": {
                     "debug": payload_alice,
-                    "message": messages::to_hex_string(&tx_alice)
+                    "message": messages::to_hex_string(&tx_alice),
+                    "service_id": SERVICE_ID,
                 },
                 "location": {
                     "block_height": 1,
@@ -112,6 +113,7 @@ fn test_explorer_basics() {
                 },
                 "location_proof": tx_info.location_proof(), // too complicated to check
                 "status": { "type": "success" },
+                "time": tx_info.time(),
             })
         );
     }
@@ -137,7 +139,8 @@ fn test_explorer_basics() {
         json!({
             "content": {
                     "debug": payload_bob,
-                    "message": messages::to_hex_string(&tx_bob)
+                    "message": messages::to_hex_string(&tx_bob),
+                    "service_id": SERVICE_ID,
             },
             "location": {
                 "block_height": 2,
@@ -149,6 +152,7 @@ fn test_explorer_basics() {
                 "code": 1,
                 "description": "Not allowed",
             },
+            "time": tx_info.time(),
         })
     );
 
@@ -161,7 +165,8 @@ fn test_explorer_basics() {
         json!({
             "content": {
                     "debug": payload_transfer,
-                    "message": messages::to_hex_string(&tx_transfer)
+                    "message": messages::to_hex_string(&tx_transfer),
+                    "service_id": SERVICE_ID,
             },
             "location": {
                 "block_height": 2,
@@ -172,6 +177,7 @@ fn test_explorer_basics() {
                 "type": "panic",
                 "description": "oops",
             },
+            "time": tx_info.time(),
         })
     );
 }
