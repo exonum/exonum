@@ -24,8 +24,7 @@ hex = "0.3.2"
 leb128 = "0.2"
 num-traits = "0.2"
 
-# TODO: revert to original rocksdb
-rocksdb = { git = "https://github.com/pavel-mukhanov/rust-rocksdb", branch = "sync_snapshot" }
+rocksdb = "0.12.3"
 rust_decimal = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
