@@ -23,7 +23,6 @@ failure = "0.1"
 hex = "0.3.2"
 leb128 = "0.2"
 num-traits = "0.2"
-
 rocksdb = "0.12.3"
 rust_decimal = "1.0"
 serde = "1.0"
