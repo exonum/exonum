@@ -25,7 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use exonum_merkledb::{Database, DbOptions, ObjectHash};
+use exonum_merkledb::{BinaryValue, Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Sink};
 use tokio_core::reactor::Core;
@@ -34,6 +34,7 @@ use toml::Value;
 
 use std::{
     collections::{BTreeMap, HashSet},
+    convert::TryFrom,
     fmt,
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -66,7 +67,7 @@ use crate::{
         fabric::{NodePrivateConfig, NodePublicConfig},
         user_agent, Height, Milliseconds, Round, ValidatorId,
     },
-    messages::{AnyTx, Connect, Message, Verified, SignedMessage},
+    messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
 };
 
@@ -470,7 +471,7 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Message::concrete(
+        let connect = Verified::from_value(
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
@@ -519,13 +520,15 @@ impl NodeHandler {
         }
     }
 
-    fn sign_message<T>(&self, message: T) -> Verified<T> {
-        unimplemented!();
-        // Message::concrete(
-        //     message,
-        //     *self.state.consensus_public_key(),
-        //     self.state.consensus_secret_key(),
-        // )
+    fn sign_message<T>(&self, message: T) -> Verified<T>
+    where
+        T: TryFrom<SignedMessage> + Into<ExonumMessage> + Clone,
+    {
+        Verified::from_value(
+            message,
+            self.state.consensus_public_key(),
+            self.state.consensus_secret_key(),
+        )
     }
 
     /// Return internal `SharedNodeState`
@@ -586,7 +589,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(Signed::author);
+            let it = self.state.peers().values().map(Verified::author);
             let it = it.chain(
                 self.state()
                     .connect_list()
@@ -1054,7 +1057,7 @@ impl Node {
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            *self.state().consensus_public_key(),
+            self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),

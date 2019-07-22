@@ -286,6 +286,6 @@ pub trait Transaction: BinaryValue {
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Verified<AnyTx> {
-        Verified::new(self.into_any_tx(service_id), public_key, secret_key)
+        Verified::from_value(self.into_any_tx(service_id), public_key, secret_key)
     }
 }

@@ -44,7 +44,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
-    messages::{AnyTx, Connect, Message, Precommit, SignedMessage, Verified},
+    messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
     runtime::{dispatcher::Dispatcher, supervisor::Supervisor},
 };
@@ -58,7 +58,7 @@ mod tests;
 
 /// Transaction message shortcut.
 #[deprecated]
-pub type TransactionMessage = SignedMessage;
+pub type TransactionMessage = Verified<AnyTx>;
 
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
@@ -205,9 +205,11 @@ impl Blockchain {
         //     ));
         // }
 
-        let msg = Message::concrete(tx, self.service_keypair.0, &self.service_keypair.1);
-
-        self.api_sender.broadcast_transaction(msg)
+        self.api_sender.broadcast_transaction(Verified::from_value(
+            tx,
+            self.service_keypair.0,
+            &self.service_keypair.1,
+        ))
     }
 
     /// Executes the given transactions from the pool.
@@ -272,9 +274,9 @@ impl Blockchain {
                 proposer_id,
                 height,
                 tx_hashes.len() as u32,
-                &last_hash,
-                &tx_hash,
-                &state_hash,
+                last_hash,
+                tx_hash,
+                state_hash,
             );
             trace!("execute block = {:?}", block);
             // Calculate block hash.
@@ -438,8 +440,8 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message<T: Into<Message>>(&mut self, round: Round, raw: Verified<T>) {
-        self.save_messages(round, iter::once(raw.into()));
+    pub(crate) fn save_message<T: Into<Message>>(&mut self, round: Round, message: T) {
+        self.save_messages(round, iter::once(message.into()));
     }
 
     /// Saves a collection of SignedMessage to the consensus messages cache with single access to the

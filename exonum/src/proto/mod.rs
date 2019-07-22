@@ -61,12 +61,13 @@
 
 pub use self::schema::{
     blockchain::{Block, ConfigReference, TxLocation},
-    helpers::{BitVec, Hash, PublicKey, Signature},
-    protocol::{
-        AnyTx, BlockRequest, BlockResponse, CallInfo, Connect, ExonumMessage, PeersRequest,
-        Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status,
-        TransactionsRequest, TransactionsResponse,
+    consensus::{
+        BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
+        PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
+        TransactionsResponse,
     },
+    helpers::{BitVec, Hash, PublicKey, Signature},
+    runtime::{AnyTx, CallInfo},
 };
 
 use std::borrow::Cow;

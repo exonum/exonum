@@ -174,7 +174,7 @@ use exonum::{
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
     proto::Any,
     runtime::{rust::ServiceFactory, ServiceInstanceId},

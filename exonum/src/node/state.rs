@@ -19,7 +19,6 @@ use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
-    ops::Deref,
     sync::{Arc, RwLock},
     time::{Duration, SystemTime},
 };
@@ -164,13 +163,13 @@ pub trait VoteMessage: Clone {
 
 impl VoteMessage for Verified<Precommit> {
     fn validator(&self) -> ValidatorId {
-        self.deref().validator()
+        self.payload().validator()
     }
 }
 
 impl VoteMessage for Verified<Prevote> {
     fn validator(&self) -> ValidatorId {
-        self.deref().validator()
+        self.payload().validator()
     }
 }
 
@@ -562,7 +561,7 @@ impl State {
         let validator_id = config
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == *self.consensus_public_key())
+            .position(|pk| pk.consensus_key == self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
 
         // TODO: update connect list (ECR-1745)
@@ -624,8 +623,8 @@ impl State {
     }
 
     /// Returns the consensus public key of the current node.
-    pub fn consensus_public_key(&self) -> &PublicKey {
-        &self.consensus_public_key
+    pub fn consensus_public_key(&self) -> PublicKey {
+        self.consensus_public_key
     }
 
     /// Returns the consensus secret key of the current node.
@@ -634,8 +633,8 @@ impl State {
     }
 
     /// Returns the service public key of the current node.
-    pub fn service_public_key(&self) -> &PublicKey {
-        &self.service_public_key
+    pub fn service_public_key(&self) -> PublicKey {
+        self.service_public_key
     }
 
     /// Returns the service secret key of the current node.
@@ -738,8 +737,8 @@ impl State {
     }
 
     /// Returns a hash of the last block.
-    pub fn last_hash(&self) -> &Hash {
-        &self.last_hash
+    pub fn last_hash(&self) -> Hash {
+        self.last_hash
     }
 
     /// Locks the node to the specified round and propose hash.
@@ -840,7 +839,7 @@ impl State {
         for (propose_hash, propose_state) in &mut self.proposes {
             propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
-                full_proposes.push((*propose_hash, propose_state.message().round()));
+                full_proposes.push((*propose_hash, propose_state.message().payload().round()));
             }
         }
 
@@ -924,7 +923,7 @@ impl State {
             Entry::Occupied(..) => bail!("Propose already found"),
             Entry::Vacant(e) => {
                 let mut unknown_txs = HashSet::new();
-                for hash in msg.transactions() {
+                for hash in &msg.payload().transactions {
                     if transactions.get(hash).is_some() {
                         if !transaction_pool.contains(hash) {
                             bail!(
@@ -990,7 +989,7 @@ impl State {
         assert!(self.incomplete_block().is_none());
 
         let mut unknown_txs = HashSet::new();
-        for hash in msg.transactions() {
+        for hash in &msg.payload().transactions {
             if txs.get(hash).is_some() {
                 if !txs_pool.contains(hash) {
                     panic!(
@@ -1022,7 +1021,7 @@ impl State {
             if validator_state.id == msg.validator() {
                 if let Some(other) = validator_state
                     .our_prevotes
-                    .insert(msg.round(), msg.clone())
+                    .insert(msg.payload().round, msg.clone())
                 {
                     if other != msg {
                         panic!(
@@ -1035,7 +1034,7 @@ impl State {
             }
         }
 
-        let key = (msg.round(), *msg.propose_hash());
+        let key = (msg.payload().round, msg.payload().propose_hash);
         let validators_len = self.validators().len();
         let votes = self
             .prevotes
@@ -1054,10 +1053,10 @@ impl State {
     }
 
     /// Returns ids of validators that that sent pre-votes for the specified propose.
-    pub fn known_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
+    pub fn known_prevotes(&self, round: Round, propose_hash: Hash) -> BitVec {
         let len = self.validators().len();
         self.prevotes
-            .get(&(round, *propose_hash))
+            .get(&(round, propose_hash))
             .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
     }
 
@@ -1080,9 +1079,9 @@ impl State {
             if validator_state.id == msg.validator() {
                 if let Some(other) = validator_state
                     .our_precommits
-                    .insert(msg.round(), msg.clone())
+                    .insert(msg.payload().round, msg.clone())
                 {
-                    if other.propose_hash() != msg.propose_hash() {
+                    if other.payload().propose_hash != msg.payload().propose_hash {
                         panic!(
                             "Trying to send different precommits for same round, old={:?}, \
                              new={:?}",
@@ -1093,7 +1092,7 @@ impl State {
             }
         }
 
-        let key = (msg.round(), *msg.block_hash());
+        let key = (msg.payload().round, msg.payload().block_hash);
         let validators_len = self.validators().len();
         let votes = self
             .precommits
@@ -1141,7 +1140,7 @@ impl State {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
                         // TODO: Inefficient. (ECR-171)
-                        if Some(*msg.propose_hash()) != self.locked_propose {
+                        if Some(msg.payload().propose_hash) != self.locked_propose {
                             return true;
                         }
                     }

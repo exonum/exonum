@@ -536,7 +536,6 @@ impl BlockchainExplorer {
         schema.transactions().get(tx_hash)
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn precommits(&self, block: &Block) -> Vec<Verified<Precommit>> {
         let schema = Schema::new(&self.snapshot);
         let precommits_table = schema.precommits(&block.object_hash());
@@ -544,7 +543,6 @@ impl BlockchainExplorer {
         precommits
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
         let schema = Schema::new(&self.snapshot);
         let tx_hashes_table = schema.block_transactions(block.height());

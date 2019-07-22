@@ -24,7 +24,7 @@ use std::fmt::{self, Display};
 
 use exonum::{
     api::{self, node::SharedNodeState, ApiAggregator, ServiceApiState},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     node::ApiSender,
 };
 

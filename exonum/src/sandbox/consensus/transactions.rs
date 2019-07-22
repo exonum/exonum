@@ -133,7 +133,7 @@ fn tx_pool_size_overflow() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &sandbox.last_hash(),
+        sandbox.last_hash(),
         &[tx1.object_hash()],
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -143,7 +143,7 @@ fn tx_pool_size_overflow() {
         .with_height(Height(1))
         .with_tx_hash(&compute_tx_hash(&[tx1.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone()]))
-        .with_prev_hash(&sandbox.last_hash())
+        .with_prev_hash(sandbox.last_hash())
         .build();
 
     sandbox.recv(&propose);

@@ -55,7 +55,7 @@ pub struct SignedMessage {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "consensus::Connect", crate = "crate")]
 pub struct Connect {
-    /// The node's address.
+    /// The node's public address.
     pub host: String,
     /// Time when the message was created.
     pub time: DateTime<Utc>,
@@ -171,15 +171,15 @@ impl Propose {
         validator: ValidatorId,
         height: Height,
         round: Round,
-        prev_hash: &Hash,
-        transactions: &[Hash],
+        prev_hash: Hash,
+        transactions: impl IntoIterator<Item = Hash>,
     ) -> Self {
         Self {
             validator,
             height,
             round,
-            prev_hash: *prev_hash,
-            transactions: transactions.to_vec(),
+            prev_hash,
+            transactions: transactions.into_iter().collect(),
         }
     }
 
@@ -244,14 +244,14 @@ impl Prevote {
         validator: ValidatorId,
         height: Height,
         round: Round,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         locked_round: Round,
     ) -> Self {
         Self {
             validator,
             height,
             round,
-            propose_hash: *propose_hash,
+            propose_hash,
             locked_round,
         }
     }
@@ -319,16 +319,16 @@ impl Precommit {
         validator: ValidatorId,
         height: Height,
         round: Round,
-        propose_hash: &Hash,
-        block_hash: &Hash,
+        propose_hash: Hash,
+        block_hash: Hash,
         time: DateTime<Utc>,
     ) -> Self {
         Self {
             validator,
             height,
             round,
-            propose_hash: *propose_hash,
-            block_hash: *block_hash,
+            propose_hash,
+            block_hash,
             time,
         }
     }
@@ -387,16 +387,16 @@ pub struct BlockResponse {
 impl BlockResponse {
     /// Create new `BlockResponse` message.
     pub fn new(
-        to: &PublicKey,
+        to: PublicKey,
         block: Block,
         precommits: Vec<Vec<u8>>,
-        transactions: &[Hash],
+        transactions: impl IntoIterator<Item = Hash>,
     ) -> Self {
         Self {
-            to: *to,
+            to,
             block,
             precommits,
-            transactions: transactions.to_vec(),
+            transactions: transactions.into_iter().collect(),
         }
     }
 
@@ -441,10 +441,10 @@ pub struct TransactionsResponse {
 
 impl TransactionsResponse {
     /// Create new `TransactionsResponse` message.
-    pub fn new(to: &PublicKey, transactions: Vec<Vec<u8>>) -> Self {
+    pub fn new(to: PublicKey, transactions: impl IntoIterator<Item = Vec<u8>>) -> Self {
         Self {
-            to: *to,
-            transactions,
+            to,
+            transactions: transactions.into_iter().collect(),
         }
     }
 
@@ -483,11 +483,11 @@ pub struct ProposeRequest {
 
 impl ProposeRequest {
     /// Create new `ProposeRequest`.
-    pub fn new(to: &PublicKey, height: Height, propose_hash: &Hash) -> Self {
+    pub fn new(to: PublicKey, height: Height, propose_hash: Hash) -> Self {
         Self {
-            to: *to,
+            to,
             height,
-            propose_hash: *propose_hash,
+            propose_hash,
         }
     }
 
@@ -524,10 +524,10 @@ pub struct TransactionsRequest {
 
 impl TransactionsRequest {
     /// Create new `TransactionsRequest`.
-    pub fn new(to: &PublicKey, txs: &[Hash]) -> Self {
+    pub fn new(to: PublicKey, txs: impl IntoIterator<Item = Hash>) -> Self {
         Self {
-            to: *to,
-            txs: txs.to_vec(),
+            to,
+            txs: txs.into_iter().collect(),
         }
     }
 
@@ -570,17 +570,17 @@ pub struct PrevotesRequest {
 impl PrevotesRequest {
     /// Create new `PrevotesRequest`.
     pub fn new(
-        to: &PublicKey,
+        to: PublicKey,
         height: Height,
         round: Round,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         validators: BitVec,
     ) -> Self {
         Self {
-            to: *to,
+            to,
             height,
             round,
-            propose_hash: *propose_hash,
+            propose_hash,
             validators,
         }
     }
@@ -628,8 +628,8 @@ pub struct PeersRequest {
 
 impl PeersRequest {
     /// Create new `PeersRequest`.
-    pub fn new(to: &PublicKey) -> Self {
-        Self { to: *to }
+    pub fn new(to: PublicKey) -> Self {
+        Self { to }
     }
     /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
@@ -658,8 +658,8 @@ pub struct BlockRequest {
 
 impl BlockRequest {
     /// Create new `BlockRequest`.
-    pub fn new(to: &PublicKey, height: Height) -> Self {
-        Self { to: *to, height }
+    pub fn new(to: PublicKey, height: Height) -> Self {
+        Self { to, height }
     }
     /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
@@ -715,6 +715,15 @@ impl TryFrom<SignedMessage> for ExonumMessage {
 
     fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
         ExonumMessage::from_bytes(value.payload.into())
+    }
+}
+
+impl TryFrom<&SignedMessage> for ExonumMessage {
+    type Error = failure::Error;
+
+    fn try_from(value: &SignedMessage) -> Result<Self, Self::Error> {
+        let bytes = std::borrow::Cow::Borrowed(value.payload.as_ref());
+        ExonumMessage::from_bytes(bytes)
     }
 }
 

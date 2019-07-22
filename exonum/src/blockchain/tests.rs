@@ -28,10 +28,9 @@ use crate::{
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
-        ServiceInstanceId,
         error::ErrorKind,
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo, ExecutionError,
+        ArtifactInfo, ExecutionError, ServiceInstanceId,
     },
 };
 

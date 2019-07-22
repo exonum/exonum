@@ -18,6 +18,7 @@ use actix::*;
 use actix_web::ws;
 use exonum_merkledb::{IndexAccess, ListProof, ObjectHash, Snapshot};
 use futures::Future;
+use hex::FromHex;
 use log::error;
 use rand::{rngs::ThreadRng, Rng};
 
@@ -34,8 +35,7 @@ use crate::{
     },
     blockchain::{Block, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
-    events::error::into_failure,
-    messages::{AnyTx, BinaryValue, Message as ExonumMessage, SignedMessage},
+    messages::SignedMessage,
 };
 
 /// Message, coming from websocket connection.
@@ -106,6 +106,7 @@ impl CommittedTransactionSummary {
         T: AsRef<dyn Snapshot> + IndexAccess,
     {
         let tx = schema.transactions().get(tx_hash)?;
+        let tx = tx.as_ref();
         let service_id = tx.call_info.instance_id as u16;
         let tx_id = tx.call_info.method_id as u16;
         let tx_result = schema.transaction_results().get(tx_hash)?;
@@ -343,15 +344,13 @@ impl Handler<Transaction> for Server {
         Transaction { tx }: Transaction,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let buf: Vec<u8> = hex::decode(tx.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_bytes(buf.into()).and_then(SignedMessage::verify)?;
-        let tx_hash = signed.object_hash();
-        let signed = AnyTx::try_from(ExonumMessage::deserialize(signed)?)
-            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
+        let msg = SignedMessage::from_hex(tx)?;
+        let tx_hash = msg.object_hash();
+        // FIXME Don't ignore message error.
         let _ = self
             .service_api_state
             .sender()
-            .broadcast_transaction(signed);
+            .broadcast_transaction(msg.verify()?);
         Ok(TransactionResponse { tx_hash })
     }
 }

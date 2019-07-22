@@ -19,6 +19,7 @@ use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Quer
 use chrono::{DateTime, Utc};
 use exonum_merkledb::ObjectHash;
 use futures::{Future, IntoFuture};
+use hex::FromHex;
 
 use std::{
     ops::{Bound, Range},
@@ -37,10 +38,9 @@ use crate::{
     },
     blockchain::Block,
     crypto::Hash,
-    events::error::into_failure,
     explorer::{self, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Message, Precommit, SignedMessage, Verified},
+    messages::{Precommit, SignedMessage, Verified},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -149,6 +149,18 @@ impl TransactionQuery {
     }
 }
 
+impl AsRef<str> for TransactionHex {
+    fn as_ref(&self) -> &str {
+        self.tx_body.as_ref()
+    }
+}
+
+impl AsRef<[u8]> for TransactionHex {
+    fn as_ref(&self) -> &[u8] {
+        self.tx_body.as_ref()
+    }
+}
+
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone, Copy)]
 pub struct ExplorerApi;
@@ -249,14 +261,12 @@ impl ExplorerApi {
         state: &ServiceApiState,
         query: TransactionHex,
     ) -> Result<TransactionResponse, ApiError> {
-        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_bytes(buf.into()).and_then(SignedMessage::verify)?;
-        let tx_hash = signed.object_hash();
-        let signed = AnyTx::try_from(Message::deserialize(signed)?)
-            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
+        let msg = SignedMessage::from_hex(query.tx_body)?;
+        let tx_hash = msg.object_hash();
+        // FIXME Don't ignore message error.
         let _ = state
             .sender()
-            .broadcast_transaction(signed)
+            .broadcast_transaction(msg.verify()?)
             .map_err(ApiError::from);
         Ok(TransactionResponse { tx_hash })
     }
@@ -366,7 +376,7 @@ fn median_precommits_time(precommits: &[Verified<Precommit>]) -> DateTime<Utc> {
     if precommits.is_empty() {
         UNIX_EPOCH.into()
     } else {
-        let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
+        let mut times: Vec<_> = precommits.iter().map(|p| p.as_ref().time()).collect();
         times.sort();
         times[times.len() / 2]
     }

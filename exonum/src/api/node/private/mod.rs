@@ -22,8 +22,8 @@ use std::{collections::HashMap, net::SocketAddr};
 use crate::{
     api::{Error as ApiError, ServiceApiScope, ServiceApiState},
     crypto::PublicKey,
-    runtime::ServiceInstanceId,
     node::{ConnectInfo, ExternalMessage},
+    runtime::ServiceInstanceId,
 };
 
 use super::SharedNodeState;

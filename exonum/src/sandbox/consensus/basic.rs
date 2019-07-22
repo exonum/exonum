@@ -70,9 +70,9 @@ fn test_check_leader() {
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(ValidatorId(0)),
         Height(1),
-        &sandbox.last_block().object_hash(),
+        sandbox.last_block().object_hash(),
         sandbox.secret_key(ValidatorId(0)),
     ));
 
@@ -120,8 +120,8 @@ fn test_reach_actual_round() {
         ValidatorId(3),
         Height(1),
         Round(4),
-        &block_at_first_height.clone().object_hash(),
-        &[], // there are no transactions in future propose
+        block_at_first_height.clone().object_hash(),
+        vec![], // there are no transactions in future propose
         sandbox.secret_key(ValidatorId(3)),
     );
 
@@ -243,8 +243,8 @@ fn test_retrieve_block_and_precommits() {
 
     assert_eq!(expected_height, block.height());
     for precommit in precommits {
-        assert_eq!(expected_height, precommit.height());
-        assert_eq!(expected_block_hash, *precommit.block_hash());
+        assert_eq!(expected_height, precommit.payload().height);
+        assert_eq!(expected_block_hash, precommit.payload().block_hash);
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());

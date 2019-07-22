@@ -539,7 +539,7 @@ fn get_propose_with_transactions_for_validator(
         validator,
         sandbox.current_height(),
         sandbox.current_round(),
-        &sandbox.last_hash(),
+        sandbox.last_hash(),
         transactions,
         sandbox.secret_key(validator),
     )
@@ -615,7 +615,7 @@ pub fn receive_valid_propose_with_transactions(
         sandbox.current_leader(),
         sandbox.current_height(),
         sandbox.current_round(),
-        &sandbox.last_hash(),
+        sandbox.last_hash(),
         transactions,
         sandbox.secret_key(sandbox.current_leader()),
     );

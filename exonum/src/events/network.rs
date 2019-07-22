@@ -38,7 +38,7 @@ use crate::{
         noise::{Handshake, HandshakeParams, NoiseHandshake},
     },
     helpers::Milliseconds,
-    messages::{Connect, Message, Service, Verified, SignedMessage},
+    messages::{Connect, Message, Service, SignedMessage, Verified},
     node::state::SharedConnectList,
 };
 
@@ -577,7 +577,7 @@ impl NetworkHandler {
         let connect = self.handshake_params.connect.clone();
         self.connect(key, &self.handshake_params)
             .and_then(move |_| {
-                if &message == connect.signed_message() {
+                if &message == connect.as_raw() {
                     Either::A(future::ok(()))
                 } else {
                     Either::B(pool.send_message(&key, message))

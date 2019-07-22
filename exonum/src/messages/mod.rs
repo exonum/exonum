@@ -39,7 +39,7 @@ use exonum_merkledb::ObjectHash;
 use std::borrow::Cow;
 
 use crate::{
-    crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH},
+    crypto::{Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH},
     helpers::{Height, Round, ValidatorId},
 };
 
@@ -65,7 +65,7 @@ pub const TX_RES_EMPTY_SIZE: usize = SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH
 pub const TX_RES_PB_OVERHEAD_PAYLOAD: usize = 8;
 
 /// Service messages.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Service {
     /// Transaction message.
     AnyTx(Verified<AnyTx>),
@@ -86,7 +86,7 @@ impl Service {
 }
 
 /// Consensus messages.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Consensus {
     /// Precommit message.
     Precommit(Verified<Precommit>),
@@ -107,7 +107,7 @@ impl Consensus {
 }
 
 /// Response messages.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Responses {
     /// Transactions response message.
     TransactionsResponse(Verified<TransactionsResponse>),
@@ -137,7 +137,7 @@ impl From<Verified<BlockResponse>> for Responses {
 }
 
 /// Request messages.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Requests {
     /// Propose request message.
     ProposeRequest(Verified<ProposeRequest>),
@@ -164,7 +164,7 @@ impl Requests {
 }
 
 /// Exonum protocol messages.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Message {
     /// Service messages.
     Service(Service),
@@ -177,6 +177,16 @@ pub enum Message {
 }
 
 impl Message {
+    /// Creates a new Exonum message.
+    #[deprecated]
+    pub fn concrete<T: Into<ExonumMessage>>(
+        message: T,
+        author: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Self {
+        Self::from(Verified::from_value(message.into(), author, secret_key))
+    }
+
     /// Deserialize message from signed message.
     pub fn from_signed(signed: SignedMessage) -> Result<Self, failure::Error> {
         signed.verify::<ExonumMessage>().map(From::from)
@@ -204,6 +214,22 @@ macro_rules! impl_message_from_verified {
             impl From<Verified<$concrete>> for Message {
                 fn from(msg: Verified<$concrete>) -> Self {
                     Message::$category($category::$concrete(msg))
+                }
+            }
+
+            impl std::convert::TryFrom<Message> for Verified<$concrete> {
+                type Error = failure::Error;
+
+                fn try_from(msg: Message) -> Result<Self, Self::Error> {
+                    if let Message::$category($category::$concrete(msg)) = msg {
+                        Ok(msg)
+                    } else {
+                        Err(failure::format_err!(
+                            "Given message is not a {}::{}",
+                            stringify!($category),
+                            stringify!($concrete)
+                        ))
+                    }
                 }
             }
         )*
@@ -243,23 +269,23 @@ impl_message_from_verified! {
 impl Requests {
     /// Returns public key of the message recipient.
     pub fn to(&self) -> PublicKey {
-        *match *self {
-            Requests::ProposeRequest(ref msg) => msg.as_ref().to(),
-            Requests::TransactionsRequest(ref msg) => msg.as_ref().to(),
-            Requests::PrevotesRequest(ref msg) => msg.as_ref().to(),
-            Requests::PeersRequest(ref msg) => msg.as_ref().to(),
-            Requests::BlockRequest(ref msg) => msg.as_ref().to(),
+        match *self {
+            Requests::ProposeRequest(ref msg) => msg.payload().to,
+            Requests::TransactionsRequest(ref msg) => msg.payload().to,
+            Requests::PrevotesRequest(ref msg) => msg.payload().to,
+            Requests::PeersRequest(ref msg) => msg.payload().to,
+            Requests::BlockRequest(ref msg) => msg.payload().to,
         }
     }
 
     /// Returns author public key of the message sender.
     pub fn author(&self) -> PublicKey {
         match *self {
-            Requests::ProposeRequest(ref msg) => msg.as_raw().author,
-            Requests::TransactionsRequest(ref msg) => msg.as_raw().author,
-            Requests::PrevotesRequest(ref msg) => msg.as_raw().author,
-            Requests::PeersRequest(ref msg) => msg.as_raw().author,
-            Requests::BlockRequest(ref msg) => msg.as_raw().author,
+            Requests::ProposeRequest(ref msg) => msg.author(),
+            Requests::TransactionsRequest(ref msg) => msg.author(),
+            Requests::PrevotesRequest(ref msg) => msg.author(),
+            Requests::PeersRequest(ref msg) => msg.author(),
+            Requests::BlockRequest(ref msg) => msg.author(),
         }
     }
 }
@@ -268,36 +294,36 @@ impl Consensus {
     /// Returns author public key of the message sender.
     pub fn author(&self) -> PublicKey {
         match *self {
-            Consensus::Propose(ref msg) => msg.as_raw().author,
-            Consensus::Prevote(ref msg) => msg.as_raw().author,
-            Consensus::Precommit(ref msg) => msg.as_raw().author,
+            Consensus::Propose(ref msg) => msg.author(),
+            Consensus::Prevote(ref msg) => msg.author(),
+            Consensus::Precommit(ref msg) => msg.author(),
         }
     }
 
     /// Returns validator id of the message sender.
     pub fn validator(&self) -> ValidatorId {
         match *self {
-            Consensus::Propose(ref msg) => msg.as_ref().validator(),
-            Consensus::Prevote(ref msg) => msg.as_ref().validator(),
-            Consensus::Precommit(ref msg) => msg.as_ref().validator(),
+            Consensus::Propose(ref msg) => msg.payload().validator(),
+            Consensus::Prevote(ref msg) => msg.payload().validator(),
+            Consensus::Precommit(ref msg) => msg.payload().validator(),
         }
     }
 
     /// Returns height of the message.
     pub fn height(&self) -> Height {
         match *self {
-            Consensus::Propose(ref msg) => msg.as_ref().height(),
-            Consensus::Prevote(ref msg) => msg.as_ref().height(),
-            Consensus::Precommit(ref msg) => msg.as_ref().height(),
+            Consensus::Propose(ref msg) => msg.payload().height(),
+            Consensus::Prevote(ref msg) => msg.payload().height(),
+            Consensus::Precommit(ref msg) => msg.payload().height(),
         }
     }
 
     /// Returns round of the message.
     pub fn round(&self) -> Round {
         match *self {
-            Consensus::Propose(ref msg) => msg.as_ref().round(),
-            Consensus::Prevote(ref msg) => msg.as_ref().round(),
-            Consensus::Precommit(ref msg) => msg.as_ref().round(),
+            Consensus::Propose(ref msg) => msg.payload().round(),
+            Consensus::Prevote(ref msg) => msg.payload().round(),
+            Consensus::Precommit(ref msg) => msg.payload().round(),
         }
     }
 }

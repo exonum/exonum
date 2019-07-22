@@ -29,7 +29,7 @@ use exonum::{
     crypto::{self, Hash},
     explorer::*,
     helpers::Height,
-    messages::{self, AnyTx, Signed},
+    messages::{AnyTx, Verified},
     runtime::{error::ErrorKind, rust::Transaction},
 };
 use exonum_merkledb::ObjectHash;
@@ -83,22 +83,16 @@ fn test_explorer_basics() {
         let tx_info = block.transaction(0).unwrap();
         assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
         assert_eq!(tx_info.status(), Ok(()));
+        assert_eq!(tx_info.content(), &tx_alice);
         assert_eq!(
-            tx_info.content().signed_message(),
-            tx_alice.signed_message()
-        );
-        assert_eq!(
-            tx_info.content().signed_message().object_hash(),
+            tx_info.content().object_hash(),
             block.transaction_hashes()[0]
         );
 
         let tx_info = explorer.transaction(&tx_alice.object_hash()).unwrap();
         assert!(!tx_info.is_in_pool());
         assert!(tx_info.is_committed());
-        assert_eq!(
-            tx_info.content().signed_message(),
-            tx_alice.signed_message()
-        );
+        assert_eq!(tx_info.content(), &tx_alice);
 
         let tx_info = match tx_info {
             TransactionInfo::Committed(info) => info,
@@ -108,7 +102,7 @@ fn test_explorer_basics() {
         assert_eq!(
             serde_json::to_value(&tx_info).unwrap(),
             json!({
-                "content": messages::to_hex_string(&tx_alice),
+                "content": tx_alice,
                 "location": {
                     "block_height": 1,
                     "position_in_block": 0,
@@ -138,7 +132,7 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": messages::to_hex_string(&tx_bob),
+            "content": tx_bob,
             "location": {
                 "block_height": 2,
                 "position_in_block": 0,
@@ -159,7 +153,7 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": messages::to_hex_string(&tx_transfer),
+            "content": tx_transfer,
             "location": {
                 "block_height": 2,
                 "position_in_block": 1,
@@ -197,10 +191,7 @@ fn test_explorer_pool_transaction() {
     let tx_info = explorer.transaction(&tx_hash).unwrap();
     assert!(tx_info.is_in_pool());
     assert!(!tx_info.is_committed());
-    assert_eq!(
-        tx_info.content().signed_message(),
-        tx_alice.signed_message()
-    );
+    assert_eq!(tx_info.content(), &tx_alice);
 }
 
 fn tx_generator() -> Box<dyn Iterator<Item = Verified<AnyTx>>> {
@@ -212,10 +203,9 @@ fn tx_generator() -> Box<dyn Iterator<Item = Verified<AnyTx>>> {
 
 // TODO Implement method id getter in CreateWallet. [ECR-3254]
 fn is_create_wallet(tx: &CommittedTransaction) -> bool {
-    let raw_tx = tx.content();
+    let raw_tx = tx.content().payload();
     if raw_tx.call_info.method_id == CreateWallet::METHOD_ID {
         raw_tx
-            .payload()
             .parse::<CreateWallet>()
             .expect("Unable to parse transaction");
         true
@@ -378,7 +368,7 @@ fn test_transaction_iterator() {
     let failed_tx_hashes: Vec<_> = block
         .iter()
         .filter(|tx| tx.status().is_err())
-        .map(|tx| tx.content().signed_message().object_hash())
+        .map(|tx| tx.content().object_hash())
         .collect();
     assert_eq!(
         failed_tx_hashes,

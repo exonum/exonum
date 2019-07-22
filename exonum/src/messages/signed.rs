@@ -19,14 +19,14 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 
-use std::{borrow::Cow, convert::TryFrom, fmt, str::FromStr, ops::Deref};
+use std::{borrow::Cow, convert::TryFrom, fmt, str::FromStr};
 
 use crate::crypto::{self, Hash, PublicKey, SecretKey};
 
-use super::types::SignedMessage;
+use super::types::{ExonumMessage, SignedMessage};
 
 impl SignedMessage {
-    /// Creates a new signed message.
+    /// Creates a new signed message from the given binary value.
     pub fn new(payload: impl BinaryValue, author: PublicKey, secret_key: &SecretKey) -> Self {
         let payload = payload.into_bytes();
         let signature = crypto::sign(payload.as_ref(), secret_key);
@@ -48,7 +48,7 @@ impl SignedMessage {
             "Failed to verify signature."
         );
         // Deserializes message.
-        let inner = T::try_from(self)
+        let inner = T::try_from(self.clone())
             .map_err(|_| failure::format_err!("Failed to decode message from payload."))?;
 
         Ok(Verified { raw: self, inner })
@@ -118,24 +118,19 @@ impl Serialize for SignedMessage {
 ///
 /// Be careful with `ProtobufConvert::from_bytes` method!
 /// It for performance reasons skips signature verification.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Debug)]
 pub struct Verified<T> {
-    pub(in super) raw: SignedMessage,
-    pub(in super) inner: T,
+    pub(super) raw: SignedMessage,
+    pub(super) inner: T,
 }
 
-impl<T> Verified<T>
-where
-    T: TryFrom<SignedMessage>,
-{
-    /// Creates a verified message from the raw buffer.
-    pub fn from_raw<V>(bytes: V) -> Result<Self, failure::Error>
-    where
-        for<'a> V: Into<Cow<'a, [u8]>>,
-    {
-        SignedMessage::from_bytes(bytes.into())?.verify()
+impl<T> PartialEq for Verified<T> {
+    fn eq(&self, other: &Verified<T>) -> bool {
+        self.raw.eq(&other.raw)
     }
+}
 
+impl<T> Verified<T> {
     /// Returns reference to the underlying signed message.
     pub fn as_raw(&self) -> &SignedMessage {
         &self.raw
@@ -146,19 +141,35 @@ where
         self.raw
     }
 
-    /// Takes the underlying verified message.
-    pub fn into_inner(self) -> T {
-        self.inner
+    /// Returns message author key.
+    pub fn author(&self) -> PublicKey {
+        self.raw.author
     }
 }
 
 impl<T> Verified<T>
 where
-    T: TryFrom<SignedMessage> + BinaryValue,
+    T: TryFrom<SignedMessage>,
 {
-    /// Creates a new verified message.
-    pub fn new(inner: T, public_key: PublicKey, secret_key: &SecretKey) -> Self {
-        let raw = SignedMessage::new(inner.to_bytes(), public_key, secret_key);
+    /// Returns reference to the underlying payload.
+    pub fn payload(&self) -> &T {
+        &self.inner
+    }
+
+    /// Takes the underlying payload.
+    pub fn into_payload(self) -> T {
+        self.inner
+    }
+}
+
+// TODO Avoid needless clone here [ECR-3222]
+impl<T> Verified<T>
+where
+    T: TryFrom<SignedMessage> + Into<ExonumMessage> + Clone,
+{
+    /// Signs the specified value and creates a new verified message from it.
+    pub fn from_value(inner: T, public_key: PublicKey, secret_key: &SecretKey) -> Self {
+        let raw = SignedMessage::new(inner.clone().into(), public_key, secret_key);
         Self { raw, inner }
     }
 }
@@ -186,7 +197,7 @@ where
     where
         S: Serializer,
     {
-        self.into_raw().serialize(serializer)
+        self.as_raw().serialize(serializer)
     }
 }
 
@@ -200,7 +211,8 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let raw = SignedMessage::from_bytes(bytes)?;
-        let inner = T::try_from(raw).map_err(|_| failure::format_err!("Noo"))?;
+        let inner = T::try_from(raw.clone())
+            .map_err(|_| failure::format_err!("Unable to decode message"))?;
         Ok(Self { raw, inner })
     }
 }
@@ -210,13 +222,19 @@ where
     T: TryFrom<SignedMessage>,
 {
     fn object_hash(&self) -> Hash {
-        crypto::hash(&self.to_bytes())
+        self.raw.object_hash()
     }
 }
 
 impl<T> AsRef<T> for Verified<T> {
     fn as_ref(&self) -> &T {
         &self.inner
+    }
+}
+
+impl<T> From<Verified<T>> for SignedMessage {
+    fn from(msg: Verified<T>) -> Self {
+        msg.into_raw()
     }
 }
 
@@ -227,6 +245,7 @@ mod tests {
         crypto::{self, Hash},
         helpers::Height,
         messages::types::{ExonumMessage, Precommit, Status},
+        runtime::{AnyTx, CallInfo},
     };
 
     #[test]
@@ -241,10 +260,10 @@ mod tests {
         let signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
 
         let verified_protocol = signed.clone().verify::<ExonumMessage>().unwrap();
-        assert_eq!(verified_protocol.payload, protocol_message);
+        assert_eq!(verified_protocol.inner, protocol_message);
 
         let verified_status = signed.clone().verify::<Status>().unwrap();
-        assert_eq!(verified_status.payload, msg);
+        assert_eq!(verified_status.inner, msg);
 
         // Wrong variant
         let err = signed.verify::<Precommit>().unwrap_err();
@@ -265,5 +284,46 @@ mod tests {
         signed.author = crypto::gen_keypair().0;
         let err = signed.clone().verify::<ExonumMessage>().unwrap_err();
         assert_eq!(err.to_string(), "Failed to verify signature.");
+    }
+
+    #[test]
+    fn test_verified_status_binary_value() {
+        let keypair = crypto::gen_keypair();
+
+        let msg = Verified::from_value(
+            Status {
+                height: Height(0),
+                last_hash: Hash::zero(),
+            },
+            keypair.0,
+            &keypair.1,
+        );
+        assert_eq!(msg.object_hash(), msg.as_raw().object_hash());
+
+        let bytes = msg.to_bytes();
+        let msg2 = Verified::<Status>::from_bytes(bytes.into()).unwrap();
+        assert_eq!(msg, msg2);
+    }
+
+    #[test]
+    fn test_verified_any_tx_binary_value() {
+        let keypair = crypto::gen_keypair();
+
+        let msg = Verified::from_value(
+            AnyTx {
+                call_info: CallInfo {
+                    instance_id: 5,
+                    method_id: 2,
+                },
+                payload: vec![1, 2, 3, 4],
+            },
+            keypair.0,
+            &keypair.1,
+        );
+        assert_eq!(msg.object_hash(), msg.as_raw().object_hash());
+
+        let bytes = msg.to_bytes();
+        let msg2 = Verified::<AnyTx>::from_bytes(bytes.into()).unwrap();
+        assert_eq!(msg, msg2);
     }
 }

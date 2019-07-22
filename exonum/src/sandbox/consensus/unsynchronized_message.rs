@@ -32,7 +32,7 @@ fn test_queue_message_from_future_round() {
         ValidatorId(3),
         Height(1),
         Round(2),
-        &sandbox.last_hash(),
+        sandbox.last_hash(),
         &[],
         sandbox.secret_key(ValidatorId(3)),
     );

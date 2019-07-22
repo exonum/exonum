@@ -231,7 +231,7 @@ impl Dispatcher {
                 hash: tx_id,
             },
         );
-        self.call(&mut context, tx.call_info, &tx.payload)?;
+        self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().payload)?;
         let actions = context.take_actions();
         // Marks dispatcher as modified if actions are not empty.
         let is_modified = !actions.is_empty();

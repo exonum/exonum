@@ -326,10 +326,10 @@ fn test_recover_consensus_messages_in_other_round() {
 
     // make sure we broadcasted same Prevote for second round
     let first_updated_prevote = sandbox.create_prevote(
-        first_prevote.validator(),
-        first_prevote.height(),
+        first_prevote.payload().validator,
+        first_prevote.payload().height,
         Round(2),
-        first_prevote.propose_hash(),
+        first_prevote.payload().propose_hash,
         Round(1),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -391,11 +391,11 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox_new.broadcast(&first_prevote);
 
     let first_precommit_new_time = sandbox_new.create_precommit(
-        first_precommit.validator(),
-        first_precommit.height(),
-        first_precommit.round(),
-        first_precommit.propose_hash(),
-        first_precommit.block_hash(),
+        first_precommit.payload().validator,
+        first_precommit.payload().height,
+        first_precommit.payload().round,
+        first_precommit.payload().propose_hash,
+        first_precommit.payload().block_hash,
         sandbox_new.time().into(),
         sandbox_new.secret_key(ValidatorId(0)),
     );

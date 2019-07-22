@@ -35,7 +35,7 @@ use crate::{
         NetworkEvent, NetworkRequest,
     },
     helpers::user_agent,
-    messages::{BinaryValue, Connect, Message, Verified, SignedMessage},
+    messages::{BinaryValue, Connect, Message, SignedMessage, Verified},
     node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel},
 };
 
@@ -198,13 +198,13 @@ impl TestEvents {
 
 pub fn connect_message(
     addr: SocketAddr,
-    public_key: &PublicKey,
+    public_key: PublicKey,
     secret_key: &SecretKey,
 ) -> Verified<Connect> {
     let time = time::UNIX_EPOCH;
-    Message::concrete(
+    Verified::from_value(
         Connect::new(&addr.to_string(), time.into(), &user_agent::get()),
-        *public_key,
+        public_key,
         secret_key,
     )
 }
@@ -212,7 +212,7 @@ pub fn connect_message(
 pub fn raw_message(payload_len: usize) -> SignedMessage {
     let buffer = vec![0u8; payload_len];
     let (pk, sk) = gen_keypair();
-    SignedMessage::new(&buffer, pk, &sk)
+    SignedMessage::new(buffer, pk, &sk)
 }
 
 #[derive(Debug, Clone)]
@@ -233,7 +233,7 @@ impl HandshakeParams {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
         let address = "127.0.0.1:8000";
 
-        let connect = Message::concrete(
+        let connect = Verified::from_value(
             Connect::new(address, SystemTime::now().into(), &user_agent::get()),
             public_key,
             &secret_key,
@@ -255,7 +255,7 @@ impl HandshakeParams {
 impl ConnectionParams {
     pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
-        let connect = connect_message(address, &public_key, &secret_key);
+        let connect = connect_message(address, public_key, &secret_key);
         let handshake_params = HandshakeParams::new(
             public_key,
             secret_key.clone(),

@@ -24,10 +24,9 @@ use crate::{
     node::ApiSender,
     proto::Any,
     runtime::{
-        ServiceInstanceId,
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        InstanceSpec, Runtime,
+        InstanceSpec, Runtime, ServiceInstanceId,
     },
 };
 

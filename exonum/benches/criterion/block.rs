@@ -42,7 +42,7 @@ use exonum::{
     blockchain::{Blockchain, GenesisConfig, InstanceCollection, Schema, ValidatorKeys},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     node::ApiSender,
 };
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
@@ -101,9 +101,13 @@ mod timestamping {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
         crypto::Hash,
-        messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{
-            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+        messages::Verified,
+        runtime::{
+            rust::{
+                ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction,
+                TransactionContext,
+            },
+            AnyTx, ServiceInstanceId,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -200,10 +204,13 @@ mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
         crypto::PublicKey,
-        messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{
-            ArtifactInfo, ErrorKind, RustArtifactId, Service, ServiceFactory, Transaction,
-            TransactionContext,
+        messages::Verified,
+        runtime::{
+            rust::{
+                ArtifactInfo, ErrorKind, RustArtifactId, Service, ServiceFactory, Transaction,
+                TransactionContext,
+            },
+            AnyTx, ServiceInstanceId,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
