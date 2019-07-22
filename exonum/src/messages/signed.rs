@@ -162,14 +162,22 @@ where
     }
 }
 
-// TODO Avoid needless clone here [ECR-3222]
 impl<T> Verified<T>
 where
-    T: TryFrom<SignedMessage> + Into<ExonumMessage> + Clone,
+    T: TryFrom<SignedMessage> + Into<ExonumMessage> + TryFrom<ExonumMessage>,
 {
     /// Signs the specified value and creates a new verified message from it.
     pub fn from_value(inner: T, public_key: PublicKey, secret_key: &SecretKey) -> Self {
-        let raw = SignedMessage::new(inner.clone().into(), public_key, secret_key);
+        // Curious trick to avoid clone.
+        // Converts inner to the `ExonumMessage` type to proper serialization.
+        let exonum_msg = inner.into();
+        let raw = SignedMessage::new(exonum_msg.to_bytes(), public_key, secret_key);
+        // Converts back to the inner type.
+        let inner = if let Ok(inner) = T::try_from(exonum_msg) {
+            inner
+        } else {
+            unreachable!("We can safely convert `ExonumMessage` back to the inner type.")
+        };
         Self { raw, inner }
     }
 }

@@ -25,7 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use exonum_merkledb::{BinaryValue, Database, DbOptions, ObjectHash};
+use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Sink};
 use tokio_core::reactor::Core;
@@ -522,7 +522,7 @@ impl NodeHandler {
 
     fn sign_message<T>(&self, message: T) -> Verified<T>
     where
-        T: TryFrom<SignedMessage> + Into<ExonumMessage> + Clone,
+        T: TryFrom<SignedMessage> + Into<ExonumMessage> + TryFrom<ExonumMessage>,
     {
         Verified::from_value(
             message,
