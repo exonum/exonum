@@ -19,7 +19,7 @@ use exonum_merkledb::ObjectHash;
 
 use crate::{
     helpers::{Height, Round, ValidatorId},
-    messages::{Verified, Propose},
+    messages::{Propose, Verified},
     sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 
@@ -103,7 +103,7 @@ fn handle_propose_with_incorrect_time() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -138,7 +138,7 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));

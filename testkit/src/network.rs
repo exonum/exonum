@@ -169,7 +169,7 @@ impl TestNode {
         &self,
         height: Height,
         last_hash: crypto::Hash,
-        tx_hashes: impl IntoIterator<Item=crypto::Hash>,
+        tx_hashes: impl IntoIterator<Item = crypto::Hash>,
     ) -> Verified<Propose> {
         Verified::from_value(
             Propose::new(

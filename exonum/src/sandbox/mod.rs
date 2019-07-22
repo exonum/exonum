@@ -41,9 +41,9 @@ use crate::{
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
-        AnyTx, BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
-        TransactionsResponse, Verified, ExonumMessage
+        AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
+        Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status,
+        TransactionsRequest, TransactionsResponse, Verified,
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
@@ -225,12 +225,12 @@ impl Sandbox {
     /// Creates a `BlockRequest` message signed by this validator.
     pub fn create_block_request(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
+        author: PublicKey,
+        to: PublicKey,
         height: Height,
         secret_key: &SecretKey,
     ) -> Verified<BlockRequest> {
-        Verified::from_value(BlockRequest::new(to, height), *author, secret_key)
+        Verified::from_value(BlockRequest::new(to, height), author, secret_key)
     }
 
     /// Creates a `Status` message signed by this validator.
@@ -245,13 +245,13 @@ impl Sandbox {
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
-    pub fn create_block_response<I: IntoIterator<Item = Verified<Precommit>>>(
+    pub fn create_block_response(
         &self,
-        public_key: &PublicKey,
-        to: &PublicKey,
+        public_key: PublicKey,
+        to: PublicKey,
         block: Block,
-        precommits: I,
-        tx_hashes: &[Hash],
+        precommits: impl IntoIterator<Item = Verified<Precommit>>,
+        tx_hashes: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
     ) -> Verified<BlockResponse> {
         Verified::from_value(
@@ -261,7 +261,7 @@ impl Sandbox {
                 precommits.into_iter().map(Verified::into_bytes).collect(),
                 tx_hashes,
             ),
-            *public_key,
+            public_key,
             secret_key,
         )
     }
@@ -285,11 +285,11 @@ impl Sandbox {
     /// Creates a `PeersRequest` message signed by this validator.
     pub fn create_peers_request(
         &self,
-        public_key: &PublicKey,
-        to: &PublicKey,
+        public_key: PublicKey,
+        to: PublicKey,
         secret_key: &SecretKey,
     ) -> Verified<PeersRequest> {
-        Verified::from_value(PeersRequest::new(to), *public_key, secret_key)
+        Verified::from_value(PeersRequest::new(to), public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -350,7 +350,7 @@ impl Sandbox {
                 validator_id,
                 propose_height,
                 propose_round,
-                &propose_hash,
+                propose_hash,
                 locked_round,
             ),
             self.public_key(validator_id),
@@ -372,7 +372,7 @@ impl Sandbox {
     ) -> Verified<PrevotesRequest> {
         Verified::from_value(
             PrevotesRequest::new(to, height, round, propose_hash, validators),
-            *from,
+            from,
             secret_key,
         )
     }
@@ -388,7 +388,7 @@ impl Sandbox {
     ) -> Verified<ProposeRequest> {
         Verified::from_value(
             ProposeRequest::new(to, height, propose_hash),
-            *author,
+            author,
             secret_key,
         )
     }
@@ -398,26 +398,23 @@ impl Sandbox {
         &self,
         author: PublicKey,
         to: PublicKey,
-        txs: &[Hash],
+        txs: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
     ) -> Verified<TransactionsRequest> {
         Verified::from_value(TransactionsRequest::new(to, txs), author, secret_key)
     }
 
     /// Creates a `TransactionsResponse` message signed by this validator.
-    pub fn create_transactions_response<I>(
+    pub fn create_transactions_response(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
-        txs: I,
+        author: PublicKey,
+        to: PublicKey,
+        txs: impl IntoIterator<Item = Verified<AnyTx>>,
         secret_key: &SecretKey,
-    ) -> Verified<TransactionsResponse>
-    where
-        I: IntoIterator<Item = Verified<AnyTx>>,
-    {
+    ) -> Verified<TransactionsResponse> {
         Verified::from_value(
-            TransactionsResponse::new(to, txs.into_iter().map(Verified::into_bytes).collect()),
-            *author,
+            TransactionsResponse::new(to, txs.into_iter().map(Verified::into_bytes)),
+            author,
             secret_key,
         )
     }
@@ -461,7 +458,7 @@ impl Sandbox {
 
     pub fn recv<T: TryFrom<SignedMessage>>(&self, msg: &Verified<T>) {
         self.check_unexpected_message();
-        let event = NetworkEvent::MessageReceived(msg.to_bytes());
+        let event = NetworkEvent::MessageReceived(msg.as_raw().to_bytes());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -486,7 +483,11 @@ impl Sandbox {
     {
         self.process_events();
         if let Some((real_addr, real_msg)) = self.pop_sent_message() {
-            assert_eq!(expected_msg, real_msg, "Expected to send other message");
+            assert_eq!(
+                expected_msg.as_raw(),
+                real_msg.as_raw(),
+                "Expected to send other message"
+            );
             assert_eq!(
                 key, real_addr,
                 "Expected to send message to other recipient"
@@ -559,7 +560,7 @@ impl Sandbox {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
                 assert_eq!(
                     expected_msg,
-                    real_msg.signed_message(),
+                    real_msg.as_raw(),
                     "Expected to broadcast other message"
                 );
                 if !expected_set.contains(&real_addr) {
@@ -862,12 +863,12 @@ impl Sandbox {
         let config = Configuration {
             listener: ListenerConfig {
                 address,
-                consensus_public_key: *inner.handler.state.consensus_public_key(),
+                consensus_public_key: inner.handler.state.consensus_public_key(),
                 consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
                 connect_list,
             },
             service: ServiceConfig {
-                service_public_key: *inner.handler.state.service_public_key(),
+                service_public_key: inner.handler.state.service_public_key(),
                 service_secret_key: inner.handler.state.service_secret_key().clone(),
             },
             network: NetworkConfiguration::default(),
@@ -913,7 +914,7 @@ impl Sandbox {
     }
 
     fn node_public_key(&self) -> PublicKey {
-        *self.node_state().consensus_public_key()
+        self.node_state().consensus_public_key()
     }
 
     fn node_secret_key(&self) -> SecretKey {

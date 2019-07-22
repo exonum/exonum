@@ -24,14 +24,13 @@ use std::borrow::Cow;
 use crate::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
-    messages::{Verified},
+    messages::Verified,
     runtime::{
-        AnyTx, ServiceInstanceId,
         rust::{
             RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
             TransactionContext,
         },
-        ArtifactInfo,
+        AnyTx, ArtifactInfo, ServiceInstanceId,
     },
 };
 

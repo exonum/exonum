@@ -33,7 +33,7 @@ fn test_queue_message_from_future_round() {
         Height(1),
         Round(2),
         sandbox.last_hash(),
-        &[],
+        vec![],
         sandbox.secret_key(ValidatorId(3)),
     );
 
@@ -46,7 +46,7 @@ fn test_queue_message_from_future_round() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -68,7 +68,7 @@ fn test_queue_prevote_message_from_next_height() {
         ValidatorId(3),
         Height(2),
         Round(1),
-        &empty_hash(),
+        empty_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -104,8 +104,8 @@ fn test_queue_propose_message_from_next_height() {
         ValidatorId(0),
         Height(2),
         Round(2),
-        &block_at_first_height.clone().object_hash(),
-        &[], // there are no transactions in future propose
+        block_at_first_height.clone().object_hash(),
+        vec![], // there are no transactions in future propose
         sandbox.secret_key(ValidatorId(0)),
     );
 

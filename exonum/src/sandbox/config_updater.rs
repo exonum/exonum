@@ -27,9 +27,8 @@ use crate::{
     messages::{AnyTx, Verified},
     proto::{schema::PROTO_SOURCES, ProtobufConvert},
     runtime::{
-        ServiceInstanceId,
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo,
+        ArtifactInfo, ServiceInstanceId,
     },
 };
 
@@ -85,7 +84,7 @@ impl ConfigUpdaterService {
 
 impl TxConfig {
     pub fn create_signed(
-        from: &PublicKey,
+        from: PublicKey,
         config: &[u8],
         actual_from: Height,
         signer: &SecretKey,
@@ -94,7 +93,7 @@ impl TxConfig {
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());
         msg.set_actual_from(actual_from.0);
-        msg.sign(ConfigUpdaterService::ID, *from, signer)
+        msg.sign(ConfigUpdaterService::ID, from, signer)
     }
 }
 

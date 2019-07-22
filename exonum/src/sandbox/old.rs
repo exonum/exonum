@@ -46,7 +46,7 @@ fn test_send_propose_and_prevote() {
         Height(1),
         Round(3),
         sandbox.last_hash(),
-        &[tx.object_hash()],
+        vec![tx.object_hash()],
         sandbox.secret_key(ValidatorId(0)),
     );
 
@@ -55,7 +55,7 @@ fn test_send_propose_and_prevote() {
         ValidatorId(0),
         Height(1),
         Round(3),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -70,7 +70,7 @@ fn test_send_prevote() {
         Height(1),
         Round(1),
         sandbox.last_hash(),
-        &[],
+        vec![],
         sandbox.secret_key(ValidatorId(2)),
     );
 
@@ -79,7 +79,7 @@ fn test_send_prevote() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -94,7 +94,7 @@ fn test_get_lock_and_send_precommit() {
         Height(1),
         Round(1),
         sandbox.last_hash(),
-        &[],
+        vec![],
         sandbox.secret_key(ValidatorId(2)),
     );
 
@@ -103,8 +103,8 @@ fn test_get_lock_and_send_precommit() {
         Height(1),
         0,
         sandbox.last_hash(),
-        &HashTag::empty_list_hash(),
-        &sandbox.last_state_hash(),
+        HashTag::empty_list_hash(),
+        sandbox.last_state_hash(),
     );
 
     sandbox.recv(&propose);
@@ -112,7 +112,7 @@ fn test_get_lock_and_send_precommit() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -120,7 +120,7 @@ fn test_get_lock_and_send_precommit() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -129,7 +129,7 @@ fn test_get_lock_and_send_precommit() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -137,8 +137,8 @@ fn test_get_lock_and_send_precommit() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -154,7 +154,7 @@ fn test_commit() {
         Height(1),
         Round(1),
         sandbox.last_hash(),
-        &[],
+        vec![],
         sandbox.secret_key(ValidatorId(2)),
     );
 
@@ -163,8 +163,8 @@ fn test_commit() {
         Height(1),
         0,
         sandbox.last_hash(),
-        &HashTag::empty_list_hash(),
-        &sandbox.last_state_hash(),
+        HashTag::empty_list_hash(),
+        sandbox.last_state_hash(),
     );
 
     sandbox.recv(&propose);
@@ -172,7 +172,7 @@ fn test_commit() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -180,7 +180,7 @@ fn test_commit() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -188,7 +188,7 @@ fn test_commit() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -196,8 +196,8 @@ fn test_commit() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -205,8 +205,8 @@ fn test_commit() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &propose.object_hash(),
+        propose.object_hash(),
+        propose.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -214,8 +214,8 @@ fn test_commit() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &propose.object_hash(),
+        propose.object_hash(),
+        propose.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -232,7 +232,7 @@ fn received_unexpected_propose() {
         Height::zero(),
         Round(1),
         sandbox.last_hash(),
-        &[],
+        vec![],
         sandbox.secret_key(ValidatorId(1)),
     );
 
@@ -241,7 +241,7 @@ fn received_unexpected_propose() {
         ValidatorId(0),
         Height::zero(),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));

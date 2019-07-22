@@ -103,10 +103,9 @@ impl<'a> BlockBuilder<'a> {
                 .unwrap_or_else(|| self.sandbox.current_leader()),
             self.height.unwrap_or_else(|| self.sandbox.current_height()),
             self.tx_count.unwrap_or(0),
-            &self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
-            &self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
-            &self
-                .state_hash
+            self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
+            self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
+            self.state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
         )
     }
@@ -167,8 +166,8 @@ impl<'a> ProposeBuilder<'a> {
                 .unwrap_or_else(|| self.sandbox.current_leader()),
             self.height.unwrap_or_else(|| self.sandbox.current_height()),
             self.round.unwrap_or_else(|| self.sandbox.current_round()),
-            self.prev_hash.unwrap_or(&self.sandbox.last_hash()),
-            self.tx_hashes.unwrap_or(&[]),
+            *self.prev_hash.unwrap_or(&self.sandbox.last_hash()),
+            self.tx_hashes.unwrap_or(&[]).iter().cloned(),
             self.sandbox.secret_key(
                 self.validator_id
                     .unwrap_or_else(|| self.sandbox.current_leader()),
@@ -358,7 +357,7 @@ where
                     val_idx,
                     initial_height,
                     round,
-                    &propose.object_hash(),
+                    propose.object_hash(),
                     NOT_LOCKED,
                     sandbox.secret_key(val_idx),
                 ));
@@ -388,8 +387,8 @@ where
                 ValidatorId(0),
                 initial_height,
                 round,
-                &propose.object_hash(),
-                &block.object_hash(),
+                propose.object_hash(),
+                block.object_hash(),
                 sandbox.time().into(),
                 sandbox.secret_key(ValidatorId(0)),
             ));
@@ -401,8 +400,8 @@ where
                     val_idx,
                     initial_height,
                     round,
-                    &propose.object_hash(),
-                    &block.object_hash(),
+                    propose.object_hash(),
+                    block.object_hash(),
                     sandbox.time().into(),
                     sandbox.secret_key(val_idx),
                 ));
@@ -416,7 +415,7 @@ where
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             }
-            sandbox.check_broadcast_status(new_height, &block.object_hash());
+            sandbox.check_broadcast_status(new_height, block.object_hash());
 
             return Ok(hashes);
         }
@@ -476,7 +475,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
                     val_idx,
                     initial_height,
                     round,
-                    &propose.object_hash(),
+                    propose.object_hash(),
                     NOT_LOCKED,
                     sandbox.secret_key(val_idx),
                 ));
@@ -501,8 +500,8 @@ pub fn add_one_height_with_transactions_from_other_validator(
                     val_idx,
                     initial_height,
                     round,
-                    &propose.object_hash(),
-                    &block.object_hash(),
+                    propose.object_hash(),
+                    block.object_hash(),
                     sandbox.time().into(),
                     sandbox.secret_key(val_idx),
                 ));
@@ -510,7 +509,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 
             let new_height = initial_height.next();
             sandbox.assert_state(new_height, Round(1));
-            sandbox.check_broadcast_status(new_height, &block.object_hash());
+            sandbox.check_broadcast_status(new_height, block.object_hash());
 
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
@@ -540,7 +539,7 @@ fn get_propose_with_transactions_for_validator(
         sandbox.current_height(),
         sandbox.current_round(),
         sandbox.last_hash(),
-        transactions,
+        transactions.iter().cloned(),
         sandbox.secret_key(validator),
     )
 }
@@ -590,7 +589,10 @@ fn try_check_and_broadcast_propose_and_prevote(
         "broadcasting propose with hash: {:?}",
         propose.object_hash()
     );
-    trace!("broadcasting propose with round: {:?}", propose.round());
+    trace!(
+        "broadcasting propose with round: {:?}",
+        propose.payload().round
+    );
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
     sandbox.try_broadcast(&propose)?;
 
@@ -598,7 +600,7 @@ fn try_check_and_broadcast_propose_and_prevote(
         ValidatorId(0),
         sandbox.current_height(),
         sandbox.current_round(),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -616,7 +618,7 @@ pub fn receive_valid_propose_with_transactions(
         sandbox.current_height(),
         sandbox.current_round(),
         sandbox.last_hash(),
-        transactions,
+        transactions.iter().cloned(),
         sandbox.secret_key(sandbox.current_leader()),
     );
     sandbox.recv(&propose);
@@ -628,10 +630,10 @@ pub fn make_request_propose_from_precommit(
     precommit: &Precommit,
 ) -> Verified<ProposeRequest> {
     sandbox.create_propose_request(
-        &sandbox.public_key(ValidatorId(0)),
-        &sandbox.public_key(precommit.validator()),
-        precommit.height(),
-        precommit.propose_hash(),
+        sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(precommit.validator()),
+        precommit.height,
+        precommit.propose_hash,
         sandbox.secret_key(ValidatorId(0)),
     )
 }
@@ -642,11 +644,11 @@ pub fn make_request_prevote_from_precommit(
 ) -> Verified<PrevotesRequest> {
     let validators = BitVec::from_elem(sandbox.validators().len(), false);
     sandbox.create_prevote_request(
-        &sandbox.public_key(ValidatorId(0)),
-        &sandbox.public_key(precommit.validator()),
-        precommit.height(),
-        precommit.round(),
-        precommit.propose_hash(),
+        sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(precommit.validator()),
+        precommit.height,
+        precommit.round,
+        precommit.propose_hash,
         validators,
         sandbox.secret_key(ValidatorId(0)),
     )
@@ -660,9 +662,9 @@ pub fn make_prevote_from_propose(
 ) -> Verified<Prevote> {
     sandbox.create_prevote(
         ValidatorId(0),
-        propose.height(),
-        propose.round(),
-        &propose.object_hash(),
+        propose.as_ref().height(),
+        propose.as_ref().round(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     )

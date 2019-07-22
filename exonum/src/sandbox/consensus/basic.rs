@@ -132,7 +132,7 @@ fn test_reach_actual_round() {
         ValidatorId(2),
         Height(1),
         Round(4),
-        &block_at_first_height.clone().object_hash(),
+        block_at_first_height.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));

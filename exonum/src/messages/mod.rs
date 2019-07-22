@@ -192,7 +192,7 @@ impl Message {
     }
 
     /// Get inner SignedMessage.
-    pub fn signed_message(&self) -> &SignedMessage {
+    pub fn as_raw(&self) -> &SignedMessage {
         match self {
             Message::Service(ref msg) => msg.signed_message(),
             Message::Consensus(ref msg) => msg.signed_message(),
@@ -204,6 +204,12 @@ impl Message {
     /// Checks buffer and return instance of `Message`.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
         SignedMessage::from_bytes(buffer.into()).and_then(Self::from_signed)
+    }
+}
+
+impl PartialEq<SignedMessage> for Message {
+    fn eq(&self, other: &SignedMessage) -> bool {
+        self.as_raw() == other
     }
 }
 
@@ -329,7 +335,7 @@ impl Consensus {
 
 impl BinaryValue for Message {
     fn to_bytes(&self) -> Vec<u8> {
-        self.signed_message().to_bytes()
+        self.as_raw().to_bytes()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
@@ -340,6 +346,6 @@ impl BinaryValue for Message {
 
 impl ObjectHash for Message {
     fn object_hash(&self) -> Hash {
-        self.signed_message().object_hash()
+        self.as_raw().object_hash()
     }
 }
