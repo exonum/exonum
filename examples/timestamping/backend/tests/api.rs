@@ -21,8 +21,8 @@ use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{gen_keypair, hash, Hash},
     helpers::Height,
-    messages::{to_hex_string, AnyTx, ServiceInstanceId, Signed},
-    runtime::rust::Transaction,
+    messages::Verified,
+    runtime::{rust::Transaction, AnyTx, ServiceInstanceId},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
@@ -98,11 +98,9 @@ fn test_api_post_timestamp() {
     let tx = TxTimestamp { content }.sign(SERVICE_ID, keypair.0, &keypair.1);
 
     let api = testkit.api();
-    let data = to_hex_string(&tx);
-
     let tx_info: TransactionResponse = api
         .public(ApiKind::Explorer)
-        .query(&json!({ "tx_body": data }))
+        .query(&json!({ "tx_body": tx }))
         .post("v1/transactions")
         .unwrap();
 

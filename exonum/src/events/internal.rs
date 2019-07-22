@@ -128,7 +128,7 @@ mod tests {
     use crate::{
         crypto::{gen_keypair, Hash, Signature},
         helpers::Height,
-        messages::{Message, Status},
+        messages::{Status, Verified},
     };
 
     use super::*;
@@ -162,8 +162,7 @@ mod tests {
 
     fn get_signed_message() -> SignedMessage {
         let (pk, sk) = gen_keypair();
-        let msg = Message::concrete(Status::new(Height(0), Hash::zero()), pk, &sk);
-        msg.signed_message().clone()
+        Verified::from_value(Status::new(Height(0), Hash::zero()), pk, &sk).into_raw()
     }
 
     #[test]

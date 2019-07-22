@@ -452,7 +452,7 @@ impl TestKit {
         self.probe_all(vec![transaction])
     }
 
-    fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
+    fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
 
@@ -472,14 +472,14 @@ impl TestKit {
             patch
         };
 
-        let propose = self
-            .leader()
-            .create_propose(new_block_height, &last_hash, tx_hashes);
+        let propose =
+            self.leader()
+                .create_propose(new_block_height, last_hash, tx_hashes.iter().cloned());
         let precommits: Vec<_> = self
             .network()
             .validators()
             .iter()
-            .map(|v| v.create_precommit(&propose, &block_hash))
+            .map(|v| v.create_precommit(propose.as_ref(), block_hash))
             .collect();
 
         let guard = self.processing_lock.lock().unwrap();

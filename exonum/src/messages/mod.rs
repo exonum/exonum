@@ -177,9 +177,8 @@ pub enum Message {
 }
 
 impl Message {
-    /// Creates a new Exonum message.
-    #[deprecated]
-    pub fn concrete<T: Into<ExonumMessage>>(
+    /// Creates a new signed Exonum message from the given value.
+    pub fn from_value<T: Into<ExonumMessage>>(
         message: T,
         author: PublicKey,
         secret_key: &SecretKey,

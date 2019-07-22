@@ -35,7 +35,7 @@ use crate::{
         NetworkEvent, NetworkRequest,
     },
     helpers::user_agent,
-    messages::{BinaryValue, Connect, Message, SignedMessage, Verified},
+    messages::{BinaryValue, Connect, SignedMessage, Verified},
     node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel},
 };
 

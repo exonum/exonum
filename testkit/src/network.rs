@@ -18,7 +18,7 @@ use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
-    messages::{Message, Precommit, Propose, Signed},
+    messages::{Precommit, Propose, Verified},
 };
 use exonum_merkledb::ObjectHash;
 
@@ -168,10 +168,10 @@ impl TestNode {
     pub fn create_propose(
         &self,
         height: Height,
-        last_hash: &crypto::Hash,
-        tx_hashes: &[crypto::Hash],
+        last_hash: crypto::Hash,
+        tx_hashes: impl IntoIterator<Item=crypto::Hash>,
     ) -> Verified<Propose> {
-        Message::concrete(
+        Verified::from_value(
             Propose::new(
                 self.validator_id
                     .expect("An attempt to create propose from a non-validator node."),
@@ -189,17 +189,17 @@ impl TestNode {
     pub fn create_precommit(
         &self,
         propose: &Propose,
-        block_hash: &crypto::Hash,
+        block_hash: crypto::Hash,
     ) -> Verified<Precommit> {
         use std::time::SystemTime;
 
-        Message::concrete(
+        Verified::from_value(
             Precommit::new(
                 self.validator_id
                     .expect("An attempt to create propose from a non-validator node."),
                 propose.height(),
                 propose.round(),
-                &propose.object_hash(),
+                propose.object_hash(),
                 block_hash,
                 SystemTime::now().into(),
             ),

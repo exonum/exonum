@@ -18,7 +18,7 @@ use exonum::{
     api::backends::actix::{HttpRequest, RawHandler, RequestHandler},
     api::{self, ServiceApiBackend},
     crypto::Hash,
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     runtime::{
         rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
         ArtifactInfo, ServiceInstanceId,

@@ -744,7 +744,7 @@ macro_rules! impl_exonum_msg_try_from_signed {
                 fn try_from(value: &SignedMessage) -> Result<Self, Self::Error> {
                     ExonumMessage::try_from(value).and_then(Self::try_from)
                 }
-            }            
+            }
         )*
     }
 }

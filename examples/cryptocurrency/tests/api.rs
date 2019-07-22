@@ -26,7 +26,7 @@ extern crate serde_json;
 use exonum::{
     api::{self, node::public::explorer::TransactionQuery},
     crypto::{self, Hash, PublicKey, SecretKey},
-    messages::{self, AnyTx, Signed},
+    messages::{AnyTx, Verified},
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
@@ -249,11 +249,10 @@ impl CryptocurrencyApi {
             name: name.to_owned(),
         }
         .sign(INSTANCE_ID, pubkey, &key);
-        let data = messages::to_hex_string(&tx);
         let tx_info: serde_json::Value = self
             .inner
             .public(ApiKind::Explorer)
-            .query(&json!({ "tx_body": data }))
+            .query(&json!({ "tx_body": tx }))
             .post("v1/transactions")
             .unwrap();
         assert_eq!(tx_info, json!({ "tx_hash": tx.object_hash() }));
@@ -262,11 +261,10 @@ impl CryptocurrencyApi {
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
     fn transfer(&self, tx: &Verified<AnyTx>) {
-        let data = messages::to_hex_string(&tx);
         let tx_info: serde_json::Value = self
             .inner
             .public(ApiKind::Explorer)
-            .query(&json!({ "tx_body": data }))
+            .query(&json!({ "tx_body": tx }))
             .post("v1/transactions")
             .unwrap();
         assert_eq!(tx_info, json!({ "tx_hash": tx.object_hash()}));

@@ -88,5 +88,5 @@ pub mod node;
 #[macro_use]
 pub mod runtime;
 
-// #[cfg(test)]
-// mod sandbox;
+#[cfg(test)]
+mod sandbox;

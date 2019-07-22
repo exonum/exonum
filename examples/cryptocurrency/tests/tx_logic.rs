@@ -23,7 +23,7 @@ extern crate exonum_testkit;
 
 use exonum::{
     crypto::{self, PublicKey, SecretKey},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     runtime::rust::Transaction,
 };
 use exonum_testkit::TestKit;

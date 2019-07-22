@@ -57,7 +57,7 @@ mod schema;
 mod tests;
 
 /// Transaction message shortcut.
-#[deprecated]
+// TODO It seems that this shortcut should be removed [ECR-3222]
 pub type TransactionMessage = Verified<AnyTx>;
 
 /// Exonum blockchain instance with a certain services set and data storage.

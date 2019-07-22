@@ -24,8 +24,8 @@ use exonum::{
     blockchain::{ExecutionErrorKind, ExecutionStatus, Schema},
     crypto::{gen_keypair, PublicKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, ServiceInstanceId, Signed},
-    runtime::rust::Transaction,
+    messages::{Verified},
+    runtime::{rust::Transaction, ServiceInstanceId, AnyTx},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};

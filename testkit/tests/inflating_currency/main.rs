@@ -23,7 +23,7 @@ use exonum::{
     api::node::public::explorer::TransactionResponse,
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Signed},
+    messages::{AnyTx, BinaryValue, Verified},
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;

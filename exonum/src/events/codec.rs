@@ -90,13 +90,14 @@ impl Encoder for MessagesCodec {
 #[cfg(test)]
 mod test {
     use bytes::BytesMut;
+    use exonum_merkledb::BinaryValue;
     use tokio_io::codec::{Decoder, Encoder};
 
     use crate::{
         crypto::{gen_keypair, Hash},
         events::noise::{HandshakeParams, NoiseWrapper},
         helpers::Height,
-        messages::{BinaryValue, Message, Status, SIGNED_MESSAGE_MIN_SIZE},
+        messages::{Status, Verified, SIGNED_MESSAGE_MIN_SIZE},
     };
 
     use super::MessagesCodec;
@@ -183,8 +184,8 @@ mod test {
 
         let raw = {
             let (pk, sk) = gen_keypair();
-            let msg = Message::concrete(Status::new(Height(0), Hash::zero()), pk, &sk);
-            msg.signed_message().clone()
+            let msg = Verified::from_value(Status::new(Height(0), Hash::zero()), pk, &sk);
+            msg.into_raw()
         };
         let data = raw.to_bytes();
 

@@ -539,15 +539,13 @@ impl BlockchainExplorer {
     fn precommits(&self, block: &Block) -> Vec<Verified<Precommit>> {
         let schema = Schema::new(&self.snapshot);
         let precommits_table = schema.precommits(&block.object_hash());
-        let precommits = precommits_table.iter().collect();
-        precommits
+        precommits_table.iter().collect()
     }
 
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
         let schema = Schema::new(&self.snapshot);
         let tx_hashes_table = schema.block_transactions(block.height());
-        let tx_hashes = tx_hashes_table.iter().collect();
-        tx_hashes
+        tx_hashes_table.iter().collect()
     }
 
     /// Retrieves a transaction that is known to be committed.

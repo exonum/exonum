@@ -164,7 +164,7 @@ mod tests {
         crypto::{gen_keypair, Hash},
         explorer::BlockWithTransactions,
         helpers::Height,
-        messages::{AnyTx, Signed},
+        messages::{AnyTx, Verified},
         runtime::rust::{
             ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
         },
