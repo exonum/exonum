@@ -47,7 +47,7 @@ use exonum::{
 };
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
-use rand::{Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempdir::TempDir;
 
 use std::{iter, sync::Arc};
@@ -59,7 +59,7 @@ const PREPARE_TRANSACTIONS: usize = 10_000;
 /// `PREPARE_TRANSACTIONS` should be divisible by all values.
 const TXS_IN_BLOCK: &[usize] = &[10, 25, 50, 100];
 
-fn gen_keypair_from_rng<R: Rng>(rng: &mut R) -> (PublicKey, SecretKey) {
+fn gen_keypair_from_rng(rng: &mut StdRng) -> (PublicKey, SecretKey) {
     use exonum::crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     let mut bytes = [0_u8; SEED_LENGTH];

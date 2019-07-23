@@ -19,7 +19,7 @@
 pub use self::wrappers::sodium_wrapper::{
     handshake::{HandshakeParams, NoiseHandshake},
     wrapper::{
-        NoiseWrapper, HANDSHAKE_HEADER_LENGTH, MAX_HANDSHAKE_MESSAGE_LENGTH,
+        NoiseWrapper, TransportWrapper, HANDSHAKE_HEADER_LENGTH, MAX_HANDSHAKE_MESSAGE_LENGTH,
         MIN_HANDSHAKE_MESSAGE_LENGTH,
     },
 };

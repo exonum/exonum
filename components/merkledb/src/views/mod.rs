@@ -92,6 +92,8 @@ pub trait IndexAccess: Clone {
 /// specified `address`. `View` contains changes, `state` contains
 /// metadata.
 ///
+/// # Example
+///
 /// ```
 /// use exonum_merkledb::{Database, TemporaryDB, IndexBuilder, ListIndex};
 ///
@@ -171,10 +173,7 @@ where
         V: BinaryAttribute + Default + Copy,
     {
         // TODO Think about stricter restrictions for index names. [ECR-2834]
-        assert!(
-            !self.address.name().is_empty(),
-            "Index name must not be empty"
-        );
+        assert_valid_name(&self.address.name);
 
         let (index_address, index_state) =
             metadata::index_metadata(self.index_access.clone(), &self.address, self.index_type);
@@ -185,11 +184,13 @@ where
     }
 
     /// Returns index based on specified `view` and `address`.
+    /// Allowable characters in index name: ASCII characters,
+    /// digits, underscores and dashes.
     ///
     /// # Panics
     ///
-    /// - Panics if index metadata doesn't match expected.
-    /// - Panics if index name is empty.
+    /// - If index name is empty or invalid.
+    /// - If index metadata doesn't match expected.
     pub fn build<V>(self) -> (View<T>, IndexState<T, V>)
     where
         V: BinaryAttribute + Default + Copy,
@@ -208,6 +209,25 @@ where
         }
 
         Some((index_view, index_state))
+    }
+}
+
+/// A function that validates an index name.
+pub fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
+    name.as_ref().as_bytes().iter().all(|c| match *c {
+        48..=57 | 65..=90 | 97..=122 | 95 | 45 | 46 => true,
+        _ => false,
+    })
+}
+
+/// Calls the `is_valid_name` function with the given name and panics if it returns `false`.
+fn assert_valid_name<S: AsRef<str>>(name: S) {
+    if name.as_ref().is_empty() {
+        panic!("Index name must not be empty")
+    }
+
+    if !is_valid_name(name) {
+        panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
     }
 }
 
