@@ -94,8 +94,8 @@ pub struct State {
 
     incomplete_block: Option<IncompleteBlock>,
 
-    ///
-    pub tx_cache: Vec<Signed<RawTransaction>>,
+    // Cache that stores transactions before adding to persistent pool.
+    tx_cache: Vec<Signed<RawTransaction>>,
 }
 
 /// State of a validator-node.
@@ -1219,5 +1219,20 @@ impl State {
             .write()
             .expect("ConnectList write lock");
         list.add(peer);
+    }
+
+    /// Returns the transactions cache length.
+    pub fn tx_cache_len(&self) -> usize {
+        self.tx_cache.len()
+    }
+
+    /// Returns reference to the transactions cache.
+    pub fn tx_cache(&self) -> &Vec<Signed<RawTransaction>> {
+        &self.tx_cache
+    }
+
+    /// Returns mutable reference to the transactions cache.
+    pub fn tx_cache_mut(&mut self) -> &mut Vec<Signed<RawTransaction>> {
+        &mut self.tx_cache
     }
 }

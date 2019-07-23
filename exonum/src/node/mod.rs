@@ -1215,20 +1215,22 @@ mod tests {
         let event = ExternalMessage::Transaction(tx_orig);
         node.handler.handle_event(event.into());
 
-        // Initial transaction should be added to the pool.
+        // Initial transaction should be added to the pool cache.
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        assert_eq!(schema.transactions_pool_len(), 1);
+        assert_eq!(node.state().tx_cache_len(), 1);
+        assert_eq!(schema.transactions_pool_len(), 0);
 
         // Create duplicated transaction.
         let tx_copy = tx.clone();
         let event = ExternalMessage::Transaction(tx_copy);
         node.handler.handle_event(event.into());
 
-        // Duplicated transaction shouldn't be added to the pool.
+        // Duplicated transaction shouldn't be added to the pool cache.
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        assert_eq!(schema.transactions_pool_len(), 1);
+        assert_eq!(node.state().tx_cache_len(), 1);
+        assert_eq!(schema.transactions_pool_len(), 0);
     }
 
     #[test]

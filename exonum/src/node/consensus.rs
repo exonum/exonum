@@ -490,7 +490,7 @@ impl NodeHandler {
                         block_hash,
                         precommits,
                         txs_block_limit,
-                        &mut self.state.tx_cache,
+                        self.state.tx_cache_mut(),
                     )
                     .unwrap();
 
@@ -550,7 +550,7 @@ impl NodeHandler {
 
         let schema = Schema::new(&snapshot);
 
-        if schema.transactions().contains(&hash) {
+        if self.state.tx_cache().contains(&msg) || schema.transactions().contains(&hash) {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
@@ -559,7 +559,7 @@ impl NodeHandler {
             bail!("Received malicious transaction.")
         }
 
-        self.state.tx_cache.push(msg);
+        self.state.tx_cache_mut().push(msg);
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();
