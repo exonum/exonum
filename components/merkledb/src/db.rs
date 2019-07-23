@@ -607,6 +607,12 @@ impl Fork {
     }
 }
 
+impl From<Patch> for Fork {
+    fn from(patch: Patch) -> Self {
+        Self::from_patch(patch)
+    }
+}
+
 impl<'a> IndexAccess for &'a Fork {
     type Changes = ChangesRef<'a>;
 

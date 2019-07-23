@@ -465,7 +465,7 @@ impl Blockchain {
         I: Iterator<Item = Signed<Precommit>>,
     {
         let patch = {
-            let fork = Fork::from_patch(patch);
+            let fork: Fork = patch.into();
 
             {
                 let mut schema = Schema::new(&fork);
