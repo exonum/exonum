@@ -154,7 +154,7 @@ impl NodeHandler {
         let block_msg = self.sign_message(BlockResponse::new(
             msg.author(),
             block,
-            precommits.iter().map(|p| p.as_raw().to_bytes()).collect(),
+            precommits.iter().map(|p| p.to_bytes()),
             transactions.iter(),
         ));
         self.send_to_peer(msg.author(), block_msg);

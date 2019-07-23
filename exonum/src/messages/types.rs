@@ -389,13 +389,13 @@ impl BlockResponse {
     pub fn new(
         to: PublicKey,
         block: Block,
-        precommits: Vec<Vec<u8>>,
+        precommits: impl IntoIterator<Item = Vec<u8>>,
         transactions: impl IntoIterator<Item = Hash>,
     ) -> Self {
         Self {
             to,
             block,
-            precommits,
+            precommits: precommits.into_iter().collect(),
             transactions: transactions.into_iter().collect(),
         }
     }
@@ -404,14 +404,17 @@ impl BlockResponse {
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
+
     /// Block header.
     pub fn block(&self) -> &Block {
         &self.block
     }
-    /// List of pre-commits.
-    pub fn precommits(&self) -> Vec<Vec<u8>> {
-        self.precommits.clone()
+
+    /// List of precommits.
+    pub fn precommits(&self) -> &[Vec<u8>] {
+        &self.precommits
     }
+
     /// List of the transaction hashes.
     pub fn transactions(&self) -> &[Hash] {
         &self.transactions
@@ -452,9 +455,10 @@ impl TransactionsResponse {
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
+
     /// List of the transactions.
-    pub fn transactions(&self) -> Vec<Vec<u8>> {
-        self.transactions.clone()
+    pub fn transactions(&self) -> &[Vec<u8>] {
+        &self.transactions
     }
 }
 
@@ -692,21 +696,36 @@ impl BlockResponse {
     }
 }
 
+/// This type describes all possible types of Exonum messages
+/// which are used in p2p communications.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "consensus::ExonumMessage", crate = "crate")]
 pub enum ExonumMessage {
+    /// Exonum transaction.
     AnyTx(AnyTx),
+    /// Handshake to other node.
     Connect(Connect),
+    /// Status information of the other node.
     Status(Status),
+    /// Consensus `Precommit` message.
     Precommit(Precommit),
+    /// Consensus `Propose` message.
     Propose(Propose),
+    /// Consensus `Prevote` message.
     Prevote(Prevote),
+    /// Information about transactions, that sent as response to `TransactionsRequest`.
     TransactionsResponse(TransactionsResponse),
+    /// Information about block, that sent as response to `BlockRequest`.
     BlockResponse(BlockResponse),
+    /// Request of some propose which hash is known.
     ProposeRequest(ProposeRequest),
+    /// Request of unknown transactions.
     TransactionsRequest(TransactionsRequest),
+    /// Request of prevotes for some propose.
     PrevotesRequest(PrevotesRequest),
+    /// Request of peer exchange.
     PeersRequest(PeersRequest),
+    /// Request of some future block.
     BlockRequest(BlockRequest),
 }
 

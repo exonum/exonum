@@ -151,12 +151,12 @@ impl<T> Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    /// Returns reference to the underlying payload.
+    /// Returns reference to the underlying message payload.
     pub fn payload(&self) -> &T {
         &self.inner
     }
 
-    /// Takes the underlying payload.
+    /// Takes the underlying message payload.
     pub fn into_payload(self) -> T {
         self.inner
     }

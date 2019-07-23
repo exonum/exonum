@@ -44,11 +44,11 @@ impl CallInfo {
     }
 }
 
-/// Transaction with call info.
+/// Transaction with information to call.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "schema::runtime::AnyTx", crate = "crate")]
 pub struct AnyTx {
-    /// Dispatch info.
+    /// Information to call.
     pub call_info: CallInfo,
     /// Serialized transaction.
     pub payload: Vec<u8>,

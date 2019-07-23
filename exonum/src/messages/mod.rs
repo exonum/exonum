@@ -76,7 +76,7 @@ pub enum Service {
 }
 
 impl Service {
-    fn signed_message(&self) -> &SignedMessage {
+    fn as_raw(&self) -> &SignedMessage {
         match self {
             Service::AnyTx(ref msg) => msg.as_raw(),
             Service::Connect(ref msg) => msg.as_raw(),
@@ -88,16 +88,16 @@ impl Service {
 /// Consensus messages.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Consensus {
-    /// Precommit message.
+    /// `Precommit` message.
     Precommit(Verified<Precommit>),
-    /// Propose message.
+    /// `Propose` message.
     Propose(Verified<Propose>),
-    /// Prevote message.
+    /// `Prevote` message.
     Prevote(Verified<Prevote>),
 }
 
 impl Consensus {
-    fn signed_message(&self) -> &SignedMessage {
+    fn as_raw(&self) -> &SignedMessage {
         match self {
             Consensus::Precommit(ref msg) => msg.as_raw(),
             Consensus::Propose(ref msg) => msg.as_raw(),
@@ -116,7 +116,7 @@ pub enum Responses {
 }
 
 impl Responses {
-    fn signed_message(&self) -> &SignedMessage {
+    fn as_raw(&self) -> &SignedMessage {
         match self {
             Responses::TransactionsResponse(ref msg) => msg.as_raw(),
             Responses::BlockResponse(ref msg) => msg.as_raw(),
@@ -152,7 +152,7 @@ pub enum Requests {
 }
 
 impl Requests {
-    fn signed_message(&self) -> &SignedMessage {
+    fn as_raw(&self) -> &SignedMessage {
         match self {
             Requests::ProposeRequest(ref msg) => msg.as_raw(),
             Requests::TransactionsRequest(ref msg) => msg.as_raw(),
@@ -191,19 +191,19 @@ impl Message {
         signed.verify::<ExonumMessage>().map(From::from)
     }
 
-    /// Get inner SignedMessage.
-    pub fn as_raw(&self) -> &SignedMessage {
-        match self {
-            Message::Service(ref msg) => msg.signed_message(),
-            Message::Consensus(ref msg) => msg.signed_message(),
-            Message::Requests(ref msg) => msg.signed_message(),
-            Message::Responses(ref msg) => msg.signed_message(),
-        }
-    }
-
     /// Checks buffer and return instance of `Message`.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
         SignedMessage::from_bytes(buffer.into()).and_then(Self::from_signed)
+    }
+
+    /// Get inner SignedMessage.
+    pub fn as_raw(&self) -> &SignedMessage {
+        match self {
+            Message::Service(ref msg) => msg.as_raw(),
+            Message::Consensus(ref msg) => msg.as_raw(),
+            Message::Requests(ref msg) => msg.as_raw(),
+            Message::Responses(ref msg) => msg.as_raw(),
+        }
     }
 }
 

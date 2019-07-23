@@ -31,7 +31,7 @@ use crate::{
 
 // Shortcut to get verified messages from bytes.
 fn into_verified<T: TryFrom<SignedMessage>>(
-    raw: Vec<Vec<u8>>,
+    raw: &[Vec<u8>],
 ) -> Result<Vec<Verified<T>>, failure::Error> {
     let mut items = Vec::with_capacity(raw.len());
     for bytes in raw {
@@ -605,7 +605,7 @@ impl NodeHandler {
             )
         }
         for tx in msg.payload().transactions() {
-            self.execute_later(InternalRequest::VerifyMessage(tx));
+            self.execute_later(InternalRequest::VerifyMessage(tx.clone()));
         }
         Ok(())
     }

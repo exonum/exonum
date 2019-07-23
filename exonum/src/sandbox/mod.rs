@@ -258,7 +258,7 @@ impl Sandbox {
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(Verified::into_bytes).collect(),
+                precommits.into_iter().map(Verified::into_bytes),
                 tx_hashes,
             ),
             public_key,
