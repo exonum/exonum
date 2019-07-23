@@ -38,7 +38,7 @@ impl SignedMessage {
     }
 
     /// Verifies message signature and returns the corresponding checked message.
-    pub fn verify<T>(self) -> Result<Verified<T>, failure::Error>
+    pub fn into_verified<T>(self) -> Result<Verified<T>, failure::Error>
     where
         T: TryFrom<Self>,
     {
@@ -192,7 +192,7 @@ where
         D: Deserializer<'de>,
     {
         SignedMessage::deserialize(deserializer)?
-            .verify::<T>()
+            .into_verified::<T>()
             .map_err(serde::de::Error::custom)
     }
 }
@@ -267,14 +267,14 @@ mod tests {
         let protocol_message = ExonumMessage::from(msg.clone());
         let signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
 
-        let verified_protocol = signed.clone().verify::<ExonumMessage>().unwrap();
+        let verified_protocol = signed.clone().into_verified::<ExonumMessage>().unwrap();
         assert_eq!(verified_protocol.inner, protocol_message);
 
-        let verified_status = signed.clone().verify::<Status>().unwrap();
+        let verified_status = signed.clone().into_verified::<Status>().unwrap();
         assert_eq!(verified_status.inner, msg);
 
         // Wrong variant
-        let err = signed.verify::<Precommit>().unwrap_err();
+        let err = signed.into_verified::<Precommit>().unwrap_err();
         assert_eq!(err.to_string(), "Failed to decode message from payload.");
     }
 
@@ -290,7 +290,7 @@ mod tests {
         let mut signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
         // Update author
         signed.author = crypto::gen_keypair().0;
-        let err = signed.clone().verify::<ExonumMessage>().unwrap_err();
+        let err = signed.clone().into_verified::<ExonumMessage>().unwrap_err();
         assert_eq!(err.to_string(), "Failed to verify signature.");
     }
 

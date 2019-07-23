@@ -266,7 +266,7 @@ impl ExplorerApi {
         // FIXME Don't ignore message error.
         let _ = state
             .sender()
-            .broadcast_transaction(msg.verify()?)
+            .broadcast_transaction(msg.into_verified()?)
             .map_err(ApiError::from);
         Ok(TransactionResponse { tx_hash })
     }

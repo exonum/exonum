@@ -188,7 +188,7 @@ impl Message {
 
     /// Deserialize message from signed message.
     pub fn from_signed(signed: SignedMessage) -> Result<Self, failure::Error> {
-        signed.verify::<ExonumMessage>().map(From::from)
+        signed.into_verified::<ExonumMessage>().map(From::from)
     }
 
     /// Checks buffer and return instance of `Message`.

@@ -35,7 +35,7 @@ fn into_verified<T: TryFrom<SignedMessage>>(
 ) -> Result<Vec<Verified<T>>, failure::Error> {
     let mut items = Vec::with_capacity(raw.len());
     for bytes in raw {
-        let verified = SignedMessage::from_bytes(bytes.into())?.verify()?;
+        let verified = SignedMessage::from_bytes(bytes.into())?.into_verified()?;
         items.push(verified);
     }
     Ok(items)

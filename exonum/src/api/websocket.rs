@@ -350,7 +350,7 @@ impl Handler<Transaction> for Server {
         let _ = self
             .service_api_state
             .sender()
-            .broadcast_transaction(msg.verify()?);
+            .broadcast_transaction(msg.into_verified()?);
         Ok(TransactionResponse { tx_hash })
     }
 }

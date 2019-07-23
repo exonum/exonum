@@ -53,7 +53,7 @@ impl InternalPart {
     ) -> impl Future<Item = (), Error = ()> {
         future::lazy(|| {
             SignedMessage::from_bytes(raw.into())
-                .and_then(SignedMessage::verify::<ExonumMessage>)
+                .and_then(SignedMessage::into_verified::<ExonumMessage>)
                 .map(Message::from)
         })
         .map_err(drop)

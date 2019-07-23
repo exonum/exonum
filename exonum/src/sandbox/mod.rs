@@ -136,7 +136,7 @@ impl SandboxInner {
 
                     InternalRequest::VerifyMessage(raw) => {
                         let msg = SignedMessage::from_bytes(raw.into())
-                            .and_then(SignedMessage::verify::<ExonumMessage>)
+                            .and_then(SignedMessage::into_verified::<ExonumMessage>)
                             .map(Message::from)
                             .unwrap();
 

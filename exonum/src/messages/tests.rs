@@ -197,7 +197,7 @@ fn test_block() {
 
     let block2: Verified<BlockResponse> = SignedMessage::from_bytes(block.to_bytes().into())
         .unwrap()
-        .verify()
+        .into_verified()
         .unwrap();
 
     assert_eq!(block2.author(), pub_key);
