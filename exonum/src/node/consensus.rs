@@ -475,16 +475,26 @@ impl NodeHandler {
     ) {
         trace!("COMMIT {:?}", block_hash);
 
+        let txs_block_limit = self.state.config().consensus.txs_block_limit;
+
         // Merge changes into storage
         let (committed_txs, proposer) = {
             let (committed_txs, proposer) = {
                 let block_state = self.state.block_mut(&block_hash).unwrap();
+                let committed_txs = block_state.txs().len();
+                let proposer = block_state.proposer_id();
 
                 self.blockchain
-                    .commit(block_state.patch(), block_hash, precommits)
+                    .commit(
+                        block_state.patch(),
+                        block_hash,
+                        precommits,
+                        txs_block_limit,
+                        &mut self.state.tx_cache,
+                    )
                     .unwrap();
 
-                (block_state.txs().len(), block_state.proposer_id())
+                (committed_txs, proposer)
             };
             // Update node state.
             self.state
@@ -537,7 +547,10 @@ impl NodeHandler {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
-        if Schema::new(&snapshot).transactions().contains(&hash) {
+
+        let schema = Schema::new(&snapshot);
+
+        if schema.transactions().contains(&hash) {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
@@ -546,14 +559,7 @@ impl NodeHandler {
             bail!("Received malicious transaction.")
         }
 
-        let fork = self.blockchain.fork();
-        {
-            let mut schema = Schema::new(&fork);
-            schema.add_transaction_into_pool(msg);
-        }
-        self.blockchain
-            .merge(fork.into_patch())
-            .expect("Unable to save transaction to persistent pool.");
+        self.state.tx_cache.push(msg);
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();

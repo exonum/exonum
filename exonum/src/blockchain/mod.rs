@@ -458,12 +458,14 @@ impl Blockchain {
         patch: Patch,
         block_hash: Hash,
         precommits: I,
+        tx_block_limit: u32,
+        tx_cache: &mut Vec<Signed<RawTransaction>>,
     ) -> Result<(), failure::Error>
     where
         I: Iterator<Item = Signed<Precommit>>,
     {
         let patch = {
-            let fork = Fork::from_patch(patch, self.db.snapshot());
+            let fork = Fork::from_patch(patch);
 
             {
                 let mut schema = Schema::new(&fork);
@@ -475,10 +477,16 @@ impl Blockchain {
                 let txs_in_block = schema.last_block().tx_count();
                 let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
                 debug_assert!(txs_count >= u64::from(txs_in_block));
-                schema
-                    .transactions_pool_len_index()
-                    .set(txs_count - u64::from(txs_in_block));
+
+                let tx_pool_len = txs_count - u64::from(txs_in_block);
+                schema.transactions_pool_len_index().set(tx_pool_len);
                 schema.update_transaction_count(u64::from(txs_in_block));
+
+                if tx_pool_len < u64::from(tx_block_limit) {
+                    while let Some(tx) = tx_cache.pop() {
+                        schema.add_transaction_into_pool(tx);
+                    }
+                }
             }
             fork.into_patch()
         };

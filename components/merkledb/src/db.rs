@@ -546,12 +546,9 @@ impl Fork {
     /// Note: using created fork to modify data already present in `patch` may lead
     /// to an inconsistent database state. Hence, this method is useful only if you
     /// are sure that the fork and `patch` interacted with different indices.
-    pub fn from_patch(patch: Patch, snapshot: Box<dyn Snapshot>) -> Self {
+    pub fn from_patch(patch: Patch) -> Self {
         Self {
-            patch: Patch {
-                changes: patch.changes,
-                snapshot,
-            },
+            patch,
             working_patch: WorkingPatch::new(),
         }
     }

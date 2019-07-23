@@ -93,6 +93,9 @@ pub struct State {
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
     incomplete_block: Option<IncompleteBlock>,
+
+    ///
+    pub tx_cache: Vec<Signed<RawTransaction>>,
 }
 
 /// State of a validator-node.
@@ -484,6 +487,8 @@ impl State {
             config: stored,
 
             incomplete_block: None,
+
+            tx_cache: Vec::new(),
         }
     }
 
