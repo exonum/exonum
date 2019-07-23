@@ -30,7 +30,7 @@ use crate::node::{ConnectListConfig, NodeConfig};
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
-pub struct ConfigFile {}
+pub struct ConfigFile;
 
 impl ConfigFile {
     /// Loads TOML-encoded file.
@@ -141,4 +141,11 @@ impl ConfigManager {
 
         Ok(())
     }
+}
+
+/// Basic trait to validate user defined configs.
+pub trait ValidateConfig {
+    /// Performs parameters validation for this configuration and returns error if
+    /// config is inconsistent.
+    fn validate(&self) -> Result<(), failure::Error>;
 }

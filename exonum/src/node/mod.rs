@@ -63,7 +63,7 @@ use crate::{
         TimeoutRequest, UnboundedSyncSender,
     },
     helpers::{
-        config::ConfigManager,
+        config::{ConfigManager, ValidateConfig},
         fabric::{NodePrivateConfig, NodePublicConfig},
         user_agent, Height, Milliseconds, Round, ValidatorId,
     },
@@ -328,35 +328,35 @@ impl NodeConfig<PathBuf> {
     }
 }
 
-impl<T> NodeConfig<T> {
-    fn validate_or_panic(&self) {
+impl<T> ValidateConfig for NodeConfig<T> {
+    fn validate(&self) -> Result<(), failure::Error> {
         let capacity = &self.mempool.events_pool_capacity;
-        if capacity.internal_events_capacity < 3 {
-            panic!(
-                "internal_events_capacity({}) must be strictly larger than 2",
-                capacity.internal_events_capacity
-            );
-        }
-        if capacity.network_requests_capacity == 0 {
-            panic!(
-                "network_requests_capacity({}) must be strictly larger than 0",
-                capacity.network_requests_capacity
-            );
-        }
+        ensure!(
+            capacity.internal_events_capacity < 3,
+            "internal_events_capacity({}) must be strictly larger than 2",
+            capacity.internal_events_capacity
+        );
+        ensure!(
+            capacity.network_requests_capacity == 0,
+            "network_requests_capacity({}) must be strictly larger than 0",
+            capacity.network_requests_capacity
+        );
+
         // Sanity checks for cases of accidental negative overflows.
         let sanity_max = 2_usize.pow(16);
-        if capacity.internal_events_capacity >= sanity_max {
-            panic!(
-                "internal_events_capacity({}) must be smaller than {}",
-                capacity.internal_events_capacity, sanity_max,
-            );
-        }
-        if capacity.network_requests_capacity >= sanity_max {
-            panic!(
-                "network_requests_capacity({}) must be smaller than {}",
-                capacity.network_requests_capacity, sanity_max,
-            );
-        }
+        ensure!(
+            capacity.internal_events_capacity >= sanity_max,
+            "internal_events_capacity({}) must be smaller than {}",
+            capacity.internal_events_capacity,
+            sanity_max,
+        );
+        ensure!(
+            capacity.network_requests_capacity >= sanity_max,
+            "network_requests_capacity({}) must be smaller than {}",
+            capacity.network_requests_capacity,
+            sanity_max,
+        );
+        Ok(())
     }
 }
 
@@ -945,7 +945,9 @@ impl Node {
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
-        node_cfg.validate_or_panic();
+        node_cfg
+            .validate()
+            .expect("Node configuration is inconsistent");
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let blockchain = Blockchain::new(
             database,
