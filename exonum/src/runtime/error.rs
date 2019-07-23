@@ -95,6 +95,17 @@ impl ErrorKind {
     }
 }
 
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorKind::Panic => f.write_str("panic"),
+            ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
+            ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
+            ErrorKind::Service { code } => write!(f, "service:{}", code),
+        }
+    }
+}
+
 /// Result of unsuccessful runtime execution.
 ///
 /// An execution error consists of an error kind and optional description.
@@ -102,7 +113,7 @@ impl ErrorKind {
 /// Therefore descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
 ///
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Fail)]
 pub struct ExecutionError {
     /// The kind of error that indicates in which module and with which code the error occurred.
     pub kind: ErrorKind,
@@ -147,6 +158,16 @@ impl ExecutionError {
             kind: ErrorKind::Panic,
             description,
         }
+    }
+}
+
+impl Display for ExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "An execution error occurred in {} with description: {}",
+            self.kind, self.description
+        )
     }
 }
 

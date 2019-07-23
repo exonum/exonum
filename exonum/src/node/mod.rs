@@ -332,12 +332,12 @@ impl<T> ValidateConfig for NodeConfig<T> {
     fn validate(&self) -> Result<(), failure::Error> {
         let capacity = &self.mempool.events_pool_capacity;
         ensure!(
-            capacity.internal_events_capacity < 3,
+            capacity.internal_events_capacity > 3,
             "internal_events_capacity({}) must be strictly larger than 2",
             capacity.internal_events_capacity
         );
         ensure!(
-            capacity.network_requests_capacity == 0,
+            capacity.network_requests_capacity != 0,
             "network_requests_capacity({}) must be strictly larger than 0",
             capacity.network_requests_capacity
         );
@@ -345,13 +345,13 @@ impl<T> ValidateConfig for NodeConfig<T> {
         // Sanity checks for cases of accidental negative overflows.
         let sanity_max = 2_usize.pow(16);
         ensure!(
-            capacity.internal_events_capacity >= sanity_max,
+            capacity.internal_events_capacity < sanity_max,
             "internal_events_capacity({}) must be smaller than {}",
             capacity.internal_events_capacity,
             sanity_max,
         );
         ensure!(
-            capacity.network_requests_capacity >= sanity_max,
+            capacity.network_requests_capacity < sanity_max,
             "network_requests_capacity({}) must be smaller than {}",
             capacity.network_requests_capacity,
             sanity_max,
@@ -1299,6 +1299,14 @@ mod tests {
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 0);
+    }
+
+    #[test]
+    fn test_good_internal_events_config() {
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let _ = Node::new(db, services, node_cfg, None);
     }
 
     #[test]

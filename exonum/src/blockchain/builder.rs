@@ -97,7 +97,7 @@ impl BlockchainBuilder {
 
         Ok(if has_genesis_block {
             let snapshot = self.database.snapshot();
-            dispatcher.restore_state(snapshot.as_ref());
+            dispatcher.restore_state(snapshot.as_ref())?;
             Blockchain::with_dispatcher(
                 self.database,
                 dispatcher,
@@ -119,9 +119,9 @@ impl BlockchainBuilder {
             // Adds builtin services.
             blockchain.merge({
                 let fork = blockchain.fork();
+                let mut dispatcher = blockchain.dispatcher();
                 for service in self.builtin_instances {
-                    let mut dispatcher = blockchain.dispatcher();
-                    dispatcher.add_builtin_service(&fork, service.0, service.1);
+                    dispatcher.add_builtin_service(&fork, service.0, service.1)?;
                 }
                 fork.into_patch()
             })?;
