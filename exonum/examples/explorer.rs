@@ -28,7 +28,7 @@ use exonum::{
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     runtime::rust::Transaction as _,
 };
 use exonum_merkledb::ObjectHash;
@@ -41,7 +41,7 @@ use crate::blockchain::{
 mod blockchain;
 
 /// Creates a transaction for the mempool.
-pub fn mempool_transaction() -> Signed<AnyTx> {
+pub fn mempool_transaction() -> Verified<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
@@ -186,7 +186,7 @@ fn main() {
 
     // JSON serialization for committed transactions
     let committed_tx: TransactionInfo = explorer
-        .transaction(&block[0].content().signed_message().object_hash())
+        .transaction(&block[0].content().object_hash())
         .unwrap();
     let tx_ref = committed_tx.as_committed().unwrap();
     assert_eq!(

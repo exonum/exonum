@@ -164,7 +164,7 @@ mod tests {
         crypto::{gen_keypair, Hash},
         explorer::BlockWithTransactions,
         helpers::Height,
-        messages::{AnyTx, Signed},
+        messages::{AnyTx, Verified},
         runtime::rust::{
             ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
         },
@@ -187,7 +187,7 @@ mod tests {
     }
 
     impl TxTimestamp {
-        fn for_str(s: &str) -> Signed<AnyTx> {
+        fn for_str(s: &str) -> Verified<AnyTx> {
             let (pubkey, key) = gen_keypair();
             Self {
                 message: s.to_owned(),

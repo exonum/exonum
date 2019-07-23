@@ -18,11 +18,14 @@ use exonum::{
     blockchain::{Blockchain, InstanceCollection, Schema},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
-    messages::{AnyTx, Message, ServiceInstanceId, Signed},
+    messages::Verified,
     node::ApiSender,
     runtime::{
-        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactInfo,
+        AnyTx, ServiceInstanceId,
+        {
+            rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
+            ArtifactInfo,
+        },
     },
 };
 use exonum_merkledb::{ObjectHash, TemporaryDB};
@@ -138,12 +141,12 @@ pub fn create_blockchain() -> Blockchain {
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
-pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>>) {
+pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyTx>>) {
     use exonum::helpers::{Round, ValidatorId};
     use exonum::messages::{Precommit, Propose};
     use std::time::SystemTime;
 
-    let tx_hashes: Vec<_> = transactions.iter().map(Signed::object_hash).collect();
+    let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
     let height = blockchain.last_block().height().next();
 
     let fork = blockchain.fork();
@@ -158,24 +161,24 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>
     let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
-    let propose = Message::concrete(
+    let propose = Verified::from_value(
         Propose::new(
             ValidatorId(0),
             height,
             Round::first(),
-            &blockchain.last_hash(),
-            &tx_hashes,
+            blockchain.last_hash(),
+            tx_hashes,
         ),
         consensus_public_key,
         &consensus_secret_key,
     );
-    let precommit = Message::concrete(
+    let precommit = Verified::from_value(
         Precommit::new(
             ValidatorId(0),
-            propose.height(),
-            propose.round(),
-            &propose.object_hash(),
-            &block_hash,
+            propose.payload().height,
+            propose.payload().round,
+            propose.object_hash(),
+            block_hash,
             SystemTime::now().into(),
         ),
         consensus_public_key,

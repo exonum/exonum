@@ -19,7 +19,7 @@ use exonum_merkledb::ObjectHash;
 
 use crate::{
     helpers::{Height, Round, ValidatorId},
-    messages::{Message, Propose},
+    messages::{Propose, Verified},
     sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 
@@ -36,8 +36,8 @@ fn test_ignore_message_with_incorrect_signature() {
         ValidatorId(0),
         Height(0),
         Round(1),
-        &sandbox.last_hash(),
-        &[],
+        sandbox.last_hash(),
+        vec![],
         sandbox.secret_key(ValidatorId(1)),
     );
 
@@ -50,13 +50,13 @@ fn test_ignore_message_with_incorrect_validator_id() {
 
     let incorrect_validator_id = ValidatorId(64_999);
 
-    let propose = Message::concrete(
+    let propose = Verified::from_value(
         Propose::new(
             incorrect_validator_id,
             Height(0),
             Round(1),
-            &sandbox.last_hash(),
-            &[],
+            sandbox.last_hash(),
+            vec![],
         ),
         sandbox.public_key(ValidatorId(1)),
         sandbox.secret_key(ValidatorId(1)),
@@ -103,7 +103,7 @@ fn handle_propose_with_incorrect_time() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -138,7 +138,7 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));

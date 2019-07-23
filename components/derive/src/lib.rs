@@ -32,8 +32,6 @@ use syn::{Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 // Exonum derive attribute names, used as
 // `#[exonum( [ ATTRIBUTE_NAME = ATTRIBUTE_VALUE or ATTRIBUTE_NAME ],* )]`
 const CRATE_PATH_ATTRIBUTE: &str = "crate";
-const PB_CONVERT_ATTRIBUTE: &str = "pb";
-const SERDE_PB_CONVERT_ATTRIBUTE: &str = "serde_pb_convert";
 const ARTIFACT_NAME: &str = "artifact_name";
 const ARTIFACT_VERSION: &str = "artifact_version";
 const PROTO_SOURCES: &str = "proto_sources";
@@ -237,17 +235,6 @@ fn get_exonum_name_value_attributes(meta_attrs: &[Meta]) -> Vec<MetaNameValue> {
             _ => None,
         })
         .collect()
-}
-
-fn find_exonum_word_attribute(meta_attrs: &[Meta], ident_name: &str) -> bool {
-    let exonum_meta = meta_attrs.iter().find(|m| m.name() == "exonum").cloned();
-
-    get_exonum_attributes(exonum_meta)
-        .iter()
-        .any(|meta| match meta {
-            Meta::Word(ident) if ident == ident_name => true,
-            _ => false,
-        })
 }
 
 fn find_attribute_path(meta_attrs: &[Meta], name: &str) -> Option<Path> {

@@ -21,13 +21,12 @@ use crate::{
     blockchain::{Blockchain, GenesisConfig, Schema},
     crypto::{PublicKey, SecretKey},
     events::InternalRequest,
-    messages::ServiceInstanceId,
     node::ApiSender,
     proto::Any,
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        InstanceSpec, Runtime,
+        InstanceSpec, Runtime, ServiceInstanceId,
     },
 };
 

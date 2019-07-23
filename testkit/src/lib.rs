@@ -55,7 +55,7 @@
 //! }
 //!
 //! impl TxTimestamp {
-//!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<AnyTx> {
+//!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Verified<AnyTx> {
 //!        let tx = TxTimestamp{ message: msg.to_owned() };
 //!        Message::sign_transaction(tx, SERVICE_ID, *author, key)
 //!    }
@@ -174,7 +174,7 @@ use exonum::{
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
     proto::Any,
     runtime::{rust::ServiceFactory, ServiceInstanceId},
@@ -382,7 +382,7 @@ impl TestKit {
     /// # }
     ///
     /// # impl MyTransaction {
-    /// #    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<AnyTx> {
+    /// #    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Verified<AnyTx> {
     /// #        let tx = MyTransaction{ message: msg.to_owned() };
     /// #        Message::sign_transaction(tx, SERVICE_ID, *author, key)
     /// #    }
@@ -425,7 +425,7 @@ impl TestKit {
     /// transactions included into one of previous blocks do not lead to any state changes.
     pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
     where
-        I: IntoIterator<Item = Signed<AnyTx>>,
+        I: IntoIterator<Item = Verified<AnyTx>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
@@ -448,11 +448,11 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe(&mut self, transaction: Signed<AnyTx>) -> Box<dyn Snapshot> {
+    pub fn probe(&mut self, transaction: Verified<AnyTx>) -> Box<dyn Snapshot> {
         self.probe_all(vec![transaction])
     }
 
-    fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
+    fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
 
@@ -472,14 +472,14 @@ impl TestKit {
             patch
         };
 
-        let propose = self
-            .leader()
-            .create_propose(new_block_height, &last_hash, tx_hashes);
+        let propose =
+            self.leader()
+                .create_propose(new_block_height, last_hash, tx_hashes.iter().cloned());
         let precommits: Vec<_> = self
             .network()
             .validators()
             .iter()
-            .map(|v| v.create_precommit(&propose, &block_hash))
+            .map(|v| v.create_precommit(propose.as_ref(), block_hash))
             .collect();
 
         let guard = self.processing_lock.lock().unwrap();
@@ -548,7 +548,7 @@ impl TestKit {
     /// - Panics if any of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
-        I: IntoIterator<Item = Signed<AnyTx>>,
+        I: IntoIterator<Item = Verified<AnyTx>>,
     {
         let tx_hashes: Vec<_> = {
             let blockchain = self.blockchain_mut();
@@ -590,7 +590,7 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
-    pub fn create_block_with_transaction(&mut self, tx: Signed<AnyTx>) -> BlockWithTransactions {
+    pub fn create_block_with_transaction(&mut self, tx: Verified<AnyTx>) -> BlockWithTransactions {
         self.create_block_with_transactions(txvec![tx])
     }
 
@@ -637,7 +637,7 @@ impl TestKit {
     }
 
     /// Adds transaction into persistent pool.
-    pub fn add_tx(&mut self, transaction: Signed<AnyTx>) {
+    pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
         let fork = self.blockchain.fork();
         {
             let mut schema = CoreSchema::new(&fork);

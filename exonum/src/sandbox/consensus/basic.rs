@@ -25,7 +25,7 @@ use crate::{
     blockchain::{IndexCoordinates, IndexOwner, Schema},
     crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
-    messages::{Precommit, Signed},
+    messages::{Precommit, Verified},
     sandbox::{
         self,
         sandbox_tests_helper::*,
@@ -70,9 +70,9 @@ fn test_check_leader() {
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(ValidatorId(0)),
         Height(1),
-        &sandbox.last_block().object_hash(),
+        sandbox.last_block().object_hash(),
         sandbox.secret_key(ValidatorId(0)),
     ));
 
@@ -120,8 +120,8 @@ fn test_reach_actual_round() {
         ValidatorId(3),
         Height(1),
         Round(4),
-        &block_at_first_height.clone().object_hash(),
-        &[], // there are no transactions in future propose
+        block_at_first_height.clone().object_hash(),
+        vec![], // there are no transactions in future propose
         sandbox.secret_key(ValidatorId(3)),
     );
 
@@ -132,7 +132,7 @@ fn test_reach_actual_round() {
         ValidatorId(2),
         Height(1),
         Round(4),
-        &block_at_first_height.clone().object_hash(),
+        block_at_first_height.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -237,14 +237,14 @@ fn test_retrieve_block_and_precommits() {
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
     let block = block_proof.block;
-    let precommits: Vec<Signed<Precommit>> = block_proof.precommits;
+    let precommits: Vec<Verified<Precommit>> = block_proof.precommits;
     let expected_height = target_height.previous();
     let expected_block_hash = block.object_hash();
 
     assert_eq!(expected_height, block.height());
     for precommit in precommits {
-        assert_eq!(expected_height, precommit.height());
-        assert_eq!(expected_block_hash, *precommit.block_hash());
+        assert_eq!(expected_height, precommit.payload().height);
+        assert_eq!(expected_block_hash, precommit.payload().block_hash);
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());

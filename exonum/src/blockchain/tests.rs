@@ -25,13 +25,12 @@ use crate::{
     blockchain::{Blockchain, InstanceCollection, Schema},
     crypto,
     helpers::{generate_testnet_config, Height, ValidatorId},
-    messages::ServiceInstanceId,
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
         error::ErrorKind,
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo, ExecutionError,
+        ArtifactInfo, ExecutionError, ServiceInstanceId,
     },
 };
 

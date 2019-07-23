@@ -24,13 +24,13 @@ use std::borrow::Cow;
 use crate::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
-    messages::{AnyTx, ServiceInstanceId, Signed},
+    messages::Verified,
     runtime::{
         rust::{
             RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
             TransactionContext,
         },
-        ArtifactInfo,
+        AnyTx, ArtifactInfo, ServiceInstanceId,
     },
 };
 
@@ -116,9 +116,9 @@ impl TimestampingTxGenerator {
 }
 
 impl Iterator for TimestampingTxGenerator {
-    type Item = Signed<AnyTx>;
+    type Item = Verified<AnyTx>;
 
-    fn next(&mut self) -> Option<Signed<AnyTx>> {
+    fn next(&mut self) -> Option<Verified<AnyTx>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
         let mut buf = TimestampTx::new();

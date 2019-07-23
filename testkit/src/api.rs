@@ -24,7 +24,7 @@ use std::fmt::{self, Display};
 
 use exonum::{
     api::{self, node::SharedNodeState, ApiAggregator, ServiceApiState},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     node::ApiSender,
 };
 
@@ -94,7 +94,7 @@ impl TestKitApi {
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
-        T: Into<Signed<AnyTx>>,
+        T: Into<Verified<AnyTx>>,
     {
         self.api_sender
             .broadcast_transaction(transaction.into())

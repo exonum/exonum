@@ -19,7 +19,6 @@ use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
-    ops::Deref,
     sync::{Arc, RwLock},
     time::{Duration, SystemTime},
 };
@@ -31,7 +30,7 @@ use crate::{
     helpers::{Height, Milliseconds, Round, ValidatorId},
     messages::{
         AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
-        Signed,
+        Verified,
     },
     node::{
         connect_list::{ConnectList, PeerAddress},
@@ -54,7 +53,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
-    our_connect_message: Signed<Connect>,
+    our_connect_message: Verified<Connect>,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -64,7 +63,7 @@ pub struct State {
     config: StoredConfiguration,
     connect_list: SharedConnectList,
 
-    peers: HashMap<PublicKey, Signed<Connect>>,
+    peers: HashMap<PublicKey, Verified<Connect>>,
     connections: HashMap<PublicKey, ConnectedPeerAddr>,
     height_start_time: SystemTime,
     height: Height,
@@ -77,8 +76,8 @@ pub struct State {
     // Messages.
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
-    prevotes: HashMap<(Round, Hash), Votes<Signed<Prevote>>>,
-    precommits: HashMap<(Round, Hash), Votes<Signed<Precommit>>>,
+    prevotes: HashMap<(Round, Hash), Votes<Verified<Prevote>>>,
+    precommits: HashMap<(Round, Hash), Votes<Verified<Precommit>>>,
 
     queued: Vec<ConsensusMessage>,
 
@@ -100,8 +99,8 @@ pub struct State {
 #[derive(Debug, Clone)]
 pub struct ValidatorState {
     id: ValidatorId,
-    our_prevotes: HashMap<Round, Signed<Prevote>>,
-    our_precommits: HashMap<Round, Signed<Precommit>>,
+    our_prevotes: HashMap<Round, Verified<Prevote>>,
+    our_precommits: HashMap<Round, Verified<Precommit>>,
 }
 
 /// `RequestData` represents a request for some data to other nodes. Each enum variant will be
@@ -132,7 +131,7 @@ struct RequestState {
 #[derive(Debug)]
 /// transactions.
 pub struct ProposeState {
-    propose: Signed<Propose>,
+    propose: Verified<Propose>,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
     // Whether the message has been saved to the consensus messages' cache or not.
@@ -152,7 +151,7 @@ pub struct BlockState {
 /// Incomplete block.
 #[derive(Clone, Debug)]
 pub struct IncompleteBlock {
-    msg: Signed<BlockResponse>,
+    msg: Verified<BlockResponse>,
     unknown_txs: HashSet<Hash>,
 }
 
@@ -162,15 +161,15 @@ pub trait VoteMessage: Clone {
     fn validator(&self) -> ValidatorId;
 }
 
-impl VoteMessage for Signed<Precommit> {
+impl VoteMessage for Verified<Precommit> {
     fn validator(&self) -> ValidatorId {
-        self.deref().validator()
+        self.payload().validator()
     }
 }
 
-impl VoteMessage for Signed<Prevote> {
+impl VoteMessage for Verified<Prevote> {
     fn validator(&self) -> ValidatorId {
-        self.deref().validator()
+        self.payload().validator()
     }
 }
 
@@ -311,7 +310,7 @@ impl ProposeState {
     }
 
     /// Returns propose-message.
-    pub fn message(&self) -> &Signed<Propose> {
+    pub fn message(&self) -> &Verified<Propose> {
         &self.propose
     }
 
@@ -370,7 +369,7 @@ impl BlockState {
 
 impl IncompleteBlock {
     /// Returns `BlockResponse` message.
-    pub fn message(&self) -> &Signed<BlockResponse> {
+    pub fn message(&self) -> &Verified<BlockResponse> {
         &self.msg
     }
 
@@ -443,8 +442,8 @@ impl State {
         service_secret_key: SecretKey,
         connect_list: ConnectList,
         stored: StoredConfiguration,
-        connect: Signed<Connect>,
-        peers: HashMap<PublicKey, Signed<Connect>>,
+        connect: Verified<Connect>,
+        peers: HashMap<PublicKey, Verified<Connect>>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -562,7 +561,7 @@ impl State {
         let validator_id = config
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == *self.consensus_public_key())
+            .position(|pk| pk.consensus_key == self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
 
         // TODO: update connect list (ECR-1745)
@@ -574,7 +573,7 @@ impl State {
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
-    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Signed<Connect>) -> bool {
+    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Verified<Connect>) -> bool {
         self.peers.insert(pubkey, msg).is_none()
     }
 
@@ -585,7 +584,7 @@ impl State {
 
     /// Removes a peer by the socket address. Returns `Some` (connect message) of the peer if it was
     /// indeed connected or `None` if there was no connection with given socket address.
-    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Signed<Connect>> {
+    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Verified<Connect>> {
         self.connections.remove(key);
         if let Some(c) = self.peers.remove(key) {
             Some(c)
@@ -608,7 +607,7 @@ impl State {
     }
 
     /// Returns the keys of known peers with their `Connect` messages.
-    pub fn peers(&self) -> &HashMap<PublicKey, Signed<Connect>> {
+    pub fn peers(&self) -> &HashMap<PublicKey, Verified<Connect>> {
         &self.peers
     }
 
@@ -624,8 +623,8 @@ impl State {
     }
 
     /// Returns the consensus public key of the current node.
-    pub fn consensus_public_key(&self) -> &PublicKey {
-        &self.consensus_public_key
+    pub fn consensus_public_key(&self) -> PublicKey {
+        self.consensus_public_key
     }
 
     /// Returns the consensus secret key of the current node.
@@ -634,8 +633,8 @@ impl State {
     }
 
     /// Returns the service public key of the current node.
-    pub fn service_public_key(&self) -> &PublicKey {
-        &self.service_public_key
+    pub fn service_public_key(&self) -> PublicKey {
+        self.service_public_key
     }
 
     /// Returns the service secret key of the current node.
@@ -738,8 +737,8 @@ impl State {
     }
 
     /// Returns a hash of the last block.
-    pub fn last_hash(&self) -> &Hash {
-        &self.last_hash
+    pub fn last_hash(&self) -> Hash {
+        self.last_hash
     }
 
     /// Locks the node to the specified round and propose hash.
@@ -840,7 +839,7 @@ impl State {
         for (propose_hash, propose_state) in &mut self.proposes {
             propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
-                full_proposes.push((*propose_hash, propose_state.message().round()));
+                full_proposes.push((*propose_hash, propose_state.message().payload().round()));
             }
         }
 
@@ -865,14 +864,14 @@ impl State {
     }
 
     /// Returns pre-votes for the specified round and propose hash.
-    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Signed<Prevote>] {
+    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Verified<Prevote>] {
         self.prevotes
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns pre-commits for the specified round and propose hash.
-    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Signed<Precommit>] {
+    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Verified<Precommit>] {
         self.precommits
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
@@ -893,7 +892,7 @@ impl State {
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
     /// cannot contain unknown transactions. Returns hash of the propose.
-    pub fn add_self_propose(&mut self, msg: Signed<Propose>) -> Hash {
+    pub fn add_self_propose(&mut self, msg: Verified<Propose>) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.object_hash();
         self.proposes.insert(
@@ -915,8 +914,8 @@ impl State {
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
     pub fn add_propose<S: IndexAccess>(
         &mut self,
-        msg: Signed<Propose>,
-        transactions: &MapIndex<S, Hash, Signed<AnyTx>>,
+        msg: Verified<Propose>,
+        transactions: &MapIndex<S, Hash, Verified<AnyTx>>,
         transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.object_hash();
@@ -924,7 +923,7 @@ impl State {
             Entry::Occupied(..) => bail!("Propose already found"),
             Entry::Vacant(e) => {
                 let mut unknown_txs = HashSet::new();
-                for hash in msg.transactions() {
+                for hash in &msg.payload().transactions {
                     if transactions.get(hash).is_some() {
                         if !transaction_pool.contains(hash) {
                             bail!(
@@ -983,14 +982,14 @@ impl State {
     /// - Received block has already committed transaction.
     pub fn create_incomplete_block<S: IndexAccess>(
         &mut self,
-        msg: &Signed<BlockResponse>,
-        txs: &MapIndex<S, Hash, Signed<AnyTx>>,
+        msg: &Verified<BlockResponse>,
+        txs: &MapIndex<S, Hash, Verified<AnyTx>>,
         txs_pool: &KeySetIndex<S, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
 
         let mut unknown_txs = HashSet::new();
-        for hash in msg.transactions() {
+        for hash in &msg.payload().transactions {
             if txs.get(hash).is_some() {
                 if !txs_pool.contains(hash) {
                     panic!(
@@ -1016,13 +1015,13 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Prevote` for the same round.
-    pub fn add_prevote(&mut self, msg: Signed<Prevote>) -> bool {
+    pub fn add_prevote(&mut self, msg: Verified<Prevote>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
                 if let Some(other) = validator_state
                     .our_prevotes
-                    .insert(msg.round(), msg.clone())
+                    .insert(msg.payload().round, msg.clone())
                 {
                     if other != msg {
                         panic!(
@@ -1035,7 +1034,7 @@ impl State {
             }
         }
 
-        let key = (msg.round(), *msg.propose_hash());
+        let key = (msg.payload().round, msg.payload().propose_hash);
         let validators_len = self.validators().len();
         let votes = self
             .prevotes
@@ -1054,10 +1053,10 @@ impl State {
     }
 
     /// Returns ids of validators that that sent pre-votes for the specified propose.
-    pub fn known_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
+    pub fn known_prevotes(&self, round: Round, propose_hash: Hash) -> BitVec {
         let len = self.validators().len();
         self.prevotes
-            .get(&(round, *propose_hash))
+            .get(&(round, propose_hash))
             .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
     }
 
@@ -1074,15 +1073,15 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Precommit` for the same round.
-    pub fn add_precommit(&mut self, msg: Signed<Precommit>) -> bool {
+    pub fn add_precommit(&mut self, msg: Verified<Precommit>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
                 if let Some(other) = validator_state
                     .our_precommits
-                    .insert(msg.round(), msg.clone())
+                    .insert(msg.payload().round, msg.clone())
                 {
-                    if other.propose_hash() != msg.propose_hash() {
+                    if other.payload().propose_hash != msg.payload().propose_hash {
                         panic!(
                             "Trying to send different precommits for same round, old={:?}, \
                              new={:?}",
@@ -1093,7 +1092,7 @@ impl State {
             }
         }
 
-        let key = (msg.round(), *msg.block_hash());
+        let key = (msg.payload().round, msg.payload().block_hash);
         let validators_len = self.validators().len();
         let votes = self
             .precommits
@@ -1141,7 +1140,7 @@ impl State {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
                         // TODO: Inefficient. (ECR-171)
-                        if Some(*msg.propose_hash()) != self.locked_propose {
+                        if Some(msg.payload().propose_hash) != self.locked_propose {
                             return true;
                         }
                     }
@@ -1188,12 +1187,12 @@ impl State {
     }
 
     /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &Signed<Connect> {
+    pub fn our_connect_message(&self) -> &Verified<Connect> {
         &self.our_connect_message
     }
 
     /// Updates the `Connect` message of the current node.
-    pub fn set_our_connect_message(&mut self, msg: Signed<Connect>) {
+    pub fn set_our_connect_message(&mut self, msg: Verified<Connect>) {
         self.our_connect_message = msg;
     }
 

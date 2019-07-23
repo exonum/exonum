@@ -30,7 +30,7 @@ use crate::{
         codec::MessagesCodec,
         noise::{Handshake, HandshakeRawMessage, HandshakeResult},
     },
-    messages::{Connect, Signed},
+    messages::{Connect, Verified},
     node::state::SharedConnectList,
 };
 
@@ -41,7 +41,7 @@ pub struct HandshakeParams {
     pub secret_key: x25519::SecretKey,
     pub remote_key: Option<x25519::PublicKey>,
     pub connect_list: SharedConnectList,
-    pub connect: Signed<Connect>,
+    pub connect: Verified<Connect>,
     max_message_len: u32,
 }
 
@@ -50,7 +50,7 @@ impl HandshakeParams {
         public_key: PublicKey,
         secret_key: SecretKey,
         connect_list: SharedConnectList,
-        connect: Signed<Connect>,
+        connect: Verified<Connect>,
         max_message_len: u32,
     ) -> Self {
         let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
@@ -76,7 +76,7 @@ pub struct NoiseHandshake {
     peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
-    connect: Signed<Connect>,
+    connect: Verified<Connect>,
 }
 
 impl NoiseHandshake {

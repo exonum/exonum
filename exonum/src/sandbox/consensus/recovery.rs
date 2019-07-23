@@ -136,7 +136,7 @@ fn should_not_vote_after_node_restart() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -146,7 +146,7 @@ fn should_not_vote_after_node_restart() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -156,8 +156,8 @@ fn should_not_vote_after_node_restart() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -205,7 +205,7 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -215,7 +215,7 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -225,8 +225,8 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -249,8 +249,8 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox_restarted.time().into(),
         sandbox_restarted.secret_key(ValidatorId(1)),
     ));
@@ -259,14 +259,14 @@ fn should_save_precommit_to_consensus_cache() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox_restarted.time().into(),
         sandbox_restarted.secret_key(ValidatorId(2)),
     ));
 
     sandbox_restarted.assert_state(Height(2), Round(1));
-    sandbox_restarted.check_broadcast_status(Height(2), &block.object_hash());
+    sandbox_restarted.check_broadcast_status(Height(2), block.object_hash());
 }
 
 /// Idea:
@@ -292,7 +292,7 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &first_propose.object_hash(),
+        first_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -302,7 +302,7 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &first_propose.object_hash(),
+        first_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -312,8 +312,8 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &first_propose.object_hash(),
-        &block.object_hash(),
+        first_propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -326,10 +326,10 @@ fn test_recover_consensus_messages_in_other_round() {
 
     // make sure we broadcasted same Prevote for second round
     let first_updated_prevote = sandbox.create_prevote(
-        first_prevote.validator(),
-        first_prevote.height(),
+        first_prevote.payload().validator,
+        first_prevote.payload().height,
         Round(2),
-        first_prevote.propose_hash(),
+        first_prevote.payload().propose_hash,
         Round(1),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -344,7 +344,7 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(1),
         Height(1),
         Round(2),
-        &second_propose.object_hash(),
+        second_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -353,7 +353,7 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(2),
         Height(1),
         Round(2),
-        &second_propose.object_hash(),
+        second_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -364,7 +364,7 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(3),
         Height(1),
         Round(2),
-        &second_propose.object_hash(),
+        second_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -375,8 +375,8 @@ fn test_recover_consensus_messages_in_other_round() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &second_propose.object_hash(),
-        &second_block.object_hash(),
+        second_propose.object_hash(),
+        second_block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     );
@@ -391,11 +391,11 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox_new.broadcast(&first_prevote);
 
     let first_precommit_new_time = sandbox_new.create_precommit(
-        first_precommit.validator(),
-        first_precommit.height(),
-        first_precommit.round(),
-        first_precommit.propose_hash(),
-        first_precommit.block_hash(),
+        first_precommit.payload().validator,
+        first_precommit.payload().height,
+        first_precommit.payload().round,
+        first_precommit.payload().propose_hash,
+        first_precommit.payload().block_hash,
         sandbox_new.time().into(),
         sandbox_new.secret_key(ValidatorId(0)),
     );
@@ -440,7 +440,7 @@ fn should_restore_peers_after_restart() {
         &user_agent::get(),
         &secret_key1,
     );
-    let peers_request = sandbox.create_peers_request(&public_key1, &public_key0, &secret_key1);
+    let peers_request = sandbox.create_peers_request(public_key1, public_key0, &secret_key1);
 
     // check that peers are absent
     sandbox.recv(&peers_request);

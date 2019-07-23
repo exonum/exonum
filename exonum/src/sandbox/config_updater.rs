@@ -24,11 +24,11 @@ use crate::{
     blockchain::{ExecutionError, Schema, StoredConfiguration},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, ServiceInstanceId, Signed},
+    messages::{AnyTx, Verified},
     proto::{schema::PROTO_SOURCES, ProtobufConvert},
     runtime::{
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo,
+        ArtifactInfo, ServiceInstanceId,
     },
 };
 
@@ -84,16 +84,16 @@ impl ConfigUpdaterService {
 
 impl TxConfig {
     pub fn create_signed(
-        from: &PublicKey,
+        from: PublicKey,
         config: &[u8],
         actual_from: Height,
         signer: &SecretKey,
-    ) -> Signed<AnyTx> {
+    ) -> Verified<AnyTx> {
         let mut msg = TxConfig::new();
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());
         msg.set_actual_from(actual_from.0);
-        msg.sign(ConfigUpdaterService::ID, *from, signer)
+        msg.sign(ConfigUpdaterService::ID, from, signer)
     }
 }
 

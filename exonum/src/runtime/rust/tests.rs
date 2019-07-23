@@ -19,7 +19,6 @@ use semver::Version;
 use std::convert::TryFrom;
 
 use crate::{
-    messages::{CallInfo, ServiceInstanceId},
     proto::{
         schema::{
             tests::{TestServiceInit, TestServiceTx},
@@ -29,7 +28,7 @@ use crate::{
     },
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, rust::ServiceDescriptor, ArtifactInfo,
-        Caller, ExecutionContext, InstanceSpec,
+        CallInfo, Caller, ExecutionContext, InstanceSpec, ServiceInstanceId,
     },
 };
 

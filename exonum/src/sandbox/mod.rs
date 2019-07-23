@@ -19,6 +19,8 @@ use futures::{sync::mpsc, Async, Future, Sink, Stream};
 use std::{
     cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    convert::TryFrom,
+    fmt::Debug,
     iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::{AddAssign, Deref},
@@ -39,9 +41,9 @@ use crate::{
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
-        AnyTx, BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, Signed, SignedMessage, Status,
-        TransactionsRequest, TransactionsResponse,
+        AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
+        Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status,
+        TransactionsRequest, TransactionsResponse, Verified,
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
@@ -111,9 +113,8 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => {
-                        let protocol_msg =
-                            Message::deserialize(msg).expect("Expected valid message.");
-                        self.sent.push_back((peer, protocol_msg))
+                        let msg = Message::from_signed(msg).expect("Expected valid message.");
+                        self.sent.push_back((peer, msg))
                     }
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
@@ -133,13 +134,14 @@ impl SandboxInner {
                         .handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
 
-                    InternalRequest::VerifyMessage(message) => {
-                        let protocol = Message::deserialize(
-                            SignedMessage::from_bytes(message.into()).unwrap(),
-                        )
-                        .unwrap();
+                    InternalRequest::VerifyMessage(raw) => {
+                        let msg = SignedMessage::from_bytes(raw.into())
+                            .and_then(SignedMessage::into_verified::<ExonumMessage>)
+                            .map(Message::from)
+                            .unwrap();
+
                         self.handler
-                            .handle_event(InternalEvent::MessageVerified(Box::new(protocol)).into())
+                            .handle_event(InternalEvent::MessageVerified(Box::new(msg)).into())
                     }
 
                     InternalRequest::Shutdown | InternalRequest::RestartApi => unreachable!(),
@@ -166,7 +168,7 @@ pub struct Sandbox {
     inner: RefCell<SandboxInner>,
     addresses: Vec<ConnectInfo>,
     /// Connect message used during initialization.
-    connect: Option<Signed<Connect>>,
+    connect: Option<Verified<Connect>>,
 }
 
 impl Sandbox {
@@ -223,43 +225,43 @@ impl Sandbox {
     /// Creates a `BlockRequest` message signed by this validator.
     pub fn create_block_request(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
+        author: PublicKey,
+        to: PublicKey,
         height: Height,
         secret_key: &SecretKey,
-    ) -> Signed<BlockRequest> {
-        Message::concrete(BlockRequest::new(to, height), *author, secret_key)
+    ) -> Verified<BlockRequest> {
+        Verified::from_value(BlockRequest::new(to, height), author, secret_key)
     }
 
     /// Creates a `Status` message signed by this validator.
     pub fn create_status(
         &self,
-        author: &PublicKey,
+        author: PublicKey,
         height: Height,
-        last_hash: &Hash,
+        last_hash: Hash,
         secret_key: &SecretKey,
-    ) -> Signed<Status> {
-        Message::concrete(Status::new(height, last_hash), *author, secret_key)
+    ) -> Verified<Status> {
+        Verified::from_value(Status::new(height, last_hash), author, secret_key)
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
-    pub fn create_block_response<I: IntoIterator<Item = Signed<Precommit>>>(
+    pub fn create_block_response(
         &self,
-        public_key: &PublicKey,
-        to: &PublicKey,
+        public_key: PublicKey,
+        to: PublicKey,
         block: Block,
-        precommits: I,
-        tx_hashes: &[Hash],
+        precommits: impl IntoIterator<Item = Verified<Precommit>>,
+        tx_hashes: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
-    ) -> Signed<BlockResponse> {
-        Message::concrete(
+    ) -> Verified<BlockResponse> {
+        Verified::from_value(
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(Signed::into_bytes).collect(),
+                precommits.into_iter().map(Verified::into_bytes),
                 tx_hashes,
             ),
-            *public_key,
+            public_key,
             secret_key,
         )
     }
@@ -272,8 +274,8 @@ impl Sandbox {
         time: chrono::DateTime<::chrono::Utc>,
         user_agent: &str,
         secret_key: &SecretKey,
-    ) -> Signed<Connect> {
-        Message::concrete(
+    ) -> Verified<Connect> {
+        Verified::from_value(
             Connect::new(&addr, time, user_agent),
             *public_key,
             secret_key,
@@ -283,11 +285,11 @@ impl Sandbox {
     /// Creates a `PeersRequest` message signed by this validator.
     pub fn create_peers_request(
         &self,
-        public_key: &PublicKey,
-        to: &PublicKey,
+        public_key: PublicKey,
+        to: PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<PeersRequest> {
-        Message::concrete(PeersRequest::new(to), *public_key, secret_key)
+    ) -> Verified<PeersRequest> {
+        Verified::from_value(PeersRequest::new(to), public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -296,11 +298,11 @@ impl Sandbox {
         validator_id: ValidatorId,
         height: Height,
         round: Round,
-        last_hash: &Hash,
-        tx_hashes: &[Hash],
+        last_hash: Hash,
+        tx_hashes: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
-    ) -> Signed<Propose> {
-        Message::concrete(
+    ) -> Verified<Propose> {
+        Verified::from_value(
             Propose::new(validator_id, height, round, last_hash, tx_hashes),
             self.public_key(validator_id),
             secret_key,
@@ -314,12 +316,12 @@ impl Sandbox {
         validator_id: ValidatorId,
         propose_height: Height,
         propose_round: Round,
-        propose_hash: &Hash,
-        block_hash: &Hash,
+        propose_hash: Hash,
+        block_hash: Hash,
         system_time: chrono::DateTime<chrono::Utc>,
         secret_key: &SecretKey,
-    ) -> Signed<Precommit> {
-        Message::concrete(
+    ) -> Verified<Precommit> {
+        Verified::from_value(
             Precommit::new(
                 validator_id,
                 propose_height,
@@ -339,16 +341,16 @@ impl Sandbox {
         validator_id: ValidatorId,
         propose_height: Height,
         propose_round: Round,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         locked_round: Round,
         secret_key: &SecretKey,
-    ) -> Signed<Prevote> {
-        Message::concrete(
+    ) -> Verified<Prevote> {
+        Verified::from_value(
             Prevote::new(
                 validator_id,
                 propose_height,
                 propose_round,
-                &propose_hash,
+                propose_hash,
                 locked_round,
             ),
             self.public_key(validator_id),
@@ -360,17 +362,17 @@ impl Sandbox {
     #[allow(clippy::too_many_arguments)]
     pub fn create_prevote_request(
         &self,
-        from: &PublicKey,
-        to: &PublicKey,
+        from: PublicKey,
+        to: PublicKey,
         height: Height,
         round: Round,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         validators: BitVec,
         secret_key: &SecretKey,
-    ) -> Signed<PrevotesRequest> {
-        Message::concrete(
+    ) -> Verified<PrevotesRequest> {
+        Verified::from_value(
             PrevotesRequest::new(to, height, round, propose_hash, validators),
-            *from,
+            from,
             secret_key,
         )
     }
@@ -378,15 +380,15 @@ impl Sandbox {
     /// Creates a `ProposeRequest` message signed by this validator.
     pub fn create_propose_request(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
+        author: PublicKey,
+        to: PublicKey,
         height: Height,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         secret_key: &SecretKey,
-    ) -> Signed<ProposeRequest> {
-        Message::concrete(
+    ) -> Verified<ProposeRequest> {
+        Verified::from_value(
             ProposeRequest::new(to, height, propose_hash),
-            *author,
+            author,
             secret_key,
         )
     }
@@ -394,28 +396,25 @@ impl Sandbox {
     /// Creates a `TransactionsRequest` message signed by this validator.
     pub fn create_transactions_request(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
-        txs: &[Hash],
+        author: PublicKey,
+        to: PublicKey,
+        txs: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
-    ) -> Signed<TransactionsRequest> {
-        Message::concrete(TransactionsRequest::new(to, txs), *author, secret_key)
+    ) -> Verified<TransactionsRequest> {
+        Verified::from_value(TransactionsRequest::new(to, txs), author, secret_key)
     }
 
     /// Creates a `TransactionsResponse` message signed by this validator.
-    pub fn create_transactions_response<I>(
+    pub fn create_transactions_response(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
-        txs: I,
+        author: PublicKey,
+        to: PublicKey,
+        txs: impl IntoIterator<Item = Verified<AnyTx>>,
         secret_key: &SecretKey,
-    ) -> Signed<TransactionsResponse>
-    where
-        I: IntoIterator<Item = Signed<AnyTx>>,
-    {
-        Message::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(Signed::into_bytes).collect()),
-            *author,
+    ) -> Verified<TransactionsResponse> {
+        Verified::from_value(
+            TransactionsResponse::new(to, txs.into_iter().map(Verified::into_bytes)),
+            author,
             secret_key,
         )
     }
@@ -453,13 +452,13 @@ impl Sandbox {
     }
 
     /// Returns connect message used during initialization.
-    pub fn connect(&self) -> Option<&Signed<Connect>> {
+    pub fn connect(&self) -> Option<&Verified<Connect>> {
         self.connect.as_ref()
     }
 
-    pub fn recv<T: ProtocolMessage>(&self, msg: &Signed<T>) {
+    pub fn recv<T: TryFrom<SignedMessage>>(&self, msg: &Verified<T>) {
         self.check_unexpected_message();
-        let event = NetworkEvent::MessageReceived(msg.to_bytes());
+        let event = NetworkEvent::MessageReceived(msg.as_raw().to_bytes());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -478,11 +477,17 @@ impl Sandbox {
         self.inner.borrow_mut().sent.pop_front()
     }
 
-    pub fn send<T: ProtocolMessage>(&self, key: PublicKey, msg: &Signed<T>) {
-        let expected_msg = T::into_protocol(msg.clone());
+    pub fn send<T>(&self, key: PublicKey, expected_msg: &Verified<T>)
+    where
+        T: TryFrom<SignedMessage> + Debug,
+    {
         self.process_events();
         if let Some((real_addr, real_msg)) = self.pop_sent_message() {
-            assert_eq!(expected_msg, real_msg, "Expected to send other message");
+            assert_eq!(
+                expected_msg.as_raw(),
+                real_msg.as_raw(),
+                "Expected to send other message"
+            );
             assert_eq!(
                 key, real_addr,
                 "Expected to send message to other recipient"
@@ -499,12 +504,15 @@ impl Sandbox {
         self.process_events();
 
         if let Some((addr, msg)) = self.pop_sent_message() {
-            let peers_request =
-                PeersRequest::try_from(msg).expect("Incorrect message. PeersRequest was expected");
+            let peers_request = Verified::<PeersRequest>::try_from(msg)
+                .expect("Incorrect message. PeersRequest was expected");
 
             let id = self.addresses.iter().position(|ref a| a.public_key == addr);
             if let Some(id) = id {
-                assert_eq!(&self.public_key(ValidatorId(id as u16)), peers_request.to());
+                assert_eq!(
+                    &self.public_key(ValidatorId(id as u16)),
+                    peers_request.payload().to()
+                );
             } else {
                 panic!("Sending PeersRequest to unknown peer {:?}", addr);
             }
@@ -513,30 +521,36 @@ impl Sandbox {
         }
     }
 
-    pub fn broadcast<T: ProtocolMessage>(&self, msg: &Signed<T>) {
+    pub fn broadcast<T: TryFrom<SignedMessage>>(&self, msg: &Verified<T>) {
         self.broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1));
     }
 
-    pub fn try_broadcast<T: ProtocolMessage>(&self, msg: &Signed<T>) -> Result<(), String> {
+    pub fn try_broadcast<T: TryFrom<SignedMessage>>(
+        &self,
+        msg: &Verified<T>,
+    ) -> Result<(), String> {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1))
     }
 
-    pub fn broadcast_to_addrs<'a, T: ProtocolMessage, I>(&self, msg: &Signed<T>, addresses: I)
-    where
+    pub fn broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
+        &self,
+        msg: &Verified<T>,
+        addresses: I,
+    ) where
         I: IntoIterator<Item = &'a PublicKey>,
     {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    pub fn try_broadcast_to_addrs<'a, T: ProtocolMessage, I>(
+    pub fn try_broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
         &self,
-        msg: &Signed<T>,
+        msg: &Verified<T>,
         addresses: I,
     ) -> Result<(), String>
     where
         I: IntoIterator<Item = &'a PublicKey>,
     {
-        let expected_msg = msg.signed_message();
+        let expected_msg = msg.as_raw();
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -546,7 +560,7 @@ impl Sandbox {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
                 assert_eq!(
                     expected_msg,
-                    real_msg.signed_message(),
+                    real_msg.as_raw(),
                     "Expected to broadcast other message"
                 );
                 if !expected_set.contains(&real_addr) {
@@ -568,9 +582,9 @@ impl Sandbox {
         Ok(())
     }
 
-    pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
+    pub fn check_broadcast_status(&self, height: Height, block_hash: Hash) {
         self.broadcast(&self.create_status(
-            &self.node_public_key(),
+            self.node_public_key(),
             height,
             block_hash,
             &self.node_secret_key(),
@@ -624,9 +638,9 @@ impl Sandbox {
         *self.last_block().state_hash()
     }
 
-    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Signed<AnyTx>>
+    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Verified<AnyTx>>
     where
-        I: IntoIterator<Item = &'a Signed<AnyTx>>,
+        I: IntoIterator<Item = &'a Verified<AnyTx>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain().snapshot();
@@ -651,7 +665,7 @@ impl Sandbox {
     /// Extracts state_hash from the fake block.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
-        I: IntoIterator<Item = &'a Signed<AnyTx>>,
+        I: IntoIterator<Item = &'a Verified<AnyTx>>,
     {
         let height = self.current_height();
         let mut blockchain = self.blockchain();
@@ -800,9 +814,9 @@ impl Sandbox {
         let connect = self.connect().map(|c| {
             self.create_connect(
                 &c.author(),
-                c.pub_addr().parse().expect("Expected resolved address"),
+                c.payload().host.parse().expect("Expected resolved address"),
                 time.into(),
-                c.user_agent(),
+                c.payload().user_agent(),
                 self.secret_key(ValidatorId(0)),
             )
         });
@@ -849,12 +863,12 @@ impl Sandbox {
         let config = Configuration {
             listener: ListenerConfig {
                 address,
-                consensus_public_key: *inner.handler.state.consensus_public_key(),
+                consensus_public_key: inner.handler.state.consensus_public_key(),
                 consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
                 connect_list,
             },
             service: ServiceConfig {
-                service_public_key: *inner.handler.state.service_public_key(),
+                service_public_key: inner.handler.state.service_public_key(),
                 service_secret_key: inner.handler.state.service_secret_key().clone(),
             },
             network: NetworkConfiguration::default(),
@@ -900,7 +914,7 @@ impl Sandbox {
     }
 
     fn node_public_key(&self) -> PublicKey {
-        *self.node_state().consensus_public_key()
+        self.node_state().consensus_public_key()
     }
 
     fn node_secret_key(&self) -> SecretKey {
@@ -945,10 +959,10 @@ impl ConnectList {
     /// Helper method to populate ConnectList after sandbox node restarts and
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
-    pub fn from_peers(peers: &HashMap<PublicKey, Signed<Connect>>) -> Self {
+    pub fn from_peers(peers: &HashMap<PublicKey, Verified<Connect>>) -> Self {
         let peers: BTreeMap<PublicKey, PeerAddress> = peers
             .iter()
-            .map(|(p, c)| (*p, PeerAddress::new(c.pub_addr().to_owned())))
+            .map(|(p, c)| (*p, PeerAddress::new(c.payload().host.clone())))
             .collect();
         ConnectList { peers }
     }
@@ -1182,11 +1196,11 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 
 pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
 where
-    I: IntoIterator<Item = &'a Signed<AnyTx>>,
+    I: IntoIterator<Item = &'a Verified<AnyTx>>,
 {
     let txs = txs
         .into_iter()
-        .map(Signed::object_hash)
+        .map(Verified::object_hash)
         .collect::<Vec<Hash>>();
     HashTag::hash_list(&txs)
 }
@@ -1202,14 +1216,13 @@ mod tests {
     use crate::{
         blockchain::ExecutionError,
         crypto::{gen_keypair_from_seed, Seed},
-        messages::{AnyTx, ServiceInstanceId},
         proto::schema::{tests::TxAfterCommit, PROTO_SOURCES},
         runtime::{
             rust::{
                 AfterCommitContext, RustArtifactId, Service, ServiceFactory, Transaction,
                 TransactionContext,
             },
-            ArtifactInfo,
+            AnyTx, ArtifactInfo, ServiceInstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1269,7 +1282,7 @@ mod tests {
     }
 
     impl TxAfterCommit {
-        pub fn new_with_height(height: Height) -> Signed<AnyTx> {
+        pub fn new_with_height(height: Height) -> Verified<AnyTx> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
             let mut payload_tx = TxAfterCommit::new();
             payload_tx.set_height(height.0);

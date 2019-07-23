@@ -38,7 +38,7 @@ use crate::{
         noise::{Handshake, HandshakeParams, NoiseHandshake},
     },
     helpers::Milliseconds,
-    messages::{Connect, Message, Service, Signed, SignedMessage},
+    messages::{Connect, Message, Service, SignedMessage, Verified},
     node::state::SharedConnectList,
 };
 
@@ -63,7 +63,7 @@ impl ConnectedPeerAddr {
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(Vec<u8>),
-    PeerConnected(ConnectedPeerAddr, Signed<Connect>),
+    PeerConnected(ConnectedPeerAddr, Verified<Connect>),
     PeerDisconnected(PublicKey),
     UnableConnectToPeer(PublicKey),
 }
@@ -101,7 +101,7 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct NetworkPart {
-    pub our_connect_message: Signed<Connect>,
+    pub our_connect_message: Verified<Connect>,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub max_message_len: u32,
@@ -497,7 +497,7 @@ impl NetworkHandler {
 
     fn handle_connection(
         connection: Connection,
-        message: Signed<Connect>,
+        message: Verified<Connect>,
         pool: ConnectionPool,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = failure::Error> {
@@ -508,7 +508,7 @@ impl NetworkHandler {
         )
     }
 
-    fn parse_connect_msg(raw: Option<Vec<u8>>) -> Result<Signed<Connect>, failure::Error> {
+    fn parse_connect_msg(raw: Option<Vec<u8>>) -> Result<Verified<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Message::from_raw_buffer(raw)?;
         match message {
@@ -577,7 +577,7 @@ impl NetworkHandler {
         let connect = self.handshake_params.connect.clone();
         self.connect(key, &self.handshake_params)
             .and_then(move |_| {
-                if &message == connect.signed_message() {
+                if &message == connect.as_raw() {
                     Either::A(future::ok(()))
                 } else {
                     Either::B(pool.send_message(&key, message))
@@ -587,7 +587,7 @@ impl NetworkHandler {
 
     fn send_peer_connected_event(
         address: &ConnectedPeerAddr,
-        message: Signed<Connect>,
+        message: Verified<Connect>,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = failure::Error> {
         let peer_connected = NetworkEvent::PeerConnected(address.clone(), message);

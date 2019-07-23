@@ -34,6 +34,7 @@ use toml::Value;
 
 use std::{
     collections::{BTreeMap, HashSet},
+    convert::TryFrom,
     fmt,
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -66,7 +67,7 @@ use crate::{
         fabric::{NodePrivateConfig, NodePublicConfig},
         user_agent, Height, Milliseconds, Round, ValidatorId,
     },
-    messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage},
+    messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
 };
 
@@ -82,7 +83,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Signed<AnyTx>),
+    Transaction(Verified<AnyTx>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -470,7 +471,7 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Message::concrete(
+        let connect = Verified::from_value(
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
@@ -519,10 +520,13 @@ impl NodeHandler {
         }
     }
 
-    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Signed<T> {
-        Message::concrete(
+    fn sign_message<T>(&self, message: T) -> Verified<T>
+    where
+        T: TryFrom<SignedMessage> + Into<ExonumMessage> + TryFrom<ExonumMessage>,
+    {
+        Verified::from_value(
             message,
-            *self.state.consensus_public_key(),
+            self.state.consensus_public_key(),
             self.state.consensus_secret_key(),
         )
     }
@@ -585,7 +589,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(Signed::author);
+            let it = self.state.peers().values().map(Verified::author);
             let it = it.chain(
                 self.state()
                     .connect_list()
@@ -805,7 +809,7 @@ impl ApiSender {
     }
 
     /// Broadcast transaction to other node.
-    pub fn broadcast_transaction(&self, tx: Signed<AnyTx>) -> Result<(), Error> {
+    pub fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
@@ -1053,7 +1057,7 @@ impl Node {
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            *self.state().consensus_public_key(),
+            self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
@@ -1196,7 +1200,7 @@ mod tests {
         }
     }
 
-    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<AnyTx> {
+    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
         msg.set_msg("Hello, World!".to_owned());

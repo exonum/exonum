@@ -18,6 +18,8 @@ use proc_macro2::Ident;
 use quote::{quote, ToTokens};
 use syn::{Attribute, Data, DeriveInput, Expr, MetaNameValue, NestedMeta, Path, Variant};
 
+use std::convert::TryFrom;
+
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ExecutionErrorAttrs {
@@ -35,13 +37,16 @@ impl Default for ExecutionErrorAttrs {
     }
 }
 
-impl ExecutionErrorAttrs {
-    fn from_attributes(args: &[Attribute]) -> Self {
-        args.iter()
+impl TryFrom<&[Attribute]> for ExecutionErrorAttrs {
+    type Error = darling::Error;
+
+    fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
+        args.as_ref()
+            .iter()
             .filter_map(|a| a.parse_meta().ok())
             .find(|m| m.name() == "exonum")
-            .map(|meta| Self::from_nested_meta(&NestedMeta::from(meta)).unwrap())
-            .unwrap_or_default()
+            .map(|meta| Self::from_nested_meta(&NestedMeta::from(meta)))
+            .unwrap_or_else(|| Ok(Self::default()))
     }
 }
 
@@ -134,7 +139,7 @@ struct IntoExecutionError {
 
 impl FromDeriveInput for IntoExecutionError {
     fn from_derive_input(input: &DeriveInput) -> Result<Self, darling::Error> {
-        let attrs = ExecutionErrorAttrs::from_attributes(&input.attrs);
+        let attrs = ExecutionErrorAttrs::try_from(input.attrs.as_ref())?;
         let data = match &input.data {
             Data::Enum(enum_data) => enum_data,
             _ => return Err(darling::Error::unsupported_shape("Only for enums.")),

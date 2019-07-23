@@ -42,7 +42,7 @@ use exonum::{
     blockchain::{Blockchain, GenesisConfig, InstanceCollection, Schema, ValidatorKeys},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, Signed},
+    messages::{AnyTx, Verified},
     node::ApiSender,
 };
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
@@ -101,9 +101,13 @@ mod timestamping {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
         crypto::Hash,
-        messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{
-            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+        messages::Verified,
+        runtime::{
+            rust::{
+                ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction,
+                TransactionContext,
+            },
+            AnyTx, ServiceInstanceId,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -175,7 +179,7 @@ mod timestamping {
         data: Hash,
     }
 
-    pub fn transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
             Tx {
@@ -185,7 +189,7 @@ mod timestamping {
         })
     }
 
-    pub fn panicking_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn panicking_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
             PanickingTx {
@@ -200,10 +204,13 @@ mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
         crypto::PublicKey,
-        messages::{AnyTx, ServiceInstanceId, Signed},
-        runtime::rust::{
-            ArtifactInfo, ErrorKind, RustArtifactId, Service, ServiceFactory, Transaction,
-            TransactionContext,
+        messages::Verified,
+        runtime::{
+            rust::{
+                ArtifactInfo, ErrorKind, RustArtifactId, Service, ServiceFactory, Transaction,
+                TransactionContext,
+            },
+            AnyTx, ServiceInstanceId,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
@@ -340,7 +347,7 @@ mod cryptocurrency {
         seed: u32,
     }
 
-    pub fn provable_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn provable_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -355,7 +362,7 @@ mod cryptocurrency {
         )
     }
 
-    pub fn unprovable_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn unprovable_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -370,7 +377,7 @@ mod cryptocurrency {
         )
     }
 
-    pub fn rollback_transactions(mut rng: StdRng) -> impl Iterator<Item = Signed<AnyTx>> {
+    pub fn rollback_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -387,7 +394,7 @@ mod cryptocurrency {
 }
 
 /// Writes transactions to the pool and returns their hashes.
-fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>>) -> Vec<Hash> {
+fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
     let fork = blockchain.fork();
 
     let tx_hashes = {
@@ -426,7 +433,7 @@ fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
 
 fn prepare_blockchain(
     blockchain: &mut Blockchain,
-    generator: impl Iterator<Item = Signed<AnyTx>>,
+    generator: impl Iterator<Item = Verified<AnyTx>>,
     blockchain_height: usize,
     txs_in_block: usize,
 ) {
@@ -451,7 +458,7 @@ fn execute_block_rocksdb(
     criterion: &mut Criterion,
     bench_name: &'static str,
     service: impl Into<InstanceCollection>,
-    mut tx_generator: impl Iterator<Item = Signed<AnyTx>>,
+    mut tx_generator: impl Iterator<Item = Verified<AnyTx>>,
 ) {
     let tempdir = TempDir::new("exonum").unwrap();
     let db = create_rocksdb(&tempdir);

@@ -50,8 +50,8 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -59,8 +59,8 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -68,8 +68,8 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -78,11 +78,11 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -91,11 +91,11 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.recv(&propose);
     sandbox.recv(&tx);
@@ -105,7 +105,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.check_broadcast_status(Height(2), &block.object_hash());
+    sandbox.check_broadcast_status(Height(2), block.object_hash());
     sandbox.add_time(Duration::from_millis(0));
 
     sandbox.add_time(Duration::from_millis(
@@ -179,7 +179,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -188,7 +188,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -198,7 +198,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -208,8 +208,8 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -223,7 +223,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &propose.object_hash(),
+        propose.object_hash(),
         Round(1),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -245,7 +245,7 @@ fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
         ValidatorId(2),
         Height(1),
         Round(2),
-        &empty_hash(),
+        empty_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));

@@ -28,8 +28,11 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, ServiceInstanceId, Signed},
-    runtime::rust::{Service, Transaction, TransactionContext},
+    messages::Verified,
+    runtime::{
+        rust::{Service, Transaction, TransactionContext},
+        AnyTx, ServiceInstanceId,
+    },
 };
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
 use exonum_time::{
@@ -88,7 +91,7 @@ impl TxMarker {
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<AnyTx> {
+    ) -> Verified<AnyTx> {
         Self { mark, time }.sign(SERVICE_ID, *public_key, secret_key)
     }
 }

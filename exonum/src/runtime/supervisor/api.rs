@@ -19,8 +19,10 @@ use super::{DeployRequest, StartService};
 use crate::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     crypto::Hash,
-    messages::ServiceInstanceId,
-    runtime::rust::{ServiceDescriptor, Transaction},
+    runtime::{
+        rust::{ServiceDescriptor, Transaction},
+        ServiceInstanceId,
+    },
 };
 
 /// Private API specification of the supervisor service.

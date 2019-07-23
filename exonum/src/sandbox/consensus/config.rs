@@ -39,7 +39,7 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().object_hash();
 
         TxConfig::create_signed(
-            &sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
             sandbox.secret_key(ValidatorId(0)),
@@ -68,7 +68,7 @@ fn test_schema_config_changes() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().object_hash();
 
         let tx = TxConfig::create_signed(
-            &sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
             sandbox.secret_key(ValidatorId(0)),

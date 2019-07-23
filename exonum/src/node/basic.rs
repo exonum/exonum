@@ -19,7 +19,7 @@ use crate::crypto::PublicKey;
 use crate::events::error::LogError;
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::Height;
-use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
+use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Status, Verified};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -43,7 +43,7 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, address: &ConnectedPeerAddr, connect: Signed<Connect>) {
+    pub fn handle_connected(&mut self, address: &ConnectedPeerAddr, connect: Verified<Connect>) {
         info!("Received Connect message from peer: {:?}", address);
         // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
         self.state.add_connection(connect.author(), address.clone());
@@ -77,11 +77,11 @@ impl NodeHandler {
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, message: Signed<Connect>) {
+    pub fn handle_connect(&mut self, message: Verified<Connect>) {
         // TODO Add spam protection (ECR-170)
         // TODO: drop connection if checks have failed. (ECR-1837)
-        let address = message.pub_addr().to_owned();
-        if address == self.state.our_connect_message().pub_addr() {
+        let address = message.payload().host.clone();
+        if address == self.state.our_connect_message().payload().host {
             trace!("Received Connect with same address as our external_address.");
             return;
         }
@@ -103,26 +103,26 @@ impl NodeHandler {
         // Check if we have another connect message from peer with the given public_key.
         let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
-            if saved_message.time() > message.time() {
+            if saved_message.payload().time() > message.payload().time() {
                 error!("Received outdated Connect message from {}", address);
                 return;
-            } else if saved_message.time() < message.time() {
-                need_connect = saved_message.pub_addr() != message.pub_addr();
-            } else if saved_message.pub_addr() == message.pub_addr() {
+            } else if saved_message.payload().time() < message.payload().time() {
+                need_connect = saved_message.payload().host != message.payload().host;
+            } else if saved_message.payload().host == message.payload().host {
                 need_connect = false;
             } else {
                 error!("Received weird Connect message from {}", address);
                 return;
             }
-            if saved_message.pub_addr() != message.pub_addr() {
+            if saved_message.payload().host != message.payload().host {
                 info!(
                     "Updating connect list for peer: {} with new addr: {}",
                     public_key,
-                    message.pub_addr()
+                    message.payload().host
                 );
                 self.state
                     .connect_list()
-                    .update_peer(&public_key, message.pub_addr().to_string())
+                    .update_peer(&public_key, message.payload().host.to_string())
             }
         }
         self.state.add_peer(public_key, message.clone());
@@ -141,12 +141,12 @@ impl NodeHandler {
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
-    pub fn handle_status(&mut self, msg: &Signed<Status>) {
+    pub fn handle_status(&mut self, msg: &Verified<Status>) {
         let height = self.state.height();
         trace!(
             "HANDLE STATUS: current height = {}, msg height = {}",
             height,
-            msg.height()
+            msg.payload().height()
         );
 
         if !self.state.connect_list().is_peer_allowed(&msg.author()) {
@@ -158,13 +158,13 @@ impl NodeHandler {
         }
 
         // Handle message from future height
-        if msg.height() > height {
+        if msg.payload().height() > height {
             let peer = msg.author();
 
             // Check validator height info
-            if msg.height() > self.state.node_height(&peer) {
+            if msg.payload().height() > self.state.node_height(&peer) {
                 // Update validator height
-                self.state.set_node_height(peer, msg.height());
+                self.state.set_node_height(peer, msg.payload().height());
             }
 
             // Request block
@@ -173,9 +173,9 @@ impl NodeHandler {
     }
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: &Signed<PeersRequest>) {
-        let peers: Vec<Signed<Connect>> =
-            self.state.peers().iter().map(|(_, b)| b.clone()).collect();
+    pub fn handle_request_peers(&mut self, msg: &Verified<PeersRequest>) {
+        let peers = self.state.peers().values().cloned().collect::<Vec<_>>();
+
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
             peers,
@@ -211,8 +211,11 @@ impl NodeHandler {
                 .nth(gen_peer_id())
                 .map(|x| x.1.clone())
                 .unwrap();
-            let msg = PeersRequest::new(&peer.author());
-            trace!("Request peers from peer with addr {:?}", peer.pub_addr());
+            let msg = PeersRequest::new(peer.author());
+            trace!(
+                "Request peers from peer with addr {:?}",
+                peer.payload().host
+            );
             let message = self.sign_message(msg);
             self.send_to_peer(peer.author(), message);
         }
@@ -229,7 +232,7 @@ impl NodeHandler {
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash();
-        let status = Status::new(self.state.height(), &hash);
+        let status = Status::new(self.state.height(), hash);
         trace!("Broadcast status: {:?}", status);
 
         let message = self.sign_message(status);

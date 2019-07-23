@@ -44,7 +44,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
-    messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
+    messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
     runtime::{dispatcher::Dispatcher, supervisor::Supervisor},
 };
@@ -57,7 +57,8 @@ mod schema;
 mod tests;
 
 /// Transaction message shortcut.
-pub type TransactionMessage = Signed<AnyTx>;
+// TODO It seems that this shortcut should be removed [ECR-3222]
+pub type TransactionMessage = Verified<AnyTx>;
 
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
@@ -195,8 +196,6 @@ impl Blockchain {
     // This method is needed for EJB.
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
-        let service_id = tx.service_id();
-
         // TODO check if service exists? [ECR-3222]
 
         // if !self.dispatcher.services().contains_key(&service_id) {
@@ -206,14 +205,11 @@ impl Blockchain {
         //     ));
         // }
 
-        let msg = Message::sign_transaction(
-            tx.service_transaction(),
-            u32::from(service_id),
+        self.api_sender.broadcast_transaction(Verified::from_value(
+            tx,
             self.service_keypair.0,
             &self.service_keypair.1,
-        );
-
-        self.api_sender.broadcast_transaction(msg)
+        ))
     }
 
     /// Executes the given transactions from the pool.
@@ -278,9 +274,9 @@ impl Blockchain {
                 proposer_id,
                 height,
                 tx_hashes.len() as u32,
-                &last_hash,
-                &tx_hash,
-                &state_hash,
+                last_hash,
+                tx_hash,
+                state_hash,
             );
             trace!("execute block = {:?}", block);
             // Calculate block hash.
@@ -377,7 +373,7 @@ impl Blockchain {
         precommits: I,
     ) -> Result<(), failure::Error>
     where
-        I: Iterator<Item = Signed<Precommit>>,
+        I: Iterator<Item = Verified<Precommit>>,
     {
         let patch = {
             let fork = {
@@ -422,7 +418,7 @@ impl Blockchain {
     // TODO move such methods into separate module. [ECR-3222]
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Signed<Connect>) {
+    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Verified<Connect>) {
         let fork = self.fork();
         Schema::new(&fork).peers_cache().put(pubkey, peer);
         self.merge(fork.into_patch())
@@ -438,14 +434,14 @@ impl Blockchain {
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
         let snapshot = self.snapshot();
         Schema::new(&snapshot).peers_cache().iter().collect()
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Signed<T>) {
-        self.save_messages(round, iter::once(raw.into()));
+    pub(crate) fn save_message<T: Into<Message>>(&mut self, round: Round, message: T) {
+        self.save_messages(round, iter::once(message.into()));
     }
 
     /// Saves a collection of SignedMessage to the consensus messages cache with single access to the

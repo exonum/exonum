@@ -17,7 +17,7 @@
 use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
 use super::{ArtifactId, Error, InstanceSpec};
-use crate::{crypto::Hash, messages::ServiceInstanceId, proto::Any};
+use crate::{crypto::Hash, proto::Any, runtime::ServiceInstanceId};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {

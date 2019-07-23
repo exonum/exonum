@@ -12,27 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::error::ExecutionError;
-pub use crate::messages::ServiceInstanceId;
-
-use exonum_merkledb::{Fork, Snapshot};
-use futures::Future;
-use serde_derive::{Deserialize, Serialize};
-
-use std::{
-    fmt::{Debug, Display},
-    str::FromStr,
+pub use self::{
+    error::ExecutionError,
+    types::{AnyTx, ArtifactId, CallInfo, InstanceSpec, MethodId, ServiceInstanceId},
 };
-
-use crate::{
-    api::ServiceApiBuilder,
-    crypto::{Hash, PublicKey, SecretKey},
-    messages::CallInfo,
-    node::ApiSender,
-    proto::{schema, Any},
-};
-
-use self::dispatcher::{Dispatcher, DispatcherSender};
 
 #[macro_use]
 pub mod rust;
@@ -40,13 +23,21 @@ pub mod dispatcher;
 pub mod error;
 pub mod supervisor;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
-pub struct InstanceSpec {
-    pub id: ServiceInstanceId,
-    pub artifact: ArtifactId,
-    pub name: String,
-}
+use exonum_merkledb::{Fork, Snapshot};
+use futures::Future;
+
+use std::fmt::Debug;
+
+use crate::{
+    api::ServiceApiBuilder,
+    crypto::{Hash, PublicKey, SecretKey},
+    node::ApiSender,
+    proto::Any,
+};
+
+use self::dispatcher::{Dispatcher, DispatcherSender};
+
+mod types;
 
 // TODO Replace by more convenient solution [ECR-3222]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -59,59 +50,6 @@ pub enum RuntimeIdentifier {
 impl From<RuntimeIdentifier> for u32 {
     fn from(id: RuntimeIdentifier) -> Self {
         id as u32
-    }
-}
-
-#[derive(
-    Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord,
-)]
-#[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
-pub struct ArtifactId {
-    pub runtime_id: u32,
-    pub name: String,
-}
-
-impl ArtifactId {
-    /// Creates a new artifact identifier from the given runtime id and name.
-    pub fn new(runtime_id: impl Into<u32>, name: impl Into<String>) -> Self {
-        Self {
-            runtime_id: runtime_id.into(),
-            name: name.into(),
-        }
-    }
-}
-
-impl_binary_key_for_binary_value! { ArtifactId }
-
-impl From<(String, u32)> for ArtifactId {
-    fn from(v: (String, u32)) -> Self {
-        Self {
-            runtime_id: v.1,
-            name: v.0,
-        }
-    }
-}
-
-impl Display for ArtifactId {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}:{}", self.runtime_id, self.name)
-    }
-}
-
-impl FromStr for ArtifactId {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split(':').take(2).collect::<Vec<_>>();
-        match &split[..] {
-            [runtime_id, name] => Ok(Self {
-                runtime_id: runtime_id.parse()?,
-                name: name.to_string(),
-            }),
-            _ => Err(failure::format_err!(
-                "Wrong artifact id format, it should be in form \"runtime_id:artifact_name\""
-            )),
-        }
     }
 }
 
@@ -255,9 +193,4 @@ impl<'a> ExecutionContext<'a> {
         std::mem::swap(&mut self.actions, &mut other);
         other
     }
-}
-
-#[test]
-fn parse_artifact_id_correct() {
-    ArtifactId::from_str("0:my-service/1.0.0").unwrap();
 }

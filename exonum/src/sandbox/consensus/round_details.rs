@@ -20,11 +20,11 @@
 use bit_vec::BitVec;
 use exonum_merkledb::ObjectHash;
 
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
 use crate::{
     helpers::{Height, Round, ValidatorId},
-    messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest},
+    messages::{PrevotesRequest, TransactionsRequest, Verified},
     node::state::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
@@ -49,7 +49,7 @@ fn positive_get_propose_send_prevote() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -81,7 +81,7 @@ fn request_propose_when_get_prevote() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &empty_hash(),
+        empty_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -89,10 +89,10 @@ fn request_propose_when_get_prevote() {
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
         &sandbox.create_propose_request(
-            &sandbox.public_key(ValidatorId(0)),
-            &sandbox.public_key(ValidatorId(2)),
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(2)),
             Height(1),
-            &empty_hash(),
+            empty_hash(),
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -108,7 +108,7 @@ fn request_prevotes_when_get_prevote_message() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &empty_hash(),
+        empty_hash(),
         Round(1),
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -116,10 +116,10 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
         &sandbox.create_propose_request(
-            &sandbox.public_key(ValidatorId(0)),
-            &sandbox.public_key(ValidatorId(2)),
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(2)),
             Height(1),
-            &empty_hash(),
+            empty_hash(),
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -130,11 +130,11 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
         &sandbox.create_prevote_request(
-            &sandbox.public_key(ValidatorId(0)),
-            &sandbox.public_key(ValidatorId(2)),
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(2)),
             Height(1),
             Round(1),
-            &empty_hash(),
+            empty_hash(),
             validators,
             sandbox.secret_key(ValidatorId(0)),
         ),
@@ -167,7 +167,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -176,7 +176,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -186,7 +186,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -196,8 +196,8 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -212,7 +212,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
             ValidatorId(0),
             Height(1),
             Round(2),
-            &propose.object_hash(),
+            propose.object_hash(),
             Round(1),
             sandbox.secret_key(ValidatorId(0)),
         ));
@@ -223,7 +223,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
             ValidatorId(0),
             Height(1),
             Round(3),
-            &propose.object_hash(),
+            propose.object_hash(),
             Round(1),
             sandbox.secret_key(ValidatorId(0)),
         ));
@@ -257,7 +257,7 @@ fn lock_to_past_round_broadcast_prevote() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -267,7 +267,7 @@ fn lock_to_past_round_broadcast_prevote() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -277,8 +277,8 @@ fn lock_to_past_round_broadcast_prevote() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -288,7 +288,7 @@ fn lock_to_past_round_broadcast_prevote() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &propose.object_hash(),
+        propose.object_hash(),
         Round(1),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -302,7 +302,7 @@ fn lock_to_past_round_broadcast_prevote() {
             ValidatorId(0),
             Height(1),
             Round(3),
-            &propose.object_hash(),
+            propose.object_hash(),
             Round(1),
             sandbox.secret_key(ValidatorId(0)),
         ));
@@ -313,7 +313,7 @@ fn lock_to_past_round_broadcast_prevote() {
             ValidatorId(0),
             Height(1),
             Round(4),
-            &propose.object_hash(),
+            propose.object_hash(),
             Round(1),
             sandbox.secret_key(ValidatorId(0)),
         ));
@@ -341,7 +341,7 @@ fn handle_precommit_remove_request_prevotes() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -350,7 +350,7 @@ fn handle_precommit_remove_request_prevotes() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -362,7 +362,7 @@ fn handle_precommit_remove_request_prevotes() {
             ValidatorId(2),
             Height(1),
             Round(1),
-            &propose.object_hash(),
+            propose.object_hash(),
             NOT_LOCKED,
             sandbox.secret_key(ValidatorId(2)),
         ));
@@ -372,8 +372,8 @@ fn handle_precommit_remove_request_prevotes() {
             ValidatorId(0),
             Height(1),
             Round(1),
-            &propose.object_hash(),
-            &block.object_hash(),
+            propose.object_hash(),
+            block.object_hash(),
             sandbox.time().into(),
             sandbox.secret_key(ValidatorId(0)),
         ));
@@ -385,8 +385,8 @@ fn handle_precommit_remove_request_prevotes() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -438,7 +438,7 @@ fn lock_to_propose_and_send_prevote() {
         ValidatorId(1),
         Height(1),
         Round(2),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -448,7 +448,7 @@ fn lock_to_propose_and_send_prevote() {
         ValidatorId(2),
         Height(1),
         Round(2),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -458,7 +458,7 @@ fn lock_to_propose_and_send_prevote() {
         ValidatorId(3),
         Height(1),
         Round(2),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -469,7 +469,7 @@ fn lock_to_propose_and_send_prevote() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -478,8 +478,8 @@ fn lock_to_propose_and_send_prevote() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -513,7 +513,7 @@ fn lock_remove_request_prevotes() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         Round(1),
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -521,7 +521,7 @@ fn lock_remove_request_prevotes() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         Round(1),
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -532,7 +532,7 @@ fn lock_remove_request_prevotes() {
             ValidatorId(1),
             Height(1),
             Round(1),
-            &propose.object_hash(),
+            propose.object_hash(),
             Round(1),
             sandbox.secret_key(ValidatorId(1)),
         ));
@@ -540,7 +540,7 @@ fn lock_remove_request_prevotes() {
             ValidatorId(0),
             Height(1),
             Round(1),
-            &propose.object_hash(),
+            propose.object_hash(),
             NOT_LOCKED,
             sandbox.secret_key(ValidatorId(0)),
         ));
@@ -548,8 +548,8 @@ fn lock_remove_request_prevotes() {
             ValidatorId(0),
             Height(1),
             Round(1),
-            &propose.object_hash(),
-            &block.object_hash(),
+            propose.object_hash(),
+            block.object_hash(),
             sandbox.time().into(),
             sandbox.secret_key(ValidatorId(0)),
         ));
@@ -579,8 +579,8 @@ fn handle_precommit_different_block_hash() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -588,8 +588,8 @@ fn handle_precommit_different_block_hash() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -597,8 +597,8 @@ fn handle_precommit_different_block_hash() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -607,11 +607,11 @@ fn handle_precommit_different_block_hash() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.recv(&propose);
     sandbox.recv(&tx);
@@ -642,8 +642,8 @@ fn handle_precommit_positive_scenario_commit() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -651,8 +651,8 @@ fn handle_precommit_positive_scenario_commit() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -660,8 +660,8 @@ fn handle_precommit_positive_scenario_commit() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -670,11 +670,11 @@ fn handle_precommit_positive_scenario_commit() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -683,11 +683,11 @@ fn handle_precommit_positive_scenario_commit() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.recv(&propose);
     sandbox.recv(&tx);
@@ -698,7 +698,7 @@ fn handle_precommit_positive_scenario_commit() {
     // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.check_broadcast_status(Height(2), &block.object_hash());
+    sandbox.check_broadcast_status(Height(2), block.object_hash());
     sandbox.add_time(Duration::from_millis(0));
 }
 
@@ -736,8 +736,8 @@ fn lock_not_send_prevotes_after_commit() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -745,8 +745,8 @@ fn lock_not_send_prevotes_after_commit() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -756,11 +756,11 @@ fn lock_not_send_prevotes_after_commit() {
         sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
         sandbox.send(
             sandbox.public_key(ValidatorId(1)),
-            &make_request_propose_from_precommit(&sandbox, &precommit_1),
+            &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
         );
         sandbox.send(
             sandbox.public_key(ValidatorId(1)),
-            &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+            &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
         );
     }
 
@@ -773,11 +773,11 @@ fn lock_not_send_prevotes_after_commit() {
         sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
         sandbox.send(
             sandbox.public_key(ValidatorId(2)),
-            &make_request_propose_from_precommit(&sandbox, &precommit_2),
+            &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
         );
         sandbox.send(
             sandbox.public_key(ValidatorId(2)),
-            &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+            &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
         );
     }
 
@@ -790,7 +790,7 @@ fn lock_not_send_prevotes_after_commit() {
             ValidatorId(2),
             Height(1),
             Round(1),
-            &propose.object_hash(),
+            propose.object_hash(),
             NOT_LOCKED,
             sandbox.secret_key(ValidatorId(2)),
         ));
@@ -800,7 +800,7 @@ fn lock_not_send_prevotes_after_commit() {
             ValidatorId(3),
             Height(1),
             Round(1),
-            &propose.object_hash(),
+            propose.object_hash(),
             NOT_LOCKED,
             sandbox.secret_key(ValidatorId(3)),
         ));
@@ -809,12 +809,12 @@ fn lock_not_send_prevotes_after_commit() {
             ValidatorId(0),
             Height(1),
             Round(1),
-            &propose.object_hash(),
-            &block.object_hash(),
+            propose.object_hash(),
+            block.object_hash(),
             sandbox.time().into(),
             sandbox.secret_key(ValidatorId(0)),
         ));
-        sandbox.check_broadcast_status(Height(2), &block.object_hash());
+        sandbox.check_broadcast_status(Height(2), block.object_hash());
     }
 
     //    add rounds to become a leader to observe broadcast messages
@@ -827,7 +827,7 @@ fn lock_not_send_prevotes_after_commit() {
         // lock will disappear and prevotes for disappeared lock (these prevotes are the
         // primary goal of the test) will not be sent
         //  !!!      sandbox.broadcast(&sandbox.create_prevote(ValidatorId(0), Height(0), Round(2),
-        // &propose.object_hash(), Round(1), sandbox.s(ValidatorId(0))));
+        // propose.object_hash(), Round(1), sandbox.s(ValidatorId(0))));
     }
 }
 
@@ -854,8 +854,8 @@ fn do_not_commit_if_propose_is_unknown() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -863,8 +863,8 @@ fn do_not_commit_if_propose_is_unknown() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -872,8 +872,8 @@ fn do_not_commit_if_propose_is_unknown() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -882,11 +882,11 @@ fn do_not_commit_if_propose_is_unknown() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -895,11 +895,11 @@ fn do_not_commit_if_propose_is_unknown() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     // !! if this propose would be received, commit would occur and last assert will
     // require height one
@@ -934,8 +934,8 @@ fn do_not_commit_if_tx_is_unknown() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -943,8 +943,8 @@ fn do_not_commit_if_tx_is_unknown() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -952,8 +952,8 @@ fn do_not_commit_if_tx_is_unknown() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -962,11 +962,11 @@ fn do_not_commit_if_tx_is_unknown() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -975,11 +975,11 @@ fn do_not_commit_if_tx_is_unknown() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
 
     sandbox.recv(&propose);
@@ -1025,8 +1025,8 @@ fn commit_using_unknown_propose_with_precommits() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -1034,8 +1034,8 @@ fn commit_using_unknown_propose_with_precommits() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -1043,8 +1043,8 @@ fn commit_using_unknown_propose_with_precommits() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -1053,11 +1053,11 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -1066,11 +1066,11 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
 
     //here consensus.rs->handle_majority_precommits()->//Commit is achieved
@@ -1078,11 +1078,11 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_3),
+        &make_request_propose_from_precommit(&sandbox, precommit_3.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_3),
+        &make_request_prevote_from_precommit(&sandbox, precommit_3.as_ref()),
     );
 
     sandbox.assert_state(Height(1), Round(1));
@@ -1094,11 +1094,11 @@ fn commit_using_unknown_propose_with_precommits() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
-    sandbox.check_broadcast_status(Height(2), &block.object_hash());
+    sandbox.check_broadcast_status(Height(2), block.object_hash());
 
     sandbox.add_time(Duration::from_millis(0));
     sandbox.assert_state(Height(2), Round(1));
@@ -1137,8 +1137,8 @@ fn handle_full_propose_wrong_state_hash() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -1146,8 +1146,8 @@ fn handle_full_propose_wrong_state_hash() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -1155,8 +1155,8 @@ fn handle_full_propose_wrong_state_hash() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -1165,11 +1165,11 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -1178,11 +1178,11 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
 
     // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
@@ -1190,11 +1190,11 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_3),
+        &make_request_propose_from_precommit(&sandbox, precommit_3.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_3),
+        &make_request_prevote_from_precommit(&sandbox, precommit_3.as_ref()),
     );
 
     sandbox.assert_state(Height(1), Round(1));
@@ -1206,7 +1206,7 @@ fn handle_full_propose_wrong_state_hash() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -1228,7 +1228,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         ValidatorId(0),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -1237,7 +1237,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         ValidatorId(1),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(1)),
     ));
@@ -1253,7 +1253,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &future_propose.object_hash(),
+        future_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -1262,15 +1262,15 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         ValidatorId(3),
         Height(1),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
     sandbox.assert_lock(Round(1), Some(propose.object_hash())); //only if round > locked round
 
     // !! lock is obtained, but broadcast(Precommit is absent
-    //    sandbox.broadcast(&sandbox.create_precommit(ValidatorId(0), Height(0), Round(1), &propose.object_hash(),
-    //          &block.object_hash(), sandbox.s(ValidatorId(0))));
+    //    sandbox.broadcast(&sandbox.create_precommit(ValidatorId(0), Height(0), Round(1), propose.object_hash(),
+    //          block.object_hash(), sandbox.s(ValidatorId(0))));
     sandbox.assert_lock(Round(1), Some(propose.object_hash()));
     sandbox.add_time(Duration::from_millis(0));
 }
@@ -1327,8 +1327,8 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         ValidatorId(1),
         Height(2),
         Round(1),
-        &height_one_propose.object_hash(),
-        &second_block.object_hash(),
+        height_one_propose.object_hash(),
+        second_block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -1336,8 +1336,8 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         ValidatorId(2),
         Height(2),
         Round(1),
-        &height_one_propose.object_hash(),
-        &second_block.object_hash(),
+        height_one_propose.object_hash(),
+        second_block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -1345,8 +1345,8 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         ValidatorId(3),
         Height(2),
         Round(1),
-        &height_one_propose.object_hash(),
-        &second_block.object_hash(),
+        height_one_propose.object_hash(),
+        second_block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -1363,11 +1363,11 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -1376,11 +1376,11 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
 
     sandbox.recv(&height_one_propose);
@@ -1388,7 +1388,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         ValidatorId(0),
         Height(2),
         Round(1),
-        &height_one_propose.object_hash(),
+        height_one_propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -1397,7 +1397,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(Height(3), Round(1));
-    sandbox.check_broadcast_status(Height(3), &second_block.object_hash());
+    sandbox.check_broadcast_status(Height(3), second_block.object_hash());
     sandbox.add_time(Duration::from_millis(0));
 
     // update blockchain with new block
@@ -1450,8 +1450,8 @@ fn commit_as_leader_send_propose_round_timeout() {
         ValidatorId(1),
         current_height,
         current_round,
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(1)),
     );
@@ -1459,8 +1459,8 @@ fn commit_as_leader_send_propose_round_timeout() {
         ValidatorId(2),
         current_height,
         current_round,
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(2)),
     );
@@ -1468,8 +1468,8 @@ fn commit_as_leader_send_propose_round_timeout() {
         ValidatorId(3),
         current_height,
         current_round,
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
         sandbox.secret_key(ValidatorId(3)),
     );
@@ -1478,11 +1478,11 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_1),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(1)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_1),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
     );
 
     sandbox.recv(&precommit_2);
@@ -1491,11 +1491,11 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_propose_from_precommit(&sandbox, &precommit_2),
+        &make_request_propose_from_precommit(&sandbox, precommit_2.as_ref()),
     );
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &make_request_prevote_from_precommit(&sandbox, &precommit_2),
+        &make_request_prevote_from_precommit(&sandbox, precommit_2.as_ref()),
     );
 
     {
@@ -1514,7 +1514,7 @@ fn commit_as_leader_send_propose_round_timeout() {
 
     let new_height = current_height.next();
     sandbox.assert_state(new_height, Round(1));
-    sandbox.check_broadcast_status(new_height, &block.object_hash());
+    sandbox.check_broadcast_status(new_height, block.object_hash());
 
     let propose = ProposeBuilder::new(&sandbox).build();
 
@@ -1549,9 +1549,9 @@ fn handle_tx_handle_full_propose() {
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
         &sandbox.create_transactions_request(
-            &sandbox.public_key(ValidatorId(0)),
-            &sandbox.public_key(ValidatorId(2)),
-            &[tx.object_hash()],
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(2)),
+            vec![tx.object_hash()],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -1593,7 +1593,7 @@ fn broadcast_prevote_with_tx_positive() {
         ValidatorId(0),
         Height(2),
         Round(1),
-        &propose.object_hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -1646,13 +1646,13 @@ fn handle_precommit_remove_propose_request() {
         .build();
 
     let precommit = sandbox.create_precommit(
-        propose.validator(),
+        propose.payload().validator,
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
-        sandbox.secret_key(propose.validator()),
+        sandbox.secret_key(propose.payload().validator),
     );
 
     sandbox.recv(&precommit);
@@ -1662,11 +1662,11 @@ fn handle_precommit_remove_propose_request() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.public_key(propose.validator()),
+        sandbox.public_key(propose.payload().validator),
         &sandbox.create_transactions_request(
-            &sandbox.public_key(ValidatorId(0)),
-            &sandbox.public_key(propose.validator()),
-            &[tx.object_hash()],
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(propose.payload().validator),
+            vec![tx.object_hash()],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -1675,13 +1675,13 @@ fn handle_precommit_remove_propose_request() {
     let prevoters = BitVec::from_elem(sandbox.validators().len(), false);
 
     sandbox.send(
-        sandbox.public_key(propose.validator()),
+        sandbox.public_key(propose.payload().validator),
         &sandbox.create_prevote_request(
-            &sandbox.public_key(ValidatorId(0)),
-            &sandbox.public_key(propose.validator()),
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(propose.payload().validator),
             Height(1),
             Round(1),
-            &propose.object_hash(),
+            propose.object_hash(),
             prevoters,
             sandbox.secret_key(ValidatorId(0)),
         ),
@@ -1703,13 +1703,13 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
         .build();
 
     let precommit = sandbox.create_precommit(
-        propose.validator(),
+        propose.payload().validator,
         Height(1),
         Round(1),
-        &propose.object_hash(),
-        &block.object_hash(),
+        propose.object_hash(),
+        block.object_hash(),
         sandbox.time().into(),
-        sandbox.secret_key(propose.validator()),
+        sandbox.secret_key(propose.payload().validator),
     );
 
     sandbox.recv(&precommit);
@@ -1720,7 +1720,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
             ValidatorId(i),
             Height(1),
             Round(1),
-            &propose.object_hash(),
+            propose.object_hash(),
             Round(0),
             sandbox.secret_key(ValidatorId(i)),
         ));
@@ -1739,23 +1739,23 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
         sandbox.process_events();
 
         let (_, msg) = sandbox.pop_sent_message().unwrap();
-        let msg = TransactionsRequest::try_from(msg)
+        let msg = Verified::<TransactionsRequest>::try_from(msg)
             .expect("Incorrect message. TransactionsRequest was expected.");
 
         assert!(
-            validators.remove(msg.to()),
+            validators.remove(&msg.payload().to),
             "Unexpected validator's PublicKey"
         );
 
         if i == 1 {
             sandbox.send(
-                sandbox.public_key(propose.validator()),
+                sandbox.public_key(propose.payload().validator),
                 &sandbox.create_prevote_request(
-                    &sandbox.public_key(ValidatorId(0)),
-                    &sandbox.public_key(propose.validator()),
+                    sandbox.public_key(ValidatorId(0)),
+                    sandbox.public_key(propose.payload().validator),
                     Height(1),
                     Round(1),
-                    &propose.object_hash(),
+                    propose.object_hash(),
                     prevoters.clone(),
                     sandbox.secret_key(ValidatorId(0)),
                 ),
@@ -1788,8 +1788,8 @@ fn handle_precommit_remove_propose_request_ask_precommitters() {
             ValidatorId(i),
             Height(1),
             Round(1),
-            &propose.object_hash(),
-            &block.object_hash(),
+            propose.object_hash(),
+            block.object_hash(),
             sandbox.time().into(),
             sandbox.secret_key(ValidatorId(i)),
         ))
@@ -1807,16 +1807,17 @@ fn handle_precommit_remove_propose_request_ask_precommitters() {
         sandbox.process_events();
 
         let (_, msg) = sandbox.pop_sent_message().unwrap();
-        let msg = TransactionsRequest::try_from(msg)
+        let msg = Verified::<TransactionsRequest>::try_from(msg)
             .expect("Incorrect message. TransactionsRequest was expected.");
 
         assert!(
-            validators.remove(msg.to()),
+            validators.remove(&msg.payload().to),
             "Unexpected validator's PublicKey"
         );
 
         let (_, msg) = sandbox.pop_sent_message().unwrap();
-        PrevotesRequest::try_from(msg).expect("Incorrect message. PrevotesRequest was expected.");
+        Verified::<PrevotesRequest>::try_from(msg)
+            .expect("Incorrect message. PrevotesRequest was expected.");
     }
 
     assert!(

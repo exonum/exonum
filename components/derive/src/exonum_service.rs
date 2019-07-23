@@ -42,7 +42,7 @@ fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) 
         fn _dispatch(
                 &self,
                 ctx: #cr::runtime::rust::TransactionContext,
-                method: #cr::messages::MethodId,
+                method: #cr::runtime::MethodId,
                 payload: &[u8]
             ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
             match method {
@@ -66,7 +66,7 @@ fn implement_transaction_for_methods(
                     impl #cr::runtime::rust::Transaction for #arg_type {
                         type Service = &'static dyn #trait_name;
 
-                        const METHOD_ID: #cr::messages::MethodId = #id;
+                        const METHOD_ID: #cr::runtime::MethodId = #id;
                     }
                 }
             });
@@ -85,7 +85,7 @@ fn implement_service_dispatcher(
         impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
             fn call(
                 &self,
-                method: #cr::messages::MethodId,
+                method: #cr::runtime::MethodId,
                 ctx: #cr::runtime::rust::service::TransactionContext,
                 payload: &[u8],
             ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {

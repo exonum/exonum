@@ -24,8 +24,8 @@ use exonum::{
     blockchain::{ExecutionErrorKind, ExecutionStatus, Schema},
     crypto::{gen_keypair, PublicKey},
     helpers::{Height, ValidatorId},
-    messages::{AnyTx, ServiceInstanceId, Signed},
-    runtime::rust::Transaction,
+    messages::Verified,
+    runtime::{rust::Transaction, AnyTx, ServiceInstanceId},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
@@ -74,7 +74,7 @@ fn assert_storage_times_eq<T: IndexAccess>(
 
 fn assert_transaction_result<S: IndexAccess>(
     snapshot: S,
-    transaction: &Signed<AnyTx>,
+    transaction: &Verified<AnyTx>,
     expected_code: u8,
 ) -> String {
     let result = Schema::new(snapshot)

@@ -31,14 +31,13 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use exonum::events::InternalRequest;
-use exonum::node::EventsPoolCapacity;
-use exonum::node::ExternalMessage;
 use exonum::{
     crypto,
+    events::InternalRequest,
     events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
-    messages::{AnyTx, Message},
-    node::NodeChannel,
+    messages::{Message, Verified},
+    node::{EventsPoolCapacity, ExternalMessage, NodeChannel},
+    runtime::{AnyTx, CallInfo},
 };
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
@@ -88,7 +87,17 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
     let (p, s) = crypto::gen_keypair();
     (0..count)
         .map(|_| {
-            let msg = Message::concrete(AnyTx::new(0, 0, vec![0; tx_size]), p, &s);
+            let msg = Verified::from_value(
+                AnyTx {
+                    call_info: CallInfo {
+                        instance_id: 0,
+                        method_id: 0,
+                    },
+                    payload: vec![0; tx_size],
+                },
+                p,
+                &s,
+            );
             msg.into_bytes()
         })
         .collect()

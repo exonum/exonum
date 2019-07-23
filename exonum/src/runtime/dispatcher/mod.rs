@@ -22,18 +22,15 @@ use std::{cell::RefCell, collections::HashMap};
 use crate::{
     api::ServiceApiBuilder,
     blockchain::{IndexCoordinates, IndexOwner},
-    messages::{AnyTx, Signed},
+    crypto::{Hash, PublicKey, SecretKey},
+    messages::{AnyTx, Verified},
     node::ApiSender,
     proto::Any,
-    {
-        crypto::{Hash, PublicKey, SecretKey},
-        messages::CallInfo,
-    },
 };
 
 use super::{
-    error::ExecutionError, ArtifactId, ArtifactInfo, Caller, ExecutionContext, InstanceSpec,
-    Runtime, ServiceInstanceId,
+    error::ExecutionError, ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext,
+    InstanceSpec, Runtime, ServiceInstanceId,
 };
 
 mod error;
@@ -225,7 +222,7 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         tx_id: Hash,
-        tx: &Signed<AnyTx>,
+        tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let mut context = ExecutionContext::new(
             fork,
@@ -234,7 +231,7 @@ impl Dispatcher {
                 hash: tx_id,
             },
         );
-        self.call(&mut context, tx.call_info, &tx.payload)?;
+        self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().payload)?;
         let actions = context.take_actions();
         // Marks dispatcher as modified if actions are not empty.
         let is_modified = !actions.is_empty();
@@ -434,10 +431,9 @@ mod tests {
 
     use crate::{
         crypto::PublicKey,
-        messages::{MethodId, ServiceInstanceId},
         runtime::{
             rust::{Error as RustRuntimeError, RustRuntime},
-            ArtifactInfo, RuntimeIdentifier, StateHashAggregator,
+            ArtifactInfo, MethodId, RuntimeIdentifier, ServiceInstanceId, StateHashAggregator,
         },
     };
 

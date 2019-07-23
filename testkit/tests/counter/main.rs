@@ -22,7 +22,7 @@ use exonum::{
     blockchain::{ExecutionError, ExecutionErrorKind},
     crypto::{self, PublicKey},
     helpers::Height,
-    messages::{self, AnyTx, Signed},
+    messages::{AnyTx, Verified},
     runtime::rust::Transaction,
 };
 use exonum_merkledb::{HashTag, ObjectHash};
@@ -46,7 +46,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn inc_count(api: &TestKitApi, by: u64) -> Signed<AnyTx> {
+fn inc_count(api: &TestKitApi, by: u64) -> Verified<AnyTx> {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxIncrement::new(by).sign(SERVICE_ID, pubkey, &key);
@@ -513,7 +513,7 @@ fn test_explorer_blocks_basic() {
                 "prev_hash": blocks[1].block.object_hash(),
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash(),
-                "time": precommit.time(),
+                "time": precommit.payload().time(),
             }],
         })
     );
@@ -745,13 +745,13 @@ fn test_explorer_single_block() {
 
         let mut validators = HashSet::new();
         for precommit in block.precommits().iter() {
-            assert_eq!(precommit.height(), Height(1));
-            assert_eq!(*precommit.block_hash(), block.header().object_hash());
+            assert_eq!(precommit.payload().height, Height(1));
+            assert_eq!(precommit.payload().block_hash, block.header().object_hash());
             let pk = testkit
                 .network()
-                .consensus_public_key_of(precommit.validator())
+                .consensus_public_key_of(precommit.payload().validator)
                 .expect("Cannot find validator id");
-            validators.insert(precommit.validator());
+            validators.insert(precommit.payload().validator);
             assert_eq!(pk, &precommit.author())
         }
 
@@ -798,7 +798,7 @@ fn test_explorer_transaction_info() {
         info,
         json!({
             "type": "in-pool",
-            "content": messages::to_hex_string(&tx),
+            "content": tx,
         })
     );
 

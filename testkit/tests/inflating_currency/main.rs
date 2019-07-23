@@ -23,7 +23,7 @@ use exonum::{
     api::node::public::explorer::TransactionResponse,
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Signed},
+    messages::{AnyTx, BinaryValue, Verified},
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
@@ -49,7 +49,7 @@ fn init_testkit() -> TestKit {
         .create()
 }
 
-fn create_wallet(api: &TestKitApi, name: &str) -> (Signed<AnyTx>, SecretKey) {
+fn create_wallet(api: &TestKitApi, name: &str) -> (Verified<AnyTx>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxCreateWallet {

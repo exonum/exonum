@@ -22,7 +22,7 @@ use tokio_core::reactor::{Handle, Timeout};
 
 use std::time::{Duration, SystemTime};
 
-use crate::messages::{Message, SignedMessage};
+use crate::messages::{ExonumMessage, Message, SignedMessage};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
 
@@ -53,12 +53,12 @@ impl InternalPart {
     ) -> impl Future<Item = (), Error = ()> {
         future::lazy(|| {
             SignedMessage::from_bytes(raw.into())
-                .and_then(SignedMessage::verify)
-                .and_then(Message::deserialize)
+                .and_then(SignedMessage::into_verified::<ExonumMessage>)
+                .map(Message::from)
         })
         .map_err(drop)
-        .and_then(|protocol| {
-            let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
+        .and_then(|msg| {
+            let event = future::ok(InternalEvent::MessageVerified(Box::new(msg)));
             Self::send_event(event, internal_tx)
         })
     }
@@ -128,7 +128,7 @@ mod tests {
     use crate::{
         crypto::{gen_keypair, Hash, Signature},
         helpers::Height,
-        messages::{Message, Status},
+        messages::{Status, Verified},
     };
 
     use super::*;
@@ -162,8 +162,7 @@ mod tests {
 
     fn get_signed_message() -> SignedMessage {
         let (pk, sk) = gen_keypair();
-        let msg = Message::concrete(Status::new(Height(0), &Hash::zero()), pk, &sk);
-        msg.signed_message().clone()
+        Verified::from_value(Status::new(Height(0), Hash::zero()), pk, &sk).into_raw()
     }
 
     #[test]
@@ -171,7 +170,7 @@ mod tests {
         let tx = get_signed_message();
 
         let expected_event =
-            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
+            InternalEvent::MessageVerified(Box::new(Message::from_signed(tx.clone()).unwrap()));
         let event = verify_message(tx.into_bytes());
         assert_eq!(event, Some(expected_event));
     }
@@ -179,7 +178,7 @@ mod tests {
     #[test]
     fn verify_incorrect_msg() {
         let mut tx = get_signed_message();
-        *tx.signature_mut() = Signature::zero();
+        tx.signature = Signature::zero();
 
         let event = verify_message(tx.into_bytes());
         assert_eq!(event, None);
