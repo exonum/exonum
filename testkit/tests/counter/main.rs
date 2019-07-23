@@ -26,7 +26,7 @@ use hex::FromHex;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY,
+    CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY, SERVICE_ID,
 };
 
 mod counter;
@@ -779,7 +779,8 @@ fn test_explorer_transaction_info() {
             "type": "in-pool",
             "content": {
                 "debug": TxIncrement::new(5),
-                "message": messages::to_hex_string(&tx)
+                "message": messages::to_hex_string(&tx),
+                "service_id": SERVICE_ID,
             },
         })
     );
@@ -881,10 +882,7 @@ fn test_boxed_tx() {
     api.send(tx);
     let block = testkit.create_block();
     assert_eq!(block.len(), 1);
-    assert_eq!(
-        block[0].content().message().service_id(),
-        counter::SERVICE_ID
-    );
+    assert_eq!(block[0].content().message().service_id(), SERVICE_ID);
 }
 
 #[test]

@@ -119,7 +119,6 @@ mod timestamping {
     };
     use exonum_merkledb::Snapshot;
     use rand::rngs::StdRng;
-    use std::borrow::Cow;
 
     const TIMESTAMPING_SERVICE_ID: u16 = 1;
 
@@ -218,7 +217,6 @@ mod cryptocurrency {
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
     use rand::{rngs::StdRng, seq::SliceRandom};
-    use std::borrow::Cow;
 
     const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 

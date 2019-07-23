@@ -17,7 +17,7 @@ use bytes::BytesMut;
 use std::mem;
 use tokio_io::codec::{Decoder, Encoder};
 
-use crate::events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
+use crate::events::noise::{TransportWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
 use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
 
 #[derive(Debug)]
@@ -25,11 +25,11 @@ pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
     max_message_len: u32,
     /// Noise session to encrypt/decrypt messages.
-    session: NoiseWrapper,
+    session: TransportWrapper,
 }
 
 impl MessagesCodec {
-    pub fn new(max_message_len: u32, session: NoiseWrapper) -> Self {
+    pub fn new(max_message_len: u32, session: TransportWrapper) -> Self {
         Self {
             max_message_len,
             session,
@@ -91,7 +91,7 @@ mod test {
     use tokio_io::codec::{Decoder, Encoder};
 
     use super::MessagesCodec;
-    use crate::events::noise::{HandshakeParams, NoiseWrapper};
+    use crate::events::noise::{HandshakeParams, NoiseWrapper, TransportWrapper};
     use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
 
     pub fn raw_message(val: Vec<u8>) -> SignedMessage {
@@ -153,8 +153,8 @@ mod test {
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
         let params = HandshakeParams::with_default_params();
 
-        let mut initiator = NoiseWrapper::initiator(&params).session;
-        let mut responder = NoiseWrapper::responder(&params).session;
+        let mut initiator = NoiseWrapper::initiator(&params).state;
+        let mut responder = NoiseWrapper::responder(&params).state;
 
         let mut buffer_msg = vec![0_u8; 1024];
         let mut buffer_out = [0_u8; 1024];
@@ -179,11 +179,11 @@ mod test {
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
 
-        let responder = NoiseWrapper {
-            session: responder.into_transport_mode().unwrap(),
+        let responder = TransportWrapper {
+            state: responder.into_transport_mode().unwrap(),
         };
-        let initiator = NoiseWrapper {
-            session: initiator.into_transport_mode().unwrap(),
+        let initiator = TransportWrapper {
+            state: initiator.into_transport_mode().unwrap(),
         };
 
         let responder_codec = MessagesCodec {

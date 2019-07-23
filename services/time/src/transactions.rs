@@ -18,8 +18,6 @@
 
 use chrono::{DateTime, Utc};
 
-use std::borrow::Cow;
-
 use exonum_merkledb::{Fork, Snapshot};
 
 use exonum::{
