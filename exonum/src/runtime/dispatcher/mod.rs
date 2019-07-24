@@ -23,10 +23,10 @@ use crate::{
     api::ServiceApiBuilder,
     blockchain::{IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
+    helpers::ValidateInput,
     messages::{AnyTx, Verified},
     node::ApiSender,
     proto::Any,
-    helpers::ValidateInput,
 };
 
 use super::{
@@ -85,14 +85,13 @@ impl Dispatcher {
     ///
     /// # Panics
     ///
-    /// * If instance spec contains invalid service name of artifact id.
+    /// * If instance spec contains invalid service name or artifact id.
     pub(crate) fn add_builtin_service(
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
-        spec.validate().expect("Invalid InstanceSpec for builtin service");
         // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
         // Registers service's artifact in runtime.
@@ -141,11 +140,17 @@ impl Dispatcher {
     }
 
     /// Initiates deploy artifact procedure in the corresponding runtime.
+    ///
+    /// # Panics
+    ///
+    /// * If artifact identifier is invalid.
     pub(crate) fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
         spec: impl Into<Any>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        debug_assert!(artifact.validate().is_ok());
+
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             runtime.deploy_artifact(artifact, spec.into())
         } else {
@@ -154,19 +159,25 @@ impl Dispatcher {
     }
 
     /// Registers deployed artifact in the dispatcher's information schema.
-    ///
     /// Make sure that you successfully complete the deploy artifact procedure.
+    ///
+    /// # Panics
+    ///
+    /// * If artifact identifier is invalid.
+    /// * If artifact was not deployed.
     pub(crate) fn register_artifact(
         &mut self,
         fork: &Fork,
         artifact: ArtifactId,
         spec: impl Into<Any>,
     ) -> Result<(), ExecutionError> {
+        debug_assert!(artifact.validate().is_ok());
         debug_assert!(
             self.artifact_info(&artifact).is_some(),
             "An attempt to register artifact which is not be deployed: {:?}",
             artifact
         );
+
         Schema::new(fork).add_artifact(artifact.clone(), spec.into())?;
         info!(
             "Registered artifact {} in runtime with id {}",
@@ -189,12 +200,18 @@ impl Dispatcher {
 
     /// Starts and configures a new service instance. After that it writes information about
     /// service instance to the dispatcher's information schema.
+    ///
+    /// # Panics
+    ///
+    /// * If instance spec contains invalid service name.
     pub(crate) fn start_service(
         &mut self,
         context: &ExecutionContext,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
+        debug_assert!(spec.validate().is_ok());
+
         // Check that service doesn't use existing identifiers.
         if self.runtime_lookup.contains_key(&spec.id) {
             return Err(Error::ServiceIdExists.into());
@@ -233,6 +250,7 @@ impl Dispatcher {
             },
         );
         self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().payload)?;
+
         let actions = context.take_actions();
         // Marks dispatcher as modified if actions are not empty.
         let is_modified = !actions.is_empty();
@@ -299,11 +317,12 @@ impl Dispatcher {
         }
     }
 
-    /// Returns additional information about artifact with the specified id if it is deployed.
+    /// Returns additional information about artifact with if it is deployed.
     pub(crate) fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
         self.runtimes.get(&id.runtime_id)?.artifact_info(id)
     }
 
+    /// Takes modified state and marks dispatcher as unmodified.
     pub(crate) fn take_modified_state(&mut self) -> bool {
         self.modified.take().is_some()
     }
@@ -336,9 +355,10 @@ impl Dispatcher {
 #[derive(Debug)]
 pub(crate) enum Action {
     /// This action registers deployed artifact in the dispatcher.
-    ///
     /// Make sure that you successfully complete the deploy artifact procedure.
     RegisterArtifact { artifact: ArtifactId, spec: Any },
+    /// This action starts service instance with the specified params.
+    /// Make sure that artifact is been deployed.
     StartService {
         artifact: ArtifactId,
         instance_name: String,

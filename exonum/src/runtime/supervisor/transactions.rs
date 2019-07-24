@@ -213,7 +213,11 @@ impl Transactions for Supervisor {
 
         let confirmations = pending_instances.confirm(&service, author);
         if confirmations == pending_instances.validators_len() {
-            trace!("Request start service with name {:?} from artifact {:?}", service.name, service.artifact);
+            trace!(
+                "Request start service with name {:?} from artifact {:?}",
+                service.name,
+                service.artifact
+            );
             // We have enough confirmations to start a new service instance,
             // if this action fails this transaction will be canceled.
             context.dispatch_action(Action::StartService {
