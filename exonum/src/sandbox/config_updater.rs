@@ -14,11 +14,8 @@
 
 pub use crate::proto::schema::tests::TxConfig;
 
-use exonum_merkledb::{impl_binary_value_for_message, BinaryValue};
-use protobuf::Message as PbMessage;
+use exonum_merkledb::BinaryValue;
 use semver::Version;
-
-use std::borrow::Cow;
 
 use crate::{
     blockchain::{ExecutionError, Schema, StoredConfiguration},
@@ -97,4 +94,4 @@ impl TxConfig {
     }
 }
 
-impl_binary_value_for_message! { TxConfig }
+impl_binary_value_for_pb_message! { TxConfig }

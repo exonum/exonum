@@ -109,6 +109,7 @@ fn test_explorer_basics() {
                 },
                 "location_proof": tx_info.location_proof(), // too complicated to check
                 "status": { "type": "success" },
+                "time": tx_info.time(),
             })
         );
     }
@@ -143,6 +144,7 @@ fn test_explorer_basics() {
                 "code": 0,
                 "description": "Not allowed",
             },
+            "time": tx_info.time(),
         })
     );
 
@@ -163,6 +165,7 @@ fn test_explorer_basics() {
                 "type": "panic",
                 "description": "oops",
             },
+            "time": tx_info.time(),
         })
     );
 }

@@ -16,6 +16,7 @@
 
 use actix::*;
 use actix_web::ws;
+use chrono::{DateTime, Utc};
 use exonum_merkledb::{IndexAccess, ListProof, ObjectHash, Snapshot};
 use futures::Future;
 use hex::FromHex;
@@ -35,6 +36,7 @@ use crate::{
     },
     blockchain::{Block, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
+    explorer::median_precommits_time,
     messages::SignedMessage,
 };
 
@@ -98,6 +100,8 @@ pub struct CommittedTransactionSummary {
     pub location: TxLocation,
     /// Proof of existence.
     pub location_proof: ListProof<Hash>,
+    /// Approximate finalization time.
+    pub time: DateTime<Utc>,
 }
 
 impl CommittedTransactionSummary {
@@ -114,6 +118,12 @@ impl CommittedTransactionSummary {
         let location_proof = schema
             .block_transactions(location.block_height())
             .get_proof(location.position_in_block());
+        let time = median_precommits_time(
+            &schema
+                .block_and_precommits(location.block_height())
+                .unwrap()
+                .precommits,
+        );
         Some(Self {
             tx_hash: *tx_hash,
             service_id,
@@ -121,6 +131,7 @@ impl CommittedTransactionSummary {
             status: tx_result,
             location,
             location_proof,
+            time,
         })
     }
 }

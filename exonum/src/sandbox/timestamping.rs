@@ -14,12 +14,9 @@
 
 pub use crate::proto::schema::tests::TimestampTx;
 
-use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
-use protobuf::Message as PbMessage;
+use exonum_merkledb::{BinaryValue, Snapshot};
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 use semver::Version;
-
-use std::borrow::Cow;
 
 use crate::{
     blockchain::ExecutionError,
@@ -85,7 +82,7 @@ impl TimestampingService {
     pub const ID: ServiceInstanceId = 3;
 }
 
-impl_binary_value_for_message! { TimestampTx }
+impl_binary_value_for_pb_message! { TimestampTx }
 
 pub struct TimestampingTxGenerator {
     rand: ThreadRng,

@@ -73,6 +73,9 @@ pub use self::schema::{
 use std::borrow::Cow;
 
 pub mod schema;
+
+#[macro_use]
+mod macros;
 #[cfg(test)]
 mod tests;
 

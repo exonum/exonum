@@ -64,44 +64,39 @@ impl Dispatcher {
     }
 
     /// Restores dispatcher from the state which saved in the specified snapshot.
-    ///
-    /// # Panics
-    /// TODO [ECR-3275]
-    pub(crate) fn restore_state(&mut self, snapshot: impl IndexAccess) {
+    pub(crate) fn restore_state(
+        &mut self,
+        snapshot: impl IndexAccess,
+    ) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
         // Restores information about the deployed services.
         for (artifact, spec) in schema.artifacts_with_spec() {
-            self.deploy_artifact(artifact.clone(), spec)
-                .wait()
-                .expect("Unable to restore deployed artifact");
+            self.deploy_artifact(artifact.clone(), spec).wait()?;
         }
         // Restarts active service instances.
         for instance in schema.service_instances().values() {
-            self.restart_service(&instance)
-                .expect("Unable to restart services");
+            self.restart_service(&instance)?;
         }
+        Ok(())
     }
 
     /// Adds built-in service with predefined identifier.
-    // TODO rewrite to return error [ECR-3222]
     pub(crate) fn add_builtin_service(
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
         constructor: Any,
-    ) {
+    ) -> Result<(), ExecutionError> {
         // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
         // Registers service's artifact in runtime.
-        self.deploy_and_register_artifact(fork, spec.artifact.clone(), artifact_spec)
-            .expect("Unable to register builtin artifact");
+        self.deploy_and_register_artifact(fork, spec.artifact.clone(), artifact_spec)?;
         // Starts builtin service instance.
         self.start_service(
             &ExecutionContext::new(fork, Caller::Blockchain),
             spec,
             constructor,
         )
-        .expect("Unable to start builtin service instance");
     }
 
     pub(crate) fn state_hash(

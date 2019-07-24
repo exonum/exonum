@@ -16,7 +16,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Trait `BinaryForm` has been replaced by `BinaryValue`. (#1298)
 
   To implement `BinaryValue` for types that implements `Protobuf::Message` use
-  `impl_binary_value_for_message` macros from `exonum-merkledb` crate.
+  `impl_binary_value_for_pb_message` macros.
 
 - Module `storage` has been replaced by `exonum-merkledb` crate. See related section
   in changelog for details. (#1293)
@@ -64,6 +64,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   corresponds to the total number of transactions in the blockchain. (#1289)
 
 #### exonum-merkledb
+
+- Added restrictions to index names. Allowable characters in index name: ASCII
+  characters, digits, underscores and dashes. (#1388)
 
 - Added `Debug` implementation for `Database`, `Snapshot`, `Iterator` dynamic
   traits (#1363)
@@ -161,6 +164,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   about available services. (#1288)
 
 - A channel for api requests has been changed to unbounded. (#1308)
+
+- Endpoints `explorer/v1/block` and `explorer/v1/transactions` were extended
+  with adding additional fields `service_id` and `time`. (#1386)
 
 #### exonum-merkledb
 

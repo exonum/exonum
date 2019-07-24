@@ -25,7 +25,9 @@ pub type ServiceInstanceId = u32;
 pub type MethodId = u32;
 
 /// Unique service transaction identifier.
-#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
+)]
 #[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
     /// Service instance identifier.
@@ -45,7 +47,7 @@ impl CallInfo {
 }
 
 /// Transaction with information to call.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::AnyTx", crate = "crate")]
 pub struct AnyTx {
     /// Information to call.

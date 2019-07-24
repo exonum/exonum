@@ -90,6 +90,7 @@ jobs:
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
     - mkdir -p target/doc/exonum_configuration
     - mkdir -p target/std/string
+    - touch target/std/primitive.usize.html
     # https://github.com/deadlinks/cargo-deadlinks/issues/37
     - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc

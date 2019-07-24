@@ -17,6 +17,7 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
+use chrono::{DateTime, Utc};
 use exonum_merkledb::{ListProof, ObjectHash, Snapshot};
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -26,6 +27,7 @@ use std::{
     fmt,
     ops::{Index, RangeBounds},
     slice,
+    time::UNIX_EPOCH,
 };
 
 use crate::{
@@ -344,6 +346,7 @@ pub struct CommittedTransaction {
     location: TxLocation,
     location_proof: ListProof<Hash>,
     status: ExecutionStatus,
+    time: DateTime<Utc>,
 }
 
 impl CommittedTransaction {
@@ -365,6 +368,11 @@ impl CommittedTransaction {
     /// Returns the status of the transaction execution.
     pub fn status(&self) -> Result<(), &ExecutionError> {
         self.status.0.as_ref().map(drop)
+    }
+
+    /// Returns an approximate commit time of the block which includes this transaction.
+    pub fn time(&self) -> &DateTime<Utc> {
+        &self.time
     }
 }
 
@@ -565,6 +573,11 @@ impl BlockchainExplorer {
             .block_transactions(location.block_height())
             .get_proof(location.position_in_block());
 
+        let block_precommits = schema
+            .block_and_precommits(location.block_height())
+            .unwrap();
+        let time = median_precommits_time(&block_precommits.precommits);
+
         // Unwrap is OK here, because we already know that transaction is committed.
         let status = schema.transaction_results().get(tx_hash).unwrap();
 
@@ -575,10 +588,10 @@ impl BlockchainExplorer {
                     .get(tx_hash)
                     .expect("BUG: Cannot find transaction in database")
             }),
-
             location,
             location_proof,
             status,
+            time,
         }
     }
 
@@ -694,5 +707,16 @@ impl<'a> DoubleEndedIterator for Blocks<'a> {
 
         self.back = self.back.previous();
         Some(BlockInfo::new(self.explorer, self.back))
+    }
+}
+
+/// Calculates a median time from precommits.
+pub fn median_precommits_time(precommits: &[Verified<Precommit>]) -> DateTime<Utc> {
+    if precommits.is_empty() {
+        UNIX_EPOCH.into()
+    } else {
+        let mut times: Vec<_> = precommits.iter().map(|p| p.payload().time()).collect();
+        times.sort();
+        times[times.len() / 2]
     }
 }
