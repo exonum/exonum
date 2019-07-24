@@ -25,6 +25,7 @@ use crate::helpers::{Height, ValidatorId};
 use crate::messages::{Message, RawTransaction};
 use crate::proto;
 use exonum_merkledb::{Database, Error as StorageError, Fork, ListIndex, Snapshot};
+use std::collections::HashMap;
 
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -108,6 +109,7 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
+        &HashMap::new(),
     );
 
     blockchain.merge(patch).unwrap();
@@ -159,6 +161,7 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
+        &HashMap::new(),
     );
 }
 
@@ -344,7 +347,7 @@ impl Service for ServicePanicStorageError {
 }
 
 fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &HashMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index = ListIndex::new(IDX_NAME, &snapshot);
@@ -353,7 +356,7 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
 }
 
 fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &HashMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);

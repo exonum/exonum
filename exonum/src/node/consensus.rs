@@ -550,7 +550,7 @@ impl NodeHandler {
 
         let schema = Schema::new(&snapshot);
 
-        if self.state.tx_cache().contains(&msg) || schema.transactions().contains(&hash) {
+        if self.state.tx_cache().contains_key(&hash) || schema.transactions().contains(&hash) {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
@@ -559,7 +559,7 @@ impl NodeHandler {
             bail!("Received malicious transaction.")
         }
 
-        self.state.tx_cache_mut().push(msg);
+        self.state.tx_cache_mut().insert(hash, msg);
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();
@@ -702,7 +702,10 @@ impl NodeHandler {
             let round = self.state.round();
             let max_count = ::std::cmp::min(u64::from(self.txs_block_limit()), pool_len);
 
-            let txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
+            let mut txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
+
+            txs.extend(self.state.tx_cache().keys());
+
             let propose = self.sign_message(Propose::new(
                 validator_id,
                 self.state.height(),
@@ -791,7 +794,8 @@ impl NodeHandler {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
-        self.blockchain.create_patch(proposer_id, height, tx_hashes)
+        self.blockchain
+            .create_patch(proposer_id, height, tx_hashes, self.state.tx_cache())
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the

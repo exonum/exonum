@@ -95,7 +95,7 @@ pub struct State {
     incomplete_block: Option<IncompleteBlock>,
 
     // Cache that stores transactions before adding to persistent pool.
-    tx_cache: Vec<Signed<RawTransaction>>,
+    tx_cache: HashMap<Hash, Signed<RawTransaction>>,
 }
 
 /// State of a validator-node.
@@ -488,7 +488,7 @@ impl State {
 
             incomplete_block: None,
 
-            tx_cache: Vec::new(),
+            tx_cache: HashMap::new(),
         }
     }
 
@@ -1227,12 +1227,12 @@ impl State {
     }
 
     /// Returns reference to the transactions cache.
-    pub fn tx_cache(&self) -> &Vec<Signed<RawTransaction>> {
+    pub fn tx_cache(&self) -> &HashMap<Hash, Signed<RawTransaction>> {
         &self.tx_cache
     }
 
     /// Returns mutable reference to the transactions cache.
-    pub fn tx_cache_mut(&mut self) -> &mut Vec<Signed<RawTransaction>> {
+    pub fn tx_cache_mut(&mut self) -> &mut HashMap<Hash, Signed<RawTransaction>> {
         &mut self.tx_cache
     }
 }

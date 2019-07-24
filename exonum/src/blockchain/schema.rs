@@ -24,6 +24,7 @@ use crate::{
     messages::{Connect, Message, Precommit, RawTransaction, Signed},
     proto,
 };
+use std::collections::HashMap;
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -509,4 +510,12 @@ where
     fn next_height(&self) -> Height {
         Height(self.block_hashes_by_height().len())
     }
+}
+
+pub fn get_tx<T: IndexAccess>(
+    hash: &Hash,
+    pool: &MapIndex<T, Hash, Signed<RawTransaction>>,
+    tx_cache: &HashMap<Hash, Signed<RawTransaction>>,
+) -> Option<Signed<RawTransaction>> {
+    pool.get(&hash).or(tx_cache.get(&hash).map(|tx| tx.clone()))
 }

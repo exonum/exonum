@@ -35,7 +35,7 @@ pub use self::{
     block::{Block, BlockProof},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
-    schema::{Schema, TxLocation},
+    schema::{get_tx, Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
         ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
@@ -58,8 +58,8 @@ use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use crate::node::ApiSender;
 use exonum_merkledb::{
-    self, Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch,
-    Result as StorageResult, Snapshot,
+    self, Database, Error as StorageError, Fork, IndexAccess, KeySetIndex, MapIndex, ObjectHash,
+    Patch, Result as StorageResult, Snapshot,
 };
 
 mod block;
@@ -229,7 +229,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[])
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &HashMap::new())
                 .1
         };
         self.merge(patch)?;
@@ -283,6 +283,7 @@ impl Blockchain {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
+        tx_cache: &HashMap<Hash, Signed<RawTransaction>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
@@ -292,7 +293,7 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions.
             for (index, hash) in tx_hashes.iter().enumerate() {
-                self.execute_transaction(*hash, height, index, &mut fork)
+                self.execute_transaction(*hash, height, index, &mut fork, tx_cache)
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
                     .expect("Transaction execution error.");
@@ -376,13 +377,14 @@ impl Blockchain {
         height: Height,
         index: usize,
         fork: &mut Fork,
+        tx_cache: &HashMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error> {
         let (tx, raw, service_name) = {
             let new_fork = &*fork;
             let snapshot = new_fork.snapshot();
             let schema = Schema::new(snapshot);
 
-            let raw = schema.transactions().get(&tx_hash).ok_or_else(|| {
+            let raw = get_tx(&tx_hash, &schema.transactions(), &tx_cache).ok_or_else(|| {
                 failure::err_msg(format!(
                     "BUG: Cannot find transaction in database. tx: {:?}",
                     tx_hash
@@ -459,7 +461,7 @@ impl Blockchain {
         block_hash: Hash,
         precommits: I,
         tx_block_limit: u32,
-        tx_cache: &mut Vec<Signed<RawTransaction>>,
+        tx_cache: &mut HashMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error>
     where
         I: Iterator<Item = Signed<Precommit>>,
@@ -476,6 +478,11 @@ impl Blockchain {
                 schema.consensus_messages_cache().clear();
                 let txs_in_block = schema.last_block().tx_count();
                 let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
+
+                //TODO: revert to txs_count from pool
+                let txs_count = tx_cache.len() as u64;
+                dbg!(txs_count);
+
                 debug_assert!(txs_count >= u64::from(txs_in_block));
 
                 let tx_pool_len = txs_count - u64::from(txs_in_block);
@@ -483,9 +490,12 @@ impl Blockchain {
                 schema.update_transaction_count(u64::from(txs_in_block));
 
                 if tx_pool_len < u64::from(tx_block_limit) {
-                    while let Some(tx) = tx_cache.pop() {
-                        schema.add_transaction_into_pool(tx);
+                    for tx in tx_cache.values() {
+                        //TODO: remove clone
+                        schema.add_transaction_into_pool(tx.clone());
                     }
+
+                    //                    tx_cache.clear();
                 }
             }
             fork.into_patch()

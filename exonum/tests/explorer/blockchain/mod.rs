@@ -27,6 +27,7 @@ use exonum::{
 };
 
 use exonum_merkledb::{Snapshot, TemporaryDB};
+use proptest::std_facade::hash_map::HashMap;
 
 pub const SERVICE_ID: u16 = 0;
 
@@ -163,7 +164,8 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
+    let (block_hash, patch) =
+        blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &HashMap::new());
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
     let propose = Message::concrete(
@@ -196,7 +198,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
             block_hash,
             vec![precommit].into_iter(),
             1,
-            &mut Vec::new(),
+            &mut HashMap::new(),
         )
         .unwrap();
 }

@@ -500,6 +500,7 @@ mod tests {
     use crate::node::ApiSender;
     use crate::proto;
     use exonum_merkledb::{Database, Entry, Snapshot, TemporaryDB};
+    use proptest::std_facade::hash_map::HashMap;
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 
@@ -642,7 +643,12 @@ mod tests {
                 blockchain.merge(fork.into_patch()).unwrap();
             }
 
-            let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(index), &[hash]);
+            let (_, patch) = blockchain.create_patch(
+                ValidatorId::zero(),
+                Height(index),
+                &[hash],
+                &HashMap::new(),
+            );
 
             db.merge(patch).unwrap();
 
