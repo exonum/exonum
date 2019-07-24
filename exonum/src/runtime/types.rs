@@ -87,7 +87,7 @@ impl ArtifactId {
         Ok(artifact)
     }
 
-    /// Checks that name contains only allowed characters.
+    /// Checks that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
         // Extended version of `exonum_merkledb::is_valid_name` that allows also '/`.
         name.as_ref().iter().all(|&c| match c {
@@ -172,6 +172,17 @@ impl InstanceSpec {
         spec.validate()?;
         Ok(spec)
     }
+
+    /// Checks that the instance name contains only allowed characters and is not empty.
+    pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
+        let name = name.as_ref();
+        ensure!(name.is_empty(), "Service instance name should not be empty");
+        ensure!(
+            is_valid_index_name(name),
+            "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
+        );
+        Ok(())
+    }
 }
 
 impl ValidateInput for InstanceSpec {
@@ -179,15 +190,7 @@ impl ValidateInput for InstanceSpec {
 
     fn validate(&self) -> Result<(), Self::Error> {
         self.artifact.validate()?;
-        ensure!(
-            !self.name.is_empty(),
-            "Service instance name should not be empty"
-        );
-        ensure!(
-            is_valid_index_name(&self.name),
-            "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
-        );
-        Ok(())
+        Self::is_valid_name(&self.name)
     }
 }
 

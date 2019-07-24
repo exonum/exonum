@@ -26,6 +26,7 @@ use crate::{
     messages::{AnyTx, Verified},
     node::ApiSender,
     proto::Any,
+    helpers::ValidateInput,
 };
 
 use super::{
@@ -91,6 +92,7 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
+        spec.validate().expect("Invalid InstanceSpec for builtin service");
         // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
         // Registers service's artifact in runtime.
@@ -336,12 +338,10 @@ pub(crate) enum Action {
     /// This action registers deployed artifact in the dispatcher.
     ///
     /// Make sure that you successfully complete the deploy artifact procedure.
-    RegisterArtifact {
-        artifact: ArtifactId,
-        spec: Any,
-    },
+    RegisterArtifact { artifact: ArtifactId, spec: Any },
     StartService {
-        spec: InstanceSpec,
+        artifact: ArtifactId,
+        instance_name: String,
         config: Any,
     },
 }
@@ -357,8 +357,20 @@ impl Action {
                 .register_artifact(context.fork, artifact, spec)
                 .map_err(From::from),
 
-            Action::StartService { spec, config } => dispatcher
-                .start_service(context, spec, config)
+            Action::StartService {
+                artifact,
+                instance_name,
+                config,
+            } => dispatcher
+                .start_service(
+                    context,
+                    InstanceSpec {
+                        artifact,
+                        name: instance_name,
+                        id: Schema::new(context.fork).vacant_instance_id(),
+                    },
+                    config,
+                )
                 .map_err(From::from),
         }
     }

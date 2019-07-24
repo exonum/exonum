@@ -14,10 +14,11 @@
 
 use crate::{
     blockchain,
+    helpers::ValidateInput,
     runtime::{
         dispatcher::{self, Action},
         rust::TransactionContext,
-        InstanceSpec,
+        ExecutionError, InstanceSpec,
     },
 };
 
@@ -35,7 +36,7 @@ pub trait Transactions {
         &self,
         context: TransactionContext,
         artifact: DeployRequest,
-    ) -> Result<(), Error>;
+    ) -> Result<(), ExecutionError>;
     /// Confirmation that the artifact was successfully deployed by the validator.
     ///
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
@@ -43,7 +44,7 @@ pub trait Transactions {
         &self,
         context: TransactionContext,
         artifact: DeployConfirmation,
-    ) -> Result<(), Error>;
+    ) -> Result<(), ExecutionError>;
     /// Requests start service.
     ///
     /// Service will be started if all of validators will send this confirmation.
@@ -51,7 +52,40 @@ pub trait Transactions {
         &self,
         context: TransactionContext,
         service: StartService,
-    ) -> Result<(), Error>;
+    ) -> Result<(), ExecutionError>;
+}
+
+impl ValidateInput for DeployRequest {
+    type Error = ExecutionError;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        self.artifact
+            .validate()
+            .map_err(|e| (Error::InvalidArtifactId, e).into())
+    }
+}
+
+impl ValidateInput for DeployConfirmation {
+    type Error = ExecutionError;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        self.artifact
+            .validate()
+            .map_err(|e| (Error::InvalidArtifactId, e).into())
+    }
+}
+
+impl ValidateInput for StartService {
+    type Error = ExecutionError;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        self.artifact
+            .validate()
+            .map_err(|e| (Error::InvalidArtifactId, e))?;
+        InstanceSpec::is_valid_name(&self.name)
+            .map_err(|e| (Error::InvalidInstanceName, e))
+            .map_err(Self::Error::from)
+    }
 }
 
 impl Transactions for Supervisor {
@@ -59,7 +93,8 @@ impl Transactions for Supervisor {
         &self,
         context: TransactionContext,
         deploy: DeployRequest,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ExecutionError> {
+        deploy.validate()?;
         let blockchain_schema = blockchain::Schema::new(context.fork());
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
@@ -101,7 +136,8 @@ impl Transactions for Supervisor {
         &self,
         mut context: TransactionContext,
         confirmation: DeployConfirmation,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ExecutionError> {
+        confirmation.validate()?;
         let blockchain_schema = blockchain::Schema::new(context.fork());
 
         // Verifies that we doesn't reach deadline height.
@@ -149,7 +185,8 @@ impl Transactions for Supervisor {
         &self,
         mut context: TransactionContext,
         service: StartService,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ExecutionError> {
+        service.validate()?;
         let blockchain_schema = blockchain::Schema::new(context.fork());
         let dispatcher_schema = dispatcher::Schema::new(context.fork());
 
@@ -176,17 +213,12 @@ impl Transactions for Supervisor {
 
         let confirmations = pending_instances.confirm(&service, author);
         if confirmations == pending_instances.validators_len() {
-            // Assigns identifier for the new service instance.
-            let spec = InstanceSpec {
-                artifact: service.artifact,
-                id: dispatcher_schema.vacant_instance_id(),
-                name: service.name,
-            };
-            trace!("Request start service with spec {:?}", spec);
+            trace!("Request start service with name {:?} from artifact {:?}", service.name, service.artifact);
             // We have enough confirmations to start a new service instance,
             // if this action fails this transaction will be canceled.
             context.dispatch_action(Action::StartService {
-                spec,
+                artifact: service.artifact,
+                instance_name: service.name,
                 config: service.config,
             })
         }
