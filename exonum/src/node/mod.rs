@@ -63,9 +63,9 @@ use crate::{
         TimeoutRequest, UnboundedSyncSender,
     },
     helpers::{
-        config::{ConfigManager, ValidateConfig},
+        config::ConfigManager,
         fabric::{NodePrivateConfig, NodePublicConfig},
-        user_agent, Height, Milliseconds, Round, ValidatorId,
+        user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
@@ -328,8 +328,10 @@ impl NodeConfig<PathBuf> {
     }
 }
 
-impl<T> ValidateConfig for NodeConfig<T> {
-    fn validate(&self) -> Result<(), failure::Error> {
+impl<T> ValidateInput for NodeConfig<T> {
+    type Error = failure::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
         let capacity = &self.mempool.events_pool_capacity;
         ensure!(
             capacity.internal_events_capacity > 3,

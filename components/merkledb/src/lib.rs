@@ -122,7 +122,6 @@
 )]
 
 #[doc(no_inline)]
-pub use self::proof_map_index::{MapProof, ProofMapIndex};
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
@@ -138,17 +137,21 @@ pub use self::{
     map_index::MapIndex,
     options::DbOptions,
     proof_list_index::{ListProof, ProofListIndex},
+    proof_map_index::{MapProof, ProofMapIndex},
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAccess, IndexAddress, IndexBuilder, ObjectAccess, Ref, RefMut, View},
+    views::{
+        is_allowed_latin1_char, is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder,
+        ObjectAccess, Ref, RefMut, View,
+    },
 };
 
 #[macro_use]
 extern crate failure;
 
 /// A specialized `Result` type for I/O operations with storage.
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[macro_use]
 mod macros;

@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{is_allowed_latin1_char, is_valid_index_name, BinaryValue};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
-use crate::proto::schema;
+use crate::{helpers::ValidateInput, proto::schema};
 
 /// Service id type.
 pub type ServiceInstanceId = u32;
@@ -63,14 +63,6 @@ impl AnyTx {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
-pub struct InstanceSpec {
-    pub id: ServiceInstanceId,
-    pub artifact: ArtifactId,
-    pub name: String,
-}
-
 #[derive(
     Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord,
 )]
@@ -81,12 +73,40 @@ pub struct ArtifactId {
 }
 
 impl ArtifactId {
-    /// Creates a new artifact identifier from the given runtime id and name.
-    pub fn new(runtime_id: impl Into<u32>, name: impl Into<String>) -> Self {
-        Self {
+    /// Creates a new artifact identifier from the given runtime id and name
+    /// or returns error if the resulting artifact id is not correct.
+    pub fn new(
+        runtime_id: impl Into<u32>,
+        name: impl Into<String>,
+    ) -> Result<Self, failure::Error> {
+        let artifact = Self {
             runtime_id: runtime_id.into(),
             name: name.into(),
-        }
+        };
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    /// Checks that name contains only allowed characters.
+    fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
+        // Extended version of `exonum_merkledb::is_valid_name` that allows also '/`.
+        name.as_ref().iter().all(|&c| match c {
+            47 => true,
+            c => is_allowed_latin1_char(c),
+        })
+    }
+}
+
+impl ValidateInput for ArtifactId {
+    type Error = failure::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        ensure!(!self.name.is_empty(), "Artifact name should not be empty");
+        ensure!(
+            Self::is_valid_name(&self.name),
+            "Artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-./"
+        );
+        Ok(())
     }
 }
 
@@ -111,12 +131,16 @@ impl FromStr for ArtifactId {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split(':').take(2).collect::<Vec<_>>();
+        let split = s.split(':').collect::<Vec<_>>();
         match &split[..] {
-            [runtime_id, name] => Ok(Self {
-                runtime_id: runtime_id.parse()?,
-                name: name.to_string(),
-            }),
+            [runtime_id, name] => {
+                let artifact = Self {
+                    runtime_id: runtime_id.parse()?,
+                    name: name.to_string(),
+                };
+                artifact.validate()?;
+                Ok(artifact)
+            }
             _ => Err(failure::format_err!(
                 "Wrong artifact id format, it should be in form \"runtime_id:artifact_name\""
             )),
@@ -124,7 +148,127 @@ impl FromStr for ArtifactId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
+pub struct InstanceSpec {
+    pub id: ServiceInstanceId,
+    pub artifact: ArtifactId,
+    pub name: String,
+}
+
+impl InstanceSpec {
+    /// Creates a new instance specification or returns an error
+    /// if the resulting specification is not correct.
+    pub fn new(
+        id: ServiceInstanceId,
+        name: impl Into<String>,
+        artifact: impl AsRef<str>,
+    ) -> Result<Self, failure::Error> {
+        let spec = Self {
+            id,
+            artifact: artifact.as_ref().parse()?,
+            name: name.into(),
+        };
+        spec.validate()?;
+        Ok(spec)
+    }
+}
+
+impl ValidateInput for InstanceSpec {
+    type Error = failure::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        self.artifact.validate()?;
+        ensure!(
+            !self.name.is_empty(),
+            "Service instance name should not be empty"
+        );
+        ensure!(
+            is_valid_index_name(&self.name),
+            "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
+        );
+        Ok(())
+    }
+}
+
 #[test]
 fn parse_artifact_id_correct() {
     "0:my-service/1.0.0".parse::<ArtifactId>().unwrap();
+    "1:com.my.java.service.v1".parse::<ArtifactId>().unwrap();
+}
+
+#[test]
+fn parse_artifact_id_incorrect_layout() {
+    let artifacts = [
+        ("0:3:my-service/1.0.0", "Wrong artifact id format"),
+        ("my-service/1.0.0", "Wrong artifact id format"),
+        ("15", "Wrong artifact id format"),
+        ("0:", "Artifact name should not be empty"),
+        (":", "Artifact name should not be empty"),
+        (":123", "cannot parse integer from empty string"),
+        ("-1:123", "invalid digit found in string"),
+        ("ava:123", "invalid digit found in string"),
+        (
+            "123:I am a service!",
+            "Artifact name contains illegal character",
+        ),
+        // cspell:ignore юникоды
+        (
+            "123:юникоды!",
+            "Artifact name contains illegal character",
+        ),
+    ];
+
+    for (artifact, expected_err) in &artifacts {
+        let actual_err = artifact.parse::<ArtifactId>().unwrap_err().to_string();
+        assert!(
+            actual_err.contains(expected_err),
+            "artifact: '{}' actual_err '{}', expected_err '{}'",
+            artifact,
+            actual_err,
+            expected_err
+        );
+    }
+}
+
+#[test]
+fn test_instance_spec_validate_correct() {
+    InstanceSpec::new(15, "foo-service", "0:my-service/1.0.0").unwrap();
+}
+
+#[test]
+fn test_instance_spec_validate_incorrect() {
+    let specs = [
+        (
+            InstanceSpec::new(1, "", "0:my-service/1.0.0"),
+            "Service instance name should not be empty",
+        ),
+        // cspell:ignore русский сервис
+        (
+            InstanceSpec::new(2, "русский_сервис", "0:my-service/1.0.0"),
+            "Service instance name contains illegal character",
+        ),
+        (
+            InstanceSpec::new(3, "space service", "1:java.runtime.service"),
+            "Service instance name contains illegal character",
+        ),
+        (
+            InstanceSpec::new(4, "foo_service", ""),
+            "Wrong artifact id format",
+        ),
+        (
+            InstanceSpec::new(5, "foo_service", ":"),
+            "cannot parse integer from empty string",
+        ),
+    ];
+
+    for (instance_spec, expected_err) in &specs {
+        let actual_err = instance_spec.as_ref().unwrap_err().to_string();
+        assert!(
+            actual_err.contains(expected_err),
+            "actual_err '{:?}', expected_err '{}'",
+            instance_spec,
+            expected_err,
+        );
+    }
 }

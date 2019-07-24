@@ -212,12 +212,29 @@ where
     }
 }
 
-/// A function that validates an index name.
-pub fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
-    name.as_ref().as_bytes().iter().all(|c| match *c {
-        48..=57 | 65..=90 | 97..=122 | 95 | 45 | 46 => true,
+/// Checks that latin1 character is allowed in index name.
+/// Only these combination of symbols are allowed:
+///
+/// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`, `.`
+pub fn is_allowed_latin1_char(c: u8) -> bool {
+    match c {
+          48..=57   // 0..9
+        | 65..=90   // A..Z
+        | 97..=122  // a..z
+        | 45..=46   // -.
+        | 95        // _
+          => true,
         _ => false,
-    })
+    }
+}
+
+/// Validates index name.
+pub fn is_valid_index_name<S: AsRef<str>>(name: S) -> bool {
+    name.as_ref()
+        .as_bytes()
+        .iter()
+        .copied()
+        .all(is_allowed_latin1_char)
 }
 
 /// Calls the `is_valid_name` function with the given name and panics if it returns `false`.
@@ -226,8 +243,8 @@ fn assert_valid_name<S: AsRef<str>>(name: S) {
         panic!("Index name must not be empty")
     }
 
-    if !is_valid_name(name) {
-        panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
+    if !is_valid_index_name(name) {
+        panic!("Wrong characters using in name. Use: a-zA-Z0-9 and one of _-.");
     }
 }
 

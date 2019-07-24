@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use {error::Error, schema::Schema};
+pub use self::{error::Error, schema::Schema};
 
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future, Future};
@@ -81,6 +81,10 @@ impl Dispatcher {
     }
 
     /// Adds built-in service with predefined identifier.
+    ///
+    /// # Panics
+    ///
+    /// * If instance spec contains invalid service name of artifact id.
     pub(crate) fn add_builtin_service(
         &mut self,
         fork: &Fork,
@@ -710,7 +714,8 @@ mod tests {
             .with_runtime(RuntimeIdentifier::Rust as u32, RustRuntime::default())
             .finalize();
 
-        let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo/1.0.0");
+        let sample_rust_spec =
+            ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo/1.0.0").unwrap();
 
         // Check deploy.
         assert_eq!(

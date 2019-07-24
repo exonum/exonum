@@ -52,7 +52,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds artifact specification to the set of deployed artifacts.
-    pub fn add_artifact(&mut self, artifact: ArtifactId, spec: Any) -> Result<(), Error> {
+    pub(crate) fn add_artifact(&mut self, artifact: ArtifactId, spec: Any) -> Result<(), Error> {
         // Checks that we have not already deployed this artifact.
         if self.artifacts().contains(&artifact.name) {
             return Err(Error::ArtifactAlreadyDeployed);
@@ -64,7 +64,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds information about started service instance to the schema.
-    pub fn add_service_instance(&mut self, spec: InstanceSpec) -> Result<(), Error> {
+    pub(crate) fn add_service_instance(&mut self, spec: InstanceSpec) -> Result<(), Error> {
         let runtime_id = self
             .artifacts()
             .get(&spec.artifact.name)
@@ -89,7 +89,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Returns the smallest vacant identifier for service instance.
-    pub fn vacant_instance_id(&self) -> ServiceInstanceId {
+    pub(crate) fn vacant_instance_id(&self) -> ServiceInstanceId {
         // TODO O(n) optimize [ECR-3222]
         let latest_known_id = self
             .service_instance_ids()
