@@ -109,7 +109,7 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
-        &HashMap::new(),
+        &mut HashMap::new(),
     );
 
     blockchain.merge(patch).unwrap();
@@ -161,7 +161,7 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
-        &HashMap::new(),
+        &mut HashMap::new(),
     );
 }
 
@@ -347,7 +347,7 @@ impl Service for ServicePanicStorageError {
 }
 
 fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &HashMap::new());
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut HashMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index = ListIndex::new(IDX_NAME, &snapshot);
@@ -356,7 +356,7 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
 }
 
 fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &HashMap::new());
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut HashMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);

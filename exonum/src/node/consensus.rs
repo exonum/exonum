@@ -213,6 +213,8 @@ impl NodeHandler {
 
             let known_nodes = self.remove_request(&RequestData::Block(block.height()));
 
+            dbg!(has_unknown_txs);
+
             if has_unknown_txs {
                 trace!("REQUEST TRANSACTIONS");
                 self.request(RequestData::BlockTransactions, msg.author());
@@ -795,7 +797,7 @@ impl NodeHandler {
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
         self.blockchain
-            .create_patch(proposer_id, height, tx_hashes, self.state.tx_cache())
+            .create_patch(proposer_id, height, tx_hashes, &mut self.state.tx_cache_mut())
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the

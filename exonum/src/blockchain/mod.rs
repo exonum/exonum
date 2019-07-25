@@ -229,7 +229,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &HashMap::new())
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &mut HashMap::new())
                 .1
         };
         self.merge(patch)?;
@@ -283,7 +283,7 @@ impl Blockchain {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        tx_cache: &HashMap<Hash, Signed<RawTransaction>>,
+        tx_cache: &mut HashMap<Hash, Signed<RawTransaction>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
@@ -377,7 +377,7 @@ impl Blockchain {
         height: Height,
         index: usize,
         fork: &mut Fork,
-        tx_cache: &HashMap<Hash, Signed<RawTransaction>>,
+        tx_cache: &mut HashMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error> {
         let (tx, raw, service_name) = {
             let new_fork = &*fork;
@@ -492,10 +492,10 @@ impl Blockchain {
                 if tx_pool_len < u64::from(tx_block_limit) {
                     for tx in tx_cache.values() {
                         //TODO: remove clone
-                        schema.add_transaction_into_pool(tx.clone());
+//                        schema.add_transaction_into_pool(tx.clone());
                     }
 
-                    //                    tx_cache.clear();
+                    tx_cache.clear();
                 }
             }
             fork.into_patch()

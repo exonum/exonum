@@ -647,7 +647,7 @@ mod tests {
                 ValidatorId::zero(),
                 Height(index),
                 &[hash],
-                &HashMap::new(),
+                &mut HashMap::new(),
             );
 
             db.merge(patch).unwrap();

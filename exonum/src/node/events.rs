@@ -117,10 +117,14 @@ impl NodeHandler {
 
     /// Broadcasts all transactions from the pool to other validators.
     pub(crate) fn handle_rebroadcast(&mut self) {
+        use exonum_crypto::Hash;
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let pool = schema.transactions_pool();
-        for tx_hash in pool.iter() {
+
+        let mut txs:Vec<Hash> = self.state.tx_cache().keys().cloned().collect();
+        txs.extend(schema.transactions_pool().iter());
+
+        for tx_hash in txs {
             self.broadcast(
                 get_tx(&tx_hash, &schema.transactions(), &self.state.tx_cache())
                     .expect("Rebroadcast: invalid transaction hash"),
