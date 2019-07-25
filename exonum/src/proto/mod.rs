@@ -283,6 +283,18 @@ where
     }
 }
 
+impl ProtobufConvert for () {
+    type ProtoStruct = protobuf::well_known_types::Empty;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        Self::ProtoStruct::default()
+    }
+
+    fn from_pb(_pb: Self::ProtoStruct) -> Result<Self, Error> {
+        Ok(())
+    }
+}
+
 /// Special case for protobuf bytes.
 impl ProtobufConvert for Vec<u8> {
     type ProtoStruct = Vec<u8>;
@@ -388,19 +400,9 @@ impl Any {
         Self::from_pb_message(value.to_pb())
     }
 
-    fn from_pb_message(pb: impl Message) -> Self {
-        // See protobuf documentation for clarification.
-        // https://developers.google.com/protocol-buffers/docs/proto3#any
-        let type_url = [Self::TYPE_URL, pb.descriptor().full_name()].concat();
-        let value = pb
-            .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for `Any`");
-
-        Self(well_known_types::Any {
-            type_url,
-            value,
-            ..Default::default()
-        })
+    /// Returns true if this instance does not contain any type of data.
+    pub fn is_null(&self) -> bool {
+        self.0.type_url.is_empty() && self.0.value.is_empty()
     }
 
     pub fn try_into<T>(self) -> Result<T, failure::Error>
@@ -421,6 +423,21 @@ impl Any {
             type_url
         );
         T::from_bytes(self.0.value.into())
+    }
+
+    fn from_pb_message(pb: impl Message) -> Self {
+        // See protobuf documentation for clarification.
+        // https://developers.google.com/protocol-buffers/docs/proto3#any
+        let type_url = [Self::TYPE_URL, pb.descriptor().full_name()].concat();
+        let value = pb
+            .write_to_bytes()
+            .expect("Failed to serialize in BinaryValue for `Any`");
+
+        Self(well_known_types::Any {
+            type_url,
+            value,
+            ..Default::default()
+        })
     }
 }
 
@@ -458,7 +475,8 @@ impl From<well_known_types::Any> for Any {
 
 impl From<()> for Any {
     fn from(_: ()) -> Self {
-        Self(well_known_types::Any::new())
+        let v = well_known_types::Empty::new();
+        Self::from_pb_message(v)
     }
 }
 

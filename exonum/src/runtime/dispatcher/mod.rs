@@ -17,11 +17,11 @@ pub use self::{error::Error, schema::Schema};
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future, Future};
 
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, panic};
 
 use crate::{
     api::ServiceApiBuilder,
-    blockchain::{IndexCoordinates, IndexOwner},
+    blockchain::{FatalError, IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
@@ -101,7 +101,6 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
-        debug!("Add builtin service with spec {:?}", spec);
         assert!(
             spec.id < MAX_BUILTIN_INSTANCE_ID,
             "Instance identifier for builtin service should be lesser than {}",
@@ -239,10 +238,18 @@ impl Dispatcher {
             .and_then(|runtime| {
                 runtime.start_service(&spec)?;
                 // Tries to configure a started instance of the service, otherwise it stops.
-                runtime
-                    .configure_service(context.fork, &spec, constructor)
-                    .or_else(|_| runtime.stop_service(&spec))?; // TODO Should we emit panic if revert failed? [ECR-3222]
-                Ok(())
+                Self::configure_service(runtime.as_ref(), context, &spec, constructor).map_err(
+                    |e| {
+                        error!(
+                            "An error occurred while configuring the service {}: {}",
+                            spec.name, e
+                        );
+                        if let Err(e) = runtime.stop_service(&spec) {
+                            panic!(FatalError::new(e.to_string()))
+                        }
+                        e
+                    },
+                )
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
@@ -329,6 +336,27 @@ impl Dispatcher {
                     request.artifact, e
                 ),
             }
+        }
+    }
+
+    // Tries to configure a started instance of the service and catches panic if occurred.
+    pub(crate) fn configure_service(
+        runtime: &(dyn Runtime + 'static),
+        context: &ExecutionContext,
+        spec: &InstanceSpec,
+        constructor: Any,
+    ) -> Result<(), ExecutionError> {
+        let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            runtime.configure_service(context.fork, &spec, constructor)
+        }));
+
+        match result {
+            // ExecutionError without panic.
+            Ok(Err(e)) => Err(e),
+            // Panic.
+            Err(panic) => Err(ExecutionError::from_panic(panic)),
+            // Normal execution.
+            Ok(Ok(_)) => Ok(()),
         }
     }
 
