@@ -20,7 +20,7 @@ use futures::{sync::mpsc, Future};
 use std::sync::Mutex;
 
 use crate::{
-    blockchain::{Blockchain, ExecutionErrorKind, InstanceCollection, Schema},
+    blockchain::{Blockchain, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema},
     crypto,
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
@@ -327,7 +327,8 @@ fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) 
     assert!(index.is_empty());
 }
 
-fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) {
+fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) -> ExecutionStatus {
+    let tx_hash = tx.object_hash();
     blockchain
         .merge({
             let fork = blockchain.fork();
@@ -346,6 +347,12 @@ fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) {
                 .1,
         )
         .unwrap();
+
+    let snapshot = blockchain.snapshot();
+    Schema::new(snapshot.as_ref())
+        .transaction_results()
+        .get(&tx_hash)
+        .unwrap()
 }
 
 fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> Blockchain {
@@ -576,6 +583,35 @@ fn test_dispatcher_deploy_good() {
         .artifacts()
         .contains(&artifact_id.name));
     assert_eq!(Entry::new(IDX_NAME, snapshot.as_ref()).get(), Some(1_u64));
+}
+
+#[test]
+fn test_dispatcher_already_deployed() {
+    let keypair = crypto::gen_keypair();
+    let mut blockchain = create_blockchain(vec![
+        InstanceCollection::new(TestDispatcherService).with_instance(TEST_SERVICE_ID, IDX_NAME, ()),
+        InstanceCollection::new(ServiceGoodImpl).with_instance(11, "good", ()),
+    ]);
+
+    let artifact_id = ServiceGoodImpl.artifact_id().into();
+
+    // Tests that we get an error if we try to deploy already deployed artifact.
+    assert!(blockchain.dispatcher().is_deployed(&artifact_id));
+    let err = blockchain
+        .dispatcher()
+        .deploy_artifact(artifact_id.clone(), ())
+        .wait()
+        .unwrap_err();
+    assert_eq!(err, dispatcher::Error::ArtifactAlreadyDeployed.into());
+    // Tests that we cannot register artifact twice.
+    let result = execute_transaction(
+        &mut blockchain,
+        TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    assert_eq!(
+        result.0,
+        Err(dispatcher::Error::ArtifactAlreadyDeployed.into())
+    );
 }
 
 #[test]
