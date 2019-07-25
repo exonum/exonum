@@ -176,7 +176,10 @@ impl InstanceSpec {
     /// Checks that the instance name contains only allowed characters and is not empty.
     pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
         let name = name.as_ref();
-        ensure!(name.is_empty(), "Service instance name should not be empty");
+        ensure!(
+            !name.is_empty(),
+            "Service instance name should not be empty"
+        );
         ensure!(
             is_valid_index_name(name),
             "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
@@ -207,7 +210,7 @@ fn parse_artifact_id_incorrect_layout() {
         ("my-service/1.0.0", "Wrong artifact id format"),
         ("15", "Wrong artifact id format"),
         ("0:", "Artifact name should not be empty"),
-        (":", "Artifact name should not be empty"),
+        (":", "cannot parse integer from empty string"),
         (":123", "cannot parse integer from empty string"),
         ("-1:123", "invalid digit found in string"),
         ("ava:123", "invalid digit found in string"),

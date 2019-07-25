@@ -215,9 +215,15 @@ impl Runtime for RustRuntime {
     }
 
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
-        self.available_artifacts
-            .get(&self.parse_artifact(id).ok()?)
-            .map(|service_factory| service_factory.artifact_info())
+        let id = self.parse_artifact(id).ok()?;
+
+        if !self.deployed_artifacts.contains(&id) {
+            None
+        } else {
+            self.available_artifacts
+                .get(&id)
+                .map(|service_factory| service_factory.artifact_info())
+        }
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {

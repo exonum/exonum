@@ -14,9 +14,9 @@
 
 //! Information schema for the runtimes dispatcher.
 
-use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Entry, IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
-use super::{ArtifactId, Error, InstanceSpec};
+use super::{ArtifactId, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
 use crate::{crypto::Hash, proto::Any, runtime::ServiceInstanceId};
 
 #[derive(Debug, Clone)]
@@ -51,6 +51,11 @@ impl<T: IndexAccess> Schema<T> {
         KeySetIndex::new("core.dispatcher.service_instance_ids", self.access.clone())
     }
 
+    /// Vacant identifier for user service instances.
+    fn vacant_instance_id(&self) -> Entry<T, ServiceInstanceId> {
+        Entry::new("core.dispatcher.vacant_instance_id", self.access.clone())
+    }
+
     /// Adds artifact specification to the set of deployed artifacts.
     pub(crate) fn add_artifact(&mut self, artifact: ArtifactId, spec: Any) -> Result<(), Error> {
         // Checks that we have not already deployed this artifact.
@@ -61,6 +66,16 @@ impl<T: IndexAccess> Schema<T> {
         self.artifacts().put(&artifact.name, artifact.runtime_id);
         self.artifact_specs().put(&artifact, spec);
         Ok(())
+    }
+
+    /// Assigns unique identifier for instance.
+    pub(crate) fn assign_instance_id(&mut self) -> ServiceInstanceId {
+        let id = self
+            .vacant_instance_id()
+            .get()
+            .unwrap_or(MAX_BUILTIN_INSTANCE_ID);
+        self.vacant_instance_id().set(id + 1);
+        id
     }
 
     /// Adds information about started service instance to the schema.
@@ -86,17 +101,6 @@ impl<T: IndexAccess> Schema<T> {
         self.service_instance_ids().insert(spec.id);
         self.service_instances().put(&name, spec);
         Ok(())
-    }
-
-    /// Returns the smallest vacant identifier for service instance.
-    pub(crate) fn vacant_instance_id(&self) -> ServiceInstanceId {
-        // TODO O(n) optimize [ECR-3222]
-        let latest_known_id = self
-            .service_instance_ids()
-            .iter()
-            .last()
-            .unwrap_or_default();
-        latest_known_id + 1
     }
 
     pub fn artifacts_with_spec(&self) -> impl IntoIterator<Item = (ArtifactId, Any)> {

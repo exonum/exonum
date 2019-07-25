@@ -37,6 +37,12 @@ use super::{
 mod error;
 mod schema;
 
+/// Max instance identifier for builtin service.
+///
+/// By analogy with network's privileged ports, we use a range 0..1023 of instance identifiers
+/// for built in services which can be created only during the blockchain genesis block creation.
+pub const MAX_BUILTIN_INSTANCE_ID: ServiceInstanceId = 1024;
+
 #[derive(Default)]
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn Runtime>>,
@@ -86,15 +92,24 @@ impl Dispatcher {
     /// # Panics
     ///
     /// * If instance spec contains invalid service name or artifact id.
+    /// * If instance id is greater than [`MAX_BUILTIN_INSTANCE_ID`]
+    ///
+    /// [`MAX_BUILTIN_INSTANCE_ID`]: constant.MAX_BUILTIN_INSTANCE_ID.html
     pub(crate) fn add_builtin_service(
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
+        debug!("Add builtin service with spec {:?}", spec);
+        assert!(
+            spec.id < MAX_BUILTIN_INSTANCE_ID,
+            "Instance identifier for builtin service should be lesser than {}",
+            MAX_BUILTIN_INSTANCE_ID
+        );
         // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
-        // Registers service's artifact in runtime.
+        // Registers service artifact in runtime.
         self.deploy_and_register_artifact(fork, spec.artifact.clone(), artifact_spec)?;
         // Starts builtin service instance.
         self.start_service(
@@ -171,9 +186,9 @@ impl Dispatcher {
         artifact: ArtifactId,
         spec: impl Into<Any>,
     ) -> Result<(), ExecutionError> {
-        debug_assert!(artifact.validate().is_ok());
+        debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         debug_assert!(
-            self.artifact_info(&artifact).is_some(),
+            self.is_deployed(&artifact),
             "An attempt to register artifact which is not be deployed: {:?}",
             artifact
         );
@@ -210,7 +225,7 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
-        debug_assert!(spec.validate().is_ok());
+        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
 
         // Check that service doesn't use existing identifiers.
         if self.runtime_lookup.contains_key(&spec.id) {
@@ -322,6 +337,11 @@ impl Dispatcher {
         self.runtimes.get(&id.runtime_id)?.artifact_info(id)
     }
 
+    /// Returns true if artifact with the given identifier is deployed.
+    pub(crate) fn is_deployed(&self, id: &ArtifactId) -> bool {
+        self.artifact_info(id).is_some()
+    }
+
     /// Takes modified state and marks dispatcher as unmodified.
     pub(crate) fn take_modified_state(&mut self) -> bool {
         self.modified.take().is_some()
@@ -387,7 +407,7 @@ impl Action {
                     InstanceSpec {
                         artifact,
                         name: instance_name,
-                        id: Schema::new(context.fork).vacant_instance_id(),
+                        id: Schema::new(context.fork).assign_instance_id(),
                     },
                     config,
                 )
