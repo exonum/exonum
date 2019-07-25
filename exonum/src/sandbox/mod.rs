@@ -53,6 +53,8 @@ use crate::{
         timestamping::TimestampingService,
     },
 };
+use crate::blockchain::get_tx;
+use std::borrow::BorrowMut;
 
 mod config_updater;
 mod consensus;
@@ -545,8 +547,12 @@ impl Sandbox {
         // So in that case we should not skip addresses and validators count.
         let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
 
+        println!("receiving messages:");
+        println!("expected class {}, type {}", expected_msg.message_class(), expected_msg.message_type());
+
         for _ in 0..expected_set.len() {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
+                println!("real_msg class {}, type {}", real_msg.signed_message().message_class(), real_msg.signed_message().message_type());
                 assert_eq!(
                     expected_msg,
                     real_msg.signed_message(),
@@ -642,7 +648,7 @@ impl Sandbox {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if schema_transactions.contains(&hash_elem) {
+                if get_tx(&hash_elem, &schema_transactions, self.node_state().tx_cache()).is_some() {
                     return false;
                 }
                 true
@@ -681,7 +687,7 @@ impl Sandbox {
         let fork = {
             let mut fork = blockchain.fork();
             let (_, patch) =
-                blockchain.create_patch(ValidatorId(0), height, &hashes, &mut HashMap::new());
+                blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
             fork.merge(patch);
             fork
         };
@@ -746,7 +752,9 @@ impl Sandbox {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
-        let vec = idx.iter().collect();
+
+        let mut vec:Vec<Hash> = idx.iter().collect();
+        vec.extend(self.node_state().tx_cache().keys().cloned());
         vec
     }
 
@@ -932,6 +940,10 @@ impl Sandbox {
 
     fn update_config(&self, config: StoredConfiguration) {
         self.inner.borrow_mut().handler.state.update_config(config);
+    }
+
+    fn remove_tx_from_cache(&self, hash: &Hash) {
+        self.inner.borrow_mut().handler.state.tx_cache_mut().remove(hash);
     }
 }
 

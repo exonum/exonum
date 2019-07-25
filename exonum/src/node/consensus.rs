@@ -679,6 +679,7 @@ impl NodeHandler {
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+        dbg!("handle_propose_timeout");
         // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late
@@ -707,6 +708,8 @@ impl NodeHandler {
             let mut txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
 
             txs.extend(self.state.tx_cache().keys());
+
+            dbg!(&txs);
 
             let propose = self.sign_message(Propose::new(
                 validator_id,

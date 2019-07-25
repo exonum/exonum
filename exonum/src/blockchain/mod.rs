@@ -229,7 +229,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &mut HashMap::new())
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &mut BTreeMap::new())
                 .1
         };
         self.merge(patch)?;
@@ -283,7 +283,7 @@ impl Blockchain {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        tx_cache: &mut HashMap<Hash, Signed<RawTransaction>>,
+        tx_cache: &mut BTreeMap<Hash, Signed<RawTransaction>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
@@ -377,7 +377,7 @@ impl Blockchain {
         height: Height,
         index: usize,
         fork: &mut Fork,
-        tx_cache: &mut HashMap<Hash, Signed<RawTransaction>>,
+        tx_cache: &mut BTreeMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error> {
         let (tx, raw, service_name) = {
             let new_fork = &*fork;
@@ -444,7 +444,8 @@ impl Blockchain {
 
         let mut schema = Schema::new(&*fork);
         schema.transaction_results().put(&tx_hash, tx_result);
-        schema.commit_transaction(&tx_hash);
+        schema.commit_transaction(&tx_hash, raw);
+        tx_cache.remove(&tx_hash);
         schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);
@@ -461,7 +462,7 @@ impl Blockchain {
         block_hash: Hash,
         precommits: I,
         tx_block_limit: u32,
-        tx_cache: &mut HashMap<Hash, Signed<RawTransaction>>,
+        tx_cache: &mut BTreeMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error>
     where
         I: Iterator<Item = Signed<Precommit>>,
@@ -480,23 +481,21 @@ impl Blockchain {
                 let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
 
                 //TODO: revert to txs_count from pool
-                let txs_count = tx_cache.len() as u64;
-                dbg!(txs_count);
+//                let txs_count = tx_cache.len() as u64;
+//                debug_assert!(txs_count >= u64::from(txs_in_block));
 
-                debug_assert!(txs_count >= u64::from(txs_in_block));
-
-                let tx_pool_len = txs_count - u64::from(txs_in_block);
-                schema.transactions_pool_len_index().set(tx_pool_len);
+//                let tx_pool_len = txs_count - u64::from(txs_in_block);
+//                schema.transactions_pool_len_index().set(tx_pool_len);
                 schema.update_transaction_count(u64::from(txs_in_block));
 
-                if tx_pool_len < u64::from(tx_block_limit) {
+//                if tx_pool_len < u64::from(tx_block_limit) {
                     for tx in tx_cache.values() {
                         //TODO: remove clone
-//                        schema.add_transaction_into_pool(tx.clone());
+                        schema.add_transaction_into_pool(tx.clone());
                     }
 
                     tx_cache.clear();
-                }
+//                }
             }
             fork.into_patch()
         };

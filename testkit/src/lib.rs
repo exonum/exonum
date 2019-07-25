@@ -191,6 +191,7 @@ use exonum::{
 
 use crate::checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use crate::poll_events::poll_events;
+use std::collections::BTreeMap;
 
 #[macro_use]
 mod macros;
@@ -635,7 +636,7 @@ impl TestKit {
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
             self.blockchain
-                .create_patch(validator_id, new_block_height, tx_hashes)
+                .create_patch(validator_id, new_block_height, tx_hashes, &mut BTreeMap::new())
         };
 
         let patch = if let Some(config_patch) = config_patch {
@@ -665,7 +666,7 @@ impl TestKit {
                 block_hash,
                 precommits.into_iter(),
                 1,
-                &mut Vec::new(),
+                &mut BTreeMap::new(),
             )
             .unwrap();
         drop(guard);

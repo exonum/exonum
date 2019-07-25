@@ -24,7 +24,7 @@ use crate::{
     messages::{Connect, Message, Precommit, RawTransaction, Signed},
     proto,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -464,7 +464,12 @@ where
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
-    pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
+    pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx:Signed<RawTransaction>) {
+        println!("commit tx {:?}", hash);
+        //TODO: remove
+        if (!self.transactions().contains(hash)) {
+            self.transactions().put(hash, tx)
+        }
         self.transactions_pool().remove(hash);
     }
 
@@ -515,7 +520,7 @@ where
 pub fn get_tx<T: IndexAccess>(
     hash: &Hash,
     pool: &MapIndex<T, Hash, Signed<RawTransaction>>,
-    tx_cache: &HashMap<Hash, Signed<RawTransaction>>,
+    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
 ) -> Option<Signed<RawTransaction>> {
     pool.get(&hash).or(tx_cache.get(&hash).map(|tx| tx.clone()))
 }

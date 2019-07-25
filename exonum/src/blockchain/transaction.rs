@@ -501,6 +501,7 @@ mod tests {
     use crate::proto;
     use exonum_merkledb::{Database, Entry, Snapshot, TemporaryDB};
     use proptest::std_facade::hash_map::HashMap;
+    use std::collections::BTreeMap;
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 
@@ -647,7 +648,7 @@ mod tests {
                 ValidatorId::zero(),
                 Height(index),
                 &[hash],
-                &mut HashMap::new(),
+                &mut BTreeMap::new(),
             );
 
             db.merge(patch).unwrap();
