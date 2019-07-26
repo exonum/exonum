@@ -89,15 +89,13 @@ pub fn wire(descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
         .private_scope()
         .endpoint_mut("deploy-artifact", {
             let instance_name = instance_name.clone();
-            move |state: &ServiceApiState, query: String| {
-                let artifact = query.parse()?;
+            move |state: &ServiceApiState, artifact: DeployRequest| {
                 ApiImpl::new(state, instance_id, &instance_name).deploy_artifact(artifact)
             }
         })
         .endpoint_mut("start-service", {
             let instance_name = instance_name.clone();
-            move |state: &ServiceApiState, query: String| {
-                let service = query.parse()?;
+            move |state: &ServiceApiState, service: StartService| {
                 ApiImpl::new(state, instance_id, &instance_name).start_service(service)
             }
         });

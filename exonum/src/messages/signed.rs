@@ -13,13 +13,12 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, ObjectHash};
-use hex::{FromHex, ToHex};
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},
 };
 
-use std::{borrow::Cow, convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Cow, convert::TryFrom};
 
 use crate::crypto::{self, Hash, PublicKey, SecretKey};
 
@@ -55,56 +54,7 @@ impl SignedMessage {
     }
 }
 
-impl ToHex for SignedMessage {
-    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.to_bytes().write_hex(w)
-    }
-
-    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.to_bytes().write_hex_upper(w)
-    }
-}
-
-impl FromHex for SignedMessage {
-    type Error = failure::Error;
-
-    fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
-        let bytes = Vec::<u8>::from_hex(v)?;
-        Self::from_bytes(bytes.into()).map_err(From::from)
-    }
-}
-
-impl fmt::Display for SignedMessage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.write_hex(f)
-    }
-}
-
-impl FromStr for SignedMessage {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_hex(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for SignedMessage {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        serde_str::deserialize(deserializer)
-    }
-}
-
-impl Serialize for SignedMessage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serde_str::serialize(self, serializer)
-    }
-}
+impl_serde_hex_for_binary_value! { SignedMessage }
 
 /// Wraps a `Payload` together with the corresponding `SignedMessage`.
 ///

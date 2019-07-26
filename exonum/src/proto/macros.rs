@@ -13,7 +13,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 
-/// Implement `BinaryValue` trait for type that implements `Protobuf::Message`.
+/// Implements `BinaryValue` trait for type that implements `Protobuf::Message`.
 #[macro_export]
 macro_rules! impl_binary_value_for_pb_message {
     ($( $type:ty ),*) => {

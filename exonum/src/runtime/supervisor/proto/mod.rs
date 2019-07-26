@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::str::FromStr;
-
-use crate::{helpers::Height, proto::Any, runtime::ArtifactId};
+use crate::{helpers::Height, impl_serde_hex_for_binary_value, proto::Any, runtime::ArtifactId};
 
 pub mod schema;
 
 // Request for the artifact deployment.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
 #[exonum(pb = "schema::DeployRequest", crate = "crate")]
 pub struct DeployRequest {
     // Artifact identifier.
@@ -31,7 +29,7 @@ pub struct DeployRequest {
 }
 
 // Request for the artifact deployment.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
 #[exonum(pb = "schema::DeployConfirmation", crate = "crate")]
 pub struct DeployConfirmation {
     // Artifact identifier.
@@ -43,7 +41,7 @@ pub struct DeployConfirmation {
 }
 
 // Request for the artifact deployment.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
 #[exonum(pb = "schema::StartService", crate = "crate")]
 pub struct StartService {
     /// Artifact identifier.
@@ -60,26 +58,9 @@ impl_binary_key_for_binary_value! { DeployRequest }
 impl_binary_key_for_binary_value! { DeployConfirmation }
 impl_binary_key_for_binary_value! { StartService }
 
-macro_rules! impl_from_str_for_protobuf_convert {
-    ($type:ident) => {
-        impl FromStr for $type {
-            type Err = failure::Error;
-
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                use protobuf::Message;
-                use $crate::proto::ProtobufConvert;
-
-                let bytes = hex::decode(s)?;
-                let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
-                inner.merge_from_bytes(bytes.as_ref())?;
-                Self::from_pb(inner)
-            }
-        }
-    };
-}
-
-impl_from_str_for_protobuf_convert! { DeployRequest }
-impl_from_str_for_protobuf_convert! { StartService }
+impl_serde_hex_for_binary_value! { DeployRequest }
+impl_serde_hex_for_binary_value! { DeployConfirmation }
+impl_serde_hex_for_binary_value! { StartService }
 
 impl From<DeployRequest> for DeployConfirmation {
     fn from(v: DeployRequest) -> Self {
