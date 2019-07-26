@@ -121,7 +121,6 @@
     clippy::indexing_slicing,
 )]
 
-#[doc(no_inline)]
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
@@ -137,7 +136,6 @@ pub use self::{
     map_index::MapIndex,
     options::DbOptions,
     proof_list_index::{ListProof, ProofListIndex},
-    proof_map_index::{MapProof, ProofMapIndex},
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
@@ -146,6 +144,9 @@ pub use self::{
         ObjectAccess, Ref, RefMut, View,
     },
 };
+// Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html does not exist!'
+#[doc(no_inline)]
+pub use self::proof_map_index::{MapProof, ProofMapIndex};
 
 #[macro_use]
 extern crate failure;
