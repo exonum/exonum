@@ -43,6 +43,8 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
 };
 
+#[macro_use]
+mod macros;
 mod signed;
 #[cfg(test)]
 mod tests;
