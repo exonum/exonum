@@ -475,7 +475,7 @@ fn prepare_blockchain(
         // precommits in any way (they are checked beforehand by the consensus algorithm).
         // TODO: add tx_block_limit
         blockchain
-            .commit(patch, block_hash, iter::empty(), 1, &mut Vec::new())
+            .commit(&patch, block_hash, iter::empty(), 1, &mut Vec::new())
             .unwrap();
     }
 }

@@ -22,7 +22,7 @@ use std::{
         HashMap,
     },
     fmt,
-    iter::{Iterator as StdIterator, Peekable},
+    iter::{FromIterator, Iterator as StdIterator, Peekable},
     mem,
     ops::{Deref, DerefMut},
 };
@@ -136,6 +136,16 @@ impl IntoIterator for Changes {
             inner: self.data.into_iter(),
         }
     }
+}
+
+/// A set of serial changes that should be applied to a storage atomically.
+///
+/// This set can contain changes from multiple tables. When a block is added to
+/// the blockchain, changes are first collected into a patch and then applied to
+/// the storage.
+#[derive(Debug, Clone)]
+pub struct Patch {
+    changes: HashMap<String, Changes>,
 }
 
 #[derive(Debug, Default)]
@@ -264,6 +274,57 @@ impl WorkingPatch {
     }
 }
 
+impl Patch {
+    /// Creates a new empty `Patch` instance.
+    fn new() -> Self {
+        Self {
+            changes: HashMap::new(),
+        }
+    }
+
+    /// Returns iterator over changes.
+    pub fn iter(&self) -> HmIter<String, Changes> {
+        self.changes.iter()
+    }
+
+    /// Returns the number of changes.
+    pub fn len(&self) -> usize {
+        self.changes
+            .iter()
+            .fold(0, |acc, (_, changes)| acc + changes.data.len())
+    }
+
+    /// Returns `true` if this patch contains no changes and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Produces a patch that would reverse the effects of this patch for a given
+    /// snapshot.
+    pub fn undo(self, snapshot: &dyn Snapshot) -> Self {
+        let mut rev_patch = Self::new();
+
+        for (name, changes) in self {
+            let rev_changes = BTreeMap::from_iter(changes.into_iter().map(|(key, ..)| {
+                match snapshot.get(&name, &key) {
+                    Some(value) => (key, Change::Put(value)),
+                    None => (key, Change::Delete),
+                }
+            }));
+
+            rev_patch.changes.insert(
+                name,
+                Changes {
+                    data: rev_changes,
+                    prefixes_to_remove: vec![],
+                },
+            );
+        }
+
+        rev_patch
+    }
+}
+
 /// Iterator over the `Patch` data.
 #[derive(Debug)]
 pub struct PatchIterator {
@@ -352,19 +413,14 @@ pub enum Change {
 /// [`rollback`]: #method.rollback
 #[derive(Debug)]
 pub struct Fork {
-    patch: Patch,
+    flushed: FlushedFork,
     working_patch: WorkingPatch,
 }
 
-/// A set of serial changes that should be applied to a storage atomically.
-///
-/// This set can contain changes from multiple tables. When a block is added to
-/// the blockchain, changes are first collected into a patch and then applied to
-/// the storage.
 #[derive(Debug)]
-pub struct Patch {
+pub struct FlushedFork {
     snapshot: Box<dyn Snapshot>,
-    changes: HashMap<String, Changes>,
+    patch: Patch,
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
@@ -422,9 +478,9 @@ pub trait Database: Send + Sync + 'static {
     /// Creates a new fork of the database from its current state.
     fn fork(&self) -> Fork {
         Fork {
-            patch: Patch {
+            flushed: FlushedFork {
                 snapshot: self.snapshot(),
-                changes: HashMap::new(),
+                patch: Patch::new(),
             },
             working_patch: WorkingPatch::new(),
         }
@@ -463,7 +519,7 @@ pub trait Database: Send + Sync + 'static {
 ///
 /// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
 /// to a full key (a string column family name + key as an array of bytes within the family).
-pub trait Snapshot: Send + Sync + 'static {
+pub trait Snapshot: 'static {
     /// Returns a value corresponding to the specified key as a raw vector of bytes,
     /// or `None` if it does not exist.
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>>;
@@ -491,19 +547,9 @@ pub trait Iterator {
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
-impl Patch {
-    pub fn changes(&self) -> HashMap<String, Changes> {
-        self.changes.clone()
-    }
-
-    pub fn iter(&self) -> HmIter<String, Changes> {
-        self.changes.iter()
-    }
-}
-
-impl Snapshot for Patch {
+impl Snapshot for FlushedFork {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(changes) = self.changes.get(name) {
+        if let Some(changes) = self.patch.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(ref v) => return Some(v.clone()),
@@ -515,7 +561,7 @@ impl Snapshot for Patch {
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        if let Some(changes) = self.changes.get(name) {
+        if let Some(changes) = self.patch.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(..) => return true,
@@ -528,7 +574,7 @@ impl Snapshot for Patch {
 
     fn iter(&self, name: &str, from: &[u8]) -> Iter {
         let range = (Included(from), Unbounded);
-        let changes = match self.changes.get(name) {
+        let changes = match self.patch.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
             None => None,
         };
@@ -541,24 +587,12 @@ impl Snapshot for Patch {
 }
 
 impl Fork {
-    /// Creates a fork based on the provided `patch` and `snapshot`.
-    ///
-    /// Note: using created fork to modify data already present in `patch` may lead
-    /// to an inconsistent database state. Hence, this method is useful only if you
-    /// are sure that the fork and `patch` interacted with different indices.
-    pub fn from_patch(patch: Patch) -> Self {
-        Self {
-            patch,
-            working_patch: WorkingPatch::new(),
-        }
-    }
-
     /// Finalizes all changes that were made after previous execution of the `flush` method.
     /// If no `flush` method had been called before, finalizes all changes that were
     /// made after creation of `Fork`.
     pub fn flush(&mut self) {
         let working_patch = mem::replace(&mut self.working_patch, WorkingPatch::new());
-        working_patch.merge_into(&mut self.patch);
+        working_patch.merge_into(&mut self.flushed.patch);
     }
 
     /// Rolls back all changes that were made after the latest execution
@@ -570,7 +604,7 @@ impl Fork {
     /// Converts the fork into `Patch` consuming the fork instance.
     pub fn into_patch(mut self) -> Patch {
         self.flush();
-        self.patch
+        self.flushed.patch
     }
 
     /// Merges a patch from another fork to this fork.
@@ -585,13 +619,13 @@ impl Fork {
         assert!(!self.is_dirty(), "cannot merge a dirty fork");
 
         for (name, changes) in patch {
-            if let Some(in_changes) = self.patch.changes.get_mut(&name) {
+            if let Some(in_changes) = self.flushed.patch.changes.get_mut(&name) {
                 in_changes.data.extend(changes.into_iter());
                 continue;
             }
 
             {
-                self.patch.changes.insert(name.to_owned(), changes);
+                self.flushed.patch.changes.insert(name.to_owned(), changes);
             }
         }
     }
@@ -607,17 +641,11 @@ impl Fork {
     }
 }
 
-impl From<Patch> for Fork {
-    fn from(patch: Patch) -> Self {
-        Self::from_patch(patch)
-    }
-}
-
 impl<'a> IndexAccess for &'a Fork {
     type Changes = ChangesRef<'a>;
 
     fn snapshot(&self) -> &dyn Snapshot {
-        &self.patch
+        &self.flushed
     }
 
     fn changes(&self, address: &IndexAddress) -> Self::Changes {
@@ -627,7 +655,7 @@ impl<'a> IndexAccess for &'a Fork {
 
 impl AsRef<dyn Snapshot> for Fork {
     fn as_ref(&self) -> &dyn Snapshot {
-        &self.patch
+        &self.flushed
     }
 }
 
