@@ -45,14 +45,14 @@
 //!
 //! # fn send<T>(_: T) {}
 //! let keypair = crypto::gen_keypair();
-//! // Let we have a some Status message.
+//! // We have some Status message.
 //! let payload = Status {
 //!     height: Height(15),
 //!     last_hash: Hash::zero(),
 //! };
-//! // With a some keypair we can sign it and get trusted status message.
+//! // With some keypair we can sign it and get trusted status message.
 //! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
-//! // Later we can convert it to raw signed message and sends by the network.
+//! // Later we can convert it to a raw signed message and send it by the network.
 //! let raw_signed_message = signed_payload.into_raw();
 //! send(raw_signed_message);
 //! ```
@@ -74,7 +74,7 @@
 //! #   };
 //! #   Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
 //! # }
-//! // For example we have got a some signed message.
+//! // For example, we have got some signed message.
 //! let raw: SignedMessage = get_signed_message();
 //! // We know that this is one type of `ExonumMessage`, so we can try to
 //! // verify its signature and try to convert it into `ExonumMessage`.
