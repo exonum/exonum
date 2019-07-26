@@ -465,7 +465,6 @@ where
 
     /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx:Signed<RawTransaction>) {
-        println!("commit tx {:?}", hash);
         //TODO: remove
         if (!self.transactions().contains(hash)) {
             self.transactions().put(hash, tx)

@@ -121,6 +121,7 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
 
+        //TODO: remove clone
         let mut txs:Vec<Hash> = self.state.tx_cache().keys().cloned().collect();
         txs.extend(schema.transactions_pool().iter());
 

@@ -547,12 +547,8 @@ impl Sandbox {
         // So in that case we should not skip addresses and validators count.
         let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
 
-        println!("receiving messages:");
-        println!("expected class {}, type {}", expected_msg.message_class(), expected_msg.message_type());
-
         for _ in 0..expected_set.len() {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
-                println!("real_msg class {}, type {}", real_msg.signed_message().message_class(), real_msg.signed_message().message_type());
                 assert_eq!(
                     expected_msg,
                     real_msg.signed_message(),

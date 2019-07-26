@@ -213,8 +213,6 @@ impl NodeHandler {
 
             let known_nodes = self.remove_request(&RequestData::Block(block.height()));
 
-            dbg!(has_unknown_txs);
-
             if has_unknown_txs {
                 trace!("REQUEST TRANSACTIONS");
                 self.request(RequestData::BlockTransactions, msg.author());
@@ -512,7 +510,7 @@ impl NodeHandler {
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let pool_len = schema.transactions_pool_len();
+        let pool_len = schema.transactions_pool_len() + self.state.tx_cache_len() as u64;
 
         metric!("node.mempool", pool_len);
 
@@ -679,7 +677,6 @@ impl NodeHandler {
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
-        dbg!("handle_propose_timeout");
         // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late
@@ -698,7 +695,7 @@ impl NodeHandler {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
             let pool = schema.transactions_pool();
-            let pool_len = schema.transactions_pool_len();
+            let pool_len = schema.transactions_pool_len() + self.state.tx_cache_len() as u64;
 
             info!("LEADER: pool = {}", pool_len);
 
@@ -708,8 +705,6 @@ impl NodeHandler {
             let mut txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
 
             txs.extend(self.state.tx_cache().keys());
-
-            dbg!(&txs);
 
             let propose = self.sign_message(Propose::new(
                 validator_id,
