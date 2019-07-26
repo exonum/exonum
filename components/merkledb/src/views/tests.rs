@@ -883,7 +883,7 @@ fn valid_name_for_url() {
 }
 
 #[test]
-#[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
+#[should_panic(expected = "Wrong characters using in name")]
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
     let snapshot = db.snapshot();
