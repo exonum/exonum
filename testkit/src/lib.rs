@@ -635,8 +635,12 @@ impl TestKit {
         let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
-            self.blockchain
-                .create_patch(validator_id, new_block_height, tx_hashes, &mut BTreeMap::new())
+            self.blockchain.create_patch(
+                validator_id,
+                new_block_height,
+                tx_hashes,
+                &mut BTreeMap::new(),
+            )
         };
 
         let patch = if let Some(config_patch) = config_patch {
@@ -662,7 +666,7 @@ impl TestKit {
         // TODO: add tx_block_limit
         self.blockchain
             .commit(
-                patch,
+                &patch,
                 block_hash,
                 precommits.into_iter(),
                 1,

@@ -279,3 +279,13 @@ fn test_store_txs_positions() {
         assert_eq!(committed_height, location.block_height());
     }
 }
+
+#[test]
+//TODO: write test to check sending transactions to pool after
+//reaching tx_block_limit
+fn tx_cache_with_tx_block_limit() {
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+
+}

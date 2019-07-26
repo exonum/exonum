@@ -740,8 +740,8 @@ impl NodeHandler {
 
     fn need_faster_propose(&self) -> bool {
         let snapshot = self.blockchain.snapshot();
-        let pending_tx_count = Schema::new(&snapshot).transactions_pool_len() +
-            self.state.tx_cache_len() as u64;
+        let pending_tx_count =
+            Schema::new(&snapshot).transactions_pool_len() + self.state.tx_cache_len() as u64;
         pending_tx_count >= u64::from(self.propose_timeout_threshold())
     }
 
@@ -1013,7 +1013,9 @@ impl Node {
         let mut core = Core::new().map_err(into_failure)?;
         core.run(handler_part.run())
             .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
-        network_thread.join().unwrap()
+        let res = network_thread.join().unwrap();
+
+        res
     }
 
     /// A generic implementation that launches `Node` and optionally creates threads
@@ -1141,6 +1143,27 @@ impl Node {
     /// Returns channel.
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
+    }
+
+    fn flush_txs_into_pool(&self) {
+        let tx_cache_size = self.state().tx_cache_len();
+
+        if tx_cache_size == 0 {
+            //No need to do anything.
+            return;
+        }
+
+        let mut blockchain = self.blockchain();
+        let mut fork = blockchain.fork();
+        let mut schema = Schema::new(&fork);
+
+        for tx in self.state().tx_cache().values() {
+            schema.add_transaction_into_pool(tx.clone());
+        }
+
+        self.blockchain().merge(fork.into_patch());
+
+        info!("Flushed {} transactions to persistent pool", tx_cache_size)
     }
 }
 

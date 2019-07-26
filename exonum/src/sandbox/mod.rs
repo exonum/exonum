@@ -27,6 +27,7 @@ use std::{
 
 use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
 
+use crate::blockchain::get_tx;
 use crate::{
     blockchain::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
@@ -53,8 +54,6 @@ use crate::{
         timestamping::TimestampingService,
     },
 };
-use crate::blockchain::get_tx;
-use std::borrow::BorrowMut;
 
 mod config_updater;
 mod consensus;
@@ -644,7 +643,13 @@ impl Sandbox {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if get_tx(&hash_elem, &schema_transactions, self.node_state().tx_cache()).is_some() {
+                if get_tx(
+                    &hash_elem,
+                    &schema_transactions,
+                    self.node_state().tx_cache(),
+                )
+                .is_some()
+                {
                     return false;
                 }
                 true
@@ -749,7 +754,7 @@ impl Sandbox {
         let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
 
-        let mut vec:Vec<Hash> = idx.iter().collect();
+        let mut vec: Vec<Hash> = idx.iter().collect();
         vec.extend(self.node_state().tx_cache().keys().cloned());
         vec
     }
@@ -943,7 +948,12 @@ impl Sandbox {
     }
 
     fn remove_tx_from_cache(&self, hash: &Hash) {
-        self.inner.borrow_mut().handler.state.tx_cache_mut().remove(hash);
+        self.inner
+            .borrow_mut()
+            .handler
+            .state
+            .tx_cache_mut()
+            .remove(hash);
     }
 }
 

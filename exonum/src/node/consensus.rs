@@ -482,8 +482,13 @@ impl NodeHandler {
             // FIXME: Avoid of clone here. (ECR-171)
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
-                .commit(&block_state.patch(), block_hash, precommits,  txs_block_limit,
-                        self.state.tx_cache_mut(),)
+                .commit(
+                    &block_state.patch(),
+                    block_hash,
+                    precommits,
+                    txs_block_limit,
+                    self.state.tx_cache_mut(),
+                )
                 .unwrap();
             // Update node state.
             self.state
@@ -783,8 +788,12 @@ impl NodeHandler {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
-        self.blockchain
-            .create_patch(proposer_id, height, tx_hashes, &mut self.state.tx_cache_mut())
+        self.blockchain.create_patch(
+            proposer_id,
+            height,
+            tx_hashes,
+            &mut self.state.tx_cache_mut(),
+        )
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the

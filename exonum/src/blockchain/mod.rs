@@ -58,8 +58,8 @@ use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use crate::node::ApiSender;
 use exonum_merkledb::{
-    self, Database, Error as StorageError, Fork, IndexAccess, KeySetIndex, MapIndex, ObjectHash,
-    Patch, Result as StorageResult, Snapshot,
+    self, Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch,
+    Result as StorageResult, Snapshot,
 };
 
 mod block;
@@ -229,8 +229,13 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &mut BTreeMap::new())
-                .1
+            self.create_patch(
+                ValidatorId::zero(),
+                Height::zero(),
+                &[],
+                &mut BTreeMap::new(),
+            )
+            .1
         };
         self.merge(patch)?;
         Ok(())
@@ -485,21 +490,20 @@ impl Blockchain {
                 let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
 
                 //TODO: revert to txs_count from pool
-//                let txs_count = tx_cache.len() as u64;
-//                debug_assert!(txs_count >= u64::from(txs_in_block));
 
-//                let tx_pool_len = txs_count - u64::from(txs_in_block);
-//                schema.transactions_pool_len_index().set(tx_pool_len);
+                let tx_cache_len = tx_cache.len() as u64;
+                // debug_assert!(txs_count >= u64::from(txs_in_block));
+
+                // let tx_pool_len = txs_count - u64::from(txs_in_block);
+                // schema.transactions_pool_len_index().set(tx_pool_len);
                 schema.update_transaction_count(u64::from(txs_in_block));
 
-//                if tx_pool_len < u64::from(tx_block_limit) {
-                    for tx in tx_cache.values() {
-                        //TODO: remove clone
-                        schema.add_transaction_into_pool(tx.clone());
+                let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();
+                for tx_hash in tx_hashes {
+                    if let Some(tx) = tx_cache.remove(&tx_hash) {
+                        schema.add_transaction_into_pool(tx);
                     }
-
-                    tx_cache.clear();
-//                }
+                }
             }
             fork.into_patch()
         };

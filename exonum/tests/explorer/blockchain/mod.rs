@@ -16,6 +16,8 @@
 
 use futures::sync::mpsc;
 
+use std::collections::BTreeMap;
+
 use exonum::{
     blockchain::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
@@ -27,8 +29,6 @@ use exonum::{
 };
 
 use exonum_merkledb::{Snapshot, TemporaryDB};
-use proptest::std_facade::hash_map::HashMap;
-use std::collections::BTreeMap;
 
 pub const SERVICE_ID: u16 = 0;
 
@@ -195,7 +195,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
 
     blockchain
         .commit(
-            patch,
+            &patch,
             block_hash,
             vec![precommit].into_iter(),
             1,

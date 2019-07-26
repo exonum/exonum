@@ -489,6 +489,7 @@ fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
 mod tests {
     use futures::sync::mpsc;
 
+    use std::collections::BTreeMap;
     use std::panic;
     use std::sync::Mutex;
 
@@ -500,8 +501,6 @@ mod tests {
     use crate::node::ApiSender;
     use crate::proto;
     use exonum_merkledb::{Database, Entry, Snapshot, TemporaryDB};
-    use proptest::std_facade::hash_map::HashMap;
-    use std::collections::BTreeMap;
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 

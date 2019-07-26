@@ -21,10 +21,12 @@ use crate::helpers::user_agent;
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct StatsInfo {
-    /// Total number of uncommitted transactions.
+    /// Total number of uncommitted transactions stored in persistent pool.
     pub tx_pool_size: u64,
     /// Total number of transactions in the blockchain.
     pub tx_count: u64,
+    /// Size of the transaction cache.
+    pub tx_cache_size: usize,
 }
 
 /// Information about whether it is possible to achieve the consensus between
@@ -74,15 +76,17 @@ impl SystemApi {
     }
 
     fn handle_stats_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        let self_ = self.clone();
         api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
             let snapshot = state.snapshot();
             let schema = Schema::new(&snapshot);
             Ok(StatsInfo {
                 tx_pool_size: schema.transactions_pool_len(),
                 tx_count: schema.transactions_len(),
+                tx_cache_size: self.shared_api_state.tx_cache_size(),
             })
         });
-        self
+        self_
     }
 
     fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
