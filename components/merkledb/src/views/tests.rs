@@ -17,7 +17,7 @@ use std::panic;
 
 use crate::{
     db,
-    views::{is_valid_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
+    views::{is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
     Database, DbOptions, Fork, ListIndex, RocksDB, TemporaryDB,
 };
 
@@ -883,7 +883,7 @@ fn valid_name_for_url() {
 }
 
 #[test]
-#[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
+#[should_panic(expected = "Wrong characters using in name")]
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
     let snapshot = db.snapshot();
@@ -892,7 +892,7 @@ fn invalid_name_panic() {
 
 fn assert_valid_name_url(name: &str) {
     let urlencoded: String = byte_serialize(name.as_bytes()).collect();
-    assert_eq!(is_valid_name(name), name == urlencoded)
+    assert_eq!(is_valid_index_name(name), name == urlencoded)
 }
 
 fn check_valid_name<S: AsRef<str>>(name: S) -> bool {

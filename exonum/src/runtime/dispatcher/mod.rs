@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use {error::Error, schema::Schema};
+pub use self::{error::Error, schema::Schema};
 
 use exonum_merkledb::{Fork, IndexAccess, Snapshot};
 use futures::{future, Future};
 
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, panic};
 
 use crate::{
     api::ServiceApiBuilder,
-    blockchain::{IndexCoordinates, IndexOwner},
+    blockchain::{FatalError, IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
+    helpers::ValidateInput,
     messages::{AnyTx, Verified},
     node::ApiSender,
     proto::Any,
@@ -35,6 +36,12 @@ use super::{
 
 mod error;
 mod schema;
+
+/// Max instance identifier for builtin service.
+///
+/// By analogy with network's privileged ports, we use a range 0..1023 of instance identifiers
+/// for built in services which can be created only during the blockchain genesis block creation.
+pub const MAX_BUILTIN_INSTANCE_ID: ServiceInstanceId = 1024;
 
 #[derive(Default)]
 pub struct Dispatcher {
@@ -81,15 +88,27 @@ impl Dispatcher {
     }
 
     /// Adds built-in service with predefined identifier.
+    ///
+    /// # Panics
+    ///
+    /// * If instance spec contains invalid service name or artifact id.
+    /// * If instance id is greater than [`MAX_BUILTIN_INSTANCE_ID`]
+    ///
+    /// [`MAX_BUILTIN_INSTANCE_ID`]: constant.MAX_BUILTIN_INSTANCE_ID.html
     pub(crate) fn add_builtin_service(
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
+        assert!(
+            spec.id < MAX_BUILTIN_INSTANCE_ID,
+            "Instance identifier for builtin service should be lesser than {}",
+            MAX_BUILTIN_INSTANCE_ID
+        );
         // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
-        // Registers service's artifact in runtime.
+        // Registers service artifact in runtime.
         self.deploy_and_register_artifact(fork, spec.artifact.clone(), artifact_spec)?;
         // Starts builtin service instance.
         self.start_service(
@@ -135,11 +154,17 @@ impl Dispatcher {
     }
 
     /// Initiates deploy artifact procedure in the corresponding runtime.
+    ///
+    /// # Panics
+    ///
+    /// * If artifact identifier is invalid.
     pub(crate) fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
         spec: impl Into<Any>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        debug_assert!(artifact.validate().is_ok());
+
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             runtime.deploy_artifact(artifact, spec.into())
         } else {
@@ -148,19 +173,25 @@ impl Dispatcher {
     }
 
     /// Registers deployed artifact in the dispatcher's information schema.
-    ///
     /// Make sure that you successfully complete the deploy artifact procedure.
+    ///
+    /// # Panics
+    ///
+    /// * If artifact identifier is invalid.
+    /// * If artifact was not deployed.
     pub(crate) fn register_artifact(
         &mut self,
         fork: &Fork,
         artifact: ArtifactId,
         spec: impl Into<Any>,
     ) -> Result<(), ExecutionError> {
+        debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         debug_assert!(
-            self.artifact_info(&artifact).is_some(),
+            self.is_deployed(&artifact),
             "An attempt to register artifact which is not be deployed: {:?}",
             artifact
         );
+
         Schema::new(fork).add_artifact(artifact.clone(), spec.into())?;
         info!(
             "Registered artifact {} in runtime with id {}",
@@ -183,12 +214,18 @@ impl Dispatcher {
 
     /// Starts and configures a new service instance. After that it writes information about
     /// service instance to the dispatcher's information schema.
+    ///
+    /// # Panics
+    ///
+    /// * If instance spec contains invalid service name.
     pub(crate) fn start_service(
         &mut self,
         context: &ExecutionContext,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
+        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
+
         // Check that service doesn't use existing identifiers.
         if self.runtime_lookup.contains_key(&spec.id) {
             return Err(Error::ServiceIdExists.into());
@@ -201,10 +238,18 @@ impl Dispatcher {
             .and_then(|runtime| {
                 runtime.start_service(&spec)?;
                 // Tries to configure a started instance of the service, otherwise it stops.
-                runtime
-                    .configure_service(context.fork, &spec, constructor)
-                    .or_else(|_| runtime.stop_service(&spec))?; // TODO Should we emit panic if revert failed? [ECR-3222]
-                Ok(())
+                Self::configure_service(runtime.as_ref(), context, &spec, constructor).map_err(
+                    |e| {
+                        error!(
+                            "An error occurred while configuring the service {}: {}",
+                            spec.name, e
+                        );
+                        if let Err(e) = runtime.stop_service(&spec) {
+                            panic!(FatalError::new(e.to_string()))
+                        }
+                        e
+                    },
+                )
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
@@ -227,6 +272,7 @@ impl Dispatcher {
             },
         );
         self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().payload)?;
+
         let actions = context.take_actions();
         // Marks dispatcher as modified if actions are not empty.
         let is_modified = !actions.is_empty();
@@ -293,11 +339,38 @@ impl Dispatcher {
         }
     }
 
-    /// Returns additional information about artifact with the specified id if it is deployed.
+    // Tries to configure a started instance of the service and catches panic if occurred.
+    pub(crate) fn configure_service(
+        runtime: &(dyn Runtime + 'static),
+        context: &ExecutionContext,
+        spec: &InstanceSpec,
+        constructor: Any,
+    ) -> Result<(), ExecutionError> {
+        let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            runtime.configure_service(context.fork, &spec, constructor)
+        }));
+
+        match result {
+            // ExecutionError without panic.
+            Ok(Err(e)) => Err(e),
+            // Panic.
+            Err(panic) => Err(ExecutionError::from_panic(panic)),
+            // Normal execution.
+            Ok(Ok(_)) => Ok(()),
+        }
+    }
+
+    /// Returns additional information about artifact with if it is deployed.
     pub(crate) fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
         self.runtimes.get(&id.runtime_id)?.artifact_info(id)
     }
 
+    /// Returns true if artifact with the given identifier is deployed.
+    pub(crate) fn is_deployed(&self, id: &ArtifactId) -> bool {
+        self.artifact_info(id).is_some()
+    }
+
+    /// Takes modified state and marks dispatcher as unmodified.
     pub(crate) fn take_modified_state(&mut self) -> bool {
         self.modified.take().is_some()
     }
@@ -330,14 +403,13 @@ impl Dispatcher {
 #[derive(Debug)]
 pub(crate) enum Action {
     /// This action registers deployed artifact in the dispatcher.
-    ///
     /// Make sure that you successfully complete the deploy artifact procedure.
-    RegisterArtifact {
-        artifact: ArtifactId,
-        spec: Any,
-    },
+    RegisterArtifact { artifact: ArtifactId, spec: Any },
+    /// This action starts service instance with the specified params.
+    /// Make sure that artifact is been deployed.
     StartService {
-        spec: InstanceSpec,
+        artifact: ArtifactId,
+        instance_name: String,
         config: Any,
     },
 }
@@ -353,8 +425,20 @@ impl Action {
                 .register_artifact(context.fork, artifact, spec)
                 .map_err(From::from),
 
-            Action::StartService { spec, config } => dispatcher
-                .start_service(context, spec, config)
+            Action::StartService {
+                artifact,
+                instance_name,
+                config,
+            } => dispatcher
+                .start_service(
+                    context,
+                    InstanceSpec {
+                        artifact,
+                        name: instance_name,
+                        id: Schema::new(context.fork).assign_instance_id(),
+                    },
+                    config,
+                )
                 .map_err(From::from),
         }
     }
@@ -710,7 +794,8 @@ mod tests {
             .with_runtime(RuntimeIdentifier::Rust as u32, RustRuntime::default())
             .finalize();
 
-        let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo/1.0.0");
+        let sample_rust_spec =
+            ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo/1.0.0").unwrap();
 
         // Check deploy.
         assert_eq!(

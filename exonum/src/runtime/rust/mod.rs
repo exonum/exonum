@@ -207,7 +207,7 @@ impl Runtime for RustRuntime {
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        if spec != Any::default() {
+        if !spec.is_null() && spec != ().into() {
             // Spec for rust artifacts should be empty.
             return Box::new(future::err(Error::IncorrectArtifactId.into()));
         }
@@ -215,9 +215,15 @@ impl Runtime for RustRuntime {
     }
 
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
-        self.available_artifacts
-            .get(&self.parse_artifact(id).ok()?)
-            .map(|service_factory| service_factory.artifact_info())
+        let id = self.parse_artifact(id).ok()?;
+
+        if !self.deployed_artifacts.contains(&id) {
+            None
+        } else {
+            self.available_artifacts
+                .get(&id)
+                .map(|service_factory| service_factory.artifact_info())
+        }
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {

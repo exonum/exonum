@@ -14,6 +14,13 @@
 
 //! The module containing building blocks for creating blockchains powered by the Exonum framework.
 
+pub use exonum_merkledb::Error as FatalError;
+
+pub use crate::runtime::{
+    error::{ErrorKind as ExecutionErrorKind, ExecutionStatus},
+    ExecutionError,
+};
+
 pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
@@ -21,16 +28,11 @@ pub use self::{
     genesis::GenesisConfig,
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
 };
-pub use crate::runtime::{
-    error::{ErrorKind as ExecutionErrorKind, ExecutionStatus},
-    ExecutionError,
-};
 
 pub mod config;
 
 use exonum_merkledb::{
-    Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch, Result as StorageResult,
-    Snapshot,
+    Database, Fork, IndexAccess, ObjectHash, Patch, Result as StorageResult, Snapshot,
 };
 use futures::{sync::mpsc, Future, Sink};
 
@@ -337,8 +339,8 @@ impl Blockchain {
                 execution_result
             }
             Err(err) => {
-                if err.is::<StorageError>() {
-                    // Continue panic unwind if the reason is StorageError.
+                if err.is::<FatalError>() {
+                    // Continue panic unwind if the reason is FatalError.
                     panic::resume_unwind(err);
                 }
                 fork.rollback();

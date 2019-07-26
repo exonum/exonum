@@ -116,7 +116,7 @@ impl Serialize for SignedMessage {
 ///
 /// So we use `Verified` to keep the original byte buffer around with the parsed `Payload`.
 ///
-/// Be careful with `ProtobufConvert::from_bytes` method!
+/// Be careful with `BinaryValue::from_bytes` method!
 /// It for performance reasons skips signature verification.
 #[derive(Clone, Debug)]
 pub struct Verified<T> {

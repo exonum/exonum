@@ -28,4 +28,8 @@ pub enum Error {
     DeployRequestAlreadyRegistered = 4,
     /// Deploy request has not been registered.
     DeployRequestNotRegistered = 5,
+    /// Artifact identifier has incorrect format.
+    InvalidArtifactId = 6,
+    /// Instance name is incorrect.
+    InvalidInstanceName = 7,
 }

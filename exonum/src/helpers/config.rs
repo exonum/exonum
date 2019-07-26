@@ -142,10 +142,3 @@ impl ConfigManager {
         Ok(())
     }
 }
-
-/// Basic trait to validate user defined configs.
-pub trait ValidateConfig {
-    /// Performs parameters validation for this configuration and returns error if
-    /// config is inconsistent.
-    fn validate(&self) -> Result<(), failure::Error>;
-}

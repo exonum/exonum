@@ -82,6 +82,15 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
         .collect::<Vec<_>>()
 }
 
+/// Basic trait to validate user defined input.
+pub trait ValidateInput {
+    /// The type returned in the event of a validate error.
+    type Error;
+    /// Performs parameters validation for this configuration and returns error if
+    /// value is inconsistent.
+    fn validate(&self) -> Result<(), Self::Error>;
+}
+
 /// This routine is adapted from the *old* Path's `path_relative_from`
 /// function, which works differently from the new `relative_from` function.
 /// In particular, this handles the case on unix where both paths are

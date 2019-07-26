@@ -121,8 +121,6 @@
     clippy::indexing_slicing,
 )]
 
-#[doc(no_inline)]
-pub use self::proof_map_index::{MapProof, ProofMapIndex};
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
@@ -141,14 +139,20 @@ pub use self::{
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAccess, IndexAddress, IndexBuilder, ObjectAccess, Ref, RefMut, View},
+    views::{
+        is_allowed_latin1_char, is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder,
+        ObjectAccess, Ref, RefMut, View,
+    },
 };
+// Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html does not exist!'
+#[doc(no_inline)]
+pub use self::proof_map_index::{MapProof, ProofMapIndex};
 
 #[macro_use]
 extern crate failure;
 
 /// A specialized `Result` type for I/O operations with storage.
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[macro_use]
 mod macros;
