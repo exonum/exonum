@@ -13,12 +13,12 @@
 // limitations under the License.
 
 /// Hex conversions for the given `BinaryValue`.
-/// 
-/// Implements `hex::FromHex` and `hex::ToHex` conversions for the given `BinaryValue` and uses them in 
-/// the implementation of the following traits: 
-/// 
+///
+/// Implements `hex::FromHex` and `hex::ToHex` conversions for the given `BinaryValue` and uses them in
+/// the implementation of the following traits:
+///
 /// `FromStr`, `Display`, `Serialize`, `Deserialize`.
-/// 
+///
 /// Pay attention that macro uses `serde_str` under the hood.
 #[macro_export]
 macro_rules! impl_serde_hex_for_binary_value {
@@ -83,5 +83,5 @@ macro_rules! impl_serde_hex_for_binary_value {
                 serde_str::serialize(self, serializer)
             }
         }
-    }
+    };
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::Height, proto::Any, runtime::ArtifactId, impl_serde_hex_for_binary_value};
+use crate::{helpers::Height, impl_serde_hex_for_binary_value, proto::Any, runtime::ArtifactId};
 
 pub mod schema;
 
