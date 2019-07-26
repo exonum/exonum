@@ -35,11 +35,11 @@ fn test_tx_response_empty_size() {
 fn test_tx_response_with_txs_size() {
     let (public_key, secret_key) = gen_keypair();
     let txs = vec![
-        vec![1u8; 8],
-        vec![2u8; 16],
-        vec![3u8; 64],
-        vec![4u8; 256],
-        vec![5u8; 4096],
+        vec![1_u8; 8],
+        vec![2_u8; 16],
+        vec![3_u8; 64],
+        vec![4_u8; 256],
+        vec![5_u8; 4096],
     ];
     let txs_size = txs.iter().fold(0, |acc, tx| acc + tx.len());
     let pb_max_overhead = TX_RES_PB_OVERHEAD_PAYLOAD * txs.len();
