@@ -1145,26 +1145,6 @@ impl Node {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
 
-    fn flush_txs_into_pool(&self) {
-        let tx_cache_size = self.state().tx_cache_len();
-
-        if tx_cache_size == 0 {
-            //No need to do anything.
-            return;
-        }
-
-        let mut blockchain = self.blockchain();
-        let mut fork = blockchain.fork();
-        let mut schema = Schema::new(&fork);
-
-        for tx in self.state().tx_cache().values() {
-            schema.add_transaction_into_pool(tx.clone());
-        }
-
-        self.blockchain().merge(fork.into_patch());
-
-        info!("Flushed {} transactions to persistent pool", tx_cache_size)
-    }
 }
 
 #[cfg(test)]

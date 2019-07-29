@@ -86,7 +86,7 @@ impl NodeHandler {
                     }
                 }
             }
-            ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
+            ExternalMessage::Shutdown => self.handle_shutdown(),
             ExternalMessage::Rebroadcast => self.handle_rebroadcast(),
         }
     }
@@ -130,4 +130,36 @@ impl NodeHandler {
             )
         }
     }
+
+    pub(crate) fn handle_shutdown(&mut self) {
+        // Flush transactions stored in tx_cache to persistent pool.
+        self.flush_txs_into_pool();
+
+        // Continue execution of shutdown.
+        self.execute_later(InternalRequest::Shutdown)
+    }
+
+    fn flush_txs_into_pool(&mut self) {
+        let tx_cache_size = self.state().tx_cache_len();
+
+        if tx_cache_size == 0 {
+            //No need to do anything.
+            trace!("Transaction cache is empty.");
+            return;
+        }
+
+        let fork = self.blockchain.fork();
+        let mut schema = Schema::new(&fork);
+
+        for tx in self.state().tx_cache().values() {
+            schema.add_transaction_into_pool(tx.clone());
+        }
+
+        if self.blockchain.merge(fork.into_patch()).is_ok() {
+            info!("Flushed {} transactions from cache to persistent pool", tx_cache_size)
+        } else {
+            warn!("Failed to flush transactions from cache to persistent pool.")
+        }
+    }
+
 }
