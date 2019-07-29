@@ -34,7 +34,7 @@
 //!
 //! # Examples
 //!
-//! The procedure of creating a new signed message.
+//! The procedure of creating a new signed message is as follows.
 //!
 //! ```
 //! use exonum::{
@@ -45,19 +45,20 @@
 //!
 //! # fn send<T>(_: T) {}
 //! let keypair = crypto::gen_keypair();
-//! // We have some Status message.
+//! // For example, get some `Status` message.
 //! let payload = Status {
 //!     height: Height(15),
 //!     last_hash: Hash::zero(),
 //! };
-//! // With some keypair we can sign it and get trusted status message.
+//! // Sign the message with some keypair to get a trusted "Status" message.
 //! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
-//! // Later we can convert it to a raw signed message and send it by the network.
+//! // Further, convert the trusted message into a raw signed message and send
+//! // it through the network.
 //! let raw_signed_message = signed_payload.into_raw();
 //! send(raw_signed_message);
 //! ```
 //!
-//! The procedure of a signed message verification.
+//! The procedure of verification of a signed message is as follows:
 //!
 //! ```
 //! use exonum::{
@@ -74,12 +75,12 @@
 //! #   };
 //! #   Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
 //! # }
-//! // For example, we have got some signed message.
+//! // Assume you have some signed message.
 //! let raw: SignedMessage = get_signed_message();
-//! // We know that this is one type of `ExonumMessage`, so we can try to
-//! // verify its signature and try to convert it into `ExonumMessage`.
+//! // You know that this is a type of `ExonumMessage`, so you can
+//! // verify its signature and convert it into `ExonumMessage`.
 //! let verified = raw.into_verified::<ExonumMessage>().expect("verification failed");
-//! // And further to look whether it is for example the status message.
+//! // Further, check whether it is a `Status` message.
 //! if let ExonumMessage::Status(ref status) = verified.payload() {
 //!     // ...
 //! }

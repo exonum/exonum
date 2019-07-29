@@ -27,7 +27,7 @@ use crate::{
     proto::schema::consensus,
 };
 
-/// Protobuf based container for the any signed messages.
+/// Protobuf based container for any signed messages.
 ///
 /// See module [documentation](index.html#examples) for examples.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
