@@ -177,7 +177,7 @@ where
     E: Into<ErrorKind>,
 {
     fn from(inner: (E, T)) -> Self {
-        ExecutionError::new(inner.0.into(), inner.1.to_string())
+        Self::new(inner.0.into(), inner.1.to_string())
     }
 }
 
@@ -298,7 +298,7 @@ impl ObjectHash for ExecutionStatus {
     }
 }
 
-/// More convenient serde format for ExecutionResult
+/// More convenient serde layout for the `ExecutionResult`
 mod execution_result {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

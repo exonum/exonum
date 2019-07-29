@@ -130,7 +130,7 @@ impl RustRuntime {
         self
     }
 
-    fn deploy(&mut self, artifact: ArtifactId) -> Result<(), ExecutionError> {
+    fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
         let artifact = self.parse_artifact(&artifact)?;
 
         if self.deployed_artifacts.contains(&artifact) {
@@ -144,6 +144,14 @@ impl RustRuntime {
         trace!("Deployed artifact: {}", artifact);
         self.deployed_artifacts.insert(artifact);
         Ok(())
+    }
+
+    fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
+        if self.deployed_artifacts.contains(&id) {
+            self.available_artifacts.get(&id).map(AsRef::as_ref)
+        } else {
+            None
+        }
     }
 }
 
@@ -170,7 +178,7 @@ impl RustArtifactId {
 
 impl From<RustArtifactId> for ArtifactId {
     fn from(inner: RustArtifactId) -> Self {
-        ArtifactId {
+        Self {
             runtime_id: RustRuntime::ID as u32,
             name: inner.to_string(),
         }
@@ -211,19 +219,13 @@ impl Runtime for RustRuntime {
             // Spec for rust artifacts should be empty.
             return Box::new(future::err(Error::IncorrectArtifactId.into()));
         }
-        Box::new(self.deploy(artifact).into_future())
+        Box::new(self.deploy(&artifact).into_future())
     }
 
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
         let id = self.parse_artifact(id).ok()?;
-
-        if !self.deployed_artifacts.contains(&id) {
-            None
-        } else {
-            self.available_artifacts
-                .get(&id)
-                .map(|service_factory| service_factory.artifact_info())
-        }
+        self.deployed_artifact(&id)
+            .map(ServiceFactory::artifact_info)
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {

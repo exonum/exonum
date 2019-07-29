@@ -218,9 +218,8 @@ fn parse_artifact_id_incorrect_layout() {
             "123:I am a service!",
             "Artifact name contains illegal character",
         ),
-        // cspell:ignore юникоды
         (
-            "123:юникоды!",
+            "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!",
             "Artifact name contains illegal character",
         ),
     ];
@@ -249,9 +248,11 @@ fn test_instance_spec_validate_incorrect() {
             InstanceSpec::new(1, "", "0:my-service/1.0.0"),
             "Service instance name should not be empty",
         ),
-        // cspell:ignore русский сервис
         (
-            InstanceSpec::new(2, "русский_сервис", "0:my-service/1.0.0"),
+            InstanceSpec::new(2,
+                "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
+                "0:my-service/1.0.0"
+            ),
             "Service instance name contains illegal character",
         ),
         (

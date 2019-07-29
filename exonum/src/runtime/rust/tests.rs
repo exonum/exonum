@@ -150,7 +150,7 @@ fn test_basic_rust_runtime() {
     // Deploy service.
     let fork = db.fork();
     dispatcher
-        .deploy_and_register_artifact(&fork, artifact.clone(), Any::default())
+        .deploy_and_register_artifact(&fork, &artifact, Any::default())
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 

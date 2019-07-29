@@ -49,7 +49,7 @@ pub enum RuntimeIdentifier {
 
 impl From<RuntimeIdentifier> for u32 {
     fn from(id: RuntimeIdentifier) -> Self {
-        id as u32
+        id as Self
     }
 }
 

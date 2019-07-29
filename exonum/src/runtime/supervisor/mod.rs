@@ -51,7 +51,7 @@ impl Service for Supervisor {
     }
 
     fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        api::wire(descriptor, builder)
+        api::wire(&descriptor, builder)
     }
 
     fn before_commit(&self, context: TransactionContext) {

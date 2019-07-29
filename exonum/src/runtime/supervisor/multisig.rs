@@ -58,10 +58,10 @@ impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
         buf.into_inner()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut values = BTreeSet::new();
 
-        let mut reader = value.as_ref();
+        let mut reader = bytes.as_ref();
         while !reader.is_empty() {
             let bytes_len = LittleEndian::read_u64(reader) as usize;
             reader = &reader[8..];

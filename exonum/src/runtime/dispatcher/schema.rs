@@ -57,7 +57,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds artifact specification to the set of deployed artifacts.
-    pub(crate) fn add_artifact(&mut self, artifact: ArtifactId, spec: Any) -> Result<(), Error> {
+    pub(crate) fn add_artifact(&mut self, artifact: &ArtifactId, spec: Any) -> Result<(), Error> {
         // Checks that we have not already deployed this artifact.
         if self.artifacts().contains(&artifact.name) {
             return Err(Error::ArtifactAlreadyDeployed);

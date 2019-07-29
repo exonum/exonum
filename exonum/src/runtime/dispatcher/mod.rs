@@ -65,7 +65,7 @@ impl Dispatcher {
     ) -> Self {
         Self {
             runtimes: runtimes.into_iter().collect(),
-            runtime_lookup: Default::default(),
+            runtime_lookup: HashMap::default(),
             modified: None,
         }
     }
@@ -109,7 +109,7 @@ impl Dispatcher {
         // Builtin services should not have an additional specification.
         let artifact_spec = Any::default();
         // Registers service artifact in runtime.
-        self.deploy_and_register_artifact(fork, spec.artifact.clone(), artifact_spec)?;
+        self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
         // Starts builtin service instance.
         self.start_service(
             &ExecutionContext::new(fork, Caller::Blockchain),
@@ -182,7 +182,7 @@ impl Dispatcher {
     pub(crate) fn register_artifact(
         &mut self,
         fork: &Fork,
-        artifact: ArtifactId,
+        artifact: &ArtifactId,
         spec: impl Into<Any>,
     ) -> Result<(), ExecutionError> {
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
@@ -192,7 +192,7 @@ impl Dispatcher {
             artifact
         );
 
-        Schema::new(fork).add_artifact(artifact.clone(), spec.into())?;
+        Schema::new(fork).add_artifact(artifact, spec.into())?;
         info!(
             "Registered artifact {} in runtime with id {}",
             artifact.name, artifact.runtime_id
@@ -203,13 +203,13 @@ impl Dispatcher {
     pub(crate) fn deploy_and_register_artifact(
         &mut self,
         fork: &Fork,
-        artifact: ArtifactId,
+        artifact: &ArtifactId,
         spec: impl Into<Any>,
     ) -> Result<(), ExecutionError> {
         let spec = spec.into();
         self.deploy_artifact(artifact.clone(), spec.clone())
             .wait()?;
-        self.register_artifact(fork, artifact, spec)
+        self.register_artifact(fork, &artifact, spec)
     }
 
     /// Starts and configures a new service instance. After that it writes information about
@@ -316,7 +316,7 @@ impl Dispatcher {
 
     pub(crate) fn after_commit(
         &mut self,
-        snapshot: Box<dyn Snapshot>,
+        snapshot: impl AsRef<dyn Snapshot>,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
@@ -422,7 +422,7 @@ impl Action {
     ) -> Result<(), ExecutionError> {
         match self {
             Action::RegisterArtifact { artifact, spec } => dispatcher
-                .register_artifact(context.fork, artifact, spec)
+                .register_artifact(context.fork, &artifact, spec)
                 .map_err(From::from),
 
             Action::StartService {
@@ -714,10 +714,10 @@ mod tests {
         // Check if we can deploy services.
         let fork = db.fork();
         dispatcher
-            .deploy_and_register_artifact(&fork, sample_rust_spec.clone(), Any::default())
+            .deploy_and_register_artifact(&fork, &sample_rust_spec, Any::default())
             .unwrap();
         dispatcher
-            .deploy_and_register_artifact(&fork, sample_java_spec.clone(), Any::default())
+            .deploy_and_register_artifact(&fork, &sample_java_spec, Any::default())
             .unwrap();
 
         // Check if we can init services.
