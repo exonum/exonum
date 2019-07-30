@@ -30,7 +30,7 @@ This document currently describes only the `exonum` crate.
 ## Storage
 
 Storage module can be found at `components/merkledb`. It provides an abstraction
-over an embedded key-value store: the `Database` trait. The keys and values could
+over an embedded key-value store: the `Database` trait. The keys and values can
 be represented as slices of bytes: `&[u8]`.
 
 To transform raw bytes into native Rust data structures and vice versa, the
@@ -51,7 +51,7 @@ service-specific data.
 
 The format of the block of the Exonum blockchain is described in
 `exonum/src/blockchain/block.rs`. Blocks are stored in the `Database`.
-The schema at `exonum/src/blockchain/schema.rs` describes the indexes used for blocks,
+The schema at `exonum/src/blockchain/schema.rs` describes the indices used for blocks,
 transactions and some other data used by Exonum core.
 
 The heart of the `Blockchain` is `Blockchain::create_patch` method, which, given
