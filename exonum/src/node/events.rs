@@ -132,11 +132,11 @@ impl NodeHandler {
     }
 
     pub(crate) fn handle_shutdown(&mut self) {
+        // Send `Shutdown` to stop event-loop.
+        self.execute_later(InternalRequest::Shutdown);
+
         // Flush transactions stored in tx_cache to persistent pool.
         self.flush_txs_into_pool();
-
-        // Continue execution of shutdown.
-        self.execute_later(InternalRequest::Shutdown)
     }
 
     fn flush_txs_into_pool(&mut self) {
@@ -156,10 +156,12 @@ impl NodeHandler {
         }
 
         if self.blockchain.merge(fork.into_patch()).is_ok() {
-            info!("Flushed {} transactions from cache to persistent pool", tx_cache_size)
+            info!(
+                "Flushed {} transactions from cache to persistent pool",
+                tx_cache_size
+            )
         } else {
             warn!("Failed to flush transactions from cache to persistent pool.")
         }
     }
-
 }

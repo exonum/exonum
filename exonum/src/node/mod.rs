@@ -1144,7 +1144,6 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
-
 }
 
 #[cfg(test)]

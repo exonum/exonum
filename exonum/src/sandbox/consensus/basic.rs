@@ -28,7 +28,7 @@ use crate::sandbox::{
     self,
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
-    timestamping_sandbox,
+    timestamping_sandbox, timestamping_sandbox_builder,
 };
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
@@ -284,8 +284,28 @@ fn test_store_txs_positions() {
 //TODO: write test to check sending transactions to pool after
 //reaching tx_block_limit
 fn tx_cache_with_tx_block_limit() {
-    let sandbox = timestamping_sandbox();
+    let mut rng = thread_rng();
+
+    let sandbox = timestamping_sandbox_builder()
+        .with_consensus(|config| {
+            config.txs_block_limit = 5;
+        })
+        .build();
+
     let sandbox_state = SandboxState::new();
 
+    let generator = TimestampingTxGenerator::with_keypair(
+        DATA_SIZE,
+        gen_keypair_from_seed(&Seed::new([10; SEED_LENGTH])),
+    );
 
+    let num_txs = rng.gen_range(0, 10);
+    let committed_block1 = generator
+        .take(num_txs)
+        .map(|tx| (tx.hash(), tx))
+        .collect::<BTreeMap<_, _>>();
+
+    let hashes =
+        add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
+    sandbox.assert_state(Height(2), Round(1));
 }

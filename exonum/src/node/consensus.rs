@@ -686,19 +686,9 @@ impl NodeHandler {
             if self.state.have_prevote(round) {
                 return;
             }
-            let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
-            let pool = schema.transactions_pool();
-            let pool_len = schema.transactions_pool_len() + self.state.tx_cache_len() as u64;
-
-            info!("LEADER: pool = {}", pool_len);
-
             let round = self.state.round();
-            let max_count = ::std::cmp::min(u64::from(self.txs_block_limit()), pool_len);
 
-            let mut txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
-
-            txs.extend(self.state.tx_cache().keys());
+            let txs = self.get_txs_for_propose();
 
             let propose = self.sign_message(Propose::new(
                 validator_id,
@@ -724,6 +714,35 @@ impl NodeHandler {
                 self.handle_majority_prevotes(round, &hash);
             }
         }
+    }
+
+    fn get_txs_for_propose(&self) -> Vec<Hash> {
+        let tx_cache_len = self.state.tx_cache_len() as u64;
+        let tx_block_limit = self.txs_block_limit();
+
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+        let pool = schema.transactions_pool();
+        let pool_len = schema.transactions_pool_len() + tx_cache_len;
+
+        info!("LEADER: pool = {}", pool_len);
+
+        let remaining_tx_count = tx_block_limit.saturating_sub(tx_cache_len as u32);
+
+        let cache_max_count = ::std::cmp::min(u64::from(self.txs_block_limit()), tx_cache_len);
+
+        let mut cache_txs: Vec<Hash> = self
+            .state
+            .tx_cache()
+            .keys()
+            .take(cache_max_count as usize)
+            .cloned()
+            .collect();
+        let mut txs: Vec<Hash> = pool.iter().take(remaining_tx_count as usize).collect();
+
+        cache_txs.extend(txs);
+
+        cache_txs
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.
