@@ -294,18 +294,17 @@ impl Dispatcher {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
+        let runtime_id = self
+            .runtime_lookup
+            .get(&call_info.instance_id)
+            .ok_or(Error::IncorrectInstanceId)?;
 
-        if runtime_id.is_none() {
-            return Err(Error::IncorrectRuntime.into());
-        }
+        let runtime = self
+            .runtimes
+            .get(&runtime_id)
+            .ok_or(Error::IncorrectRuntime)?;
 
-        if let Some(runtime) = self.runtimes.get(&runtime_id.unwrap()) {
-            runtime.execute(self, context, call_info, payload)?;
-            Ok(())
-        } else {
-            return Err(Error::IncorrectRuntime.into());
-        }
+        runtime.execute(self, context, call_info, payload)
     }
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {

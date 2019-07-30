@@ -12,6 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Transactions runtime.
+//!
+//! The module containing common building blocks for creating runtimes for the Exonum blockchain.
+//! Each `Exonum` transaction is verified instance of [`AnyTx`] message.
+//!
+//! # Transaction life cycle
+//!
+//! 1. An Exonum client creates a transaction message, including [`CallInfo`] information to
+//! find the corresponding handler to execute, serialized transaction parameters as a payload,
+//! and signs the message with the author's key pair.
+//!
+//! 2. The client transmits the message to one of the Exonum nodes in the network.
+//! The transaction is identified by the hash of the corresponding message.
+//!
+//! 3. Node verifies that the transaction has been correctly signed.
+//!
+//! 4. When the validator decides to include transaction in the next block it take the message
+//! from the transaction pool and passes it to the [`Dispatcher`] for execution.
+//!
+//! 5. Dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
+//! by its [`instance_id`]. If the corresponding runtime is been successfully found, the
+//! dispatcher passes the transaction to it for immediate [execution].
+//!
+//! 6. After that the transaction [execution status] writes into blockchain.
+//!
+//! [`AnyTx`]: struct.AnyTx.html
+//! [`CallInfo`]: struct.CallInfo.html
+//! [`Dispatcher`]: dispatcher/struct.Dispatcher.html
+//! [`instance_id`]: struct.CallInfo.html#structfield.instance_id
+//! [`Runtime`]: trait.Runtime.html
+//! [`execution`]: trait.Runtime.html#execute
+//! [execution status]: error/struct.ExecutionStatus.html
+
 pub use self::{
     error::ExecutionError,
     types::{AnyTx, ArtifactId, CallInfo, InstanceSpec, MethodId, ServiceInstanceId},
@@ -39,11 +72,13 @@ use self::dispatcher::{Dispatcher, DispatcherSender};
 
 mod types;
 
-// TODO Replace by more convenient solution [ECR-3222]
+/// List of well known runtimes.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]
 pub enum RuntimeIdentifier {
+    /// Built-in Rust runtime.
     Rust = 0,
+    /// Exonum Java Binding runtime.
     Java = 1,
 }
 

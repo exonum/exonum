@@ -32,4 +32,6 @@ pub enum Error {
     ServiceIdExists = 5,
     /// Specified service does not started.
     ServiceNotStarted = 6,
+    /// Not found a suitable runtime for the given instance id.
+    IncorrectInstanceId = 7,
 }
