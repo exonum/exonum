@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher},
+    runtime::dispatcher::Dispatcher,
 };
 
 mod block;

@@ -30,7 +30,7 @@ pub type MethodId = u32;
 )]
 #[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
-    /// Unique service instance identifier. Dispatcher uses this identifier to find the 
+    /// Unique service instance identifier. Dispatcher uses this identifier to find the
     /// corresponding runtime to execute transaction with this call info.
     pub instance_id: ServiceInstanceId,
     /// Identifier of method in service interface to call.
@@ -64,20 +64,20 @@ impl AnyTx {
     }
 }
 
-/// The artifact identifier is required by the runtime to construct service instances. 
-/// In other words an artifact identifier means same as class name, and a specific service 
+/// The artifact identifier is required by the runtime to construct service instances.
+/// In other words an artifact identifier means same as class name, and a specific service
 /// instance is the class instance.
-/// 
+///
 /// In string representation, the artifact identifier is written as follows:
 ///
-/// `{runtime_id}:{artifact_name}`, where `runtime_id` is well known [runtime identifier], 
+/// `{runtime_id}:{artifact_name}`, where `runtime_id` is well known [runtime identifier],
 /// and `artifact_name` is unique name of artifact.
 /// Artifact name can contains only these characters: `a-zA-Z0-9` and one of `_-./`.
-/// 
+///
 /// [runtime identifier]: enum.RuntimeIdentifier.html
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// # use exonum::runtime::ArtifactId;
 /// # fn main() -> Result<(), failure::Error> {
