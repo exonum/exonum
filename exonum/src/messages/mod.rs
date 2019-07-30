@@ -250,7 +250,7 @@ impl Message {
         signed.into_verified::<ExonumMessage>().map(From::from)
     }
 
-    /// Checks buffer and return instance of `Message`.
+    /// Checks buffer and returns instance of `Message`.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Self, failure::Error> {
         SignedMessage::from_bytes(buffer.into()).and_then(Self::from_signed)
     }
