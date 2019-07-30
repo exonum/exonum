@@ -91,7 +91,7 @@ pub struct SandboxInner {
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
-    pub api_requests_rx: mpsc::UnboundedReceiver<ExternalMessage>,
+    pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl SandboxInner {
@@ -840,7 +840,7 @@ impl Sandbox {
     pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(1);
 
         let address: SocketAddr = self
             .address(ValidatorId(0))
@@ -1071,7 +1071,7 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
-    let api_channel = mpsc::unbounded();
+    let api_channel = mpsc::channel(1);
     let db = TemporaryDB::new();
     let mut blockchain = Blockchain::new(
         db,

@@ -34,7 +34,6 @@ use std::{cmp::Ordering, time::SystemTime};
 use crate::helpers::{Height, Round};
 use crate::messages::Message;
 use crate::node::{ExternalMessage, NodeTimeout};
-use futures::sync::mpsc::UnboundedSender;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
@@ -42,7 +41,6 @@ mod benches;
 mod tests;
 
 pub type SyncSender<T> = Wait<Sender<T>>;
-pub type UnboundedSyncSender<T> = Wait<UnboundedSender<T>>;
 
 /// This kind of events is used to schedule execution in next event-loop ticks
 /// Usable to make flat logic and remove recursions.
@@ -88,7 +86,7 @@ pub struct HandlerPart<H: EventHandler> {
     pub handler: H,
     pub internal_rx: mpsc::Receiver<InternalEvent>,
     pub network_rx: mpsc::Receiver<NetworkEvent>,
-    pub api_rx: mpsc::UnboundedReceiver<ExternalMessage>,
+    pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl<H: EventHandler + 'static> HandlerPart<H> {

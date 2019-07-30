@@ -26,7 +26,7 @@ pub use self::{
 pub mod state;
 
 use failure::Error;
-use futures::{sync::mpsc, Sink};
+use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
@@ -53,7 +53,7 @@ use crate::events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
     HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
-    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest, UnboundedSyncSender,
+    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
 };
 use crate::helpers::{
     config::ConfigManager,
@@ -113,7 +113,7 @@ pub trait SystemStateProvider: ::std::fmt::Debug + Send + 'static {
 
 /// Transactions sender.
 #[derive(Clone)]
-pub struct ApiSender(pub mpsc::UnboundedSender<ExternalMessage>);
+pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
 pub struct NodeHandler {
@@ -369,7 +369,7 @@ pub struct NodeSender {
     /// Network requests sender.
     pub network_requests: SyncSender<NetworkRequest>,
     /// Api requests sender.
-    pub api_requests: UnboundedSyncSender<ExternalMessage>,
+    pub api_requests: SyncSender<ExternalMessage>,
 }
 
 /// Node role.
@@ -805,7 +805,7 @@ impl fmt::Debug for NodeHandler {
 
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
-    pub fn new(inner: mpsc::UnboundedSender<ExternalMessage>) -> Self {
+    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
         ApiSender(inner)
     }
 
@@ -819,7 +819,8 @@ impl ApiSender {
     pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
         self.0
             .clone()
-            .unbounded_send(message)
+            .send(message)
+            .wait()
             .map(drop)
             .map_err(into_failure)
     }
@@ -878,8 +879,8 @@ pub struct NodeChannel {
     ),
     /// Channel for api requests.
     pub api_requests: (
-        mpsc::UnboundedSender<ExternalMessage>,
-        mpsc::UnboundedReceiver<ExternalMessage>,
+        mpsc::Sender<ExternalMessage>,
+        mpsc::Receiver<ExternalMessage>,
     ),
     /// Channel for network events.
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
@@ -904,7 +905,7 @@ impl NodeChannel {
         Self {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
-            api_requests: mpsc::unbounded(), // TODO ECR-3163
+            api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
             internal_events: mpsc::channel(buffer_sizes.internal_events_capacity),
         }
