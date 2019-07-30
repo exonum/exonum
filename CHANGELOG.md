@@ -158,6 +158,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Endpoints `explorer/v1/block` and `explorer/v1/transactions` were extended
   with adding additional fields `service_id` and `time`. (#1386)
 
+- Added `tx_cache` field in `State` to cache incoming transactions before
+  adding them to persistent pool. (#1398)
+
 #### exonum-merkledb
 
 - Updated `ProofMapIndex` data layout. (#1293)
@@ -180,8 +183,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `len` method to `MapIndex` and `ProofMapIndex`. (#1312)
 
 - Added `len` method to `KeySetIndex` and `ValueSetIndex`. (#1319)
-
-- Added `from_patch` method to `Fork`. (#1345)
 
 #### exonum-testkit
 
