@@ -423,7 +423,7 @@ impl TestKit {
         network: TestNetwork,
         genesis: GenesisConfig,
     ) -> Self {
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
         let db = CheckpointDb::new(database);

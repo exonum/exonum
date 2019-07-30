@@ -840,7 +840,7 @@ impl Sandbox {
     pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::channel(100);
 
         let address: SocketAddr = self
             .address(ValidatorId(0))
@@ -1071,7 +1071,7 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
-    let api_channel = mpsc::channel(1);
+    let api_channel = mpsc::channel(100);
     let db = TemporaryDB::new();
     let mut blockchain = Blockchain::new(
         db,

@@ -127,7 +127,7 @@ pub fn create_blockchain() -> Blockchain {
     let (consensus_key, _) = consensus_keys();
     let service_keys = crypto::gen_keypair();
 
-    let api_channel = mpsc::channel(1);
+    let api_channel = mpsc::channel(10);
     let mut blockchain = Blockchain::new(
         TemporaryDB::new(),
         vec![MyService.into()],
