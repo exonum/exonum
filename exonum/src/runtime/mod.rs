@@ -15,27 +15,6 @@
 //! Transactions runtime.
 //!
 //! The module containing common building blocks for creating runtimes for the Exonum blockchain.
-//! Each `Exonum` transaction is verified instance of [`AnyTx`] message.
-//!
-//! # Transaction life cycle
-//!
-//! 1. An Exonum client creates a transaction message, including [`CallInfo`] information to
-//! find the corresponding handler to execute, serialized transaction parameters as a payload,
-//! and signs the message with the author's key pair.
-//!
-//! 2. The client transmits the message to one of the Exonum nodes in the network.
-//! The transaction is identified by the hash of the corresponding message.
-//!
-//! 3. Node verifies that the transaction has been correctly signed.
-//!
-//! 4. When the validator decides to include transaction in the next block it takes the message
-//! from the transaction pool and passes it to the [`Dispatcher`] for execution.
-//!
-//! 5. Dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
-//! by its [`instance_id`]. If the corresponding runtime is successfully found, the
-//! dispatcher passes the transaction to it for immediate [execution].
-//!
-//! 6. After that the transaction [execution status] writes into blockchain.
 //! 
 //! Each runtime contains specific services to execute transactions, process events,
 //! and provide user APIs, e.t.c. There is a unified dispatcher that redirects all calls
@@ -63,6 +42,27 @@
 //! 
 //! 5. // TODO stop instance procedure.
 //! 
+//! Each `Exonum` transaction is verified instance of [`AnyTx`] message.
+//!
+//! # Transaction life cycle
+//!
+//! 1. An Exonum client creates a transaction message, including [`CallInfo`] information to
+//! find the corresponding handler to execute, serialized transaction parameters as a payload,
+//! and signs the message with the author's key pair.
+//!
+//! 2. The client transmits the message to one of the Exonum nodes in the network.
+//! The transaction is identified by the hash of the corresponding message.
+//!
+//! 3. Node verifies that the transaction has been correctly signed.
+//!
+//! 4. When the validator decides to include transaction in the next block it takes the message
+//! from the transaction pool and passes it to the [`Dispatcher`] for execution.
+//!
+//! 5. Dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
+//! by its [`instance_id`]. If the corresponding runtime is successfully found, the
+//! dispatcher passes the transaction to it for immediate [execution].
+//!
+//! 6. After that the transaction [execution status] writes into blockchain.
 //! 
 //!
 //! [`AnyTx`]: struct.AnyTx.html
