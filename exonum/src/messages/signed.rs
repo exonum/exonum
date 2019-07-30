@@ -29,7 +29,7 @@ impl SignedMessage {
     pub fn new(payload: impl BinaryValue, author: PublicKey, secret_key: &SecretKey) -> Self {
         let payload = payload.into_bytes();
         let signature = crypto::sign(payload.as_ref(), secret_key);
-        SignedMessage {
+        Self {
             payload,
             author,
             signature,
@@ -68,6 +68,8 @@ impl_serde_hex_for_binary_value! { SignedMessage }
 ///
 /// Be careful with `BinaryValue::from_bytes` method!
 /// It for performance reasons skips signature verification.
+///
+/// See module [documentation](index.html#examples) for examples.
 #[derive(Clone, Debug)]
 pub struct Verified<T> {
     pub(super) raw: SignedMessage,
@@ -75,7 +77,7 @@ pub struct Verified<T> {
 }
 
 impl<T> PartialEq for Verified<T> {
-    fn eq(&self, other: &Verified<T>) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.raw.eq(&other.raw)
     }
 }
