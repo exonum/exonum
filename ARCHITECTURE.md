@@ -29,17 +29,17 @@ This document currently describes only the `exonum` crate.
 
 ## Storage
 
-Storage module can be found at `components/merkledb`. It provides an abstraction 
+Storage module can be found at `components/merkledb`. It provides an abstraction
 over an embedded key-value store: the `Database` trait. The keys and values could
 be represented as slices of bytes: `&[u8]`.
 
-To transform raw bytes into native Rust data structures and vice versa, the 
+To transform raw bytes into native Rust data structures and vice versa, the
 `BinaryKey`, `BinaryValue` and `ProtobufConvert` traits are used.
 
 On top of raw storage, collections like sets, lists and maps are provided: see
-various `*Index` structs. Of particular interest are 
-`components/merkledb/src/proof_map_index` and 
-`components/merkledb/src/proof_list_index` modules, which provide 
+various `*Index` structs. Of particular interest are
+`components/merkledb/src/proof_map_index` and
+`components/merkledb/src/proof_list_index` modules, which provide
 Merkelized collections, capable of providing compact proofs for search queries.
 
 Note that indexes are used both by the Exonum core and by the services. The core
@@ -50,7 +50,7 @@ service-specific data.
 ## Blockchain
 
 The format of the block of the Exonum blockchain is described in
-`exonum/src/blockchain/block.rs`. Blocks are stored in the `Database`. 
+`exonum/src/blockchain/block.rs`. Blocks are stored in the `Database`.
 The schema at `exonum/src/blockchain/schema.rs` describes the indexes used for blocks,
 transactions and some other data used by Exonum core.
 
@@ -74,7 +74,7 @@ the `exonum/src/messages/protocol.rs` module.
 
 `Node` is also responsible for starting an HTTP API server. The API is assembled
 from the built-in part, specified in `exonum/src/api` and parts, provided by each
-service. The entry point of API construction is a `create_app` function of 
+service. The entry point of API construction is a `create_app` function of
 `exonum/src/api/backend/actix.rs` module.
 
 ## Configuration
