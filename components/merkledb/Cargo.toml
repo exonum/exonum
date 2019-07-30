@@ -40,7 +40,7 @@ rand = "0.6.5"
 proptest = "0.9"
 modifier = "0.1"
 pretty_assertions = "0.6"
-url = "1.7.2"
+url = "2.0.0"
 
 [[bench]]
 name = "criterion"
