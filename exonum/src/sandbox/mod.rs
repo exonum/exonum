@@ -946,15 +946,6 @@ impl Sandbox {
     fn update_config(&self, config: StoredConfiguration) {
         self.inner.borrow_mut().handler.state.update_config(config);
     }
-
-    fn remove_tx_from_cache(&self, hash: &Hash) {
-        self.inner
-            .borrow_mut()
-            .handler
-            .state
-            .tx_cache_mut()
-            .remove(hash);
-    }
 }
 
 impl Drop for Sandbox {

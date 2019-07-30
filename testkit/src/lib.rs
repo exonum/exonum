@@ -663,13 +663,11 @@ impl TestKit {
             .collect();
 
         let guard = self.processing_lock.lock().unwrap();
-        // TODO: add tx_block_limit
         self.blockchain
             .commit(
                 &patch,
                 block_hash,
                 precommits.into_iter(),
-                1,
                 &mut BTreeMap::new(),
             )
             .unwrap();

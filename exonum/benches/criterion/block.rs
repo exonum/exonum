@@ -52,7 +52,7 @@ use futures::sync::mpsc;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempdir::TempDir;
 
-use std::iter;
+use std::{collections::BTreeMap, iter};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -106,7 +106,12 @@ fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Bloc
 }
 
 fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, Patch) {
-    blockchain.create_patch(ValidatorId::zero(), Height(height), txs)
+    blockchain.create_patch(
+        ValidatorId::zero(),
+        Height(height),
+        txs,
+        &mut BTreeMap::new(),
+    )
 }
 
 mod timestamping {
@@ -473,9 +478,8 @@ fn prepare_blockchain(
         let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
         // precommits in any way (they are checked beforehand by the consensus algorithm).
-        // TODO: add tx_block_limit
         blockchain
-            .commit(&patch, block_hash, iter::empty(), 1, &mut Vec::new())
+            .commit(&patch, block_hash, iter::empty(), &mut BTreeMap::new())
             .unwrap();
     }
 }

@@ -475,8 +475,6 @@ impl NodeHandler {
     ) {
         trace!("COMMIT {:?}", block_hash);
 
-        let txs_block_limit = self.state.config().consensus.txs_block_limit;
-
         // Merge changes into storage
         let (committed_txs, proposer) = {
             // FIXME: Avoid of clone here. (ECR-171)
@@ -486,7 +484,6 @@ impl NodeHandler {
                     &block_state.patch(),
                     block_hash,
                     precommits,
-                    txs_block_limit,
                     self.state.tx_cache_mut(),
                 )
                 .unwrap();
@@ -728,8 +725,7 @@ impl NodeHandler {
         info!("LEADER: pool = {}", pool_len);
 
         let remaining_tx_count = tx_block_limit.saturating_sub(tx_cache_len as u32);
-
-        let cache_max_count = ::std::cmp::min(u64::from(self.txs_block_limit()), tx_cache_len);
+        let cache_max_count = ::std::cmp::min(u64::from(tx_block_limit), tx_cache_len);
 
         let mut cache_txs: Vec<Hash> = self
             .state
@@ -738,10 +734,9 @@ impl NodeHandler {
             .take(cache_max_count as usize)
             .cloned()
             .collect();
-        let mut txs: Vec<Hash> = pool.iter().take(remaining_tx_count as usize).collect();
+        let pool_txs: Vec<Hash> = pool.iter().take(remaining_tx_count as usize).collect();
 
-        cache_txs.extend(txs);
-
+        cache_txs.extend(pool_txs);
         cache_txs
     }
 

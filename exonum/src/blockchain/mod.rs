@@ -466,7 +466,6 @@ impl Blockchain {
         patch: &Patch,
         block_hash: Hash,
         precommits: I,
-        tx_block_limit: u32,
         tx_cache: &mut BTreeMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error>
     where
@@ -487,15 +486,7 @@ impl Blockchain {
                 // cleared when a new height is achieved.
                 schema.consensus_messages_cache().clear();
                 let txs_in_block = schema.last_block().tx_count();
-                let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
 
-                //TODO: revert to txs_count from pool
-
-                let tx_cache_len = tx_cache.len() as u64;
-                // debug_assert!(txs_count >= u64::from(txs_in_block));
-
-                // let tx_pool_len = txs_count - u64::from(txs_in_block);
-                // schema.transactions_pool_len_index().set(tx_pool_len);
                 schema.update_transaction_count(u64::from(txs_in_block));
 
                 let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();

@@ -465,11 +465,15 @@ where
 
     /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx: Signed<RawTransaction>) {
-        //TODO: remove
         if !self.transactions().contains(hash) {
             self.transactions().put(hash, tx)
         }
-        self.transactions_pool().remove(hash);
+
+        if self.transactions_pool().contains(hash) {
+            self.transactions_pool().remove(hash);
+            let txs_pool_len = self.transactions_pool_len_index().get().unwrap();
+            self.transactions_pool_len_index().set(txs_pool_len - 1);
+        }
     }
 
     /// Updates transaction count of the blockchain.
@@ -520,8 +524,8 @@ where
 /// to return it from transactions cache.
 pub fn get_tx<T: IndexAccess>(
     hash: &Hash,
-    pool: &MapIndex<T, Hash, Signed<RawTransaction>>,
+    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
     tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
 ) -> Option<Signed<RawTransaction>> {
-    pool.get(&hash).or(tx_cache.get(&hash).map(|tx| tx.clone()))
+    txs.get(&hash).or_else(|| tx_cache.get(&hash).cloned())
 }
