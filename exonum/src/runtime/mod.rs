@@ -36,6 +36,34 @@
 //! dispatcher passes the transaction to it for immediate [execution].
 //!
 //! 6. After that the transaction [execution status] writes into blockchain.
+//! 
+//! Each runtime contains specific services to execute transactions, process events,
+//! and provide user APIs, e.t.c. There is a unified dispatcher that redirects all calls
+//! and requests to the appropriate runtime environment. Thus, users work with it, and not 
+//! with a specific runtimes.
+//! 
+//! # Service life cycle
+//! 
+//! 1. Each runtime has own [artifacts] registry from which users can deploy them. The artifact
+//! identifier is required by the runtime to construct service instances. In other words,
+//! an artifact identifier means same as class name, and a specific service instance is
+//! the class instance.
+//! 
+//! 2. Each validator should request the dispatcher to deploy an artifact and send confirmation 
+//! if this request is successful. Then, if the number of confirmations is equal to the total 
+//! number of validators, each validator calls the dispatcher to register the artifact as deployed.
+//! After that validators can send requests to start new services instances from this artifact.
+//! 
+//! 3. To start a new service instance, each validator should send request to dispatcher. 
+//! Each request contains the artifact identifier, instance name, and instance configuration parameters.
+//! Then, as in the previous case, if the number of confirmations is equal to the total number of validators,
+//! each validator calls dispatcher to start a new service instance.
+//! 
+//! 4. // TODO modify instance configuration procedure.
+//! 
+//! 5. // TODO stop instance procedure.
+//! 
+//! 
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
@@ -44,6 +72,8 @@
 //! [`Runtime`]: trait.Runtime.html
 //! [`execution`]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
+//! [artifacts]: struct.ArtifactId.html
+//! 
 
 pub use self::{
     error::ExecutionError,
