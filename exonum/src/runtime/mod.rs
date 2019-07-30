@@ -28,11 +28,11 @@
 //!
 //! 3. Node verifies that the transaction has been correctly signed.
 //!
-//! 4. When the validator decides to include transaction in the next block it take the message
+//! 4. When the validator decides to include transaction in the next block it takes the message
 //! from the transaction pool and passes it to the [`Dispatcher`] for execution.
 //!
 //! 5. Dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
-//! by its [`instance_id`]. If the corresponding runtime is been successfully found, the
+//! by its [`instance_id`]. If the corresponding runtime is successfully found, the
 //! dispatcher passes the transaction to it for immediate [execution].
 //!
 //! 6. After that the transaction [execution status] writes into blockchain.
