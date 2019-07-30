@@ -27,6 +27,7 @@ use crate::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
         InstanceSpec, Runtime, ServiceInstanceId,
+        supervisor::Supervisor
     },
 };
 
@@ -55,7 +56,18 @@ impl BlockchainBuilder {
         }
     }
 
-    pub fn with_rust_runtime(
+    pub fn with_default_runtime(self, services: impl IntoIterator<Item = InstanceCollection>) -> Self {
+        // Adds builtin supervisor service.
+        let mut services = services.into_iter().collect::<Vec<_>>();
+        services.push(InstanceCollection::new(Supervisor).with_instance(
+            Supervisor::BUILTIN_ID,
+            Supervisor::BUILTIN_NAME,
+            (),
+        ));
+        self.with_rust_runtime(services)
+    }
+
+    pub(crate) fn with_rust_runtime(
         mut self,
         services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {

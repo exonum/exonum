@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, supervisor::Supervisor},
+    runtime::{dispatcher::Dispatcher},
 };
 
 mod block;
@@ -87,16 +87,8 @@ impl Blockchain {
         api_sender: ApiSender,
         internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        let mut services = services.into_iter().collect::<Vec<_>>();
-        // Adds builtin supervisor service.
-        services.push(InstanceCollection::new(Supervisor).with_instance(
-            Supervisor::BUILTIN_ID,
-            Supervisor::BUILTIN_NAME,
-            (),
-        ));
-
         BlockchainBuilder::new(database, config, service_keypair)
-            .with_rust_runtime(services)
+            .with_default_runtime(services)
             .finalize(api_sender, internal_requests)
             .expect("Unable to create blockchain instance")
     }

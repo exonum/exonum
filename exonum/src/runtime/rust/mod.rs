@@ -19,7 +19,7 @@ pub use self::{
         TransactionContext,
     },
 };
-pub use super::{dispatcher, error::ErrorKind, ArtifactInfo, CallInfo, ServiceInstanceId};
+pub use super::{error::ErrorKind, ArtifactInfo, CallInfo, ServiceInstanceId};
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
@@ -39,8 +39,10 @@ use crate::{
 };
 
 use super::{
-    dispatcher::DispatcherSender, error::ExecutionError, ArtifactId, Caller, ExecutionContext,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    dispatcher::{self, DispatcherSender},
+    error::ExecutionError,
+    ArtifactId, Caller, ExecutionContext, InstanceSpec, Runtime, RuntimeIdentifier,
+    StateHashAggregator,
 };
 
 pub mod error;

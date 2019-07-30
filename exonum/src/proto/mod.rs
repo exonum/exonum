@@ -70,7 +70,7 @@ pub use self::schema::{
     runtime::{AnyTx, CallInfo},
 };
 
-use std::borrow::Cow;
+use std::{borrow::Cow, convert::TryFrom};
 
 pub mod schema;
 
@@ -473,6 +473,8 @@ impl From<well_known_types::Any> for Any {
     }
 }
 
+// TODO implement conversions for the other well known types [ECR-3222]
+
 impl From<()> for Any {
     fn from(_: ()) -> Self {
         let v = well_known_types::Empty::new();
@@ -493,6 +495,24 @@ impl From<Vec<u8>> for Any {
         let mut v = well_known_types::BytesValue::new();
         v.set_value(s);
         Self::from_pb_message(v)
+    }
+}
+
+impl From<u64> for Any {
+    fn from(s: u64) -> Self {
+        let mut v = well_known_types::UInt64Value::new();
+        v.set_value(s);
+        Self::from_pb_message(v)
+    }
+}
+
+impl TryFrom<Any> for u64 {
+    type Error = failure::Error;
+
+    fn try_from(value: Any) -> Result<Self, Self::Error> {
+        let mut v = well_known_types::UInt64Value::new();
+        v.merge_from_bytes(&value.0.value)?;
+        Ok(v.value)
     }
 }
 
