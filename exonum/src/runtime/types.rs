@@ -48,17 +48,17 @@ impl CallInfo {
 }
 
 /// Transaction with information to call.
-/// 
+///
 /// # Examples
-/// 
+///
 /// Creating a new signed transaction.
 /// ```
 /// use exonum::{
 ///     crypto,
 ///     messages::Verified,
 ///     runtime::{AnyTx, CallInfo},
-/// }; 
-/// 
+/// };
+///
 /// let keypair = crypto::gen_keypair();
 /// let transaction = Verified::from_value(
 ///     AnyTx {

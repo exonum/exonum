@@ -136,7 +136,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     pub fn tx_hash(&self) -> Hash {
-        self.runtime_context.caller.transaction_id().unwrap()
+        self.runtime_context.caller.transaction_hash().unwrap()
     }
 
     pub fn author(&self) -> PublicKey {

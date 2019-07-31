@@ -187,8 +187,13 @@ where
     }
 }
 
+/// Useful artifact information for Exonum clients.
 #[derive(Debug, PartialEq)]
 pub struct ArtifactInfo<'a> {
+    /// List of protobuf files that make up the service interface, first element in tuple
+    /// is the file name, second is its content.
+    ///
+    /// The common interface entry point is always in `service.proto` file.
     pub proto_sources: &'a [(&'a str, &'a str)],
 }
 
@@ -203,24 +208,39 @@ impl<'a> Default for ArtifactInfo<'a> {
     }
 }
 
+/// An accessory structure that aggregates root objects hashes of runtime service
+/// information schemas with the root hash of runtime information schema itself.
 #[derive(Debug, PartialEq, Default)]
 pub struct StateHashAggregator {
+    /// List of hashes of the root objects of runtime information schemas.
     pub runtime: Vec<Hash>,
+    /// List of hashes of the root objects of service instances schemas.
     pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
 }
 
+/// The one who causes the transaction execution.
 #[derive(Debug, PartialEq)]
 pub enum Caller {
-    Transaction { hash: Hash, author: PublicKey },
+    /// A usual transaction from Exonum client, authorized by his key pair.
+    Transaction {
+        /// The transaction hash that is used as the identifier.
+        hash: Hash,
+        /// Public key of the user who signed this transaction.
+        author: PublicKey,
+    },
+    // This transaction is invoked on behalf of the blockchain itself,
+    // for example [`before_commit`](trait.Runtime#before_commit) event.
     Blockchain,
 }
 
 impl Caller {
+    /// Returns the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
         self.as_transaction().map(|(_hash, author)| *author)
     }
 
-    pub fn transaction_id(&self) -> Option<Hash> {
+    /// Returns transaction hash, if it exists.
+    pub fn transaction_hash(&self) -> Option<Hash> {
         self.as_transaction().map(|(hash, _)| *hash)
     }
 
