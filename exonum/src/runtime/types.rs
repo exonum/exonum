@@ -48,6 +48,33 @@ impl CallInfo {
 }
 
 /// Transaction with information to call.
+/// 
+/// # Examples
+/// 
+/// Creating a new signed transaction.
+/// ```
+/// use exonum::{
+///     crypto,
+///     messages::Verified,
+///     runtime::{AnyTx, CallInfo},
+/// }; 
+/// 
+/// let keypair = crypto::gen_keypair();
+/// let transaction = Verified::from_value(
+///     AnyTx {
+///         call_info: CallInfo {
+///             // Service instance which we want to call.
+///             instance_id: 1024,
+///             // Concrete method of the service interface.
+///             method_id: 0,
+///         },
+///         // Transaction payload.
+///         payload: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()
+///     },
+///     keypair.0,
+///     &keypair.1
+/// );
+/// ```
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::AnyTx", crate = "crate")]
 pub struct AnyTx {
