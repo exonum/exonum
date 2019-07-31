@@ -24,7 +24,6 @@ use crate::{
     messages::{Connect, Message, Precommit, RawTransaction, Signed},
     proto,
 };
-use std::collections::BTreeMap;
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -518,23 +517,4 @@ where
     fn next_height(&self) -> Height {
         Height(self.block_hashes_by_height().len())
     }
-}
-
-/// Return transaction from persistent pool. If transaction is not present in pool, try
-/// to return it from transactions cache.
-pub fn get_tx<T: IndexAccess>(
-    hash: &Hash,
-    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
-    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
-) -> Option<Signed<RawTransaction>> {
-    txs.get(&hash).or_else(|| tx_cache.get(&hash).cloned())
-}
-
-/// Checks that transaction exists in the persistent pool or in the transaction cache.
-pub fn check_tx<T: IndexAccess>(
-    hash: &Hash,
-    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
-    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
-) -> bool {
-    txs.contains(&hash) || tx_cache.contains_key(&hash)
 }

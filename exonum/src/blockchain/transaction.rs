@@ -696,7 +696,7 @@ mod tests {
 
     fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::channel(0);
         Blockchain::new(
             TemporaryDB::new(),
             vec![Box::new(TxResultService) as Box<dyn Service>],

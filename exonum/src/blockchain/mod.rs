@@ -35,7 +35,7 @@ pub use self::{
     block::{Block, BlockProof},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
-    schema::{check_tx, get_tx, Schema, TxLocation},
+    schema::{Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
         ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
@@ -58,7 +58,7 @@ use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use crate::node::ApiSender;
 use exonum_merkledb::{
-    self, Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch,
+    self, Database, Error as StorageError, Fork, IndexAccess, MapIndex, ObjectHash, Patch,
     Result as StorageResult, Snapshot,
 };
 
@@ -593,4 +593,23 @@ impl Clone for Blockchain {
             service_keypair: self.service_keypair.clone(),
         }
     }
+}
+
+/// Return transaction from persistent pool. If transaction is not present in pool, try
+/// to return it from transactions cache.
+pub(crate) fn get_tx<T: IndexAccess>(
+    hash: &Hash,
+    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
+    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
+) -> Option<Signed<RawTransaction>> {
+    txs.get(&hash).or_else(|| tx_cache.get(&hash).cloned())
+}
+
+/// Checks that transaction exists in the persistent pool or in the transaction cache.
+pub(crate) fn check_tx<T: IndexAccess>(
+    hash: &Hash,
+    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
+    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
+) -> bool {
+    txs.contains(&hash) || tx_cache.contains_key(&hash)
 }
