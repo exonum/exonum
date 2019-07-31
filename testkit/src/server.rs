@@ -165,8 +165,9 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::rust::{
-            ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+        runtime::{
+            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+            ArtifactInfo,
         },
     };
     use exonum_merkledb::ObjectHash;

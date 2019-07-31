@@ -103,11 +103,8 @@ mod timestamping {
         crypto::Hash,
         messages::Verified,
         runtime::{
-            rust::{
-                ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction,
-                TransactionContext,
-            },
-            AnyTx, ServiceInstanceId,
+            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+            AnyTx, ArtifactInfo, ServiceInstanceId,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -206,11 +203,8 @@ mod cryptocurrency {
         crypto::PublicKey,
         messages::Verified,
         runtime::{
-            rust::{
-                ArtifactInfo, ErrorKind, RustArtifactId, Service, ServiceFactory, Transaction,
-                TransactionContext,
-            },
-            AnyTx, ServiceInstanceId,
+            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+            AnyTx, ArtifactInfo, ErrorKind, ServiceInstanceId,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};

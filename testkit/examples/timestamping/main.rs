@@ -23,8 +23,9 @@ use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{ExecutionError, Schema},
     crypto::gen_keypair,
-    runtime::rust::{
-        ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+    runtime::{
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        ArtifactInfo,
     },
 };
 use exonum_merkledb::ObjectHash;

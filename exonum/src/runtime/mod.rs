@@ -78,7 +78,7 @@
 //!
 
 pub use self::{
-    error::ExecutionError,
+    error::{ErrorKind, ExecutionError},
     types::{AnyTx, ArtifactId, CallInfo, InstanceSpec, MethodId, ServiceInstanceId},
 };
 
