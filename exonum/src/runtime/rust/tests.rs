@@ -168,11 +168,8 @@ fn test_basic_rust_runtime() {
         .into();
 
         let fork = db.fork();
-        let context = ExecutionContext::new(&fork, Caller::Blockchain);
 
-        dispatcher
-            .start_service(&context, spec, constructor)
-            .unwrap();
+        dispatcher.start_service(&fork, spec, constructor).unwrap();
         {
             let entry = Entry::new("constructor_entry", &fork);
             assert_eq!(entry.get(), Some("constructor_message".to_owned()));

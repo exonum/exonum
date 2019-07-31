@@ -111,11 +111,7 @@ impl Dispatcher {
         // Registers service artifact in runtime.
         self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
         // Starts builtin service instance.
-        self.start_service(
-            &ExecutionContext::new(fork, Caller::Blockchain),
-            spec,
-            constructor,
-        )
+        self.start_service(fork, spec, constructor)
     }
 
     pub(crate) fn state_hash(
@@ -220,7 +216,7 @@ impl Dispatcher {
     /// * If instance spec contains invalid service name.
     pub(crate) fn start_service(
         &mut self,
-        context: &ExecutionContext,
+        fork: &Fork,
         spec: InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
@@ -238,22 +234,20 @@ impl Dispatcher {
             .and_then(|runtime| {
                 runtime.start_service(&spec)?;
                 // Tries to configure a started instance of the service, otherwise it stops.
-                Self::configure_service(runtime.as_ref(), context, &spec, constructor).map_err(
-                    |e| {
-                        error!(
-                            "An error occurred while configuring the service {}: {}",
-                            spec.name, e
-                        );
-                        if let Err(e) = runtime.stop_service(&spec) {
-                            panic!(FatalError::new(e.to_string()))
-                        }
-                        e
-                    },
-                )
+                Self::configure_service(runtime.as_ref(), fork, &spec, constructor).map_err(|e| {
+                    error!(
+                        "An error occurred while configuring the service {}: {}",
+                        spec.name, e
+                    );
+                    if let Err(e) = runtime.stop_service(&spec) {
+                        panic!(FatalError::new(e.to_string()))
+                    }
+                    e
+                })
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
-        Schema::new(context.fork).add_service_instance(spec)?;
+        Schema::new(fork).add_service_instance(spec)?;
         Ok(())
     }
 
@@ -278,7 +272,7 @@ impl Dispatcher {
         let is_modified = !actions.is_empty();
         // Executes pending dispatcher actions.
         for action in actions {
-            action.execute(self, &context)?;
+            action.execute(self, fork)?;
         }
 
         if is_modified {
@@ -341,12 +335,12 @@ impl Dispatcher {
     // Tries to configure a started instance of the service and catches panic if occurred.
     pub(crate) fn configure_service(
         runtime: &(dyn Runtime + 'static),
-        context: &ExecutionContext,
+        fork: &Fork,
         spec: &InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
         let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            runtime.configure_service(context.fork, &spec, constructor)
+            runtime.configure_service(fork, &spec, constructor)
         }));
 
         match result {
@@ -414,14 +408,10 @@ pub(crate) enum Action {
 }
 
 impl Action {
-    fn execute(
-        self,
-        dispatcher: &mut Dispatcher,
-        context: &ExecutionContext,
-    ) -> Result<(), ExecutionError> {
+    fn execute(self, dispatcher: &mut Dispatcher, fork: &Fork) -> Result<(), ExecutionError> {
         match self {
             Action::RegisterArtifact { artifact, spec } => dispatcher
-                .register_artifact(context.fork, &artifact, spec)
+                .register_artifact(fork, &artifact, spec)
                 .map_err(From::from),
 
             Action::StartService {
@@ -430,11 +420,11 @@ impl Action {
                 config,
             } => dispatcher
                 .start_service(
-                    context,
+                    fork,
                     InstanceSpec {
                         artifact,
                         name: instance_name,
-                        id: Schema::new(context.fork).assign_instance_id(),
+                        id: Schema::new(fork).assign_instance_id(),
                     },
                     config,
                 )
@@ -720,10 +710,9 @@ mod tests {
             .unwrap();
 
         // Check if we can init services.
-        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher
             .start_service(
-                &context,
+                &fork,
                 InstanceSpec {
                     artifact: sample_rust_spec.clone(),
                     id: RUST_SERVICE_ID,
@@ -734,7 +723,7 @@ mod tests {
             .expect("start_service failed for rust");
         dispatcher
             .start_service(
-                &context,
+                &fork,
                 InstanceSpec {
                     artifact: sample_java_spec.clone(),
                     id: JAVA_SERVICE_ID,
@@ -747,6 +736,7 @@ mod tests {
         // Check if we can execute transactions.
         let tx_payload = [0x00_u8; 1];
 
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher
             .call(
                 &mut context,
@@ -807,12 +797,11 @@ mod tests {
 
         // Checks if we can start services.
         let fork = db.fork();
-        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
 
         assert_eq!(
             dispatcher
                 .start_service(
-                    &context,
+                    &fork,
                     InstanceSpec {
                         artifact: sample_rust_spec.clone(),
                         id: RUST_SERVICE_ID,
@@ -827,6 +816,7 @@ mod tests {
         // Check if we can execute transactions.
         let tx_payload = [0x00_u8; 1];
 
+        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
         dispatcher
             .call(
                 &mut context,
