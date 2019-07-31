@@ -75,7 +75,7 @@ impl Wallet {
 
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
-pub struct CurrencySchema<S> {
+pub struct CurrencySchema<S: IndexAccess> {
     view: S,
 }
 
@@ -134,9 +134,8 @@ pub trait CurrencyInterface {
 impl CurrencyInterface for CurrencyService {
     fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> Result<(), Error> {
         let author = context.author();
-        let view = context.fork();
-        let height = CoreSchema::new(view).height();
-        let schema = CurrencySchema { view };
+        let height = CoreSchema::new(context.fork()).height();
+        let schema = CurrencySchema::new(context.fork());
         if schema.wallet(&author).is_none() {
             let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE, height.0);
             schema.wallets().put(&author, wallet);
@@ -150,7 +149,7 @@ impl CurrencyInterface for CurrencyService {
             Err(Error::Foo)?;
         }
         let view = context.fork();
-        let height = CoreSchema::new(view).height();
+        let height = CoreSchema::new(view.clone()).height();
         let schema = CurrencySchema { view };
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&arg.to);

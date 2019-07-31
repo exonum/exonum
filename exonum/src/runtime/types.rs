@@ -99,6 +99,7 @@ impl AnyTx {
 ///
 /// `{runtime_id}:{artifact_name}`, where `runtime_id` is well known [runtime identifier],
 /// and `artifact_name` is unique name of artifact.
+///
 /// Artifact name can contains only these characters: `a-zA-Z0-9` and one of `_-./`.
 ///
 /// [runtime identifier]: enum.RuntimeIdentifier.html
@@ -202,12 +203,18 @@ impl FromStr for ArtifactId {
     }
 }
 
+/// Exhaustive service instance specification.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
+    /// Unique service instance identifier.
     pub id: ServiceInstanceId,
-    pub artifact: ArtifactId,
+    /// Unique service instance name.
+    ///
+    /// It should contains only these characters: `a-zA-Z0-9` and one of `_-./`.
     pub name: String,
+    /// Identifier of the corresponding artifact.
+    pub artifact: ArtifactId,
 }
 
 impl InstanceSpec {

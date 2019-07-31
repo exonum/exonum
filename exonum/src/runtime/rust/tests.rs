@@ -70,7 +70,7 @@ pub struct TestServiceImpl;
 impl TestService for TestServiceImpl {
     fn method_a(&self, mut context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
         {
-            let fork = context.fork() as &Fork;
+            let fork = context.fork();
             let mut entry = Entry::new("method_a_entry", fork);
             entry.set(arg.value);
         }
@@ -89,7 +89,7 @@ impl TestService for TestServiceImpl {
     }
 
     fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
-        let fork = context.fork() as &Fork;
+        let fork = context.fork();
         let mut entry = Entry::new("method_b_entry", fork);
         entry.set(arg.value);
         Ok(())

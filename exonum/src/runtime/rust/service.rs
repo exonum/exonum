@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, IndexAccess, Snapshot};
 use failure::Error;
 
 use std::fmt::{self, Debug};
@@ -131,7 +131,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
             .map(|id| ValidatorId(id as u16))
     }
 
-    pub fn fork(&self) -> &Fork {
+    pub fn fork(&self) -> impl IndexAccess + 'b {
         self.runtime_context.fork
     }
 

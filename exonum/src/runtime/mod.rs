@@ -253,15 +253,19 @@ impl Caller {
     }
 }
 
+/// Provides the current state of the blockchain and caller information for the transaction
+/// which being executed.
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
+    /// Reference of the actual state of the blockchain with new uncommitted changes.
     pub fork: &'a Fork,
+    /// The one who causes the transaction execution.
     pub caller: Caller,
     actions: Vec<dispatcher::Action>,
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub fn new(fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,

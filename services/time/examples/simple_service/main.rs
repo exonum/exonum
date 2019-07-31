@@ -112,11 +112,12 @@ struct MarkerService;
 impl MarkerInterface for MarkerService {
     fn mark(&self, context: TransactionContext, arg: TxMarker) -> Result<(), ExecutionError> {
         let author = context.author();
-        let view = context.fork();
-        let time = TimeSchema::new(TIME_SERVICE_NAME, view).time().get();
+        let time = TimeSchema::new(TIME_SERVICE_NAME, context.fork())
+            .time()
+            .get();
         match time {
             Some(current_time) if current_time <= arg.time => {
-                let schema = MarkerSchema::new(view);
+                let schema = MarkerSchema::new(context.fork());
                 schema.marks().put(&author, arg.mark);
             }
             _ => {}

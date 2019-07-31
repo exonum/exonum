@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    Database, Entry, Error as StorageError, Fork, ListIndex, ObjectHash, TemporaryDB,
+    Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex, ObjectHash, TemporaryDB,
 };
 use futures::{sync::mpsc, Future};
 
@@ -306,7 +306,7 @@ impl ServiceFactory for TxResultCheckService {
     }
 }
 
-fn create_entry(fork: &Fork) -> Entry<&Fork, u64> {
+fn create_entry<T: IndexAccess>(fork: T) -> Entry<T, u64> {
     Entry::new("transaction_status_test", fork)
 }
 
