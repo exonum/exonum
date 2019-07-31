@@ -27,7 +27,7 @@ use std::{
 
 use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
 
-use crate::blockchain::get_tx;
+use crate::blockchain::check_tx;
 use crate::{
     blockchain::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
@@ -643,13 +643,11 @@ impl Sandbox {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if get_tx(
+                if check_tx(
                     &hash_elem,
                     &schema_transactions,
                     self.node_state().tx_cache(),
-                )
-                .is_some()
-                {
+                ) {
                     return false;
                 }
                 true

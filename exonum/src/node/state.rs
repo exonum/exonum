@@ -24,7 +24,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::blockchain::{get_tx, ConsensusConfig, StoredConfiguration, ValidatorKeys};
+use crate::blockchain::{check_tx, ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -934,8 +934,8 @@ impl State {
             Entry::Vacant(e) => {
                 let mut unknown_txs = HashSet::new();
                 for hash in msg.transactions() {
-                    if get_tx(hash, transactions, &self.tx_cache).is_some() {
-                        if !self.tx_cache.contains_key(hash) && !transaction_pool.contains(hash) {
+                    if check_tx(hash, transactions, &self.tx_cache) {
+                        if !transaction_pool.contains(hash) {
                             bail!(
                                 "Received propose with already \
                                  committed transaction"
@@ -1000,8 +1000,8 @@ impl State {
 
         let mut unknown_txs = HashSet::new();
         for hash in msg.transactions() {
-            if get_tx(hash, &txs, &self.tx_cache).is_some() {
-                if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
+            if check_tx(hash, &txs, &self.tx_cache) {
+                if !txs_pool.contains(hash) {
                     panic!(
                         "Received block with already \
                          committed transaction"

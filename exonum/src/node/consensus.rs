@@ -14,7 +14,7 @@
 
 use std::collections::HashSet;
 
-use crate::blockchain::Schema;
+use crate::blockchain::{check_tx, Schema};
 use crate::crypto::{CryptoHash, Hash, PublicKey};
 use crate::events::InternalRequest;
 use crate::helpers::{Height, Round, ValidatorId};
@@ -501,7 +501,7 @@ impl NodeHandler {
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let pool_len = schema.transactions_pool_len() + self.state.tx_cache_len() as u64;
+        let pool_len = schema.transactions_pool_len();
 
         metric!("node.mempool", pool_len);
 
@@ -538,10 +538,9 @@ impl NodeHandler {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
-
         let schema = Schema::new(&snapshot);
 
-        if self.state.tx_cache().contains_key(&hash) || schema.transactions().contains(&hash) {
+        if check_tx(&hash, &schema.transactions(), self.state.tx_cache()) {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
@@ -714,18 +713,18 @@ impl NodeHandler {
     }
 
     fn get_txs_for_propose(&self) -> Vec<Hash> {
-        let tx_cache_len = self.state.tx_cache_len() as u64;
+        let txs_cache_len = self.state.tx_cache_len() as u64;
         let tx_block_limit = self.txs_block_limit();
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let pool = schema.transactions_pool();
-        let pool_len = schema.transactions_pool_len() + tx_cache_len;
+        let pool_len = schema.transactions_pool_len();
 
-        info!("LEADER: pool = {}", pool_len);
+        info!("LEADER: pool = {}, cache = {}", pool_len, txs_cache_len);
 
-        let remaining_tx_count = tx_block_limit.saturating_sub(tx_cache_len as u32);
-        let cache_max_count = ::std::cmp::min(u64::from(tx_block_limit), tx_cache_len);
+        let remaining_tx_count = tx_block_limit.saturating_sub(txs_cache_len as u32);
+        let cache_max_count = ::std::cmp::min(u64::from(tx_block_limit), txs_cache_len);
 
         let mut cache_txs: Vec<Hash> = self
             .state

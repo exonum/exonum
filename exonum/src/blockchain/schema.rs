@@ -529,3 +529,12 @@ pub fn get_tx<T: IndexAccess>(
 ) -> Option<Signed<RawTransaction>> {
     txs.get(&hash).or_else(|| tx_cache.get(&hash).cloned())
 }
+
+/// Checks that transaction exists in the persistent pool or in the transaction cache.
+pub fn check_tx<T: IndexAccess>(
+    hash: &Hash,
+    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
+    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
+) -> bool {
+    txs.contains(&hash) || tx_cache.contains_key(&hash)
+}
