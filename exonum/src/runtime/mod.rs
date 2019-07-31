@@ -24,7 +24,7 @@
 //! # Service life cycle
 //!
 //! 1. Each runtime has own [artifacts] registry from which users can deploy them. The artifact
-//! identifier is required by the runtime to construct service instances. In other words,
+//! identifier is required by the runtime for constructing service instances. In other words,
 //! an artifact identifier means same as class name, and a specific service instance is
 //! the class instance.
 //!
