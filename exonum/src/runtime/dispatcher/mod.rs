@@ -30,8 +30,9 @@ use crate::{
 };
 
 use super::{
-    error::ExecutionError, ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext,
-    InstanceSpec, Runtime, ServiceInstanceId,
+    error::{catch_panic, ExecutionError},
+    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceSpec, Runtime,
+    ServiceInstanceId,
 };
 
 mod error;
@@ -339,18 +340,7 @@ impl Dispatcher {
         spec: &InstanceSpec,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
-        let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            runtime.configure_service(fork, &spec, constructor)
-        }));
-
-        match result {
-            // ExecutionError without panic.
-            Ok(Err(e)) => Err(e),
-            // Panic.
-            Err(panic) => Err(ExecutionError::from_panic(panic)),
-            // Normal execution.
-            Ok(Ok(_)) => Ok(()),
-        }
+        catch_panic(|| runtime.configure_service(fork, &spec, constructor))
     }
 
     /// Returns additional information about artifact with if it is deployed.

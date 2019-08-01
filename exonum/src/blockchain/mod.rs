@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::dispatcher::Dispatcher,
+    runtime::{dispatcher::Dispatcher, error::catch_panic},
 };
 
 mod block;
@@ -309,41 +309,20 @@ impl Blockchain {
 
         fork.flush();
 
-        let catch_result = {
-            panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                dispatcher.execute(fork, tx_hash, &transaction)
-            }))
-        };
-
-        let tx_result = match catch_result {
-            Ok(execution_result) => {
-                match execution_result {
-                    Ok(()) => {
-                        fork.flush();
-                    }
-                    Err(ref e) => {
-                        // Unlike panic, transaction failure isn't that rare, so logging the
-                        // whole transaction body is an overkill: it can be relatively big.
-                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
-                        fork.rollback();
-                    }
-                }
-                execution_result
-            }
-            Err(err) => {
-                if err.is::<FatalError>() {
-                    // Continue panic unwind if the reason is FatalError.
-                    panic::resume_unwind(err);
+        let tx_result = catch_panic(|| dispatcher.execute(fork, tx_hash, &transaction));
+        match &tx_result {
+            Ok(_) => fork.flush(),
+            Err(e) => {
+                if e.kind == ExecutionErrorKind::Panic {
+                    error!("{:?} transaction execution panicked: {:?}", transaction, e);
+                } else {
+                    // Unlike panic, transaction failure isn't that rare, so logging the
+                    // whole transaction body is an overkill: it can be relatively big.
+                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
                 }
                 fork.rollback();
-                error!(
-                    "{:?} transaction execution panicked: {:?}",
-                    transaction, err
-                );
-
-                Err(ExecutionError::from_panic(&err))
             }
-        };
+        }
 
         let mut schema = Schema::new(&*fork);
         schema

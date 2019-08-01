@@ -140,6 +140,10 @@ impl From<RuntimeIdentifier> for u32 {
 /// Keep in mind that runtime methods can be executed in two ways: during the blocks execution
 /// and during the node restart, thus be careful not to do unnecessary actions in the runtime
 /// methods.
+/// 
+/// # Hints
+/// 
+/// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics in order of panic policy. 
 pub trait Runtime: Send + Debug + 'static {
     /// Request to deploy artifact with the given identifier and additional specification.
     ///

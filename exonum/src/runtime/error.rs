@@ -17,9 +17,10 @@
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use protobuf::Message;
 
-use std::{any::Any, convert::TryFrom, fmt::Display};
+use std::{any::Any, convert::TryFrom, fmt::Display, panic};
 
 use crate::{
+    blockchain::FatalError,
     crypto::{self, Hash},
     proto::{schema::runtime, ProtobufConvert},
 };
@@ -119,6 +120,32 @@ pub struct ExecutionError {
     pub kind: ErrorKind,
     /// Optional description which doesn't affect `object_hash`.
     pub description: String,
+}
+
+/// Invokes a closure, capturing the cause of an unwinding panic if one occurs.
+///
+/// This function will return closure's result if the closure does not panic, 
+/// and will return `Err(ExecutionError::panic(cause))` if the closure panics. 
+/// Also this function skips `FatalError` panics above.
+pub fn catch_panic<F, T>(maybe_panic: F) -> Result<T, ExecutionError>
+where
+    F: FnOnce() -> Result<T, ExecutionError>,
+{
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(maybe_panic));
+    match result {
+        // ExecutionError without panic.
+        Ok(Err(e)) => Err(e),
+        // Panic.
+        Err(panic) => {
+            if panic.is::<FatalError>() {
+                // Continue panic unwind if the reason is FatalError.
+                panic::resume_unwind(panic);
+            }
+            Err(ExecutionError::from_panic(panic))
+        }
+        // Normal execution.
+        Ok(Ok(value)) => Ok(value),
+    }
 }
 
 impl ExecutionError {
