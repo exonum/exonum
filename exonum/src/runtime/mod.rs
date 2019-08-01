@@ -28,15 +28,17 @@
 //! an artifact identifier means same as class name, and a specific service instance is
 //! the class instance.
 //!
-//! 2. Each validator should request the dispatcher to deploy an artifact and send confirmation
-//! if this request is successful. Then, if the number of confirmations is equal to the total
-//! number of validators, each validator calls the dispatcher to register the artifact as deployed.
-//! After that validators can send requests to start new services instances from this artifact.
+//! 2. Each validator administrator should request the dispatcher to deploy an artifact 
+//! and then validator node should send confirmation if this request is successful. Then, if the
+//! number of confirmations is equal to the total number of validators, each validator calls the
+//! dispatcher to register the artifact as deployed. After that validators can send requests to 
+//! start new services instances from this artifact.
 //!
-//! 3. To start a new service instance, each validator should send a request to the dispatcher.
-//! Each request contains the artifact identifier, instance name, and instance configuration parameters.
-//! Then, as in the previous case, if the number of confirmations is equal to the total number of validators,
-//! each validator calls dispatcher to start a new service instance.
+//! 3. To start a new service instance, each validator administrator should send request
+//! to dispatcher. Each request contains the artifact identifier, instance name, and 
+//! instance configuration parameters. Then, as in the previous case, if the number of
+//! confirmations is equal to the total number of validators, each validator calls dispatcher
+//! to start a new service instance.
 //!
 //! 4. // TODO modify instance configuration procedure.
 //!
@@ -46,9 +48,9 @@
 //!
 //! # Transaction life cycle
 //!
-//! 1. An Exonum client creates a transaction message, including [`CallInfo`] information to
-//! find the corresponding handler to execute, serialized transaction parameters as a payload,
-//! and signs the message with the author's key pair.
+//! 1. An Exonum client creates a transaction message which includes [CallInfo] information
+//! about the corresponding handler and serialized transaction parameters as a payload;
+//! and then signs the message with the author's key pair.
 //!
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
 //! The transaction is identified by the hash of the corresponding message.
