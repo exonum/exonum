@@ -33,7 +33,7 @@ pub struct CallInfo {
     /// Unique service instance identifier. Dispatcher uses this identifier to find the
     /// corresponding runtime to execute transaction.
     pub instance_id: ServiceInstanceId,
-     /// Identifier of the method in the service interface to call.
+    /// Identifier of the method in the service interface to call.
     pub method_id: MethodId,
 }
 

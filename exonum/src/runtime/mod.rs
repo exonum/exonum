@@ -18,8 +18,8 @@
 //!
 //! Each runtime contains specific services to execute transactions, process events,
 //! provide user APIs, e.t.c. There is a unified dispatcher that redirects all the calls
-//! and requests to the appropriate runtime environment. Thus, users work with it, and not
-//! with a specific runtimes.
+//! and requests to the appropriate runtime environment. Thus, blockchain interact with the
+//! dispatcher, and not with a specific runtime instance.
 //!
 //! # Service life cycle
 //!
@@ -28,14 +28,14 @@
 //! an artifact identifier means same as class name, and a specific service instance is
 //! the class instance.
 //!
-//! 2. Each validator administrator should request the dispatcher to deploy an artifact 
+//! 2. Each validator administrator should request the dispatcher to deploy an artifact
 //! and then validator node should send confirmation if this request is successful. Then, if the
 //! number of confirmations is equal to the total number of validators, each validator calls the
-//! dispatcher to register the artifact as deployed. After that validators can send requests to 
+//! dispatcher to register the artifact as deployed. After that validators can send requests to
 //! start new services instances from this artifact.
 //!
 //! 3. To start a new service instance, each validator administrator should send request
-//! to dispatcher. Each request contains the artifact identifier, instance name, and 
+//! to dispatcher. Each request contains the artifact identifier, instance name, and
 //! instance configuration parameters. Then, as in the previous case, if the number of
 //! confirmations is equal to the total number of validators, each validator calls dispatcher
 //! to start a new service instance.
