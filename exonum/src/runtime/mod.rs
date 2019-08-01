@@ -14,16 +14,16 @@
 
 //! Transactions runtime.
 //!
-//! The module containing common building blocks for creating runtimes for the Exonum blockchain.
+//! This module contains common building blocks for creating runtimes for the Exonum blockchain.
 //!
 //! Each runtime contains specific services to execute transactions, process events,
-//! and provide user APIs, e.t.c. There is a unified dispatcher that redirects all calls
+//! provide user APIs, e.t.c. There is a unified dispatcher that redirects all the calls
 //! and requests to the appropriate runtime environment. Thus, users work with it, and not
 //! with a specific runtimes.
 //!
 //! # Service life cycle
 //!
-//! 1. Each runtime has own [artifacts] registry from which users can deploy them. The artifact
+//! 1. Each runtime has its own [artifacts] registry from which users can deploy them. The artifact
 //! identifier is required by the runtime for constructing service instances. In other words,
 //! an artifact identifier means same as class name, and a specific service instance is
 //! the class instance.
@@ -33,7 +33,7 @@
 //! number of validators, each validator calls the dispatcher to register the artifact as deployed.
 //! After that validators can send requests to start new services instances from this artifact.
 //!
-//! 3. To start a new service instance, each validator should send request to dispatcher.
+//! 3. To start a new service instance, each validator should send a request to the dispatcher.
 //! Each request contains the artifact identifier, instance name, and instance configuration parameters.
 //! Then, as in the previous case, if the number of confirmations is equal to the total number of validators,
 //! each validator calls dispatcher to start a new service instance.
@@ -53,16 +53,16 @@
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
 //! The transaction is identified by the hash of the corresponding message.
 //!
-//! 3. Node verifies that the transaction has been correctly signed.
+//! 3. Node verifies that transaction for a correctness of the signature.
 //!
 //! 4. When the validator decides to include transaction in the next block it takes the message
 //! from the transaction pool and passes it to the [`Dispatcher`] for execution.
 //!
 //! 5. Dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
 //! by its [`instance_id`]. If the corresponding runtime is successfully found, the
-//! dispatcher passes the transaction to it for immediate [execution].
+//! dispatcher passes the transaction into found runtime for immediate [execution].
 //!
-//! 6. After that the transaction [execution status] writes into blockchain.
+//! 6. After execution the transaction [execution status] is written into blockchain.
 //!
 //!
 //! [`AnyTx`]: struct.AnyTx.html

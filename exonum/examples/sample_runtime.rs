@@ -48,7 +48,7 @@ struct SampleService {
     counter: Cell<u64>,
 }
 
-/// Simple runtime
+/// Sample runtime.
 #[derive(Debug, Default)]
 struct SampleRuntime {
     deployed_artifacts: BTreeMap<ArtifactId, Any>,
@@ -155,7 +155,7 @@ impl Runtime for SampleRuntime {
             call_info.method_id, call_info.instance_id
         );
 
-        // Very simple transactions executor.
+        // Very simple transaction executor.
         match call_info.method_id {
             // Increment counter
             0 => {
@@ -167,7 +167,7 @@ impl Runtime for SampleRuntime {
                 Ok(())
             }
 
-            // Reset counter
+            // Reset counter.
             1 => {
                 if !payload.is_empty() {
                     Err(SampleRuntimeError::IncorrectPayload.into())
@@ -177,7 +177,7 @@ impl Runtime for SampleRuntime {
                     Ok(())
                 }
             }
-            // Unknown transaction
+            // Unknown transaction.
             _ => Err(SampleRuntimeError::IncorrectCallInfo.into()),
         }
     }
@@ -259,7 +259,7 @@ fn main() {
     let api_sender = ApiSender::new(channel.api_requests.0.clone());
 
     println!("Creating blockchain with additional runtime...");
-    // Create blockchain with rust runtime and our additional.
+    // Create blockchain with rust runtime and our additional runtime.
     let blockchain = BlockchainBuilder::new(db, genesis, service_keypair.clone())
         .with_default_runtime(vec![])
         .with_additional_runtime(SampleRuntime::default())
@@ -290,7 +290,7 @@ fn main() {
         // Waits until request will be finished.
         thread::sleep(Duration::from_secs(5));
 
-        // Sends start service request to the sample runtime
+        // Sends start service request to the sample runtime.
         let instance_name = "instance".to_owned();
         api_sender
             .broadcast_transaction(

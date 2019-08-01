@@ -298,7 +298,7 @@ impl ObjectHash for ExecutionStatus {
     }
 }
 
-/// More convenient serde layout for the `ExecutionResult`
+/// More convenient serde layout for the `ExecutionResult`.
 mod execution_result {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

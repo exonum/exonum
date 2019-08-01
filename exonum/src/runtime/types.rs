@@ -21,7 +21,7 @@ use crate::{helpers::ValidateInput, proto::schema};
 
 /// Unique service instance identifier.
 pub type ServiceInstanceId = u32;
-/// Identifier of method in service interface to call.
+/// Identifier of the method in the service interface to call.
 pub type MethodId = u32;
 
 /// Unique service transaction identifier.
@@ -31,9 +31,9 @@ pub type MethodId = u32;
 #[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
     /// Unique service instance identifier. Dispatcher uses this identifier to find the
-    /// corresponding runtime to execute transaction with this call info.
+    /// corresponding runtime to execute transaction.
     pub instance_id: ServiceInstanceId,
-    /// Identifier of method in service interface to call.
+     /// Identifier of the method in the service interface to call.
     pub method_id: MethodId,
 }
 
