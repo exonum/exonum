@@ -133,10 +133,10 @@ impl BlockchainBuilder {
             );
             // Adds builtin services.
             blockchain.merge({
-                let fork = blockchain.fork();
+                let mut fork = blockchain.fork();
                 let mut dispatcher = blockchain.dispatcher();
                 for service in self.builtin_instances {
-                    dispatcher.add_builtin_service(&fork, service.0, service.1)?;
+                    dispatcher.add_builtin_service(&mut fork, service.0, service.1)?;
                 }
                 fork.into_patch()
             })?;

@@ -120,37 +120,88 @@ impl From<RuntimeIdentifier> for u32 {
     }
 }
 
-/// Runtime environment for services.
+/// This trait describes runtime environment for the Exonum services.
 ///
-/// It does not assign id to services/interfaces, ids are given to runtime from outside.
+/// You can read more about the life cycle of services and transactions
+/// [above](index.html#service-life-cycle).
+///
+/// Using this trait, you can extend the Exonum blockchain with the services written in
+/// different languages. It assumes that the deployment procedure of a new service may be
+/// complex and long and even may fail;
+/// therefore, it was introduced an additional entity - artifacts.
+/// Each artifact has a unique identifier and, depending on the runtime, may have an additional
+/// specification which needs for its deployment. For example, the file to be compiled.
+/// Artifact creates corresponding services instances, the same way as classes in object
+/// oriented programming.
+///
+/// Please pay attention to the panic handling policy during the implementation of methods.
+/// If no policy is specified, then the method should not panic and each panic will abort node.
+///
+/// Keep in mind that runtime methods can be executed in two ways: during the blocks execution
+/// and during the node restart, thus be careful not to do unnecessary actions in the runtime
+/// methods.
 pub trait Runtime: Send + Debug + 'static {
     /// Request to deploy artifact with the given identifier and additional specification.
-    /// It immediately returns true if artifact have already deployed.
+    ///
+    /// # Policy on panics
+    ///
+    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// them into `ExecutionError`.
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
-    /// Returns additional information about artifact with the specified id if it is deployed.
+    /// Returns protobuf description of deployed artifact with the specified identifier.
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
     /// Starts a new service instance with the given specification.
+    ///
+    /// # Policy on panics
+    ///
+    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// them into `ExecutionError`.
+    /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
     /// Configures a service instance with the given parameters.
+    ///
+    /// There are two cases when this method is called:
+    ///
+    /// - After creating a new service instance by the [`start_service`] invocation, in this case
+    /// if an error during this action occurs, dispatcher will invoke [`stop_service`]
+    /// and you must be sure that this invocation will not fail.
+    /// - During the configuration change procedure. [ECR-3306]
+    ///
+    /// # Policy on panics
+    ///
+    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// them into `ExecutionError`.
+    ///
+    /// ['start_service`]: #start_service
+    /// ['stop_service`]: #stop_service
     fn configure_service(
         &self,
-        context: &Fork,
+        fork: &Fork,
         spec: &InstanceSpec,
         parameters: Any,
     ) -> Result<(), ExecutionError>;
 
     /// Stops existing service instance with the given specification.
+    ///
+    /// # Policy on panics
+    ///
+    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// them into `ExecutionError`.
+    /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
-    /// Execute transaction.
-    // TODO Do not use dispatcher struct directly.
+    /// Execute service transaction.
+    ///
+    /// # Policy on panics
+    ///
+    /// Do not process, just skip above.
     fn execute(
         &self,
         dispatcher: &dispatcher::Dispatcher,
@@ -163,10 +214,20 @@ pub trait Runtime: Send + Debug + 'static {
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
 
     /// Calls `before_commit` for all the services stored in the runtime.
+    ///
+    /// # Policy on panics
+    ///
+    /// * This method should catch each kind of panics except of `FatalError` and writes
+    /// them into log.
+    /// * If panic occurs, the runtime should rollback changes in fork.
     fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
 
-    // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
+    ///
+    /// # Policy on panics
+    ///
+    /// * This method should catch each kind of panics except of `FatalError` and writes
+    /// them into log.
     fn after_commit(
         &self,
         dispatcher: &DispatcherSender,
