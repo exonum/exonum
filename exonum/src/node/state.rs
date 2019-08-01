@@ -936,7 +936,7 @@ impl State {
                 for hash in msg.transactions() {
                     if self.tx_cache.contains_key(hash) {
                         //Tx with `hash` is  not committed yet.
-                        continue
+                        continue;
                     }
 
                     if transactions.contains(hash) {
