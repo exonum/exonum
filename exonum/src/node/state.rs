@@ -934,8 +934,13 @@ impl State {
             Entry::Vacant(e) => {
                 let mut unknown_txs = HashSet::new();
                 for hash in msg.transactions() {
-                    if check_tx(hash, transactions, &self.tx_cache) {
-                        if !self.tx_cache.contains_key(hash) && !transaction_pool.contains(hash) {
+                    if self.tx_cache.contains_key(hash) {
+                        //Tx with `hash` is  not committed yet.
+                        continue
+                    }
+
+                    if transactions.contains(hash) {
+                        if !transaction_pool.contains(hash) {
                             bail!(
                                 "Received propose with already \
                                  committed transaction"

@@ -492,7 +492,9 @@ impl Blockchain {
                 let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();
                 for tx_hash in tx_hashes {
                     if let Some(tx) = tx_cache.remove(&tx_hash) {
-                        schema.add_transaction_into_pool(tx);
+                        if !schema.transactions().contains(&tx_hash) {
+                            schema.add_transaction_into_pool(tx);
+                        }
                     }
                 }
             }

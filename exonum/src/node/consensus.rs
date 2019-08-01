@@ -122,7 +122,7 @@ impl NodeHandler {
         ) {
             Ok(state) => state.has_unknown_txs(),
             Err(err) => {
-                warn!("{}, msg={:?}", err, msg);
+                warn!("{} from {:?}", err, msg.validator());
                 return;
             }
         };
