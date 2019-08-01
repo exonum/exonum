@@ -103,6 +103,24 @@ impl ViewChanges {
         }
     }
 
+    pub fn merge(first: Option<ViewChanges>, second: Option<ViewChanges>) -> ViewChanges {
+        let second = second.unwrap_or(ViewChanges::new());
+        let (data, empty) = match first {
+            Some(first) => {
+                let mut data = first.data.clone();
+                data.extend(second.data);
+                (data, first.empty && second.empty)
+            }
+            None => {
+                (second.data, second.empty)
+            }
+        };
+        ViewChanges {
+            data,
+            empty,
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.empty
     }
@@ -186,8 +204,7 @@ impl Drop for ChangesRef<'_> {
             panic!("insertion point for changes disappeared at {:?}", self.key);
         });
 
-        debug_assert!(changes.is_none(), "edit conflict at {:?}", self.key);
-        *changes = self.changes.take();
+        *changes = Some(ViewChanges::merge(changes.clone(), self.changes.clone()));
     }
 }
 
@@ -207,7 +224,7 @@ impl WorkingPatch {
     pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
-            let view_changes = changes.get_mut(address).map(Option::take);
+            let view_changes = changes.get_mut(address).cloned();
             view_changes.unwrap_or_else(|| {
                 changes
                     .entry(address.clone())
@@ -215,12 +232,6 @@ impl WorkingPatch {
                     .take()
             })
         };
-
-        assert!(
-            view_changes.is_some(),
-            "multiple mutable borrows of an index at {:?}",
-            address
-        );
 
         ChangesRef {
             changes: view_changes,

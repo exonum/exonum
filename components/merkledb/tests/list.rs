@@ -129,6 +129,64 @@ mod list_index {
     }
 
     proptest_compare_collections!(proptest_compare_to_rust_vec, ListIndex, Vec, ListAction);
+
+    #[test]
+    fn works_just_fine() {
+        use exonum_merkledb::{Database, TemporaryDB};
+
+        let db = TemporaryDB::new();
+
+        let fork = db.fork();
+        let reference = Vec::new();
+        {
+            let mut collection = ListIndex::new("test", &fork);
+            collection.push(0);
+            collection.clear();
+        }
+
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        let collection = ListIndex::new("test", &fork);
+        compare_collections(&collection, &reference).unwrap();
+    }
+
+    #[test]
+    fn failing_for_no_reason() {
+        use exonum_merkledb::{Database, TemporaryDB};
+        eprintln!("START");
+
+        let db = TemporaryDB::new();
+
+        eprintln!("FORK");
+        let mut fork = db.fork();
+        let mut reference = Vec::new();
+        let my_actions = vec![ListAction::Push(0 as i32), ListAction::Clear];
+        eprintln!("BEFORE LOOP");
+
+        for action in my_actions {
+            eprintln!("LOOP");
+            match action {
+                ListAction::MergeFork => {
+                    db.merge(fork.into_patch()).unwrap();
+                    fork = db.fork();
+                }
+                _ => {
+                    let mut collection = ListIndex::new("test", &fork);
+                    action.clone().modify(&mut collection);
+                    action.clone().modify(&mut reference);
+                    compare_collections(&collection, &reference).unwrap();
+                }
+            }
+        }
+        eprintln!("MERGE");
+        db.merge(fork.into_patch()).unwrap();
+
+        eprintln!("TEST");
+        let fork = db.fork();
+        let collection = ListIndex::new("test", &fork);
+        compare_collections(&collection, &reference).unwrap();
+    }
 }
 
 mod proof_list_index {
