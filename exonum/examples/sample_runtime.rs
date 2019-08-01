@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Example of very simple runtime that can perform two transactions:
+//! Example of a very simple runtime that can perform two types of transaction:
 //! increment and reset counter in service instance.
 
 use exonum::{
@@ -157,7 +157,7 @@ impl Runtime for SampleRuntime {
 
         // Very simple transaction executor.
         match call_info.method_id {
-            // Increment counter
+            // Increment counter.
             0 => {
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
