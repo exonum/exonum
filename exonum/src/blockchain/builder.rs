@@ -47,7 +47,7 @@ pub struct BlockchainBuilder {
     pub service_keypair: (PublicKey, SecretKey),
     /// List of supported runtimes.
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
-    /// List of privileged services with configuration parameters that are created directly 
+    /// List of privileged services with configuration parameters that are created directly
     /// in the genesis block.
     pub builtin_instances: Vec<(InstanceSpec, Any)>,
 }

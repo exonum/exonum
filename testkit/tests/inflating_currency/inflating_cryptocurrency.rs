@@ -211,7 +211,7 @@ impl Service for CurrencyService {
 
 impl ServiceFactory for CurrencyService {
     fn artifact_id(&self) -> RustArtifactId {
-        "cryptocurrency/1.0.0".parse().unwrap()
+        "cryptocurrency:1.0.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {

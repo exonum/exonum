@@ -54,7 +54,7 @@ impl Service for CommitWatcherService {
 
 impl ServiceFactory for CommitWatcherService {
     fn artifact_id(&self) -> RustArtifactId {
-        "after-commit/1.0.0".parse().unwrap()
+        "after-commit:1.0.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {
@@ -81,7 +81,7 @@ struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
 
 impl ServiceFactory for StartCheckerServiceFactory {
     fn artifact_id(&self) -> RustArtifactId {
-        "configure/1.0.0".parse().unwrap()
+        "configure:1.0.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {

@@ -188,7 +188,7 @@ impl From<RustArtifactId> for ArtifactId {
 
 impl fmt::Display for RustArtifactId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}/{}", self.name, self.version)
+        write!(f, "{}:{}", self.name, self.version)
     }
 }
 
@@ -196,7 +196,7 @@ impl FromStr for RustArtifactId {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split('/').take(2).collect::<Vec<_>>();
+        let split = s.split(':').take(2).collect::<Vec<_>>();
         match &split[..] {
             [name, version] => {
                 let version = Version::parse(version)?;
@@ -205,7 +205,7 @@ impl FromStr for RustArtifactId {
                     version,
                 })
             },
-            _ => Err(failure::format_err!("Wrong rust artifact name format, it should be in form \"artifact_name/artifact_version\""))
+            _ => Err(failure::format_err!("Wrong rust artifact name format, it should be in form \"artifact_name:artifact_version\""))
         }
     }
 }
@@ -381,5 +381,5 @@ impl Runtime for RustRuntime {
 
 #[test]
 fn parse_rust_artifact_id_correct() {
-    RustArtifactId::from_str("my-service/1.0.0").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0").unwrap();
 }

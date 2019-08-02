@@ -774,7 +774,7 @@ mod tests {
             .finalize();
 
         let sample_rust_spec =
-            ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo/1.0.0").unwrap();
+            ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo:1.0.0").unwrap();
 
         // Check deploy.
         assert_eq!(

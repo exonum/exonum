@@ -75,7 +75,7 @@ impl Service for TimestampingService {}
 
 impl ServiceFactory for TimestampingService {
     fn artifact_id(&self) -> RustArtifactId {
-        "timestamping/1.0.0".parse().unwrap()
+        "timestamping:1.0.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {

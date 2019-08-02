@@ -74,7 +74,7 @@ impl CallInfo {
 ///             method_id: 0,
 ///         },
 ///         // Transaction payload.
-///         payload: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()
+///         arguments: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()
 ///     },
 ///     keypair.0,
 ///     &keypair.1
@@ -105,7 +105,7 @@ impl AnyTx {
 /// `{runtime_id}:{artifact_name}`, where `runtime_id` is well-known [runtime identifier],
 /// and `artifact_name` is unique name of artifact.
 ///
-/// Artifact name can contains only these characters: `a-zA-Z0-9` and one of `_-./`.
+/// Artifact name can contains only these characters: `a-zA-Z0-9` and one of `_-.:`.
 ///
 /// [runtime identifier]: enum.RuntimeIdentifier.html
 ///
@@ -115,7 +115,7 @@ impl AnyTx {
 /// # use exonum::runtime::ArtifactId;
 /// # fn main() -> Result<(), failure::Error> {
 /// // Typical Rust artifact.
-/// let rust_artifact_id = "0:my-service/1.0.0".parse::<ArtifactId>()?;
+/// let rust_artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>()?;
 /// // Typical Java artifact.
 /// let java_artifact_id = "1:org.exonum.service.1".parse::<ArtifactId>()?;
 /// # Ok(())
@@ -149,9 +149,9 @@ impl ArtifactId {
 
     /// Checks that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
-        // Extended version of `exonum_merkledb::is_valid_name` that allows also '/`.
+        // Extended version of `exonum_merkledb::is_valid_name` that allows also ':`.
         name.as_ref().iter().all(|&c| match c {
-            47 => true,
+            58 => true,
             c => is_allowed_latin1_char(c),
         })
     }
@@ -164,7 +164,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             Self::is_valid_name(&self.name),
-            "Artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-./"
+            "Artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-.:"
         );
         Ok(())
     }
@@ -191,7 +191,7 @@ impl FromStr for ArtifactId {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split(':').collect::<Vec<_>>();
+        let split = s.splitn(2, ':').collect::<Vec<_>>();
         match &split[..] {
             [runtime_id, name] => {
                 let artifact = Self {
@@ -265,15 +265,13 @@ impl ValidateInput for InstanceSpec {
 
 #[test]
 fn parse_artifact_id_correct() {
-    "0:my-service/1.0.0".parse::<ArtifactId>().unwrap();
+    "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
     "1:com.my.java.service.v1".parse::<ArtifactId>().unwrap();
 }
 
 #[test]
 fn parse_artifact_id_incorrect_layout() {
     let artifacts = [
-        ("0:3:my-service/1.0.0", "Wrong artifact id format"),
-        ("my-service/1.0.0", "Wrong artifact id format"),
         ("15", "Wrong artifact id format"),
         ("0:", "Artifact name should not be empty"),
         (":", "cannot parse integer from empty string"),
@@ -304,20 +302,20 @@ fn parse_artifact_id_incorrect_layout() {
 
 #[test]
 fn test_instance_spec_validate_correct() {
-    InstanceSpec::new(15, "foo-service", "0:my-service/1.0.0").unwrap();
+    InstanceSpec::new(15, "foo-service", "0:my-service:1.0.0").unwrap();
 }
 
 #[test]
 fn test_instance_spec_validate_incorrect() {
     let specs = [
         (
-            InstanceSpec::new(1, "", "0:my-service/1.0.0"),
+            InstanceSpec::new(1, "", "0:my-service:1.0.0"),
             "Service instance name should not be empty",
         ),
         (
             InstanceSpec::new(2,
                 "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
-                "0:my-service/1.0.0"
+                "0:my-service:1.0.0"
             ),
             "Service instance name contains illegal character",
         ),

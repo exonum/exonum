@@ -224,7 +224,7 @@ impl Service for CounterService {
 
 impl ServiceFactory for CounterService {
     fn artifact_id(&self) -> RustArtifactId {
-        "counter-service/1.0.0".parse().unwrap()
+        "counter-service:1.0.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {

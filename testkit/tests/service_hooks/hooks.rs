@@ -88,7 +88,7 @@ impl Service for AfterCommitService {
 
 impl ServiceFactory for AfterCommitService {
     fn artifact_id(&self) -> RustArtifactId {
-        "after-commit/1.0.0".parse().unwrap()
+        "after-commit:1.0.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {

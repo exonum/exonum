@@ -223,7 +223,7 @@ mod tests {
 
     impl ServiceFactory for SampleService {
         fn artifact_id(&self) -> RustArtifactId {
-            "sample-service/1.0.0".parse().unwrap()
+            "sample-service:1.0.0".parse().unwrap()
         }
 
         fn artifact_info(&self) -> ArtifactInfo {
