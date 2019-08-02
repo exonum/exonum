@@ -266,7 +266,7 @@ impl Dispatcher {
                 hash: tx_id,
             },
         );
-        self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().payload)?;
+        self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().arguments)?;
 
         let actions = context.take_actions();
         // Marks dispatcher as modified if actions are not empty.
@@ -287,7 +287,7 @@ impl Dispatcher {
         &self,
         context: &mut ExecutionContext,
         call_info: CallInfo,
-        payload: &[u8],
+        arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         let runtime_id = self
             .runtime_lookup
@@ -299,7 +299,7 @@ impl Dispatcher {
             .get(&runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
 
-        runtime.execute(self, context, call_info, payload)
+        runtime.execute(self, context, call_info, arguments)
     }
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {

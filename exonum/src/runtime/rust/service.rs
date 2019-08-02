@@ -275,7 +275,7 @@ pub trait Transaction: BinaryValue {
                 instance_id,
                 method_id: Self::METHOD_ID,
             },
-            payload: self.into_bytes(),
+            arguments: self.into_bytes(),
         }
     }
 

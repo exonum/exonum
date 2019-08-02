@@ -85,14 +85,14 @@ impl CallInfo {
 pub struct AnyTx {
     /// Information to call corresponding executor.
     pub call_info: CallInfo,
-    /// Serialized transaction.
-    pub payload: Vec<u8>,
+    /// Serialized transaction arguments.
+    pub arguments: Vec<u8>,
 }
 
 impl AnyTx {
-    /// Parses transaction content as concrete type.
+    /// Parses transaction arguments as concrete type.
     pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
-        T::from_bytes(Cow::Borrowed(&self.payload))
+        T::from_bytes(Cow::Borrowed(&self.arguments))
     }
 }
 

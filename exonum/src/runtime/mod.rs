@@ -32,7 +32,7 @@
 //! and then validator node should send confirmation if this request is successful. Then, if the
 //! number of confirmations is equal to the total number of validators, each validator calls the
 //! dispatcher to register the artifact as deployed. After that validators can send requests to
-//! start new services instances from this artifact.
+//! start new service instances from this artifact.
 //!
 //! 3. To start a new service instance, each validator administrator should send request
 //! to dispatcher. Each request contains the exactly same artifact identifier, instance name, and
@@ -213,7 +213,7 @@ pub trait Runtime: Send + Debug + 'static {
         dispatcher: &dispatcher::Dispatcher,
         context: &mut ExecutionContext,
         call_info: CallInfo,
-        payload: &[u8],
+        arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
     /// Gets state hashes of the every contained service.
