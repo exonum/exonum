@@ -33,7 +33,7 @@ pub trait PrivateApi {
     /// by the current node, and returns its hash.
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
     /// Creates and broadcasts the `StartService` transaction, which is signed
-    /// by the current node, and returns its hash.    
+    /// by the current node, and returns its hash.
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
 }
 
@@ -84,7 +84,6 @@ impl<'a> PrivateApi for ApiImpl<'a> {
 pub fn wire(descriptor: &ServiceDescriptor, builder: &mut ServiceApiBuilder) {
     let instance_id = descriptor.service_id();
     let instance_name = descriptor.service_name().to_owned();
-
     builder
         .private_scope()
         .endpoint_mut("deploy-artifact", {

@@ -47,7 +47,7 @@ pub enum ErrorKind {
     Service {
         /// User-defined error code.
         /// Error codes can have different meanings for the different transactions
-        /// and services.        
+        /// and services.
         code: u8,
     },
 }

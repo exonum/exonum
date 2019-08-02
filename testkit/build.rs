@@ -22,6 +22,11 @@ fn main() {
             "hooks_example_protobuf_mod.rs",
         ),
         (
+            "tests/supervisor/proto",
+            vec!["tests/supervisor/proto"],
+            "supervisor_example_protobuf_mod.rs",
+        ),
+        (
             "examples/timestamping/proto",
             vec!["examples/timestamping/proto"],
             "timestamping_example_protobuf_mod.rs",
