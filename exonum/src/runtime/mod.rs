@@ -44,7 +44,7 @@
 //!
 //! 5. // TODO stop instance procedure.
 //!
-//! Each Exonum transaction is an [`AnyTx`] message with a verified/correct signature
+//! Each Exonum transaction is an [`AnyTx`] message with a correct signature
 //!
 //! # Transaction life cycle
 //!
@@ -132,14 +132,17 @@ impl From<RuntimeIdentifier> for u32 {
 /// complex and long and even may fail;
 /// therefore, it was introduced an additional entity - artifacts.
 /// Each artifact has a unique identifier and, depending on the runtime, may have an additional
-/// specification which needs for its deployment. For example, the file to be compiled.
+/// specification needed for its deployment. For example, the file to be compiled.
 /// Artifact creates corresponding services instances, the same way as classes in object
 /// oriented programming.
+/// 
+/// # Notes
 ///
-/// Please pay attention to the panic handling policy during the implementation of methods.
+/// * Please pay attention to the panic handling policy during the implementation of methods.
 /// If no policy is specified, then the method should not panic and each panic will abort node.
-///
-/// Keep in mind that runtime methods can be executed in two ways: during the blocks execution
+/// * If you have to revert changes in fork you should revert only changes which were made by 
+/// the service that caused panic.
+/// * Keep in mind that runtime methods can be executed in two ways: during the blocks execution
 /// and during the node restart, thus be careful not to do unnecessary actions in the runtime
 /// methods.
 ///
@@ -159,7 +162,12 @@ pub trait Runtime: Send + Debug + 'static {
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
-    /// Returns protobuf description of deployed artifact with the specified identifier.
+    /// Returns protobuf description of deployed artifact with the specified identifier,
+    /// otherwise, if the artifact is not deployed, returns `None`.
+    /// 
+    /// # Notes for runtime developers.
+    /// 
+    /// * Ensure that the deployed artifact must has information, even if it is empty.
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
     /// Starts a new service instance with the given specification.
@@ -175,10 +183,10 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// There are two cases when this method is called:
     ///
-    /// - After creating a new service instance by the [`start_service`] invocation, in this case
+    /// * After creating a new service instance by the [`start_service`] invocation, in this case
     /// if an error during this action occurs, dispatcher will invoke [`stop_service`]
     /// and you must be sure that this invocation will not fail.
-    /// - During the configuration change procedure. [ECR-3306]
+    /// * During the configuration change procedure. [ECR-3306]
     ///
     /// # Policy on panics
     ///
