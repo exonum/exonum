@@ -28,7 +28,7 @@
 //! an artifact identifier means same as class name, and a specific service instance is
 //! the class instance.
 //!
-//! 2. Each validator administrator should request the dispatcher to deploy an artifact
+//! 2. Each validator administrator requests the dispatcher to deploy an artifact
 //! and then validator node should send confirmation if this request is successful. Then, if the
 //! number of confirmations is equal to the total number of validators, each validator calls the
 //! dispatcher to register the artifact as deployed. After that validators can send requests to
