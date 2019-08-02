@@ -29,6 +29,7 @@ message Connect {
 message Status {
   uint64 height = 1;
   exonum.Hash last_hash = 2;
+  uint64 pool_size = 3;
 }
 
 message Propose {

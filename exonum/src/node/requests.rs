@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::Hash;
+
 use super::NodeHandler;
 use crate::blockchain::Schema;
 use crate::messages::{
@@ -71,6 +73,20 @@ impl NodeHandler {
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &Signed<TransactionsRequest>) {
+        trace!("HANDLE TRANSACTIONS REQUEST");
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+
+        let hashes: Vec<Hash>= if msg.txs().is_empty() {
+            schema.transactions_pool().iter().collect()
+        } else {
+            msg.txs().to_vec()
+        };
+
+        self.handle_request_txs_pool(msg, &hashes);
+    }
+
+    pub fn handle_request_txs_pool(&mut self, msg: &Signed<TransactionsRequest>, hashes: &[Hash]) {
         use std::mem;
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
@@ -80,8 +96,8 @@ impl NodeHandler {
         let unoccupied_message_size = self.state.config().consensus.max_message_len as usize
             - TRANSACTION_RESPONSE_EMPTY_SIZE;
 
-        for hash in msg.txs() {
-            let tx = schema.transactions().get(hash);
+        for hash in hashes {
+            let tx = schema.transactions().get(&hash);
             if let Some(tx) = tx {
                 let raw = tx.signed_message().raw().to_vec();
                 if txs_size + raw.len() + RAW_TRANSACTION_HEADER > unoccupied_message_size {

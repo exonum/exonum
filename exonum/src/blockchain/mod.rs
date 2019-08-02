@@ -178,6 +178,11 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
+    /// Returns the latest committed block.
+    pub fn pool_size(&self) -> u64 {
+        Schema::new(&self.snapshot()).transactions_pool_len()
+    }
+
     /// Creates and commits the genesis block with the given genesis configuration
     /// if the blockchain has not been initialized.
     ///
@@ -286,6 +291,12 @@ impl Blockchain {
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
+
+        println!(
+            "creating patch from proposer {}, tx_count = {}",
+            proposer_id,
+            tx_hashes.len()
+        );
 
         let block_hash = {
             // Get last hash.

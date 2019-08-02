@@ -122,14 +122,17 @@ pub struct Status {
     height: Height,
     /// Hash of the last committed block.
     last_hash: Hash,
+    /// Hash of the last committed block.
+    pool_size: u64,
 }
 
 impl Status {
     /// Create new `Status` message.
-    pub fn new(height: Height, last_hash: &Hash) -> Self {
+    pub fn new(height: Height, last_hash: &Hash, pool_size: u64) -> Self {
         Self {
             height,
             last_hash: *last_hash,
+            pool_size,
         }
     }
 
@@ -141,6 +144,11 @@ impl Status {
     /// Hash of the last committed block.
     pub fn last_hash(&self) -> &Hash {
         &self.last_hash
+    }
+
+    /// Pool size
+    pub fn pool_size(&self) -> u64 {
+        self.pool_size
     }
 }
 

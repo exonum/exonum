@@ -500,6 +500,8 @@ impl NodeHandler {
 
         metric!("node.mempool", pool_len);
 
+        println!("commited {}", committed_txs);
+
         let height = self.state.height();
         info!(
             "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
@@ -700,8 +702,16 @@ impl NodeHandler {
                 self.state.last_hash(),
                 &txs,
             ));
+
             // Put our propose to the consensus messages cache
             self.blockchain.save_message(round, propose.clone());
+
+            println!(
+                "broadcast propose: pool len = {}, proposer = {}, txs_count = {}",
+                pool_len,
+                validator_id,
+                txs.len()
+            );
 
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.clone());
@@ -745,7 +755,11 @@ impl NodeHandler {
                         .collect();
                     self.sign_message(TransactionsRequest::new(&peer, &txs))
                         .into()
-                }
+                },
+                RequestData::PoolTransactions => {
+                    self.sign_message(TransactionsRequest::new(&peer, &[]))
+                        .into()
+                },
                 RequestData::BlockTransactions => {
                     let txs: Vec<_> = match self.state.incomplete_block() {
                         Some(incomplete_block) => {
