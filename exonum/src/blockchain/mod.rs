@@ -69,6 +69,7 @@ pub type TransactionMessage = Verified<AnyTx>;
 #[derive(Debug, Clone)]
 pub struct Blockchain {
     db: Arc<dyn Database>,
+    // FIXME fix visibility [ECR-3222]
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,

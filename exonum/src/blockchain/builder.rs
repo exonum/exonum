@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! The module responsible for the correct Exonum blockchain creation.
+
 use exonum_merkledb::Database;
 use futures::sync::mpsc;
 
@@ -31,17 +33,28 @@ use crate::{
     },
 };
 
-// TODO Modern replacement for DispatcherBuilder [ECR-3275]
+/// The object responsible for the correct Exonum blockchain creation from components.
+///
+/// During the `Blockchain` creation it creates and commits genesis block if database
+/// is empty, otherwise it just restores state from database.
 #[derive(Debug)]
 pub struct BlockchainBuilder {
+    /// The database which works under the hood.
     pub database: Arc<dyn Database>,
+    /// Blockchain configuration which uses to create genesis block.
     pub genesis_config: GenesisConfig,
+    /// Keypair, which  is used to sign service transactions on behalf of this node.
     pub service_keypair: (PublicKey, SecretKey),
+    /// List of supported runtimes.
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    /// List of privileged services with configuration parameters that are created directly 
+    /// in the genesis block.
     pub builtin_instances: Vec<(InstanceSpec, Any)>,
 }
 
 impl BlockchainBuilder {
+    /// Creates a new builder instance for the specified database, genesis configuration and
+    /// service keypair without any runtimes. The user must add them by himself.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
         genesis_config: GenesisConfig,
@@ -56,6 +69,14 @@ impl BlockchainBuilder {
         }
     }
 
+    /// Adds built-in Rust runtime with the default built-in services.
+    ///
+    /// # List of built-in services to be added:
+    ///
+    /// * The [`Supervisor`] service, which is responsible for adding, modifying and removing user
+    /// services during the operation of the blockchain.
+    ///
+    /// [`Supervisor`]: ../runtime/supervisor/index.html
     pub fn with_default_runtime(
         self,
         services: impl IntoIterator<Item = InstanceCollection>,
@@ -70,7 +91,8 @@ impl BlockchainBuilder {
         self.with_rust_runtime(services)
     }
 
-    pub(crate) fn with_rust_runtime(
+    /// Adds built-in Rust runtime with the specified built-in services.
+    pub fn with_rust_runtime(
         mut self,
         services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {
@@ -82,6 +104,7 @@ impl BlockchainBuilder {
         self.with_additional_runtime(runtime)
     }
 
+    /// Adds additional runtime with the specified identifier.
     pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
@@ -147,9 +170,12 @@ impl BlockchainBuilder {
     }
 }
 
+/// Rust runtime artifact with the list of instances.
 #[derive(Debug)]
 pub struct InstanceCollection {
+    /// Rust services factory as a special case of an artifact.
     pub factory: Box<dyn ServiceFactory>,
+    /// List of service instances with the initial configuration parameters.
     pub instances: Vec<(InstanceSpec, Any)>,
 }
 
