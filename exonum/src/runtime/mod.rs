@@ -17,8 +17,8 @@
 //! This module contains common building blocks for creating runtimes for the Exonum blockchain.
 //!
 //! Each runtime contains specific services to execute transactions, process events,
-//! provide user APIs, e.t.c. There is a unified dispatcher that redirects all the calls
-//! and requests to the appropriate runtime environment. Thus, blockchain interact with the
+//! provide user APIs, etc. There is a unified dispatcher that redirects all the calls
+//! and requests to the appropriate runtime environment. Thus, blockchain interacts with the
 //! dispatcher, and not with a specific runtime instance.
 //!
 //! # Service life cycle
@@ -140,10 +140,10 @@ impl From<RuntimeIdentifier> for u32 {
 /// Keep in mind that runtime methods can be executed in two ways: during the blocks execution
 /// and during the node restart, thus be careful not to do unnecessary actions in the runtime
 /// methods.
-/// 
+///
 /// # Hints
-/// 
-/// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics in order of panic policy. 
+///
+/// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics in order of panic policy.
 pub trait Runtime: Send + Debug + 'static {
     /// Request to deploy artifact with the given identifier and additional specification.
     ///

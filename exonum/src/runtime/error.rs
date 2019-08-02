@@ -124,8 +124,8 @@ pub struct ExecutionError {
 
 /// Invokes a closure, capturing the cause of an unwinding panic if one occurs.
 ///
-/// This function will return closure's result if the closure does not panic, 
-/// and will return `Err(ExecutionError::panic(cause))` if the closure panics. 
+/// This function will return closure's result if the closure does not panic,
+/// and will return `Err(ExecutionError::panic(cause))` if the closure panics.
 /// Also this function skips `FatalError` panics above.
 pub fn catch_panic<F, T>(maybe_panic: F) -> Result<T, ExecutionError>
 where

@@ -249,7 +249,7 @@ fn node_config() -> NodeConfig {
 fn main() {
     exonum::helpers::init_logger().unwrap();
 
-    println!("Creating in-memory database...");
+    println!("Creating database in temporary dir...");
 
     let db = TemporaryDB::new();
     let node_cfg = node_config();
