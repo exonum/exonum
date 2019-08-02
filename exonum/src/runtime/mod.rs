@@ -35,7 +35,7 @@
 //! start new services instances from this artifact.
 //!
 //! 3. To start a new service instance, each validator administrator should send request
-//! to dispatcher. Each request contains the artifact identifier, instance name, and
+//! to dispatcher. Each request contains the exactly same artifact identifier, instance name, and
 //! instance configuration parameters. Then, as in the previous case, if the number of
 //! confirmations is equal to the total number of validators, each validator calls dispatcher
 //! to start a new service instance.
@@ -44,7 +44,7 @@
 //!
 //! 5. // TODO stop instance procedure.
 //!
-//! Each `Exonum` transaction is verified instance of [`AnyTx`] message.
+//! Each Exonum transaction is an [`AnyTx`] message with a verified/correct signature
 //!
 //! # Transaction life cycle
 //!
@@ -55,14 +55,16 @@
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
 //! The transaction is identified by the hash of the corresponding message.
 //!
-//! 3. Node verifies that transaction for a correctness of the signature.
+//! 3. Node verifies that transaction for a correctness of the signature and retransmits it to
+//! other network nodes if it is correct.
 //!
 //! 4. When the validator decides to include transaction in the next block it takes the message
 //! from the transaction pool and passes it to the [`Dispatcher`] for execution.
 //!
 //! 5. Dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
-//! by its [`instance_id`]. If the corresponding runtime is successfully found, the
-//! dispatcher passes the transaction into found runtime for immediate [execution].
+//! by the service [instance_id] recorded in the message. If the corresponding runtime is
+//! successfully found, the dispatcher passes the transaction into found runtime for
+//! immediate [execution].
 //!
 //! 6. After execution the transaction [execution status] is written into blockchain.
 //!
@@ -72,7 +74,7 @@
 //! [`Dispatcher`]: dispatcher/struct.Dispatcher.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.instance_id
 //! [`Runtime`]: trait.Runtime.html
-//! [`execution`]: trait.Runtime.html#execute
+//! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
 //!
@@ -104,7 +106,7 @@ use self::dispatcher::{Dispatcher, DispatcherSender};
 
 mod types;
 
-/// List of well known runtimes.
+/// List of well-known runtimes.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]
 pub enum RuntimeIdentifier {
@@ -290,7 +292,7 @@ pub struct StateHashAggregator {
 pub enum Caller {
     /// A usual transaction from Exonum client, authorized by his key pair.
     Transaction {
-        /// The transaction hash that is used as the identifier.
+        /// The transaction message hash.
         hash: Hash,
         /// Public key of the user who signed this transaction.
         author: PublicKey,
@@ -324,7 +326,8 @@ impl Caller {
 /// which being executed.
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
-    /// Reference of the actual state of the blockchain with new uncommitted changes.
+    /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
+    /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
     /// The one who causes the transaction execution.
     pub caller: Caller,

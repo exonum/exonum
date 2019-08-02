@@ -20,6 +20,11 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 use crate::{helpers::ValidateInput, proto::schema};
 
 /// Unique service instance identifier.
+///
+/// * This is the secondary identifier, mainly used in transaction messages.
+/// The primary is the service instance name.
+///
+/// * The core assigns this identifier when the service is started.
 pub type ServiceInstanceId = u32;
 /// Identifier of the method in the service interface to call.
 pub type MethodId = u32;
@@ -97,7 +102,7 @@ impl AnyTx {
 ///
 /// In string representation, the artifact identifier is written as follows:
 ///
-/// `{runtime_id}:{artifact_name}`, where `runtime_id` is well known [runtime identifier],
+/// `{runtime_id}:{artifact_name}`, where `runtime_id` is well-known [runtime identifier],
 /// and `artifact_name` is unique name of artifact.
 ///
 /// Artifact name can contains only these characters: `a-zA-Z0-9` and one of `_-./`.
@@ -121,7 +126,7 @@ impl AnyTx {
 )]
 #[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
 pub struct ArtifactId {
-    /// Well known runtime identifier.
+    /// Runtime identifier.
     pub runtime_id: u32,
     /// Unique artifact name.
     pub name: String,

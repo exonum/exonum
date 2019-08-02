@@ -473,7 +473,7 @@ impl From<well_known_types::Any> for Any {
     }
 }
 
-// TODO implement conversions for the other well known types [ECR-3222]
+// TODO implement conversions for the other well-known types [ECR-3222]
 
 impl From<()> for Any {
     fn from(_: ()) -> Self {
