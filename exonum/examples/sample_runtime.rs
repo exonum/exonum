@@ -155,7 +155,7 @@ impl Runtime for SampleRuntime {
             call_info.method_id, call_info.instance_id
         );
 
-        // Very simple transaction executor.
+        // Simple transaction executor.
         match call_info.method_id {
             // Increment counter.
             0 => {
@@ -177,6 +177,7 @@ impl Runtime for SampleRuntime {
                     Ok(())
                 }
             }
+
             // Unknown transaction.
             _ => Err(SampleRuntimeError::IncorrectCallInfo.into()),
         }
@@ -259,7 +260,7 @@ fn main() {
     let api_sender = ApiSender::new(channel.api_requests.0.clone());
 
     println!("Creating blockchain with additional runtime...");
-    // Create blockchain with rust runtime and our additional runtime.
+    // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain = BlockchainBuilder::new(db, genesis, service_keypair.clone())
         .with_default_runtime(vec![])
         .with_additional_runtime(SampleRuntime::default())
@@ -290,7 +291,7 @@ fn main() {
         // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
 
-        // Sends start service request to the sample runtime.
+        // Send a `StartService` request to the sample runtime.
         let instance_name = "instance".to_owned();
         api_sender
             .broadcast_transaction(
@@ -307,10 +308,10 @@ fn main() {
                 ),
             )
             .unwrap();
-        // Wait until the request is finished.
+        // Wait until instance identifier is assigned.
         thread::sleep(Duration::from_secs(5));
 
-        // Gets assigned instance identifier.
+        // Get an instance identifier.
         let snapshot = blockchain.snapshot();
         let instance_id = dispatcher::Schema::new(snapshot.as_ref())
             .service_instances()

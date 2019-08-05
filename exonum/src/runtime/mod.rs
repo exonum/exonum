@@ -150,7 +150,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics in order of panic policy.
 pub trait Runtime: Send + Debug + 'static {
-    /// Request to deploy artifact with the given identifier and additional specification.
+    /// Request to deploy artifact with the given identifier and additional deploy specification.
     ///
     /// # Policy on panics
     ///
@@ -159,7 +159,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: Any,
+        deploy_spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
     /// Returns protobuf description of deployed artifact with the specified identifier,
