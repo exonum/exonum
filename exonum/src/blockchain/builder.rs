@@ -81,7 +81,7 @@ impl BlockchainBuilder {
         self,
         services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {
-        // Adds builtin supervisor service.
+        // Add the built-in `Supervisor` service.
         let mut services = services.into_iter().collect::<Vec<_>>();
         services.push(InstanceCollection::new(Supervisor).with_instance(
             Supervisor::BUILTIN_ID,

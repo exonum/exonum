@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Example of a very simple runtime that can perform two types of transaction:
-//! increment and reset counter in service instance.
+//! increment and reset counter in the service instance.
 
 use exonum::{
     blockchain::{BlockchainBuilder, GenesisConfig, ValidatorKeys},
@@ -73,7 +73,7 @@ impl SampleRuntime {
 }
 
 impl Runtime for SampleRuntime {
-    /// In this simplest case, the artifact is just added in the deployed artifacts table.
+    /// In the present simplest case, the artifact is added into the deployed artifacts table.
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
@@ -93,7 +93,7 @@ impl Runtime for SampleRuntime {
         )
     }
 
-    /// Start service request just creates a new `SampleService` instance with the specified id.
+    /// `start_service` request creates a new `SampleService` instance with the specified ID.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
             return Err(DispatcherError::ArtifactNotDeployed.into());
@@ -108,7 +108,7 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    /// Configure service request just sets counter value of the corresponding
+    /// `configure_service` request sets the counter value of the corresponding
     /// `SampleService` instance
     fn configure_service(
         &self,
@@ -128,7 +128,7 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    /// Stop service just removes service with the specified id from the started services.
+    /// `stop_service` removes the service with the specified ID from the list of the started services.
     fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         println!("Stopping service: {:?}", spec);
         self.started_services
@@ -272,7 +272,7 @@ fn main() {
 
     let handle = thread::spawn(move || {
         let deadline_height = Height(10_000_000);
-        // Sends artifact deploy request to the sample runtime.
+        // Send an artifact `DeployRequest` to the sample runtime.
         api_sender
             .broadcast_transaction(
                 DeployRequest {
@@ -287,7 +287,7 @@ fn main() {
                 ),
             )
             .unwrap();
-        // Waits until request will be finished.
+        // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
 
         // Sends start service request to the sample runtime.
@@ -307,7 +307,7 @@ fn main() {
                 ),
             )
             .unwrap();
-        // Waits until request will be finished.
+        // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
 
         // Gets assigned instance identifier.
@@ -317,7 +317,7 @@ fn main() {
             .get(&instance_name)
             .unwrap()
             .id;
-        // Sends update counter transaction.
+        // Send an update counter transaction.
         api_sender
             .broadcast_transaction(Verified::from_value(
                 AnyTx {
@@ -332,7 +332,7 @@ fn main() {
             ))
             .unwrap();
         thread::sleep(Duration::from_secs(2));
-        // Sends reset counter transaction.
+        // Send a reset counter transaction.
         api_sender
             .broadcast_transaction(Verified::from_value(
                 AnyTx {
