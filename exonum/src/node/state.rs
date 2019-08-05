@@ -109,7 +109,7 @@ pub struct ValidatorState {
 pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
-    /// TODO: add doc.
+    /// Represents `PoolTransactionsRequest` message.
     PoolTransactions,
     /// Represents `TransactionsRequest` message for `Propose`.
     ProposeTransactions(Hash),

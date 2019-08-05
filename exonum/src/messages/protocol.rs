@@ -560,6 +560,33 @@ impl TransactionsRequest {
     }
 }
 
+/// Request for pool transactions.
+///
+/// ### Processing
+/// All transactions from mempool are sent to the recipient.
+///
+/// ### Generation
+/// A node can send `PoolTransactionsRequest` during `Status` message
+/// handling.
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::PoolTransactionsRequest", crate = "crate")]
+pub struct PoolTransactionsRequest {
+    /// Public key of the recipient.
+    to: PublicKey,
+}
+
+impl PoolTransactionsRequest {
+    /// Create new `TransactionsRequest`.
+    pub fn new(to: &PublicKey) -> Self {
+        Self { to: *to }
+    }
+
+    /// Public key of the recipient.
+    pub fn to(&self) -> &PublicKey {
+        &self.to
+    }
+}
+
 /// Request for pre-votes.
 ///
 /// ### Validation
@@ -883,6 +910,8 @@ impl_protocol! {
             PeersRequest = 3,
             /// Request of some future block.
             BlockRequest = 4,
+            /// Request of uncommitted transactions.
+            PoolTransactionsRequest = 5,
         },
 
     }
@@ -954,6 +983,7 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.to(),
             Requests::PeersRequest(ref msg) => msg.to(),
             Requests::BlockRequest(ref msg) => msg.to(),
+            Requests::PoolTransactionsRequest(ref msg) => msg.to(),
         }
     }
 
@@ -965,6 +995,7 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.author(),
             Requests::PeersRequest(ref msg) => msg.author(),
             Requests::BlockRequest(ref msg) => msg.author(),
+            Requests::PoolTransactionsRequest(ref msg) => msg.author(),
         }
     }
 }

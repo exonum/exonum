@@ -63,7 +63,7 @@ pub use self::schema::blockchain::{Block, ConfigReference, TransactionResult, Tx
 pub use self::schema::helpers::{BitVec, Hash, PublicKey, Signature};
 pub use self::schema::protocol::{
     BlockRequest, BlockResponse, Connect, PeersRequest, Precommit, Prevote, PrevotesRequest,
-    Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
+    Propose, ProposeRequest, Status, TransactionsRequest, PoolTransactionsRequest, TransactionsResponse,
 };
 
 pub mod schema;

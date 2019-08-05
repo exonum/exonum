@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::Hash;
+use exonum_crypto::{Hash, PublicKey};
 
 use super::NodeHandler;
 use crate::blockchain::Schema;
 use crate::messages::{
-    BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
-    TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
+    BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest, ProposeRequest,
+    Requests, Signed, TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
     TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 
@@ -48,6 +48,7 @@ impl NodeHandler {
             Requests::PrevotesRequest(ref msg) => self.handle_request_prevotes(msg),
             Requests::PeersRequest(ref msg) => self.handle_request_peers(msg),
             Requests::BlockRequest(ref msg) => self.handle_request_block(msg),
+            Requests::PoolTransactionsRequest(ref msg) => self.handle_pool_request_txs(msg),
         }
     }
 
@@ -74,21 +75,21 @@ impl NodeHandler {
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &Signed<TransactionsRequest>) {
         trace!("HANDLE TRANSACTIONS REQUEST");
-        let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-
-        let hashes: Vec<Hash>= if msg.txs().is_empty() {
-            schema.transactions_pool().iter().collect()
-        } else {
-            msg.txs().to_vec()
-        };
-
-        self.handle_request_txs_pool(msg, &hashes);
+        self.send_transactions_by_hash(&msg.author(), msg.txs());
     }
 
-    pub fn handle_request_txs_pool(&mut self, msg: &Signed<TransactionsRequest>, hashes: &[Hash]) {
+    /// Handles `PoolTransactionsRequest` message. For details see the message documentation.
+    pub fn handle_pool_request_txs(&mut self, msg: &Signed<PoolTransactionsRequest>) {
+        trace!("HANDLE POOL TRANSACTIONS REQUEST");
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+        let hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
+
+        self.send_transactions_by_hash(&msg.author(), &hashes);
+    }
+
+    fn send_transactions_by_hash(&mut self, author: &PublicKey, hashes: &[Hash]) {
         use std::mem;
-        trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let mut txs = Vec::new();
@@ -102,11 +103,11 @@ impl NodeHandler {
                 let raw = tx.signed_message().raw().to_vec();
                 if txs_size + raw.len() + RAW_TRANSACTION_HEADER > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
-                        &msg.author(),
+                        author,
                         mem::replace(&mut txs, vec![]),
                     ));
 
-                    self.send_to_peer(msg.author(), txs_response);
+                    self.send_to_peer(*author, txs_response);
                     txs_size = 0;
                 }
                 txs_size += raw.len() + RAW_TRANSACTION_HEADER;
@@ -115,9 +116,8 @@ impl NodeHandler {
         }
 
         if !txs.is_empty() {
-            let txs_response = self.sign_message(TransactionsResponse::new(&msg.author(), txs));
-
-            self.send_to_peer(msg.author(), txs_response);
+            let txs_response = self.sign_message(TransactionsResponse::new(author, txs));
+            self.send_to_peer(*author, txs_response);
         }
     }
 

@@ -94,3 +94,7 @@ message BlockRequest {
   exonum.PublicKey to = 1;
   uint64 height = 2;
 }
+
+message PoolTransactionsRequest {
+  exonum.PublicKey to = 1;
+}

@@ -19,9 +19,7 @@ use crate::crypto::PublicKey;
 use crate::events::error::LogError;
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::Height;
-use crate::messages::{
-    Connect, Message, PeersRequest, Responses, Service, Signed, Status,
-};
+use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
