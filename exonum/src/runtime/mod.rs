@@ -229,6 +229,11 @@ pub trait Runtime: Send + Debug + 'static {
 
     /// Calls `before_commit` for all the services stored in the runtime.
     ///
+    /// # Notes for runtime developers.
+    ///
+    /// * The order of services during the invocation this method must be the same for each node;
+    /// in other words the order of runtime services must be the same for each node.
+    ///
     /// # Policy on panics
     ///
     /// * This method should catch each kind of panics except of `FatalError` and writes
