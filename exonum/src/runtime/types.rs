@@ -216,7 +216,7 @@ pub struct InstanceSpec {
     pub id: ServiceInstanceId,
     /// Unique service instance name.
     ///
-    /// It should contains only these characters: `a-zA-Z0-9` and one of `_-./`.
+    /// It must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
     pub name: String,
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,
