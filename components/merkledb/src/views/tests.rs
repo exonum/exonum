@@ -909,3 +909,41 @@ fn check_index_name<S: AsRef<str>>(name: S) -> Result<(), ()> {
 
     catch_result.map_err(|_| ())
 }
+
+#[test]
+fn fork_from_patch() {
+    use crate::ListIndex;
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+
+    {
+        let mut index = ListIndex::new("index", &fork);
+        index.push(1);
+        index.push(2);
+        index.push(3);
+
+        let last = index.pop();
+        assert_eq!(last, Some(3));
+
+        index.set(1, 5);
+    }
+
+    let patch = fork.into_patch();
+    let fork: Fork = patch.into();
+    {
+        let index = ListIndex::new("index", &fork);
+
+        assert_eq!(index.get(0), Some(1));
+        assert_eq!(index.get(1), Some(5));
+        assert_eq!(index.get(2), None);
+
+        let items: Vec<i32> = index.iter().collect();
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items, vec![1, 5]);
+    }
+
+    db.merge(fork.into_patch())
+        .expect("Fork created from patch should be merged successfully");
+}

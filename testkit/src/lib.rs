@@ -665,7 +665,7 @@ impl TestKit {
         let guard = self.processing_lock.lock().unwrap();
         self.blockchain
             .commit(
-                &patch,
+                patch,
                 block_hash,
                 precommits.into_iter(),
                 &mut BTreeMap::new(),

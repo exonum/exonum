@@ -195,7 +195,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
 
     blockchain
         .commit(
-            &patch,
+            patch,
             block_hash,
             vec![precommit].into_iter(),
             &mut BTreeMap::new(),
