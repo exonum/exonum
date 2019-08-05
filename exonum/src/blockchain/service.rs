@@ -350,6 +350,7 @@ pub struct ApiNodeState {
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
     broadcast_server_address: Option<Addr<websocket::Server>>,
+    tx_cache_len: usize,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -436,6 +437,7 @@ impl SharedNodeState {
         lock.majority_count = state.majority_count();
         lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
+        lock.tx_cache_len = state.tx_cache_len();
 
         for (p, a) in state.connections() {
             match a {
@@ -552,6 +554,11 @@ impl SharedNodeState {
         if let Some(server) = state.broadcast_server_address.as_ref() {
             server.do_send(websocket::Terminate);
         }
+    }
+
+    pub(crate) fn tx_cache_size(&self) -> usize {
+        let state = self.state.read().expect("Expected read lock");
+        state.tx_cache_len
     }
 }
 

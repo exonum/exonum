@@ -463,8 +463,16 @@ where
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
-    pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
-        self.transactions_pool().remove(hash);
+    pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx: Signed<RawTransaction>) {
+        if !self.transactions().contains(hash) {
+            self.transactions().put(hash, tx)
+        }
+
+        if self.transactions_pool().contains(hash) {
+            self.transactions_pool().remove(hash);
+            let txs_pool_len = self.transactions_pool_len_index().get().unwrap();
+            self.transactions_pool_len_index().set(txs_pool_len - 1);
+        }
     }
 
     /// Updates transaction count of the blockchain.

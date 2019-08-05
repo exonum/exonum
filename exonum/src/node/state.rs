@@ -24,7 +24,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
+use crate::blockchain::{check_tx, ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -93,6 +93,9 @@ pub struct State {
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
     incomplete_block: Option<IncompleteBlock>,
+
+    // Cache that stores transactions before adding to persistent pool.
+    tx_cache: BTreeMap<Hash, Signed<RawTransaction>>,
 }
 
 /// State of a validator-node.
@@ -484,6 +487,8 @@ impl State {
             config: stored,
 
             incomplete_block: None,
+
+            tx_cache: BTreeMap::new(),
         }
     }
 
@@ -929,7 +934,12 @@ impl State {
             Entry::Vacant(e) => {
                 let mut unknown_txs = HashSet::new();
                 for hash in msg.transactions() {
-                    if transactions.get(hash).is_some() {
+                    if self.tx_cache.contains_key(hash) {
+                        //Tx with `hash` is  not committed yet.
+                        continue;
+                    }
+
+                    if transactions.contains(hash) {
                         if !transaction_pool.contains(hash) {
                             bail!(
                                 "Received propose with already \
@@ -995,8 +1005,8 @@ impl State {
 
         let mut unknown_txs = HashSet::new();
         for hash in msg.transactions() {
-            if txs.get(hash).is_some() {
-                if !txs_pool.contains(hash) {
+            if check_tx(hash, &txs, &self.tx_cache) {
+                if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
                     panic!(
                         "Received block with already \
                          committed transaction"
@@ -1209,5 +1219,20 @@ impl State {
             .write()
             .expect("ConnectList write lock");
         list.add(peer);
+    }
+
+    /// Returns the transactions cache length.
+    pub fn tx_cache_len(&self) -> usize {
+        self.tx_cache.len()
+    }
+
+    /// Returns reference to the transactions cache.
+    pub fn tx_cache(&self) -> &BTreeMap<Hash, Signed<RawTransaction>> {
+        &self.tx_cache
+    }
+
+    /// Returns mutable reference to the transactions cache.
+    pub fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Signed<RawTransaction>> {
+        &mut self.tx_cache
     }
 }

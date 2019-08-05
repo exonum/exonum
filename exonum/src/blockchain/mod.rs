@@ -58,7 +58,7 @@ use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use crate::node::ApiSender;
 use exonum_merkledb::{
-    self, Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch,
+    self, Database, Error as StorageError, Fork, IndexAccess, MapIndex, ObjectHash, Patch,
     Result as StorageResult, Snapshot,
 };
 
@@ -229,8 +229,13 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[])
-                .1
+            self.create_patch(
+                ValidatorId::zero(),
+                Height::zero(),
+                &[],
+                &mut BTreeMap::new(),
+            )
+            .1
         };
         self.merge(patch)?;
         Ok(())
@@ -283,6 +288,7 @@ impl Blockchain {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
+        tx_cache: &mut BTreeMap<Hash, Signed<RawTransaction>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
@@ -292,7 +298,7 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions.
             for (index, hash) in tx_hashes.iter().enumerate() {
-                self.execute_transaction(*hash, height, index, &mut fork)
+                self.execute_transaction(*hash, height, index, &mut fork, tx_cache)
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
                     .expect("Transaction execution error.");
@@ -376,13 +382,14 @@ impl Blockchain {
         height: Height,
         index: usize,
         fork: &mut Fork,
+        tx_cache: &mut BTreeMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error> {
         let (tx, raw, service_name) = {
             let new_fork = &*fork;
             let snapshot = new_fork.snapshot();
             let schema = Schema::new(snapshot);
 
-            let raw = schema.transactions().get(&tx_hash).ok_or_else(|| {
+            let raw = get_tx(&tx_hash, &schema.transactions(), &tx_cache).ok_or_else(|| {
                 failure::err_msg(format!(
                     "BUG: Cannot find transaction in database. tx: {:?}",
                     tx_hash
@@ -442,7 +449,8 @@ impl Blockchain {
 
         let mut schema = Schema::new(&*fork);
         schema.transaction_results().put(&tx_hash, tx_result);
-        schema.commit_transaction(&tx_hash);
+        schema.commit_transaction(&tx_hash, raw);
+        tx_cache.remove(&tx_hash);
         schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);
@@ -458,6 +466,7 @@ impl Blockchain {
         patch: &Patch,
         block_hash: Hash,
         precommits: I,
+        tx_cache: &mut BTreeMap<Hash, Signed<RawTransaction>>,
     ) -> Result<(), failure::Error>
     where
         I: Iterator<Item = Signed<Precommit>>,
@@ -477,12 +486,17 @@ impl Blockchain {
                 // cleared when a new height is achieved.
                 schema.consensus_messages_cache().clear();
                 let txs_in_block = schema.last_block().tx_count();
-                let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
-                debug_assert!(txs_count >= u64::from(txs_in_block));
-                schema
-                    .transactions_pool_len_index()
-                    .set(txs_count - u64::from(txs_in_block));
+
                 schema.update_transaction_count(u64::from(txs_in_block));
+
+                let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();
+                for tx_hash in tx_hashes {
+                    if let Some(tx) = tx_cache.remove(&tx_hash) {
+                        if !schema.transactions().contains(&tx_hash) {
+                            schema.add_transaction_into_pool(tx);
+                        }
+                    }
+                }
             }
             fork.into_patch()
         };
@@ -581,4 +595,23 @@ impl Clone for Blockchain {
             service_keypair: self.service_keypair.clone(),
         }
     }
+}
+
+/// Return transaction from persistent pool. If transaction is not present in pool, try
+/// to return it from transactions cache.
+pub(crate) fn get_tx<T: IndexAccess>(
+    hash: &Hash,
+    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
+    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
+) -> Option<Signed<RawTransaction>> {
+    txs.get(&hash).or_else(|| tx_cache.get(&hash).cloned())
+}
+
+/// Checks that transaction exists in the persistent pool or in the transaction cache.
+pub(crate) fn check_tx<T: IndexAccess>(
+    hash: &Hash,
+    txs: &MapIndex<T, Hash, Signed<RawTransaction>>,
+    tx_cache: &BTreeMap<Hash, Signed<RawTransaction>>,
+) -> bool {
+    txs.contains(&hash) || tx_cache.contains_key(&hash)
 }

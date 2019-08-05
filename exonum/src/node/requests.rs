@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::NodeHandler;
-use crate::blockchain::Schema;
+use crate::blockchain::{get_tx, Schema};
 use crate::messages::{
     BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
     TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
@@ -81,7 +81,7 @@ impl NodeHandler {
             - TRANSACTION_RESPONSE_EMPTY_SIZE;
 
         for hash in msg.txs() {
-            let tx = schema.transactions().get(hash);
+            let tx = get_tx(&hash, &schema.transactions(), &self.state.tx_cache());
             if let Some(tx) = tx {
                 let raw = tx.signed_message().raw().to_vec();
                 if txs_size + raw.len() + RAW_TRANSACTION_HEADER > unoccupied_message_size {

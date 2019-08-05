@@ -98,12 +98,14 @@ impl SignedMessage {
     }
 
     /// Returns message class, which is an ID inside protocol.
-    pub(in crate::messages) fn message_class(&self) -> u8 {
+    //TODO: revert privacy
+    pub fn message_class(&self) -> u8 {
         self.raw[PUBLIC_KEY_LENGTH]
     }
 
     /// Returns message type, which is an ID inside some class of messages.
-    pub(in crate::messages) fn message_type(&self) -> u8 {
+    //TODO: revert privacy
+    pub fn message_type(&self) -> u8 {
         self.raw[PUBLIC_KEY_LENGTH + 1]
     }
 

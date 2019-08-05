@@ -191,6 +191,7 @@ use exonum::{
 
 use crate::checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use crate::poll_events::poll_events;
+use std::collections::BTreeMap;
 
 #[macro_use]
 mod macros;
@@ -422,7 +423,7 @@ impl TestKit {
         network: TestNetwork,
         genesis: GenesisConfig,
     ) -> Self {
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
         let db = CheckpointDb::new(database);
@@ -634,8 +635,12 @@ impl TestKit {
         let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
-            self.blockchain
-                .create_patch(validator_id, new_block_height, tx_hashes)
+            self.blockchain.create_patch(
+                validator_id,
+                new_block_height,
+                tx_hashes,
+                &mut BTreeMap::new(),
+            )
         };
 
         let patch = if let Some(config_patch) = config_patch {
@@ -659,7 +664,12 @@ impl TestKit {
 
         let guard = self.processing_lock.lock().unwrap();
         self.blockchain
-            .commit(&patch, block_hash, precommits.into_iter())
+            .commit(
+                &patch,
+                block_hash,
+                precommits.into_iter(),
+                &mut BTreeMap::new(),
+            )
             .unwrap();
         drop(guard);
 

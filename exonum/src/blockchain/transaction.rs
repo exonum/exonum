@@ -489,6 +489,7 @@ fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
 mod tests {
     use futures::sync::mpsc;
 
+    use std::collections::BTreeMap;
     use std::panic;
     use std::sync::Mutex;
 
@@ -642,7 +643,12 @@ mod tests {
                 blockchain.merge(fork.into_patch()).unwrap();
             }
 
-            let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(index), &[hash]);
+            let (_, patch) = blockchain.create_patch(
+                ValidatorId::zero(),
+                Height(index),
+                &[hash],
+                &mut BTreeMap::new(),
+            );
 
             db.merge(patch).unwrap();
 
@@ -690,7 +696,7 @@ mod tests {
 
     fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(0);
         Blockchain::new(
             TemporaryDB::new(),
             vec![Box::new(TxResultService) as Box<dyn Service>],

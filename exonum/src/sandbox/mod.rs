@@ -27,6 +27,7 @@ use std::{
 
 use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
 
+use crate::blockchain::check_tx;
 use crate::{
     blockchain::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
@@ -90,7 +91,7 @@ pub struct SandboxInner {
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
-    pub api_requests_rx: mpsc::UnboundedReceiver<ExternalMessage>,
+    pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl SandboxInner {
@@ -642,7 +643,11 @@ impl Sandbox {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if schema_transactions.contains(&hash_elem) {
+                if check_tx(
+                    &hash_elem,
+                    &schema_transactions,
+                    self.node_state().tx_cache(),
+                ) {
                     return false;
                 }
                 true
@@ -680,7 +685,8 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain.create_patch(ValidatorId(0), height, &hashes);
+            let (_, patch) =
+                blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
             fork.merge(patch);
             fork
         };
@@ -745,7 +751,9 @@ impl Sandbox {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
-        let vec = idx.iter().collect();
+
+        let mut vec: Vec<Hash> = idx.iter().collect();
+        vec.extend(self.node_state().tx_cache().keys().cloned());
         vec
     }
 
@@ -780,6 +788,10 @@ impl Sandbox {
         let view = self.blockchain_ref().snapshot();
         let schema = Schema::new(&view);
         assert_eq!(expected, schema.transactions_pool_len());
+    }
+
+    pub fn assert_tx_cache_len(&self, expected: u64) {
+        assert_eq!(expected, self.node_state().tx_cache_len() as u64);
     }
 
     pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
@@ -826,7 +838,7 @@ impl Sandbox {
     pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(100);
 
         let address: SocketAddr = self
             .address(ValidatorId(0))
@@ -1057,7 +1069,7 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
-    let api_channel = mpsc::unbounded();
+    let api_channel = mpsc::channel(100);
     let db = TemporaryDB::new();
     let mut blockchain = Blockchain::new(
         db,
