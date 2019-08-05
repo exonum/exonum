@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
-use crate::blockchain::Schema;
+use crate::blockchain::{get_tx, Schema};
 use crate::events::{
     error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent,
 };
@@ -86,7 +86,7 @@ impl NodeHandler {
                     }
                 }
             }
-            ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
+            ExternalMessage::Shutdown => self.handle_shutdown(),
             ExternalMessage::Rebroadcast => self.handle_rebroadcast(),
         }
     }
@@ -116,16 +116,52 @@ impl NodeHandler {
 
     /// Broadcasts all transactions from the pool to other validators.
     pub(crate) fn handle_rebroadcast(&mut self) {
+        use exonum_crypto::Hash;
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let pool = schema.transactions_pool();
-        for tx_hash in pool.iter() {
+
+        let mut txs: Vec<Hash> = self.state.tx_cache().keys().cloned().collect();
+        txs.extend(schema.transactions_pool().iter());
+
+        for tx_hash in txs {
             self.broadcast(
-                schema
-                    .transactions()
-                    .get(&tx_hash)
+                get_tx(&tx_hash, &schema.transactions(), &self.state.tx_cache())
                     .expect("Rebroadcast: invalid transaction hash"),
             )
+        }
+    }
+
+    pub(crate) fn handle_shutdown(&mut self) {
+        // Send `Shutdown` to stop event-loop.
+        self.execute_later(InternalRequest::Shutdown);
+
+        // Flush transactions stored in tx_cache to persistent pool.
+        self.flush_txs_into_pool();
+    }
+
+    fn flush_txs_into_pool(&mut self) {
+        let tx_cache_size = self.state().tx_cache_len();
+
+        if tx_cache_size == 0 {
+            //No need to do anything.
+            trace!("Transaction cache is empty.");
+            return;
+        }
+
+        let fork = self.blockchain.fork();
+        let mut schema = Schema::new(&fork);
+
+        for tx in self.state().tx_cache().values() {
+            schema.add_transaction_into_pool(tx.clone());
+        }
+
+        if self.blockchain.merge(fork.into_patch()).is_ok() {
+            info!(
+                "Flushed {} transactions from cache to persistent pool",
+                tx_cache_size
+            )
+        } else {
+            warn!("Failed to flush transactions from cache to persistent pool.")
         }
     }
 }

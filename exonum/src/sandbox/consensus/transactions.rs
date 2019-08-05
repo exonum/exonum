@@ -177,7 +177,8 @@ fn tx_pool_size_overflow() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
     sandbox.recv(&tx2);
-    sandbox.assert_pool_len(2);
+    sandbox.assert_tx_cache_len(1);
+    sandbox.assert_pool_len(0);
 
     sandbox.recv(&sandbox.create_precommit(
         ValidatorId(1),
@@ -198,7 +199,8 @@ fn tx_pool_size_overflow() {
         sandbox.secret_key(ValidatorId(2)),
     ));
 
-    //first tx should be committed and removed from pool
+    //first tx should be committed and removed from cache and added to pool
+    sandbox.assert_tx_cache_len(0);
     sandbox.assert_pool_len(1);
     sandbox.broadcast(&sandbox.create_status(
         &sandbox.public_key(ValidatorId(0)),

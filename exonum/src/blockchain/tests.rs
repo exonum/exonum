@@ -25,6 +25,7 @@ use crate::helpers::{Height, ValidatorId};
 use crate::messages::{Message, RawTransaction};
 use crate::proto;
 use exonum_merkledb::{Database, Error as StorageError, Fork, ListIndex, Snapshot};
+use std::collections::BTreeMap;
 
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -108,6 +109,7 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
+        &mut BTreeMap::new(),
     );
 
     blockchain.merge(patch).unwrap();
@@ -159,6 +161,7 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
+        &mut BTreeMap::new(),
     );
 }
 
@@ -344,7 +347,8 @@ impl Service for ServicePanicStorageError {
 }
 
 fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    let (_, patch) =
+        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index = ListIndex::new(IDX_NAME, &snapshot);
@@ -353,7 +357,8 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
 }
 
 fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    let (_, patch) =
+        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
@@ -376,7 +381,7 @@ mod memorydb_tests {
 
     fn create_blockchain() -> Blockchain {
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(0);
         Blockchain::new(
             TemporaryDB::new(),
             vec![Box::new(super::TestService) as Box<dyn Service>],
@@ -388,7 +393,7 @@ mod memorydb_tests {
 
     fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(0);
         Blockchain::new(
             TemporaryDB::new(),
             vec![service],
@@ -455,7 +460,7 @@ mod rocksdb_tests {
     fn create_blockchain(path: &Path) -> Blockchain {
         let db = create_database(path);
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(0);
         Blockchain::new(
             db,
             vec![Box::new(super::TestService) as Box<dyn Service>],
@@ -468,7 +473,7 @@ mod rocksdb_tests {
     fn create_blockchain_with_service(path: &Path, service: Box<dyn Service>) -> Blockchain {
         let db = create_database(path);
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(0);
         Blockchain::new(
             db,
             vec![service],

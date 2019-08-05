@@ -153,10 +153,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added a new endpoint `system/v1/services` for displaying information
   about available services. (#1288)
 
-- A channel for api requests has been changed to unbounded. (#1308)
-
 - Endpoints `explorer/v1/block` and `explorer/v1/transactions` were extended
   with adding additional fields `service_id` and `time`. (#1386)
+
+- Added `tx_cache` field to `State` to cache incoming transactions before
+  adding them to persistent pool. (#1398)
 
 #### exonum-merkledb
 
@@ -180,6 +181,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `len` method to `MapIndex` and `ProofMapIndex`. (#1312)
 
 - Added `len` method to `KeySetIndex` and `ValueSetIndex`. (#1319)
+
+- Added `From<Patch>` trait implementation to `Fork`. (#1403)
 
 #### exonum-testkit
 

@@ -16,6 +16,8 @@
 
 use futures::sync::mpsc;
 
+use std::collections::BTreeMap;
+
 use exonum::{
     blockchain::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
@@ -125,7 +127,7 @@ pub fn create_blockchain() -> Blockchain {
     let (consensus_key, _) = consensus_keys();
     let service_keys = crypto::gen_keypair();
 
-    let api_channel = mpsc::unbounded();
+    let api_channel = mpsc::channel(10);
     let mut blockchain = Blockchain::new(
         TemporaryDB::new(),
         vec![MyService.into()],
@@ -163,7 +165,8 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
+    let (block_hash, patch) =
+        blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &mut BTreeMap::new());
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
     let propose = Message::concrete(
@@ -191,6 +194,11 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
     );
 
     blockchain
-        .commit(&patch, block_hash, vec![precommit].into_iter())
+        .commit(
+            patch,
+            block_hash,
+            vec![precommit].into_iter(),
+            &mut BTreeMap::new(),
+        )
         .unwrap();
 }

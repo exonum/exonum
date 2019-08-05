@@ -52,6 +52,7 @@ fn stats() {
     let expected = StatsInfo {
         tx_pool_size: 0,
         tx_count: 0,
+        tx_cache_size: 0,
     };
     assert_eq!(info, expected);
 }

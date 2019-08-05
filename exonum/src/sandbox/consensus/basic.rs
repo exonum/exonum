@@ -28,7 +28,7 @@ use crate::sandbox::{
     self,
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
-    timestamping_sandbox,
+    timestamping_sandbox, timestamping_sandbox_builder,
 };
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
@@ -278,4 +278,32 @@ fn test_store_txs_positions() {
         assert_eq!(expected_idx as u64, location.position_in_block());
         assert_eq!(committed_height, location.block_height());
     }
+}
+
+#[test]
+fn tx_cache_with_tx_block_limit() {
+    let sandbox = timestamping_sandbox_builder()
+        .with_consensus(|config| {
+            config.txs_block_limit = 5;
+        })
+        .build();
+
+    let generator = TimestampingTxGenerator::with_keypair(
+        DATA_SIZE,
+        gen_keypair_from_seed(&Seed::new([10; SEED_LENGTH])),
+    );
+
+    let num_txs = 10;
+    let txs = generator
+        .take(num_txs)
+        .map(|tx| (tx.hash(), tx))
+        .collect::<BTreeMap<_, _>>();
+
+    for tx in txs.values() {
+        sandbox.recv(tx)
+    }
+
+    sandbox.assert_tx_cache_len(10);
+
+    //TODO: check pool after commit.
 }
