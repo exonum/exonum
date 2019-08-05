@@ -68,7 +68,7 @@ enum SampleRuntimeError {
 }
 
 impl SampleRuntime {
-    /// Runtime identifier for this runtime.
+    /// Runtime identifier for the present runtime.
     const ID: u32 = 255;
 }
 

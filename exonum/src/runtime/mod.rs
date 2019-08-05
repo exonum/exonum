@@ -106,7 +106,7 @@ use self::dispatcher::{Dispatcher, DispatcherSender};
 
 mod types;
 
-/// List of well-known runtimes.
+/// List of predefined runtimes.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]
 pub enum RuntimeIdentifier {
@@ -167,7 +167,7 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// # Notes for runtime developers.
     ///
-    /// * Ensure that the deployed artifact must has information, even if it is empty.
+    /// * Ensure that the deployed artifact has this information, even if it is empty.
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
     /// Starts a new service instance with the given specification.

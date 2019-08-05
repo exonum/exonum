@@ -102,7 +102,7 @@ impl AnyTx {
 ///
 /// In string representation, the artifact identifier is written as follows:
 ///
-/// `{runtime_id}:{artifact_name}`, where `runtime_id` is well-known [runtime identifier],
+/// `{runtime_id}:{artifact_name}`, where `runtime_id` is [runtime identifier],
 /// and `artifact_name` is unique name of artifact.
 ///
 /// Artifact name can contains only these characters: `a-zA-Z0-9` and one of `_-.:`.
