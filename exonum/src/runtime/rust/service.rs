@@ -28,7 +28,7 @@ use crate::{
         api::ServiceApiBuilder,
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactInfo, CallInfo, ExecutionContext, InstanceId, MethodId,
+        AnyTx, ArtifactInfo, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
@@ -46,14 +46,14 @@ pub trait ServiceDispatcher: Send {
 pub trait Service: ServiceDispatcher + Debug + 'static {
     fn configure(
         &self,
-        _descriptor: ServiceDescriptor,
+        _descriptor: InstanceDescriptor,
         _fork: &Fork,
         _params: Any,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: ServiceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
@@ -83,41 +83,21 @@ where
 }
 
 #[derive(Debug)]
-pub struct ServiceDescriptor<'a> {
-    id: InstanceId,
-    name: &'a str,
-}
-
-impl<'a> ServiceDescriptor<'a> {
-    pub(crate) fn new(id: InstanceId, name: &'a str) -> Self {
-        Self { id, name }
-    }
-
-    /// Returns the current service instance identifier.
-    pub fn service_id(&self) -> InstanceId {
-        self.id
-    }
-
-    /// Returns the current service instance name.
-    pub fn service_name(&self) -> &str {
-        self.name
-    }
-}
-
-#[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    pub(super) service_descriptor: ServiceDescriptor<'a>,
+    pub(super) instance_descriptor: InstanceDescriptor<'a>,
     pub(super) runtime_context: &'a mut ExecutionContext<'b>,
     pub(super) dispatcher: &'a Dispatcher,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
+    // TODO replace this methods by the `instance_descriptor` [ECR-3222]
+
     pub fn service_id(&self) -> InstanceId {
-        self.service_descriptor.service_id()
+        self.instance_descriptor.id
     }
 
     pub fn service_name(&self) -> &str {
-        self.service_descriptor.service_name()
+        self.instance_descriptor.name
     }
 
     /// If the current node is a validator, returns its identifier, for other nodes return `None`.
@@ -155,7 +135,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
 pub struct AfterCommitContext<'a> {
     dispatcher: &'a DispatcherSender,
-    service_descriptor: ServiceDescriptor<'a>,
+    instance_descriptor: InstanceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
     service_keypair: &'a (PublicKey, SecretKey),
     tx_sender: &'a ApiSender,
@@ -165,14 +145,14 @@ impl<'a> AfterCommitContext<'a> {
     /// Creates context for `after_commit` method.
     pub(crate) fn new(
         dispatcher: &'a DispatcherSender,
-        service_descriptor: ServiceDescriptor<'a>,
+        instance_descriptor: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
             dispatcher,
-            service_descriptor,
+            instance_descriptor,
             snapshot,
             service_keypair,
             tx_sender,
@@ -187,12 +167,12 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns the current service instance identifier.
     pub fn service_id(&self) -> InstanceId {
-        self.service_descriptor.service_id()
+        self.instance_descriptor.id
     }
 
     /// Returns the current service instance name.
     pub fn service_name(&self) -> &str {
-        self.service_descriptor.service_name()
+        self.instance_descriptor.name
     }
 
     /// If the current node is a validator, returns its identifier, for other nodes return `None`.
@@ -256,7 +236,7 @@ impl<'a> AfterCommitContext<'a> {
 impl<'a> Debug for AfterCommitContext<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
-            .field("service_descriptor", &self.service_descriptor)
+            .field("instance_descriptor", &self.instance_descriptor)
             .finish()
     }
 }

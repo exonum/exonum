@@ -46,7 +46,8 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, Service, ServiceDescriptor},
+        rust::{AfterCommitContext, Service},
+        InstanceDescriptor,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -75,8 +76,8 @@ impl Service for TimeService {
         api::PrivateApi.wire(builder);
     }
 
-    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = TimeSchema::new(descriptor.service_name(), snapshot);
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = TimeSchema::new(descriptor.name, snapshot);
         schema.state_hash()
     }
 

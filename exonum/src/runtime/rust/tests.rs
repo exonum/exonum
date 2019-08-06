@@ -27,8 +27,8 @@ use crate::{
         Any,
     },
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, rust::ServiceDescriptor, ArtifactInfo,
-        CallInfo, Caller, ExecutionContext, InstanceId, InstanceSpec,
+        dispatcher::Dispatcher, error::ExecutionError, ArtifactInfo, CallInfo, Caller,
+        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -99,7 +99,7 @@ impl TestService for TestServiceImpl {
 impl Service for TestServiceImpl {
     fn configure(
         &self,
-        _descriptor: ServiceDescriptor,
+        _descriptor: InstanceDescriptor,
         fork: &Fork,
         arg: Any,
     ) -> Result<(), ExecutionError> {

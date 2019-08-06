@@ -29,11 +29,8 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{
-            RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
-            TransactionContext,
-        },
-        AnyTx, ArtifactId, ArtifactInfo, ExecutionError, InstanceId,
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        AnyTx, ArtifactId, ArtifactInfo, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 
@@ -85,7 +82,7 @@ struct TestDispatcherService;
 impl Service for TestDispatcherService {
     fn configure(
         &self,
-        _descriptor: ServiceDescriptor,
+        _descriptor: InstanceDescriptor,
         _fork: &Fork,
         params: Any,
     ) -> Result<(), ExecutionError> {

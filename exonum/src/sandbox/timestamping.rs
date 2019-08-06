@@ -23,11 +23,8 @@ use crate::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
     runtime::{
-        rust::{
-            RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
-            TransactionContext,
-        },
-        AnyTx, ArtifactInfo, InstanceId,
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        AnyTx, ArtifactInfo, InstanceDescriptor, InstanceId,
     },
 };
 
@@ -56,7 +53,7 @@ impl TimestampingInterface for TimestampingService {
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _descriptor: ServiceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 }

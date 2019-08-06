@@ -39,11 +39,7 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
     proto::Any,
-    runtime::{
-        api::ServiceApiBuilder,
-        dispatcher,
-        rust::{Service, ServiceDescriptor},
-    },
+    runtime::{api::ServiceApiBuilder, dispatcher, rust::Service, InstanceDescriptor},
 };
 use exonum_merkledb::{Fork, Snapshot};
 
@@ -62,7 +58,7 @@ pub struct TimestampingService;
 impl Service for TimestampingService {
     fn configure(
         &self,
-        descriptor: ServiceDescriptor,
+        descriptor: InstanceDescriptor,
         fork: &Fork,
         params: Any,
     ) -> Result<(), ExecutionError> {
@@ -74,9 +70,7 @@ impl Service for TimestampingService {
             return Err(Error::TimeServiceNotFound.into());
         }
 
-        Schema::new(descriptor.service_name(), fork)
-            .config()
-            .set(config);
+        Schema::new(descriptor.name, fork).config().set(config);
         Ok(())
     }
 
@@ -84,8 +78,8 @@ impl Service for TimestampingService {
         TimestampingApi.wire(builder);
     }
 
-    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(descriptor.service_name(), snapshot);
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = Schema::new(descriptor.name, snapshot);
         schema.state_hash()
     }
 }

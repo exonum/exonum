@@ -14,10 +14,7 @@
 
 pub use self::{
     error::Error,
-    service::{
-        AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction,
-        TransactionContext,
-    },
+    service::{AfterCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
 };
 
 pub mod error;
@@ -70,8 +67,11 @@ impl Instance {
         Self { id, name, service }
     }
 
-    pub fn descriptor(&self) -> ServiceDescriptor {
-        ServiceDescriptor::new(self.id, &self.name)
+    pub fn descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor {
+            id: self.id,
+            name: &self.name,
+        }
     }
 
     pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
@@ -263,13 +263,13 @@ impl Runtime for RustRuntime {
     ) -> Result<(), ExecutionError> {
         trace!("Configure service instance {}", descriptor);
 
-        let service_instance = self
+        let instance = self
             .started_services
             .get(&descriptor.id)
             .ok_or(dispatcher::Error::ServiceNotStarted)?;
-        service_instance
+        instance
             .as_ref()
-            .configure(service_instance.descriptor(), fork, parameters)
+            .configure(instance.descriptor(), fork, parameters)
     }
 
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
@@ -289,13 +289,13 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
-        service_instance
+        let instance = self.started_services.get(&call_info.instance_id).unwrap();
+        instance
             .as_ref()
             .call(
                 call_info.method_id,
                 TransactionContext {
-                    service_descriptor: service_instance.descriptor(),
+                    instance_descriptor: instance.descriptor(),
                     runtime_context,
                     dispatcher,
                 },
@@ -316,12 +316,13 @@ impl Runtime for RustRuntime {
     }
 
     fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {
-        for service in self.started_services.values() {
+        // TODO Use `catch_panic` helper. [ECR-3222]
+        for instance in self.started_services.values() {
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                service.as_ref().before_commit(TransactionContext {
+                instance.as_ref().before_commit(TransactionContext {
                     dispatcher,
                     runtime_context: &mut ExecutionContext::new(fork, Caller::Blockchain),
-                    service_descriptor: service.descriptor(),
+                    instance_descriptor: instance.descriptor(),
                 })
             })) {
                 Ok(..) => fork.flush(),
@@ -360,16 +361,16 @@ impl Runtime for RustRuntime {
     fn services_api(&self, context: &ServiceApiContext) -> Vec<(String, ServiceApiBuilder)> {
         self.started_services
             .values()
-            .map(|service_instance| {
+            .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
                     context.clone(),
                     InstanceDescriptor {
-                        id: service_instance.id,
-                        name: service_instance.name.as_ref(),
+                        id: instance.id,
+                        name: instance.name.as_ref(),
                     },
                 );
-                service_instance.as_ref().wire_api(&mut builder);
-                (service_instance.name.clone(), builder)
+                instance.as_ref().wire_api(&mut builder);
+                (instance.name.clone(), builder)
             })
             .collect()
     }

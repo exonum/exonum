@@ -25,8 +25,8 @@ use crate::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, Service, ServiceDescriptor, Transaction, TransactionContext},
-        InstanceId,
+        rust::{AfterCommitContext, Service, Transaction, TransactionContext},
+        InstanceDescriptor, InstanceId,
     },
 };
 
@@ -46,8 +46,8 @@ mod transactions;
 pub struct Supervisor;
 
 impl Service for Supervisor {
-    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        Schema::new(descriptor.service_name(), snapshot).state_hash()
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        Schema::new(descriptor.name, snapshot).state_hash()
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
