@@ -177,7 +177,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
     proto::Any,
-    runtime::{rust::ServiceFactory, ServiceInstanceId},
+    runtime::{rust::ServiceFactory, InstanceId},
 };
 use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
@@ -229,7 +229,7 @@ impl TestKit {
     pub fn for_service(
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
-        id: ServiceInstanceId,
+        id: InstanceId,
         constructor: impl Into<Any>,
     ) -> Self {
         TestKitBuilder::validator()

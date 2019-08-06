@@ -28,7 +28,7 @@ use crate::{
     },
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, rust::ServiceDescriptor, ArtifactInfo,
-        CallInfo, Caller, ExecutionContext, InstanceSpec, ServiceInstanceId,
+        CallInfo, Caller, ExecutionContext, InstanceId, InstanceSpec,
     },
 };
 
@@ -37,7 +37,7 @@ use super::{
     ArtifactId, Error, RustArtifactId, RustRuntime, TransactionContext,
 };
 
-const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
+const SERVICE_INSTANCE_ID: InstanceId = 2;
 const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
 #[derive(Debug, ProtobufConvert)]

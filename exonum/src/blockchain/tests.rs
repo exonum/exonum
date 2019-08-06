@@ -33,12 +33,12 @@ use crate::{
             RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
             TransactionContext,
         },
-        AnyTx, ArtifactId, ArtifactInfo, ExecutionError, ServiceInstanceId,
+        AnyTx, ArtifactId, ArtifactInfo, ExecutionError, InstanceId,
     },
 };
 
 const IDX_NAME: &str = "idx_name";
-const TEST_SERVICE_ID: ServiceInstanceId = 255;
+const TEST_SERVICE_ID: InstanceId = 255;
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
@@ -262,7 +262,7 @@ impl ServiceFactory for ServicePanicStorageErrorImpl {
     }
 }
 
-const TX_CHECK_RESULT_SERVICE_ID: ServiceInstanceId = 255;
+const TX_CHECK_RESULT_SERVICE_ID: InstanceId = 255;
 
 lazy_static! {
     static ref EXECUTION_STATUS: Mutex<Result<(), ExecutionError>> = Mutex::new(Ok(()));

@@ -81,7 +81,7 @@
 
 pub use self::{
     error::{ErrorKind, ExecutionError},
-    types::{AnyTx, ArtifactId, CallInfo, InstanceSpec, MethodId, ServiceInstanceId},
+    types::{AnyTx, ArtifactId, CallInfo, InstanceId, InstanceSpec, MethodId},
 };
 
 #[macro_use]
@@ -297,7 +297,7 @@ pub struct StateHashAggregator {
     /// List of hashes of the root objects of runtime information schemas.
     pub runtime: Vec<Hash>,
     /// List of hashes of the root objects of service instances schemas.
-    pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
+    pub instances: Vec<(InstanceId, Vec<Hash>)>,
 }
 
 /// The one who causes the transaction execution.
@@ -371,7 +371,7 @@ impl<'a> ExecutionContext<'a> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InstanceDescriptor<'a> {
     /// Returns the current service instance identifier.
-    pub id: ServiceInstanceId,
+    pub id: InstanceId,
     /// Returns the current service instance name.
     pub name: &'a str,
     /// A special field in order to prevent the user from creating an instance of this struct.

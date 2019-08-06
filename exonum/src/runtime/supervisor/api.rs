@@ -21,7 +21,7 @@ use crate::{
     crypto::Hash,
     runtime::{
         rust::{ServiceDescriptor, Transaction},
-        ServiceInstanceId,
+        InstanceId,
     },
 };
 
@@ -39,16 +39,12 @@ pub trait PrivateApi {
 
 struct ApiImpl<'a> {
     state: &'a ServiceApiState,
-    instance_id: ServiceInstanceId,
+    instance_id: InstanceId,
     _instance_name: String,
 }
 
 impl<'a> ApiImpl<'a> {
-    fn new(
-        state: &'a ServiceApiState,
-        instance_id: ServiceInstanceId,
-        instance_name: &str,
-    ) -> Self {
+    fn new(state: &'a ServiceApiState, instance_id: InstanceId, instance_name: &str) -> Self {
         Self {
             state,
             instance_id,

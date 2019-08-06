@@ -22,7 +22,7 @@ use exonum::{
     crypto::{Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
-    runtime::{rust::ServiceDescriptor, ServiceInstanceId},
+    runtime::{rust::ServiceDescriptor, InstanceId},
 };
 
 use crate::{wallet::Wallet, Schema};
@@ -67,7 +67,7 @@ pub struct WalletInfo {
 #[derive(Debug, Clone)]
 pub struct PublicApi {
     service_name: String,
-    service_id: ServiceInstanceId,
+    service_id: InstanceId,
 }
 
 impl PublicApi {

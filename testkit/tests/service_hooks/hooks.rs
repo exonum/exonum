@@ -19,7 +19,7 @@ use exonum::{
     helpers::Height,
     runtime::{
         rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        ArtifactInfo, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert};
@@ -29,7 +29,7 @@ use std::sync::{
     Arc,
 };
 
-pub const SERVICE_ID: ServiceInstanceId = 512;
+pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq)]

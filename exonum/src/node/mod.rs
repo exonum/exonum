@@ -1190,13 +1190,13 @@ mod tests {
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ArtifactInfo, ExecutionError, ServiceInstanceId,
+            ArtifactInfo, ExecutionError, InstanceId,
         },
     };
 
     use super::*;
 
-    const SERVICE_ID: ServiceInstanceId = 15;
+    const SERVICE_ID: InstanceId = 15;
 
     impl_binary_value_for_pb_message! { TxSimple }
 

@@ -23,7 +23,7 @@ use crate::{
     api::{Error as ApiError, ServiceApiScope, ServiceApiState},
     crypto::PublicKey,
     node::{ConnectInfo, ExternalMessage},
-    runtime::ServiceInstanceId,
+    runtime::InstanceId,
 };
 
 use super::SharedNodeState;
@@ -34,7 +34,7 @@ pub struct ServiceInfo {
     /// Service name.
     pub name: String,
     /// Service identifier for database schema and service messages.
-    pub id: ServiceInstanceId,
+    pub id: InstanceId,
 }
 
 /// Short information about the current node.

@@ -21,7 +21,7 @@ use exonum::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        AnyTx, ServiceInstanceId,
+        AnyTx, InstanceId,
         {
             rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
             ArtifactInfo,
@@ -32,7 +32,7 @@ use exonum_merkledb::{ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
 use semver::Version;
 
-pub const SERVICE_ID: ServiceInstanceId = 4;
+pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
 

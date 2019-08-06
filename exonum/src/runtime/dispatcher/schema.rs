@@ -17,7 +17,7 @@
 use exonum_merkledb::{Entry, IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
 use super::{ArtifactId, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
-use crate::{crypto::Hash, proto::Any, runtime::ServiceInstanceId};
+use crate::{crypto::Hash, proto::Any, runtime::InstanceId};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -47,12 +47,12 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Internal index to store identifiers of service instances.
-    fn service_instance_ids(&self) -> KeySetIndex<T, ServiceInstanceId> {
+    fn service_instance_ids(&self) -> KeySetIndex<T, InstanceId> {
         KeySetIndex::new("core.dispatcher.service_instance_ids", self.access.clone())
     }
 
     /// Vacant identifier for user service instances.
-    fn vacant_instance_id(&self) -> Entry<T, ServiceInstanceId> {
+    fn vacant_instance_id(&self) -> Entry<T, InstanceId> {
         Entry::new("core.dispatcher.vacant_instance_id", self.access.clone())
     }
 
@@ -69,7 +69,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Assigns unique identifier for instance.
-    pub(crate) fn assign_instance_id(&mut self) -> ServiceInstanceId {
+    pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
         let id = self
             .vacant_instance_id()
             .get()

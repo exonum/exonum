@@ -19,7 +19,7 @@ use exonum::{
     helpers::Height,
     runtime::{
         rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        ArtifactInfo, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
@@ -30,7 +30,7 @@ use super::proto;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
-pub const SERVICE_ID: ServiceInstanceId = 55;
+pub const SERVICE_ID: InstanceId = 55;
 pub const SERVICE_NAME: &str = "cryptocurrency";
 
 /// Initial balance of newly created wallet.

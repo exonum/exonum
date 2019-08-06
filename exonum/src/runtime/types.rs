@@ -27,7 +27,7 @@ use super::InstanceDescriptor;
 /// The primary is the service instance name.
 ///
 /// * The core assigns this identifier when the service is started.
-pub type ServiceInstanceId = u32;
+pub type InstanceId = u32;
 /// Identifier of the method in the service interface to call.
 pub type MethodId = u32;
 
@@ -39,7 +39,7 @@ pub type MethodId = u32;
 pub struct CallInfo {
     /// Unique service instance identifier. Dispatcher uses this identifier to find the
     /// corresponding runtime to execute transaction.
-    pub instance_id: ServiceInstanceId,
+    pub instance_id: InstanceId,
     /// Identifier of the method in the service interface to call.
     pub method_id: MethodId,
 }
@@ -215,7 +215,7 @@ impl FromStr for ArtifactId {
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
     /// Unique service instance identifier.
-    pub id: ServiceInstanceId,
+    pub id: InstanceId,
     /// Unique service instance name.
     ///
     /// It must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
@@ -228,7 +228,7 @@ impl InstanceSpec {
     /// Creates a new instance specification or returns an error
     /// if the resulting specification is not correct.
     pub fn new(
-        id: ServiceInstanceId,
+        id: InstanceId,
         name: impl Into<String>,
         artifact: impl AsRef<str>,
     ) -> Result<Self, failure::Error> {

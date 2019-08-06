@@ -27,7 +27,7 @@ use crate::{
             RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
             TransactionContext,
         },
-        AnyTx, ArtifactInfo, ServiceInstanceId,
+        AnyTx, ArtifactInfo, InstanceId,
     },
 };
 
@@ -79,7 +79,7 @@ impl ServiceFactory for TimestampingService {
 }
 
 impl TimestampingService {
-    pub const ID: ServiceInstanceId = 3;
+    pub const ID: InstanceId = 3;
 }
 
 impl_binary_value_for_pb_message! { TimestampTx }

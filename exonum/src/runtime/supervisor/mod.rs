@@ -26,7 +26,7 @@ use crate::{
     crypto::Hash,
     runtime::{
         rust::{AfterCommitContext, Service, ServiceDescriptor, Transaction, TransactionContext},
-        ServiceInstanceId,
+        InstanceId,
     },
 };
 
@@ -122,6 +122,6 @@ impl Service for Supervisor {
 }
 
 impl Supervisor {
-    pub const BUILTIN_ID: ServiceInstanceId = 0;
+    pub const BUILTIN_ID: InstanceId = 0;
     pub const BUILTIN_NAME: &'static str = "supervisor";
 }

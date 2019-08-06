@@ -25,7 +25,7 @@ use crate::{
     proto::{schema::PROTO_SOURCES, ProtobufConvert},
     runtime::{
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        ArtifactInfo, InstanceId,
     },
 };
 
@@ -76,7 +76,7 @@ impl ServiceFactory for ConfigUpdaterService {
 }
 
 impl ConfigUpdaterService {
-    pub const ID: ServiceInstanceId = 2;
+    pub const ID: InstanceId = 2;
 }
 
 impl TxConfig {

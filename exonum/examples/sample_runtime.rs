@@ -26,8 +26,8 @@ use exonum::{
         dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
         supervisor::{DeployRequest, StartService, Supervisor},
-        AnyTx, ArtifactId, ArtifactInfo, CallInfo, ExecutionContext, ExecutionError, InstanceSpec,
-        Runtime, ServiceInstanceId, StateHashAggregator,
+        AnyTx, ArtifactId, ArtifactInfo, CallInfo, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, Runtime, StateHashAggregator, InstanceDescriptor,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -52,7 +52,7 @@ struct SampleService {
 #[derive(Debug, Default)]
 struct SampleRuntime {
     deployed_artifacts: BTreeMap<ArtifactId, Any>,
-    started_services: BTreeMap<ServiceInstanceId, SampleService>,
+    started_services: BTreeMap<InstanceId, SampleService>,
 }
 
 // Define runtime specific errors.
@@ -113,26 +113,26 @@ impl Runtime for SampleRuntime {
     fn configure_service(
         &self,
         _context: &Fork,
-        spec: &InstanceSpec,
+        descriptor: InstanceDescriptor,
         parameters: Any,
     ) -> Result<(), ExecutionError> {
         let service_instance = self
             .started_services
-            .get(&spec.id)
+            .get(&descriptor.id)
             .ok_or(DispatcherError::ServiceNotStarted)?;
 
         let new_value =
             u64::try_from(parameters).map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
         service_instance.counter.set(new_value);
-        println!("Configuring service {} with value {}", spec.name, new_value);
+        println!("Configuring service {} with value {}", descriptor.name, new_value);
         Ok(())
     }
 
     /// `stop_service` removes the service with the specified ID from the list of the started services.
-    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        println!("Stopping service: {:?}", spec);
+    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
+        println!("Stopping service: {}", descriptor);
         self.started_services
-            .remove(&spec.id)
+            .remove(&descriptor.id)
             .map(drop)
             .ok_or(DispatcherError::ServiceNotStarted)
             .map_err(ExecutionError::from)

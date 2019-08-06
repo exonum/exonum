@@ -21,7 +21,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        ArtifactInfo, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
@@ -34,7 +34,7 @@ use std::sync::Arc;
 use super::proto;
 
 pub const SERVICE_NAME: &str = "counter";
-pub const SERVICE_ID: ServiceInstanceId = 2;
+pub const SERVICE_ID: InstanceId = 2;
 /// "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 

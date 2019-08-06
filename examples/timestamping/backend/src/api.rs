@@ -19,7 +19,7 @@ use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof, IndexCoordinates, IndexOwner},
     crypto::Hash,
-    runtime::{rust::ServiceDescriptor, ServiceInstanceId},
+    runtime::{rust::ServiceDescriptor, InstanceId},
 };
 
 use crate::schema::{Schema, TimestampEntry};
@@ -53,7 +53,7 @@ pub struct TimestampProof {
 #[derive(Debug, Clone)]
 pub struct PublicApi {
     service_name: String,
-    service_id: ServiceInstanceId,
+    service_id: InstanceId,
 }
 
 impl PublicApi {

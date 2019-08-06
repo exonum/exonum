@@ -29,7 +29,7 @@ use crate::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
         supervisor::Supervisor,
-        InstanceSpec, Runtime, ServiceInstanceId,
+        InstanceId, InstanceSpec, Runtime,
     },
 };
 
@@ -191,7 +191,7 @@ impl InstanceCollection {
     /// Adds a new service instance to the collection.
     pub fn with_instance(
         mut self,
-        id: ServiceInstanceId,
+        id: InstanceId,
         name: impl Into<String>,
         params: impl Into<Any>,
     ) -> Self {

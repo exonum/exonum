@@ -28,7 +28,7 @@ use crate::{
     runtime::{
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactInfo, CallInfo, ExecutionContext, MethodId, ServiceInstanceId,
+        AnyTx, ArtifactInfo, CallInfo, ExecutionContext, InstanceId, MethodId,
     },
 };
 
@@ -84,17 +84,17 @@ where
 
 #[derive(Debug)]
 pub struct ServiceDescriptor<'a> {
-    id: ServiceInstanceId,
+    id: InstanceId,
     name: &'a str,
 }
 
 impl<'a> ServiceDescriptor<'a> {
-    pub(crate) fn new(id: ServiceInstanceId, name: &'a str) -> Self {
+    pub(crate) fn new(id: InstanceId, name: &'a str) -> Self {
         Self { id, name }
     }
 
     /// Returns the current service instance identifier.
-    pub fn service_id(&self) -> ServiceInstanceId {
+    pub fn service_id(&self) -> InstanceId {
         self.id
     }
 
@@ -112,7 +112,7 @@ pub struct TransactionContext<'a, 'b> {
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    pub fn service_id(&self) -> ServiceInstanceId {
+    pub fn service_id(&self) -> InstanceId {
         self.service_descriptor.service_id()
     }
 
@@ -186,7 +186,7 @@ impl<'a> AfterCommitContext<'a> {
     }
 
     /// Returns the current service instance identifier.
-    pub fn service_id(&self) -> ServiceInstanceId {
+    pub fn service_id(&self) -> InstanceId {
         self.service_descriptor.service_id()
     }
 
@@ -269,7 +269,7 @@ pub trait Transaction: BinaryValue {
     const METHOD_ID: MethodId;
 
     /// Creates unsigned service transaction from the value.
-    fn into_any_tx(self, instance_id: ServiceInstanceId) -> AnyTx {
+    fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
         AnyTx {
             call_info: CallInfo {
                 instance_id,
@@ -282,7 +282,7 @@ pub trait Transaction: BinaryValue {
     /// Signs value as transaction with the specified instance identifier.
     fn sign(
         self,
-        service_id: ServiceInstanceId,
+        service_id: InstanceId,
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Verified<AnyTx> {

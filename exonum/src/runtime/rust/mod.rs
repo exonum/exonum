@@ -40,8 +40,8 @@ use crate::{
 use super::{
     dispatcher::{self, DispatcherSender},
     error::ExecutionError,
-    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceSpec,
-    Runtime, RuntimeIdentifier, ServiceInstanceId, StateHashAggregator,
+    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 pub mod error;
@@ -54,19 +54,19 @@ pub mod tests;
 pub struct RustRuntime {
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
-    started_services: BTreeMap<ServiceInstanceId, Instance>,
-    started_services_by_name: HashMap<String, ServiceInstanceId>,
+    started_services: BTreeMap<InstanceId, Instance>,
+    started_services_by_name: HashMap<String, InstanceId>,
 }
 
 #[derive(Debug)]
 struct Instance {
-    id: ServiceInstanceId,
+    id: InstanceId,
     name: String,
     service: Box<dyn Service>,
 }
 
 impl Instance {
-    pub fn new(id: ServiceInstanceId, name: String, service: Box<dyn Service>) -> Self {
+    pub fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
         Self { id, name, service }
     }
 
@@ -74,7 +74,7 @@ impl Instance {
         ServiceDescriptor::new(self.id, &self.name)
     }
 
-    pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (ServiceInstanceId, Vec<Hash>) {
+    pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
         (
             self.id,
             self.service.state_hash(self.descriptor(), snapshot),

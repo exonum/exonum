@@ -1219,7 +1219,7 @@ mod tests {
                 AfterCommitContext, RustArtifactId, Service, ServiceFactory, Transaction,
                 TransactionContext,
             },
-            AnyTx, ArtifactInfo, ServiceInstanceId,
+            AnyTx, ArtifactInfo, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1275,7 +1275,7 @@ mod tests {
     }
 
     impl AfterCommitService {
-        pub const ID: ServiceInstanceId = 2;
+        pub const ID: InstanceId = 2;
     }
 
     impl TxAfterCommit {

@@ -31,8 +31,8 @@ use crate::{
 
 use super::{
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceSpec,
-    Runtime, ServiceInstanceId,
+    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceSpec, Runtime,
 };
 
 mod error;
@@ -42,12 +42,12 @@ mod schema;
 ///
 /// By analogy with network's privileged ports, we use a range 0..1023 of instance identifiers
 /// for built in services which can be created only during the blockchain genesis block creation.
-pub const MAX_BUILTIN_INSTANCE_ID: ServiceInstanceId = 1024;
+pub const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
 
 #[derive(Default)]
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn Runtime>>,
-    runtime_lookup: HashMap<ServiceInstanceId, u32>,
+    runtime_lookup: HashMap<InstanceId, u32>,
     modified: Option<()>,
 }
 
@@ -492,7 +492,7 @@ mod tests {
         crypto::PublicKey,
         runtime::{
             rust::{Error as RustRuntimeError, RustRuntime},
-            ArtifactInfo, MethodId, RuntimeIdentifier, ServiceInstanceId, StateHashAggregator,
+            ArtifactInfo, InstanceId, MethodId, RuntimeIdentifier, StateHashAggregator,
         },
     };
 
@@ -535,7 +535,7 @@ mod tests {
     #[derive(Debug)]
     struct SampleRuntime {
         runtime_type: u32,
-        instance_id: ServiceInstanceId,
+        instance_id: InstanceId,
         method_id: MethodId,
     }
 
@@ -546,7 +546,7 @@ mod tests {
     }
 
     impl SampleRuntime {
-        fn new(runtime_type: u32, instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
+        fn new(runtime_type: u32, instance_id: InstanceId, method_id: MethodId) -> Self {
             Self {
                 runtime_type,
                 instance_id,
@@ -648,8 +648,8 @@ mod tests {
 
     #[test]
     fn test_dispatcher_simple() {
-        const RUST_SERVICE_ID: ServiceInstanceId = 2;
-        const JAVA_SERVICE_ID: ServiceInstanceId = 3;
+        const RUST_SERVICE_ID: InstanceId = 2;
+        const JAVA_SERVICE_ID: InstanceId = 3;
         const RUST_SERVICE_NAME: &str = "rust-service";
         const JAVA_SERVICE_NAME: &str = "java-service";
         const RUST_METHOD_ID: MethodId = 0;
@@ -755,7 +755,7 @@ mod tests {
 
     #[test]
     fn test_dispatcher_rust_runtime_no_service() {
-        const RUST_SERVICE_ID: ServiceInstanceId = 2;
+        const RUST_SERVICE_ID: InstanceId = 2;
         const RUST_SERVICE_NAME: &str = "rust-service";
         const RUST_METHOD_ID: MethodId = 0;
 
