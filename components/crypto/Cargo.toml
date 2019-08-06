@@ -16,7 +16,7 @@ byteorder = { version = "1.2.7", features = [ "i128" ] }
 chrono = "0.4.6"
 hex = "0.3.2"
 hex-buffer-serde = "0.2.0"
-pwbox = "0.1.4"
+pwbox = "0.2.0"
 rand = "0.6"
 rust_decimal = "1.0"
 serde = "1.0.10"
