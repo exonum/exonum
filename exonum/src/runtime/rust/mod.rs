@@ -25,7 +25,7 @@ use futures::{future, Future, IntoFuture};
 use semver::Version;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, BTreeMap},
     fmt, panic,
     str::FromStr,
 };
@@ -54,7 +54,7 @@ pub mod tests;
 pub struct RustRuntime {
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
-    started_services: HashMap<ServiceInstanceId, Instance>,
+    started_services: BTreeMap<ServiceInstanceId, Instance>,
     started_services_by_name: HashMap<String, ServiceInstanceId>,
 }
 
