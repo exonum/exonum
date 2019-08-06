@@ -30,6 +30,7 @@ use self::{
 };
 use crate::{
     api::node::SharedNodeState, blockchain::Blockchain, crypto::PublicKey, node::ApiSender,
+    runtime::api::ServiceApiContext,
 };
 
 pub mod backends;
@@ -228,9 +229,9 @@ impl ServiceApiScope {
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct ServiceApiBuilder {
-    blockchain: Option<Blockchain>,
-    public_scope: ServiceApiScope,
-    private_scope: ServiceApiScope,
+    pub(crate) blockchain: Option<Blockchain>,
+    pub(crate) public_scope: ServiceApiScope,
+    pub(crate) private_scope: ServiceApiScope,
 }
 
 impl ServiceApiBuilder {
@@ -347,11 +348,13 @@ impl ApiAggregator {
 
         let blockchain = self.blockchain.clone();
         let dispatcher = self.blockchain.dispatcher();
+        let context = ServiceApiContext::with_blockchain(&blockchain);
         inner.extend(
             dispatcher
-                .services_api()
+                .services_api(&context)
                 .into_iter()
-                .map(|(name, mut builder)| {
+                .map(|(name, builder)| {
+                    let mut builder = ServiceApiBuilder::from(builder);
                     builder.set_blockchain(blockchain.clone());
                     (format!("services/{}", name), builder)
                 }),

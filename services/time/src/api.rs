@@ -16,7 +16,7 @@
 
 use chrono::{DateTime, Utc};
 
-use exonum::{api, blockchain::Schema, crypto::PublicKey};
+use exonum::{blockchain::Schema, crypto::PublicKey, runtime::api};
 
 use crate::TimeSchema;
 
@@ -31,61 +31,36 @@ pub struct ValidatorTime {
 
 /// Implements the exonum-time public API.
 #[derive(Debug, Clone)]
-pub struct PublicApi {
-    service_name: String,
-}
+pub struct PublicApi;
 
 impl PublicApi {
-    /// Creates a new public API instance for service instance with the given name.
-    pub fn new(service_name: impl Into<String>) -> Self {
-        Self {
-            service_name: service_name.into(),
-        }
-    }
-
     /// Endpoint for getting time values for all validators.
     pub fn current_time(
-        service_name: &str,
         state: &api::ServiceApiState,
+        _query: (),
     ) -> api::Result<Option<DateTime<Utc>>> {
-        let view = state.snapshot();
-        let schema = TimeSchema::new(service_name, &view);
-        Ok(schema.time().get())
+        Ok(TimeSchema::new(state.instance().name, state.snapshot())
+            .time()
+            .get())
     }
 
     /// Used to extend Api.
     pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
-        let service_name = self.service_name;
-        builder.public_scope().endpoint(
-            "v1/current_time",
-            move |state: &api::ServiceApiState, _query: ()| {
-                Self::current_time(&service_name, state)
-            },
-        );
+        builder
+            .public_scope()
+            .endpoint("v1/current_time", Self::current_time);
     }
 }
 
 /// Implements the exonum-time private API.
 #[derive(Debug, Clone)]
-pub struct PrivateApi {
-    service_name: String,
-}
+pub struct PrivateApi;
 
 impl PrivateApi {
-    /// Creates a new private API instance for service instance with the given name.
-    pub fn new(service_name: impl Into<String>) -> Self {
-        Self {
-            service_name: service_name.into(),
-        }
-    }
-
     /// Endpoint for getting time values for all validators.
-    pub fn all_validators_times(
-        service_name: &str,
-        state: &api::ServiceApiState,
-    ) -> api::Result<Vec<ValidatorTime>> {
+    pub fn all_validators_times(state: &api::ServiceApiState) -> api::Result<Vec<ValidatorTime>> {
         let view = state.snapshot();
-        let schema = TimeSchema::new(service_name, &view);
+        let schema = TimeSchema::new(state.instance().name, view);
         let idx = schema.validators_times();
 
         // The times of all validators for which time is known.
@@ -101,12 +76,11 @@ impl PrivateApi {
 
     /// Endpoint for getting time values for current validators.
     pub fn current_validators_time(
-        service_name: &str,
         state: &api::ServiceApiState,
     ) -> api::Result<Vec<ValidatorTime>> {
         let view = state.snapshot();
-        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-        let schema = TimeSchema::new(service_name, &view);
+        let validator_keys = Schema::new(view).actual_configuration().validator_keys;
+        let schema = TimeSchema::new(state.instance().name, view);
         let idx = schema.validators_times();
 
         // The times of current validators.
@@ -126,16 +100,10 @@ impl PrivateApi {
         builder
             .private_scope()
             .endpoint("v1/validators_times", {
-                let service_name = self.service_name.clone();
-                move |state: &api::ServiceApiState, _query: ()| {
-                    Self::current_validators_time(&service_name, state)
-                }
+                move |state: &api::ServiceApiState, _query: ()| Self::current_validators_time(state)
             })
             .endpoint("v1/validators_times/all", {
-                let service_name = self.service_name.clone();
-                move |state: &api::ServiceApiState, _query: ()| {
-                    Self::all_validators_times(&service_name, state)
-                }
+                move |state: &api::ServiceApiState, _query: ()| Self::all_validators_times(state)
             });
     }
 }

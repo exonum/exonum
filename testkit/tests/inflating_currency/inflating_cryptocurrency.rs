@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use exonum::{
-    api,
     blockchain::Schema as CoreSchema,
     crypto::PublicKey,
     helpers::Height,
     runtime::{
-        rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
+        api::{self, ServiceApiBuilder},
+        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
         ArtifactInfo, InstanceId,
     },
 };
@@ -181,17 +181,17 @@ impl CryptocurrencyApi {
     /// Endpoint for retrieving a single wallet.
     fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<u64> {
         let snapshot = state.snapshot();
-        let schema = CurrencySchema::new(&snapshot);
+        let schema = CurrencySchema::new(snapshot);
         schema
             .wallet(&query.pub_key)
             .map(|wallet| {
-                let height = CoreSchema::new(&snapshot).height();
+                let height = CoreSchema::new(snapshot).height();
                 wallet.actual_balance(height)
             })
             .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
     }
 
-    fn wire(builder: &mut api::ServiceApiBuilder) {
+    fn wire(builder: &mut ServiceApiBuilder) {
         builder.public_scope().endpoint("v1/balance", Self::balance);
     }
 }
@@ -204,7 +204,7 @@ pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut api::ServiceApiBuilder) {
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
     }
 }

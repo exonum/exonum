@@ -20,6 +20,12 @@ pub use self::{
     },
 };
 
+pub mod error;
+#[macro_use]
+pub mod service;
+#[cfg(test)]
+pub mod tests;
+
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
 use semver::Version;
@@ -31,24 +37,18 @@ use std::{
 };
 
 use crate::{
-    api::ServiceApiBuilder,
     crypto::{Hash, PublicKey, SecretKey},
     node::ApiSender,
     proto::Any,
 };
 
 use super::{
+    api::{ServiceApiBuilder, ServiceApiContext},
     dispatcher::{self, DispatcherSender},
     error::ExecutionError,
     ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
-
-pub mod error;
-#[macro_use]
-pub mod service;
-#[cfg(test)]
-pub mod tests;
 
 #[derive(Debug, Default)]
 pub struct RustRuntime {
@@ -357,14 +357,18 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self, context: &ServiceApiContext) -> Vec<(String, ServiceApiBuilder)> {
         self.started_services
             .values()
             .map(|service_instance| {
-                let mut builder = ServiceApiBuilder::new();
-                service_instance
-                    .as_ref()
-                    .wire_api(service_instance.descriptor(), &mut builder);
+                let mut builder = ServiceApiBuilder::new(
+                    context.clone(),
+                    InstanceDescriptor {
+                        id: service_instance.id,
+                        name: service_instance.name.as_ref(),
+                    },
+                );
+                service_instance.as_ref().wire_api(&mut builder);
                 (service_instance.name.clone(), builder)
             })
             .collect()

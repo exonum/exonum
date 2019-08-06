@@ -86,6 +86,7 @@ pub use self::{
 
 #[macro_use]
 pub mod rust;
+pub mod api;
 pub mod dispatcher;
 pub mod error;
 pub mod supervisor;
@@ -96,13 +97,15 @@ use futures::Future;
 use std::fmt::Debug;
 
 use crate::{
-    api::ServiceApiBuilder,
     crypto::{Hash, PublicKey, SecretKey},
     node::ApiSender,
     proto::Any,
 };
 
-use self::dispatcher::{Dispatcher, DispatcherSender};
+use self::{
+    api::{ServiceApiBuilder, ServiceApiContext},
+    dispatcher::{Dispatcher, DispatcherSender},
+};
 
 mod types;
 
@@ -255,7 +258,7 @@ pub trait Runtime: Send + Debug + 'static {
         tx_sender: &ApiSender,
     );
 
-    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self, _context: &ServiceApiContext) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
     }
 }
@@ -374,12 +377,16 @@ pub struct InstanceDescriptor<'a> {
     pub id: InstanceId,
     /// Returns the current service instance name.
     pub name: &'a str,
-    /// A special field in order to prevent the user from creating an instance of this struct.
-    _phantom: std::marker::PhantomData<()>,
 }
 
 impl std::fmt::Display for InstanceDescriptor<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", self.id, self.name)
+    }
+}
+
+impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
+    fn from(descriptor: InstanceDescriptor) -> Self {
+        (descriptor.id, descriptor.name.to_owned())
     }
 }

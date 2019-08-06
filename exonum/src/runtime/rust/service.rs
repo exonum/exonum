@@ -18,7 +18,6 @@ use failure::Error;
 use std::fmt::{self, Debug};
 
 use crate::{
-    api::ServiceApiBuilder,
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
@@ -26,6 +25,7 @@ use crate::{
     node::ApiSender,
     proto::Any,
     runtime::{
+        api::ServiceApiBuilder,
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
         AnyTx, ArtifactInfo, CallInfo, ExecutionContext, InstanceId, MethodId,
@@ -61,7 +61,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 
     fn after_commit(&self, _context: AfterCommitContext) {}
 
-    fn wire_api(&self, _descriptor: ServiceDescriptor, _builder: &mut ServiceApiBuilder) {}
+    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
     // TODO: add other hooks such as "on node startup", etc.
 }
 

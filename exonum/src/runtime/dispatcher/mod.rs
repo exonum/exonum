@@ -20,7 +20,6 @@ use futures::{future, Future};
 use std::{cell::RefCell, collections::HashMap, panic};
 
 use crate::{
-    api::ServiceApiBuilder,
     blockchain::{FatalError, IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::ValidateInput,
@@ -30,6 +29,7 @@ use crate::{
 };
 
 use super::{
+    api::{ServiceApiBuilder, ServiceApiContext},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime,
@@ -141,11 +141,14 @@ impl Dispatcher {
         aggregator
     }
 
-    pub(crate) fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    pub(crate) fn services_api(
+        &self,
+        context: &ServiceApiContext,
+    ) -> Vec<(String, ServiceApiBuilder)> {
         self.runtimes
             .iter()
             .fold(Vec::new(), |mut api, (_, runtime)| {
-                api.append(&mut runtime.services_api());
+                api.append(&mut runtime.services_api(context));
                 api
             })
     }

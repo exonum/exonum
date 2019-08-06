@@ -490,7 +490,8 @@ impl TestKit {
 
         self.poll_events();
 
-        BlockchainExplorer::new(&self.blockchain)
+        let snapshot = self.snapshot();
+        BlockchainExplorer::new(snapshot.as_ref())
             .block_with_txs(self.height())
             .unwrap()
     }
@@ -683,11 +684,6 @@ impl TestKit {
     /// Returns the height of latest committed block.
     pub fn height(&self) -> Height {
         self.blockchain.last_block().height()
-    }
-
-    /// Returns the blockchain explorer instance.
-    pub fn explorer(&self) -> BlockchainExplorer {
-        BlockchainExplorer::new(&self.blockchain)
     }
 
     /// Returns the actual blockchain configuration.

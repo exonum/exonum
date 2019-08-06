@@ -260,7 +260,6 @@ impl InstanceSpec {
         InstanceDescriptor {
             id: self.id,
             name: self.name.as_ref(),
-            _phantom: std::marker::PhantomData,
         }
     }
 }

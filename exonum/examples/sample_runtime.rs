@@ -26,8 +26,8 @@ use exonum::{
         dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
         supervisor::{DeployRequest, StartService, Supervisor},
-        AnyTx, ArtifactId, ArtifactInfo, CallInfo, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, Runtime, StateHashAggregator, InstanceDescriptor,
+        AnyTx, ArtifactId, ArtifactInfo, CallInfo, ExecutionContext, ExecutionError,
+        InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -124,7 +124,10 @@ impl Runtime for SampleRuntime {
         let new_value =
             u64::try_from(parameters).map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
         service_instance.counter.set(new_value);
-        println!("Configuring service {} with value {}", descriptor.name, new_value);
+        println!(
+            "Configuring service {} with value {}",
+            descriptor.name, new_value
+        );
         Ok(())
     }
 

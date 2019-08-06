@@ -181,7 +181,8 @@ impl ExplorerApi {
     ///
     /// [`BlocksQuery`]: struct.BlocksQuery.html
     pub fn blocks(state: &ServiceApiState, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
-        let explorer = BlockchainExplorer::new(state.blockchain());
+        let snapshot = state.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::BadRequest(format!(
                 "Max block count per request exceeded ({})",
@@ -245,7 +246,8 @@ impl ExplorerApi {
 
     /// Returns the content for a block at a specific height.
     pub fn block(state: &ServiceApiState, query: BlockQuery) -> Result<BlockInfo, ApiError> {
-        BlockchainExplorer::new(state.blockchain())
+        let snapshot = state.snapshot();
+        BlockchainExplorer::new(snapshot.as_ref())
             .block(query.height)
             .map(From::from)
             .ok_or_else(|| {
@@ -258,7 +260,8 @@ impl ExplorerApi {
         state: &ServiceApiState,
         query: TransactionQuery,
     ) -> Result<TransactionInfo, ApiError> {
-        BlockchainExplorer::new(state.blockchain())
+        let snapshot = state.snapshot();
+        BlockchainExplorer::new(snapshot.as_ref())
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();

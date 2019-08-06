@@ -21,10 +21,10 @@ pub use self::{
 use exonum_merkledb::Snapshot;
 
 use crate::{
-    api::ServiceApiBuilder,
     blockchain,
     crypto::Hash,
     runtime::{
+        api::ServiceApiBuilder,
         rust::{AfterCommitContext, Service, ServiceDescriptor, Transaction, TransactionContext},
         InstanceId,
     },
@@ -50,8 +50,8 @@ impl Service for Supervisor {
         Schema::new(descriptor.service_name(), snapshot).state_hash()
     }
 
-    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        api::wire(&descriptor, builder)
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::wire(builder)
     }
 
     fn before_commit(&self, context: TransactionContext) {

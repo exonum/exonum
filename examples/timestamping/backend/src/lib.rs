@@ -36,11 +36,11 @@ pub mod schema;
 pub mod transactions;
 
 use exonum::{
-    api::ServiceApiBuilder,
     blockchain::ExecutionError,
     crypto::Hash,
     proto::Any,
     runtime::{
+        api::ServiceApiBuilder,
         dispatcher,
         rust::{Service, ServiceDescriptor},
     },
@@ -80,8 +80,8 @@ impl Service for TimestampingService {
         Ok(())
     }
 
-    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        TimestampingApi::new(descriptor).wire(builder);
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        TimestampingApi.wire(builder);
     }
 
     fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {

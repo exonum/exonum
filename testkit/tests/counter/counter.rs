@@ -15,17 +15,21 @@
 //! Sample counter service.
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
-    api::backends::actix::{HttpRequest, RawHandler, RequestHandler},
-    api::{self, ServiceApiBackend},
+    api::{
+        self,
+        backends::actix::{HttpRequest, RawHandler, RequestHandler},
+        ServiceApiBackend,
+    },
     crypto::Hash,
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
+        api::{ServiceApiBuilder, ServiceApiState},
+        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
         ArtifactInfo, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
@@ -137,7 +141,7 @@ struct CounterApi;
 
 impl CounterApi {
     fn increment(
-        state: &api::ServiceApiState,
+        state: &ServiceApiState,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
@@ -147,14 +151,13 @@ impl CounterApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn count(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
-        let snapshot = state.snapshot();
-        let schema = CounterSchema::new(&snapshot);
+    fn count(snapshot: &dyn Snapshot) -> api::Result<u64> {
+        let schema = CounterSchema::new(snapshot);
         Ok(schema.count().unwrap_or_default())
     }
 
     fn reset(
-        state: &api::ServiceApiState,
+        state: &ServiceApiState,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
@@ -164,14 +167,14 @@ impl CounterApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn wire(builder: &mut api::ServiceApiBuilder) {
+    fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .private_scope()
-            .endpoint("count", Self::count)
+            .endpoint("count", |state, _query: ()| Self::count(state.snapshot()))
             .endpoint_mut("reset", Self::reset);
         builder
             .public_scope()
-            .endpoint("count", Self::count)
+            .endpoint("count", |state, _query: ()| Self::count(state.snapshot()))
             .endpoint_mut("count", Self::increment);
 
         // Check processing of custom HTTP headers. We test this using simple authorization
@@ -188,8 +191,8 @@ impl CounterApi {
                 return Err(api::Error::Unauthorized);
             }
 
-            let state = request.state();
-            Self::count(&state, ())
+            let snapshot = request.state().snapshot();
+            Self::count(snapshot.as_ref())
         };
         let handler: Arc<RawHandler> = Arc::new(move |request| {
             Box::new(
@@ -217,7 +220,7 @@ impl CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut api::ServiceApiBuilder) {
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CounterApi::wire(builder)
     }
 }

@@ -99,7 +99,8 @@ impl TestkitServerApi {
             }
         }
 
-        let explorer = BlockchainExplorer::new(&testkit.blockchain);
+        let snapshot = testkit.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         Ok(explorer.block_with_txs(testkit.height()))
     }
 

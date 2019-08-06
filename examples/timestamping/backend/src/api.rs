@@ -16,10 +16,9 @@
 use exonum_merkledb::MapProof;
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof, IndexCoordinates, IndexOwner},
     crypto::Hash,
-    runtime::{rust::ServiceDescriptor, InstanceId},
+    runtime::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
 use crate::schema::{Schema, TimestampEntry};
@@ -50,51 +49,40 @@ pub struct TimestampProof {
 }
 
 /// Public service API.
-#[derive(Debug, Clone)]
-pub struct PublicApi {
-    service_name: String,
-    service_id: InstanceId,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct PublicApi;
 
 impl PublicApi {
-    /// Creates a new public API for the specified service instance.
-    pub fn new(descriptor: ServiceDescriptor) -> Self {
-        Self {
-            service_name: descriptor.service_name().to_owned(),
-            service_id: descriptor.service_id(),
-        }
-    }
-
     /// Endpoint for getting a single timestamp.
     pub fn handle_timestamp(
-        &self,
+        self,
         state: &ServiceApiState,
         hash: &Hash,
     ) -> api::Result<Option<TimestampEntry>> {
         let snapshot = state.snapshot();
-        let schema = Schema::new(&self.service_name, &snapshot);
+        let schema = Schema::new(state.instance().name, snapshot);
         Ok(schema.timestamps().get(hash))
     }
 
     /// Endpoint for getting the proof of a single timestamp.
     pub fn handle_timestamp_proof(
-        &self,
+        self,
         state: &ServiceApiState,
         hash: Hash,
     ) -> api::Result<TimestampProof> {
         let snapshot = state.snapshot();
         let (state_proof, block_info) = {
-            let blockchain_schema = blockchain::Schema::new(&snapshot);
-            let last_block_height = state.blockchain().last_block().height();
+            let blockchain_schema = blockchain::Schema::new(snapshot);
+            let last_block_height = blockchain_schema.last_block().height();
             let block_proof = blockchain_schema
                 .block_and_precommits(last_block_height)
                 .unwrap();
             let state_proof = blockchain_schema
                 .state_hash_aggregator()
-                .get_proof(IndexOwner::Service(self.service_id).coordinate_for(0));
+                .get_proof(IndexOwner::Service(state.instance().id).coordinate_for(0));
             (state_proof, block_proof)
         };
-        let schema = Schema::new(&self.service_name, &snapshot);
+        let schema = Schema::new(state.instance().name, snapshot);
         let timestamp_proof = schema.timestamps().get_proof(hash);
         Ok(TimestampProof {
             block_info,
@@ -108,15 +96,13 @@ impl PublicApi {
         builder
             .public_scope()
             .endpoint("v1/timestamps/value", {
-                let api = self.clone();
                 move |state: &ServiceApiState, query: TimestampQuery| {
-                    api.handle_timestamp(state, &query.hash)
+                    self.handle_timestamp(state, &query.hash)
                 }
             })
             .endpoint("v1/timestamps/proof", {
-                let api = self.clone();
                 move |state: &ServiceApiState, query: TimestampQuery| {
-                    api.handle_timestamp_proof(state, query.hash)
+                    self.handle_timestamp_proof(state, query.hash)
                 }
             });
     }
