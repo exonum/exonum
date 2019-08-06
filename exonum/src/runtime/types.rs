@@ -19,6 +19,8 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use crate::{helpers::ValidateInput, proto::schema};
 
+use super::InstanceDescriptor;
+
 /// Unique service instance identifier.
 ///
 /// * This is the secondary identifier, mainly used in transaction messages.
@@ -251,6 +253,15 @@ impl InstanceSpec {
             "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
         );
         Ok(())
+    }
+
+    /// Returns the corresponding descriptor of this instance specification.
+    pub fn as_descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor {
+            id: self.id,
+            name: self.name.as_ref(),
+            _phantom: std::marker::PhantomData,
+        }
     }
 }
 

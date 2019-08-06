@@ -25,7 +25,7 @@ use futures::{future, Future, IntoFuture};
 use semver::Version;
 
 use std::{
-    collections::{HashMap, HashSet, BTreeMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt, panic,
     str::FromStr,
 };
@@ -40,8 +40,8 @@ use crate::{
 use super::{
     dispatcher::{self, DispatcherSender},
     error::ExecutionError,
-    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceSpec, Runtime,
-    RuntimeIdentifier, ServiceInstanceId, StateHashAggregator,
+    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceSpec,
+    Runtime, RuntimeIdentifier, ServiceInstanceId, StateHashAggregator,
 };
 
 pub mod error;
@@ -258,33 +258,25 @@ impl Runtime for RustRuntime {
     fn configure_service(
         &self,
         fork: &Fork,
-        spec: &InstanceSpec,
+        descriptor: InstanceDescriptor,
         parameters: Any,
     ) -> Result<(), ExecutionError> {
-        let artifact = self.parse_artifact(&spec.artifact)?;
-
-        trace!(
-            "Configure service {} instance with id: {}",
-            artifact,
-            spec.id
-        );
+        trace!("Configure service instance {}", descriptor);
 
         let service_instance = self
             .started_services
-            .get(&spec.id)
+            .get(&descriptor.id)
             .ok_or(dispatcher::Error::ServiceNotStarted)?;
         service_instance
             .as_ref()
             .configure(service_instance.descriptor(), fork, parameters)
     }
 
-    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        let artifact = self.parse_artifact(&spec.artifact)?;
-
-        trace!("Stop service {} instance with id: {}", artifact, spec.id);
+    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
+        trace!("Stop service instance {}", descriptor);
 
         self.started_services
-            .remove(&spec.id)
+            .remove(&descriptor.id)
             .ok_or(dispatcher::Error::ServiceNotStarted)
             .map(drop)
             .map_err(From::from)

@@ -198,7 +198,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn configure_service(
         &self,
         fork: &Fork,
-        spec: &InstanceSpec,
+        descriptor: InstanceDescriptor,
         parameters: Any,
     ) -> Result<(), ExecutionError>;
 
@@ -209,7 +209,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * This method should catch each kind of panics except of `FatalError` and converts
     /// them into `ExecutionError`.
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
-    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
+    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
 
     /// Execute service transaction.
     ///
@@ -364,5 +364,22 @@ impl<'a> ExecutionContext<'a> {
         let mut other = Vec::new();
         std::mem::swap(&mut self.actions, &mut other);
         other
+    }
+}
+
+/// Instance descriptor contains information to access running service instance.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct InstanceDescriptor<'a> {
+    /// Returns the current service instance identifier.
+    pub id: ServiceInstanceId,
+    /// Returns the current service instance name.
+    pub name: &'a str,
+    /// A special field in order to prevent the user from creating an instance of this struct.
+    _phantom: std::marker::PhantomData<()>,
+}
+
+impl std::fmt::Display for InstanceDescriptor<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.id, self.name)
     }
 }

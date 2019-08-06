@@ -31,8 +31,8 @@ use crate::{
 
 use super::{
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceSpec, Runtime,
-    ServiceInstanceId,
+    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceSpec,
+    Runtime, ServiceInstanceId,
 };
 
 mod error;
@@ -235,16 +235,17 @@ impl Dispatcher {
             .and_then(|runtime| {
                 runtime.start_service(&spec)?;
                 // Tries to configure a started instance of the service, otherwise it stops.
-                Self::configure_service(runtime.as_ref(), fork, &spec, constructor).map_err(|e| {
-                    error!(
-                        "An error occurred while configuring the service {}: {}",
-                        spec.name, e
-                    );
-                    if let Err(e) = runtime.stop_service(&spec) {
-                        panic!(FatalError::new(e.to_string()))
-                    }
-                    e
-                })
+                Self::configure_service(runtime.as_ref(), fork, spec.as_descriptor(), constructor)
+                    .map_err(|e| {
+                        error!(
+                            "An error occurred while configuring the service {}: {}",
+                            spec.name, e
+                        );
+                        if let Err(e) = runtime.stop_service(spec.as_descriptor()) {
+                            panic!(FatalError::new(e.to_string()))
+                        }
+                        e
+                    })
             })?;
         self.register_running_service(&spec);
         // Adds service instance to the dispatcher schema.
@@ -337,10 +338,10 @@ impl Dispatcher {
     pub(crate) fn configure_service(
         runtime: &(dyn Runtime + 'static),
         fork: &Fork,
-        spec: &InstanceSpec,
+        descriptor: InstanceDescriptor,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
-        catch_panic(|| runtime.configure_service(fork, &spec, constructor))
+        catch_panic(|| runtime.configure_service(fork, descriptor, constructor))
     }
 
     /// Returns additional information about artifact with if it is deployed.
@@ -578,25 +579,17 @@ mod tests {
             }
         }
 
-        fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-            if spec.artifact.runtime_id == self.runtime_type {
-                Ok(())
-            } else {
-                Err(Error::IncorrectRuntime.into())
-            }
+        fn stop_service(&mut self, _descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
+            Ok(())
         }
 
         fn configure_service(
             &self,
             _fork: &Fork,
-            spec: &InstanceSpec,
+            _descriptor: InstanceDescriptor,
             _parameters: Any,
         ) -> Result<(), ExecutionError> {
-            if spec.artifact.runtime_id == self.runtime_type {
-                Ok(())
-            } else {
-                Err(Error::IncorrectRuntime.into())
-            }
+            Ok(())
         }
 
         fn execute(
