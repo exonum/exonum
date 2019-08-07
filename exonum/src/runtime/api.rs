@@ -23,6 +23,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 
 use crate::{
+    api::{ApiBuilder, ApiScope},
     blockchain::Blockchain,
     crypto::{PublicKey, SecretKey},
     node::ApiSender,
@@ -64,8 +65,7 @@ impl<'a> ServiceApiState<'a> {
     }
 }
 
-// TODO rename [ECR-3222]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ServiceApiContext {
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
@@ -90,14 +90,14 @@ impl ServiceApiContext {
         }
     }
 
-    fn snapshot(&self) -> Box<dyn Snapshot> {
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.database.snapshot()
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ServiceApiScope {
-    inner: crate::api::ServiceApiScope,
+    inner: ApiScope,
     context: ServiceApiContext,
     descriptor: (InstanceId, String),
 }
@@ -105,7 +105,7 @@ pub struct ServiceApiScope {
 impl ServiceApiScope {
     pub fn new(context: ServiceApiContext, instance_descriptor: InstanceDescriptor) -> Self {
         Self {
-            inner: crate::api::ServiceApiScope::new(),
+            inner: ApiScope::new(),
             context,
             descriptor: instance_descriptor.into(),
         }
@@ -163,7 +163,9 @@ impl ServiceApiScope {
     }
 }
 
+#[derive(Debug)]
 pub struct ServiceApiBuilder {
+    context: ServiceApiContext,
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
 }
@@ -172,6 +174,7 @@ impl ServiceApiBuilder {
     /// Creates a new service API builder.
     pub(crate) fn new(context: ServiceApiContext, instance_descriptor: InstanceDescriptor) -> Self {
         Self {
+            context: context.clone(),
             public_scope: ServiceApiScope::new(context.clone(), instance_descriptor),
             private_scope: ServiceApiScope::new(context, instance_descriptor),
         }
@@ -186,9 +189,14 @@ impl ServiceApiBuilder {
     pub fn private_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.private_scope
     }
+
+    /// Returns a reference to the underlying service API context.
+    pub fn context(&self) -> &ServiceApiContext {
+        &self.context
+    }
 }
 
-impl From<ServiceApiBuilder> for crate::api::ServiceApiBuilder {
+impl From<ServiceApiBuilder> for ApiBuilder {
     fn from(inner: ServiceApiBuilder) -> Self {
         Self {
             public_scope: inner.public_scope.inner,

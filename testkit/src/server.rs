@@ -13,10 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    api::{
-        self, node::SharedNodeState, ApiAggregator, ServiceApiBuilder, ServiceApiScope,
-        ServiceApiState,
-    },
+    api::{self, node::SharedNodeState, ApiAggregator, ApiBuilder, ApiScope, ServiceApiState},
     crypto::Hash,
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
@@ -104,7 +101,7 @@ impl TestkitServerApi {
         Ok(explorer.block_with_txs(testkit.height()))
     }
 
-    fn handle_status(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_status(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             self.status()
@@ -112,7 +109,7 @@ impl TestkitServerApi {
         self_
     }
 
-    fn handle_create_block(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_create_block(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint_mut(
             name,
@@ -123,7 +120,7 @@ impl TestkitServerApi {
         self_
     }
 
-    fn handle_rollback(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_rollback(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint_mut(name, move |_state: &ServiceApiState, height: Height| {
             self.rollback(height)
@@ -131,7 +128,7 @@ impl TestkitServerApi {
         self_
     }
 
-    fn wire(self, builder: &mut ServiceApiBuilder) {
+    fn wire(self, builder: &mut ApiBuilder) {
         let api_scope = builder.private_scope();
         self.handle_status("v1/status", api_scope)
             .handle_rollback("v1/blocks/rollback", api_scope)
@@ -140,8 +137,8 @@ impl TestkitServerApi {
 }
 
 ///  Creates an API handlers for processing testkit-specific HTTP requests.
-pub fn create_testkit_handlers(inner: &Arc<RwLock<TestKit>>) -> ServiceApiBuilder {
-    let mut builder = ServiceApiBuilder::new();
+pub fn create_testkit_handlers(inner: &Arc<RwLock<TestKit>>) -> ApiBuilder {
+    let mut builder = ApiBuilder::new();
     let server_api = TestkitServerApi(inner.clone());
     server_api.wire(&mut builder);
     builder

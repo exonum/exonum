@@ -20,7 +20,7 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    api::{Error as ApiError, ServiceApiScope, ServiceApiState},
+    api::{ApiScope, Error as ApiError, ServiceApiState},
     crypto::PublicKey,
     node::{ConnectInfo, ExternalMessage},
     runtime::InstanceId,
@@ -110,7 +110,7 @@ impl SystemApi {
     }
 
     /// Adds private system API endpoints to the corresponding scope.
-    pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
+    pub fn wire(self, api_scope: &mut ApiScope) -> &mut ApiScope {
         self.handle_peers_info("v1/peers", api_scope)
             .handle_peer_add("v1/peers", api_scope)
             .handle_network_info("v1/network", api_scope)
@@ -121,7 +121,7 @@ impl SystemApi {
         api_scope
     }
 
-    fn handle_peers_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_peers_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
@@ -151,7 +151,7 @@ impl SystemApi {
         self_
     }
 
-    fn handle_peer_add(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_peer_add(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         api_scope.endpoint_mut(
             name,
             move |state: &ServiceApiState, connect_info: ConnectInfo| -> Result<(), ApiError> {
@@ -164,7 +164,7 @@ impl SystemApi {
         self
     }
 
-    fn handle_network_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_network_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(self.info.clone())
@@ -172,11 +172,7 @@ impl SystemApi {
         self_
     }
 
-    fn handle_is_consensus_enabled(
-        self,
-        name: &'static str,
-        api_scope: &mut ServiceApiScope,
-    ) -> Self {
+    fn handle_is_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(self.shared_api_state.is_enabled())
@@ -184,11 +180,7 @@ impl SystemApi {
         self_
     }
 
-    fn handle_set_consensus_enabled(
-        self,
-        name: &'static str,
-        api_scope: &mut ServiceApiScope,
-    ) -> Self {
+    fn handle_set_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint_mut(
             name,
@@ -202,7 +194,7 @@ impl SystemApi {
         self_
     }
 
-    fn handle_shutdown(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         api_scope.endpoint_mut(
             name,
             move |state: &ServiceApiState, _query: ()| -> Result<(), ApiError> {
@@ -215,7 +207,7 @@ impl SystemApi {
         self
     }
 
-    fn handle_rebroadcast(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_rebroadcast(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         api_scope.endpoint_mut(
             name,
             move |state: &ServiceApiState, _query: ()| -> Result<(), ApiError> {

@@ -17,7 +17,7 @@
 use exonum_merkledb::IndexAccess;
 
 use crate::{
-    api::{self, node::SharedNodeState, ServiceApiScope, ServiceApiState},
+    api::{self, node::SharedNodeState, ApiScope, ServiceApiState},
     blockchain::Schema,
     helpers::user_agent,
     proto::schema::PROTO_SOURCES as EXONUM_PROTO_SOURCES,
@@ -113,7 +113,7 @@ impl SystemApi {
         Self { shared_api_state }
     }
 
-    fn handle_stats_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_stats_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
             let snapshot = state.snapshot();
             let schema = Schema::new(&snapshot);
@@ -125,14 +125,14 @@ impl SystemApi {
         self
     }
 
-    fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(user_agent::get())
         });
         self
     }
 
-    fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(HealthCheckInfo {
@@ -143,11 +143,7 @@ impl SystemApi {
         self_
     }
 
-    fn handle_list_services_info(
-        self,
-        name: &'static str,
-        api_scope: &mut ServiceApiScope,
-    ) -> Self {
+    fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let api_state = self.shared_api_state.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(api_state.dispatcher_info())
@@ -155,7 +151,7 @@ impl SystemApi {
         self
     }
 
-    fn handle_proto_source(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_proto_source(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let api_state = self.shared_api_state.clone();
         api_scope.endpoint(name, {
             move |_state: &ServiceApiState, query: ProtoSourcesQuery| {
@@ -201,7 +197,7 @@ impl SystemApi {
     }
 
     /// Adds public system API endpoints to the corresponding scope.
-    pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
+    pub fn wire(self, api_scope: &mut ApiScope) -> &mut ApiScope {
         self.handle_stats_info("v1/stats", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)
             .handle_user_agent_info("v1/user_agent", api_scope)

@@ -33,7 +33,7 @@ use crate::{
         },
         node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
-        Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+        ApiBackend, ApiScope, Error as ApiError, ServiceApiState,
     },
     blockchain::Block,
     crypto::Hash,
@@ -325,10 +325,10 @@ impl ExplorerApi {
 
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire(
-        api_scope: &mut ServiceApiScope,
+        api_scope: &mut ApiScope,
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
-    ) -> &mut ServiceApiScope {
+    ) -> &mut ApiScope {
         // Default subscription for blocks.
         Self::handle_ws(
             "v1/blocks/subscribe",

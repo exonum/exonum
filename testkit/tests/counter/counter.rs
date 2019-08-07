@@ -18,7 +18,7 @@ use exonum::{
     api::{
         self,
         backends::actix::{HttpRequest, RawHandler, RequestHandler},
-        ServiceApiBackend,
+        ApiBackend,
     },
     crypto::Hash,
     messages::{AnyTx, Verified},
@@ -180,7 +180,8 @@ impl CounterApi {
         // Check processing of custom HTTP headers. We test this using simple authorization
         // with a fixed bearer token; for practical apps, the tokens might
         // be [JSON Web Tokens](https://jwt.io/).
-        let handler = |request: HttpRequest| -> api::Result<u64> {
+        let context = builder.context().clone();
+        let handler = move |request: HttpRequest| -> api::Result<u64> {
             let auth_header = request
                 .headers()
                 .get("Authorization")
@@ -191,7 +192,7 @@ impl CounterApi {
                 return Err(api::Error::Unauthorized);
             }
 
-            let snapshot = request.state().snapshot();
+            let snapshot = context.snapshot();
             Self::count(snapshot.as_ref())
         };
         let handler: Arc<RawHandler> = Arc::new(move |request| {

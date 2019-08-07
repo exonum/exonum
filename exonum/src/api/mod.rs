@@ -42,10 +42,10 @@ mod state;
 pub mod websocket;
 mod with;
 
-/// Defines an object that could be used as an API backend.
+/// Defines an object that could be used as a Exonum API backend.
 ///
 /// This trait is used to implement an API backend for Exonum.
-pub trait ServiceApiBackend: Sized {
+pub trait ApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
     type Handler;
     /// Concrete backend API builder.
@@ -86,17 +86,17 @@ pub trait ServiceApiBackend: Sized {
     fn wire(&self, output: Self::Backend) -> Self::Backend;
 }
 
-/// Service API builder for the concrete API scope or in other words
+/// Exonum API builder for the concrete API scope or in other words
 /// access level (public or private).
 ///
 /// Endpoints cannot be declared to the builder directly, first you need to
 /// indicate the scope the endpoint(s) will belong to.
 #[derive(Debug, Clone, Default)]
-pub struct ServiceApiScope {
+pub struct ApiScope {
     pub(crate) actix_backend: actix::ApiBuilder,
 }
 
-impl ServiceApiScope {
+impl ApiScope {
     /// Creates a new instance.
     pub fn new() -> Self {
         Self::default()
@@ -147,7 +147,7 @@ impl ServiceApiScope {
     }
 }
 
-/// Service API builder, which is used to add service-specific endpoints to the node API.
+/// Exonum API builder, which is used to add endpoints to the node API.
 ///
 /// # Examples
 ///
@@ -228,14 +228,14 @@ impl ServiceApiScope {
 ///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct ServiceApiBuilder {
+pub struct ApiBuilder {
     pub(crate) blockchain: Option<Blockchain>,
-    pub(crate) public_scope: ServiceApiScope,
-    pub(crate) private_scope: ServiceApiScope,
+    pub(crate) public_scope: ApiScope,
+    pub(crate) private_scope: ApiScope,
 }
 
-impl ServiceApiBuilder {
-    /// Creates a new service API builder.
+impl ApiBuilder {
+    /// Creates a new API builder.
     pub fn new() -> Self {
         Self {
             blockchain: None,
@@ -243,21 +243,13 @@ impl ServiceApiBuilder {
         }
     }
 
-    #[allow(dead_code)]
-    fn with_blockchain(blockchain: Blockchain) -> Self {
-        Self {
-            blockchain: Some(blockchain),
-            ..Default::default()
-        }
-    }
-
     /// Returns a mutable reference to the public API scope builder.
-    pub fn public_scope(&mut self) -> &mut ServiceApiScope {
+    pub fn public_scope(&mut self) -> &mut ApiScope {
         &mut self.public_scope
     }
 
     /// Returns a mutable reference to the private API scope builder.
-    pub fn private_scope(&mut self) -> &mut ServiceApiScope {
+    pub fn private_scope(&mut self) -> &mut ApiScope {
         &mut self.private_scope
     }
 
@@ -308,7 +300,7 @@ pub trait ExtendApiBackend {
     /// Extends API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
     where
-        I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
+        I: IntoIterator<Item = (&'a str, &'a ApiScope)>;
 }
 
 /// Exonum node API aggregator. This structure enables several API backends to
@@ -317,7 +309,7 @@ pub trait ExtendApiBackend {
 pub struct ApiAggregator {
     blockchain: Blockchain,
     node_state: SharedNodeState,
-    inner: BTreeMap<String, ServiceApiBuilder>,
+    inner: BTreeMap<String, ApiBuilder>,
 }
 
 impl ApiAggregator {
@@ -354,7 +346,7 @@ impl ApiAggregator {
                 .services_api(&context)
                 .into_iter()
                 .map(|(name, builder)| {
-                    let mut builder = ServiceApiBuilder::from(builder);
+                    let mut builder = ApiBuilder::from(builder);
                     builder.set_blockchain(blockchain.clone());
                     (format!("services/{}", name), builder)
                 }),
@@ -377,7 +369,7 @@ impl ApiAggregator {
     }
 
     /// Adds API factory with the given prefix to the aggregator.
-    pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
+    pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ApiBuilder) {
         self.inner.insert(prefix.into(), builder);
     }
 
@@ -386,19 +378,16 @@ impl ApiAggregator {
         self.node_state.update_dispatcher_state(&self.blockchain);
     }
 
-    fn explorer_api(
-        blockchain: &Blockchain,
-        shared_node_state: SharedNodeState,
-    ) -> ServiceApiBuilder {
-        let mut builder = ServiceApiBuilder::new();
+    fn explorer_api(blockchain: &Blockchain, shared_node_state: SharedNodeState) -> ApiBuilder {
+        let mut builder = ApiBuilder::new();
         let service_api_state = ServiceApiState::new(blockchain.clone());
         ExplorerApi::wire(builder.public_scope(), service_api_state, shared_node_state);
         builder
     }
 
-    fn system_api(shared_api_state: SharedNodeState) -> ServiceApiBuilder {
+    fn system_api(shared_api_state: SharedNodeState) -> ApiBuilder {
         // Waits until dispatcher will be unlocked to get fresh info.
-        let mut builder = ServiceApiBuilder::new();
+        let mut builder = ApiBuilder::new();
         self::node::private::SystemApi::new(NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
         self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
