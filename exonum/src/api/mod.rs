@@ -14,9 +14,6 @@
 
 //! API and corresponding utilities.
 
-// TODO remove me
-pub use crate::runtime::api::ApiContext;
-
 pub use self::{
     error::Error,
     with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
@@ -28,16 +25,20 @@ pub mod manager;
 pub mod node;
 pub mod websocket;
 
+use exonum_merkledb::{Database, Snapshot};
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use self::{
     backends::actix,
     node::{private::NodeInfo, public::ExplorerApi},
 };
 use crate::{
-    api::node::SharedNodeState, blockchain::Blockchain, crypto::PublicKey, node::ApiSender,
+    api::node::SharedNodeState,
+    blockchain::Blockchain,
+    crypto::{PublicKey, SecretKey},
+    node::ApiSender,
 };
 
 mod with;
@@ -319,5 +320,34 @@ impl ApiAggregator {
         self::node::public::SystemApi::new(context.clone(), shared_api_state)
             .wire(builder.public_scope());
         builder
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ApiContext {
+    service_keypair: (PublicKey, SecretKey),
+    api_sender: ApiSender,
+    database: Arc<dyn Database>,
+}
+
+impl ApiContext {
+    pub fn with_blockchain(blockchain: &Blockchain) -> Self {
+        Self {
+            service_keypair: blockchain.service_keypair.clone(),
+            api_sender: blockchain.api_sender.clone(),
+            database: blockchain.db.clone(),
+        }
+    }
+
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
+        self.database.snapshot()
+    }
+
+    pub fn sender(&self) -> &ApiSender {
+        &self.api_sender
+    }
+
+    pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
+        (&self.service_keypair.0, &self.service_keypair.1)
     }
 }

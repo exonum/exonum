@@ -97,13 +97,14 @@ use futures::Future;
 use std::fmt::Debug;
 
 use crate::{
+    api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
     node::ApiSender,
     proto::Any,
 };
 
 use self::{
-    api::{ApiContext, ServiceApiBuilder},
+    api::ServiceApiBuilder,
     dispatcher::{Dispatcher, DispatcherSender},
 };
 

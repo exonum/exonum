@@ -14,17 +14,14 @@
 
 //! Building blocks for creating services' API.
 
-pub use crate::api::{Error, FutureResult, Result};
+pub use crate::api::{ApiContext, Error, FutureResult, Result};
 
-use exonum_merkledb::{Database, Snapshot};
+use exonum_merkledb::Snapshot;
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::sync::Arc;
-
 use crate::{
     api::{ApiBuilder, ApiScope},
-    blockchain::Blockchain,
     crypto::{PublicKey, SecretKey},
     node::ApiSender,
     runtime::{InstanceDescriptor, InstanceId},
@@ -50,9 +47,9 @@ impl<'a> ServiceApiState<'a> {
         instance_descriptor: InstanceDescriptor<'a>,
     ) -> Self {
         Self {
-            service_keypair: (&context.service_keypair.0, &context.service_keypair.1),
+            service_keypair: context.service_keypair(),
             instance_descriptor,
-            api_sender: &context.api_sender,
+            api_sender: context.sender(),
             snapshot: context.snapshot(),
         }
     }
@@ -79,31 +76,6 @@ impl<'a> ServiceApiState<'a> {
     /// Returns a reference to the API sender.
     pub fn sender(&self) -> &ApiSender {
         self.api_sender
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ApiContext {
-    service_keypair: (PublicKey, SecretKey),
-    api_sender: ApiSender,
-    database: Arc<dyn Database>,
-}
-
-impl ApiContext {
-    pub fn with_blockchain(blockchain: &Blockchain) -> Self {
-        Self {
-            service_keypair: blockchain.service_keypair.clone(),
-            api_sender: blockchain.api_sender.clone(),
-            database: blockchain.db.clone(),
-        }
-    }
-
-    pub fn snapshot(&self) -> Box<dyn Snapshot> {
-        self.database.snapshot()
-    }
-
-    pub fn sender(&self) -> &ApiSender {
-        &self.api_sender
     }
 }
 

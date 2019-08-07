@@ -33,7 +33,7 @@ use crate::{
         },
         node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
-        ApiBackend, ApiScope, Error as ApiError,
+        ApiBackend, ApiContext, ApiScope, Error as ApiError,
     },
     blockchain::Block,
     crypto::Hash,
@@ -41,7 +41,7 @@ use crate::{
     helpers::Height,
     messages::{Precommit, SignedMessage, Verified},
     node::ApiSender,
-    runtime::{api::ApiContext, CallInfo},
+    runtime::CallInfo,
 };
 
 /// The maximum number of blocks to return per blocks request, in this way

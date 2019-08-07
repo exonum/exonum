@@ -17,11 +17,11 @@
 use exonum_merkledb::IndexAccess;
 
 use crate::{
-    api::{self, node::SharedNodeState, ApiScope},
+    api::{self, node::SharedNodeState, ApiContext, ApiScope},
     blockchain::Schema,
     helpers::user_agent,
     proto::schema::PROTO_SOURCES as EXONUM_PROTO_SOURCES,
-    runtime::{api::ApiContext, dispatcher, ArtifactId, InstanceSpec},
+    runtime::{dispatcher, ArtifactId, InstanceSpec},
 };
 
 /// Information about the current state of the node memory pool.
