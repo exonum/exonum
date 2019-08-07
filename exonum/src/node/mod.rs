@@ -778,6 +778,11 @@ impl NodeHandler {
         self.blockchain.last_block().hash()
     }
 
+    /// Returns the latest committed block.
+    pub fn uncommitted_txs_count(&self) -> u64 {
+        self.blockchain.pool_size() + self.state.tx_cache_len() as u64
+    }
+
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
         // Round start time = H + (r - 1) * t0 + (r-1)(r-2)/2 * dt

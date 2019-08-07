@@ -98,8 +98,7 @@ impl NodeHandler {
             - TRANSACTION_RESPONSE_EMPTY_SIZE;
 
         for hash in hashes {
-            let tx = get_tx(&hash, &schema.transactions(), &self.state.tx_cache());
-            if let Some(tx) = tx {
+            if let Some(tx) = get_tx(&hash, &schema.transactions(), &self.state.tx_cache()) {
                 let raw = tx.signed_message().raw().to_vec();
                 if txs_size + raw.len() + RAW_TRANSACTION_HEADER > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(

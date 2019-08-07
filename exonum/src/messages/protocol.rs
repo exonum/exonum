@@ -122,7 +122,7 @@ pub struct Status {
     height: Height,
     /// Hash of the last committed block.
     last_hash: Hash,
-    /// Hash of the last committed block.
+    /// Transactions pool size.
     pool_size: u64,
 }
 
@@ -146,7 +146,7 @@ impl Status {
         &self.last_hash
     }
 
-    /// Pool size
+    /// Pool size.
     pub fn pool_size(&self) -> u64 {
         self.pool_size
     }
@@ -577,8 +577,8 @@ pub struct PoolTransactionsRequest {
 
 impl PoolTransactionsRequest {
     /// Create new `TransactionsRequest`.
-    pub fn new(to: &PublicKey) -> Self {
-        Self { to: *to }
+    pub fn new(to: PublicKey) -> Self {
+        Self { to }
     }
 
     /// Public key of the recipient.

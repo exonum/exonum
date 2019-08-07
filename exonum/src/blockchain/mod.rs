@@ -178,7 +178,7 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
-    /// Returns the latest committed block.
+    /// Returns the transactions pool size.
     pub fn pool_size(&self) -> u64 {
         Schema::new(&self.snapshot()).transactions_pool_len()
     }
@@ -297,12 +297,6 @@ impl Blockchain {
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
-
-        println!(
-            "creating patch from proposer {}, tx_count = {}",
-            proposer_id,
-            tx_hashes.len()
-        );
 
         let block_hash = {
             // Get last hash.

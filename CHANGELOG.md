@@ -159,6 +159,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `tx_cache` field to `State` to cache incoming transactions before
   adding them to persistent pool. (#1398)
 
+- Added new request message `PoolTransactionsRequest` to obtain pool transactions
+ from another peers. (#)
+
 #### exonum-merkledb
 
 - Updated `ProofMapIndex` data layout. (#1293)

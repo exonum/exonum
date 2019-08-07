@@ -235,9 +235,14 @@ impl Sandbox {
         author: &PublicKey,
         height: Height,
         last_hash: &Hash,
+        pool_size: u64,
         secret_key: &SecretKey,
     ) -> Signed<Status> {
-        Message::concrete(Status::new(height, last_hash, 0), *author, secret_key)
+        Message::concrete(
+            Status::new(height, last_hash, pool_size),
+            *author,
+            secret_key,
+        )
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
@@ -540,7 +545,7 @@ impl Sandbox {
     where
         I: IntoIterator<Item = &'a PublicKey>,
     {
-        let expected_msg = msg.signed_message();
+        let expected_msg = Message::deserialize(msg.signed_message().clone()).unwrap();
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -548,9 +553,9 @@ impl Sandbox {
 
         for _ in 0..expected_set.len() {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
+                let real_msg = Message::deserialize(real_msg.signed_message().clone()).unwrap();
                 assert_eq!(
-                    expected_msg,
-                    real_msg.signed_message(),
+                    expected_msg, real_msg,
                     "Expected to broadcast other message"
                 );
                 if !expected_set.contains(&real_addr) {
@@ -577,6 +582,7 @@ impl Sandbox {
             &self.node_public_key(),
             height,
             block_hash,
+            0,
             &self.node_secret_key(),
         ));
     }

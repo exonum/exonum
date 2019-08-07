@@ -171,8 +171,7 @@ impl NodeHandler {
             self.request(RequestData::Block(height), peer);
         }
 
-        if self.blockchain.pool_size() == 0 && msg.pool_size() > 0 {
-            println!("Request pool transactions from other sender");
+        if self.uncommitted_txs_count() == 0 && msg.pool_size() > 0 {
             self.request(RequestData::PoolTransactions, peer);
         }
     }
@@ -234,7 +233,7 @@ impl NodeHandler {
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash();
-        let pool_size = self.blockchain.pool_size();
+        let pool_size = self.uncommitted_txs_count();
         let status = Status::new(self.state.height(), &hash, pool_size);
         trace!("Broadcast status: {:?}", status);
 
