@@ -331,6 +331,19 @@ pub struct ApiContext {
 }
 
 impl ApiContext {
+    #[doc(hidden)]
+    pub fn new(
+        database: Arc<dyn Database>,
+        service_keypair: (PublicKey, SecretKey),
+        sender: ApiSender,
+    ) -> Self {
+        Self {
+            database,
+            service_keypair,
+            api_sender: sender,
+        }
+    }
+
     pub fn with_blockchain(blockchain: &Blockchain) -> Self {
         Self {
             service_keypair: blockchain.service_keypair.clone(),

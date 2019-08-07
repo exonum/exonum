@@ -156,17 +156,15 @@ impl ServiceApiScope {
 /// The example below shows a common practice of API implementation.
 ///
 /// ```rust
-/// #[macro_use] extern crate exonum;
-/// #[macro_use] extern crate serde_derive;
-/// extern crate futures;
+/// use serde_derive::{Deserialize, Serialize};
 ///
-/// use futures::Future;
-///
-/// use std::net::SocketAddr;
-///
-/// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
-/// use exonum::blockchain::{Schema};
-/// use exonum::crypto::{Hash, PublicKey};
+/// use exonum::{
+///     blockchain::Schema,
+///     crypto::{self, Hash},
+///     node::ExternalMessage,
+///     runtime::api::{self, ServiceApiBuilder, ServiceApiState},
+/// };
+/// use exonum_merkledb::ObjectHash;
 ///
 /// // Declares a type which describes an API specification and implementation.
 /// pub struct MyApi;
@@ -176,7 +174,7 @@ impl ServiceApiScope {
 /// // For the web backend, `MyQuery` will be deserialized from a `block_height={number}` string.
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
-///     pub block_height: u64
+///     pub block_height: u64,
 /// }
 ///
 /// // For the web backend, `BlockInfo` will be serialized into a JSON string.
@@ -189,18 +187,19 @@ impl ServiceApiScope {
 /// impl MyApi {
 ///     // Immutable handler, which returns a hash of the block at the given height.
 ///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
-///         let snapshot = state.snapshot();
-///         let schema = Schema::new(&snapshot);
-///         Ok(schema.block_hashes_by_height()
+///         let schema = Schema::new(state.snapshot());
+///         Ok(schema
+///             .block_hashes_by_height()
 ///             .get(query.block_height)
-///             .map(|hash| BlockInfo { hash })
-///         )
+///             .map(|hash| BlockInfo { hash }))
 ///     }
 ///
-///     // Mutable handler which removes the peer with the given key from the cache.
-///     pub fn remove_peer(state: &ServiceApiState, query: PublicKey) -> api::Result<()> {
-///         let mut blockchain = state.blockchain().clone();
-///         Ok(blockchain.remove_peer_with_pubkey(&query))
+///     // Mutable handler which sends `Rebroadcast` request to node.
+///     pub fn rebroadcast(state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///         state
+///             .sender()
+///             .send_external_message(ExternalMessage::Rebroadcast)
+///             .map_err(From::from)
 ///     }
 ///
 ///     // Simple handler without any parameters.
@@ -209,25 +208,49 @@ impl ServiceApiScope {
 ///     }
 ///
 ///     // You may also create asynchronous handlers for long requests.
-///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
-///      -> api::FutureResult<Option<Hash>> {
-///         let blockchain = state.blockchain().clone().snapshot();
+///     pub fn async_operation(
+///         _state: &ServiceApiState,
+///         query: MyQuery,
+///     ) -> api::FutureResult<Option<Hash>> {
 ///         Box::new(futures::lazy(move || {
-///             let schema = Schema::new(&blockchain);
-///             Ok(schema.block_hashes_by_height().get(query.block_height))
+///             Ok(Some(query.block_height.object_hash()))
 ///         }))
 ///     }
 /// }
 ///
-/// # let mut builder = ServiceApiBuilder::default();
-/// // Adds `MyApi` handlers to the corresponding builder.
-/// builder.public_scope()
-///     .endpoint("v1/ping", MyApi::ping)
-///     .endpoint("v1/block_hash", MyApi::block_hash)
-///     .endpoint("v1/block_hash_async", MyApi::block_hash_async);
-/// // Adds a mutable endpoint for to the private API.
-/// builder.private_scope()
-///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
+/// fn wire_api(builder: &mut ServiceApiBuilder) -> &mut ServiceApiBuilder {
+///     // Adds `MyApi` handlers to the corresponding builder.
+///     builder
+///         .public_scope()
+///         .endpoint("v1/ping", MyApi::ping)
+///         .endpoint("v1/block_hash", MyApi::block_hash)
+///         .endpoint("v1/async_operation", MyApi::async_operation);
+///     // Adds a mutable endpoint for to the private API.
+///     builder
+///         .private_scope()
+///         .endpoint_mut("v1/rebroadcast", MyApi::rebroadcast);
+///     builder
+/// }
+///
+/// # fn main() {
+/// #     use exonum::{api::ApiContext, node::ApiSender, runtime::InstanceDescriptor};
+/// #     use exonum_merkledb::TemporaryDB;
+/// #     use futures::sync::mpsc;
+/// #
+/// #     let context = ApiContext::new(
+/// #         TemporaryDB::new().into(),
+/// #         crypto::gen_keypair(),
+/// #         ApiSender::new(mpsc::unbounded().0),
+/// #     );
+/// #     let mut builder = ServiceApiBuilder::new(
+/// #         context,
+/// #         InstanceDescriptor {
+/// #             id: 1100,
+/// #             name: "example",
+/// #         },
+/// #     );
+/// #     wire_api(&mut builder);
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct ServiceApiBuilder {
@@ -238,7 +261,8 @@ pub struct ServiceApiBuilder {
 
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
-    pub(crate) fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
+    #[doc(hidden)]
+    pub fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
         Self {
             context: context.clone(),
             public_scope: ServiceApiScope::new(context.clone(), instance_descriptor),
