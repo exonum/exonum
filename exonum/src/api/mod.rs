@@ -344,6 +344,7 @@ impl ApiContext {
         }
     }
 
+    #[doc(hidden)]
     pub fn with_blockchain(blockchain: &Blockchain) -> Self {
         Self {
             service_keypair: blockchain.service_keypair.clone(),
