@@ -103,7 +103,7 @@ use crate::{
 };
 
 use self::{
-    api::{ServiceApiBuilder, ServiceApiContext},
+    api::{ApiContext, ServiceApiBuilder},
     dispatcher::{Dispatcher, DispatcherSender},
 };
 
@@ -258,7 +258,7 @@ pub trait Runtime: Send + Debug + 'static {
         tx_sender: &ApiSender,
     );
 
-    fn services_api(&self, _context: &ServiceApiContext) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
     }
 }

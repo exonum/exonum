@@ -30,6 +30,11 @@ use crate::{
     runtime::{InstanceDescriptor, InstanceId},
 };
 
+/// Provides the current blockchain state to API handlers.
+///
+/// This structure is a part of the node that is available to the API. For example,
+/// it can return the private key of the node, which allows the service to send
+/// certain transactions to the blockchain.
 #[derive(Debug)]
 pub struct ServiceApiState<'a> {
     service_keypair: (&'a PublicKey, &'a SecretKey),
@@ -40,6 +45,18 @@ pub struct ServiceApiState<'a> {
 }
 
 impl<'a> ServiceApiState<'a> {
+    pub fn from_api_context(
+        context: &'a ApiContext,
+        instance_descriptor: InstanceDescriptor<'a>,
+    ) -> Self {
+        Self {
+            service_keypair: (&context.service_keypair.0, &context.service_keypair.1),
+            instance_descriptor,
+            api_sender: &context.api_sender,
+            snapshot: context.snapshot(),
+        }
+    }
+
     pub fn instance(&self) -> InstanceDescriptor {
         self.instance_descriptor
     }
@@ -66,13 +83,13 @@ impl<'a> ServiceApiState<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ServiceApiContext {
+pub struct ApiContext {
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
     database: Arc<dyn Database>,
 }
 
-impl ServiceApiContext {
+impl ApiContext {
     pub fn with_blockchain(blockchain: &Blockchain) -> Self {
         Self {
             service_keypair: blockchain.service_keypair.clone(),
@@ -81,29 +98,24 @@ impl ServiceApiContext {
         }
     }
 
-    pub fn state<'a>(&'a self, instance_descriptor: InstanceDescriptor<'a>) -> ServiceApiState<'a> {
-        ServiceApiState {
-            service_keypair: (&self.service_keypair.0, &self.service_keypair.1),
-            instance_descriptor,
-            api_sender: &self.api_sender,
-            snapshot: self.snapshot(),
-        }
-    }
-
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.database.snapshot()
+    }
+
+    pub fn sender(&self) -> &ApiSender {
+        &self.api_sender
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ServiceApiScope {
     inner: ApiScope,
-    context: ServiceApiContext,
+    context: ApiContext,
     descriptor: (InstanceId, String),
 }
 
 impl ServiceApiScope {
-    pub fn new(context: ServiceApiContext, instance_descriptor: InstanceDescriptor) -> Self {
+    pub fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
         Self {
             inner: ApiScope::new(),
             context,
@@ -120,17 +132,18 @@ impl ServiceApiScope {
     {
         let context = self.context.clone();
         let descriptor = self.descriptor.clone();
-        self.inner.endpoint(
-            name,
-            move |_: &crate::api::ServiceApiState, query: Q| -> crate::api::FutureResult<I> {
-                let state = context.state(InstanceDescriptor {
-                    id: descriptor.0,
-                    name: descriptor.1.as_ref(),
-                });
+        self.inner
+            .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
+                let state = ServiceApiState::from_api_context(
+                    &context,
+                    InstanceDescriptor {
+                        id: descriptor.0,
+                        name: descriptor.1.as_ref(),
+                    },
+                );
                 let result = handler(&state, query);
                 Box::new(result.into_future())
-            },
-        );
+            });
         self
     }
 
@@ -143,17 +156,18 @@ impl ServiceApiScope {
     {
         let context = self.context.clone();
         let descriptor = self.descriptor.clone();
-        self.inner.endpoint_mut(
-            name,
-            move |_: &crate::api::ServiceApiState, query: Q| -> crate::api::FutureResult<I> {
-                let mut state = context.state(InstanceDescriptor {
-                    id: descriptor.0,
-                    name: descriptor.1.as_ref(),
-                });
-                let result = handler(&mut state, query);
+        self.inner
+            .endpoint_mut(name, move |query: Q| -> crate::api::FutureResult<I> {
+                let state = ServiceApiState::from_api_context(
+                    &context,
+                    InstanceDescriptor {
+                        id: descriptor.0,
+                        name: descriptor.1.as_ref(),
+                    },
+                );
+                let result = handler(&state, query);
                 Box::new(result.into_future())
-            },
-        );
+            });
         self
     }
 
@@ -163,16 +177,96 @@ impl ServiceApiScope {
     }
 }
 
+/// Exonum service API builder, which is used to add endpoints to the node API.
+///
+/// # Examples
+///
+/// The example below shows a common practice of API implementation.
+///
+/// ```rust
+/// #[macro_use] extern crate exonum;
+/// #[macro_use] extern crate serde_derive;
+/// extern crate futures;
+///
+/// use futures::Future;
+///
+/// use std::net::SocketAddr;
+///
+/// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
+/// use exonum::blockchain::{Schema};
+/// use exonum::crypto::{Hash, PublicKey};
+///
+/// // Declares a type which describes an API specification and implementation.
+/// pub struct MyApi;
+///
+/// // Declares structures for requests and responses.
+///
+/// // For the web backend, `MyQuery` will be deserialized from a `block_height={number}` string.
+/// #[derive(Deserialize, Clone, Copy)]
+/// pub struct MyQuery {
+///     pub block_height: u64
+/// }
+///
+/// // For the web backend, `BlockInfo` will be serialized into a JSON string.
+/// #[derive(Serialize, Clone, Copy)]
+/// pub struct BlockInfo {
+///     pub hash: Hash,
+/// }
+///
+/// // Creates API handlers.
+/// impl MyApi {
+///     // Immutable handler, which returns a hash of the block at the given height.
+///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
+///         let snapshot = state.snapshot();
+///         let schema = Schema::new(&snapshot);
+///         Ok(schema.block_hashes_by_height()
+///             .get(query.block_height)
+///             .map(|hash| BlockInfo { hash })
+///         )
+///     }
+///
+///     // Mutable handler which removes the peer with the given key from the cache.
+///     pub fn remove_peer(state: &ServiceApiState, query: PublicKey) -> api::Result<()> {
+///         let mut blockchain = state.blockchain().clone();
+///         Ok(blockchain.remove_peer_with_pubkey(&query))
+///     }
+///
+///     // Simple handler without any parameters.
+///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///         Ok(())
+///     }
+///
+///     // You may also create asynchronous handlers for long requests.
+///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
+///      -> api::FutureResult<Option<Hash>> {
+///         let blockchain = state.blockchain().clone().snapshot();
+///         Box::new(futures::lazy(move || {
+///             let schema = Schema::new(&blockchain);
+///             Ok(schema.block_hashes_by_height().get(query.block_height))
+///         }))
+///     }
+/// }
+///
+/// # let mut builder = ServiceApiBuilder::default();
+/// // Adds `MyApi` handlers to the corresponding builder.
+/// builder.public_scope()
+///     .endpoint("v1/ping", MyApi::ping)
+///     .endpoint("v1/block_hash", MyApi::block_hash)
+///     .endpoint("v1/block_hash_async", MyApi::block_hash_async);
+/// // Adds a mutable endpoint for to the private API.
+/// builder.private_scope()
+///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
+/// ```
 #[derive(Debug)]
 pub struct ServiceApiBuilder {
-    context: ServiceApiContext,
+    context: ApiContext,
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
 }
 
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
-    pub(crate) fn new(context: ServiceApiContext, instance_descriptor: InstanceDescriptor) -> Self {
+    pub(crate) fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
         Self {
             context: context.clone(),
             public_scope: ServiceApiScope::new(context.clone(), instance_descriptor),
@@ -190,8 +284,8 @@ impl ServiceApiBuilder {
         &mut self.private_scope
     }
 
-    /// Returns a reference to the underlying service API context.
-    pub fn context(&self) -> &ServiceApiContext {
+    /// Returns a reference to the underlying API context.
+    pub fn context(&self) -> &ApiContext {
         &self.context
     }
 }

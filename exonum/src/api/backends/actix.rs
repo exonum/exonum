@@ -42,17 +42,17 @@ use crate::api::{
     error::Error as ApiError,
     manager::{ApiManager, RestartServer},
     ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend, FutureResult, Immutable,
-    Mutable, NamedWith, Result, ServiceApiState,
+    Mutable, NamedWith, Result,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
 /// Type alias for the concrete `actix-web` HTTP request.
-pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
+pub type HttpRequest = actix_web::HttpRequest<()>;
 /// Type alias for the inner `actix-web` HTTP requests handler.
 pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
-/// Type alias for the `actix-web::App` with the `ServiceApiState`.
-pub type App = actix_web::App<ServiceApiState>;
+/// Type alias for the `actix-web::App`.
+pub type App = actix_web::App<()>;
 /// Type alias for the `actix-web::App` configuration.
 pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
 
@@ -91,7 +91,7 @@ impl ApiBuilder {
 
 impl ApiBackend for ApiBuilder {
     type Handler = RequestHandler;
-    type Backend = actix_web::Scope<ServiceApiState>;
+    type Backend = actix_web::Scope<()>;
 
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
         self.handlers.push(handler);
@@ -109,7 +109,7 @@ impl ApiBackend for ApiBuilder {
     }
 }
 
-impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
+impl ExtendApiBackend for actix_web::Scope<()> {
     fn extend<'a, I>(mut self, items: I) -> Self
     where
         I: IntoIterator<Item = (&'a str, &'a ApiScope)>,
@@ -138,17 +138,16 @@ impl ResponseError for ApiError {
 
 impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F, Immutable>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I> + 'static + Send + Sync + Clone,
+    F: Fn(Q) -> Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
     fn from(f: NamedWith<Q, I, Result<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
-            let context = request.state();
             let future = Query::from_request(&request, &Default::default())
                 .map(Query::into_inner)
-                .and_then(|query| handler(context, query).map_err(From::from))
+                .and_then(|query| handler(query).map_err(From::from))
                 .and_then(|value| Ok(HttpResponse::Ok().json(value)))
                 .into_future();
             Box::new(future)
@@ -164,7 +163,7 @@ where
 
 impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F, Mutable>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I> + 'static + Send + Sync + Clone,
+    F: Fn(Q) -> Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
@@ -172,12 +171,11 @@ where
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
-            let context = request.state().clone();
             request
                 .json()
                 .from_err()
                 .and_then(move |query: Q| {
-                    handler(&context, query)
+                    handler(query)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
                 })
@@ -194,19 +192,18 @@ where
 
 impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F, Immutable>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
+    F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
     fn from(f: NamedWith<Q, I, FutureResult<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
-            let context = request.state().clone();
             let handler = handler.clone();
             Query::from_request(&request, &Default::default())
                 .map(Query::into_inner)
                 .into_future()
-                .and_then(move |query| handler(&context, query).map_err(From::from))
+                .and_then(move |query| handler(query).map_err(From::from))
                 .map(|value| HttpResponse::Ok().json(value))
                 .responder()
         };
@@ -221,7 +218,7 @@ where
 
 impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F, Mutable>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
+    F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
@@ -229,12 +226,11 @@ where
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
-            let context = request.state().clone();
             request
                 .json()
                 .from_err()
                 .and_then(move |query: Q| {
-                    handler(&context, query)
+                    handler(query)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
                 })
@@ -253,8 +249,7 @@ where
 pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeConfig) -> App {
     let app_config = runtime_config.app_config;
     let access = runtime_config.access;
-    let state = ServiceApiState::new(aggregator.blockchain.clone());
-    let mut app = App::with_state(state);
+    let mut app = App::new();
     app = app.scope("api", |scope| aggregator.extend_backend(access, scope));
     if let Some(app_config) = app_config {
         app = app_config(app);

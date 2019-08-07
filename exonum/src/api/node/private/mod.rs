@@ -20,9 +20,9 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    api::{ApiScope, Error as ApiError, ServiceApiState},
+    api::{ApiScope, Error as ApiError},
     crypto::PublicKey,
-    node::{ConnectInfo, ExternalMessage},
+    node::{ApiSender, ConnectInfo, ExternalMessage},
     runtime::InstanceId,
 };
 
@@ -98,12 +98,14 @@ struct ConsensusEnabledQuery {
 pub struct SystemApi {
     info: NodeInfo,
     shared_api_state: SharedNodeState,
+    sender: ApiSender,
 }
 
 impl SystemApi {
     /// Creates a new `private::SystemApi` instance.
-    pub fn new(info: NodeInfo, shared_api_state: SharedNodeState) -> Self {
+    pub fn new(sender: ApiSender, info: NodeInfo, shared_api_state: SharedNodeState) -> Self {
         Self {
+            sender,
             info,
             shared_api_state,
         }
@@ -123,7 +125,7 @@ impl SystemApi {
 
     fn handle_peers_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
+        api_scope.endpoint(name, move |_query: ()| {
             let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
             for connect_info in self.shared_api_state.outgoing_connections() {
@@ -152,29 +154,25 @@ impl SystemApi {
     }
 
     fn handle_peer_add(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        let self_ = self.clone();
         api_scope.endpoint_mut(
             name,
-            move |state: &ServiceApiState, connect_info: ConnectInfo| -> Result<(), ApiError> {
-                state
-                    .sender()
-                    .peer_add(connect_info)
-                    .map_err(ApiError::from)
+            move |connect_info: ConnectInfo| -> Result<(), ApiError> {
+                self.sender.peer_add(connect_info).map_err(ApiError::from)
             },
         );
-        self
+        self_
     }
 
     fn handle_network_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            Ok(self.info.clone())
-        });
+        api_scope.endpoint(name, move |_query: ()| Ok(self.info.clone()));
         self_
     }
 
     fn handle_is_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
+        api_scope.endpoint(name, move |_query: ()| {
             Ok(self.shared_api_state.is_enabled())
         });
         self_
@@ -184,9 +182,8 @@ impl SystemApi {
         let self_ = self.clone();
         api_scope.endpoint_mut(
             name,
-            move |state: &ServiceApiState, query: ConsensusEnabledQuery| -> Result<(), ApiError> {
-                state
-                    .sender()
+            move |query: ConsensusEnabledQuery| -> Result<(), ApiError> {
+                self.sender
                     .send_external_message(ExternalMessage::Enable(query.enabled))
                     .map_err(ApiError::from)
             },
@@ -195,28 +192,22 @@ impl SystemApi {
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint_mut(
-            name,
-            move |state: &ServiceApiState, _query: ()| -> Result<(), ApiError> {
-                state
-                    .sender()
-                    .send_external_message(ExternalMessage::Shutdown)
-                    .map_err(ApiError::from)
-            },
-        );
-        self
+        let self_ = self.clone();
+        api_scope.endpoint_mut(name, move |_query: ()| -> Result<(), ApiError> {
+            self.sender
+                .send_external_message(ExternalMessage::Shutdown)
+                .map_err(ApiError::from)
+        });
+        self_
     }
 
     fn handle_rebroadcast(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint_mut(
-            name,
-            move |state: &ServiceApiState, _query: ()| -> Result<(), ApiError> {
-                state
-                    .sender()
-                    .send_external_message(ExternalMessage::Rebroadcast)
-                    .map_err(ApiError::from)
-            },
-        );
-        self
+        let self_ = self.clone();
+        api_scope.endpoint_mut(name, move |_query: ()| -> Result<(), ApiError> {
+            self.sender
+                .send_external_message(ExternalMessage::Rebroadcast)
+                .map_err(ApiError::from)
+        });
+        self_
     }
 }

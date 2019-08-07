@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    api::{ServiceApiBuilder, ServiceApiContext},
+    api::{ApiContext, ServiceApiBuilder},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime,
@@ -141,10 +141,7 @@ impl Dispatcher {
         aggregator
     }
 
-    pub(crate) fn services_api(
-        &self,
-        context: &ServiceApiContext,
-    ) -> Vec<(String, ServiceApiBuilder)> {
+    pub(crate) fn services_api(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         self.runtimes
             .iter()
             .fold(Vec::new(), |mut api, (_, runtime)| {

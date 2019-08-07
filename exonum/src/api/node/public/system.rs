@@ -17,11 +17,11 @@
 use exonum_merkledb::IndexAccess;
 
 use crate::{
-    api::{self, node::SharedNodeState, ApiScope, ServiceApiState},
+    api::{self, node::SharedNodeState, ApiScope},
     blockchain::Schema,
     helpers::user_agent,
     proto::schema::PROTO_SOURCES as EXONUM_PROTO_SOURCES,
-    runtime::{dispatcher, ArtifactId, InstanceSpec},
+    runtime::{api::ApiContext, dispatcher, ArtifactId, InstanceSpec},
 };
 
 /// Information about the current state of the node memory pool.
@@ -104,18 +104,23 @@ pub struct ProtoSourcesQuery {
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
-    shared_api_state: SharedNodeState,
+    context: ApiContext,
+    node_state: SharedNodeState,
 }
 
 impl SystemApi {
     /// Creates a new `public::SystemApi` instance.
-    pub fn new(shared_api_state: SharedNodeState) -> Self {
-        Self { shared_api_state }
+    pub fn new(context: ApiContext, node_state: SharedNodeState) -> Self {
+        Self {
+            context,
+            node_state,
+        }
     }
 
     fn handle_stats_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
-            let snapshot = state.snapshot();
+        let context = self.context.clone();
+        api_scope.endpoint(name, move |_query: ()| {
+            let snapshot = context.snapshot();
             let schema = Schema::new(&snapshot);
             Ok(StatsInfo {
                 tx_pool_size: schema.transactions_pool_len(),
@@ -126,15 +131,13 @@ impl SystemApi {
     }
 
     fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            Ok(user_agent::get())
-        });
+        api_scope.endpoint(name, move |_query: ()| Ok(user_agent::get()));
         self
     }
 
     fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
+        api_scope.endpoint(name, move |_query: ()| {
             Ok(HealthCheckInfo {
                 consensus_status: self.get_consensus_status(),
                 connected_peers: self.get_number_of_connected_peers(),
@@ -144,19 +147,17 @@ impl SystemApi {
     }
 
     fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            Ok(api_state.dispatcher_info())
-        });
+        let node_state = self.node_state.clone();
+        api_scope.endpoint(name, move |_query: ()| Ok(node_state.dispatcher_info()));
         self
     }
 
     fn handle_proto_source(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let api_state = self.shared_api_state.clone();
+        let node_state = self.node_state.clone();
         api_scope.endpoint(name, {
-            move |_state: &ServiceApiState, query: ProtoSourcesQuery| {
+            move |query: ProtoSourcesQuery| {
                 if let Some(artifact_id) = query.artifact {
-                    api_state
+                    node_state
                         .artifact_sources(&artifact_id.parse()?)
                         .ok_or_else(|| {
                             api::Error::NotFound(format!(
@@ -177,16 +178,16 @@ impl SystemApi {
     }
 
     fn get_number_of_connected_peers(&self) -> usize {
-        let in_conn = self.shared_api_state.incoming_connections().len();
-        let out_conn = self.shared_api_state.outgoing_connections().len();
+        let in_conn = self.node_state.incoming_connections().len();
+        let out_conn = self.node_state.outgoing_connections().len();
         // We sum incoming and outgoing connections here because we keep only one connection
         // between nodes. A connection could be incoming or outgoing but only one.
         in_conn + out_conn
     }
 
     fn get_consensus_status(&self) -> ConsensusStatus {
-        if self.shared_api_state.is_enabled() {
-            if self.shared_api_state.consensus_status() {
+        if self.node_state.is_enabled() {
+            if self.node_state.consensus_status() {
                 ConsensusStatus::Active
             } else {
                 ConsensusStatus::Enabled

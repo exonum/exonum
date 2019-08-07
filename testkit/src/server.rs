@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    api::{self, node::SharedNodeState, ApiAggregator, ApiBuilder, ApiScope, ServiceApiState},
+    api::{self, node::SharedNodeState, ApiAggregator, ApiBuilder, ApiScope},
     crypto::Hash,
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
@@ -103,28 +103,21 @@ impl TestkitServerApi {
 
     fn handle_status(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            self.status()
-        });
+        api_scope.endpoint(name, move |_query: ()| self.status());
         self_
     }
 
     fn handle_create_block(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint_mut(
-            name,
-            move |_state: &ServiceApiState, query: Option<CreateBlockQuery>| {
-                self.create_block(query.and_then(|query| query.tx_hashes))
-            },
-        );
+        api_scope.endpoint_mut(name, move |query: Option<CreateBlockQuery>| {
+            self.create_block(query.and_then(|query| query.tx_hashes))
+        });
         self_
     }
 
     fn handle_rollback(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint_mut(name, move |_state: &ServiceApiState, height: Height| {
-            self.rollback(height)
-        });
+        api_scope.endpoint_mut(name, move |height: Height| self.rollback(height));
         self_
     }
 

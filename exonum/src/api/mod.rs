@@ -14,11 +14,19 @@
 
 //! API and corresponding utilities.
 
+// TODO remove me
+pub use crate::runtime::api::ApiContext;
+
 pub use self::{
     error::Error,
-    state::ServiceApiState,
     with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
 };
+
+pub mod backends;
+pub mod error;
+pub mod manager;
+pub mod node;
+pub mod websocket;
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -30,16 +38,8 @@ use self::{
 };
 use crate::{
     api::node::SharedNodeState, blockchain::Blockchain, crypto::PublicKey, node::ApiSender,
-    runtime::api::ServiceApiContext,
 };
 
-pub mod backends;
-pub mod error;
-pub mod manager;
-pub mod node;
-
-mod state;
-pub mod websocket;
 mod with;
 
 /// Defines an object that could be used as a Exonum API backend.
@@ -57,7 +57,7 @@ pub trait ApiBackend: Sized {
         N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
@@ -71,7 +71,7 @@ pub trait ApiBackend: Sized {
         N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
@@ -114,7 +114,7 @@ impl ApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
@@ -133,7 +133,7 @@ impl ApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
@@ -148,85 +148,6 @@ impl ApiScope {
 }
 
 /// Exonum API builder, which is used to add endpoints to the node API.
-///
-/// # Examples
-///
-/// The example below shows a common practice of API implementation.
-///
-/// ```rust
-/// #[macro_use] extern crate exonum;
-/// #[macro_use] extern crate serde_derive;
-/// extern crate futures;
-///
-/// use futures::Future;
-///
-/// use std::net::SocketAddr;
-///
-/// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
-/// use exonum::blockchain::{Schema};
-/// use exonum::crypto::{Hash, PublicKey};
-///
-/// // Declares a type which describes an API specification and implementation.
-/// pub struct MyApi;
-///
-/// // Declares structures for requests and responses.
-///
-/// // For the web backend, `MyQuery` will be deserialized from a `block_height={number}` string.
-/// #[derive(Deserialize, Clone, Copy)]
-/// pub struct MyQuery {
-///     pub block_height: u64
-/// }
-///
-/// // For the web backend, `BlockInfo` will be serialized into a JSON string.
-/// #[derive(Serialize, Clone, Copy)]
-/// pub struct BlockInfo {
-///     pub hash: Hash,
-/// }
-///
-/// // Creates API handlers.
-/// impl MyApi {
-///     // Immutable handler, which returns a hash of the block at the given height.
-///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
-///         let snapshot = state.snapshot();
-///         let schema = Schema::new(&snapshot);
-///         Ok(schema.block_hashes_by_height()
-///             .get(query.block_height)
-///             .map(|hash| BlockInfo { hash })
-///         )
-///     }
-///
-///     // Mutable handler which removes the peer with the given key from the cache.
-///     pub fn remove_peer(state: &ServiceApiState, query: PublicKey) -> api::Result<()> {
-///         let mut blockchain = state.blockchain().clone();
-///         Ok(blockchain.remove_peer_with_pubkey(&query))
-///     }
-///
-///     // Simple handler without any parameters.
-///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
-///         Ok(())
-///     }
-///
-///     // You may also create asynchronous handlers for long requests.
-///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
-///      -> api::FutureResult<Option<Hash>> {
-///         let blockchain = state.blockchain().clone().snapshot();
-///         Box::new(futures::lazy(move || {
-///             let schema = Schema::new(&blockchain);
-///             Ok(schema.block_hashes_by_height().get(query.block_height))
-///         }))
-///     }
-/// }
-///
-/// # let mut builder = ServiceApiBuilder::default();
-/// // Adds `MyApi` handlers to the corresponding builder.
-/// builder.public_scope()
-///     .endpoint("v1/ping", MyApi::ping)
-///     .endpoint("v1/block_hash", MyApi::block_hash)
-///     .endpoint("v1/block_hash_async", MyApi::block_hash_async);
-/// // Adds a mutable endpoint for to the private API.
-/// builder.private_scope()
-///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
-/// ```
 #[derive(Debug, Clone, Default)]
 pub struct ApiBuilder {
     pub(crate) blockchain: Option<Blockchain>,
@@ -317,10 +238,14 @@ impl ApiAggregator {
     pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
         let mut inner = BTreeMap::new();
         // Adds built-in APIs.
-        inner.insert("system".to_owned(), Self::system_api(node_state.clone()));
+        let context = ApiContext::with_blockchain(&blockchain);
+        inner.insert(
+            "system".to_owned(),
+            Self::system_api(context.clone(), node_state.clone()),
+        );
         inner.insert(
             "explorer".to_owned(),
-            Self::explorer_api(&blockchain, node_state.clone()),
+            Self::explorer_api(context.clone(), node_state.clone()),
         );
         Self {
             inner,
@@ -340,7 +265,7 @@ impl ApiAggregator {
 
         let blockchain = self.blockchain.clone();
         let dispatcher = self.blockchain.dispatcher();
-        let context = ServiceApiContext::with_blockchain(&blockchain);
+        let context = ApiContext::with_blockchain(&blockchain);
         inner.extend(
             dispatcher
                 .services_api(&context)
@@ -378,19 +303,21 @@ impl ApiAggregator {
         self.node_state.update_dispatcher_state(&self.blockchain);
     }
 
-    fn explorer_api(blockchain: &Blockchain, shared_node_state: SharedNodeState) -> ApiBuilder {
+    fn explorer_api(context: ApiContext, shared_node_state: SharedNodeState) -> ApiBuilder {
         let mut builder = ApiBuilder::new();
-        let service_api_state = ServiceApiState::new(blockchain.clone());
-        ExplorerApi::wire(builder.public_scope(), service_api_state, shared_node_state);
+
+        ExplorerApi::new(context).wire(builder.public_scope(), shared_node_state);
         builder
     }
 
-    fn system_api(shared_api_state: SharedNodeState) -> ApiBuilder {
-        // Waits until dispatcher will be unlocked to get fresh info.
+    fn system_api(context: ApiContext, shared_api_state: SharedNodeState) -> ApiBuilder {
         let mut builder = ApiBuilder::new();
-        self::node::private::SystemApi::new(NodeInfo::new(), shared_api_state.clone())
+
+        let sender = context.sender().clone();
+        self::node::private::SystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
+        self::node::public::SystemApi::new(context.clone(), shared_api_state)
+            .wire(builder.public_scope());
         builder
     }
 }

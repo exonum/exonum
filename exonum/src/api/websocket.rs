@@ -26,13 +26,12 @@ use rand::{rngs::ThreadRng, Rng};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
-    sync::Arc,
 };
 
 use crate::{
     api::{
         node::public::explorer::{TransactionHex, TransactionResponse},
-        ServiceApiState,
+        ApiContext,
     },
     blockchain::{Block, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
@@ -191,15 +190,15 @@ pub(crate) struct Transaction {
 
 pub(crate) struct Server {
     pub subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
-    service_api_state: Arc<ServiceApiState>,
+    context: ApiContext,
     rng: RefCell<ThreadRng>,
 }
 
 impl Server {
-    pub fn new(service_api_state: Arc<ServiceApiState>) -> Self {
+    pub fn new(context: ApiContext) -> Self {
         Self {
             subscribers: BTreeMap::new(),
-            service_api_state,
+            context,
             rng: RefCell::new(rand::thread_rng()),
         }
     }
@@ -301,7 +300,7 @@ impl Handler<Broadcast> for Server {
     type Result = ();
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
-        let snapshot = self.service_api_state.snapshot();
+        let snapshot = self.context.snapshot();
         let schema = Schema::new(&snapshot);
         let block = schema.blocks().get(&block_hash).unwrap();
         let height = block.height();
@@ -359,7 +358,7 @@ impl Handler<Transaction> for Server {
         let tx_hash = msg.object_hash();
         // FIXME Don't ignore message error.
         let _ = self
-            .service_api_state
+            .context
             .sender()
             .broadcast_transaction(msg.into_verified()?);
         Ok(TransactionResponse { tx_hash })
@@ -444,7 +443,7 @@ impl Session {
 }
 
 impl Actor for Session {
-    type Context = ws::WebsocketContext<Self, ServiceApiState>;
+    type Context = ws::WebsocketContext<Self, ()>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let address: Recipient<_> = ctx.address().recipient();

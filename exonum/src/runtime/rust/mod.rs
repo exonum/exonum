@@ -40,7 +40,7 @@ use crate::{
 };
 
 use super::{
-    api::{ServiceApiBuilder, ServiceApiContext},
+    api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, DispatcherSender},
     error::ExecutionError,
     ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
@@ -358,7 +358,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn services_api(&self, context: &ServiceApiContext) -> Vec<(String, ServiceApiBuilder)> {
+    fn services_api(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         self.started_services
             .values()
             .map(|instance| {

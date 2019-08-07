@@ -23,7 +23,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::{self, Display};
 
 use exonum::{
-    api::{self, node::SharedNodeState, ApiAggregator, ServiceApiState},
+    api::{self, node::SharedNodeState, ApiAggregator},
     messages::{AnyTx, Verified},
     node::ApiSender,
 };
@@ -307,8 +307,7 @@ where
 /// Creates a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     let server = TestServer::with_factory(move || {
-        let state = ServiceApiState::new(aggregator.blockchain().clone());
-        App::with_state(state.clone())
+        App::new()
             .scope("public/api", |scope| {
                 trace!("Create public/api");
                 aggregator.extend_backend(ApiAccess::Public, scope)
