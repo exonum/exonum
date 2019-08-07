@@ -20,6 +20,7 @@ use futures::{future, Future};
 use std::{cell::RefCell, collections::HashMap, panic};
 
 use crate::{
+    api::ApiBuilder,
     blockchain::{FatalError, IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::ValidateInput,
@@ -29,7 +30,7 @@ use crate::{
 };
 
 use super::{
-    api::{ApiContext, ServiceApiBuilder},
+    api::ApiContext,
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime,
@@ -141,13 +142,25 @@ impl Dispatcher {
         aggregator
     }
 
-    pub(crate) fn services_api(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
+    pub(crate) fn api_endpoints(
+        &self,
+        context: &ApiContext,
+    ) -> impl IntoIterator<Item = (String, ApiBuilder)> {
         self.runtimes
-            .iter()
-            .fold(Vec::new(), |mut api, (_, runtime)| {
-                api.append(&mut runtime.services_api(context));
-                api
+            .values()
+            .map(|runtime| {
+                runtime
+                    .services_api(context)
+                    .into_iter()
+                    .map(|(service_name, builder)| {
+                        (
+                            ["services/", &service_name].concat(),
+                            ApiBuilder::from(builder),
+                        )
+                    })
             })
+            .flatten()
+            .collect::<Vec<_>>()
     }
 
     /// Initiates deploy artifact procedure in the corresponding runtime.

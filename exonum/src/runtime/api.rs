@@ -291,7 +291,6 @@ impl From<ServiceApiBuilder> for ApiBuilder {
         Self {
             public_scope: inner.public_scope.inner,
             private_scope: inner.private_scope.inner,
-            blockchain: None,
         }
     }
 }

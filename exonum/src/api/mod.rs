@@ -151,7 +151,6 @@ impl ApiScope {
 /// Exonum API builder, which is used to add endpoints to the node API.
 #[derive(Debug, Clone, Default)]
 pub struct ApiBuilder {
-    pub(crate) blockchain: Option<Blockchain>,
     pub(crate) public_scope: ApiScope,
     pub(crate) private_scope: ApiScope,
 }
@@ -159,10 +158,7 @@ pub struct ApiBuilder {
 impl ApiBuilder {
     /// Creates a new API builder.
     pub fn new() -> Self {
-        Self {
-            blockchain: None,
-            ..Default::default()
-        }
+        Self::default()
     }
 
     /// Returns a mutable reference to the public API scope builder.
@@ -173,26 +169,6 @@ impl ApiBuilder {
     /// Returns a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ApiScope {
         &mut self.private_scope
-    }
-
-    /// Returns an optional reference to the Blockchain.
-    pub fn blockchain(&self) -> Option<&Blockchain> {
-        self.blockchain.as_ref()
-    }
-
-    /// Returns an optional reference to the ApiSender.
-    pub fn api_sender(&self) -> Option<&ApiSender> {
-        self.blockchain().map(|blockchain| &blockchain.api_sender)
-    }
-
-    /// Returns an optional value to the PublicKey.
-    pub fn public_key(&self) -> Option<PublicKey> {
-        self.blockchain()
-            .map(|blockchain| blockchain.service_keypair.0)
-    }
-
-    pub fn set_blockchain(&mut self, blockchain: Blockchain) {
-        self.blockchain = Some(blockchain);
     }
 }
 
@@ -231,25 +207,25 @@ pub trait ExtendApiBackend {
 pub struct ApiAggregator {
     blockchain: Blockchain,
     node_state: SharedNodeState,
-    inner: BTreeMap<String, ApiBuilder>,
+    endpoints: BTreeMap<String, ApiBuilder>,
 }
 
 impl ApiAggregator {
     /// Aggregates API for the given blockchain and node state.
     pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
-        let mut inner = BTreeMap::new();
+        let mut endpoints = BTreeMap::new();
         // Adds built-in APIs.
         let context = ApiContext::with_blockchain(&blockchain);
-        inner.insert(
+        endpoints.insert(
             "system".to_owned(),
             Self::system_api(context.clone(), node_state.clone()),
         );
-        inner.insert(
+        endpoints.insert(
             "explorer".to_owned(),
             Self::explorer_api(context.clone(), node_state.clone()),
         );
         Self {
-            inner,
+            endpoints,
             blockchain,
             node_state,
         }
@@ -262,32 +238,23 @@ impl ApiAggregator {
 
     /// Extends the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
-        let mut inner = self.inner.clone();
+        let mut endpoints = self.endpoints.clone();
 
         let blockchain = self.blockchain.clone();
         let dispatcher = self.blockchain.dispatcher();
         let context = ApiContext::with_blockchain(&blockchain);
-        inner.extend(
-            dispatcher
-                .services_api(&context)
-                .into_iter()
-                .map(|(name, builder)| {
-                    let mut builder = ApiBuilder::from(builder);
-                    builder.set_blockchain(blockchain.clone());
-                    (format!("services/{}", name), builder)
-                }),
-        );
+        endpoints.extend(dispatcher.api_endpoints(&context));
 
-        trace!("Create actix-web worker with api: {:#?}", inner);
+        trace!("Create actix-web worker with api: {:#?}", endpoints);
 
         match access {
             ApiAccess::Public => backend.extend(
-                inner
+                endpoints
                     .iter()
                     .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
             ),
             ApiAccess::Private => backend.extend(
-                inner
+                endpoints
                     .iter()
                     .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
             ),
@@ -296,7 +263,7 @@ impl ApiAggregator {
 
     /// Adds API factory with the given prefix to the aggregator.
     pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ApiBuilder) {
-        self.inner.insert(prefix.into(), builder);
+        self.endpoints.insert(prefix.into(), builder);
     }
 
     /// Refreshes shared node state.
