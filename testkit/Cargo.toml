@@ -36,7 +36,7 @@ exonum-merkledb = { version = "0.11.0", path = "../components/merkledb" }
 
 [dev-dependencies]
 hex = "0.3.2"
-rand = "0.6.4"
+rand = "0.7"
 pretty_assertions = "0.6.1"
 assert_matches = "1.2.0"
 thread_local = "0.3.6"
