@@ -85,6 +85,11 @@ long_benchmarks = []
 metrics-log = []
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
 with-serde = []
+rocksdb_snappy = ["exonum-merkledb/rocksdb_snappy"]
+rocksdb_lz4 = ["exonum-merkledb/rocksdb_lz4"]
+rocksdb_zlib = ["exonum-merkledb/rocksdb_zlib"]
+rocksdb_zstd = ["exonum-merkledb/rocksdb_zstd"]
+rocksdb_bzip2 = ["exonum-merkledb/rocksdb_bzip2"]
 
 [build-dependencies]
 exonum-build = { version = "0.11.0", path = "../components/build" }

@@ -23,7 +23,7 @@ failure = "0.1"
 hex = "0.3.2"
 leb128 = "0.2"
 num-traits = "0.2"
-rocksdb = "0.12.3"
+rocksdb = { version = "0.12.3", default-features = false }
 rust_decimal = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
@@ -49,6 +49,11 @@ harness = false
 
 [features]
 long_benchmarks = []
+rocksdb_snappy = ["rocksdb/snappy"]
+rocksdb_lz4 = ["rocksdb/lz4"]
+rocksdb_zlib = ["rocksdb/zlib"]
+rocksdb_zstd = ["rocksdb/zstd"]
+rocksdb_bzip2 = ["rocksdb/bzip2"]
 
 [[example]]
 name = "blockchain"
