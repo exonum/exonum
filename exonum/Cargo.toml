@@ -79,7 +79,7 @@ harness = false
 path = "benches/criterion/lib.rs"
 
 [features]
-default = ["sodiumoxide-crypto", "with-serde"]
+default = ["sodiumoxide-crypto", "with-serde", "rocksdb_snappy"]
 float_serialize = []
 long_benchmarks = []
 metrics-log = []

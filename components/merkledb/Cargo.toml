@@ -48,6 +48,7 @@ path = "benches/lib.rs"
 harness = false
 
 [features]
+default = ["rocksdb_snappy"]
 long_benchmarks = []
 rocksdb_snappy = ["rocksdb/snappy"]
 rocksdb_lz4 = ["rocksdb/lz4"]
