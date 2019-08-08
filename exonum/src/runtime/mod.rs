@@ -25,8 +25,8 @@
 //!
 //! 1. Each runtime has its own [artifacts] registry from which users can deploy them. The artifact
 //! identifier is required by the runtime for constructing service instances. In other words,
-//! an artifact identifier means same as class name, and a specific service instance is
-//! the class instance.
+//! an artifact identifier is similar to a class name, and a specific
+//! service instance - to a class instance.
 //!
 //! 2. Each validator administrator requests the dispatcher to deploy an artifact
 //! and then the validator node should send the confirmation if this request is successful. Then, if the
@@ -215,7 +215,7 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// # Policy on Panics
     ///
-    /// Do not process, just skip above.
+    /// Do not process. Panic will be processed by the method caller.
     fn execute(
         &self,
         dispatcher: &dispatcher::Dispatcher,
@@ -300,7 +300,7 @@ pub struct StateHashAggregator {
     pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
 }
 
-/// The one who causes the transaction execution.
+/// The initiator of the transaction execution.
 #[derive(Debug, PartialEq)]
 pub enum Caller {
     /// A usual transaction from the Exonum client, authorized by its key pair.
@@ -342,7 +342,7 @@ pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
-    /// The one who causes the transaction execution.
+    /// The initiator of the transaction execution.
     pub caller: Caller,
     actions: Vec<dispatcher::Action>,
 }

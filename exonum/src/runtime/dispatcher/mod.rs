@@ -227,7 +227,7 @@ impl Dispatcher {
         if self.runtime_lookup.contains_key(&spec.id) {
             return Err(Error::ServiceIdExists.into());
         }
-        // Tries to start and configure service instance.
+        // Try to start and configure the service instance.
         self.runtimes
             .get_mut(&spec.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)
@@ -252,7 +252,7 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Executes transaction. // TODO documentation [ECR-3275]
+    // TODO documentation [ECR-3275]
     pub(crate) fn execute(
         &mut self,
         fork: &Fork,
@@ -348,30 +348,30 @@ impl Dispatcher {
         self.runtimes.get(&id.runtime_id)?.artifact_info(id)
     }
 
-    /// Returns true if artifact with the given identifier is deployed.
+    /// Return true if the artifact with the given identifier is deployed.
     pub(crate) fn is_deployed(&self, id: &ArtifactId) -> bool {
         self.artifact_info(id).is_some()
     }
 
-    /// Takes modified state and marks dispatcher as unmodified.
+    /// Take the modified state and mark the dispatcher as unmodified.
     pub(crate) fn take_modified_state(&mut self) -> bool {
         self.modified.take().is_some()
     }
 
-    /// Marks dispatcher as modified.
+    /// Mark the dispatcher as modified.
     fn mark_as_modified(&mut self) {
         trace!("Dispatcher state is modified");
         self.modified = Some(());
     }
 
-    /// Registers service instance in the runtime lookup table.
+    /// Register the service instance in the runtime lookup table.
     fn register_running_service(&mut self, instance: &InstanceSpec) {
         info!("Running service instance {:?}", instance);
         self.runtime_lookup
             .insert(instance.id, instance.artifact.runtime_id);
     }
 
-    /// Just starts a new service instance.
+    /// Start a new service instance.
     fn restart_service(&mut self, instance: &InstanceSpec) -> Result<(), ExecutionError> {
         let runtime = self
             .runtimes
@@ -385,11 +385,11 @@ impl Dispatcher {
 
 #[derive(Debug)]
 pub(crate) enum Action {
-    /// This action registers deployed artifact in the dispatcher.
+    /// This action registers the deployed artifact in the dispatcher.
     /// Make sure that you successfully complete the deploy artifact procedure.
     RegisterArtifact { artifact: ArtifactId, spec: Any },
-    /// This action starts service instance with the specified params.
-    /// Make sure that artifact is been deployed.
+    /// This action starts the service instance with the specified params.
+    /// Make sure that the artifact is deployed.
     StartService {
         artifact: ArtifactId,
         instance_name: String,
