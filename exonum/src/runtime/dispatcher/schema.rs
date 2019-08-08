@@ -56,9 +56,9 @@ impl<T: IndexAccess> Schema<T> {
         Entry::new("core.dispatcher.vacant_instance_id", self.access.clone())
     }
 
-    /// Adds artifact specification to the set of deployed artifacts.
+    /// Add artifact specification to the set of the deployed artifacts.
     pub(crate) fn add_artifact(&mut self, artifact: &ArtifactId, spec: Any) -> Result<(), Error> {
-        // Checks that we have not already deployed this artifact.
+        // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact.name) {
             return Err(Error::ArtifactAlreadyDeployed);
         }

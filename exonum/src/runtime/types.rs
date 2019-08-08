@@ -22,11 +22,11 @@ use crate::{helpers::ValidateInput, proto::schema};
 /// Unique service instance identifier.
 ///
 /// * This is the secondary identifier, mainly used in transaction messages.
-/// The primary is the service instance name.
+/// The primary one is the service instance name.
 ///
 /// * The core assigns this identifier when the service is started.
 pub type ServiceInstanceId = u32;
-/// Identifier of the method in the service interface to call.
+/// Identifier of the method in the service interface required for the call.
 pub type MethodId = u32;
 
 /// Unique service transaction identifier.
@@ -35,10 +35,10 @@ pub type MethodId = u32;
 )]
 #[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
-    /// Unique service instance identifier. Dispatcher uses this identifier to find the
-    /// corresponding runtime to execute transaction.
+    /// Unique service instance identifier. The dispatcher uses this identifier to find the
+    /// corresponding runtime to execute a transaction.
     pub instance_id: ServiceInstanceId,
-    /// Identifier of the method in the service interface to call.
+    /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
 }
 
@@ -52,11 +52,11 @@ impl CallInfo {
     }
 }
 
-/// Transaction with information to call.
+/// Transaction with the information required for the call.
 ///
 /// # Examples
 ///
-/// Creating a new signed transaction.
+/// Create a new signed transaction.
 /// ```
 /// use exonum::{
 ///     crypto,
@@ -70,7 +70,7 @@ impl CallInfo {
 ///         call_info: CallInfo {
 ///             // Service instance which we want to call.
 ///             instance_id: 1024,
-///             // Concrete method of the service interface.
+///             // Specific method of the service interface.
 ///             method_id: 0,
 ///         },
 ///         // Transaction payload.
@@ -83,29 +83,29 @@ impl CallInfo {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::AnyTx", crate = "crate")]
 pub struct AnyTx {
-    /// Information to call corresponding executor.
+    /// Information required for the call of the corresponding executor.
     pub call_info: CallInfo,
     /// Serialized transaction arguments.
     pub arguments: Vec<u8>,
 }
 
 impl AnyTx {
-    /// Parses transaction arguments as concrete type.
+    /// Parse transaction arguments as a specific type.
     pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
         T::from_bytes(Cow::Borrowed(&self.arguments))
     }
 }
 
 /// The artifact identifier is required by the runtime to construct service instances.
-/// In other words an artifact identifier means same as class name, and a specific service
-/// instance is the class instance.
+/// In other words, an artifact identifier is similar to a class name, and a specific service
+/// instance is similar to a class instance.
 ///
-/// In string representation, the artifact identifier is written as follows:
+/// In string representation the artifact identifier is written as follows:
 ///
-/// `{runtime_id}:{artifact_name}`, where `runtime_id` is [runtime identifier],
-/// and `artifact_name` is unique name of artifact.
+/// `{runtime_id}:{artifact_name}`, where `runtime_id` is a [runtime identifier],
+/// and `artifact_name` is a unique name of the artifact.
 ///
-/// Artifact name can contains only these characters: `a-zA-Z0-9` and one of `_-.:`.
+/// Artifact name contains only the following characters: `a-zA-Z0-9` and one of `_-.:`.
 ///
 /// [runtime identifier]: enum.RuntimeIdentifier.html
 ///
@@ -147,9 +147,9 @@ impl ArtifactId {
         Ok(artifact)
     }
 
-    /// Checks that the artifact name contains only allowed characters and is not empty.
+    /// Check that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
-        // Extended version of `exonum_merkledb::is_valid_name` that allows also ':`.
+        // Extended version of `exonum_merkledb::is_valid_name` that also allows ':`.
         name.as_ref().iter().all(|&c| match c {
             58 => true,
             c => is_allowed_latin1_char(c),
@@ -164,7 +164,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             Self::is_valid_name(&self.name),
-            "Artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-.:"
+            "Artifact name contains an illegal character, use only: a-zA-Z0-9 and one of _-.:"
         );
         Ok(())
     }
@@ -216,7 +216,7 @@ pub struct InstanceSpec {
     pub id: ServiceInstanceId,
     /// Unique service instance name.
     ///
-    /// It must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
+    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
     pub name: String,
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,

@@ -217,7 +217,7 @@ impl Runtime for RustRuntime {
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if !spec.is_null() && spec != ().into() {
-            // Spec for rust artifacts should be empty.
+            // Keep the spec for Rust artifacts empty.
             return Box::new(future::err(Error::IncorrectArtifactId.into()));
         }
         Box::new(self.deploy(&artifact).into_future())

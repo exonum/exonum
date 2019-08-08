@@ -107,11 +107,11 @@ impl Dispatcher {
             "Instance identifier for builtin service should be lesser than {}",
             MAX_BUILTIN_INSTANCE_ID
         );
-        // Builtin services should not have an additional specification.
+        // Built-in services should not have an additional specification.
         let artifact_spec = Any::default();
-        // Registers service artifact in runtime.
+        // Register service artifact in the runtime.
         self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
-        // Starts builtin service instance.
+        // Start the built-in service instance.
         self.start_service(fork, spec, constructor)
     }
 
@@ -209,7 +209,7 @@ impl Dispatcher {
         self.register_artifact(fork, &artifact, spec)
     }
 
-    /// Starts and configures a new service instance. After that it writes information about
+    /// Start and configure a new service instance. After that, write the information about the
     /// service instance to the dispatcher's information schema.
     ///
     /// # Panics
@@ -234,7 +234,7 @@ impl Dispatcher {
             .map_err(ExecutionError::from)
             .and_then(|runtime| {
                 runtime.start_service(&spec)?;
-                // Tries to configure a started instance of the service, otherwise it stops.
+                // Try to configure the started instance of the service, otherwise stop.
                 Self::configure_service(runtime.as_ref(), fork, &spec, constructor).map_err(|e| {
                     error!(
                         "An error occurred while configuring the service {}: {}",
@@ -247,7 +247,7 @@ impl Dispatcher {
                 })
             })?;
         self.register_running_service(&spec);
-        // Adds service instance to the dispatcher schema.
+        // Add service instance to the dispatcher schema.
         Schema::new(fork).add_service_instance(spec)?;
         Ok(())
     }
@@ -269,9 +269,9 @@ impl Dispatcher {
         self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().arguments)?;
 
         let actions = context.take_actions();
-        // Marks dispatcher as modified if actions are not empty.
+        // Mark the dispatcher as modified if actions are not empty.
         let is_modified = !actions.is_empty();
-        // Executes pending dispatcher actions.
+        // Execute pending dispatcher actions.
         for action in actions {
             action.execute(self, fork)?;
         }
@@ -333,7 +333,7 @@ impl Dispatcher {
         }
     }
 
-    // Tries to configure a started instance of the service and catches panic if occurred.
+    // Try to configure the started instance of the service and catch panic if it occurs.
     pub(crate) fn configure_service(
         runtime: &(dyn Runtime + 'static),
         fork: &Fork,
@@ -343,7 +343,7 @@ impl Dispatcher {
         catch_panic(|| runtime.configure_service(fork, &spec, constructor))
     }
 
-    /// Returns additional information about artifact with if it is deployed.
+    /// Return additional information about the artifact if it is deployed.
     pub(crate) fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
         self.runtimes.get(&id.runtime_id)?.artifact_info(id)
     }
@@ -690,7 +690,7 @@ mod tests {
             name: "second".into(),
         };
 
-        // Check if we can deploy services.
+        // Check if the services are ready for deploy.
         let fork = db.fork();
         dispatcher
             .deploy_and_register_artifact(&fork, &sample_rust_spec, Any::default())
@@ -699,7 +699,7 @@ mod tests {
             .deploy_and_register_artifact(&fork, &sample_java_spec, Any::default())
             .unwrap();
 
-        // Check if we can init services.
+        // Check if we the services are ready for initiation.
         dispatcher
             .start_service(
                 &fork,
@@ -723,7 +723,7 @@ mod tests {
             )
             .expect("start_service failed for java");
 
-        // Check if we can execute transactions.
+        // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
         let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
@@ -785,7 +785,7 @@ mod tests {
             RustRuntimeError::UnableToDeploy.into()
         );
 
-        // Checks if we can start services.
+        // Check if the services are ready to start.
         let fork = db.fork();
 
         assert_eq!(
@@ -803,7 +803,7 @@ mod tests {
             Error::ArtifactNotDeployed.into()
         );
 
-        // Check if we can execute transactions.
+        // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
         let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
