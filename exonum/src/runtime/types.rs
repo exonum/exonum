@@ -280,11 +280,11 @@ fn parse_artifact_id_incorrect_layout() {
         ("ava:123", "invalid digit found in string"),
         (
             "123:I am a service!",
-            "Artifact name contains illegal character",
+            "Artifact name contains an illegal character",
         ),
         (
             "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!",
-            "Artifact name contains illegal character",
+            "Artifact name contains an illegal character",
         ),
     ];
 
