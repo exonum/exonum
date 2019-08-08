@@ -130,7 +130,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// Using this trait, you can extend the Exonum blockchain with the services written in
 /// different languages. It assumes that the deployment procedure of a new service may be
 /// complex and long and even may fail;
-/// therefore, we introduced an additional entity - artifacts.
+/// therefore, we introduce an additional entity - artifacts.
 /// Each artifact has a unique identifier and, depending on the runtime, may have an additional
 /// specification needed for its deployment. For example, the file to be compiled.
 /// Artifact creates corresponding service instances similar to classes in the object

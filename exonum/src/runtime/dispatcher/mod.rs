@@ -699,7 +699,7 @@ mod tests {
             .deploy_and_register_artifact(&fork, &sample_java_spec, Any::default())
             .unwrap();
 
-        // Check if we the services are ready for initiation.
+        // Check if the services are ready for initiation.
         dispatcher
             .start_service(
                 &fork,
