@@ -23,13 +23,13 @@ pub mod service;
 #[cfg(test)]
 pub mod tests;
 
-use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
 use semver::Version;
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt, panic,
+    fmt,
     str::FromStr,
 };
 
@@ -42,7 +42,7 @@ use crate::{
 use super::{
     api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, DispatcherSender},
-    error::ExecutionError,
+    error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
@@ -316,25 +316,24 @@ impl Runtime for RustRuntime {
     }
 
     fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {
-        // TODO Use `catch_panic` helper. [ECR-3222]
         for instance in self.started_services.values() {
-            match panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            let result = catch_panic(|| {
                 instance.as_ref().before_commit(TransactionContext {
                     dispatcher,
                     runtime_context: &mut ExecutionContext::new(fork, Caller::Blockchain),
                     instance_descriptor: instance.descriptor(),
-                })
-            })) {
-                Ok(..) => fork.flush(),
-                Err(err) => {
-                    if err.is::<StorageError>() {
-                        // Continue panic unwind if the reason is StorageError.
-                        panic::resume_unwind(err);
-                    }
-                    fork.rollback();
+                });
+                Ok(())
+            });
 
-                    // TODO add service name
-                    error!("Service before_commit failed with error: {:?}", err);
+            match result {
+                Ok(..) => fork.flush(),
+                Err(e) => {
+                    fork.rollback();
+                    error!(
+                        "Service \"{}\" `before_commit` failed with error: {:?}",
+                        instance.name, e
+                    );
                 }
             }
         }

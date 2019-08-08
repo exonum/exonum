@@ -135,7 +135,11 @@ impl BlockchainBuilder {
         };
 
         Ok(if has_genesis_block {
-            let context = ApiContext::new(self.database.clone(), self.service_keypair.clone(), api_sender.clone());
+            let context = ApiContext::new(
+                self.database.clone(),
+                self.service_keypair.clone(),
+                api_sender.clone(),
+            );
             dispatcher.restore_state(&context)?;
             Blockchain::with_dispatcher(
                 self.database,
