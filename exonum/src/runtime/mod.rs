@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Transactions runtime.
+//! Transactions Runtime.
 //!
 //! This module contains common building blocks for creating runtimes for the Exonum blockchain.
 //!
@@ -21,52 +21,52 @@
 //! and requests to the appropriate runtime environment. Thus, blockchain interacts with the
 //! dispatcher, and not with a specific runtime instance.
 //!
-//! # Service life cycle
+//! # Service Life Cycle
 //!
 //! 1. Each runtime has its own [artifacts] registry from which users can deploy them. The artifact
 //! identifier is required by the runtime for constructing service instances. In other words,
-//! an artifact identifier means same as class name, and a specific service instance is
-//! the class instance.
+//! an artifact identifier is similar to a class name, and a specific
+//! service instance - to a class instance.
 //!
 //! 2. Each validator administrator requests the dispatcher to deploy an artifact
-//! and then validator node should send confirmation if this request is successful. Then, if the
+//! and then the validator node should send the confirmation if this request is successful. Then, if the
 //! number of confirmations is equal to the total number of validators, each validator calls the
-//! dispatcher to register the artifact as deployed. After that validators can send requests to
+//! dispatcher to register the artifact as deployed. After that the validators can send requests to
 //! start new service instances from this artifact.
 //!
-//! 3. To start a new service instance, each validator administrator should send request
-//! to dispatcher. Each request contains the exactly same artifact identifier, instance name, and
+//! 3. To start a new service instance, each validator administrator should send a request
+//! to the dispatcher. Each request contains exactly the same artifact identifier, instance name, and
 //! instance configuration parameters. Then, as in the previous case, if the number of
-//! confirmations is equal to the total number of validators, each validator calls dispatcher
+//! confirmations is equal to the total number of validators, each validator calls the dispatcher
 //! to start a new service instance.
 //!
 //! 4. // TODO modify instance configuration procedure.
 //!
 //! 5. // TODO stop instance procedure.
 //!
-//! Each Exonum transaction is an [`AnyTx`] message with a correct signature
+//! Each Exonum transaction is an [`AnyTx`] message with a correct signature.
 //!
-//! # Transaction life cycle
+//! # Transaction Life Cycle
 //!
 //! 1. An Exonum client creates a transaction message which includes [CallInfo] information
-//! about the corresponding handler and serialized transaction parameters as a payload;
-//! and then signs the message with the author's key pair.
+//! about the corresponding handler and serialized transaction parameters as a payload.
+//! The client then signs the message with the author's key pair.
 //!
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
 //! The transaction is identified by the hash of the corresponding message.
 //!
-//! 3. Node verifies that transaction for a correctness of the signature and retransmits it to
-//! other network nodes if it is correct.
+//! 3. The node verifies the transaction for correctness of the signature and retransmits it to
+//! the other network nodes if it is correct.
 //!
-//! 4. When the validator decides to include transaction in the next block it takes the message
+//! 4. When the validator decides to include the transaction into the next block it takes the message
 //! from the transaction pool and passes it to the [`Dispatcher`] for execution.
 //!
-//! 5. Dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
+//! 5. The dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
 //! by the service [instance_id] recorded in the message. If the corresponding runtime is
-//! successfully found, the dispatcher passes the transaction into found runtime for
+//! successfully found, the dispatcher passes the transaction into this runtime for
 //! immediate [execution].
 //!
-//! 6. After execution the transaction [execution status] is written into blockchain.
+//! 6. After execution the transaction [execution status] is written into the blockchain.
 //!
 //!
 //! [`AnyTx`]: struct.AnyTx.html
@@ -77,7 +77,6 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-//!
 
 pub use self::{
     error::{ErrorKind, ExecutionError},
@@ -134,31 +133,31 @@ impl From<RuntimeIdentifier> for u32 {
 /// Using this trait, you can extend the Exonum blockchain with the services written in
 /// different languages. It assumes that the deployment procedure of a new service may be
 /// complex and long and even may fail;
-/// therefore, it was introduced an additional entity - artifacts.
+/// therefore, we introduce an additional entity - artifacts.
 /// Each artifact has a unique identifier and, depending on the runtime, may have an additional
 /// specification needed for its deployment. For example, the file to be compiled.
-/// Artifact creates corresponding services instances, the same way as classes in object
+/// Artifact creates corresponding service instances similar to classes in the object
 /// oriented programming.
 ///
 /// # Notes
 ///
 /// * Please pay attention to the panic handling policy during the implementation of methods.
-/// If no policy is specified, then the method should not panic and each panic will abort node.
-/// * If you have to revert changes in fork you should revert only changes which were made by
+/// If no policy is specified, then the method should not panic and each panic will abort the node.
+/// * If you have to revert changes in the fork, you should revert only changes which were made by
 /// the service that caused panic.
 /// * Keep in mind that runtime methods can be executed in two ways: during the blocks execution
-/// and during the node restart, thus be careful not to do unnecessary actions in the runtime
+/// and during the node restart. Thus, be careful to avoid unnecessary actions in the runtime
 /// methods.
 ///
 /// # Hints
 ///
-/// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics in order of panic policy.
+/// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics according to panic policy.
 pub trait Runtime: Send + Debug + 'static {
     /// Request to deploy artifact with the given identifier and additional deploy specification.
     ///
-    /// # Policy on panics
+    /// # Policy on Panics
     ///
-    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     fn deploy_artifact(
         &mut self,
@@ -166,35 +165,35 @@ pub trait Runtime: Send + Debug + 'static {
         deploy_spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
-    /// Returns protobuf description of deployed artifact with the specified identifier,
-    /// otherwise, if the artifact is not deployed, returns `None`.
+    /// Return Protobuf description of the deployed artifact with the specified identifier.
+    /// If the artifact is not deployed, return `None`.
     ///
-    /// # Notes for runtime developers.
+    /// # Notes for Runtime Developers
     ///
-    /// * Ensure that the deployed artifact has this information, even if it is empty.
+    /// * Ensure that the deployed artifact has the following information, even if it is empty.
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
 
-    /// Starts a new service instance with the given specification.
+    /// Start a new service instance with the given specification.
     ///
     /// # Policy on panics
     ///
-    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
-    /// Configures a service instance with the given parameters.
+    /// Configure a service instance with the given parameters.
     ///
-    /// There are two cases when this method is called:
+    /// This method is called in two cases:
     ///
-    /// * After creating a new service instance by the [`start_service`] invocation, in this case
-    /// if an error during this action occurs, dispatcher will invoke [`stop_service`]
-    /// and you must be sure that this invocation will not fail.
+    /// * After creating a new service instance by the [`start_service`] invocation. In this case,
+    /// if an error during this action occurs, the dispatcher will invoke [`stop_service`].
+    /// Make sure that this invocation will not fail.
     /// * During the configuration change procedure. [ECR-3306]
     ///
-    /// # Policy on panics
+    /// # Policy on Panics
     ///
-    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     ///
     /// ['start_service`]: #start_service
@@ -206,20 +205,20 @@ pub trait Runtime: Send + Debug + 'static {
         parameters: Any,
     ) -> Result<(), ExecutionError>;
 
-    /// Stops existing service instance with the given specification.
+    /// Stop existing service instance with the given specification.
     ///
-    /// # Policy on panics
+    /// # Policy on Panics
     ///
-    /// * This method should catch each kind of panics except of `FatalError` and converts
+    /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
 
     /// Execute service transaction.
     ///
-    /// # Policy on panics
+    /// # Policy on Panics
     ///
-    /// Do not process, just skip above.
+    /// Do not process. Panic will be processed by the method caller.
     fn execute(
         &self,
         dispatcher: &dispatcher::Dispatcher,
@@ -228,29 +227,29 @@ pub trait Runtime: Send + Debug + 'static {
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
-    /// Gets state hashes of the every contained service.
+    /// Gets the state hashes of the every available service.
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
 
     /// Calls `before_commit` for all the services stored in the runtime.
     ///
-    /// # Notes for runtime developers.
+    /// # Notes for Runtime Developers.
     ///
-    /// * The order of services during the invocation this method must be the same for each node;
-    /// in other words the order of runtime services must be the same for each node.
+    /// * The order of services during invocation of this method must be the same for each node.
+    /// In other words, the order of the runtime services must be the same for each node.
     ///
-    /// # Policy on panics
+    /// # Policy on Panics
     ///
-    /// * This method should catch each kind of panics except of `FatalError` and writes
-    /// them into log.
-    /// * If panic occurs, the runtime should rollback changes in fork.
+    /// * Catch each kind of panics except for `FatalError` and write
+    /// them into the log.
+    /// * If panic occurs, the runtime rolls back the changes in the fork.
     fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
-    /// # Policy on panics
+    /// # Policy on Panics
     ///
-    /// * This method should catch each kind of panics except of `FatalError` and writes
-    /// them into log.
+    /// * Catch each kind of panics except for `FatalError` and write
+    /// them into the log.
     fn after_commit(
         &self,
         dispatcher: &DispatcherSender,
@@ -276,10 +275,10 @@ where
 /// Useful artifact information for Exonum clients.
 #[derive(Debug, PartialEq)]
 pub struct ArtifactInfo<'a> {
-    /// List of protobuf files that make up the service interface, first element in tuple
-    /// is the file name, second is its content.
+    /// List of Protobuf files that make up the service interface. The first element in the tuple
+    /// is the file name, the second one is its content.
     ///
-    /// The common interface entry point is always in `service.proto` file.
+    /// The common interface entry point is always in the `service.proto` file.
     pub proto_sources: &'a [(&'a str, &'a str)],
 }
 
@@ -294,22 +293,22 @@ impl<'a> Default for ArtifactInfo<'a> {
     }
 }
 
-/// An accessory structure that aggregates root objects hashes of runtime service
-/// information schemas with the root hash of runtime information schema itself.
+/// An accessory structure that aggregates root object hashes of the service
+/// information schemas of the runtime with the root hash of the runtime information schema itself.
 #[derive(Debug, PartialEq, Default)]
 pub struct StateHashAggregator {
-    /// List of hashes of the root objects of runtime information schemas.
+    /// List of hashes of the root objects of the runtime information schemas.
     pub runtime: Vec<Hash>,
-    /// List of hashes of the root objects of service instances schemas.
+    /// List of hashes of the root objects of the service instances schemas.
     pub instances: Vec<(InstanceId, Vec<Hash>)>,
 }
 
-/// The one who causes the transaction execution.
+/// The initiator of the transaction execution.
 #[derive(Debug, PartialEq)]
 pub enum Caller {
-    /// A usual transaction from Exonum client, authorized by his key pair.
+    /// A usual transaction from the Exonum client, authorized by its key pair.
     Transaction {
-        /// The transaction message hash.
+        /// Hash of the transaction message.
         hash: Hash,
         /// Public key of the user who signed this transaction.
         author: PublicKey,
@@ -320,12 +319,12 @@ pub enum Caller {
 }
 
 impl Caller {
-    /// Returns the author's public key, if it exists.
+    /// Return the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
         self.as_transaction().map(|(_hash, author)| *author)
     }
 
-    /// Returns transaction hash, if it exists.
+    /// Return the transaction hash, if it exists.
     pub fn transaction_hash(&self) -> Option<Hash> {
         self.as_transaction().map(|(hash, _)| *hash)
     }
@@ -339,14 +338,14 @@ impl Caller {
     }
 }
 
-/// Provides the current state of the blockchain and caller information for the transaction
-/// which being executed.
+/// Provide the current state of the blockchain and the caller information in respect of the transaction
+/// which is being executed.
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
-    /// The one who causes the transaction execution.
+    /// The initiator of the transaction execution.
     pub caller: Caller,
     actions: Vec<dispatcher::Action>,
 }

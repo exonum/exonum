@@ -317,8 +317,8 @@ impl Blockchain {
                 if e.kind == ExecutionErrorKind::Panic {
                     error!("{:?} transaction execution panicked: {:?}", transaction, e);
                 } else {
-                    // Unlike panic, transaction failure isn't that rare, so logging the
-                    // whole transaction body is an overkill: it can be relatively big.
+                    // Unlike panic, transaction failure is a regular case. So logging the
+                    // whole transaction body is an overkill: the body can be relatively big.
                     info!("{:?} transaction execution failed: {:?}", tx_hash, e);
                 }
                 fork.rollback();

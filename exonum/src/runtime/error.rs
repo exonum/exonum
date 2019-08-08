@@ -122,11 +122,11 @@ pub struct ExecutionError {
     pub description: String,
 }
 
-/// Invokes a closure, capturing the cause of an unwinding panic if one occurs.
+/// Invokes closure, capturing the cause of the unwinding panic if one occurs.
 ///
-/// This function will return closure's result if the closure does not panic,
-/// and will return `Err(ExecutionError::panic(cause))` if the closure panics.
-/// This function does not catch `FatalError` panics
+/// This function will return the result of the closure if the closure does not panic.
+/// If the closure panics, it returns `Err(ExecutionError::panic(cause))`.
+/// This function does not catch `FatalError` panics.
 pub fn catch_panic<F, T>(maybe_panic: F) -> Result<T, ExecutionError>
 where
     F: FnOnce() -> Result<T, ExecutionError>,
@@ -138,7 +138,7 @@ where
         // Panic.
         Err(panic) => {
             if panic.is::<FatalError>() {
-                // Continue panic unwind if the reason is FatalError.
+                // Continue panic unwinding if the reason is FatalError.
                 panic::resume_unwind(panic);
             }
             Err(ExecutionError::from_panic(panic))
@@ -149,7 +149,7 @@ where
 }
 
 impl ExecutionError {
-    /// Creates a new execution error instance with the specified kind and optional description.
+    /// Creates a new execution error instance with the specified error kind and an optional description.
     pub fn new(kind: ErrorKind, description: impl Into<String>) -> Self {
         Self {
             kind,
