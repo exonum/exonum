@@ -358,7 +358,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn services_api(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
+    fn api_endpoints(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         self.started_services
             .values()
             .map(|instance| {
@@ -370,7 +370,7 @@ impl Runtime for RustRuntime {
                     },
                 );
                 instance.as_ref().wire_api(&mut builder);
-                (instance.name.clone(), builder)
+                (["services/", &instance.name].concat(), builder)
             })
             .collect()
     }

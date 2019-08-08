@@ -14,10 +14,14 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{Fork, IndexAccess, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future};
 
-use std::{cell::RefCell, collections::HashMap, panic};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    panic,
+};
 
 use crate::{
     api::ApiBuilder,
@@ -32,8 +36,8 @@ use crate::{
 use super::{
     api::ApiContext,
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime,
+    ApiChange, ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+    InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -47,9 +51,9 @@ pub const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
 
 #[derive(Default)]
 pub struct Dispatcher {
-    runtimes: HashMap<u32, Box<dyn Runtime>>,
+    runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     runtime_lookup: HashMap<InstanceId, u32>,
-    modified: Option<()>,
+    api_changes: BTreeMap<u32, Vec<ApiChange>>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -68,24 +72,24 @@ impl Dispatcher {
         Self {
             runtimes: runtimes.into_iter().collect(),
             runtime_lookup: HashMap::default(),
-            modified: None,
+            api_changes: BTreeMap::new(),
         }
     }
 
     /// Restores dispatcher from the state which saved in the specified snapshot.
-    pub(crate) fn restore_state(
-        &mut self,
-        snapshot: impl IndexAccess,
-    ) -> Result<(), ExecutionError> {
-        let schema = Schema::new(snapshot);
-        // Restores information about the deployed services.
+    pub(crate) fn restore_state(&mut self, context: &ApiContext) -> Result<(), ExecutionError> {
+        let snapshot = context.snapshot();
+        let schema = Schema::new(&snapshot);
+        // Restore information about the deployed services.
         for (artifact, spec) in schema.artifacts_with_spec() {
             self.deploy_artifact(artifact.clone(), spec).wait()?;
         }
-        // Restarts active service instances.
+        // Restart active service instances.
         for instance in schema.service_instances().values() {
             self.restart_service(&instance)?;
         }
+        // Notify runtimes about API to start.
+        self.notify_api_changes(context);
         Ok(())
     }
 
@@ -150,14 +154,9 @@ impl Dispatcher {
             .values()
             .map(|runtime| {
                 runtime
-                    .services_api(context)
+                    .api_endpoints(context)
                     .into_iter()
-                    .map(|(service_name, builder)| {
-                        (
-                            ["services/", &service_name].concat(),
-                            ApiBuilder::from(builder),
-                        )
-                    })
+                    .map(|(service_name, builder)| (service_name, ApiBuilder::from(builder)))
             })
             .flatten()
             .collect::<Vec<_>>()
@@ -281,17 +280,9 @@ impl Dispatcher {
             },
         );
         self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().arguments)?;
-
-        let actions = context.take_actions();
-        // Mark the dispatcher as modified if actions are not empty.
-        let is_modified = !actions.is_empty();
         // Execute pending dispatcher actions.
-        for action in actions {
+        for action in context.actions.drain(..) {
             action.execute(self, fork)?;
-        }
-
-        if is_modified {
-            self.mark_as_modified();
         }
         Ok(())
     }
@@ -367,15 +358,22 @@ impl Dispatcher {
         self.artifact_info(id).is_some()
     }
 
-    /// Take the modified state and mark the dispatcher as unmodified.
-    pub(crate) fn take_modified_state(&mut self) -> bool {
-        self.modified.take().is_some()
-    }
+    /// Notify the runtime about API changes and return true if there were such changes.
+    pub(crate) fn notify_api_changes(&mut self, context: &ApiContext) -> bool {
+        let api_changes = {
+            let mut api_changes = BTreeMap::default();
+            std::mem::swap(&mut api_changes, &mut self.api_changes);
+            api_changes
+        };
 
-    /// Mark the dispatcher as modified.
-    fn mark_as_modified(&mut self) {
-        trace!("Dispatcher state is modified");
-        self.modified = Some(());
+        let has_changes = !api_changes.is_empty();
+        for (runtime_id, changes) in api_changes {
+            self.runtimes
+                .get(&runtime_id)
+                .unwrap()
+                .notify_api_changes(context, &changes)
+        }
+        has_changes
     }
 
     /// Register the service instance in the runtime lookup table.
@@ -383,6 +381,12 @@ impl Dispatcher {
         info!("Running service instance {:?}", instance);
         self.runtime_lookup
             .insert(instance.id, instance.artifact.runtime_id);
+        // Add service instance to list of modified APIs.
+        let runtime_changes = self
+            .api_changes
+            .entry(instance.artifact.runtime_id)
+            .or_default();
+        runtime_changes.push(ApiChange::InstanceAdded(instance.id));
     }
 
     /// Start a new service instance.
@@ -499,21 +503,27 @@ impl DispatcherSender {
 #[cfg(test)]
 mod tests {
     use exonum_merkledb::{Database, TemporaryDB};
-    use futures::IntoFuture;
+    use futures::{sync::mpsc, IntoFuture};
+
+    use std::sync::{
+        mpsc::{channel, Sender},
+        Arc,
+    };
 
     use crate::{
-        crypto::PublicKey,
+        crypto::{self, PublicKey},
+        node::ApiSender,
         runtime::{
             rust::{Error as RustRuntimeError, RustRuntime},
-            ArtifactInfo, InstanceId, MethodId, RuntimeIdentifier, StateHashAggregator,
+            ApiChange, ArtifactInfo, InstanceId, MethodId, RuntimeIdentifier, StateHashAggregator,
         },
     };
 
     use super::*;
 
     enum SampleRuntimes {
-        First = 2,
-        Second = 3,
+        First = 5,
+        Second = 6,
     }
 
     #[derive(Debug)]
@@ -545,11 +555,12 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct SampleRuntime {
         runtime_type: u32,
         instance_id: InstanceId,
         method_id: MethodId,
+        api_changes_sender: Sender<(u32, Vec<ApiChange>)>,
     }
 
     #[derive(Debug, IntoExecutionError)]
@@ -559,11 +570,17 @@ mod tests {
     }
 
     impl SampleRuntime {
-        fn new(runtime_type: u32, instance_id: InstanceId, method_id: MethodId) -> Self {
+        fn new(
+            runtime_type: u32,
+            instance_id: InstanceId,
+            method_id: MethodId,
+            api_changes_sender: Sender<(u32, Vec<ApiChange>)>,
+        ) -> Self {
             Self {
                 runtime_type,
                 instance_id,
                 method_id,
+                api_changes_sender,
             }
         }
     }
@@ -637,12 +654,17 @@ mod tests {
         fn artifact_info(&self, _id: &ArtifactId) -> Option<ArtifactInfo> {
             Some(ArtifactInfo::default())
         }
+
+        fn notify_api_changes(&self, _context: &ApiContext, changes: &[ApiChange]) {
+            let changes = (self.runtime_type, changes.to_vec());
+            self.api_changes_sender.send(changes).unwrap();
+        }
     }
 
     #[test]
     fn test_builder() {
-        let runtime_a = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0);
-        let runtime_b = SampleRuntime::new(SampleRuntimes::Second as u32, 1, 0);
+        let runtime_a = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, channel().0);
+        let runtime_b = SampleRuntime::new(SampleRuntimes::Second as u32, 1, 0, channel().0);
 
         let dispatcher = DispatcherBuilder::new()
             .with_runtime(runtime_a.runtime_type, runtime_a)
@@ -669,22 +691,25 @@ mod tests {
         const JAVA_METHOD_ID: MethodId = 1;
 
         // Create dispatcher and test data.
-        let db = TemporaryDB::new();
+        let db = Arc::new(TemporaryDB::new());
 
+        let (changes_tx, changes_rx) = channel();
         let runtime_a = SampleRuntime::new(
             SampleRuntimes::First as u32,
             RUST_SERVICE_ID,
             RUST_METHOD_ID,
+            changes_tx.clone(),
         );
         let runtime_b = SampleRuntime::new(
             SampleRuntimes::Second as u32,
             JAVA_SERVICE_ID,
             JAVA_METHOD_ID,
+            changes_tx,
         );
 
         let mut dispatcher = DispatcherBuilder::new()
-            .with_runtime(runtime_a.runtime_type, runtime_a)
-            .with_runtime(runtime_b.runtime_type, runtime_b)
+            .with_runtime(runtime_a.runtime_type, runtime_a.clone())
+            .with_runtime(runtime_b.runtime_type, runtime_b.clone())
             .finalize();
 
         let sample_rust_spec = ArtifactId {
@@ -764,6 +789,42 @@ mod tests {
                 &tx_payload,
             )
             .expect_err("Incorrect tx java");
+
+        // Check that API changes in dispatcher contains started services.
+        let context = ApiContext::new(
+            db.clone(),
+            crypto::gen_keypair(),
+            ApiSender::new(mpsc::unbounded().0),
+        );
+        assert!(dispatcher.notify_api_changes(&context));
+        let expected_api_changes = vec![
+            (
+                SampleRuntimes::First as u32,
+                vec![ApiChange::InstanceAdded(RUST_SERVICE_ID)],
+            ),
+            (
+                SampleRuntimes::Second as u32,
+                vec![ApiChange::InstanceAdded(JAVA_SERVICE_ID)],
+            ),
+        ];
+        assert_eq!(
+            expected_api_changes,
+            changes_rx.iter().take(2).collect::<Vec<_>>()
+        );
+        // Check that API changes is empty after the `notify_api_changes`.
+        assert!(dispatcher.api_changes.is_empty());
+
+        // Check that API changes in dispatcher contains started services after restart.
+        db.merge(fork.into_patch()).unwrap();
+        let mut dispatcher = DispatcherBuilder::new()
+            .with_runtime(runtime_a.runtime_type, runtime_a)
+            .with_runtime(runtime_b.runtime_type, runtime_b)
+            .finalize();
+        dispatcher.restore_state(&context).unwrap();
+        assert_eq!(
+            expected_api_changes,
+            changes_rx.iter().take(2).collect::<Vec<_>>()
+        );
     }
 
     #[test]

@@ -43,6 +43,7 @@ use std::{
 };
 
 use crate::{
+    api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
@@ -378,7 +379,8 @@ impl Blockchain {
         let mut dispatcher = self.dispatcher();
         dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
         // Sends `RestartApi` request if dispatcher state was been modified.
-        if dispatcher.take_modified_state() {
+        let context = ApiContext::with_blockchain(self);
+        if dispatcher.notify_api_changes(&context) {
             self.internal_requests
                 .clone()
                 .send(InternalRequest::RestartApi)

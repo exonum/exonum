@@ -258,8 +258,17 @@ pub trait Runtime: Send + Debug + 'static {
         tx_sender: &ApiSender,
     );
 
-    fn services_api(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
+    /// Collect the full list of API handlers from the runtime for the built-in Exonum API server.
+    /// This method is called during an API server restart.
+    /// 
+    /// Use this method if you do not plan to use your own API processing mechanism.
+    #[doc(hidden)]
+    fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
+    }
+
+    fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {
+
     }
 }
 
@@ -362,12 +371,6 @@ impl<'a> ExecutionContext<'a> {
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
         self.actions.push(action);
     }
-
-    pub(crate) fn take_actions(&mut self) -> Vec<dispatcher::Action> {
-        let mut other = Vec::new();
-        std::mem::swap(&mut self.actions, &mut other);
-        other
-    }
 }
 
 /// Instance descriptor contains information to access running service instance.
@@ -389,4 +392,13 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
     fn from(descriptor: InstanceDescriptor) -> Self {
         (descriptor.id, descriptor.name.to_owned())
     }
+}
+
+/// Change in list of service instances.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub enum ApiChange {
+    /// New instance has been added.
+    InstanceAdded(InstanceId),
+    /// Instance has been removed.
+    InstanceRemoved(InstanceId),
 }
