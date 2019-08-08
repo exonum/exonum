@@ -18,7 +18,7 @@ use std::panic;
 use crate::{
     db,
     views::{is_valid_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
-    Database, DbOptions, Fork, ListIndex, RocksDB, TemporaryDB,
+    Database, DbOptions, Entry, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -774,7 +774,7 @@ fn test_index_builder_without_name() {
 }
 
 #[test]
-#[should_panic(expected = "Index type doesn't match specified")]
+#[should_panic(expected = "Index type does not match specified one")]
 fn test_metadata_index_usual_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
@@ -792,7 +792,7 @@ fn test_metadata_index_usual_incorrect() {
 }
 
 #[test]
-#[should_panic(expected = "Index type doesn't match specified")]
+#[should_panic(expected = "Index type does not match specified one")]
 fn test_metadata_index_family_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
@@ -809,6 +809,43 @@ fn test_metadata_index_family_incorrect() {
         .index_name("simple")
         .family_id("family")
         .build::<()>();
+}
+
+#[test]
+#[should_panic(expected = "Index type does not match specified one")]
+fn test_metadata_index_wrong_type_map_list() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut map = MapIndex::new("simple", &fork);
+        map.put(&1, vec![1, 2, 3]);
+    }
+
+    db.merge(fork.into_patch()).unwrap();
+    // Checks the index metadata.
+    let snapshot = db.snapshot();
+    let list: ListIndex<_, Vec<u8>> = ListIndex::new("simple", &snapshot);
+    list.get(1);
+}
+
+#[test]
+#[should_panic(
+    expected = "Error while reading the index state. Possibly the index type does not match specified one"
+)]
+fn test_metadata_index_wrong_type_entry_list() {
+    let db = TemporaryDB::new();
+    // Creates the index metadata.
+    let fork = db.fork();
+    {
+        let mut entry = Entry::new("simple", &fork);
+        entry.set(vec![1, 2, 3]);
+    }
+
+    db.merge(fork.into_patch()).unwrap();
+    // Checks the index metadata.
+    let snapshot = db.snapshot();
+    let list: ListIndex<_, Vec<u8>> = ListIndex::new("simple", &snapshot);
+    list.get(1);
 }
 
 #[test]

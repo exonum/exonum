@@ -25,7 +25,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use std::{
     fmt,
-    io::{Read, Write},
+    io::{Error, Read, Write},
     marker::PhantomData,
     mem::size_of,
 };
@@ -196,17 +196,17 @@ impl BinaryAttribute for ProofMapState {
         }
     }
 
-    fn read<R: Read>(buffer: &mut R) -> Self {
+    fn read<R: Read>(buffer: &mut R) -> Result<Self, Error> {
         let mut tmp = [0_u8; PROOF_PATH_SIZE];
-        let len = buffer.read_u64::<LittleEndian>().unwrap();
+        let len = buffer.read_u64::<LittleEndian>()?;
 
-        let proof_path = match buffer.read(&mut tmp).unwrap() {
+        let proof_path = match buffer.read(&mut tmp)? {
             0 => None,
             PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
             other => panic!("Unexpected attribute length: {}", other),
         };
 
-        Self { len, proof_path }
+        Ok(Self { len, proof_path })
     }
 }
 
