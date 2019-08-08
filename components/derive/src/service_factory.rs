@@ -82,7 +82,7 @@ pub fn implement_service_factory(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl #cr::runtime::rust::ServiceFactory for #name {
             fn artifact_id(&self) -> #cr::runtime::rust::RustArtifactId {
-                concat!(#artifact_name, "/", #artifact_version).parse().unwrap()
+                concat!(#artifact_name, ":", #artifact_version).parse().unwrap()
             }
 
             fn artifact_info(&self) -> #cr::runtime::ArtifactInfo {

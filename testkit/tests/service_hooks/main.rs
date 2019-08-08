@@ -40,8 +40,8 @@ fn test_after_commit() {
     for i in 1..5 {
         let block = testkit.create_block();
         if i > 1 {
-            let message = &block[0].content().payload().payload;
-            let message = TxAfterCommit::from_bytes(message.into()).unwrap();
+            let arguments = &block[0].content().payload().arguments;
+            let message = TxAfterCommit::from_bytes(arguments.into()).unwrap();
             assert_eq!(message, TxAfterCommit::new(Height(i - 1)));
         }
 

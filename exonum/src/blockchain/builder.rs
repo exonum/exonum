@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! The module responsible for the correct Exonum blockchain creation.
+
 use exonum_merkledb::Database;
 use futures::sync::mpsc;
 
@@ -26,21 +28,33 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
+        supervisor::Supervisor,
         InstanceSpec, Runtime, ServiceInstanceId,
     },
 };
 
-// TODO Modern replacement for DispatcherBuilder [ECR-3275]
+/// The object responsible for the correct Exonum blockchain creation from the components.
+///
+/// During the `Blockchain` creation it creates and commits a genesis block if the database
+/// is empty. Otherwise, it restores the state from the database.
 #[derive(Debug)]
 pub struct BlockchainBuilder {
+    /// The database which works under the hood.
     pub database: Arc<dyn Database>,
+    /// Blockchain configuration used to create the genesis block.
     pub genesis_config: GenesisConfig,
+    /// Keypair, which  is used to sign service transactions on behalf of this node.
     pub service_keypair: (PublicKey, SecretKey),
+    /// List of the supported runtimes.
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    /// List of the privileged services with the configuration parameters that are created directly
+    /// in the genesis block.
     pub builtin_instances: Vec<(InstanceSpec, Any)>,
 }
 
 impl BlockchainBuilder {
+    /// Creates a new builder instance for the specified database, the genesis configuration and
+    /// the service keypair without any runtimes. The user must add them by himself/herself.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
         genesis_config: GenesisConfig,
@@ -55,6 +69,29 @@ impl BlockchainBuilder {
         }
     }
 
+    /// Add the built-in Rust runtime with the default built-in services.
+    ///
+    /// # List of the built-in services to be added:
+    ///
+    /// * The [`Supervisor`] service, which is responsible for adding, modifying and removing user
+    /// services during the operation of the blockchain.
+    ///
+    /// [`Supervisor`]: ../runtime/supervisor/index.html
+    pub fn with_default_runtime(
+        self,
+        services: impl IntoIterator<Item = InstanceCollection>,
+    ) -> Self {
+        // Add the built-in `Supervisor` service.
+        let mut services = services.into_iter().collect::<Vec<_>>();
+        services.push(InstanceCollection::new(Supervisor).with_instance(
+            Supervisor::BUILTIN_ID,
+            Supervisor::BUILTIN_NAME,
+            (),
+        ));
+        self.with_rust_runtime(services)
+    }
+
+    /// Add the built-in Rust runtime with the specified built-in services.
     pub fn with_rust_runtime(
         mut self,
         services: impl IntoIterator<Item = InstanceCollection>,
@@ -67,6 +104,7 @@ impl BlockchainBuilder {
         self.with_additional_runtime(runtime)
     }
 
+    /// Add an additional runtime with the specified identifier.
     pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
@@ -132,9 +170,12 @@ impl BlockchainBuilder {
     }
 }
 
+/// Rust runtime artifact with the list of instances.
 #[derive(Debug)]
 pub struct InstanceCollection {
+    /// Rust services factory as a special case of an artifact.
     pub factory: Box<dyn ServiceFactory>,
+    /// List of service instances with the initial configuration parameters.
     pub instances: Vec<(InstanceSpec, Any)>,
 }
 

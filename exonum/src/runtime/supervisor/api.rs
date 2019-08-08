@@ -81,7 +81,7 @@ impl<'a> PrivateApi for ApiImpl<'a> {
     }
 }
 
-pub fn wire(descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
+pub fn wire(descriptor: &ServiceDescriptor, builder: &mut ServiceApiBuilder) {
     let instance_id = descriptor.service_id();
     let instance_name = descriptor.service_name().to_owned();
 

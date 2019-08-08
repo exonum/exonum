@@ -19,7 +19,7 @@ use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof, IndexCoordinates, IndexOwner},
     crypto::Hash,
-    runtime::rust::{ServiceDescriptor, ServiceInstanceId},
+    runtime::{rust::ServiceDescriptor, ServiceInstanceId},
 };
 
 use crate::schema::{Schema, TimestampEntry};

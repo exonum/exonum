@@ -14,7 +14,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{blockchain::Schema, crypto::PublicKey, runtime::rust::TransactionContext};
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::IndexAccess;
 
 use crate::{proto, schema::TimeSchema, TimeService};
 
@@ -45,7 +45,7 @@ impl TxTime {
 impl TxTime {
     pub(crate) fn check_signed_by_validator(
         &self,
-        snapshot: &dyn Snapshot,
+        snapshot: impl IndexAccess,
         author: &PublicKey,
     ) -> Result<(), Error> {
         let keys = Schema::new(snapshot).actual_configuration().validator_keys;
@@ -60,7 +60,7 @@ impl TxTime {
     pub(crate) fn update_validator_time(
         &self,
         service_name: &str,
-        fork: &Fork,
+        fork: impl IndexAccess,
         author: &PublicKey,
     ) -> Result<(), Error> {
         let schema = TimeSchema::new(service_name, fork);
@@ -76,9 +76,11 @@ impl TxTime {
         }
     }
 
-    pub(crate) fn update_consolidated_time(service_name: &str, fork: &Fork) {
-        let keys = Schema::new(fork).actual_configuration().validator_keys;
-        let schema = TimeSchema::new(service_name, fork);
+    pub(crate) fn update_consolidated_time(service_name: &str, access: impl IndexAccess) {
+        let keys = Schema::new(access.clone())
+            .actual_configuration()
+            .validator_keys;
+        let schema = TimeSchema::new(service_name, access);
 
         // Find all known times for the validators.
         let validator_times = {
@@ -126,12 +128,11 @@ pub trait TimeOracleInterface {
 impl TimeOracleInterface for TimeService {
     fn time(&self, context: TransactionContext, arg: TxTime) -> Result<(), Error> {
         let author = context.author();
-        let view = context.fork();
         let service_name = context.service_name();
 
-        arg.check_signed_by_validator(view.as_ref(), &author)?;
-        arg.update_validator_time(service_name, view, &author)?;
-        TxTime::update_consolidated_time(service_name, view);
+        arg.check_signed_by_validator(context.fork(), &author)?;
+        arg.update_validator_time(service_name, context.fork(), &author)?;
+        TxTime::update_consolidated_time(service_name, context.fork());
         Ok(())
     }
 }

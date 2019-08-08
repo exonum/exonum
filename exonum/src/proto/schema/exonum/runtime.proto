@@ -28,7 +28,7 @@ message CallInfo {
 
 message AnyTx {
   CallInfo call_info = 1;
-  bytes payload = 2;
+  bytes arguments = 2;
 }
 
 message ArtifactId {

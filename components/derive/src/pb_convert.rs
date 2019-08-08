@@ -151,7 +151,7 @@ impl ToTokens for ProtobufConvertStruct {
             impl ProtobufConvert for #name {
                 type ProtoStruct = #pb_name;
 
-                fn from_pb(mut pb: Self::ProtoStruct) -> std::result::Result<Self, failure::Error> {
+                fn from_pb(pb: Self::ProtoStruct) -> std::result::Result<Self, failure::Error> {
                     #from_pb_impl
                 }
 

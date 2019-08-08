@@ -93,7 +93,7 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
                         instance_id: 0,
                         method_id: 0,
                     },
-                    payload: vec![0; tx_size],
+                    arguments: vec![0; tx_size],
                 },
                 p,
                 &s,

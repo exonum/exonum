@@ -58,7 +58,7 @@ fn node_config() -> NodeConfig {
 fn main() {
     exonum::helpers::init_logger().unwrap();
 
-    println!("Creating in-memory database...");
+    println!("Creating database in temporary dir...");
     let node = Node::new(
         TemporaryDB::new(),
         vec![InstanceCollection::new(CryptocurrencyService)],

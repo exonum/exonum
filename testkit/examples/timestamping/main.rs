@@ -23,8 +23,9 @@ use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{ExecutionError, Schema},
     crypto::gen_keypair,
-    runtime::rust::{
-        ArtifactInfo, RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext,
+    runtime::{
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        ArtifactInfo,
     },
 };
 use exonum_merkledb::ObjectHash;
@@ -74,7 +75,7 @@ impl Service for TimestampingService {}
 
 impl ServiceFactory for TimestampingService {
     fn artifact_id(&self) -> RustArtifactId {
-        "timestamping/1.0.0".parse().unwrap()
+        "timestamping:1.0.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {

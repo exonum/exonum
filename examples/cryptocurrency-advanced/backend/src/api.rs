@@ -22,7 +22,7 @@ use exonum::{
     crypto::{Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
-    runtime::rust::{ServiceDescriptor, ServiceInstanceId},
+    runtime::{rust::ServiceDescriptor, ServiceInstanceId},
 };
 
 use crate::{wallet::Wallet, Schema};

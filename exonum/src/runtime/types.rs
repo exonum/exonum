@@ -19,9 +19,14 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use crate::{helpers::ValidateInput, proto::schema};
 
-/// Service id type.
+/// Unique service instance identifier.
+///
+/// * This is the secondary identifier, mainly used in transaction messages.
+/// The primary one is the service instance name.
+///
+/// * The core assigns this identifier when the service is started.
 pub type ServiceInstanceId = u32;
-/// Method id type.
+/// Identifier of the method in the service interface required for the call.
 pub type MethodId = u32;
 
 /// Unique service transaction identifier.
@@ -30,9 +35,10 @@ pub type MethodId = u32;
 )]
 #[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
-    /// Service instance identifier.
+    /// Unique service instance identifier. The dispatcher uses this identifier to find the
+    /// corresponding runtime to execute a transaction.
     pub instance_id: ServiceInstanceId,
-    /// Identifier of method in service interface to call.
+    /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
 }
 
@@ -46,29 +52,83 @@ impl CallInfo {
     }
 }
 
-/// Transaction with information to call.
+/// Transaction with the information required for the call.
+///
+/// # Examples
+///
+/// Create a new signed transaction.
+/// ```
+/// use exonum::{
+///     crypto,
+///     messages::Verified,
+///     runtime::{AnyTx, CallInfo},
+/// };
+///
+/// let keypair = crypto::gen_keypair();
+/// let transaction = Verified::from_value(
+///     AnyTx {
+///         call_info: CallInfo {
+///             // Service instance which we want to call.
+///             instance_id: 1024,
+///             // Specific method of the service interface.
+///             method_id: 0,
+///         },
+///         // Transaction payload.
+///         arguments: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()
+///     },
+///     keypair.0,
+///     &keypair.1
+/// );
+/// ```
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::AnyTx", crate = "crate")]
 pub struct AnyTx {
-    /// Information to call.
+    /// Information required for the call of the corresponding executor.
     pub call_info: CallInfo,
-    /// Serialized transaction.
-    pub payload: Vec<u8>,
+    /// Serialized transaction arguments.
+    pub arguments: Vec<u8>,
 }
 
 impl AnyTx {
-    /// Parses transaction content as concrete type.
+    /// Parse transaction arguments as a specific type.
     pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
-        T::from_bytes(Cow::Borrowed(&self.payload))
+        T::from_bytes(Cow::Borrowed(&self.arguments))
     }
 }
 
+/// The artifact identifier is required by the runtime to construct service instances.
+/// In other words, an artifact identifier is similar to a class name, and a specific service
+/// instance is similar to a class instance.
+///
+/// In string representation the artifact identifier is written as follows:
+///
+/// `{runtime_id}:{artifact_name}`, where `runtime_id` is a [runtime identifier],
+/// and `artifact_name` is a unique name of the artifact.
+///
+/// Artifact name contains only the following characters: `a-zA-Z0-9` and one of `_-.:`.
+///
+/// [runtime identifier]: enum.RuntimeIdentifier.html
+///
+/// # Example
+///
+/// ```
+/// # use exonum::runtime::ArtifactId;
+/// # fn main() -> Result<(), failure::Error> {
+/// // Typical Rust artifact.
+/// let rust_artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>()?;
+/// // Typical Java artifact.
+/// let java_artifact_id = "1:org.exonum.service.1".parse::<ArtifactId>()?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(
     Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord,
 )]
 #[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
 pub struct ArtifactId {
+    /// Runtime identifier.
     pub runtime_id: u32,
+    /// Unique artifact name.
     pub name: String,
 }
 
@@ -87,11 +147,11 @@ impl ArtifactId {
         Ok(artifact)
     }
 
-    /// Checks that the artifact name contains only allowed characters and is not empty.
+    /// Check that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
-        // Extended version of `exonum_merkledb::is_valid_name` that allows also '/`.
+        // Extended version of `exonum_merkledb::is_valid_name` that also allows ':`.
         name.as_ref().iter().all(|&c| match c {
-            47 => true,
+            58 => true,
             c => is_allowed_latin1_char(c),
         })
     }
@@ -104,7 +164,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             Self::is_valid_name(&self.name),
-            "Artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-./"
+            "Artifact name contains an illegal character, use only: a-zA-Z0-9 and one of _-.:"
         );
         Ok(())
     }
@@ -131,7 +191,7 @@ impl FromStr for ArtifactId {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split(':').collect::<Vec<_>>();
+        let split = s.splitn(2, ':').collect::<Vec<_>>();
         match &split[..] {
             [runtime_id, name] => {
                 let artifact = Self {
@@ -148,12 +208,18 @@ impl FromStr for ArtifactId {
     }
 }
 
+/// Exhaustive service instance specification.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
+    /// Unique service instance identifier.
     pub id: ServiceInstanceId,
-    pub artifact: ArtifactId,
+    /// Unique service instance name.
+    ///
+    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
     pub name: String,
+    /// Identifier of the corresponding artifact.
+    pub artifact: ArtifactId,
 }
 
 impl InstanceSpec {
@@ -199,15 +265,13 @@ impl ValidateInput for InstanceSpec {
 
 #[test]
 fn parse_artifact_id_correct() {
-    "0:my-service/1.0.0".parse::<ArtifactId>().unwrap();
+    "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
     "1:com.my.java.service.v1".parse::<ArtifactId>().unwrap();
 }
 
 #[test]
 fn parse_artifact_id_incorrect_layout() {
     let artifacts = [
-        ("0:3:my-service/1.0.0", "Wrong artifact id format"),
-        ("my-service/1.0.0", "Wrong artifact id format"),
         ("15", "Wrong artifact id format"),
         ("0:", "Artifact name should not be empty"),
         (":", "cannot parse integer from empty string"),
@@ -216,12 +280,11 @@ fn parse_artifact_id_incorrect_layout() {
         ("ava:123", "invalid digit found in string"),
         (
             "123:I am a service!",
-            "Artifact name contains illegal character",
+            "Artifact name contains an illegal character",
         ),
-        // cspell:ignore юникоды
         (
-            "123:юникоды!",
-            "Artifact name contains illegal character",
+            "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!",
+            "Artifact name contains an illegal character",
         ),
     ];
 
@@ -239,19 +302,21 @@ fn parse_artifact_id_incorrect_layout() {
 
 #[test]
 fn test_instance_spec_validate_correct() {
-    InstanceSpec::new(15, "foo-service", "0:my-service/1.0.0").unwrap();
+    InstanceSpec::new(15, "foo-service", "0:my-service:1.0.0").unwrap();
 }
 
 #[test]
 fn test_instance_spec_validate_incorrect() {
     let specs = [
         (
-            InstanceSpec::new(1, "", "0:my-service/1.0.0"),
+            InstanceSpec::new(1, "", "0:my-service:1.0.0"),
             "Service instance name should not be empty",
         ),
-        // cspell:ignore русский сервис
         (
-            InstanceSpec::new(2, "русский_сервис", "0:my-service/1.0.0"),
+            InstanceSpec::new(2,
+                "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
+                "0:my-service:1.0.0"
+            ),
             "Service instance name contains illegal character",
         ),
         (

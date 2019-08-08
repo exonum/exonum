@@ -24,8 +24,8 @@ codecov
 compat
 concat
 consts
-Cors
 cors
+Cors
 counterintuitive
 cryptocurrency
 cryptographically
@@ -152,6 +152,7 @@ signum
 smallvec
 socketaddr
 sodiumoxide
+splitn
 stateful
 stringify
 struct

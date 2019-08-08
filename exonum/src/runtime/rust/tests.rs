@@ -70,7 +70,7 @@ pub struct TestServiceImpl;
 impl TestService for TestServiceImpl {
     fn method_a(&self, mut context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
         {
-            let fork = context.fork() as &Fork;
+            let fork = context.fork();
             let mut entry = Entry::new("method_a_entry", fork);
             entry.set(arg.value);
         }
@@ -89,7 +89,7 @@ impl TestService for TestServiceImpl {
     }
 
     fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
-        let fork = context.fork() as &Fork;
+        let fork = context.fork();
         let mut entry = Entry::new("method_b_entry", fork);
         entry.set(arg.value);
         Ok(())
@@ -150,7 +150,7 @@ fn test_basic_rust_runtime() {
     // Deploy service.
     let fork = db.fork();
     dispatcher
-        .deploy_and_register_artifact(&fork, artifact.clone(), Any::default())
+        .deploy_and_register_artifact(&fork, &artifact, Any::default())
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 
@@ -168,11 +168,8 @@ fn test_basic_rust_runtime() {
         .into();
 
         let fork = db.fork();
-        let context = ExecutionContext::new(&fork, Caller::Blockchain);
 
-        dispatcher
-            .start_service(&context, spec, constructor)
-            .unwrap();
+        dispatcher.start_service(&fork, spec, constructor).unwrap();
         {
             let entry = Entry::new("constructor_entry", &fork);
             assert_eq!(entry.get(), Some("constructor_message".to_owned()));

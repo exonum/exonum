@@ -97,7 +97,7 @@ impl Service for MyService {}
 
 impl ServiceFactory for MyService {
     fn artifact_id(&self) -> RustArtifactId {
-        "ws-test/0.1.0".parse().unwrap()
+        "ws-test:0.1.0".parse().unwrap()
     }
 
     fn artifact_info(&self) -> ArtifactInfo {

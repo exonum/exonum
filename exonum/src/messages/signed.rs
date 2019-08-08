@@ -275,7 +275,7 @@ mod tests {
                     instance_id: 5,
                     method_id: 2,
                 },
-                payload: vec![1, 2, 3, 4],
+                arguments: vec![1, 2, 3, 4],
             },
             keypair.0,
             &keypair.1,

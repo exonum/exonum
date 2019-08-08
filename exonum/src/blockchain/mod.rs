@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, supervisor::Supervisor},
+    runtime::{dispatcher::Dispatcher, error::catch_panic},
 };
 
 mod block;
@@ -69,6 +69,7 @@ pub type TransactionMessage = Verified<AnyTx>;
 #[derive(Debug, Clone)]
 pub struct Blockchain {
     db: Arc<dyn Database>,
+    // FIXME fix visibility [ECR-3222]
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
@@ -87,16 +88,8 @@ impl Blockchain {
         api_sender: ApiSender,
         internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        let mut services = services.into_iter().collect::<Vec<_>>();
-        // Adds builtin supervisor service.
-        services.push(InstanceCollection::new(Supervisor).with_instance(
-            Supervisor::BUILTIN_ID,
-            Supervisor::BUILTIN_NAME,
-            (),
-        ));
-
         BlockchainBuilder::new(database, config, service_keypair)
-            .with_rust_runtime(services)
+            .with_default_runtime(services)
             .finalize(api_sender, internal_requests)
             .expect("Unable to create blockchain instance")
     }
@@ -317,41 +310,20 @@ impl Blockchain {
 
         fork.flush();
 
-        let catch_result = {
-            panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                dispatcher.execute(fork, tx_hash, &transaction)
-            }))
-        };
-
-        let tx_result = match catch_result {
-            Ok(execution_result) => {
-                match execution_result {
-                    Ok(()) => {
-                        fork.flush();
-                    }
-                    Err(ref e) => {
-                        // Unlike panic, transaction failure isn't that rare, so logging the
-                        // whole transaction body is an overkill: it can be relatively big.
-                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
-                        fork.rollback();
-                    }
-                }
-                execution_result
-            }
-            Err(err) => {
-                if err.is::<FatalError>() {
-                    // Continue panic unwind if the reason is FatalError.
-                    panic::resume_unwind(err);
+        let tx_result = catch_panic(|| dispatcher.execute(fork, tx_hash, &transaction));
+        match &tx_result {
+            Ok(_) => fork.flush(),
+            Err(e) => {
+                if e.kind == ExecutionErrorKind::Panic {
+                    error!("{:?} transaction execution panicked: {:?}", transaction, e);
+                } else {
+                    // Unlike panic, transaction failure is a regular case. So logging the
+                    // whole transaction body is an overkill: the body can be relatively big.
+                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
                 }
                 fork.rollback();
-                error!(
-                    "{:?} transaction execution panicked: {:?}",
-                    transaction, err
-                );
-
-                Err(ExecutionError::from_panic(&err))
             }
-        };
+        }
 
         let mut schema = Schema::new(&*fork);
         schema

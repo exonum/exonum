@@ -19,7 +19,6 @@ pub use self::{
         TransactionContext,
     },
 };
-pub use super::{dispatcher, error::ErrorKind, ArtifactInfo, CallInfo, ServiceInstanceId};
 
 use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
@@ -39,8 +38,10 @@ use crate::{
 };
 
 use super::{
-    dispatcher::DispatcherSender, error::ExecutionError, ArtifactId, Caller, ExecutionContext,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    dispatcher::{self, DispatcherSender},
+    error::ExecutionError,
+    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceSpec, Runtime,
+    RuntimeIdentifier, ServiceInstanceId, StateHashAggregator,
 };
 
 pub mod error;
@@ -130,7 +131,7 @@ impl RustRuntime {
         self
     }
 
-    fn deploy(&mut self, artifact: ArtifactId) -> Result<(), ExecutionError> {
+    fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
         let artifact = self.parse_artifact(&artifact)?;
 
         if self.deployed_artifacts.contains(&artifact) {
@@ -144,6 +145,14 @@ impl RustRuntime {
         trace!("Deployed artifact: {}", artifact);
         self.deployed_artifacts.insert(artifact);
         Ok(())
+    }
+
+    fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
+        if self.deployed_artifacts.contains(&id) {
+            self.available_artifacts.get(&id).map(AsRef::as_ref)
+        } else {
+            None
+        }
     }
 }
 
@@ -170,7 +179,7 @@ impl RustArtifactId {
 
 impl From<RustArtifactId> for ArtifactId {
     fn from(inner: RustArtifactId) -> Self {
-        ArtifactId {
+        Self {
             runtime_id: RustRuntime::ID as u32,
             name: inner.to_string(),
         }
@@ -179,7 +188,7 @@ impl From<RustArtifactId> for ArtifactId {
 
 impl fmt::Display for RustArtifactId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}/{}", self.name, self.version)
+        write!(f, "{}:{}", self.name, self.version)
     }
 }
 
@@ -187,7 +196,7 @@ impl FromStr for RustArtifactId {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split('/').take(2).collect::<Vec<_>>();
+        let split = s.split(':').take(2).collect::<Vec<_>>();
         match &split[..] {
             [name, version] => {
                 let version = Version::parse(version)?;
@@ -196,7 +205,7 @@ impl FromStr for RustArtifactId {
                     version,
                 })
             },
-            _ => Err(failure::format_err!("Wrong rust artifact name format, it should be in form \"artifact_name/artifact_version\""))
+            _ => Err(failure::format_err!("Wrong rust artifact name format, it should be in form \"artifact_name:artifact_version\""))
         }
     }
 }
@@ -208,22 +217,16 @@ impl Runtime for RustRuntime {
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if !spec.is_null() && spec != ().into() {
-            // Spec for rust artifacts should be empty.
+            // Keep the spec for Rust artifacts empty.
             return Box::new(future::err(Error::IncorrectArtifactId.into()));
         }
-        Box::new(self.deploy(artifact).into_future())
+        Box::new(self.deploy(&artifact).into_future())
     }
 
     fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
         let id = self.parse_artifact(id).ok()?;
-
-        if !self.deployed_artifacts.contains(&id) {
-            None
-        } else {
-            self.available_artifacts
-                .get(&id)
-                .map(|service_factory| service_factory.artifact_info())
-        }
+        self.deployed_artifact(&id)
+            .map(ServiceFactory::artifact_info)
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
@@ -378,5 +381,5 @@ impl Runtime for RustRuntime {
 
 #[test]
 fn parse_rust_artifact_id_correct() {
-    RustArtifactId::from_str("my-service/1.0.0").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0").unwrap();
 }

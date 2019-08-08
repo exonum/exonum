@@ -17,9 +17,10 @@
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use protobuf::Message;
 
-use std::{any::Any, convert::TryFrom, fmt::Display};
+use std::{any::Any, convert::TryFrom, fmt::Display, panic};
 
 use crate::{
+    blockchain::FatalError,
     crypto::{self, Hash},
     proto::{schema::runtime, ProtobufConvert},
 };
@@ -121,8 +122,34 @@ pub struct ExecutionError {
     pub description: String,
 }
 
+/// Invokes closure, capturing the cause of the unwinding panic if one occurs.
+///
+/// This function will return the result of the closure if the closure does not panic.
+/// If the closure panics, it returns `Err(ExecutionError::panic(cause))`.
+/// This function does not catch `FatalError` panics.
+pub fn catch_panic<F, T>(maybe_panic: F) -> Result<T, ExecutionError>
+where
+    F: FnOnce() -> Result<T, ExecutionError>,
+{
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(maybe_panic));
+    match result {
+        // ExecutionError without panic.
+        Ok(Err(e)) => Err(e),
+        // Panic.
+        Err(panic) => {
+            if panic.is::<FatalError>() {
+                // Continue panic unwinding if the reason is FatalError.
+                panic::resume_unwind(panic);
+            }
+            Err(ExecutionError::from_panic(panic))
+        }
+        // Normal execution.
+        Ok(Ok(value)) => Ok(value),
+    }
+}
+
 impl ExecutionError {
-    /// Creates a new execution error instance with the specified kind and optional description.
+    /// Creates a new execution error instance with the specified error kind and an optional description.
     pub fn new(kind: ErrorKind, description: impl Into<String>) -> Self {
         Self {
             kind,
@@ -177,7 +204,7 @@ where
     E: Into<ErrorKind>,
 {
     fn from(inner: (E, T)) -> Self {
-        ExecutionError::new(inner.0.into(), inner.1.to_string())
+        Self::new(inner.0.into(), inner.1.to_string())
     }
 }
 
@@ -298,7 +325,7 @@ impl ObjectHash for ExecutionStatus {
     }
 }
 
-/// More convenient serde format for ExecutionResult
+/// More convenient serde layout for the `ExecutionResult`.
 mod execution_result {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
