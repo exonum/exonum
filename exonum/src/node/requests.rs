@@ -28,6 +28,7 @@ use crate::messages::{
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, msg: &Requests) {
+        println!("handle_request {:?}", self.state.validator_id());
         // Request are sent to us
         if msg.to() != *self.state.consensus_public_key() {
             error!("Received message addressed to other peer = {:?}.", msg.to());
@@ -81,9 +82,14 @@ impl NodeHandler {
     /// Handles `PoolTransactionsRequest` message. For details see the message documentation.
     pub fn handle_pool_request_txs(&mut self, msg: &Signed<PoolTransactionsRequest>) {
         trace!("HANDLE POOL TRANSACTIONS REQUEST");
+        println!("HANDLE POOL TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
+
+        let mut hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
+        hashes.extend(self.state.tx_cache().keys().cloned());
+
+        println!("hashes {:?}", hashes);
 
         self.send_transactions_by_hash(&msg.author(), &hashes);
     }

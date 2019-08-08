@@ -54,6 +54,7 @@ use crate::{
         timestamping::TimestampingService,
     },
 };
+use crate::messages::PoolTransactionsRequest;
 
 mod config_updater;
 mod consensus;
@@ -291,6 +292,16 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Signed<PeersRequest> {
         Message::concrete(PeersRequest::new(to), *public_key, secret_key)
+    }
+
+    /// Creates a `PoolTransactionsRequest` message signed by this validator.
+    pub fn create_pool_transactions_request(
+        &self,
+        public_key: &PublicKey,
+        to: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Signed<PoolTransactionsRequest> {
+        Message::concrete(PoolTransactionsRequest::new(to), *public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
