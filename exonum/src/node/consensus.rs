@@ -543,8 +543,6 @@ impl NodeHandler {
     pub fn handle_tx(&mut self, msg: Signed<RawTransaction>) -> Result<(), failure::Error> {
         let hash = msg.hash();
 
-        println!("handle tx self validator id {:?}", self.state.validator_id());
-
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
 

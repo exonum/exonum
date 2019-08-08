@@ -28,6 +28,7 @@ use std::{
 use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
 
 use crate::blockchain::check_tx;
+use crate::messages::PoolTransactionsRequest;
 use crate::{
     blockchain::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
@@ -54,7 +55,6 @@ use crate::{
         timestamping::TimestampingService,
     },
 };
-use crate::messages::PoolTransactionsRequest;
 
 mod config_updater;
 mod consensus;
