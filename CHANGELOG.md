@@ -178,8 +178,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
 
-- Added `len` method to `KeySetIndex` and `ValueSetIndex`. (#1319)
-
 - Added `From<Patch>` trait implementation to `Fork`. (#1403)
 
 #### exonum-testkit
