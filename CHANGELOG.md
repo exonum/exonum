@@ -160,7 +160,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   adding them to persistent pool. (#1398)
 
 - Added new request message `PoolTransactionsRequest` to obtain pool transactions
- from another peers. (#)
+ from another peers. (#1404)
 
 #### exonum-merkledb
 

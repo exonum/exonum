@@ -778,7 +778,7 @@ impl NodeHandler {
         self.blockchain.last_block().hash()
     }
 
-    /// Returns the latest committed block.
+    /// Returns the number of uncommitted transactions.
     pub fn uncommitted_txs_count(&self) -> u64 {
         self.blockchain.pool_size() + self.state.tx_cache_len() as u64
     }
