@@ -68,10 +68,10 @@ impl DispatcherState {
             .clone()
             .into_iter()
             .filter_map(|artifact_id| {
-                dispatcher.artifact_info(&artifact_id).map(|info| {
+                dispatcher.artifact_protobuf_spec(&artifact_id).map(|info| {
                     (
                         artifact_id,
-                        info.proto_sources.iter().map(ProtoSource::from).collect(),
+                        info.sources.iter().map(ProtoSource::from).collect(),
                     )
                 })
             })

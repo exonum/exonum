@@ -30,7 +30,7 @@ use crate::{
         dispatcher,
         error::ErrorKind,
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        AnyTx, ArtifactId, ArtifactInfo, ExecutionError, InstanceDescriptor, InstanceId,
+        AnyTx, ArtifactId, ArtifactProtobufSpec, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 
@@ -194,8 +194,8 @@ impl ServiceFactory for ServiceGoodImpl {
         RustArtifactId::new("good_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -222,8 +222,8 @@ impl ServiceFactory for ServicePanicImpl {
         RustArtifactId::new("panic_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -250,8 +250,8 @@ impl ServiceFactory for ServicePanicStorageErrorImpl {
         RustArtifactId::new("storage_error_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -294,8 +294,8 @@ impl ServiceFactory for TxResultCheckService {
         RustArtifactId::new("good_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

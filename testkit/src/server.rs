@@ -158,7 +158,7 @@ mod tests {
         messages::{AnyTx, Verified},
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ArtifactInfo,
+            ArtifactProtobufSpec,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -217,8 +217,8 @@ mod tests {
             "sample-service:1.0.0".parse().unwrap()
         }
 
-        fn artifact_info(&self) -> ArtifactInfo {
-            ArtifactInfo::default()
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
         }
 
         fn create_instance(&self) -> Box<dyn Service> {

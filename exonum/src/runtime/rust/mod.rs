@@ -43,8 +43,8 @@ use super::{
     api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, DispatcherSender},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+    InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 #[derive(Debug, Default)]
@@ -223,10 +223,10 @@ impl Runtime for RustRuntime {
         Box::new(self.deploy(&artifact).into_future())
     }
 
-    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
+    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
         let id = self.parse_artifact(id).ok()?;
         self.deployed_artifact(&id)
-            .map(ServiceFactory::artifact_info)
+            .map(ServiceFactory::artifact_protobuf_spec)
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {

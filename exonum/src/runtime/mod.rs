@@ -171,7 +171,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// # Notes for Runtime Developers
     ///
     /// * Ensure that the deployed artifact has the following information, even if it is empty.
-    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
+    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec>;
 
     /// Start a new service instance with the given specification.
     ///
@@ -283,23 +283,23 @@ where
     }
 }
 
-/// Useful artifact information for Exonum clients.
+/// Artifact protobuf specification for Exonum clients.
 #[derive(Debug, PartialEq)]
-pub struct ArtifactInfo<'a> {
+pub struct ArtifactProtobufSpec<'a> {
     /// List of Protobuf files that make up the service interface. The first element in the tuple
     /// is the file name, the second one is its content.
     ///
     /// The common interface entry point is always in the `service.proto` file.
-    pub proto_sources: &'a [(&'a str, &'a str)],
+    pub sources: &'a [(&'a str, &'a str)],
 }
 
-impl<'a> Default for ArtifactInfo<'a> {
+impl<'a> Default for ArtifactProtobufSpec<'a> {
     /// Creates blank artifact information without any proto sources.
     fn default() -> Self {
         const EMPTY_SOURCES: [(&str, &str); 0] = [];
 
         Self {
-            proto_sources: EMPTY_SOURCES.as_ref(),
+            sources: EMPTY_SOURCES.as_ref(),
         }
     }
 }

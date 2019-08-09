@@ -26,7 +26,7 @@ use exonum::{
         dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
         supervisor::{DeployRequest, StartService, Supervisor},
-        AnyTx, ArtifactId, ArtifactInfo, CallInfo, ExecutionContext, ExecutionError,
+        AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
@@ -186,10 +186,10 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
+    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
         self.deployed_artifacts
             .get(id)
-            .map(|_| ArtifactInfo::default())
+            .map(|_| ArtifactProtobufSpec::default())
     }
 
     fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {

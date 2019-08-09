@@ -1190,7 +1190,7 @@ mod tests {
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ArtifactInfo, ExecutionError, InstanceId,
+            ArtifactProtobufSpec, ExecutionError, InstanceId,
         },
     };
 
@@ -1225,8 +1225,8 @@ mod tests {
             "test-service:0.1.0".parse().unwrap()
         }
 
-        fn artifact_info(&self) -> ArtifactInfo {
-            ArtifactInfo::default()
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
         }
 
         fn create_instance(&self) -> Box<dyn Service> {

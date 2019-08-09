@@ -28,7 +28,8 @@ use crate::{
         api::ServiceApiBuilder,
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactInfo, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId, MethodId,
+        AnyTx, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+        MethodId,
     },
 };
 
@@ -68,7 +69,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 pub trait ServiceFactory: Send + Debug + 'static {
     fn artifact_id(&self) -> RustArtifactId;
 
-    fn artifact_info(&self) -> ArtifactInfo;
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec;
 
     fn create_instance(&self) -> Box<dyn Service>;
 }

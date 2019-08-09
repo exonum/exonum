@@ -24,7 +24,7 @@ use exonum::{
         AnyTx, InstanceId,
         {
             rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-            ArtifactInfo,
+            ArtifactProtobufSpec,
         },
     },
 };
@@ -109,8 +109,8 @@ impl ServiceFactory for MyService {
         }
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

@@ -18,11 +18,11 @@ use exonum::{
     helpers::Height,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactInfo, InstanceId,
+        rust::{Service, TransactionContext},
+        InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
+use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
 use exonum_merkledb::{IndexAccess, MapIndex};
 use serde_derive::{Deserialize, Serialize};
 
@@ -199,28 +199,17 @@ impl CryptocurrencyApi {
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 /// Define the service.
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "cryptocurrency",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto"
+)]
 pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
-    }
-}
-
-impl ServiceFactory for CurrencyService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "cryptocurrency:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }

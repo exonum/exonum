@@ -14,27 +14,23 @@
 
 use exonum_derive::exonum_service;
 use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
-use semver::Version;
 
 use std::convert::TryFrom;
 
 use crate::{
     proto::{
-        schema::{
-            tests::{TestServiceInit, TestServiceTx},
-            PROTO_SOURCES,
-        },
+        schema::tests::{TestServiceInit, TestServiceTx},
         Any,
     },
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, ArtifactInfo, CallInfo, Caller,
-        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
+        dispatcher::Dispatcher, error::ExecutionError, CallInfo, Caller, ExecutionContext,
+        InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
 use super::{
     service::{Service, ServiceFactory},
-    ArtifactId, Error, RustArtifactId, RustRuntime, TransactionContext,
+    ArtifactId, Error, RustRuntime, TransactionContext,
 };
 
 const SERVICE_INSTANCE_ID: InstanceId = 2;
@@ -64,7 +60,13 @@ trait TestService {
     fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "test_service",
+    artifact_version = "0.1.0",
+    proto_sources = "crate::proto::schema"
+)]
 pub struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
@@ -111,28 +113,6 @@ impl Service for TestServiceImpl {
     }
 }
 
-#[derive(Debug)]
-struct TestServiceFactory;
-
-impl ServiceFactory for TestServiceFactory {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId {
-            name: "test_service".to_owned(),
-            version: Version::new(0, 1, 0),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(TestServiceImpl)
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: PROTO_SOURCES.as_ref(),
-        }
-    }
-}
-
 #[test]
 fn test_basic_rust_runtime() {
     let db = TemporaryDB::new();
@@ -140,7 +120,7 @@ fn test_basic_rust_runtime() {
     // Create runtime and service.
     let mut runtime = RustRuntime::new();
 
-    let service_factory = Box::new(TestServiceFactory);
+    let service_factory = Box::new(TestServiceImpl);
     let artifact: ArtifactId = service_factory.artifact_id().into();
     runtime.add_service_factory(service_factory);
 

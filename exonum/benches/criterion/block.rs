@@ -104,7 +104,7 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            AnyTx, ArtifactInfo, InstanceId,
+            AnyTx, ArtifactProtobufSpec, InstanceId,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -149,8 +149,8 @@ mod timestamping {
             "timestamping/0.0.1".parse().unwrap()
         }
 
-        fn artifact_info(&self) -> ArtifactInfo {
-            ArtifactInfo::default()
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
         }
 
         fn create_instance(&self) -> Box<dyn Service> {
@@ -204,7 +204,7 @@ mod cryptocurrency {
         messages::Verified,
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            AnyTx, ArtifactInfo, ErrorKind, InstanceId,
+            AnyTx, ArtifactProtobufSpec, ErrorKind, InstanceId,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
@@ -302,8 +302,8 @@ mod cryptocurrency {
             "cryptocurrency/0.0.1".parse().unwrap()
         }
 
-        fn artifact_info(&self) -> ArtifactInfo {
-            ArtifactInfo::default()
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
         }
 
         fn create_instance(&self) -> Box<dyn Service> {

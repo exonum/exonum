@@ -36,8 +36,8 @@ use crate::{
 use super::{
     api::ApiContext,
     error::{catch_panic, ExecutionError},
-    ApiChange, ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
-    InstanceId, InstanceSpec, Runtime,
+    ApiChange, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext,
+    InstanceDescriptor, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -349,13 +349,15 @@ impl Dispatcher {
     }
 
     /// Return additional information about the artifact if it is deployed.
-    pub(crate) fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
-        self.runtimes.get(&id.runtime_id)?.artifact_info(id)
+    pub(crate) fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+        self.runtimes
+            .get(&id.runtime_id)?
+            .artifact_protobuf_spec(id)
     }
 
     /// Return true if the artifact with the given identifier is deployed.
     pub(crate) fn is_deployed(&self, id: &ArtifactId) -> bool {
-        self.artifact_info(id).is_some()
+        self.artifact_protobuf_spec(id).is_some()
     }
 
     /// Notify the runtime about API changes and return true if there were such changes.
@@ -515,7 +517,8 @@ mod tests {
         node::ApiSender,
         runtime::{
             rust::{Error as RustRuntimeError, RustRuntime},
-            ApiChange, ArtifactInfo, InstanceId, MethodId, RuntimeIdentifier, StateHashAggregator,
+            ApiChange, ArtifactProtobufSpec, InstanceId, MethodId, RuntimeIdentifier,
+            StateHashAggregator,
         },
     };
 
@@ -651,8 +654,8 @@ mod tests {
         ) {
         }
 
-        fn artifact_info(&self, _id: &ArtifactId) -> Option<ArtifactInfo> {
-            Some(ArtifactInfo::default())
+        fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+            Some(ArtifactProtobufSpec::default())
         }
 
         fn notify_api_changes(&self, _context: &ApiContext, changes: &[ApiChange]) {

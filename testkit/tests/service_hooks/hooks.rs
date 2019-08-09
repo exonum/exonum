@@ -18,11 +18,11 @@ use exonum::{
     blockchain::ExecutionError,
     helpers::Height,
     runtime::{
-        rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactInfo, InstanceId,
+        rust::{AfterCommitContext, Service, TransactionContext},
+        InstanceId,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert};
+use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -53,7 +53,13 @@ impl TxAfterCommit {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "after-commit",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto",
+    with_constructor = "Self::new_instance"
+)]
 pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,
 }
@@ -76,6 +82,10 @@ impl AfterCommitService {
     pub fn counter(&self) -> usize {
         self.counter.load(Ordering::SeqCst)
     }
+
+    pub fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(self.clone())
+    }
 }
 
 impl Service for AfterCommitService {
@@ -83,21 +93,5 @@ impl Service for AfterCommitService {
         self.counter.fetch_add(1, Ordering::SeqCst);
         let tx = TxAfterCommit::new(context.height());
         context.broadcast_transaction(tx);
-    }
-}
-
-impl ServiceFactory for AfterCommitService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "after-commit:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(self.clone())
     }
 }

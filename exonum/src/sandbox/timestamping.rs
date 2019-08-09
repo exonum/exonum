@@ -24,7 +24,7 @@ use crate::{
     messages::Verified,
     runtime::{
         rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        AnyTx, ArtifactInfo, InstanceDescriptor, InstanceId,
+        AnyTx, ArtifactProtobufSpec, InstanceDescriptor, InstanceId,
     },
 };
 
@@ -66,8 +66,8 @@ impl ServiceFactory for TimestampingService {
         }
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, Node},
     runtime::{
         rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactInfo, InstanceId,
+        ArtifactProtobufSpec, InstanceId,
     },
 };
 use exonum_merkledb::TemporaryDB;
@@ -100,8 +100,8 @@ impl ServiceFactory for MyService {
         "ws-test:0.1.0".parse().unwrap()
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

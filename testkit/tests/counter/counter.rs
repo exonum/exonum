@@ -24,11 +24,11 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
-        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactInfo, InstanceId,
+        rust::{Service, TransactionContext},
+        InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
+use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
 use futures::{Future, IntoFuture};
 use log::trace;
@@ -217,27 +217,16 @@ impl CounterApi {
 
 // // // // Service // // // //
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "counter-service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto"
+)]
 pub struct CounterService;
 
 impl Service for CounterService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CounterApi::wire(builder)
-    }
-}
-
-impl ServiceFactory for CounterService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "counter-service:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }
