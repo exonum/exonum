@@ -493,11 +493,11 @@ impl TransactionsResponse {
 #[exonum(pb = "proto::ProposeRequest", crate = "crate")]
 pub struct ProposeRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The height to which the message is related.
-    height: Height,
+    pub height: Height,
     /// Hash of the `Propose`.
-    propose_hash: Hash,
+    pub propose_hash: Hash,
 }
 
 impl ProposeRequest {
@@ -536,9 +536,9 @@ impl ProposeRequest {
 #[exonum(pb = "proto::TransactionsRequest", crate = "crate")]
 pub struct TransactionsRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The list of the transaction hashes.
-    txs: Vec<Hash>,
+    pub txs: Vec<Hash>,
 }
 
 impl TransactionsRequest {
@@ -572,18 +572,13 @@ impl TransactionsRequest {
 #[exonum(pb = "proto::PoolTransactionsRequest", crate = "crate")]
 pub struct PoolTransactionsRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
 }
 
 impl PoolTransactionsRequest {
     /// Create new `TransactionsRequest`.
     pub fn new(to: PublicKey) -> Self {
         Self { to }
-    }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
     }
 }
 
@@ -602,15 +597,15 @@ impl PoolTransactionsRequest {
 #[exonum(pb = "proto::PrevotesRequest", crate = "crate")]
 pub struct PrevotesRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The height to which the message is related.
-    height: Height,
+    pub height: Height,
     /// The round to which the message is related.
-    round: Round,
+    pub round: Round,
     /// Hash of the `Propose`.
-    propose_hash: Hash,
+    pub propose_hash: Hash,
     /// The list of validators that send pre-votes.
-    validators: BitVec,
+    pub validators: BitVec,
 }
 
 impl PrevotesRequest {
@@ -669,7 +664,7 @@ impl PrevotesRequest {
 #[exonum(pb = "proto::PeersRequest", crate = "crate")]
 pub struct PeersRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
 }
 
 impl PeersRequest {
@@ -697,9 +692,9 @@ impl PeersRequest {
 #[exonum(pb = "proto::BlockRequest", crate = "crate")]
 pub struct BlockRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The height to which the message is related.
-    height: Height,
+    pub height: Height,
 }
 
 impl BlockRequest {
@@ -977,13 +972,13 @@ impl Message {
 impl Requests {
     /// Returns public key of the message recipient.
     pub fn to(&self) -> PublicKey {
-        *match *self {
-            Requests::ProposeRequest(ref msg) => msg.to(),
-            Requests::TransactionsRequest(ref msg) => msg.to(),
-            Requests::PrevotesRequest(ref msg) => msg.to(),
-            Requests::PeersRequest(ref msg) => msg.to(),
-            Requests::BlockRequest(ref msg) => msg.to(),
-            Requests::PoolTransactionsRequest(ref msg) => msg.to(),
+        match *self {
+            Requests::ProposeRequest(ref msg) => msg.to,
+            Requests::TransactionsRequest(ref msg) => msg.to,
+            Requests::PrevotesRequest(ref msg) => msg.to,
+            Requests::PeersRequest(ref msg) => msg.to,
+            Requests::BlockRequest(ref msg) => msg.to,
+            Requests::PoolTransactionsRequest(ref msg) => msg.to,
         }
     }
 

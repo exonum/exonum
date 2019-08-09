@@ -48,7 +48,7 @@ impl NodeHandler {
             Requests::PrevotesRequest(ref msg) => self.handle_request_prevotes(msg),
             Requests::PeersRequest(ref msg) => self.handle_request_peers(msg),
             Requests::BlockRequest(ref msg) => self.handle_request_block(msg),
-            Requests::PoolTransactionsRequest(ref msg) => self.handle_pool_request_txs(msg),
+            Requests::PoolTransactionsRequest(ref msg) => self.handle_request_pool_txs(msg),
         }
     }
 
