@@ -18,7 +18,7 @@
 //! over the items of this index.
 
 use std::{
-    io::{Read, Write},
+    io::{Error, Read, Write},
     marker::PhantomData,
 };
 
@@ -51,11 +51,11 @@ impl BinaryAttribute for SparseListSize {
         buffer.write_u64::<LittleEndian>(self.length).unwrap();
     }
 
-    fn read<R: Read>(buffer: &mut R) -> Self {
-        Self {
-            capacity: buffer.read_u64::<LittleEndian>().unwrap(),
-            length: buffer.read_u64::<LittleEndian>().unwrap(),
-        }
+    fn read<R: Read>(buffer: &mut R) -> Result<Self, Error> {
+        Ok(Self {
+            capacity: buffer.read_u64::<LittleEndian>()?,
+            length: buffer.read_u64::<LittleEndian>()?,
+        })
     }
 }
 

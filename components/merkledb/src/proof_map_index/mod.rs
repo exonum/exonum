@@ -23,7 +23,7 @@ pub use self::{
 
 use std::{
     fmt,
-    io::{Read, Write},
+    io::{Error, Read, Write},
     marker::PhantomData,
 };
 
@@ -171,13 +171,14 @@ impl BinaryAttribute for Option<ProofPath> {
         }
     }
 
-    fn read<R: Read>(buffer: &mut R) -> Self {
+    fn read<R: Read>(buffer: &mut R) -> Result<Self, Error> {
         let mut tmp = [0_u8; PROOF_PATH_SIZE];
-        match buffer.read(&mut tmp).unwrap() {
+        let proof_path = match buffer.read(&mut tmp).unwrap() {
             0 => None,
             PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
             other => panic!("Unexpected attribute length: {}", other),
-        }
+        };
+        Ok(proof_path)
     }
 }
 
