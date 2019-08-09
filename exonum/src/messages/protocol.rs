@@ -509,19 +509,6 @@ impl ProposeRequest {
             propose_hash: *propose_hash,
         }
     }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// Hash of the `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
-    }
 }
 
 /// Request for transactions by hash.
@@ -548,15 +535,6 @@ impl TransactionsRequest {
             to: *to,
             txs: txs.to_vec(),
         }
-    }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The list of the transaction hashes.
-    pub fn txs(&self) -> &[Hash] {
-        &self.txs
     }
 }
 
@@ -626,22 +604,6 @@ impl PrevotesRequest {
         }
     }
 
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// The round to which the message is related.
-    pub fn round(&self) -> Round {
-        self.round
-    }
-    /// Hash of the `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
-    }
     /// The list of validators that send pre-votes.
     pub fn validators(&self) -> BitVec {
         self.validators.clone()
@@ -672,10 +634,6 @@ impl PeersRequest {
     pub fn new(to: &PublicKey) -> Self {
         Self { to: *to }
     }
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
 }
 
 /// Request for the block with the given `height`.
@@ -701,14 +659,6 @@ impl BlockRequest {
     /// Create new `BlockRequest`.
     pub fn new(to: &PublicKey, height: Height) -> Self {
         Self { to: *to, height }
-    }
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
     }
 }
 

@@ -524,7 +524,7 @@ impl Sandbox {
 
             let id = self.addresses.iter().position(|ref a| a.public_key == addr);
             if let Some(id) = id {
-                assert_eq!(&self.public_key(ValidatorId(id as u16)), peers_request.to());
+                assert_eq!(&self.public_key(ValidatorId(id as u16)), &peers_request.to);
             } else {
                 panic!("Sending PeersRequest to unknown peer {:?}", addr);
             }

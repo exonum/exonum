@@ -55,13 +55,13 @@ impl NodeHandler {
     /// Handles `ProposeRequest` message. For details see the message documentation.
     pub fn handle_request_propose(&mut self, msg: &Signed<ProposeRequest>) {
         trace!("HANDLE PROPOSE REQUEST");
-        if msg.height() != self.state.height() {
+        if msg.height != self.state.height() {
             return;
         }
 
-        let propose = if msg.height() == self.state.height() {
+        let propose = if msg.height == self.state.height() {
             self.state
-                .propose(msg.propose_hash())
+                .propose(&msg.propose_hash)
                 .map(|p| p.message().clone())
         } else {
             return;
@@ -75,7 +75,7 @@ impl NodeHandler {
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &Signed<TransactionsRequest>) {
         trace!("HANDLE TRANSACTIONS REQUEST");
-        self.send_transactions_by_hash(&msg.author(), msg.txs());
+        self.send_transactions_by_hash(&msg.author(), &msg.txs);
     }
 
     /// Handles `PoolTransactionsRequest` message. For details see the message documentation.
@@ -125,14 +125,14 @@ impl NodeHandler {
     /// Handles `PrevotesRequest` message. For details see the message documentation.
     pub fn handle_request_prevotes(&mut self, msg: &Signed<PrevotesRequest>) {
         trace!("HANDLE PREVOTES REQUEST");
-        if msg.height() != self.state.height() {
+        if msg.height != self.state.height() {
             return;
         }
 
         let has_prevotes = msg.validators();
         let prevotes = self
             .state
-            .prevotes(msg.round(), *msg.propose_hash())
+            .prevotes(msg.round, msg.propose_hash)
             .iter()
             .filter(|p| !has_prevotes[p.validator().into()])
             .cloned()
@@ -147,17 +147,17 @@ impl NodeHandler {
     pub fn handle_request_block(&mut self, msg: &Signed<BlockRequest>) {
         trace!(
             "Handle block request with height:{}, our height: {}",
-            msg.height(),
+            msg.height,
             self.state.height()
         );
-        if msg.height() >= self.state.height() {
+        if msg.height >= self.state.height() {
             return;
         }
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
 
-        let height = msg.height();
+        let height = msg.height;
         let block_hash = schema.block_hash_by_height(height).unwrap();
 
         let block = schema.blocks().get(&block_hash).unwrap();
