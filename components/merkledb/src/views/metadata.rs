@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, cell::Cell, mem};
+use std::{borrow::Cow, cell::Cell, io::Error, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
@@ -47,13 +47,13 @@ pub enum IndexType {
 const INDEX_STATE_TAG: u32 = 0;
 
 /// A type that can be (de)serialized as a metadata value.
-pub trait BinaryAttribute {
+pub trait BinaryAttribute: Sized {
     /// Size of the value.
     fn size(&self) -> usize;
     /// Writes value to specified `buffer`.
     fn write<W: std::io::Write>(&self, buffer: &mut W);
     /// Reads value from specified `buffer`.
-    fn read<R: std::io::Read>(buffer: &mut R) -> Self;
+    fn read<R: std::io::Read>(buffer: &mut R) -> Result<Self, Error>;
 }
 
 /// No-op implementation.
@@ -64,7 +64,9 @@ impl BinaryAttribute for () {
 
     fn write<W: std::io::Write>(&self, _buffer: &mut W) {}
 
-    fn read<R: std::io::Read>(_buffer: &mut R) -> Self {}
+    fn read<R: std::io::Read>(_buffer: &mut R) -> Result<Self, Error> {
+        Ok(())
+    }
 }
 
 impl BinaryAttribute for u64 {
@@ -76,8 +78,8 @@ impl BinaryAttribute for u64 {
         buffer.write_u64::<LittleEndian>(*self).unwrap()
     }
 
-    fn read<R: std::io::Read>(buffer: &mut R) -> Self {
-        buffer.read_u64::<LittleEndian>().unwrap()
+    fn read<R: std::io::Read>(buffer: &mut R) -> Result<Self, Error> {
+        buffer.read_u64::<LittleEndian>()
     }
 }
 
@@ -139,12 +141,12 @@ where
 
         let mut state_bytes = &bytes[0..state_len];
         let state = V::read(&mut state_bytes);
-
+        ensure!(state.is_ok(), "Error while reading the index state. Possibly the index type does not match specified one");
         Ok(Self {
             identifier,
             index_type: IndexType::from_u32(index_type)
                 .ok_or_else(|| format_err!("Unknown index type: {}", index_type))?,
-            state,
+            state: state.unwrap(),
         })
     }
 }
@@ -176,7 +178,7 @@ where
     let (metadata, is_new) = if let Some(metadata) = pool.index_metadata(&index_name) {
         assert_eq!(
             metadata.index_type, index_type,
-            "Index type doesn't match specified"
+            "Index type does not match specified one"
         );
         (metadata, false)
     } else {
@@ -318,8 +320,8 @@ mod tests {
         assert_eq!(buf.len(), 16);
 
         let mut reader = Cursor::new(buf);
-        let a = u64::read(&mut reader);
-        let b = u64::read(&mut reader);
+        let a = u64::read(&mut reader).unwrap();
+        let b = u64::read(&mut reader).unwrap();
         assert_eq!(a, 11);
         assert_eq!(b, 12);
     }
