@@ -40,11 +40,8 @@ struct ApiImpl<'a>(&'a ServiceApiState<'a>);
 
 impl<'a> ApiImpl<'a> {
     fn broadcast_transaction(&self, transaction: impl Transaction) -> Result<Hash, failure::Error> {
-        let signed = transaction.sign(
-            self.0.instance().id,
-            *self.0.public_key(),
-            self.0.secret_key(),
-        );
+        let keypair = self.0.service_keypair();
+        let signed = transaction.sign(self.0.instance().id, *keypair.0, keypair.1);
 
         let hash = signed.object_hash();
         self.0.sender().broadcast_transaction(signed)?;

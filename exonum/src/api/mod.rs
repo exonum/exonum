@@ -282,15 +282,14 @@ impl ApiAggregator {
         let sender = context.sender().clone();
         self::node::private::SystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        self::node::public::SystemApi::new(context, shared_api_state)
-            .wire(builder.public_scope());
+        self::node::public::SystemApi::new(context, shared_api_state).wire(builder.public_scope());
         builder
     }
 }
 
 /// Provide the current state of the blockchain to the API handlers.
-/// 
-/// This context contains a necessary parts to interaction with blockchain 
+///
+/// This context contains a necessary parts to interaction with blockchain
 /// and may be shared between any kind of handlers.
 #[derive(Debug, Clone)]
 pub struct ApiContext {
@@ -325,7 +324,7 @@ impl ApiContext {
     }
 
     /// Create a new blockchain database state snapshot.
-    /// 
+    ///
     /// Be careful with this method! It can be called in a different thread than in where
     /// changes are made in the blockchain;thus several method's calls in the handler
     /// can lead to the race condition.
@@ -338,7 +337,7 @@ impl ApiContext {
         &self.api_sender
     }
 
-    /// Return reference to the service key pair.
+    /// Return reference to the service key pair of the current node.
     pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
         (&self.service_keypair.0, &self.service_keypair.1)
     }

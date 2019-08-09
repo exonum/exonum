@@ -38,7 +38,6 @@
 //     clippy::default_trait_access,
 // )]
 
-
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;

@@ -64,14 +64,9 @@ impl<'a> ServiceApiState<'a> {
         self.snapshot.as_ref()
     }
 
-    /// Return a public key of the current node.
-    pub fn public_key(&self) -> &PublicKey {
-        self.service_keypair.0
-    }
-
-    /// Return a secret key of the current node.
-    pub fn secret_key(&self) -> &SecretKey {
-        self.service_keypair.1
+    /// Return reference to the service key pair of the current node.
+    pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
+        (&self.service_keypair.0, &self.service_keypair.1)
     }
 
     /// Return a reference to the transactions sender.
@@ -81,7 +76,7 @@ impl<'a> ServiceApiState<'a> {
 }
 
 /// Exonum API builder for the concrete service API [scope].
-/// 
+///
 /// [scope]: ../../api/struct.ApiScope.html
 #[derive(Debug, Clone)]
 pub struct ServiceApiScope {
@@ -101,7 +96,7 @@ impl ServiceApiScope {
     }
 
     /// Add a readonly endpoint handler to the service API scope.
-    /// 
+    ///
     /// In HTTP backends, this type of endpoint corresponds to `GET` requests.
     /// [Read more](../../api/struct.ApiScope.html#endpoint)
     pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
@@ -129,7 +124,7 @@ impl ServiceApiScope {
     }
 
     /// Add an endpoint handler to the service API scope.
-    /// 
+    ///
     /// In HTTP backends, this type of endpoint corresponds to `POST` requests.
     /// [Read more](../../api/struct.ApiScope.html#endpoint_mut)
     pub fn endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
