@@ -27,7 +27,9 @@ use crate::{
     proto::schema::consensus,
 };
 
-/// Container for the signed messages.
+/// Protobuf based container for any signed messages.
+///
+/// See module [documentation](index.html#examples) for examples.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "consensus::SignedMessage", crate = "crate")]
 pub struct SignedMessage {
@@ -70,7 +72,7 @@ impl Connect {
         time: DateTime<Utc>,
         user_agent: impl Into<String>,
     ) -> Self {
-        Connect {
+        Self {
             host: host.into(),
             time,
             user_agent: user_agent.into(),
@@ -290,7 +292,7 @@ impl Prevote {
 /// number from the message is bigger than a node's "locked round", then a
 /// node replies with `PrevotesRequest`.  If there are unknown transactions,
 /// then `TransactionsRequest` is sent in reply.  If a validator receives
-/// +2/3 precommits for the same proposal with the same block_hash, then
+/// +2/3 precommits for the same proposal with the same `block_hash`, then
 /// block is executed and `Status` is broadcast.
 ///
 /// ### Generation
@@ -719,7 +721,7 @@ impl TryFrom<SignedMessage> for ExonumMessage {
     type Error = failure::Error;
 
     fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
-        ExonumMessage::from_bytes(value.payload.into())
+        Self::from_bytes(value.payload.into())
     }
 }
 
@@ -728,7 +730,7 @@ impl TryFrom<&SignedMessage> for ExonumMessage {
 
     fn try_from(value: &SignedMessage) -> Result<Self, Self::Error> {
         let bytes = std::borrow::Cow::Borrowed(value.payload.as_ref());
-        ExonumMessage::from_bytes(bytes)
+        Self::from_bytes(bytes)
     }
 }
 

@@ -29,7 +29,64 @@
 //!                 |                                |
 //!                 V                                V
 //!              (drop)                           (drop)
+//!
 //! ```
+//!
+//! # Examples
+//!
+//! The procedure of creating a new signed message is as follows.
+//!
+//! ```
+//! use exonum::{
+//!     crypto::{self, Hash},
+//!     helpers::Height,
+//!     messages::{Status, Verified},
+//! };
+//!
+//! # fn send<T>(_: T) {}
+//! let keypair = crypto::gen_keypair();
+//! // For example, get some `Status` message.
+//! let payload = Status {
+//!     height: Height(15),
+//!     last_hash: Hash::zero(),
+//! };
+//! // Sign the message with some keypair to get a trusted "Status" message.
+//! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
+//! // Further, convert the trusted message into a raw signed message and send
+//! // it through the network.
+//! let raw_signed_message = signed_payload.into_raw();
+//! send(raw_signed_message);
+//! ```
+//!
+//! The procedure of verification of a signed message is as follows:
+//!
+//! ```
+//! use exonum::{
+//!     crypto::{self, Hash},
+//!     helpers::Height,
+//!     messages::{Status, Verified, SignedMessage, ExonumMessage},
+//! };
+//!
+//! # fn get_signed_message() -> SignedMessage {
+//! #   let keypair = crypto::gen_keypair();
+//! #   let payload = Status {
+//! #       height: Height(15),
+//! #       last_hash: Hash::zero(),
+//! #   };
+//! #   Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
+//! # }
+//! // Assume you have some signed message.
+//! let raw: SignedMessage = get_signed_message();
+//! // You know that this is a type of `ExonumMessage`, so you can
+//! // verify its signature and convert it into `ExonumMessage`.
+//! let verified = raw.into_verified::<ExonumMessage>().expect("verification failed");
+//! // Further, check whether it is a `Status` message.
+//! if let ExonumMessage::Status(ref status) = verified.payload() {
+//!     // ...
+//! }
+//! ```
+//!
+//!
 
 pub use self::{signed::Verified, types::*};
 pub use exonum_merkledb::BinaryValue;
@@ -165,7 +222,7 @@ impl Requests {
     }
 }
 
-/// Exonum protocol messages.
+/// Representation of the Exonum message which is divided into categories.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Message {
     /// Service messages.
@@ -193,8 +250,8 @@ impl Message {
         signed.into_verified::<ExonumMessage>().map(From::from)
     }
 
-    /// Checks buffer and return instance of `Message`.
-    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
+    /// Checks buffer and returns instance of `Message`.
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Self, failure::Error> {
         SignedMessage::from_bytes(buffer.into()).and_then(Self::from_signed)
     }
 
@@ -248,7 +305,7 @@ macro_rules! impl_message_from_verified {
                     $(
                         ExonumMessage::$concrete(inner) => {
                             let inner = Verified::<$concrete> { raw, inner };
-                            Message::from(inner)
+                            Self::from(inner)
                         }
                     )*
                 }
@@ -342,7 +399,7 @@ impl BinaryValue for Message {
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_bytes(value)?;
-        Message::from_signed(message)
+        Self::from_signed(message)
     }
 }
 
