@@ -175,7 +175,7 @@ pub trait Runtime: Send + Debug + 'static {
 
     /// Start a new service instance with the given specification.
     ///
-    /// # Policy on panics
+    /// # Policy on Panics
     ///
     /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
