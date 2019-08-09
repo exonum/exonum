@@ -79,7 +79,7 @@ impl NodeHandler {
     }
 
     /// Handles `PoolTransactionsRequest` message. For details see the message documentation.
-    pub fn handle_pool_request_txs(&mut self, msg: &Signed<PoolTransactionsRequest>) {
+    pub fn handle_request_pool_txs(&mut self, msg: &Signed<PoolTransactionsRequest>) {
         trace!("HANDLE POOL TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
