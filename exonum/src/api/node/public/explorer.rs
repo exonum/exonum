@@ -367,7 +367,7 @@ impl ExplorerApi {
             "v1/ws",
             api_scope.web_backend(),
             self.context.clone(),
-            shared_node_state.clone(),
+            shared_node_state,
             |_| Ok(SubscriptionType::None),
         );
         api_scope

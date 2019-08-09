@@ -43,8 +43,6 @@ use crate::{
 
 mod with;
 
-/// Defines an object that could be used as a Exonum API backend.
-///
 /// This trait is used to implement an API backend for Exonum.
 pub trait ApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
@@ -52,7 +50,7 @@ pub trait ApiBackend: Sized {
     /// Concrete backend API builder.
     type Backend;
 
-    /// Adds the given endpoint handler to the backend.
+    /// Add the given endpoint handler to the backend.
     fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
         N: Into<String>,
@@ -66,7 +64,7 @@ pub trait ApiBackend: Sized {
         self.raw_handler(Self::Handler::from(named_with))
     }
 
-    /// Adds the given mutable endpoint handler to the backend.
+    /// Add the given mutable endpoint handler to the backend.
     fn endpoint_mut<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
         N: Into<String>,
@@ -80,10 +78,10 @@ pub trait ApiBackend: Sized {
         self.raw_handler(Self::Handler::from(named_with))
     }
 
-    /// Adds the raw endpoint handler for the given backend.
+    /// Add the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
 
-    /// Binds API handlers to the given backend.
+    /// Bind API handlers to the given backend.
     fn wire(&self, output: Self::Backend) -> Self::Backend;
 }
 
@@ -98,12 +96,12 @@ pub struct ApiScope {
 }
 
 impl ApiScope {
-    /// Creates a new instance.
+    /// Create a new instance.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Adds the given endpoint handler to the API scope. These endpoints
+    /// Add the given endpoint handler to the API scope. These endpoints
     /// are designed for reading operations.
     ///
     /// For now there is only web backend and it has the following requirements:
@@ -123,7 +121,7 @@ impl ApiScope {
         self
     }
 
-    /// Adds the given mutable endpoint handler to the API scope. These endpoints
+    /// Add the given mutable endpoint handler to the API scope. These endpoints
     /// are designed for modification operations.
     ///
     /// For now there is only web backend and it has the following requirements:
@@ -142,7 +140,7 @@ impl ApiScope {
         self
     }
 
-    /// Returns a mutable reference to the underlying web backend.
+    /// Return a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
         &mut self.actix_backend
     }
@@ -156,17 +154,17 @@ pub struct ApiBuilder {
 }
 
 impl ApiBuilder {
-    /// Creates a new API builder.
+    /// Create a new API builder.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Returns a mutable reference to the public API scope builder.
+    /// Return a mutable reference to the public API scope builder.
     pub fn public_scope(&mut self) -> &mut ApiScope {
         &mut self.public_scope
     }
 
-    /// Returns a mutable reference to the private API scope builder.
+    /// Return a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ApiScope {
         &mut self.private_scope
     }
@@ -195,7 +193,7 @@ impl fmt::Display for ApiAccess {
 /// This trait enables implementing additional API scopes, besides the built-in
 /// private and public scopes.
 pub trait ExtendApiBackend {
-    /// Extends API backend by the given scopes.
+    /// Extend API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
     where
         I: IntoIterator<Item = (&'a str, &'a ApiScope)>;
@@ -211,7 +209,7 @@ pub struct ApiAggregator {
 }
 
 impl ApiAggregator {
-    /// Aggregates API for the given blockchain and node state.
+    /// Aggregate API for the given blockchain and node state.
     pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
         let mut endpoints = BTreeMap::new();
         // Adds built-in APIs.
@@ -231,12 +229,12 @@ impl ApiAggregator {
         }
     }
 
-    /// Returns a reference to the blockchain used by the aggregator.
+    /// Return a reference to the blockchain used by the aggregator.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
     }
 
-    /// Extends the given API backend by handlers with the given access level.
+    /// Extend the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
         let mut endpoints = self.endpoints.clone();
 
@@ -261,12 +259,12 @@ impl ApiAggregator {
         }
     }
 
-    /// Adds API factory with the given prefix to the aggregator.
+    /// Add API factory with the given prefix to the aggregator.
     pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ApiBuilder) {
         self.endpoints.insert(prefix.into(), builder);
     }
 
-    /// Refreshes shared node state.
+    /// Refresh shared node state.
     fn refresh(&self) {
         self.node_state.update_dispatcher_state(&self.blockchain);
     }
@@ -284,12 +282,16 @@ impl ApiAggregator {
         let sender = context.sender().clone();
         self::node::private::SystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        self::node::public::SystemApi::new(context.clone(), shared_api_state)
+        self::node::public::SystemApi::new(context, shared_api_state)
             .wire(builder.public_scope());
         builder
     }
 }
 
+/// Provide the current state of the blockchain to the API handlers.
+/// 
+/// This context contains a necessary parts to interaction with blockchain 
+/// and may be shared between any kind of handlers.
 #[derive(Debug, Clone)]
 pub struct ApiContext {
     service_keypair: (PublicKey, SecretKey),
@@ -298,6 +300,7 @@ pub struct ApiContext {
 }
 
 impl ApiContext {
+    /// Create a new API context instance from the specified blockchain parts.
     #[doc(hidden)]
     pub fn new(
         database: Arc<dyn Database>,
@@ -311,6 +314,7 @@ impl ApiContext {
         }
     }
 
+    /// Create a new API context instance for the specified blockchain.
     #[doc(hidden)]
     pub fn with_blockchain(blockchain: &Blockchain) -> Self {
         Self {
@@ -320,14 +324,21 @@ impl ApiContext {
         }
     }
 
+    /// Create a new blockchain database state snapshot.
+    /// 
+    /// Be careful with this method! It can be called in a different thread than in where
+    /// changes are made in the blockchain;thus several method's calls in the handler
+    /// can lead to the race condition.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.database.snapshot()
     }
 
+    /// Return reference to the transactions sender.
     pub fn sender(&self) -> &ApiSender {
         &self.api_sender
     }
 
+    /// Return reference to the service key pair.
     pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
         (&self.service_keypair.0, &self.service_keypair.1)
     }

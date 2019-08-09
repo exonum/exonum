@@ -22,26 +22,22 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![cfg_attr(feature = "long_benchmarks", feature(test))]
-// TODO This lints produces a lot of code style warnings [ERC2699]
-// #![cfg_attr(feature = "cargo-clippy", warn(clippy::pedantic))]
-#![cfg_attr(
-    feature = "cargo-clippy",
-    allow(
-          // Next `cast_*` lints don't give alternatives.
-          clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-          // `filter(..).map(..)` often looks more shorter and readable.
-          clippy::filter_map,
-          // Next lints produce too much noise/false positives.
-          clippy::module_name_repetitions, clippy::similar_names,
-          // Variant name ends with the enum name. Similar behavior to similar_names.
-          clippy::pub_enum_variant_names,
-          // Next lints allowed due to false positive.
-          clippy::doc_markdown,
-          // '... may panic' lints.
-          clippy::indexing_slicing,
-    )
-)]
+// #![warn(clippy::pedantic)]
+// #![allow(
+//     // Next `cast_*` lints don't give alternatives.
+//     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+//     // `filter(..).map(..)` often looks more shorter and readable.
+//     clippy::filter_map,
+//     // Next lints produce too much noise/false positives.
+//     clippy::module_name_repetitions, clippy::similar_names,
+//     // Variant name ends with the enum name. Similar behavior to similar_names.
+//     clippy::pub_enum_variant_names,
+//     // '... may panic' lints.
+//     clippy::indexing_slicing,
+//     // Suggestions for code that uses a lot of generics look ugly.
+//     clippy::default_trait_access,
+// )]
+
 
 #[cfg(test)]
 #[macro_use]

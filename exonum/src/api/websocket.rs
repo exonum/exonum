@@ -14,6 +14,8 @@
 
 //! WebSocket API.
 
+// TODO Move module to the backends/actix directory. [ECR-3222]
+
 use actix::*;
 use actix_web::ws;
 use chrono::{DateTime, Utc};
@@ -224,7 +226,7 @@ impl Server {
     }
 
     fn disconnect_all(&mut self) {
-        for (_, subscriber) in self.subscribers.iter_mut() {
+        for subscriber in self.subscribers.values_mut() {
             for recipient in subscriber.values_mut() {
                 if let Err(err) = recipient.do_send(Message::Close) {
                     warn!("Can't send Close message to a websocket client: {:?}", err);
@@ -283,8 +285,7 @@ impl Handler<UpdateSubscriptions> for Server {
         let addr = if let Some(addr) = self
             .subscribers
             .values()
-            .map(HashMap::iter)
-            .flatten()
+            .flat_map(HashMap::iter)
             .find_map(|(k, v)| if k == &id { Some(v.clone()) } else { None })
         {
             addr

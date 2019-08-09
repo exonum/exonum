@@ -259,14 +259,18 @@ pub trait Runtime: Send + Debug + 'static {
     );
 
     /// Collect the full list of API handlers from the runtime for the built-in Exonum API server.
-    /// This method is called during an API server restart.
-    ///
-    /// Use this method if you do not plan to use your own API processing mechanism.
+    /// 
+    /// This method is called during an API server restart. Use this method if you do not plan to
+    /// use your own API processing mechanism.
     #[doc(hidden)]
     fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
     }
 
+    /// Notify runtime about changes in list of available in API service instances.
+    /// 
+    /// The purpose of this method is provide building blocks to create your own API processing
+    /// mechanisms.
     fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
 }
 
@@ -374,9 +378,9 @@ impl<'a> ExecutionContext<'a> {
 /// Instance descriptor contains information to access running service instance.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InstanceDescriptor<'a> {
-    /// Returns the current service instance identifier.
+    /// The current service instance identifier.
     pub id: InstanceId,
-    /// Returns the current service instance name.
+    /// The current service instance name.
     pub name: &'a str,
 }
 

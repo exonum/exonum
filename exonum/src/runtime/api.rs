@@ -27,11 +27,10 @@ use crate::{
     runtime::{InstanceDescriptor, InstanceId},
 };
 
-/// Provides the current blockchain state to API handlers.
+/// Provide the current blockchain state snapshot to API handlers.
 ///
-/// This structure is a part of the node that is available to the API. For example,
-/// it can return the private key of the node, which allows the service to send
-/// certain transactions to the blockchain.
+/// This structure allows a service API handler to interact with the service instance
+/// and other parts of the blockchain.
 #[derive(Debug)]
 pub struct ServiceApiState<'a> {
     service_keypair: (&'a PublicKey, &'a SecretKey),
@@ -42,6 +41,7 @@ pub struct ServiceApiState<'a> {
 }
 
 impl<'a> ServiceApiState<'a> {
+    /// Create service API state snapshot from the given context and instance descriptor.
     pub fn from_api_context(
         context: &'a ApiContext,
         instance_descriptor: InstanceDescriptor<'a>,
@@ -54,31 +54,35 @@ impl<'a> ServiceApiState<'a> {
         }
     }
 
+    /// Return a service instance descriptor of the current API handler.
     pub fn instance(&self) -> InstanceDescriptor {
         self.instance_descriptor
     }
 
-    /// Creates a read-only snapshot of the current blockchain state.
+    /// Return a read-only snapshot of the current blockchain state.
     pub fn snapshot(&'a self) -> &dyn Snapshot {
         self.snapshot.as_ref()
     }
 
-    /// Returns the public key of the current node.
+    /// Return a public key of the current node.
     pub fn public_key(&self) -> &PublicKey {
         self.service_keypair.0
     }
 
-    /// Returns the secret key of the current node.
+    /// Return a secret key of the current node.
     pub fn secret_key(&self) -> &SecretKey {
         self.service_keypair.1
     }
 
-    /// Returns a reference to the API sender.
+    /// Return a reference to the transactions sender.
     pub fn sender(&self) -> &ApiSender {
         self.api_sender
     }
 }
 
+/// Exonum API builder for the concrete service API [scope].
+/// 
+/// [scope]: ../../api/struct.ApiScope.html
 #[derive(Debug, Clone)]
 pub struct ServiceApiScope {
     inner: ApiScope,
@@ -87,6 +91,7 @@ pub struct ServiceApiScope {
 }
 
 impl ServiceApiScope {
+    /// Create a new service API scope for the specified service instance.
     pub fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
         Self {
             inner: ApiScope::new(),
@@ -95,6 +100,10 @@ impl ServiceApiScope {
         }
     }
 
+    /// Add a readonly endpoint handler to the service API scope.
+    /// 
+    /// In HTTP backends, this type of endpoint corresponds to `GET` requests.
+    /// [Read more](../../api/struct.ApiScope.html#endpoint)
     pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -119,6 +128,10 @@ impl ServiceApiScope {
         self
     }
 
+    /// Add an endpoint handler to the service API scope.
+    /// 
+    /// In HTTP backends, this type of endpoint corresponds to `POST` requests.
+    /// [Read more](../../api/struct.ApiScope.html#endpoint_mut)
     pub fn endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -143,7 +156,7 @@ impl ServiceApiScope {
         self
     }
 
-    /// Returns a mutable reference to the underlying web backend.
+    /// Return a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut crate::api::backends::actix::ApiBuilder {
         self.inner.web_backend()
     }
@@ -260,7 +273,7 @@ pub struct ServiceApiBuilder {
 }
 
 impl ServiceApiBuilder {
-    /// Creates a new service API builder.
+    /// Create a new service API builder for the specified service instance.
     #[doc(hidden)]
     pub fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
         Self {
@@ -270,17 +283,17 @@ impl ServiceApiBuilder {
         }
     }
 
-    /// Returns a mutable reference to the public API scope builder.
+    /// Return a mutable reference to the public API scope builder.
     pub fn public_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.public_scope
     }
 
-    /// Returns a mutable reference to the private API scope builder.
+    /// Return a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.private_scope
     }
 
-    /// Returns a reference to the underlying API context.
+    /// Return a reference to the underlying API context.
     pub fn context(&self) -> &ApiContext {
         &self.context
     }
