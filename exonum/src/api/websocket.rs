@@ -36,7 +36,8 @@ use crate::events::error::into_failure;
 use crate::explorer::{median_precommits_time, TxStatus};
 use crate::messages::{Message as ExonumMessage, ProtocolMessage, RawTransaction, SignedMessage};
 
-use exonum_merkledb::{IndexAccess, ListProof, Snapshot};
+use exonum_merkledb::{IndexAccess, Snapshot};
+use exonum_merkledb::proof_list_index::ListProof;
 
 /// Message, coming from websocket connection.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]

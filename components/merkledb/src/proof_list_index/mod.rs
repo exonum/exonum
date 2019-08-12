@@ -14,7 +14,7 @@
 
 //! An implementation of a Merkelized version of an array list (Merkle tree).
 
-pub use self::proof::{ListProof, ListProofError, ProofOfAbsence};
+pub use self::proof::{ProofVariant, ListProofError, ListProof, ProofOfAbsence};
 
 use std::{
     marker::PhantomData,
@@ -214,23 +214,23 @@ where
         ProofListKey::new(self.height(), 0)
     }
 
-    fn construct_proof(&self, key: ProofListKey, from: u64, to: u64) -> ListProof<V> {
+    fn construct_proof(&self, key: ProofListKey, from: u64, to: u64) -> ProofVariant<V> {
         if key.height() == 1 {
-            return ListProof::Leaf(self.get(key.index()).unwrap());
+            return ProofVariant::Leaf(self.get(key.index()).unwrap());
         }
         let middle = key.first_right_leaf_index();
         if to <= middle {
-            ListProof::Left(
+            ProofVariant::Left(
                 Box::new(self.construct_proof(key.left(), from, to)),
                 self.get_branch(key.right()),
             )
         } else if middle <= from {
-            ListProof::Right(
+            ProofVariant::Right(
                 self.get_branch_unchecked(key.left()),
                 Box::new(self.construct_proof(key.right(), from, to)),
             )
         } else {
-            ListProof::Full(
+            ProofVariant::Full(
                 Box::new(self.construct_proof(key.left(), from, middle)),
                 Box::new(self.construct_proof(key.right(), middle, to)),
             )
@@ -379,11 +379,13 @@ where
     /// let proof_of_absence = index.get_proof(1);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
-        if index >= self.len() {
-            return ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()));
-        }
+        let proof = if index >= self.len() {
+            ProofVariant::Absent(self.merkle_root())
+        } else {
+            self.construct_proof(self.root_key(), index, index + 1)
+        };
 
-        self.construct_proof(self.root_key(), index, index + 1)
+        ListProof::new(self.len(), proof)
     }
 
     /// Returns the proof of existence for the list elements in the specified range.
@@ -431,11 +433,13 @@ where
             )
         }
 
-        if to > self.len() {
-            ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()))
+        let proof = if to > self.len() {
+            ProofVariant::Absent(self.merkle_root())
         } else {
             self.construct_proof(self.root_key(), from, to)
-        }
+        };
+
+        ListProof::new(self.len(), proof)
     }
 
     /// Returns an iterator over the list. The iterator element type is V.

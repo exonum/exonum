@@ -35,8 +35,9 @@ use crate::crypto::{CryptoHash, Hash};
 use crate::helpers::Height;
 use crate::messages::{Precommit, RawTransaction, Signed};
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{ListProof, Snapshot};
+use exonum_merkledb::{ProofVariant, Snapshot};
 use std::time::UNIX_EPOCH;
+use exonum_merkledb::proof_list_index::ListProof;
 
 /// Transaction parsing result.
 type ParseResult = Result<TransactionMessage, failure::Error>;

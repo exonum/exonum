@@ -58,17 +58,75 @@ impl ProofOfAbsence {
 
 /// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ListProof<V> {
+pub enum ProofVariant<V> {
     /// A branch of proof in which both children contain requested elements.
-    Full(Box<ListProof<V>>, Box<ListProof<V>>),
+    Full(Box<ProofVariant<V>>, Box<ProofVariant<V>>),
     /// A branch of proof in which only the left child contains requested elements.
-    Left(Box<ListProof<V>>, Option<Hash>),
+    Left(Box<ProofVariant<V>>, Option<Hash>),
     /// A branch of proof in which only the right child contains requested elements.
-    Right(Hash, Box<ListProof<V>>),
+    Right(Hash, Box<ProofVariant<V>>),
     /// A leaf of the proof with the requested element.
     Leaf(V),
     /// Proof of absence of an element with the specified index.
-    Absent(ProofOfAbsence),
+    Absent(Hash),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListProof<V> {
+    length: u64,
+    proof: ProofVariant<V>,
+}
+
+impl<V> ListProof<V>
+where
+    V: BinaryValue,
+{
+    pub fn new(length: u64, proof: ProofVariant<V>) -> Self {
+        Self { length, proof }
+    }
+
+    // Length of the corresponding ProofList.
+    pub fn length(&self) -> u64 {
+        self.length
+    }
+
+    // Proof.
+    pub fn proof(&self) -> &ProofVariant<V> {
+        &self.proof
+    }
+
+    /// Verifies the correctness of the proof by the trusted list hash and the number of
+    /// elements in the tree.
+    ///
+    /// To validate the proof one needs to provide `expected_list_hash` calculated as follows:
+    /// ```text
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// ```
+    /// and `length` of the `ProofListIndex`.
+    ///
+    /// If the proof is valid, a vector with indices and references to elements is returned.
+    /// Otherwise, `Err` is returned.
+    ///
+    /// If the proof is the proof of absence, then empty vector will be returned.
+    pub fn validate(&self, expected_list_hash: Hash) -> Result<Vec<(u64, &V)>, ListProofError> {
+        let mut vec = Vec::new();
+        let height = self.length.next_power_of_two().trailing_zeros() as u8 + 1;
+        let root_hash = self.proof().collect(ProofListKey::new(height, 0), self.length, &mut vec)?;
+
+        match self.proof() {
+            ProofVariant::Absent(_) => {
+                if expected_list_hash != root_hash {
+                    return Err(ListProofError::UnmatchedRootHash);
+                }
+            }
+            _ => {
+                if HashTag::hash_list_node(self.length, root_hash) != expected_list_hash {
+                    return Err(ListProofError::UnmatchedRootHash);
+                }
+            }
+        }
+        Ok(vec)
+    }
 }
 
 /// An error that is returned when the list proof is invalid.
@@ -85,90 +143,54 @@ pub enum ListProofError {
     UnmatchedRootHash,
 }
 
-impl<V> ListProof<V>
+impl<V> ProofVariant<V>
 where
     V: BinaryValue,
 {
     fn collect<'a>(
         &'a self,
         key: ProofListKey,
+        length: u64,
         vec: &mut Vec<(u64, &'a V)>,
     ) -> Result<Hash, ListProofError> {
         if key.height() == 0 {
             return Err(ListProofError::UnexpectedBranch);
         }
         let hash = match *self {
-            ListProof::Full(ref left, ref right) => HashTag::hash_node(
-                &left.collect(key.left(), vec)?,
-                &right.collect(key.right(), vec)?,
+            ProofVariant::Full(ref left, ref right) => HashTag::hash_node(
+                &left.collect(key.left(), length, vec)?,
+                &right.collect(key.right(), length, vec)?,
             ),
-            ListProof::Left(ref left, Some(ref right)) => {
-                HashTag::hash_node(&left.collect(key.left(), vec)?, right)
+            ProofVariant::Left(ref left, Some(ref right)) => {
+                HashTag::hash_node(&left.collect(key.left(), length, vec)?, right)
             }
-            ListProof::Left(ref left, None) => {
-                HashTag::hash_single_node(&left.collect(key.left(), vec)?)
+            ProofVariant::Left(ref left, None) => {
+                HashTag::hash_single_node(&left.collect(key.left(), length, vec)?)
             }
-            ListProof::Right(ref left, ref right) => {
-                HashTag::hash_node(left, &right.collect(key.right(), vec)?)
+            ProofVariant::Right(ref left, ref right) => {
+                HashTag::hash_node(left, &right.collect(key.right(), length, vec)?)
             }
-            ListProof::Leaf(ref value) => {
+            ProofVariant::Leaf(ref value) => {
                 if key.height() > 1 {
                     return Err(ListProofError::UnexpectedLeaf);
                 }
                 vec.push((key.index(), value));
                 HashTag::hash_leaf(&value.to_bytes())
             }
-            ListProof::Absent(ref proof) => {
-                HashTag::hash_list_node(proof.length, proof.merkle_root)
+            ProofVariant::Absent(merkle_root) => {
+                HashTag::hash_list_node(length, merkle_root)
             }
         };
         Ok(hash)
     }
-
-    /// Verifies the correctness of the proof by the trusted list hash and the number of
-    /// elements in the tree.
-    ///
-    /// To validate the proof one needs to provide `expected_list_hash` calculated as follows:
-    /// ```text
-    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
-    /// ```
-    /// and `length` of the `ProofListIndex`.
-    ///
-    /// If the proof is valid, a vector with indices and references to elements is returned.
-    /// Otherwise, `Err` is returned.
-    ///
-    /// If the proof is the proof of absence, then empty vector will be returned.
-    pub fn validate(
-        &self,
-        expected_list_hash: Hash,
-        len: u64,
-    ) -> Result<Vec<(u64, &V)>, ListProofError> {
-        let mut vec = Vec::new();
-        let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
-        let root_hash = self.collect(ProofListKey::new(height, 0), &mut vec)?;
-
-        match *self {
-            ListProof::Absent(_) => {
-                if expected_list_hash != root_hash {
-                    return Err(ListProofError::UnmatchedRootHash);
-                }
-            }
-            _ => {
-                if HashTag::hash_list_node(len, root_hash) != expected_list_hash {
-                    return Err(ListProofError::UnmatchedRootHash);
-                }
-            }
-        }
-        Ok(vec)
-    }
 }
 
-impl<V: Serialize> Serialize for ListProof<V> {
+impl<V: Serialize> Serialize for ProofVariant<V> {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        use self::ListProof::*;
+        use self::ProofVariant::*;
         let mut state;
         match *self {
             Full(ref left_proof, ref right_proof) => {
@@ -195,16 +217,15 @@ impl<V: Serialize> Serialize for ListProof<V> {
                 state = ser.serialize_struct("Leaf", 1)?;
                 state.serialize_field("val", val)?;
             }
-            ListProof::Absent(ref proof) => {
-                state = ser.serialize_struct("Absent", 2)?;
-                state.serialize_field("length", &proof.length)?;
-                state.serialize_field("hash", &proof.merkle_root)?;
+            ProofVariant::Absent(merkle_root) => {
+                state = ser.serialize_struct("Absent", 1)?;
+                state.serialize_field("hash", &merkle_root)?;
             }
         }
         state.end()
     }
 }
-impl<'a, V> Deserialize<'a> for ListProof<V>
+impl<'a, V> Deserialize<'a> for ProofVariant<V>
 where
     for<'de> V: Deserialize<'de>,
 {
@@ -257,7 +278,7 @@ where
                     let right_hash: Hash = from_value(right_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", right_value, &err))
                     })?;
-                    ListProof::Left(Box::new(left_proof), Some(right_hash))
+                    ProofVariant::Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
                     let right_proof: Self = from_value(right_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", right_value, &err))
@@ -265,7 +286,7 @@ where
                     let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", left_value, &err))
                     })?;
-                    ListProof::Right(left_hash, Box::new(right_proof))
+                    ProofVariant::Right(left_hash, Box::new(right_proof))
                 } else {
                     let left_proof = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", left_value, &err))
@@ -273,7 +294,7 @@ where
                     let right_proof = from_value(right_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", right_value, &err))
                     })?;
-                    ListProof::Full(Box::new(left_proof), Box::new(right_proof))
+                    ProofVariant::Full(Box::new(left_proof), Box::new(right_proof))
                 }
             }
             1 => {
@@ -288,14 +309,14 @@ where
                     let val: V = from_value(leaf_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("V", leaf_value, &err))
                     })?;
-                    ListProof::Leaf(val)
+                    ProofVariant::Leaf(val)
                 } else {
                     // "left" is present
                     let left_value = map_key_value.get("left").unwrap();
                     let left_proof: Self = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", left_value, &err))
                     })?;
-                    ListProof::Left(Box::new(left_proof), None)
+                    ProofVariant::Left(Box::new(left_proof), None)
                 }
             }
             _ => {
@@ -307,5 +328,71 @@ where
             }
         };
         Ok(res)
+    }
+}
+
+impl<V: Serialize> Serialize for ListProof<V> {
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = ser.serialize_struct("Proof", 2)?;
+        state.serialize_field("length", &self.length)?;
+        state.serialize_field("proof", &self.proof)?;
+        state.end()
+    }
+}
+impl<'a, V> Deserialize<'a> for ListProof<V>
+where
+    V: BinaryValue,
+    for<'de> V: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        fn format_err_string(type_str: &str, value: &Value, err: &SerdeJsonError) -> String {
+            format!(
+                "Couldn't deserialize {} from serde_json::Value: {}, error: {}",
+                type_str, value, err
+            )
+        }
+
+        let json: Value = <Value as Deserialize>::deserialize(deserializer)?;
+        if !json.is_object() {
+            return Err(D::Error::custom(format!(
+                "Invalid json: it is expected to be json \
+                 Object. json: {:?}",
+                json
+            )));
+        }
+        let map_key_value = json.as_object().unwrap();
+        let length;
+
+        if let Some(value) = map_key_value.get("length") {
+            length = from_value(value.clone())
+                .map_err(|err| D::Error::custom(format_err_string("length", value, &err)))?;
+        } else {
+            return Err(D::Error::custom(format!(
+                "Invalid json: list length is not found. \
+                 Value: {:?}",
+                json
+            )));
+        };
+
+        let proof;
+
+        if let Some(value) = map_key_value.get("proof") {
+            proof = from_value(value.clone())
+                .map_err(|err| D::Error::custom(format_err_string("proof", value, &err)))?;
+        } else {
+            return Err(D::Error::custom(format!(
+                "Invalid json: proof is not found. \
+                 Value: {:?}",
+                json
+            )));
+        };
+
+        Ok(ListProof::new(length, proof))
     }
 }

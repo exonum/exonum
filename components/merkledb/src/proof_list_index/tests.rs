@@ -22,10 +22,11 @@ use serde_json::{from_str, to_string};
 
 use exonum_crypto::Hash;
 
+use crate::proof_list_index::proof::ListProof;
 use crate::{
     hash::{HashTag, ObjectHash},
     proof_list_index::{
-        ListProof::{
+        ProofVariant::{
             self, {Full, Leaf, Left, Right},
         },
         ProofListIndex,
@@ -148,42 +149,39 @@ fn test_list_index_proof() {
     index.push(2_u64);
 
     assert_eq!(index.object_hash(), HashTag::hash_list_node(1, h0));
-    assert_eq!(index.get_proof(0), Leaf(2));
+    assert_eq!(index.get_proof(0), ListProof::new(1, Leaf(2)));
     assert_eq!(
-        index
-            .get_proof(0)
-            .validate(index.object_hash(), index.len())
-            .unwrap(),
+        index.get_proof(0).validate(index.object_hash()).unwrap(),
         [(0, &2)]
     );
 
     index.push(4_u64);
     assert_eq!(index.object_hash(), HashTag::hash_list_node(2, h01));
-    assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
     assert_eq!(
-        index
-            .get_proof(0)
-            .validate(index.object_hash(), index.len())
-            .unwrap(),
+        index.get_proof(0),
+        ListProof::new(2, Left(Box::new(Leaf(2)), Some(h1)))
+    );
+    assert_eq!(
+        index.get_proof(0).validate(index.object_hash()).unwrap(),
         [(0, &2)]
     );
-    assert_eq!(index.get_proof(1), Right(h0, Box::new(Leaf(4))));
     assert_eq!(
-        index
-            .get_proof(1)
-            .validate(index.object_hash(), index.len())
-            .unwrap(),
+        index.get_proof(1),
+        ListProof::new(2, Right(h0, Box::new(Leaf(4))))
+    );
+    assert_eq!(
+        index.get_proof(1).validate(index.object_hash()).unwrap(),
         [(1, &4)]
     );
 
     assert_eq!(
         index.get_range_proof(0..2),
-        Full(Box::new(Leaf(2)), Box::new(Leaf(4)))
+        ListProof::new(2, Full(Box::new(Leaf(2)), Box::new(Leaf(4))))
     );
     assert_eq!(
         index
             .get_range_proof(0..2)
-            .validate(index.object_hash(), index.len())
+            .validate(index.object_hash())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
@@ -192,79 +190,82 @@ fn test_list_index_proof() {
     assert_eq!(index.object_hash(), HashTag::hash_list_node(3, h012));
     assert_eq!(
         index.get_proof(0),
-        Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22))
+        ListProof::new(
+            3,
+            Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22))
+        )
     );
     assert_eq!(
-        index
-            .get_proof(0)
-            .validate(index.object_hash(), index.len())
-            .unwrap(),
+        index.get_proof(0).validate(index.object_hash()).unwrap(),
         [(0, &2)]
     );
     assert_eq!(
         index.get_proof(1),
-        Left(Box::new(Right(h0, Box::new(Leaf(4)))), Some(h22))
+        ListProof::new(3, Left(Box::new(Right(h0, Box::new(Leaf(4)))), Some(h22)))
     );
     assert_eq!(
-        index
-            .get_proof(1)
-            .validate(index.object_hash(), index.len())
-            .unwrap(),
+        index.get_proof(1).validate(index.object_hash()).unwrap(),
         [(1, &4)]
     );
     assert_eq!(
         index.get_proof(2),
-        Right(h01, Box::new(Left(Box::new(Leaf(6)), None)))
+        ListProof::new(3, Right(h01, Box::new(Left(Box::new(Leaf(6)), None))))
     );
     assert_eq!(
-        index
-            .get_proof(2)
-            .validate(index.object_hash(), index.len())
-            .unwrap(),
+        index.get_proof(2).validate(index.object_hash()).unwrap(),
         [(2, &6)]
     );
 
     assert_eq!(
         index.get_range_proof(0..2),
-        Left(
-            Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
-            Some(h22),
+        ListProof::new(
+            3,
+            Left(
+                Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
+                Some(h22),
+            )
         )
     );
     assert_eq!(
         index
             .get_range_proof(0..2)
-            .validate(index.object_hash(), index.len())
+            .validate(index.object_hash())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
 
     assert_eq!(
         index.get_range_proof(1..3),
-        Full(
-            Box::new(Right(h0, Box::new(Leaf(4)))),
-            Box::new(Left(Box::new(Leaf(6)), None)),
+        ListProof::new(
+            3,
+            Full(
+                Box::new(Right(h0, Box::new(Leaf(4)))),
+                Box::new(Left(Box::new(Leaf(6)), None)),
+            )
         )
     );
     assert_eq!(
         index
             .get_range_proof(1..3)
-            .validate(index.object_hash(), index.len())
+            .validate(index.object_hash())
             .unwrap(),
         [(1, &4), (2, &6)]
     );
 
     assert_eq!(
         index.get_range_proof(0..3),
-        Full(
-            Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
-            Box::new(Left(Box::new(Leaf(6)), None)),
+        ListProof::new(
+            3,
+            Full(
+                Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
+                Box::new(Left(Box::new(Leaf(6)), None)),
+            )
         )
     );
     assert_eq!(
         index
             .get_range_proof(0..3)
-            .validate(index.object_hash(), index.len())
+            .validate(index.object_hash())
             .unwrap(),
         [(0, &2), (1, &4), (2, &6)]
     );
@@ -290,7 +291,7 @@ fn test_randomly_generate_proofs() {
         let range_proof = index.get_range_proof(start_range..end_range);
         {
             let (indices, actual_values): (Vec<_>, Vec<_>) = range_proof
-                .validate(table_merkle_root, index.len())
+                .validate(table_merkle_root)
                 .unwrap()
                 .into_iter()
                 .unzip();
@@ -380,35 +381,20 @@ fn test_index_and_proof_roots() {
 
         assert_eq!(index.object_hash(), exp_root);
         let range_proof = index.get_range_proof(proof_ind..proof_ind + 1);
-        assert_eq!(
-            range_proof
-                .validate(index.object_hash(), index.len())
-                .unwrap()
-                .len(),
-            1
-        );
+        assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 1);
         let json_representation = to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
         assert_eq!(deserialized_proof, range_proof);
         let range_proof = index.get_range_proof(0..proof_ind + 1);
         assert_eq!(
-            range_proof
-                .validate(index.object_hash(), index.len())
-                .unwrap()
-                .len(),
+            range_proof.validate(index.object_hash()).unwrap().len(),
             (proof_ind + 1) as usize
         );
         let json_representation = to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
         assert_eq!(deserialized_proof, range_proof);
         let range_proof = index.get_range_proof(0..1);
-        assert_eq!(
-            range_proof
-                .validate(index.object_hash(), index.len())
-                .unwrap()
-                .len(),
-            1
-        );
+        assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 1);
         let json_representation = to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
         assert_eq!(deserialized_proof, range_proof);
@@ -416,7 +402,7 @@ fn test_index_and_proof_roots() {
 
     let range_proof = index.get_range_proof(0..8);
     let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
-        .validate(index.object_hash(), index.len())
+        .validate(index.object_hash())
         .unwrap()
         .into_iter()
         .unzip();
@@ -437,21 +423,9 @@ fn test_index_and_proof_roots() {
     }
 
     let mut range_proof = index.get_range_proof(3..5);
-    assert_eq!(
-        range_proof
-            .validate(index.object_hash(), index.len())
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 2);
     range_proof = index.get_range_proof(2..6);
-    assert_eq!(
-        range_proof
-            .validate(index.object_hash(), index.len())
-            .unwrap()
-            .len(),
-        4
-    );
+    assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 4);
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
@@ -462,7 +436,7 @@ fn test_proof_illegal_lower_bound() {
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     let proof = index.get_range_proof(0..1);
 
-    assert_proof_of_absence(proof, index.object_hash(), index.len());
+    assert_proof_of_absence(proof, index.object_hash());
     index.push(vec![1]);
 }
 
@@ -475,7 +449,7 @@ fn test_proof_illegal_bound_empty() {
         index.push(vec![i]);
     }
     let proof = index.get_range_proof(8..9);
-    assert_proof_of_absence(proof, index.object_hash(), index.len());
+    assert_proof_of_absence(proof, index.object_hash());
 }
 
 #[test]
@@ -522,20 +496,20 @@ fn test_proof_structure() {
 
     assert_eq!(
         vec![4, 5, 6],
-        *(range_proof.validate(list_hash, 5).unwrap()[0].1)
+        *(range_proof.validate(list_hash).unwrap()[0].1)
     );
 
     let serialized_proof = to_string(&range_proof).unwrap();
     let deserialized_proof: ListProof<Vec<u8>> = from_str(&serialized_proof).unwrap();
     assert_eq!(deserialized_proof, range_proof);
 
-    if let ListProof::Right(left_hash1, right_proof1) = range_proof {
-        assert_eq!(left_hash1, h1234);
-        let unboxed_proof = *right_proof1;
-        if let ListProof::Left(left_proof2, right_hash2) = unboxed_proof {
+    if let ProofVariant::Right(left_hash1, right_proof1) = range_proof.proof() {
+        assert_eq!(*left_hash1, h1234);
+        let unboxed_proof = *right_proof1.clone();
+        if let ProofVariant::Left(left_proof2, right_hash2) = unboxed_proof {
             assert!(right_hash2.is_none());
-            let unboxed_proof = *left_proof2;
-            if let ListProof::Left(_, right_hash3) = unboxed_proof {
+            let unboxed_proof = *left_proof2.clone();
+            if let ProofVariant::Left(_, right_hash3) = unboxed_proof {
                 assert!(right_hash3.is_none());
             } else {
                 panic!("Expected ListProof::Left variant");
@@ -667,10 +641,10 @@ fn proof_of_absence() {
     let expected_hash = HashTag::hash_list_node(list.len(), object_hash);
 
     let proof = list.get_proof(non_existed_index);
-    assert_proof_of_absence(proof, expected_hash, list.len());
+    assert_proof_of_absence(proof, expected_hash);
 
     let proof = list.get_range_proof(2..non_existed_index);
-    assert_proof_of_absence(proof, expected_hash, list.len());
+    assert_proof_of_absence(proof, expected_hash);
 }
 
 #[test]
@@ -690,23 +664,22 @@ fn proof_of_absence_range() {
     let expected_hash = HashTag::hash_list_node(list.len(), object_hash);
 
     let proof = list.get_range_proof(2..);
-    assert!(proof.validate(expected_hash, list.len()).is_ok());
+    assert!(proof.validate(expected_hash).is_ok());
 
     let proof = list.get_range_proof(2..non_existed_index);
-    assert_proof_of_absence(proof, expected_hash, list.len());
+    assert_proof_of_absence(proof, expected_hash);
 }
 
 fn assert_proof_of_absence<V: BinaryValue + ObjectHash + Debug>(
     proof: ListProof<V>,
     expected_hash: Hash,
-    len: u64,
 ) {
-    let validation_result = proof.validate(expected_hash, len);
+    let validation_result = proof.validate(expected_hash);
     assert!(validation_result.is_ok());
     assert!(validation_result.unwrap().is_empty());
 
-    if let ListProof::Absent(proof) = proof {
-        let actual_hash = HashTag::hash_list_node(proof.length(), proof.merkle_root());
+    if let ProofVariant::Absent(merkle_root) = proof.proof() {
+        let actual_hash = HashTag::hash_list_node(proof.length(), *merkle_root);
         assert_eq!(expected_hash, actual_hash);
     } else {
         panic!("Unexpected proof {:?}", proof);
