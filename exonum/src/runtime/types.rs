@@ -214,9 +214,15 @@ impl FromStr for ArtifactId {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
-    /// Unique service instance identifier.
+    /// The unique numeric ID of the service instance.
+    /// 
+    ///  Exonum assigns it to the service on instantiation. It is mainly used to route the
+    /// transaction messages belonging to this instance.
     pub id: InstanceId,
-    /// Unique service instance name.
+    /// The unique name of the service instance. 
+    /// 
+    /// It serves as the primary identifier of this service in most operations.
+    /// It is assigned by the network administrators.
     ///
     /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
     pub name: String,

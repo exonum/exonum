@@ -262,6 +262,9 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// This method is called during an API server restart. Use this method if you do not plan to
     /// use your own API processing mechanism.
+    /// 
+    /// Warning! It is a temporary method which not to break the existing `RustRuntime` code,
+    /// in future it will be removed.
     #[doc(hidden)]
     fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
@@ -376,11 +379,13 @@ impl<'a> ExecutionContext<'a> {
 }
 
 /// Instance descriptor contains information to access running service instance.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct InstanceDescriptor<'a> {
-    /// The current service instance identifier.
+    /// The unique numeric ID of the service instance.
+    /// [Read more.](struct.InstanceSpec.html#structfield.id)
     pub id: InstanceId,
-    /// The current service instance name.
+    /// The unique name of the service instance.
+    /// [Read more.](struct.InstanceSpec.html#structfield.name)
     pub name: &'a str,
 }
 
@@ -397,7 +402,7 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
 }
 
 /// Change in list of service instances.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ApiChange {
     /// New instance has been added.
     InstanceAdded(InstanceId),
