@@ -159,6 +159,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `tx_cache` field to `State` to cache incoming transactions before
   adding them to persistent pool. (#1398)
 
+- Added new request message `PoolTransactionsRequest` to obtain pool transactions
+ from another peers. (#1404)
+
 #### exonum-merkledb
 
 - Updated `ProofMapIndex` data layout. (#1293)
@@ -177,10 +180,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     returns optional references to index.
 
 - `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
-
-- Added `len` method to `MapIndex` and `ProofMapIndex`. (#1312)
-
-- Added `len` method to `KeySetIndex` and `ValueSetIndex`. (#1319)
 
 - Added `From<Patch>` trait implementation to `Fork`. (#1403)
 

@@ -19,8 +19,8 @@ use crate::crypto::{CryptoHash, Hash, PublicKey};
 use crate::events::InternalRequest;
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{
-    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
+    BlockRequest, BlockResponse, Consensus as ConsensusMessage, PoolTransactionsRequest, Precommit,
+    Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
     TransactionsRequest, TransactionsResponse,
 };
 use crate::node::{NodeHandler, RequestData};
@@ -699,6 +699,7 @@ impl NodeHandler {
                 self.state.last_hash(),
                 &txs,
             ));
+
             // Put our propose to the consensus messages cache
             self.blockchain.save_message(round, propose.clone());
 
@@ -771,6 +772,9 @@ impl NodeHandler {
                         .collect();
                     self.sign_message(TransactionsRequest::new(&peer, &txs))
                         .into()
+                }
+                RequestData::PoolTransactions => {
+                    self.sign_message(PoolTransactionsRequest::new(peer)).into()
                 }
                 RequestData::BlockTransactions => {
                     let txs: Vec<_> = match self.state.incomplete_block() {

@@ -812,7 +812,9 @@ fn test_metadata_index_family_incorrect() {
 }
 
 #[test]
-#[should_panic(expected = "Index type does not match specified one")]
+#[should_panic(
+    expected = "Error while reading the index state. Possibly the index type does not match specified one"
+)]
 fn test_metadata_index_wrong_type_map_list() {
     let db = TemporaryDB::new();
     let fork = db.fork();

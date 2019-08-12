@@ -178,6 +178,11 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
+    /// Returns the transactions pool size.
+    pub fn pool_size(&self) -> u64 {
+        Schema::new(&self.snapshot()).transactions_pool_len()
+    }
+
     /// Creates and commits the genesis block with the given genesis configuration
     /// if the blockchain has not been initialized.
     ///
