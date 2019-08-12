@@ -325,9 +325,11 @@ impl ApiContext {
 
     /// Create a new blockchain database state snapshot.
     ///
-    /// Be careful with this method! It can be called in a different thread than in where
-    /// changes are made in the blockchain;thus several method's calls in the handler
-    /// can lead to the race condition.
+    /// Be careful with this method! It is recommended to get a snapshot only once per request
+    /// to ensure all database accesses see the same state. When a snapshot is requested
+    /// from a different thread than the one where changes are made to the blockchain,
+    /// each invocation might get a snapshot corresponding to a different blockchain state,
+    /// likely leading to a race condition.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.database.snapshot()
     }

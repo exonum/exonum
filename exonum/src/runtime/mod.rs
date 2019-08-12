@@ -262,7 +262,7 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// This method is called during an API server restart. Use this method if you do not plan to
     /// use your own API processing mechanism.
-    /// 
+    ///
     /// Warning! It is a temporary method which not to break the existing `RustRuntime` code,
     /// in future it will be removed.
     #[doc(hidden)]
