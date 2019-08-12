@@ -129,9 +129,9 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Message::concrete(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
-        Message::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
-        Message::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
+        Message::concrete(Status::new(Height(2), &hash(&[]), 0), pub_key, &secret_key).hash(),
+        Message::concrete(Status::new(Height(4), &hash(&[2]), 0), pub_key, &secret_key).hash(),
+        Message::concrete(Status::new(Height(7), &hash(&[3]), 0), pub_key, &secret_key).hash(),
     ];
     let precommits_buf: Vec<_> = precommits.iter().map(|x| x.clone().serialize()).collect();
     let block = Message::concrete(

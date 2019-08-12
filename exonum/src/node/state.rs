@@ -112,6 +112,8 @@ pub struct ValidatorState {
 pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
+    /// Represents `PoolTransactionsRequest` message.
+    PoolTransactions,
     /// Represents `TransactionsRequest` message for `Propose`.
     ProposeTransactions(Hash),
     /// Represents `TransactionsRequest` message for `BlockResponse`.
@@ -260,9 +262,9 @@ impl RequestData {
     pub fn timeout(&self) -> Duration {
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
-                TRANSACTIONS_REQUEST_TIMEOUT
-            }
+            RequestData::ProposeTransactions(..)
+            | RequestData::BlockTransactions
+            | RequestData::PoolTransactions => TRANSACTIONS_REQUEST_TIMEOUT,
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };

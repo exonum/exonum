@@ -1735,7 +1735,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
             .expect("Incorrect message. TransactionsRequest was expected.");
 
         assert!(
-            validators.remove(msg.to()),
+            validators.remove(&msg.to),
             "Unexpected validator's PublicKey"
         );
 
@@ -1801,7 +1801,7 @@ fn handle_precommit_remove_propose_request_ask_precommitters() {
             .expect("Incorrect message. TransactionsRequest was expected.");
 
         assert!(
-            validators.remove(msg.to()),
+            validators.remove(&msg.to),
             "Unexpected validator's PublicKey"
         );
 

@@ -122,14 +122,17 @@ pub struct Status {
     height: Height,
     /// Hash of the last committed block.
     last_hash: Hash,
+    /// Transactions pool size.
+    pool_size: u64,
 }
 
 impl Status {
     /// Create new `Status` message.
-    pub fn new(height: Height, last_hash: &Hash) -> Self {
+    pub fn new(height: Height, last_hash: &Hash, pool_size: u64) -> Self {
         Self {
             height,
             last_hash: *last_hash,
+            pool_size,
         }
     }
 
@@ -141,6 +144,11 @@ impl Status {
     /// Hash of the last committed block.
     pub fn last_hash(&self) -> &Hash {
         &self.last_hash
+    }
+
+    /// Pool size.
+    pub fn pool_size(&self) -> u64 {
+        self.pool_size
     }
 }
 
@@ -485,11 +493,11 @@ impl TransactionsResponse {
 #[exonum(pb = "proto::ProposeRequest", crate = "crate")]
 pub struct ProposeRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The height to which the message is related.
-    height: Height,
+    pub height: Height,
     /// Hash of the `Propose`.
-    propose_hash: Hash,
+    pub propose_hash: Hash,
 }
 
 impl ProposeRequest {
@@ -500,19 +508,6 @@ impl ProposeRequest {
             height,
             propose_hash: *propose_hash,
         }
-    }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// Hash of the `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
     }
 }
 
@@ -528,9 +523,9 @@ impl ProposeRequest {
 #[exonum(pb = "proto::TransactionsRequest", crate = "crate")]
 pub struct TransactionsRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The list of the transaction hashes.
-    txs: Vec<Hash>,
+    pub txs: Vec<Hash>,
 }
 
 impl TransactionsRequest {
@@ -541,14 +536,27 @@ impl TransactionsRequest {
             txs: txs.to_vec(),
         }
     }
+}
 
+/// Request for pool transactions.
+///
+/// ### Processing
+/// All transactions from mempool are sent to the recipient.
+///
+/// ### Generation
+/// A node can send `PoolTransactionsRequest` during `Status` message
+/// handling.
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::PoolTransactionsRequest", crate = "crate")]
+pub struct PoolTransactionsRequest {
     /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The list of the transaction hashes.
-    pub fn txs(&self) -> &[Hash] {
-        &self.txs
+    pub to: PublicKey,
+}
+
+impl PoolTransactionsRequest {
+    /// Create new `TransactionsRequest`.
+    pub fn new(to: PublicKey) -> Self {
+        Self { to }
     }
 }
 
@@ -567,15 +575,15 @@ impl TransactionsRequest {
 #[exonum(pb = "proto::PrevotesRequest", crate = "crate")]
 pub struct PrevotesRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The height to which the message is related.
-    height: Height,
+    pub height: Height,
     /// The round to which the message is related.
-    round: Round,
+    pub round: Round,
     /// Hash of the `Propose`.
-    propose_hash: Hash,
+    pub propose_hash: Hash,
     /// The list of validators that send pre-votes.
-    validators: BitVec,
+    pub validators: BitVec,
 }
 
 impl PrevotesRequest {
@@ -596,22 +604,6 @@ impl PrevotesRequest {
         }
     }
 
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// The round to which the message is related.
-    pub fn round(&self) -> Round {
-        self.round
-    }
-    /// Hash of the `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
-    }
     /// The list of validators that send pre-votes.
     pub fn validators(&self) -> BitVec {
         self.validators.clone()
@@ -634,17 +626,13 @@ impl PrevotesRequest {
 #[exonum(pb = "proto::PeersRequest", crate = "crate")]
 pub struct PeersRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
 }
 
 impl PeersRequest {
     /// Create new `PeersRequest`.
     pub fn new(to: &PublicKey) -> Self {
         Self { to: *to }
-    }
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
     }
 }
 
@@ -662,23 +650,15 @@ impl PeersRequest {
 #[exonum(pb = "proto::BlockRequest", crate = "crate")]
 pub struct BlockRequest {
     /// Public key of the recipient.
-    to: PublicKey,
+    pub to: PublicKey,
     /// The height to which the message is related.
-    height: Height,
+    pub height: Height,
 }
 
 impl BlockRequest {
     /// Create new `BlockRequest`.
     pub fn new(to: &PublicKey, height: Height) -> Self {
         Self { to: *to, height }
-    }
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
     }
 }
 
@@ -875,6 +855,8 @@ impl_protocol! {
             PeersRequest = 3,
             /// Request of some future block.
             BlockRequest = 4,
+            /// Request of uncommitted transactions.
+            PoolTransactionsRequest = 5,
         },
 
     }
@@ -940,12 +922,13 @@ impl Message {
 impl Requests {
     /// Returns public key of the message recipient.
     pub fn to(&self) -> PublicKey {
-        *match *self {
-            Requests::ProposeRequest(ref msg) => msg.to(),
-            Requests::TransactionsRequest(ref msg) => msg.to(),
-            Requests::PrevotesRequest(ref msg) => msg.to(),
-            Requests::PeersRequest(ref msg) => msg.to(),
-            Requests::BlockRequest(ref msg) => msg.to(),
+        match *self {
+            Requests::ProposeRequest(ref msg) => msg.to,
+            Requests::TransactionsRequest(ref msg) => msg.to,
+            Requests::PrevotesRequest(ref msg) => msg.to,
+            Requests::PeersRequest(ref msg) => msg.to,
+            Requests::BlockRequest(ref msg) => msg.to,
+            Requests::PoolTransactionsRequest(ref msg) => msg.to,
         }
     }
 
@@ -957,6 +940,7 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.author(),
             Requests::PeersRequest(ref msg) => msg.author(),
             Requests::BlockRequest(ref msg) => msg.author(),
+            Requests::PoolTransactionsRequest(ref msg) => msg.author(),
         }
     }
 }

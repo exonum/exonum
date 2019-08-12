@@ -70,6 +70,7 @@ fn test_check_leader() {
         &sandbox.public_key(ValidatorId(0)),
         Height(1),
         &sandbox.last_block().hash(),
+        1,
         sandbox.secret_key(ValidatorId(0)),
     ));
 
