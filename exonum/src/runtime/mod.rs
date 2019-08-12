@@ -270,7 +270,7 @@ pub trait Runtime: Send + Debug + 'static {
         Vec::new()
     }
 
-    /// Notify runtime about changes in list of available in API service instances.
+    /// Notify runtime about changes in list of service instances.
     ///
     /// The purpose of this method is provide building blocks to create your own API processing
     /// mechanisms.
