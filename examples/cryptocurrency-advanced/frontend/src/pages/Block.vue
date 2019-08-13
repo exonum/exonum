@@ -132,7 +132,7 @@
 
         try {
           const data = await this.$blockchain.getBlock(this.height)
-          this.block = data.block
+          this.block = data
           this.transactions = data.txs
           this.isSpinnerVisible = false
         } catch (error) {
