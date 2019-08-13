@@ -133,12 +133,6 @@ impl TestKitApi {
     pub fn system_public_api(&self) -> SystemPublicApi {
         SystemPublicApi::new(self)
     }
-
-    // TODO: implement
-    pub fn system_private_api(self) {
-        // SystemPrivateApi::new(self) // TODO
-        unimplemented!("TODO")
-    }
 }
 
 // TODO: Is it really a good idea? Just using supervisor's endpoints looks easier.
@@ -365,16 +359,6 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     server
 }
 
-// TODO: SystemPublicApi & SystemPrivateApi
-
-// TODO: Add `SystemPrivateApi` with methods for endpoints:
-// "v1/peers"
-// "v1/network"
-// "v1/consensus_enabled"
-// "v1/consensus_enabled"
-// "v1/shutdown"
-// "v1/rebroadcast"
-
 /// Wrapper for the public system API allowing to easily use it (compared to raw `TestKitApi` calls).
 pub struct SystemPublicApi<'a> {
     pub inner: &'a TestKitApi,
@@ -420,10 +404,4 @@ impl<'a> SystemPublicApi<'a> {
             .get("v1/services")
             .unwrap()
     }
-
-    // TODO: add more endpoints
-    // "v1/stats"
-    // "v1/healthcheck"
-    // "v1/user_agent"
-    // "v1/proto-sources"
 }
