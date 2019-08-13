@@ -85,7 +85,9 @@ impl<T: Database> From<CheckpointDb<T>> for Arc<dyn Database> {
 }
 
 impl<T: Database> From<T> for CheckpointDb<T> {
-    fn from(db: T) -> Self { CheckpointDb::new(db) }
+    fn from(db: T) -> Self {
+        CheckpointDb::new(db)
+    }
 }
 
 /// Handler to a checkpointed database, which

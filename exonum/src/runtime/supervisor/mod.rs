@@ -73,10 +73,6 @@ impl Service for Supervisor {
     }
 
     fn after_commit(&self, context: AfterCommitContext) {
-        if context.validator_id().is_none() {
-            return;
-        }
-
         let schema = Schema::new(context.service_name(), context.snapshot());
         let pending_deployments = schema.pending_deployments();
 
@@ -93,24 +89,27 @@ impl Service for Supervisor {
                 let artifact = unconfirmed_request.artifact.clone();
                 let spec = unconfirmed_request.spec.clone();
                 // A callback that will broadcast the `ArtifactDeployConfirmation` transaction
-                // if the request for deployment completes successfully.
+                // if the request for deployment completes successfully and node is validator.
                 let and_then = {
                     let tx_sender = context.transaction_broadcaster();
                     let keypair = (*context.public_key(), context.secret_key().clone());
                     let service_id = context.service_id();
+                    let is_validator = context.validator_id().is_some();
                     move || {
-                        trace!(
-                            "Sent confirmation for deployment request {:?}",
-                            unconfirmed_request
-                        );
+                        if is_validator {
+                            trace!(
+                                "Sent confirmation for deployment request {:?}",
+                                unconfirmed_request
+                            );
 
-                        let transaction = DeployConfirmation::from(unconfirmed_request);
-                        tx_sender
-                            .broadcast_transaction(
-                                transaction.sign(service_id, keypair.0, &keypair.1),
-                            )
-                            .map_err(|e| error!("Couldn't broadcast transaction {}.", e))
-                            .ok();
+                            let transaction = DeployConfirmation::from(unconfirmed_request);
+                            tx_sender
+                                .broadcast_transaction(
+                                    transaction.sign(service_id, keypair.0, &keypair.1),
+                                )
+                                .map_err(|e| error!("Couldn't broadcast transaction {}.", e))
+                                .ok();
+                        }
                     }
                 };
                 // TODO Rewrite on async await syntax. [ECR-3222]

@@ -684,7 +684,6 @@ fn test_auditor_cant_send_requests() {
 
 /// This test emulates a normal workflow with a validator and an auditor.
 #[test]
-#[ignore] // TODO: fix this test: `An attempt to register artifact which is not be deployed`
 fn test_auditor_normal_workflow() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
 
