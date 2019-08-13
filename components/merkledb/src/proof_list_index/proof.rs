@@ -71,6 +71,8 @@ pub enum ProofVariant<V> {
     Absent(Hash),
 }
 
+/// Wrapper around `ListProofVariant` that represents full proof with the length of the
+/// corresponding `ProofList`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListProof<V> {
     length: u64,
@@ -96,17 +98,14 @@ where
     }
 
     /// Verifies the correctness of the proof by the trusted list hash.
-    ///
-    /// To validate the proof one needs to provide `expected_list_hash` calculated as follows:
-    /// ```text
-    /// h = sha-256( HashTag::List || length as u64 || merkle_root )
-    /// ```
-    /// and `length` of the `ProofListIndex`.
+    /// For more information about list hash see [`HashTag::hash_list_node()`].
     ///
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
     ///
     /// If the proof is the proof of absence, then empty vector will be returned.
+    ///
+    /// [`HashTag::hash_list_node()`]: enum.HashTag.html#hash_list_node
     pub fn validate(&self, expected_list_hash: Hash) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = self.length.next_power_of_two().trailing_zeros() as u8 + 1;
