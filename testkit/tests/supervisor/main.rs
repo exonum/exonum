@@ -54,17 +54,17 @@ fn assert_no_count(api: &TestKitApi, service_name: &'static str) {
 }
 
 fn does_artifact_exist(api: &TestKitApi, name: &str) -> bool {
-    let artifacts = &api.system_public_api().services().artifacts;
+    let artifacts = &api.exonum_api().services().artifacts;
     artifacts.iter().any(|a| a.name == name)
 }
 
 fn does_service_instance_exist(api: &TestKitApi, name: &str) -> bool {
-    let services = &api.system_public_api().services().services;
+    let services = &api.exonum_api().services().services;
     services.iter().any(|s| s.name == name)
 }
 
 fn find_instance_id(api: &TestKitApi, instance_name: &str) -> ServiceInstanceId {
-    let services = &api.system_public_api().services().services;
+    let services = &api.exonum_api().services().services;
     services
         .iter()
         .find(|service| service.name == instance_name)
@@ -170,7 +170,7 @@ fn deploy_default(testkit: &mut TestKit) {
     let hash = deploy_artifact(&api, request);
     testkit.create_block();
 
-    api.system_public_api().assert_tx_success(hash);
+    api.exonum_api().assert_tx_success(hash);
 
     // Confirmation is ready.
     assert!(testkit.is_tx_in_pool(&deploy_confirmation_hash));
@@ -193,7 +193,7 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Service
     let hash = start_service(&api, request);
     testkit.create_block();
 
-    api.system_public_api().assert_tx_success(hash);
+    api.exonum_api().assert_tx_success(hash);
 
     let api = testkit.api(); // Update the API
     assert!(does_service_instance_exist(&api, instance_name));
@@ -299,7 +299,7 @@ fn test_artifact_deploy_bad_deadline_height() {
     // No confirmation was generated
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
-    let system_api = api.system_public_api();
+    let system_api = api.exonum_api();
     let expected_status = json!({
        "type": "service_error",
        "code": 2,
@@ -321,7 +321,7 @@ fn test_start_service_instance_bad_deadline_height() {
     let hash = start_service(&api, request);
     testkit.create_block();
 
-    let system_api = api.system_public_api();
+    let system_api = api.exonum_api();
     let expected_status = json!({
        "type": "service_error",
        "code": 2,
@@ -347,7 +347,7 @@ fn test_try_run_unregistered_service_instance() {
     let hash = start_service(&api, request);
     testkit.create_block();
 
-    let system_api = api.system_public_api();
+    let system_api = api.exonum_api();
     let expected_status = json!({
        "type": "dispatcher_error",
        "code": 3,
@@ -372,7 +372,7 @@ fn test_bad_artifact_name() {
     testkit.create_block();
 
     // The deploy request transaction was executed...
-    api.system_public_api().assert_tx_success(hash);
+    api.exonum_api().assert_tx_success(hash);
 
     // ... but no confirmation was generated ...
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
@@ -403,7 +403,7 @@ fn test_bad_runtime_id() {
     testkit.create_block();
 
     // The deploy request transaction was executed...
-    api.system_public_api().assert_tx_success(hash);
+    api.exonum_api().assert_tx_success(hash);
 
     // ... but no confirmation was generated ...
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
@@ -429,7 +429,7 @@ fn test_empty_service_instance_name() {
     let hash = start_service(&api, request);
     testkit.create_block();
 
-    let system_api = api.system_public_api();
+    let system_api = api.exonum_api();
     let expected_status = json!({
        "type": "service_error",
        "code": 7,
@@ -451,7 +451,7 @@ fn test_bad_service_instance_name() {
     let hash = start_service(&api, request);
     testkit.create_block();
 
-    let system_api = api.system_public_api();
+    let system_api = api.exonum_api();
     let expected_status = json!({
        "type": "service_error",
        "code": 7,
@@ -476,7 +476,7 @@ fn test_start_service_instance_twice() {
         let hash = start_service(&api, request);
         testkit.create_block();
 
-        api.system_public_api().assert_tx_success(hash);
+        api.exonum_api().assert_tx_success(hash);
 
         let api = testkit.api(); // Update the API
         assert!(does_service_instance_exist(&api, instance_name));
@@ -491,7 +491,7 @@ fn test_start_service_instance_twice() {
         let hash = start_service(&api, request);
         testkit.create_block();
 
-        let system_api = api.system_public_api();
+        let system_api = api.exonum_api();
         let expected_status = json!({
            "type": "service_error",
            "code": 3,
@@ -543,7 +543,7 @@ fn test_multiple_validators() {
 
     testkit.create_block();
 
-    api.system_public_api()
+    api.exonum_api()
         .assert_txs_success(&[deploy_artifact_0_tx_hash, deploy_artifact_1_tx_hash]);
 
     // Emulate a confirmation from the second validator.
@@ -582,7 +582,7 @@ fn test_multiple_validators() {
 
         testkit.create_block();
 
-        api.system_public_api()
+        api.exonum_api()
             .assert_txs_success(&[start_service_0_tx_hash, start_service_1_tx_hash]);
 
         let api = testkit.api(); // Update the API
@@ -628,7 +628,7 @@ fn test_multiple_validators_no_confirmation() {
 
     testkit.create_block();
 
-    api.system_public_api()
+    api.exonum_api()
         .assert_tx_success(deploy_artifact_0_tx_hash);
 
     // Deliberately not sending a confirmation from the second validator.
@@ -670,7 +670,7 @@ fn test_auditor_cant_send_requests() {
 
     testkit.create_block();
 
-    let system_api = api.system_public_api();
+    let system_api = api.exonum_api();
 
     // Emulated request executed as fine...
     system_api.assert_tx_success(deploy_artifact_validator_tx_hash);
@@ -704,8 +704,7 @@ fn test_auditor_norman_workflow() {
 
     testkit.create_block();
 
-    api.system_public_api()
-        .assert_tx_success(deploy_artifact_tx_hash);
+    api.exonum_api().assert_tx_success(deploy_artifact_tx_hash);
 
     // Emulate a confirmation from the validator.
     testkit.add_tx(deploy_confirmation.clone());

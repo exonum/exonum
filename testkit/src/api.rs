@@ -130,8 +130,8 @@ impl TestKitApi {
         )
     }
 
-    pub fn system_public_api(&self) -> SystemPublicApi {
-        SystemPublicApi::new(self)
+    pub fn exonum_api(&self) -> ExonumNodeApi {
+        ExonumNodeApi::new(self)
     }
 }
 
@@ -337,19 +337,16 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     server
 }
 
-/// Wrapper for the public system API allowing to easily use it (compared to raw `TestKitApi` calls).
-pub struct SystemPublicApi<'a> {
+/// A convenience wrapper for Exonum node API to reduce the boilerplate code.
+pub struct ExonumNodeApi<'a> {
     pub inner: &'a TestKitApi,
 }
 
-impl<'a> SystemPublicApi<'a> {
+impl<'a> ExonumNodeApi<'a> {
     pub fn new(api: &'a TestKitApi) -> Self {
         Self { inner: api }
     }
 
-    // TODO: This function doesn't really belongs to _system_ API,
-    // it should be later moved to something like `ExplorerPublicApi`.
-    //
     /// Asserts that the transaction with the given hash has a specified status.
     pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: &serde_json::Value) {
         let info: serde_json::Value = self
