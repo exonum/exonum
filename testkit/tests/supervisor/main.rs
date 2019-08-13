@@ -93,7 +93,6 @@ fn deploy_artifact_manually(
     signed_request.object_hash()
 }
 
-// TODO: Just implement PrivateApi (from exonum/src/runtime/supervisor/api.rs) for TestKitApi.
 fn start_service(api: &TestKitApi, request: StartService) -> crypto::Hash {
     let hash: crypto::Hash = api
         .private(ApiKind::Service("supervisor"))

@@ -135,28 +135,6 @@ impl TestKitApi {
     }
 }
 
-// TODO: Is it really a good idea? Just using supervisor's endpoints looks easier.
-// impl supervisor::PrivateApi for TestKitApi {
-//     // type Error = (); // TODO: What error type should I use here?
-//
-//     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
-//         // TODO: What keys should I use here? I don't have an access to TestKit's data here.
-//         // let signed = artifact.sign(
-//         //     self.instance_id,
-//         //     *self.state.public_key(),
-//         //     self.state.secret_key(),
-//         // );
-//         // let hash = signed.object_hash();
-//         // self.send(signed);
-//         // Ok(hash)
-//         unimplemented!()
-//     }
-//
-//     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error> {
-//         unimplemented!()
-//     }
-// }
-
 type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + 'b>;
 
 /// An HTTP requests builder. This type can be used to send requests to
