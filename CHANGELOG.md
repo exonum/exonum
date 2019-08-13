@@ -112,6 +112,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
     `(bits_len + 7) / 8` bytes.
 
+- `ListProof` now contains number of elements in corresponding `ProofListIndex`.
+  Serialization format of `ListProof` also changed and now contains two objects
+  `length` and `proof`. (#1414)
+
 ### New features
 
 #### exonum

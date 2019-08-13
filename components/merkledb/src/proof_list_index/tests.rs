@@ -26,10 +26,10 @@ use crate::proof_list_index::proof::ListProof;
 use crate::{
     hash::{HashTag, ObjectHash},
     proof_list_index::{
+        ProofListIndex,
         ProofVariant::{
             self, {Full, Leaf, Left, Right},
         },
-        ProofListIndex,
     },
     BinaryValue, Database, TemporaryDB,
 };
@@ -436,7 +436,7 @@ fn test_proof_illegal_lower_bound() {
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     let proof = index.get_range_proof(0..1);
 
-    assert_proof_of_absence(proof, index.object_hash());
+    assert_proof_of_absence(&proof, index.object_hash());
     index.push(vec![1]);
 }
 
@@ -449,7 +449,7 @@ fn test_proof_illegal_bound_empty() {
         index.push(vec![i]);
     }
     let proof = index.get_range_proof(8..9);
-    assert_proof_of_absence(proof, index.object_hash());
+    assert_proof_of_absence(&proof, index.object_hash());
 }
 
 #[test]
@@ -503,7 +503,7 @@ fn test_proof_structure() {
     let deserialized_proof: ListProof<Vec<u8>> = from_str(&serialized_proof).unwrap();
     assert_eq!(deserialized_proof, range_proof);
 
-    if let ProofVariant::Right(left_hash1, right_proof1) = range_proof.proof() {
+    if let ProofVariant::Right(left_hash1, right_proof1) = range_proof.proof_variant() {
         assert_eq!(*left_hash1, h1234);
         let unboxed_proof = *right_proof1.clone();
         if let ProofVariant::Left(left_proof2, right_hash2) = unboxed_proof {
@@ -641,10 +641,10 @@ fn proof_of_absence() {
     let expected_hash = HashTag::hash_list_node(list.len(), object_hash);
 
     let proof = list.get_proof(non_existed_index);
-    assert_proof_of_absence(proof, expected_hash);
+    assert_proof_of_absence(&proof, expected_hash);
 
     let proof = list.get_range_proof(2..non_existed_index);
-    assert_proof_of_absence(proof, expected_hash);
+    assert_proof_of_absence(&proof, expected_hash);
 }
 
 #[test]
@@ -667,18 +667,18 @@ fn proof_of_absence_range() {
     assert!(proof.validate(expected_hash).is_ok());
 
     let proof = list.get_range_proof(2..non_existed_index);
-    assert_proof_of_absence(proof, expected_hash);
+    assert_proof_of_absence(&proof, expected_hash);
 }
 
 fn assert_proof_of_absence<V: BinaryValue + ObjectHash + Debug>(
-    proof: ListProof<V>,
+    proof: &ListProof<V>,
     expected_hash: Hash,
 ) {
     let validation_result = proof.validate(expected_hash);
     assert!(validation_result.is_ok());
     assert!(validation_result.unwrap().is_empty());
 
-    if let ProofVariant::Absent(merkle_root) = proof.proof() {
+    if let ProofVariant::Absent(merkle_root) = proof.proof_variant() {
         let actual_hash = HashTag::hash_list_node(proof.length(), *merkle_root);
         assert_eq!(expected_hash, actual_hash);
     } else {

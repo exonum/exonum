@@ -81,17 +81,17 @@ impl<V> ListProof<V>
 where
     V: BinaryValue,
 {
-    pub fn new(length: u64, proof: ProofVariant<V>) -> Self {
+    pub(crate) fn new(length: u64, proof: ProofVariant<V>) -> Self {
         Self { length, proof }
     }
 
-    // Length of the corresponding ProofList.
+    /// Length of the corresponding ProofList.
     pub fn length(&self) -> u64 {
         self.length
     }
 
-    // Proof.
-    pub fn proof(&self) -> &ProofVariant<V> {
+    /// Underlying proof variant.
+    pub fn proof_variant(&self) -> &ProofVariant<V> {
         &self.proof
     }
 
@@ -111,9 +111,11 @@ where
     pub fn validate(&self, expected_list_hash: Hash) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = self.length.next_power_of_two().trailing_zeros() as u8 + 1;
-        let root_hash = self.proof().collect(ProofListKey::new(height, 0), self.length, &mut vec)?;
+        let root_hash =
+            self.proof_variant()
+                .collect(ProofListKey::new(height, 0), self.length, &mut vec)?;
 
-        match self.proof() {
+        match self.proof_variant() {
             ProofVariant::Absent(_) => {
                 if expected_list_hash != root_hash {
                     return Err(ListProofError::UnmatchedRootHash);
@@ -177,9 +179,7 @@ where
                 vec.push((key.index(), value));
                 HashTag::hash_leaf(&value.to_bytes())
             }
-            ProofVariant::Absent(merkle_root) => {
-                HashTag::hash_list_node(length, merkle_root)
-            }
+            ProofVariant::Absent(merkle_root) => HashTag::hash_list_node(length, merkle_root),
         };
         Ok(hash)
     }
@@ -393,6 +393,6 @@ where
             )));
         };
 
-        Ok(ListProof::new(length, proof))
+        Ok(Self::new(length, proof))
     }
 }

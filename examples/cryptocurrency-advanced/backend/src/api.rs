@@ -14,7 +14,7 @@
 
 //! Cryptocurrency API.
 
-use exonum_merkledb::{ProofVariant, MapProof};
+use exonum_merkledb::{ListProof, MapProof};
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
@@ -46,7 +46,7 @@ pub struct WalletProof {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletHistory {
     /// Proof of the list of transaction hashes.
-    pub proof: ProofVariant<Hash>,
+    pub proof: ListProof<Hash>,
     /// List of above transactions.
     pub transactions: Vec<TransactionMessage>,
 }
