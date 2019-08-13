@@ -502,12 +502,10 @@ fn test_start_service_instance_twice() {
 }
 
 #[test]
-#[should_panic] // TODO: This test shouldn't panic, it's a bug.
 fn test_restart_node_and_start_service_instance() {
-    let service = IncService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_service(InstanceCollection::new(service.clone()))
+        .with_service(InstanceCollection::new(IncService))
         .create();
 
     deploy_default(&mut testkit);
