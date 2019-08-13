@@ -19,45 +19,21 @@ use exonum_crypto::Hash;
 
 use super::{super::BinaryValue, key::ProofListKey, HashTag};
 
-/// Encapsulates a proof of absence for `ProofListIndex`.
+/// An enum that represents a proof of existence/absence for a proof list elements.
 ///
 /// Proof of absence for an element with the specified index consists of
 /// `merkle_root` of `ProofListIndex` and `length` of the list.
 ///
-/// Element with `index` is absent in the list with provided `length`
-/// and `merkle_root` when two conditions are met:
+/// Element with `index` is absent in the list with provided
+/// `merkle_root` when two conditions are met:
 /// ```text
 /// 1. list_hash == sha256( HashTag::List || length || merkle_root )
 /// 2. index > length
 /// ```
 ///
 /// In case of a range proof this rule applies to the whole range.
-#[derive(Debug, PartialEq, Clone, Eq)]
-pub struct ProofOfAbsence {
-    length: u64,
-    merkle_root: Hash,
-}
-
-impl ProofOfAbsence {
-    /// New `ProofOfAbsence` for specified list `length` and `merkle_root`.
-    pub fn new(length: u64, merkle_root: Hash) -> Self {
-        Self {
-            length,
-            merkle_root,
-        }
-    }
-
-    pub fn length(&self) -> u64 {
-        self.length
-    }
-
-    pub fn merkle_root(&self) -> Hash {
-        self.merkle_root
-    }
-}
-
-/// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, Clone, PartialEq, Eq)]
+//TODO: serialize/deserialize with serde derive [ECR-3222]
 pub enum ProofVariant<V> {
     /// A branch of proof in which both children contain requested elements.
     Full(Box<ProofVariant<V>>, Box<ProofVariant<V>>),
@@ -73,6 +49,7 @@ pub enum ProofVariant<V> {
 
 /// Wrapper around `ListProofVariant` that represents full proof with the length of the
 /// corresponding `ProofList`.
+//TODO: deserialize with serde derive [ECR-3222]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ListProof<V> {
     length: u64,
