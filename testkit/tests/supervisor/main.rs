@@ -363,7 +363,7 @@ fn test_bad_artifact_name() {
 
     let bad_artifact = ArtifactId {
         runtime_id: RuntimeIdentifier::Rust as _,
-        name: "does_not_exist/1.0.0".into(),
+        name: "does-not-exist:1.0.0".into(),
     };
     let request = deploy_request(bad_artifact.clone(), testkit.height().next());
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
