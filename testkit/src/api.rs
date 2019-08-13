@@ -356,8 +356,8 @@ impl<'a> ExonumNodeApi<'a> {
             .get("v1/transactions")
             .unwrap();
         if let serde_json::Value::Object(mut info) = info {
-            let tx_status = info.remove("status").unwrap();
-            assert_eq!(tx_status, *expected_status);
+            let tx_status = info.get("status").unwrap();
+            assert_eq!(tx_status, expected_status);
         } else {
             panic!("Invalid transaction info format, object expected");
         }
