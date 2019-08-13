@@ -256,7 +256,7 @@ fn test_static_service() {
 
 /// Tests a normal dynamic service workflow with one validator.
 #[test]
-fn test_dynamic_service_nowrmal_workflow() {
+fn test_dynamic_service_normal_workflow() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit);
     let instance_name = "test_basics";
