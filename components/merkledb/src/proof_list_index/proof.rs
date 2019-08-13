@@ -95,12 +95,11 @@ where
         &self.proof
     }
 
-    /// Verifies the correctness of the proof by the trusted list hash and the number of
-    /// elements in the tree.
+    /// Verifies the correctness of the proof by the trusted list hash.
     ///
     /// To validate the proof one needs to provide `expected_list_hash` calculated as follows:
     /// ```text
-    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// h = sha-256( HashTag::List || length as u64 || merkle_root )
     /// ```
     /// and `length` of the `ProofListIndex`.
     ///
@@ -111,22 +110,14 @@ where
     pub fn validate(&self, expected_list_hash: Hash) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = self.length.next_power_of_two().trailing_zeros() as u8 + 1;
-        let root_hash =
-            self.proof_variant()
+        let merkle_root =
+            self.proof
                 .collect(ProofListKey::new(height, 0), self.length, &mut vec)?;
 
-        match self.proof_variant() {
-            ProofVariant::Absent(_) => {
-                if expected_list_hash != root_hash {
-                    return Err(ListProofError::UnmatchedRootHash);
-                }
-            }
-            _ => {
-                if HashTag::hash_list_node(self.length, root_hash) != expected_list_hash {
-                    return Err(ListProofError::UnmatchedRootHash);
-                }
-            }
+        if HashTag::hash_list_node(self.length, merkle_root) != expected_list_hash {
+            return Err(ListProofError::UnmatchedRootHash);
         }
+
         Ok(vec)
     }
 }
@@ -179,7 +170,7 @@ where
                 vec.push((key.index(), value));
                 HashTag::hash_leaf(&value.to_bytes())
             }
-            ProofVariant::Absent(merkle_root) => HashTag::hash_list_node(length, merkle_root),
+            ProofVariant::Absent(merkle_root) => merkle_root,
         };
         Ok(hash)
     }
