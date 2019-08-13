@@ -73,7 +73,7 @@ pub enum ProofVariant<V> {
 
 /// Wrapper around `ListProofVariant` that represents full proof with the length of the
 /// corresponding `ProofList`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ListProof<V> {
     length: u64,
     proof: ProofVariant<V>,
@@ -215,6 +215,7 @@ impl<V: Serialize> Serialize for ProofVariant<V> {
         state.end()
     }
 }
+
 impl<'a, V> Deserialize<'a> for ProofVariant<V>
 where
     for<'de> V: Deserialize<'de>,
@@ -321,17 +322,6 @@ where
     }
 }
 
-impl<V: Serialize> Serialize for ListProof<V> {
-    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = ser.serialize_struct("Proof", 2)?;
-        state.serialize_field("length", &self.length)?;
-        state.serialize_field("proof", &self.proof)?;
-        state.end()
-    }
-}
 impl<'a, V> Deserialize<'a> for ListProof<V>
 where
     V: BinaryValue,
