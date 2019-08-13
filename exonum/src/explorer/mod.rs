@@ -390,7 +390,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///     },
 ///     "location": { "block_height": 1, "position_in_block": 0 },
 ///     "location_proof": // ...
-/// #                     { "val": Hash::zero() },
+/// #                     { "length": 1,
+/// #                       "proof": {"val": Hash::zero() }},
 ///     "status": { "type": "success" },
 ///     "time": "2019-07-16T15:26:43.502696Z"
 /// });

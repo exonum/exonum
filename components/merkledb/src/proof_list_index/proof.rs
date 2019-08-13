@@ -82,7 +82,7 @@ where
     ///
     /// If the proof is the proof of absence, then empty vector will be returned.
     ///
-    /// [`HashTag::hash_list_node()`]: enum.HashTag.html#hash_list_node
+    /// [`HashTag::hash_list_node()`]: enum.HashTag.html#method.hash_list_node
     pub fn validate(&self, expected_list_hash: Hash) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = self.length.next_power_of_two().trailing_zeros() as u8 + 1;
