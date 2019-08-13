@@ -96,7 +96,7 @@ impl Blockchain {
 
     /// Creates the blockchain instance with the specified dispatcher.
     pub(crate) fn with_dispatcher(
-        db: impl Into<Arc<dyn Database>>,
+        db: Arc<dyn Database>,
         dispatcher: Dispatcher,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
@@ -104,7 +104,7 @@ impl Blockchain {
         internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
-            db: db.into(),
+            db,
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
             dispatcher: Arc::new(Mutex::new(dispatcher)),

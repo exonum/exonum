@@ -242,7 +242,7 @@ impl TestKit {
     }
 
     fn assemble(
-        database: TemporaryDB,
+        database: impl Into<CheckpointDb<TemporaryDB>>,
         service_factories: impl IntoIterator<Item = InstanceCollection>,
         network: TestNetwork,
         genesis: GenesisConfig,
@@ -250,9 +250,9 @@ impl TestKit {
         let api_channel = mpsc::unbounded();
         let api_sender = ApiSender::new(api_channel.0.clone());
 
-        let db = CheckpointDb::new(database);
-        let db_handler = db.handler();
+        let db = database.into();
 
+        let db_handler = db.handler();
         let blockchain = Blockchain::new(
             db,
             service_factories,
@@ -847,17 +847,18 @@ impl TestKit {
     ///
     /// [`StoppedTestKit`]: struct.StoppedTestKit.html
     pub fn stop(self) -> StoppedTestKit {
-        drop(self.blockchain);
-        drop(self.events_stream);
-        // Needed for unwrapping `db_handler` by reducing the `Arc` count for the database.
+        let Self {
+            cfg_proposal,
+            db_handler,
+            network,
+            ..
+        } = self;
 
+        let db = db_handler.into_inner();
         StoppedTestKit {
-            network: self.network,
-            cfg_proposal: self.cfg_proposal,
-            db: self
-                .db_handler
-                .try_unwrap()
-                .expect("cannot retrieve database state"),
+            network,
+            cfg_proposal,
+            db,
         }
     }
 }
@@ -928,7 +929,7 @@ impl TestKit {
 /// ```
 #[derive(Debug)]
 pub struct StoppedTestKit {
-    db: TemporaryDB,
+    db: CheckpointDb<TemporaryDB>,
     network: TestNetwork,
     cfg_proposal: Option<ConfigurationProposalState>,
 }
@@ -1031,4 +1032,10 @@ fn test_multiple_spec_of_validators_in_builder() {
         .with_validators(2)
         .create();
     drop(testkit);
+}
+
+#[test]
+fn test_stop() {
+    let testkit = TestKitBuilder::validator().with_logger().create();
+    let _testkit_stopped = testkit.stop();
 }
