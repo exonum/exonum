@@ -23,7 +23,7 @@ mock.onGet('/api/explorer/v1/transactions?hash=ce0743cff6bdef0afa2f3af68b77612aa
 
 mock.onGet('/api/services/configuration/v1/configs/actual').reply(200, actual)
 
-mock.onGet('/api/services/timestamping/v1/timestamps/proof?hash=0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9').reply(200, proof)
+mock.onGet('/api/services/timestamping/v1/timestamps/proof?hash=67fa96da3465c77befabd75b53027e39b35c79d0ed69a175fff5141516353cc3').reply(200, proof)
 
 describe('Interaction with blockchain', () => {
   it('should generate new signing key pair', () => {
@@ -47,18 +47,18 @@ describe('Interaction with blockchain', () => {
   })
 
   it('should get timestamp proof and verify it', async () => {
-    const hash = '0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9'
+    const hash = '67fa96da3465c77befabd75b53027e39b35c79d0ed69a175fff5141516353cc3'
 
     await expect(Vue.prototype.$blockchain.getTimestampProof(hash)).resolves.toEqual({
       'time': {
-        'nanos': 599417000,
-        'seconds': 1544625292
+        'nanos': 93835000,
+        'seconds': 1565701488
       },
       'timestamp': {
-        'content_hash': '0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9',
-        'metadata': 'Some contract'
+        'content_hash': '67fa96da3465c77befabd75b53027e39b35c79d0ed69a175fff5141516353cc3',
+        'metadata': 'Test data'
       },
-      'tx_hash': 'ce0743cff6bdef0afa2f3af68b77612aa8f22190d3e94534268e3b784cfd7805'
+      'tx_hash': '787f027f0f3e0e677f0de15163a7bcd4aacec49d960c5dac4fd31b3edb1a9092'
     })
   })
 })

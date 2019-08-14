@@ -4,16 +4,16 @@ import MockAdapter from 'axios-mock-adapter'
 import * as Blockchain from '../src/plugins/blockchain.js'
 import actual from './data/actual.json'
 import proof from './data/proof.json'
-import 'babel-polyfill';
+import 'babel-polyfill'
 
 const mock = new MockAdapter(axios)
-const bigIntRegex = /[0-9]+/i;
-const hexRegex = /[0-9A-Fa-f]+/i;
+const bigIntRegex = /[0-9]+/i
+const hexRegex = /[0-9A-Fa-f]+/i
 const TRANSACTION_URL = '/api/explorer/v1/transactions'
 const TRANSACTION_EXPLORER_URL = '/api/explorer/v1/transactions?hash='
 const PROOF_URL = '/api/services/cryptocurrency/v1/wallets/info?pub_key='
 const keyPair = {
-  publicKey: '78cf8b5e5c020696319eb32a1408e6c65e7d97733d34528fbdce08438a0243e8',
+  publicKey: '15bfd860538540d0635de8322af12a89163990d13329f8a4ec7982f663323683',
   secretKey: 'b5b3ccf6ca4475b7ff3d910d5ab31e4723098490a3e341dd9d2896b42ebc9f8978cf8b5e5c020696319eb32a1408e6c65e7d97733d34528fbdce08438a0243e8'
 }
 
@@ -90,16 +90,82 @@ describe('Interaction with blockchain', () => {
   it('should get wallet proof and verify it', async () => {
     const data = await Vue.prototype.$blockchain.getWallet(keyPair.publicKey)
 
-    expect(data.wallet).toEqual({
-      "pub_key": {
-        "data": [120, 207, 139, 94, 92, 2, 6, 150, 49, 158, 179, 42, 20, 8, 230, 198, 94, 125, 151, 115, 61, 52, 82, 143, 189, 206, 8, 67, 138, 2, 67, 232]
-      },
-      "name": "John Doe",
-      "balance": 100,
-      "history_len": 1,
-      "history_hash": {
-        "data": [85, 32, 155, 60, 107, 216, 89, 59, 156, 144, 234, 205, 58, 87, 207, 196, 72, 235, 192, 212, 115, 22, 35, 90, 76, 163, 161, 117, 21, 72, 163, 132]
-      }
-    })
+    expect(data.wallet)
+      .toEqual({
+          'pub_key': {
+            'data': [
+              21,
+              191,
+              216,
+              96,
+              83,
+              133,
+              64,
+              208,
+              99,
+              93,
+              232,
+              50,
+              42,
+              241,
+              42,
+              137,
+              22,
+              57,
+              144,
+              209,
+              51,
+              41,
+              248,
+              164,
+              236,
+              121,
+              130,
+              246,
+              99,
+              50,
+              54,
+              131]
+          },
+          'name': 'I am a name',
+          'balance': 100,
+          'history_len': 1,
+          'history_hash': {
+            'data': [
+              184,
+              25,
+              173,
+              170,
+              217,
+              218,
+              84,
+              183,
+              171,
+              60,
+              183,
+              247,
+              49,
+              154,
+              178,
+              71,
+              105,
+              211,
+              78,
+              247,
+              39,
+              134,
+              150,
+              20,
+              75,
+              109,
+              6,
+              33,
+              240,
+              245,
+              208,
+              186]
+          }
+        }
+      )
   })
 })
