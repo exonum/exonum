@@ -45,8 +45,9 @@ mod schema;
 
 /// Max instance identifier for builtin service.
 ///
-/// By analogy with network's privileged ports, we use a range 0..1023 of instance identifiers
-/// for built in services which can be created only during the blockchain genesis block creation.
+/// By analogy with the privileged ports of the network, we use a range 0..1023 of instance
+/// identifiers for built-in services which can be created only during the blockchain genesis
+/// block creation.
 pub const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
 
 #[derive(Default)]
@@ -76,7 +77,7 @@ impl Dispatcher {
         }
     }
 
-    /// Restores dispatcher from the state which saved in the specified snapshot.
+    /// Restore the dispatcher from the state which was saved in the specified snapshot.
     pub(crate) fn restore_state(&mut self, context: &ApiContext) -> Result<(), ExecutionError> {
         let snapshot = context.snapshot();
         let schema = Schema::new(&snapshot);
@@ -162,7 +163,7 @@ impl Dispatcher {
             .collect::<Vec<_>>()
     }
 
-    /// Initiates deploy artifact procedure in the corresponding runtime.
+    /// Initiate artifact deploy procedure in the corresponding runtime.
     ///
     /// # Panics
     ///
@@ -181,7 +182,7 @@ impl Dispatcher {
         }
     }
 
-    /// Registers deployed artifact in the dispatcher's information schema.
+    /// Register deployed artifact in the dispatcher's information schema.
     /// Make sure that you successfully complete the deploy artifact procedure.
     ///
     /// # Panics
@@ -288,7 +289,7 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Calls the corresponding runtime method.
+    /// Call the corresponding runtime method.
     pub(crate) fn call(
         &self,
         context: &mut ExecutionContext,
@@ -361,7 +362,7 @@ impl Dispatcher {
         self.artifact_protobuf_spec(id).is_some()
     }
 
-    /// Notify the runtime about API changes and return true if there were such changes.
+    /// Notify the runtime about API changes and return true if there are such changes.
     pub(crate) fn notify_api_changes(&mut self, context: &ApiContext) -> bool {
         let api_changes = {
             let mut api_changes = BTreeMap::default();
@@ -384,7 +385,7 @@ impl Dispatcher {
         info!("Running service instance {:?}", instance);
         self.runtime_lookup
             .insert(instance.id, instance.artifact.runtime_id);
-        // Add service instance to list of modified APIs.
+        // Add service instance to the list of modified APIs.
         let runtime_changes = self
             .api_changes
             .entry(instance.artifact.runtime_id)
@@ -452,7 +453,7 @@ struct DeployArtifactRequest {
 }
 
 impl DeployArtifactRequest {
-    /// Invokes request callback.
+    /// Invoke request callback.
     fn completed(self) {
         (self.and_then)();
     }
@@ -475,14 +476,14 @@ pub struct DispatcherSender {
 }
 
 impl DispatcherSender {
-    /// Creates a new instance.
+    /// Create a new instance.
     fn new() -> Self {
         Self {
             deploy_request: RefCell::default(),
         }
     }
 
-    /// Requests an artifact deployment and invokes the callback if the deployment
+    /// Request an artifact deployment and invoke the callback if the deployment
     /// was successfully completed.
     pub(super) fn request_deploy_artifact<F>(&self, artifact: ArtifactId, spec: Any, and_then: F)
     where
@@ -497,7 +498,7 @@ impl DispatcherSender {
             })
     }
 
-    /// Takes requests from this channel.
+    /// Take requests from this channel.
     fn take_deploy_requests(self) -> Vec<DeployArtifactRequest> {
         self.deploy_request.into_inner()
     }
@@ -542,7 +543,6 @@ mod tests {
             }
         }
 
-        /// Adds additional runtime.
         fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
             self.dispatcher.runtimes.insert(id, runtime.into());
             self
@@ -794,7 +794,7 @@ mod tests {
             )
             .expect_err("Incorrect tx java");
 
-        // Check that API changes in dispatcher contains started services.
+        // Check that API changes in the dispatcher contain the started services.
         let context = ApiContext::new(
             db.clone(),
             crypto::gen_keypair(),
@@ -815,10 +815,10 @@ mod tests {
             expected_api_changes,
             changes_rx.iter().take(2).collect::<Vec<_>>()
         );
-        // Check that API changes is empty after the `notify_api_changes`.
+        // Check that API changes are empty after the `notify_api_changes`.
         assert!(dispatcher.api_changes.is_empty());
 
-        // Check that API changes in dispatcher contains started services after restart.
+        // Check that API changes in the dispatcher contain the started services after restart.
         db.merge(fork.into_patch()).unwrap();
         let mut dispatcher = DispatcherBuilder::new()
             .with_runtime(runtime_a.runtime_type, runtime_a)

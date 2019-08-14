@@ -270,9 +270,9 @@ pub trait Runtime: Send + Debug + 'static {
         Vec::new()
     }
 
-    /// Notify runtime about changes in the list of service instances.
+    /// Notify the runtime about the changes in the list of service instances.
     ///
-    /// The purpose of this method is to provide the building blocks to create your own
+    /// The purpose of this method is to provide building blocks to create your own
     /// API processing mechanisms.
     fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
 }

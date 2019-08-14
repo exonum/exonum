@@ -289,8 +289,8 @@ impl ApiAggregator {
 
 /// This entity provides the current state of the blockchain to the API handlers.
 ///
-/// This context contains a necessary parts for the blockchain interaction
-/// and may be shared between any kind of handlers.
+/// This context contains necessary parts for interaction with the blockchain
+/// and may be shared among any kind of handlers.
 #[derive(Debug, Clone)]
 pub struct ApiContext {
     service_keypair: (PublicKey, SecretKey),
@@ -326,7 +326,7 @@ impl ApiContext {
     /// Create a new blockchain database state snapshot.
     ///
     /// Be careful with this method! It is recommended to get a snapshot only once per request
-    /// to ensure all the database accesses see the same state. When the snapshot is requested
+    /// to ensure all the database accesses see the same state. When a snapshot is requested
     /// from a different thread than the one where changes are made to the blockchain,
     /// each invocation might get a snapshot corresponding to a different blockchain state,
     /// likely leading to a race condition.
