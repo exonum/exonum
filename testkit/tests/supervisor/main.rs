@@ -201,27 +201,24 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Service
 }
 
 fn testkit_with_inc_service() -> TestKit {
-    let service = IncService::new();
     TestKitBuilder::validator()
         .with_logger()
-        .with_service(InstanceCollection::new(service))
+        .with_service(InstanceCollection::new(IncService))
         .create()
 }
 
 fn testkit_with_inc_service_and_two_validators() -> TestKit {
-    let service = IncService::new();
     TestKitBuilder::validator()
         .with_logger()
-        .with_service(InstanceCollection::new(service))
+        .with_service(InstanceCollection::new(IncService))
         .with_validators(2)
         .create()
 }
 
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
-    let service = IncService::new();
     TestKitBuilder::auditor()
         .with_logger()
-        .with_service(InstanceCollection::new(service))
+        .with_service(InstanceCollection::new(IncService))
         .with_validators(1)
         .create()
 }
@@ -394,7 +391,7 @@ fn test_bad_runtime_id() {
 
     let artifact = ArtifactId {
         runtime_id: bad_runtime_id,
-        name: IncService::new().artifact_id().to_string(),
+        name: IncService.artifact_id().to_string(),
     };
     let request = deploy_request(artifact.clone(), testkit.height().next());
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
@@ -510,12 +507,52 @@ fn test_restart_node_and_start_service_instance() {
 
     deploy_default(&mut testkit);
 
-    // TODO: testkit crashes here at the moment. This looks like a bug.
-    // thread 'test_restart_node_and_start_service_instance' panicked at 'cannot retrieve database state: CheckpointDbHandler { inner: RwLock { data: CheckpointDbInner { db: TemporaryDB { inner: RocksDB, _dir: TempDir { path: "/tmp/.tmpaTHDzU" } }, backup_stack: [] } } }', src/libcore/result.rs:999:5
-    let _testkit_stopped = testkit.stop();
+    // Stop the node.
+    let testkit_stopped = testkit.stop();
 
-    // TODO: Try to start IncService's instance now
-    // let _testkit = testkit_stopped.resume(vec![service]);
+    // And start it again with the same service factory.
+    let mut testkit = testkit_stopped.resume(vec![IncService]);
+    let api = testkit.api();
+
+    // Ensure that the deployed artifact still exists.
+    assert!(does_artifact_exist(&api, &artifact_default().name));
+
+    let instance_name = "test_basics";
+    let (key_pub, key_priv) = crypto::gen_keypair();
+
+    // Start IncService's instance now.
+    let instance_id = start_service_instance(&mut testkit, instance_name);
+    let api = testkit.api(); // update the API
+
+    // Check that the service instance actually works.
+    {
+        assert_no_count(&api, instance_name);
+
+        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        testkit.create_block();
+        assert_count(&api, instance_name, 1);
+
+        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        testkit.create_block();
+        assert_count(&api, instance_name, 2);
+    }
+
+    // Restart the node again.
+    let testkit_stopped = testkit.stop();
+    let mut testkit = testkit_stopped.resume(vec![IncService]);
+    let api = testkit.api();
+
+    // Ensure that the started service instance still exists.
+    assert!(does_service_instance_exist(&api, instance_name));
+
+    // Check that the service instance still works.
+    {
+        assert_count(&api, instance_name, 2);
+
+        api.send(TxInc { seed: 2 }.sign(instance_id, key_pub, &key_priv));
+        testkit.create_block();
+        assert_count(&api, instance_name, 3);
+    }
 }
 
 /// This test emulates a normal workflow with two validators.
@@ -564,8 +601,6 @@ fn test_multiple_validators() {
 
     // Start the service now
     {
-        let api = testkit.api();
-
         assert!(!does_service_instance_exist(&api, instance_name));
 
         let deadline = testkit.height().next();
@@ -716,4 +751,45 @@ fn test_auditor_normal_workflow() {
 
     // The artifact is deployed.
     assert!(does_artifact_exist(&testkit.api(), &artifact.name));
+
+    let instance_name = "inc";
+
+    // Start the service now
+    {
+        let api = testkit.api();
+
+        assert!(!does_service_instance_exist(&api, instance_name));
+
+        let deadline = testkit.height().next();
+        let request_start = start_service_request(artifact_default(), instance_name, deadline);
+
+        // Emulate a start instance request from the validator.
+        let start_service_tx_hash =
+            start_service_manually(&mut testkit, &request_start, ValidatorId(0));
+
+        testkit.create_block();
+
+        api.exonum_api().assert_tx_success(start_service_tx_hash);
+
+        let api = testkit.api(); // Update the API
+        assert!(does_service_instance_exist(&api, instance_name));
+    }
+
+    let api = testkit.api(); // Update the API
+    let instance_id = find_instance_id(&api, instance_name);
+
+    // Сheck that service фсегфддн works.
+    {
+        assert_no_count(&api, instance_name);
+
+        let (key_pub, key_priv) = crypto::gen_keypair();
+
+        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        testkit.create_block();
+        assert_count(&api, instance_name, 1);
+
+        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        testkit.create_block();
+        assert_count(&api, instance_name, 2);
+    }
 }
