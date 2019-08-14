@@ -689,7 +689,7 @@ fn test_auditor_cant_send_requests() {
 
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
-        // Manually signing the tx with audtitor's keypair.
+        // Manually signing the tx with auditor's keypair.
         let service_id = Supervisor::BUILTIN_ID;
         let confirmation: DeployConfirmation = request_deploy.clone().into();
         let keys = &testkit.us().service_keypair();
@@ -778,7 +778,7 @@ fn test_auditor_normal_workflow() {
     let api = testkit.api(); // Update the API
     let instance_id = find_instance_id(&api, instance_name);
 
-    // Сheck that service фсегфддн works.
+    // Check that service still works.
     {
         assert_no_count(&api, instance_name);
 
