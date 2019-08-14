@@ -26,7 +26,7 @@ use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
-/// Enum that represents type of the ProofMap node.
+/// Enum that represents type of the `ProofMap` node.
 #[derive(Debug)]
 pub enum Node {
     /// Leaf node, contains hash of the leaf value.
