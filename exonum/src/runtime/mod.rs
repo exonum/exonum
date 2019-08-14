@@ -263,7 +263,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// This method is called during an API server restart. Use this method if you do not plan to
     /// use your own API processing mechanism.
     ///
-    /// Warning! It is a temporary method which not to break the existing `RustRuntime` code,
+    /// Warning! It is a temporary method which retains the existing `RustRuntime` code.
     /// in future it will be removed.
     #[doc(hidden)]
     fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
