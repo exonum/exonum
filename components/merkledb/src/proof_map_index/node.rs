@@ -26,23 +26,24 @@ use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
-/// Enum that represents type of the ProofMap node.
+/// Enum that represents the type of the `ProofMap` node.
 #[derive(Debug)]
 pub enum Node {
-    /// Leaf node, contains hash of the leaf value.
+    /// Leaf node that contains a hash of the leaf value.
     Leaf(Hash),
     /// Branch node.
     Branch(BranchNode),
 }
 
-/// Struct that encapsulates raw representation of the branch node.
+/// Structure that encapsulates a raw representation of the branch node.
 #[derive(Clone, PartialEq)]
 pub struct BranchNode {
     raw: Vec<u8>,
 }
 
 impl BranchNode {
-    pub(crate) fn empty() -> Self {
+    /// Create empty `BranchNode`.
+    pub fn empty() -> Self {
         Self {
             raw: vec![0_u8; BRANCH_NODE_SIZE],
         }

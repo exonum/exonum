@@ -492,12 +492,12 @@ pub trait Iterator {
 }
 
 impl Patch {
-    /// Returns changes keyed by index address.
+    /// Return changes keyed by the index address.
     pub fn changes(&self) -> HashMap<String, Changes> {
         self.changes.clone()
     }
 
-    /// Returns iterator over the underlying changes.
+    /// Return an iterator over the underlying changes.
     pub fn iter(&self) -> HmIter<String, Changes> {
         self.changes.iter()
     }

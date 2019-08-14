@@ -47,12 +47,12 @@ impl ProofOfAbsence {
         }
     }
 
-    /// Returns length of the corresponding `ProofListIndex`.
+    /// Return the length of the corresponding `ProofListIndex`.
     pub fn length(&self) -> u64 {
         self.length
     }
 
-    /// Returns merkle root of the corresponding `ProofListIndex`.
+    /// Return the Merkle root of the corresponding `ProofListIndex`.
     pub fn merkle_root(&self) -> Hash {
         self.merkle_root
     }
