@@ -85,7 +85,7 @@ pub trait ApiBackend: Sized {
     fn wire(&self, output: Self::Backend) -> Self::Backend;
 }
 
-/// Exonum API builder for the concrete API scope or in other words
+/// Exonum API builder for the concrete API scope or, in other words,
 /// access level (public or private).
 ///
 /// Endpoints cannot be declared to the builder directly, first you need to
