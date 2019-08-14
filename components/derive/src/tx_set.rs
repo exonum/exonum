@@ -15,7 +15,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{Attribute, Data, DataEnum, DeriveInput, Fields, Lit, MetaNameValue, Type, Variant};
+use syn::{Attribute, Data, DataEnum, DeriveInput, Fields, Lit, Type, Variant};
 
 use std::collections::HashSet;
 
@@ -73,26 +73,20 @@ fn get_tx_variants(data: &DataEnum) -> Vec<ParsedVariant> {
 fn get_message_id(variant: &Variant) -> Option<u16> {
     let literal = get_exonum_name_value_attributes(&variant.attrs)
         .iter()
-        .filter_map(|MetaNameValue { ident, lit, .. }| {
-            if ident == "message_id" {
-                Some(lit)
+        .cloned()
+        .filter_map(|meta| {
+            if meta.path.is_ident("message_id") {
+                Some(meta.lit)
             } else {
                 None
             }
         })
-        .cloned()
         .next()?;
 
     Some(match literal {
-        Lit::Int(int_value) => {
-            if int_value.value() > u64::from(u16::max_value()) {
-                panic!(
-                    "Specified `message_id` is too large; expected value in range 0..={}",
-                    u16::max_value()
-                );
-            }
-            int_value.value() as u16
-        }
+        Lit::Int(int_value) => int_value
+            .base10_parse::<u16>()
+            .expect("Cannot parse `message_id` integer value"),
         Lit::Str(str_value) => str_value
             .value()
             .parse()
@@ -252,14 +246,14 @@ fn implement_into_boxed_tx(
 fn should_convert_variants(attrs: &[Attribute]) -> bool {
     let value = get_exonum_name_value_attributes(attrs)
         .iter()
-        .filter_map(|MetaNameValue { ident, lit, .. }| {
-            if ident == "convert_variants" {
-                Some(lit)
+        .cloned()
+        .filter_map(|meta| {
+            if meta.path.is_ident("convert_variants") {
+                Some(meta.lit)
             } else {
                 None
             }
         })
-        .cloned()
         .next();
     if let Some(value) = value {
         match value {
@@ -415,7 +409,7 @@ mod tests {
     #[test]
     fn extract_boxed_type_works() {
         let ty: Type = parse_quote!(Box<Foo>);
-        assert_eq!(extract_boxed_type(&ty).unwrap(), parse_quote!(Foo));
+        assert!(extract_boxed_type(&ty).is_some());
         let ty: Type = parse_quote!(Foo);
         assert!(extract_boxed_type(&ty).is_none());
         let ty: Type = parse_quote!(Box<Foo, Bar>);
