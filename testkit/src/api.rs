@@ -355,7 +355,7 @@ impl<'a> ExonumNodeApi<'a> {
             .query(&TransactionQuery::new(tx_hash))
             .get("v1/transactions")
             .unwrap();
-        if let serde_json::Value::Object(mut info) = info {
+        if let serde_json::Value::Object(info) = info {
             let tx_status = info.get("status").unwrap();
             assert_eq!(tx_status, expected_status);
         } else {
