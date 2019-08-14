@@ -15,7 +15,7 @@ description = "Helper macros for serialization structs in protobuf."
 proc-macro = true
 
 [dependencies]
-syn = "0.15"
+syn = "1.0"
 quote = "0.6"
 proc-macro2 = "0.4"
 
