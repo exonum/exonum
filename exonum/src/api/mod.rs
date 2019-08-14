@@ -86,7 +86,7 @@ pub trait ApiBackend: Sized {
 }
 
 /// Exonum API builder for the concrete API scope or, in other words,
-/// access level (public or private).
+/// API access level (public or private).
 ///
 /// Endpoints cannot be declared to the builder directly, first you need to
 /// indicate the scope the endpoint(s) will belong to.
