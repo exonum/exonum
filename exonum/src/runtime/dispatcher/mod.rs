@@ -254,6 +254,7 @@ impl Dispatcher {
                             spec.name, e
                         );
                         if let Err(e) = runtime.stop_service(spec.as_descriptor()) {
+                            // TODO Find the way to avoid panic from the untrusted code. [ECR-3222]
                             panic!(FatalError::new(e.to_string()))
                         }
                         e

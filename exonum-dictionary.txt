@@ -191,6 +191,7 @@ unflushed
 unreceived
 unsync
 untagged
+untrusted
 usize
 uuid
 uuids
