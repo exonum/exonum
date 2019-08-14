@@ -193,7 +193,7 @@ impl InstanceCollection {
         }
     }
 
-    /// Adds a new service instance to the collection.
+    /// Add a new service instance to the collection.
     pub fn with_instance(
         mut self,
         id: InstanceId,

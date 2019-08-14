@@ -24,17 +24,17 @@
 )]
 // #![warn(clippy::pedantic)]
 // #![allow(
-//     // Next `cast_*` lints don't give alternatives.
+//     // The following `cast_*` lints do not give alternatives:
 //     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-//     // `filter(..).map(..)` often looks more shorter and readable.
+//     // `filter(..).map(..)` often looks shorter and more readable.
 //     clippy::filter_map,
-//     // Next lints produce too much noise/false positives.
+//     // The following lints produce too much noise/false positives:
 //     clippy::module_name_repetitions, clippy::similar_names,
-//     // Variant name ends with the enum name. Similar behavior to similar_names.
+//     // Variant name ends with the enum name. Demonstrates similar behavior to `similar_names`.
 //     clippy::pub_enum_variant_names,
 //     // '... may panic' lints.
 //     clippy::indexing_slicing,
-//     // Suggestions for code that uses a lot of generics look ugly.
+//     // Suggestions for improvement that look inadequate in respect of the code that uses a lot of generics.
 //     clippy::default_trait_access,
 // )]
 

@@ -304,7 +304,7 @@ where
     }
 }
 
-/// Creates a test server.
+/// Create a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     let server = TestServer::with_factory(move || {
         App::new()

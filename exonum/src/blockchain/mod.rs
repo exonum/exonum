@@ -378,7 +378,7 @@ impl Blockchain {
         // Invokes `after_commit` for each service in order of their identifiers
         let mut dispatcher = self.dispatcher();
         dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
-        // Sends `RestartApi` request if dispatcher state was been modified.
+        // Send `RestartApi` request if the dispatcher state has been modified.
         let context = ApiContext::with_blockchain(self);
         if dispatcher.notify_api_changes(&context) {
             self.internal_requests

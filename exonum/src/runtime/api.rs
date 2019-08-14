@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Building blocks for creating services' API.
+//! Building blocks for creating API of services.
 
 pub use crate::api::{ApiContext, Error, FutureResult, Result};
 
@@ -97,8 +97,8 @@ impl ServiceApiScope {
 
     /// Add a readonly endpoint handler to the service API scope.
     ///
-    /// In HTTP backends, this type of endpoint corresponds to `GET` requests.
-    /// [Read more](../../api/struct.ApiScope.html#endpoint)
+    /// In HTTP backends this type of endpoint corresponds to `GET` requests.
+    /// [Read more.](../../api/struct.ApiScope.html#endpoint)
     pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -125,8 +125,8 @@ impl ServiceApiScope {
 
     /// Add an endpoint handler to the service API scope.
     ///
-    /// In HTTP backends, this type of endpoint corresponds to `POST` requests.
-    /// [Read more](../../api/struct.ApiScope.html#endpoint_mut)
+    /// In HTTP backends this type of endpoint corresponds to `POST` requests.
+    /// [Read more.](../../api/struct.ApiScope.html#endpoint_mut)
     pub fn endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -157,11 +157,11 @@ impl ServiceApiScope {
     }
 }
 
-/// Exonum service API builder, which is used to add endpoints to the node API.
+/// Exonum service API builder which is used to add endpoints to the node API.
 ///
 /// # Examples
 ///
-/// The example below shows a common practice of API implementation.
+/// The example below shows a common practice of the API implementation.
 ///
 /// ```rust
 /// use serde_derive::{Deserialize, Serialize};
@@ -174,26 +174,26 @@ impl ServiceApiScope {
 /// };
 /// use exonum_merkledb::ObjectHash;
 ///
-/// // Declares a type which describes an API specification and implementation.
+/// // Declare a type which describes an API specification and implementation.
 /// pub struct MyApi;
 ///
-/// // Declares structures for requests and responses.
+/// // Declare structures for requests and responses.
 ///
-/// // For the web backend, `MyQuery` will be deserialized from a `block_height={number}` string.
+/// // For the web backend `MyQuery` will be deserialized from the `block_height={number}` string.
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
 ///     pub block_height: u64,
 /// }
 ///
-/// // For the web backend, `BlockInfo` will be serialized into a JSON string.
+/// // For the web backend `BlockInfo` will be serialized into a JSON string.
 /// #[derive(Serialize, Clone, Copy)]
 /// pub struct BlockInfo {
 ///     pub hash: Hash,
 /// }
 ///
-/// // Creates API handlers.
+/// // Create API handlers.
 /// impl MyApi {
-///     // Immutable handler, which returns a hash of the block at the given height.
+///     // Immutable handler which returns a hash of the block at the given height.
 ///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
 ///         let schema = Schema::new(state.snapshot());
 ///         Ok(schema
@@ -202,7 +202,7 @@ impl ServiceApiScope {
 ///             .map(|hash| BlockInfo { hash }))
 ///     }
 ///
-///     // Mutable handler which sends `Rebroadcast` request to node.
+///     // Mutable handler which sends `Rebroadcast` request to the node.
 ///     pub fn rebroadcast(state: &ServiceApiState, _query: ()) -> api::Result<()> {
 ///         state
 ///             .sender()
@@ -227,13 +227,13 @@ impl ServiceApiScope {
 /// }
 ///
 /// fn wire_api(builder: &mut ServiceApiBuilder) -> &mut ServiceApiBuilder {
-///     // Adds `MyApi` handlers to the corresponding builder.
+///     // Add `MyApi` handlers to the corresponding builder.
 ///     builder
 ///         .public_scope()
 ///         .endpoint("v1/ping", MyApi::ping)
 ///         .endpoint("v1/block_hash", MyApi::block_hash)
 ///         .endpoint("v1/async_operation", MyApi::async_operation);
-///     // Adds a mutable endpoint for to the private API.
+///     // Add a mutable endpoint for to the private API.
 ///     builder
 ///         .private_scope()
 ///         .endpoint_mut("v1/rebroadcast", MyApi::rebroadcast);

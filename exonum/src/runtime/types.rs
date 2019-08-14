@@ -23,8 +23,8 @@ use super::InstanceDescriptor;
 
 /// Unique service instance identifier.
 ///
-/// * This is the secondary identifier, mainly used in transaction messages.
-/// The primary one is the service instance name.
+/// * This is a secondary identifier, mainly used in transaction messages.
+/// The primary one is a service instance name.
 ///
 /// * The core assigns this identifier when the service is started.
 pub type InstanceId = u32;
@@ -214,14 +214,14 @@ impl FromStr for ArtifactId {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
-    /// The unique numeric ID of the service instance.
+    /// Unique numeric ID of the service instance.
     ///
-    ///  Exonum assigns it to the service on instantiation. It is mainly used to route the
+    ///  Exonum assigns an ID to the service on instantiation. It is mainly used to route
     /// transaction messages belonging to this instance.
     pub id: InstanceId,
-    /// The unique name of the service instance.
+    /// Unique name of the service instance.
     ///
-    /// It serves as the primary identifier of this service in most operations.
+    /// The name serves as a primary identifier of this service in most operations.
     /// It is assigned by the network administrators.
     ///
     /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
@@ -231,7 +231,7 @@ pub struct InstanceSpec {
 }
 
 impl InstanceSpec {
-    /// Creates a new instance specification or returns an error
+    /// Create a new instance specification or return an error
     /// if the resulting specification is not correct.
     pub fn new(
         id: InstanceId,
@@ -261,7 +261,7 @@ impl InstanceSpec {
         Ok(())
     }
 
-    /// Returns the corresponding descriptor of this instance specification.
+    /// Return the corresponding descriptor of this instance specification.
     pub fn as_descriptor(&self) -> InstanceDescriptor {
         InstanceDescriptor {
             id: self.id,

@@ -178,12 +178,12 @@ pub struct ExplorerApi {
 }
 
 impl ExplorerApi {
-    /// Creates a new `ExplorerApi` instance.
+    /// Create a new `ExplorerApi` instance.
     pub fn new(context: ApiContext) -> Self {
         Self { context }
     }
 
-    /// Returns the explored range and the corresponding headers. The range specifies the smallest
+    /// Return the explored range and the corresponding headers. The range specifies the smallest
     /// and largest heights traversed to collect the number of blocks specified in
     /// the [`BlocksQuery`] struct.
     ///
@@ -251,7 +251,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Returns the content for a block at a specific height.
+    /// Return the content for a block at a specific height.
     pub fn block(snapshot: &dyn Snapshot, query: BlockQuery) -> Result<BlockInfo, ApiError> {
         BlockchainExplorer::new(snapshot)
             .block(query.height)
@@ -261,7 +261,7 @@ impl ExplorerApi {
             })
     }
 
-    /// Searches for a transaction, either committed or uncommitted, by the hash.
+    /// Search for a transaction, either committed or uncommitted, by the hash.
     pub fn transaction_info(
         snapshot: &dyn Snapshot,
         query: TransactionQuery,
@@ -274,7 +274,7 @@ impl ExplorerApi {
             })
     }
 
-    /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
+    /// Add transaction into the pool of unconfirmed transactions, and broadcast transaction to other nodes.
     // TODO move this method to the public system API [ECR-3222]
     pub fn add_transaction(
         sender: &ApiSender,
@@ -328,7 +328,7 @@ impl ExplorerApi {
         });
     }
 
-    /// Adds explorer API endpoints to the corresponding scope.
+    /// Add explorer API endpoints to the corresponding scope.
     pub fn wire(
         self,
         api_scope: &mut ApiScope,

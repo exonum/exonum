@@ -68,7 +68,7 @@ impl<T: IndexAccess> Schema<T> {
         Ok(())
     }
 
-    /// Assigns unique identifier for instance.
+    /// Assign unique identifier for an instance.
     pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
         let id = self
             .vacant_instance_id()

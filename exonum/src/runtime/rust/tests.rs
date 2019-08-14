@@ -117,7 +117,7 @@ impl Service for TestServiceImpl {
 fn test_basic_rust_runtime() {
     let db = TemporaryDB::new();
 
-    // Create runtime and service.
+    // Create a runtime and a service.
     let mut runtime = RustRuntime::new();
 
     let service_factory = Box::new(TestServiceImpl);

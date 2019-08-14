@@ -101,7 +101,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.instance_descriptor.name
     }
 
-    /// If the current node is a validator, returns its identifier, for other nodes return `None`.
+    /// If the current node is a validator, return its identifier, for other nodes return `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.runtime_context.fork)
@@ -143,7 +143,7 @@ pub struct AfterCommitContext<'a> {
 }
 
 impl<'a> AfterCommitContext<'a> {
-    /// Creates context for `after_commit` method.
+    /// Create context for the `after_commit` method.
     pub(crate) fn new(
         dispatcher: &'a DispatcherSender,
         instance_descriptor: InstanceDescriptor<'a>,
@@ -166,17 +166,17 @@ impl<'a> AfterCommitContext<'a> {
         self.snapshot
     }
 
-    /// Returns the current service instance identifier.
+    /// Return the current service instance identifier.
     pub fn service_id(&self) -> InstanceId {
         self.instance_descriptor.id
     }
 
-    /// Returns the current service instance name.
+    /// Return the current service instance name.
     pub fn service_name(&self) -> &str {
         self.instance_descriptor.name
     }
 
-    /// If the current node is a validator, returns its identifier, for other nodes return `None`.
+    /// If the current node is a validator, return its identifier, for other nodes return `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot)
@@ -249,7 +249,7 @@ pub trait Transaction: BinaryValue {
     /// Identifier of service method which executes the given transaction.
     const METHOD_ID: MethodId;
 
-    /// Creates unsigned service transaction from the value.
+    /// Create unsigned service transaction from the value.
     fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
         AnyTx {
             call_info: CallInfo {
@@ -260,7 +260,7 @@ pub trait Transaction: BinaryValue {
         }
     }
 
-    /// Signs value as transaction with the specified instance identifier.
+    /// Sign the value as a transaction with the specified instance identifier.
     fn sign(
         self,
         service_id: InstanceId,

@@ -77,7 +77,7 @@ impl Service for TimestampingService {}
 
 fn main() {
     let instance_id = 512;
-    // Create testkit for network with four validators.
+    // Create a testkit for a network with four validators.
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(InstanceCollection::new(TimestampingService).with_instance(

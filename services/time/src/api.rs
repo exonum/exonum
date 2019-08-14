@@ -29,7 +29,7 @@ pub struct ValidatorTime {
     pub time: Option<DateTime<Utc>>,
 }
 
-/// Implements the exonum-time public API.
+/// Implement the public API for Exonum time.
 #[derive(Debug, Clone)]
 pub struct PublicApi;
 
@@ -44,7 +44,7 @@ impl PublicApi {
             .get())
     }
 
-    /// Used to extend Api.
+    /// Extend API.
     pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
         builder
             .public_scope()
@@ -52,7 +52,7 @@ impl PublicApi {
     }
 }
 
-/// Implements the exonum-time private API.
+/// Implement the private API for Exonum time.
 #[derive(Debug, Clone)]
 pub struct PrivateApi;
 
@@ -63,7 +63,7 @@ impl PrivateApi {
         let schema = TimeSchema::new(state.instance().name, view);
         let idx = schema.validators_times();
 
-        // The times of all validators for which time is known.
+        // All available times of the validators.
         let validators_times = idx
             .iter()
             .map(|(public_key, time)| ValidatorTime {
@@ -83,7 +83,7 @@ impl PrivateApi {
         let schema = TimeSchema::new(state.instance().name, view);
         let idx = schema.validators_times();
 
-        // The times of current validators.
+        // Times of the current validators.
         // `None` if the time of the validator is unknown.
         let validators_times = validator_keys
             .iter()

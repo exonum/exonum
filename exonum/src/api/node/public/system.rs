@@ -109,7 +109,7 @@ pub struct SystemApi {
 }
 
 impl SystemApi {
-    /// Creates a new `public::SystemApi` instance.
+    /// Create a new `public::SystemApi` instance.
     pub fn new(context: ApiContext, node_state: SharedNodeState) -> Self {
         Self {
             context,
@@ -180,8 +180,8 @@ impl SystemApi {
     fn get_number_of_connected_peers(&self) -> usize {
         let in_conn = self.node_state.incoming_connections().len();
         let out_conn = self.node_state.outgoing_connections().len();
-        // We sum incoming and outgoing connections here because we keep only one connection
-        // between nodes. A connection could be incoming or outgoing but only one.
+        // Sum incoming and outgoing connections here to keep only one connection
+        // between nodes. There can be only one connection - either incoming or outgoing one.
         in_conn + out_conn
     }
 
@@ -197,7 +197,7 @@ impl SystemApi {
         }
     }
 
-    /// Adds public system API endpoints to the corresponding scope.
+    /// Add public system API endpoints to the corresponding scope.
     pub fn wire(self, api_scope: &mut ApiScope) -> &mut ApiScope {
         self.handle_stats_info("v1/stats", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)

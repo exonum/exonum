@@ -33,7 +33,7 @@ use super::SharedNodeState;
 pub struct ServiceInfo {
     /// Service name.
     pub name: String,
-    /// Service identifier for database schema and service messages.
+    /// Service identifier for the database schema and service messages.
     pub id: InstanceId,
 }
 
@@ -102,7 +102,7 @@ pub struct SystemApi {
 }
 
 impl SystemApi {
-    /// Creates a new `private::SystemApi` instance.
+    /// Create a new `private::SystemApi` instance.
     pub fn new(sender: ApiSender, info: NodeInfo, shared_api_state: SharedNodeState) -> Self {
         Self {
             sender,
@@ -111,7 +111,7 @@ impl SystemApi {
         }
     }
 
-    /// Adds private system API endpoints to the corresponding scope.
+    /// Add private system API endpoints to the corresponding scope.
     pub fn wire(self, api_scope: &mut ApiScope) -> &mut ApiScope {
         self.handle_peers_info("v1/peers", api_scope)
             .handle_peer_add("v1/peers", api_scope)

@@ -129,7 +129,7 @@ impl TestkitServerApi {
     }
 }
 
-///  Creates an API handlers for processing testkit-specific HTTP requests.
+///  Create API handlers for processing testkit-specific HTTP requests.
 pub fn create_testkit_handlers(inner: &Arc<RwLock<TestKit>>) -> ApiBuilder {
     let mut builder = ApiBuilder::new();
     let server_api = TestkitServerApi(inner.clone());

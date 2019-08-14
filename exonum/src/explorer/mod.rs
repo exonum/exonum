@@ -512,12 +512,12 @@ pub struct BlockchainExplorer<'a> {
 }
 
 impl<'a> BlockchainExplorer<'a> {
-    /// Creates a new `BlockchainExplorer` instance.
+    /// Create a new `BlockchainExplorer` instance.
     pub fn new(snapshot: &'a dyn Snapshot) -> Self {
         BlockchainExplorer { snapshot }
     }
 
-    /// Returns information about the transaction identified by the hash.
+    /// Return information about the transaction identified by the hash.
     pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
         let schema = Schema::new(self.snapshot);
         let content = self.transaction_without_proof(tx_hash)?;
@@ -529,7 +529,7 @@ impl<'a> BlockchainExplorer<'a> {
         Some(TransactionInfo::Committed(tx))
     }
 
-    /// Returns transaction message without proof.
+    /// Return transaction message without proof.
     pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<TransactionMessage> {
         let schema = Schema::new(self.snapshot);
         schema.transactions().get(tx_hash)
@@ -586,7 +586,7 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
-    /// Returns the height of the blockchain.
+    /// Return the height of the blockchain.
     pub fn height(&self) -> Height {
         let schema = Schema::new(self.snapshot);
         schema.height()
@@ -601,7 +601,7 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
-    /// Returns block together with its transactions for the specified height, or `None`
+    /// Return a block together with its transactions at the specified height, or `None`
     /// if there is no such block.
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
         let schema = Schema::new(self.snapshot);

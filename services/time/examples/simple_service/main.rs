@@ -45,11 +45,11 @@ use std::sync::Arc;
 
 mod proto;
 
-/// Time oracle instance id.
+/// Time oracle instance ID.
 const TIME_SERVICE_ID: InstanceId = 112;
 /// Time oracle instance name.
 const TIME_SERVICE_NAME: &str = "time-oracle";
-/// Marker service id.
+/// Marker service ID.
 const SERVICE_ID: InstanceId = 128;
 /// Marker service name.
 const SERVICE_NAME: &str = "marker";

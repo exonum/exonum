@@ -686,7 +686,7 @@ impl TestKit {
         self.blockchain.last_block().height()
     }
 
-    /// Returns the actual blockchain configuration.
+    /// Return an actual blockchain configuration.
     pub fn actual_configuration(&self) -> StoredConfiguration {
         CoreSchema::new(&self.snapshot()).actual_configuration()
     }

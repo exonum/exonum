@@ -260,11 +260,11 @@ pub trait Runtime: Send + Debug + 'static {
 
     /// Collect the full list of API handlers from the runtime for the built-in Exonum API server.
     ///
-    /// This method is called during an API server restart. Use this method if you do not plan to
+    /// This method is called during the API server restart. Use this method if you do not plan to
     /// use your own API processing mechanism.
     ///
     /// Warning! It is a temporary method which retains the existing `RustRuntime` code.
-    /// in future it will be removed.
+    /// It will be removed in the future.
     #[doc(hidden)]
     fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
@@ -286,7 +286,7 @@ where
     }
 }
 
-/// Artifact protobuf specification for Exonum clients.
+/// Artifact Protobuf specification for the Exonum clients.
 #[derive(Debug, PartialEq)]
 pub struct ArtifactProtobufSpec<'a> {
     /// List of Protobuf files that make up the service interface. The first element in the tuple
@@ -297,7 +297,7 @@ pub struct ArtifactProtobufSpec<'a> {
 }
 
 impl<'a> Default for ArtifactProtobufSpec<'a> {
-    /// Creates blank artifact information without any proto sources.
+    /// Create blank artifact information without any proto sources.
     fn default() -> Self {
         const EMPTY_SOURCES: [(&str, &str); 0] = [];
 
@@ -401,7 +401,7 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
     }
 }
 
-/// Change in list of service instances.
+/// Change in the list of service instances.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ApiChange {
     /// New instance has been added.

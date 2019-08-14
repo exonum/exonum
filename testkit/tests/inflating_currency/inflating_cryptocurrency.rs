@@ -33,7 +33,7 @@ use super::proto;
 pub const SERVICE_ID: InstanceId = 55;
 pub const SERVICE_NAME: &str = "cryptocurrency";
 
-/// Initial balance of newly created wallet.
+/// Initial balance of a newly created wallet.
 pub const INIT_BALANCE: u64 = 0;
 
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
