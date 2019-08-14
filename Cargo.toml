@@ -5,3 +5,10 @@ authors = ["Exonum Team <exonum@bifury.com>"]
 edition = "2018"
 
 [dependencies]
+exonum = { path = "../exonum/exonum" }
+structopt = "0.2.18"
+serde = { version = "1.0", features = ["derive"] }
+failure = "0.1"
+zeroize = "0.9"
+rpassword = "4.0"
+toml = "0.5"
