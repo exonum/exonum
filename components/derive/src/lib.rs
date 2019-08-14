@@ -21,7 +21,7 @@ mod tx_set;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Attribute, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
+use syn::{Attribute, Meta, MetaList, MetaNameValue, NestedMeta};
 
 // Exonum derive attribute names, used as
 // `#[exonum( [ ATTRIBUTE_NAME = ATTRIBUTE_VALUE or ATTRIBUTE_NAME ],* )]`
@@ -204,16 +204,12 @@ pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
 /// or with `exonum::` when outside.
 fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
     let map_attrs = get_exonum_name_value_attributes(attrs);
-    let crate_path = map_attrs.into_iter().find_map(|nv| match &nv {
-        MetaNameValue {
-            lit: Lit::Str(path),
-            ident,
-            ..
-        } if ident == CRATE_PATH_ATTRIBUTE => Some(
-            path.parse::<Path>()
-                .expect("failed to parse crate path in the attribute"),
-        ),
-        _ => None,
+    let crate_path = map_attrs.into_iter().find_map(|nv| {
+        if nv.path.is_ident(CRATE_PATH_ATTRIBUTE) {
+            Some(nv.path)
+        } else {
+            None
+        }
     });
 
     if let Some(path) = crate_path {
@@ -225,9 +221,11 @@ fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
 
 /// Extract attributes in the form of `#[exonum(name = "value")]`
 fn get_exonum_attributes(attrs: &[Attribute]) -> Vec<Meta> {
-    let exonum_meta = attrs
-        .iter()
-        .find_map(|attr| attr.parse_meta().ok().filter(|m| m.name() == "exonum"));
+    let exonum_meta = attrs.iter().find_map(|attr| {
+        attr.parse_meta()
+            .ok()
+            .filter(|m| m.path().is_ident("exonum"))
+    });
 
     match exonum_meta {
         Some(Meta::List(MetaList { nested: list, .. })) => list
@@ -253,8 +251,7 @@ fn get_exonum_name_value_attributes(attrs: &[Attribute]) -> Vec<MetaNameValue> {
 }
 
 fn find_exonum_word_attribute(attrs: &[Attribute], ident_name: &str) -> bool {
-    get_exonum_attributes(attrs).iter().any(|meta| match meta {
-        Meta::Word(ident) if ident == ident_name => true,
-        _ => false,
-    })
+    get_exonum_attributes(attrs)
+        .iter()
+        .any(|meta| meta.path().is_ident(ident_name))
 }
