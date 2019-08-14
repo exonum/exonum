@@ -25,7 +25,7 @@ use super::{
 fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
     let map_attrs = get_exonum_name_value_attributes(attrs);
     let struct_path = map_attrs.into_iter().find_map(|nv| {
-        if nv.ident == PB_CONVERT_ATTRIBUTE {
+        if nv.path.is_ident(PB_CONVERT_ATTRIBUTE) {
             match nv.lit {
                 Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
                 _ => None,
