@@ -556,6 +556,49 @@ fn test_restart_node_and_start_service_instance() {
     }
 }
 
+// TODO: This test shouldn't panic.
+#[test]
+#[should_panic(expected = "called `Result::unwrap()` on an `Err` value: NotFound")]
+fn test_restart_node_during_artifact_deployment() {
+    let testkit = TestKitBuilder::validator()
+        .with_logger()
+        .with_service(InstanceCollection::new(IncService))
+        .create();
+
+    let artifact = artifact_default();
+
+    assert!(!does_artifact_exist(&testkit.api(), &artifact.name));
+
+    let request = deploy_request(artifact.clone(), testkit.height().next());
+    let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
+    let hash = deploy_artifact(&testkit.api(), request);
+
+    // Restart the node after the deploy request was sent.
+    let mut testkit = testkit.stop().resume(vec![IncService]);
+
+    testkit.create_block();
+
+    testkit.api().exonum_api().assert_tx_success(hash);
+
+    // Restart the node again after the first block was created.
+    let mut testkit = testkit.stop().resume(vec![IncService]);
+
+    testkit.api().exonum_api().assert_tx_success(hash);
+
+    // Confirmation is ready.
+    assert!(testkit.is_tx_in_pool(&deploy_confirmation_hash));
+
+    testkit.create_block();
+
+    // Restart the node after the artifact was deployed.
+    let testkit = testkit.stop().resume(vec![IncService]);
+
+    // Confirmation is gone now.
+    assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
+
+    assert!(does_artifact_exist(&testkit.api(), &artifact.name));
+}
+
 /// This test emulates a normal workflow with two validators.
 #[test]
 fn test_multiple_validators() {
