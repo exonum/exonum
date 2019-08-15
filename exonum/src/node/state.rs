@@ -93,6 +93,9 @@ pub struct State {
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
     incomplete_block: Option<IncompleteBlock>,
+
+    // Cache that stores transactions before adding to persistent pool.
+    tx_cache: BTreeMap<Hash, Signed<RawTransaction>>,
 }
 
 /// State of a validator-node.
@@ -109,6 +112,8 @@ pub struct ValidatorState {
 pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
+    /// Represents `PoolTransactionsRequest` message.
+    PoolTransactions,
     /// Represents `TransactionsRequest` message for `Propose`.
     ProposeTransactions(Hash),
     /// Represents `TransactionsRequest` message for `BlockResponse`.
@@ -257,9 +262,9 @@ impl RequestData {
     pub fn timeout(&self) -> Duration {
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
-                TRANSACTIONS_REQUEST_TIMEOUT
-            }
+            RequestData::ProposeTransactions(..)
+            | RequestData::BlockTransactions
+            | RequestData::PoolTransactions => TRANSACTIONS_REQUEST_TIMEOUT,
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
@@ -484,6 +489,8 @@ impl State {
             config: stored,
 
             incomplete_block: None,
+
+            tx_cache: BTreeMap::new(),
         }
     }
 
@@ -548,6 +555,11 @@ impl State {
     /// Returns `ConsensusConfig`.
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
+    }
+
+    /// Returns `BTreeMap` with service configs identified by name.
+    pub fn services_config(&self) -> &BTreeMap<String, Value> {
+        &self.config.services
     }
 
     /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node
@@ -776,6 +788,11 @@ impl State {
     /// Returns a block with the specified hash.
     pub fn block(&self, hash: &Hash) -> Option<&BlockState> {
         self.blocks.get(hash)
+    }
+
+    /// Returns a mutable block with the specified hash.
+    pub fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
+        self.blocks.get_mut(hash)
     }
 
     /// Updates mode's round.
@@ -1204,5 +1221,20 @@ impl State {
             .write()
             .expect("ConnectList write lock");
         list.add(peer);
+    }
+
+    /// Returns the transactions cache length.
+    pub fn tx_cache_len(&self) -> usize {
+        self.tx_cache.len()
+    }
+
+    /// Returns reference to the transactions cache.
+    pub fn tx_cache(&self) -> &BTreeMap<Hash, Signed<RawTransaction>> {
+        &self.tx_cache
+    }
+
+    /// Returns mutable reference to the transactions cache.
+    pub fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Signed<RawTransaction>> {
+        &mut self.tx_cache
     }
 }

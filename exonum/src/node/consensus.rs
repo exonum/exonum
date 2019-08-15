@@ -696,17 +696,10 @@ impl NodeHandler {
             if self.state.have_prevote(round) {
                 return;
             }
-            let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
-            let pool = schema.transactions_pool();
-            let pool_len = schema.transactions_pool_len();
-
-            info!("LEADER: pool = {}", pool_len);
-
             let round = self.state.round();
-            let max_count = ::std::cmp::min(u64::from(self.txs_block_limit()), pool_len);
 
-            let txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
+            let txs = self.get_txs_for_propose();
+
             let propose = self.sign_message(Propose::new(
                 validator_id,
                 self.state.height(),
@@ -733,6 +726,33 @@ impl NodeHandler {
         }
     }
 
+    fn get_txs_for_propose(&self) -> Vec<Hash> {
+        let txs_cache_len = self.state.tx_cache_len() as u64;
+        let tx_block_limit = self.txs_block_limit();
+
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+        let pool = schema.transactions_pool();
+        let pool_len = schema.transactions_pool_len();
+
+        info!("LEADER: pool = {}, cache = {}", pool_len, txs_cache_len);
+
+        let remaining_tx_count = tx_block_limit.saturating_sub(txs_cache_len as u32);
+        let cache_max_count = ::std::cmp::min(u64::from(tx_block_limit), txs_cache_len);
+
+        let mut cache_txs: Vec<Hash> = self
+            .state
+            .tx_cache()
+            .keys()
+            .take(cache_max_count as usize)
+            .cloned()
+            .collect();
+        let pool_txs: Vec<Hash> = pool.iter().take(remaining_tx_count as usize).collect();
+
+        cache_txs.extend(pool_txs);
+        cache_txs
+    }
+
     /// Handles request timeout by sending the corresponding request message to a peer.
     pub fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
         trace!("HANDLE REQUEST TIMEOUT");
@@ -755,6 +775,9 @@ impl NodeHandler {
                         .collect();
                     self.sign_message(TransactionsRequest::new(peer, txs))
                         .into()
+                }
+                RequestData::PoolTransactions => {
+                    self.sign_message(PoolTransactionsRequest::new(peer)).into()
                 }
                 RequestData::BlockTransactions => {
                     let txs: Vec<_> = match self.state.incomplete_block() {

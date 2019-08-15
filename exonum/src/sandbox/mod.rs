@@ -795,6 +795,10 @@ impl Sandbox {
         assert_eq!(expected, schema.transactions_pool_len());
     }
 
+    pub fn assert_tx_cache_len(&self, expected: u64) {
+        assert_eq!(expected, self.node_state().tx_cache_len() as u64);
+    }
+
     pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
         let state = self.node_state();
 

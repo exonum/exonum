@@ -157,6 +157,8 @@ impl NodeHandler {
             return;
         }
 
+        let peer = msg.author();
+
         // Handle message from future height
         if msg.payload().height() > height {
             let peer = msg.author();
@@ -169,6 +171,10 @@ impl NodeHandler {
 
             // Request block
             self.request(RequestData::Block(height), peer);
+        }
+
+        if self.uncommitted_txs_count() == 0 && msg.pool_size() > 0 {
+            self.request(RequestData::PoolTransactions, peer);
         }
     }
 

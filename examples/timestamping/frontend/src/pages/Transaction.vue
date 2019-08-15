@@ -1,11 +1,21 @@
 <template>
   <div>
-    <div class="container mt-5">
-      <div class="row justify-content-sm-center">
-        <div class="col-md-6 col-md-offset-3">
-          <h1>Transaction</h1>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-12">
+          <nav v-if="location.block_height" class="mt-5" aria-label="breadcrumb">
+            <ol class="breadcrumb">
+              <li class="breadcrumb-item">
+                <router-link :to="{ name: 'blockchain' }">Blockchain</router-link>
+              </li>
+              <li class="breadcrumb-item">
+                <router-link :to="{ name: 'block', params: { height: location.block_height } }">Block {{ location.block_height }}</router-link>
+              </li>
+              <li class="breadcrumb-item active" aria-current="page">Transaction {{ hash }}</li>
+            </ol>
+          </nav>
 
-          <div v-if="location.block_height" class="card mt-5">
+          <div class="card mt-5">
             <div class="card-header">Transaction</div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
@@ -16,7 +26,7 @@
                   </div>
                 </div>
               </li>
-              <li class="list-group-item">
+              <li v-if="location.block_height" class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Block:</strong></div>
                   <div class="col-sm-9">

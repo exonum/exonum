@@ -212,7 +212,7 @@ where
     }
 }
 
-/// Checks that latin1 character is allowed in index name.
+/// Check that latin1 character is allowed in index name.
 /// Only these combination of symbols are allowed:
 ///
 /// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`, `.`
@@ -228,7 +228,7 @@ pub fn is_allowed_latin1_char(c: u8) -> bool {
     }
 }
 
-/// Validates index name.
+/// Validate index name.
 pub fn is_valid_index_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref()
         .as_bytes()

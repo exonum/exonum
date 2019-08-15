@@ -377,7 +377,7 @@ mod tests {
             #[test]
             fn $test_name() {
                 use rand::{distributions::Standard, thread_rng, Rng};
-                let mut rng = thread_rng();
+                let rng = thread_rng();
 
                 // Fuzzed roundtrip
                 let mut buffer = [0_u8; $size];

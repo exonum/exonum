@@ -51,6 +51,7 @@ impl NodeHandler {
             Requests::PrevotesRequest(ref msg) => self.handle_request_prevotes(msg),
             Requests::PeersRequest(ref msg) => self.handle_request_peers(msg),
             Requests::BlockRequest(ref msg) => self.handle_request_block(msg),
+            Requests::PoolTransactionsRequest(ref msg) => self.handle_request_pool_txs(msg),
         }
     }
 
@@ -77,6 +78,23 @@ impl NodeHandler {
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &Verified<TransactionsRequest>) {
         trace!("HANDLE TRANSACTIONS REQUEST");
+        self.send_transactions_by_hash(&msg.author(), &msg.txs);
+    }
+
+    /// Handles `PoolTransactionsRequest` message. For details see the message documentation.
+    pub fn handle_request_pool_txs(&mut self, msg: &Signed<PoolTransactionsRequest>) {
+        trace!("HANDLE POOL TRANSACTIONS REQUEST");
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+
+        let mut hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
+        hashes.extend(self.state.tx_cache().keys().cloned());
+
+        self.send_transactions_by_hash(&msg.author(), &hashes);
+    }
+
+    fn send_transactions_by_hash(&mut self, author: &PublicKey, hashes: &[Hash]) {
+        use std::mem;
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let mut txs = Vec::new();

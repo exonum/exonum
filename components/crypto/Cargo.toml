@@ -1,6 +1,6 @@
 [package]
 name = "exonum-crypto"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -12,14 +12,18 @@ categories = ["cryptography", "hashing"]
 description = "Cryptography related types, constants, traits and functions."
 
 [dependencies]
+byteorder = { version = "1.2.7", features = [ "i128" ] }
+chrono = "0.4.6"
 hex = "0.3.2"
 hex-buffer-serde = "0.2.0"
-pwbox = "0.1.4"
-rand = "0.6"
+pwbox = "0.2.0"
+rand = "0.7"
+rust_decimal = "1.0"
 serde = "1.0.10"
 serde_derive = "1.0.64"
 serde_json = "1.0.19"
 toml = "0.5.0"
+uuid = "0.7.1"
 exonum_sodiumoxide = { version = "0.0.22", optional = true }
 
 [dev-dependencies]

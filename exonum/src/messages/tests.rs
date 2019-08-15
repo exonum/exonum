@@ -262,3 +262,13 @@ fn test_precommit_serde_wrong_signature() {
     let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
     assert_eq!(precommit2, precommit);
 }
+
+#[test]
+fn test_raw_transaction_small_size() {
+    assert!(ServiceTransaction::from_bytes(Cow::from(&vec![0_u8; 1])).is_err());
+    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 2])).is_err());
+    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 3])).is_err());
+    let tx = RawTransaction::from_bytes(Cow::from(&vec![0_u8; 4])).unwrap();
+    assert_eq!(tx.service_id, 0);
+    assert_eq!(tx.service_transaction.transaction_id, 0);
+}
