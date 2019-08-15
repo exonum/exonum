@@ -48,7 +48,8 @@ fn assert_count(api: &TestKitApi, service_name: &'static str, expected_count: u6
     assert_eq!(real_count, expected_count);
 }
 
-fn assert_no_count(api: &TestKitApi, service_name: &'static str) {
+/// Check that the service's counter isn't started yet (no TxInc txs were received).
+fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
     let response: api::Result<u64> = api.public(ApiKind::Service(service_name)).get("v1/counter");
     assert!(response.is_err());
 }
@@ -238,7 +239,7 @@ fn test_static_service() {
     let mut testkit = testkit_with_inc_service_and_static_instance();
     let api = testkit.api();
 
-    assert_no_count(&api, SERVICE_NAME);
+    assert_count_is_not_set(&api, SERVICE_NAME);
 
     let (key_pub, key_priv) = crypto::gen_keypair();
 
@@ -251,7 +252,7 @@ fn test_static_service() {
     assert_count(&api, SERVICE_NAME, 2);
 }
 
-/// Tests a normal dynamic service workflow with one validator.
+/// Test a normal dynamic service workflow with one validator.
 #[test]
 fn test_dynamic_service_normal_workflow() {
     let mut testkit = testkit_with_inc_service();
@@ -260,7 +261,7 @@ fn test_dynamic_service_normal_workflow() {
     let instance_id = start_service_instance(&mut testkit, instance_name);
     let api = testkit.api();
 
-    assert_no_count(&api, instance_name);
+    assert_count_is_not_set(&api, instance_name);
 
     let (key_pub, key_priv) = crypto::gen_keypair();
 
@@ -274,7 +275,7 @@ fn test_dynamic_service_normal_workflow() {
 }
 
 #[test]
-fn test_artifact_deploy_bad_deadline_height() {
+fn test_artifact_deploy_with_already_passed_deadline_height() {
     let mut testkit = testkit_with_inc_service();
 
     // We skip to Height(1) ...
@@ -306,7 +307,7 @@ fn test_artifact_deploy_bad_deadline_height() {
 }
 
 #[test]
-fn test_start_service_instance_bad_deadline_height() {
+fn test_start_service_instance_with_already_passed_deadline_height() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit);
 
@@ -526,7 +527,7 @@ fn test_restart_node_and_start_service_instance() {
 
     // Check that the service instance actually works.
     {
-        assert_no_count(&api, instance_name);
+        assert_count_is_not_set(&api, instance_name);
 
         api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
@@ -627,7 +628,7 @@ fn test_multiple_validators() {
 
     // Basic check that service works.
     {
-        assert_no_count(&api, instance_name);
+        assert_count_is_not_set(&api, instance_name);
 
         let (key_pub, key_priv) = crypto::gen_keypair();
 
@@ -780,7 +781,7 @@ fn test_auditor_normal_workflow() {
 
     // Check that service still works.
     {
-        assert_no_count(&api, instance_name);
+        assert_count_is_not_set(&api, instance_name);
 
         let (key_pub, key_priv) = crypto::gen_keypair();
 
