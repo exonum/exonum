@@ -19,7 +19,7 @@ use exonum_crypto::Hash;
 
 use super::{super::BinaryValue, key::ProofListKey, HashTag};
 
-/// An enum that represents a proof of existence/absence for a proof list elements.
+/// An enum that represents a proof of existence/absence for elements in a proof list.
 ///
 /// Proof of absence for an element with the specified index consists of
 /// `merkle_root` of `ProofListIndex` and `length` of the list.
@@ -43,7 +43,8 @@ pub enum ProofVariant<V> {
     Right(Hash, Box<ProofVariant<V>>),
     /// A leaf of the proof with the requested element.
     Leaf(V),
-    /// Proof of absence of an element with the specified index.
+    /// Part of the proof of absence of an element. Full proof is represented by `ListProof`
+    /// which also contains length of the list.
     Absent(Hash),
 }
 
@@ -146,7 +147,7 @@ where
                 vec.push((key.index(), value));
                 HashTag::hash_leaf(&value.to_bytes())
             }
-            ProofVariant::Absent(merkle_root) => merkle_root,
+            ProofVariant::Absent(hash) => hash,
         };
         Ok(hash)
     }
@@ -184,9 +185,9 @@ impl<V: Serialize> Serialize for ProofVariant<V> {
                 state = ser.serialize_struct("Leaf", 1)?;
                 state.serialize_field("val", val)?;
             }
-            ProofVariant::Absent(merkle_root) => {
+            ProofVariant::Absent(hash) => {
                 state = ser.serialize_struct("Absent", 1)?;
-                state.serialize_field("hash", &merkle_root)?;
+                state.serialize_field("hash", &hash)?;
             }
         }
         state.end()

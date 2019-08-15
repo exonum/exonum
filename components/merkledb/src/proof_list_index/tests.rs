@@ -678,8 +678,8 @@ fn assert_proof_of_absence<V: BinaryValue + ObjectHash + Debug>(
     assert!(validation_result.is_ok());
     assert!(validation_result.unwrap().is_empty());
 
-    if let ProofVariant::Absent(merkle_root) = proof.proof_variant() {
-        let actual_hash = HashTag::hash_list_node(proof.length(), *merkle_root);
+    if let ProofVariant::Absent(hash) = proof.proof_variant() {
+        let actual_hash = HashTag::hash_list_node(proof.length(), *hash);
         assert_eq!(expected_hash, actual_hash);
     } else {
         panic!("Unexpected proof {:?}", proof);
