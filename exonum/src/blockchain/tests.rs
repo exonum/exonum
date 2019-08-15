@@ -29,16 +29,13 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{
-            RustArtifactId, Service, ServiceDescriptor, ServiceFactory, Transaction,
-            TransactionContext,
-        },
-        AnyTx, ArtifactId, ArtifactInfo, ExecutionError, ServiceInstanceId,
+        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
+        AnyTx, ArtifactId, ArtifactProtobufSpec, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 
 const IDX_NAME: &str = "idx_name";
-const TEST_SERVICE_ID: ServiceInstanceId = 255;
+const TEST_SERVICE_ID: InstanceId = 255;
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
@@ -85,7 +82,7 @@ struct TestDispatcherService;
 impl Service for TestDispatcherService {
     fn configure(
         &self,
-        _descriptor: ServiceDescriptor,
+        _descriptor: InstanceDescriptor,
         _fork: &Fork,
         params: Any,
     ) -> Result<(), ExecutionError> {
@@ -197,8 +194,8 @@ impl ServiceFactory for ServiceGoodImpl {
         RustArtifactId::new("good_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -225,8 +222,8 @@ impl ServiceFactory for ServicePanicImpl {
         RustArtifactId::new("panic_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -253,8 +250,8 @@ impl ServiceFactory for ServicePanicStorageErrorImpl {
         RustArtifactId::new("storage_error_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -262,7 +259,7 @@ impl ServiceFactory for ServicePanicStorageErrorImpl {
     }
 }
 
-const TX_CHECK_RESULT_SERVICE_ID: ServiceInstanceId = 255;
+const TX_CHECK_RESULT_SERVICE_ID: InstanceId = 255;
 
 lazy_static! {
     static ref EXECUTION_STATUS: Mutex<Result<(), ExecutionError>> = Mutex::new(Ok(()));
@@ -297,8 +294,8 @@ impl ServiceFactory for TxResultCheckService {
         RustArtifactId::new("good_service", 1, 0, 0)
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

@@ -22,7 +22,7 @@ use exonum::{
     crypto::{gen_keypair, hash, Hash},
     helpers::Height,
     messages::Verified,
-    runtime::{rust::Transaction, AnyTx, ServiceInstanceId},
+    runtime::{rust::Transaction, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
@@ -36,9 +36,9 @@ use exonum_timestamping::{
 
 use std::time::SystemTime;
 
-const TIME_SERVICE_ID: ServiceInstanceId = 2;
+const TIME_SERVICE_ID: InstanceId = 2;
 const TIME_SERVICE_NAME: &str = "my-time";
-const SERVICE_ID: ServiceInstanceId = 3;
+const SERVICE_ID: InstanceId = 3;
 const SERVICE_NAME: &str = "my-timestamping";
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {

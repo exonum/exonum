@@ -18,7 +18,7 @@ extern crate serde_derive;
 // HACK: Silent "dead_code" warning.
 pub use crate::hooks::{AfterCommitService, TxAfterCommit, SERVICE_ID, SERVICE_NAME};
 
-use exonum::{helpers::Height, runtime::rust::Transaction};
+use exonum::{explorer::BlockchainExplorer, helpers::Height, runtime::rust::Transaction};
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
 
@@ -52,8 +52,8 @@ fn test_after_commit() {
         assert!(testkit.is_tx_in_pool(&tx.object_hash()));
     }
 
-    let expected_block_sizes = testkit
-        .explorer()
+    let snapshot = testkit.snapshot();
+    let expected_block_sizes = BlockchainExplorer::new(snapshot.as_ref())
         .blocks(Height(1)..)
         .all(|block| block.len() == if block.height() == Height(1) { 0 } else { 1 });
     assert!(expected_block_sizes);
@@ -93,8 +93,8 @@ fn restart_testkit() {
                 .object_hash()
         })
         .all(|hash| {
-            testkit
-                .explorer()
+            let snapshot = testkit.snapshot();
+            BlockchainExplorer::new(snapshot.as_ref())
                 .transaction_without_proof(&hash)
                 .is_some()
         });

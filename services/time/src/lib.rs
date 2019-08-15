@@ -43,9 +43,12 @@ pub mod time_provider;
 pub mod transactions;
 
 use exonum::{
-    api::ServiceApiBuilder,
     crypto::Hash,
-    runtime::rust::{AfterCommitContext, Service, ServiceDescriptor},
+    runtime::{
+        api::ServiceApiBuilder,
+        rust::{AfterCommitContext, Service},
+        InstanceDescriptor,
+    },
 };
 use exonum_merkledb::Snapshot;
 
@@ -68,14 +71,13 @@ pub struct TimeService {
 }
 
 impl Service for TimeService {
-    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        let name = descriptor.service_name();
-        api::PublicApi::new(name).wire(builder);
-        api::PrivateApi::new(name).wire(builder);
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi.wire(builder);
+        api::PrivateApi.wire(builder);
     }
 
-    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = TimeSchema::new(descriptor.service_name(), snapshot);
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = TimeSchema::new(descriptor.name, snapshot);
         schema.state_hash()
     }
 

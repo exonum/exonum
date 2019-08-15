@@ -21,10 +21,10 @@ use exonum::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        AnyTx, ServiceInstanceId,
+        AnyTx, InstanceId,
         {
             rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-            ArtifactInfo,
+            ArtifactProtobufSpec,
         },
     },
 };
@@ -32,7 +32,7 @@ use exonum_merkledb::{ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
 use semver::Version;
 
-pub const SERVICE_ID: ServiceInstanceId = 4;
+pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
 
@@ -109,8 +109,8 @@ impl ServiceFactory for MyService {
         }
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

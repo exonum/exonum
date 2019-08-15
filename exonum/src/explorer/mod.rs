@@ -31,9 +31,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{
-        Block, Blockchain, ExecutionError, ExecutionStatus, Schema, TransactionMessage, TxLocation,
-    },
+    blockchain::{Block, ExecutionError, ExecutionStatus, Schema, TransactionMessage, TxLocation},
     crypto::Hash,
     helpers::Height,
     messages::{Precommit, Verified},
@@ -70,14 +68,14 @@ fn end_height(bound: Bound<&Height>, max: Height) -> Height {
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
     header: Block,
-    explorer: &'a BlockchainExplorer,
+    explorer: &'a BlockchainExplorer<'a>,
     precommits: RefCell<Option<Vec<Verified<Precommit>>>>,
     txs: RefCell<Option<Vec<Hash>>>,
 }
 
 impl<'a> BlockInfo<'a> {
     fn new(explorer: &'a BlockchainExplorer, height: Height) -> Self {
-        let schema = Schema::new(&explorer.snapshot);
+        let schema = Schema::new(explorer.snapshot);
         let header = {
             let hashes = schema.block_hashes_by_height();
             let blocks = schema.blocks();
@@ -508,27 +506,20 @@ impl TransactionInfo {
 /// all calls to the methods of an explorer instance are guaranteed to be consistent.
 ///
 /// [`Snapshot`]: ../../exonum_merkledb/trait.Snapshot.html
-pub struct BlockchainExplorer {
-    snapshot: Box<dyn Snapshot>,
+#[derive(Debug, Copy, Clone)]
+pub struct BlockchainExplorer<'a> {
+    snapshot: &'a dyn Snapshot,
 }
 
-impl fmt::Debug for BlockchainExplorer {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        f.debug_struct("BlockchainExplorer").finish()
-    }
-}
-
-impl BlockchainExplorer {
-    /// Creates a new `BlockchainExplorer` instance.
-    pub fn new(blockchain: &Blockchain) -> Self {
-        BlockchainExplorer {
-            snapshot: blockchain.snapshot(),
-        }
+impl<'a> BlockchainExplorer<'a> {
+    /// Create a new `BlockchainExplorer` instance.
+    pub fn new(snapshot: &'a dyn Snapshot) -> Self {
+        BlockchainExplorer { snapshot }
     }
 
-    /// Returns information about the transaction identified by the hash.
+    /// Return information about the transaction identified by the hash.
     pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
         let content = self.transaction_without_proof(tx_hash)?;
         if schema.transactions_pool().contains(tx_hash) {
             return Some(TransactionInfo::InPool { content });
@@ -538,20 +529,20 @@ impl BlockchainExplorer {
         Some(TransactionInfo::Committed(tx))
     }
 
-    /// Returns transaction message without proof.
+    /// Return transaction message without proof.
     pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<TransactionMessage> {
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
         schema.transactions().get(tx_hash)
     }
 
     fn precommits(&self, block: &Block) -> Vec<Verified<Precommit>> {
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
         let precommits_table = schema.precommits(&block.object_hash());
         precommits_table.iter().collect()
     }
 
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
         let tx_hashes_table = schema.block_transactions(block.height());
         tx_hashes_table.iter().collect()
     }
@@ -562,7 +553,7 @@ impl BlockchainExplorer {
         tx_hash: &Hash,
         maybe_content: Option<TransactionMessage>,
     ) -> CommittedTransaction {
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
 
         let location = schema
             .transactions_locations()
@@ -595,9 +586,9 @@ impl BlockchainExplorer {
         }
     }
 
-    /// Returns the height of the blockchain.
+    /// Return the height of the blockchain.
     pub fn height(&self) -> Height {
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
         schema.height()
     }
 
@@ -610,10 +601,10 @@ impl BlockchainExplorer {
         }
     }
 
-    /// Returns block together with its transactions for the specified height, or `None`
+    /// Return a block together with its transactions at the specified height, or `None`
     /// if there is no such block.
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
         let txs_table = schema.block_transactions(height);
         let block_proof = schema.block_and_precommits(height);
 
@@ -631,7 +622,7 @@ impl BlockchainExplorer {
     pub fn blocks<R: RangeBounds<Height>>(&self, heights: R) -> Blocks {
         use std::cmp::max;
 
-        let schema = Schema::new(&self.snapshot);
+        let schema = Schema::new(self.snapshot);
         let max_height = schema.height();
 
         let ptr = match heights.start_bound() {
@@ -649,7 +640,7 @@ impl BlockchainExplorer {
 
 /// Iterator over blocks in the blockchain.
 pub struct Blocks<'a> {
-    explorer: &'a BlockchainExplorer,
+    explorer: &'a BlockchainExplorer<'a>,
     ptr: Height,
     back: Height,
 }

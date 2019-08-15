@@ -15,17 +15,16 @@
 pub use crate::proto::schema::tests::TxConfig;
 
 use exonum_merkledb::BinaryValue;
-use semver::Version;
 
 use crate::{
     blockchain::{ExecutionError, Schema, StoredConfiguration},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, Verified},
-    proto::{schema::PROTO_SOURCES, ProtobufConvert},
+    proto::ProtobufConvert,
     runtime::{
-        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        rust::{Service, Transaction, TransactionContext},
+        InstanceId,
     },
 };
 
@@ -38,7 +37,13 @@ pub trait ConfigUpdaterInterface {
     ) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "config_updater",
+    artifact_version = "0.1.0",
+    proto_sources = "crate::proto::schema"
+)]
 pub struct ConfigUpdaterService;
 
 impl ConfigUpdaterInterface for ConfigUpdaterService {
@@ -56,27 +61,8 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
 
 impl Service for ConfigUpdaterService {}
 
-impl ServiceFactory for ConfigUpdaterService {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId {
-            name: "config_updater".into(),
-            version: Version::new(0, 1, 0),
-        }
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
-
 impl ConfigUpdaterService {
-    pub const ID: ServiceInstanceId = 2;
+    pub const ID: InstanceId = 2;
 }
 
 impl TxConfig {

@@ -13,16 +13,16 @@
 // limitations under the License.
 
 use exonum::{
-    api,
     blockchain::Schema as CoreSchema,
     crypto::PublicKey,
     helpers::Height,
     runtime::{
-        rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        api::{self, ServiceApiBuilder},
+        rust::{Service, TransactionContext},
+        InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
+use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
 use exonum_merkledb::{IndexAccess, MapIndex};
 use serde_derive::{Deserialize, Serialize};
 
@@ -30,10 +30,10 @@ use super::proto;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
-pub const SERVICE_ID: ServiceInstanceId = 55;
+pub const SERVICE_ID: InstanceId = 55;
 pub const SERVICE_NAME: &str = "cryptocurrency";
 
-/// Initial balance of newly created wallet.
+/// Initial balance of a newly created wallet.
 pub const INIT_BALANCE: u64 = 0;
 
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
@@ -181,17 +181,17 @@ impl CryptocurrencyApi {
     /// Endpoint for retrieving a single wallet.
     fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<u64> {
         let snapshot = state.snapshot();
-        let schema = CurrencySchema::new(&snapshot);
+        let schema = CurrencySchema::new(snapshot);
         schema
             .wallet(&query.pub_key)
             .map(|wallet| {
-                let height = CoreSchema::new(&snapshot).height();
+                let height = CoreSchema::new(snapshot).height();
                 wallet.actual_balance(height)
             })
             .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
     }
 
-    fn wire(builder: &mut api::ServiceApiBuilder) {
+    fn wire(builder: &mut ServiceApiBuilder) {
         builder.public_scope().endpoint("v1/balance", Self::balance);
     }
 }
@@ -199,28 +199,17 @@ impl CryptocurrencyApi {
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 /// Define the service.
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "cryptocurrency",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto"
+)]
 pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut api::ServiceApiBuilder) {
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
-    }
-}
-
-impl ServiceFactory for CurrencyService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "cryptocurrency:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }

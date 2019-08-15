@@ -31,7 +31,7 @@ use exonum::{
     messages::Verified,
     runtime::{
         rust::{Service, Transaction, TransactionContext},
-        AnyTx, ServiceInstanceId,
+        AnyTx, InstanceId,
     },
 };
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
@@ -45,12 +45,12 @@ use std::sync::Arc;
 
 mod proto;
 
-/// Time oracle instance id.
-const TIME_SERVICE_ID: ServiceInstanceId = 112;
+/// Time oracle instance ID.
+const TIME_SERVICE_ID: InstanceId = 112;
 /// Time oracle instance name.
 const TIME_SERVICE_NAME: &str = "time-oracle";
-/// Marker service id.
-const SERVICE_ID: ServiceInstanceId = 128;
+/// Marker service ID.
+const SERVICE_ID: InstanceId = 128;
 /// Marker service name.
 const SERVICE_NAME: &str = "marker";
 

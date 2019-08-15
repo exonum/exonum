@@ -104,7 +104,7 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            AnyTx, ArtifactInfo, ServiceInstanceId,
+            AnyTx, ArtifactProtobufSpec, InstanceId,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -113,7 +113,7 @@ mod timestamping {
     use super::gen_keypair_from_rng;
     use crate::proto;
 
-    const TIMESTAMPING_SERVICE_ID: ServiceInstanceId = 254;
+    const TIMESTAMPING_SERVICE_ID: InstanceId = 254;
 
     #[exonum_service(dispatcher = "Timestamping")]
     pub trait TimestampingInterface {
@@ -149,8 +149,8 @@ mod timestamping {
             "timestamping/0.0.1".parse().unwrap()
         }
 
-        fn artifact_info(&self) -> ArtifactInfo {
-            ArtifactInfo::default()
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
         }
 
         fn create_instance(&self) -> Box<dyn Service> {
@@ -204,7 +204,7 @@ mod cryptocurrency {
         messages::Verified,
         runtime::{
             rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            AnyTx, ArtifactInfo, ErrorKind, ServiceInstanceId,
+            AnyTx, ArtifactProtobufSpec, ErrorKind, InstanceId,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
@@ -213,7 +213,7 @@ mod cryptocurrency {
     use super::gen_keypair_from_rng;
     use crate::proto;
 
-    const CRYPTOCURRENCY_SERVICE_ID: ServiceInstanceId = 255;
+    const CRYPTOCURRENCY_SERVICE_ID: InstanceId = 255;
 
     // Number of generated accounts.
     const KEY_COUNT: usize = super::PREPARE_TRANSACTIONS / 10;
@@ -302,8 +302,8 @@ mod cryptocurrency {
             "cryptocurrency/0.0.1".parse().unwrap()
         }
 
-        fn artifact_info(&self) -> ArtifactInfo {
-            ArtifactInfo::default()
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
         }
 
         fn create_instance(&self) -> Box<dyn Service> {

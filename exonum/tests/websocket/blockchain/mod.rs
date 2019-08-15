@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, Node},
     runtime::{
         rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        ArtifactProtobufSpec, InstanceId,
     },
 };
 use exonum_merkledb::TemporaryDB;
@@ -33,7 +33,7 @@ use std::{
 
 mod proto;
 
-pub const SERVICE_ID: ServiceInstanceId = 118;
+pub const SERVICE_ID: InstanceId = 118;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CreateWallet")]
@@ -100,8 +100,8 @@ impl ServiceFactory for MyService {
         "ws-test:0.1.0".parse().unwrap()
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

@@ -80,7 +80,8 @@ pub fn sample_blockchain() -> Blockchain {
 
 fn main() {
     let blockchain = sample_blockchain();
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
 
     // `BlockInfo` usage
     let block: BlockInfo = explorer.block(Height(1)).unwrap();

@@ -17,11 +17,10 @@ use failure::Fail;
 
 use super::{DeployRequest, StartService};
 use crate::{
-    api::{self, ServiceApiBuilder, ServiceApiState},
     crypto::Hash,
     runtime::{
-        rust::{ServiceDescriptor, Transaction},
-        ServiceInstanceId,
+        api::{self, ServiceApiBuilder, ServiceApiState},
+        rust::Transaction,
     },
 };
 
@@ -37,39 +36,20 @@ pub trait PrivateApi {
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
 }
 
-struct ApiImpl<'a> {
-    state: &'a ServiceApiState,
-    instance_id: ServiceInstanceId,
-    _instance_name: String,
-}
+struct ApiImpl<'a>(&'a ServiceApiState<'a>);
 
 impl<'a> ApiImpl<'a> {
-    fn new(
-        state: &'a ServiceApiState,
-        instance_id: ServiceInstanceId,
-        instance_name: &str,
-    ) -> Self {
-        Self {
-            state,
-            instance_id,
-            _instance_name: instance_name.to_owned(),
-        }
-    }
-
     fn broadcast_transaction(&self, transaction: impl Transaction) -> Result<Hash, failure::Error> {
-        let signed = transaction.sign(
-            self.instance_id,
-            *self.state.public_key(),
-            self.state.secret_key(),
-        );
+        let keypair = self.0.service_keypair();
+        let signed = transaction.sign(self.0.instance().id, *keypair.0, keypair.1);
 
         let hash = signed.object_hash();
-        self.state.sender().broadcast_transaction(signed)?;
+        self.0.sender().broadcast_transaction(signed)?;
         Ok(hash)
     }
 }
 
-impl<'a> PrivateApi for ApiImpl<'a> {
+impl PrivateApi for ApiImpl<'_> {
     type Error = api::Error;
 
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
@@ -81,22 +61,13 @@ impl<'a> PrivateApi for ApiImpl<'a> {
     }
 }
 
-pub fn wire(descriptor: &ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-    let instance_id = descriptor.service_id();
-    let instance_name = descriptor.service_name().to_owned();
-
+pub fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
-        .endpoint_mut("deploy-artifact", {
-            let instance_name = instance_name.clone();
-            move |state: &ServiceApiState, artifact: DeployRequest| {
-                ApiImpl::new(state, instance_id, &instance_name).deploy_artifact(artifact)
-            }
+        .endpoint_mut("deploy-artifact", |state, query| {
+            ApiImpl(state).deploy_artifact(query)
         })
-        .endpoint_mut("start-service", {
-            let instance_name = instance_name.clone();
-            move |state: &ServiceApiState, service: StartService| {
-                ApiImpl::new(state, instance_id, &instance_name).start_service(service)
-            }
+        .endpoint_mut("start-service", |state, query| {
+            ApiImpl(state).start_service(query)
         });
 }

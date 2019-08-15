@@ -17,7 +17,7 @@
 use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
-use exonum_merkledb::ObjectHash;
+use exonum_merkledb::{ObjectHash, Snapshot};
 use futures::{Future, IntoFuture};
 use hex::FromHex;
 
@@ -33,13 +33,14 @@ use crate::{
         },
         node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
-        Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+        ApiBackend, ApiContext, ApiScope, Error as ApiError,
     },
     blockchain::Block,
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
     messages::{Precommit, SignedMessage, Verified},
+    node::ApiSender,
     runtime::CallInfo,
 };
 
@@ -171,17 +172,24 @@ impl AsRef<[u8]> for TransactionHex {
 }
 
 /// Exonum blockchain explorer API.
-#[derive(Debug, Clone, Copy)]
-pub struct ExplorerApi;
+#[derive(Debug, Clone)]
+pub struct ExplorerApi {
+    context: ApiContext,
+}
 
 impl ExplorerApi {
-    /// Returns the explored range and the corresponding headers. The range specifies the smallest
+    /// Create a new `ExplorerApi` instance.
+    pub fn new(context: ApiContext) -> Self {
+        Self { context }
+    }
+
+    /// Return the explored range and the corresponding headers. The range specifies the smallest
     /// and largest heights traversed to collect the number of blocks specified in
     /// the [`BlocksQuery`] struct.
     ///
     /// [`BlocksQuery`]: struct.BlocksQuery.html
-    pub fn blocks(state: &ServiceApiState, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
-        let explorer = BlockchainExplorer::new(state.blockchain());
+    pub fn blocks(snapshot: &dyn Snapshot, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::BadRequest(format!(
                 "Max block count per request exceeded ({})",
@@ -243,9 +251,9 @@ impl ExplorerApi {
         })
     }
 
-    /// Returns the content for a block at a specific height.
-    pub fn block(state: &ServiceApiState, query: BlockQuery) -> Result<BlockInfo, ApiError> {
-        BlockchainExplorer::new(state.blockchain())
+    /// Return the content for a block at a specific height.
+    pub fn block(snapshot: &dyn Snapshot, query: BlockQuery) -> Result<BlockInfo, ApiError> {
+        BlockchainExplorer::new(snapshot)
             .block(query.height)
             .map(From::from)
             .ok_or_else(|| {
@@ -253,28 +261,29 @@ impl ExplorerApi {
             })
     }
 
-    /// Searches for a transaction, either committed or uncommitted, by the hash.
+    /// Search for a transaction, either committed or uncommitted, by the hash.
     pub fn transaction_info(
-        state: &ServiceApiState,
+        snapshot: &dyn Snapshot,
         query: TransactionQuery,
     ) -> Result<TransactionInfo, ApiError> {
-        BlockchainExplorer::new(state.blockchain())
+        BlockchainExplorer::new(snapshot)
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
                 ApiError::NotFound(description)
             })
     }
-    /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
+
+    /// Add transaction into the pool of unconfirmed transactions, and broadcast transaction to other nodes.
+    // TODO move this method to the public system API [ECR-3222]
     pub fn add_transaction(
-        state: &ServiceApiState,
+        sender: &ApiSender,
         query: TransactionHex,
     ) -> Result<TransactionResponse, ApiError> {
         let msg = SignedMessage::from_hex(query.tx_body)?;
         let tx_hash = msg.object_hash();
         // FIXME Don't ignore message error.
-        let _ = state
-            .sender()
+        let _ = sender
             .broadcast_transaction(msg.into_verified()?)
             .map_err(ApiError::from);
         Ok(TransactionResponse { tx_hash })
@@ -284,21 +293,20 @@ impl ExplorerApi {
     pub fn handle_ws<Q>(
         name: &'static str,
         backend: &mut actix_backend::ApiBuilder,
-        service_api_state: ServiceApiState,
+        context: ApiContext,
         shared_node_state: SharedNodeState,
         extract_query: Q,
     ) where
         Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
     {
         let server = Arc::new(Mutex::new(None));
-        let service_api_state = Arc::new(service_api_state);
 
         let index = move |request: HttpRequest| -> FutureResponse {
             let server = server.clone();
-            let service_api_state = service_api_state.clone();
+            let context = context.clone();
             let mut address = server.lock().expect("Expected mutex lock");
             if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::new(service_api_state)));
+                *address = Some(Arbiter::start(|_| Server::new(context)));
 
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
@@ -320,17 +328,17 @@ impl ExplorerApi {
         });
     }
 
-    /// Adds explorer API endpoints to the corresponding scope.
+    /// Add explorer API endpoints to the corresponding scope.
     pub fn wire(
-        api_scope: &mut ServiceApiScope,
-        service_api_state: ServiceApiState,
+        self,
+        api_scope: &mut ApiScope,
         shared_node_state: SharedNodeState,
-    ) -> &mut ServiceApiScope {
+    ) -> &mut ApiScope {
         // Default subscription for blocks.
         Self::handle_ws(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
-            service_api_state.clone(),
+            self.context.clone(),
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::Blocks),
         );
@@ -338,7 +346,7 @@ impl ExplorerApi {
         Self::handle_ws(
             "v1/transactions/subscribe",
             api_scope.web_backend(),
-            service_api_state.clone(),
+            self.context.clone(),
             shared_node_state.clone(),
             |request| {
                 if request.query().is_empty() {
@@ -358,15 +366,27 @@ impl ExplorerApi {
         Self::handle_ws(
             "v1/ws",
             api_scope.web_backend(),
-            service_api_state.clone(),
-            shared_node_state.clone(),
+            self.context.clone(),
+            shared_node_state,
             |_| Ok(SubscriptionType::None),
         );
         api_scope
-            .endpoint("v1/blocks", Self::blocks)
-            .endpoint("v1/block", Self::block)
-            .endpoint("v1/transactions", Self::transaction_info)
-            .endpoint_mut("v1/transactions", Self::add_transaction)
+            .endpoint("v1/blocks", {
+                let context = self.context.clone();
+                move |query| Self::blocks(context.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/block", {
+                let context = self.context.clone();
+                move |query| Self::block(context.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/transactions", {
+                let context = self.context.clone();
+                move |query| Self::transaction_info(context.snapshot().as_ref(), query)
+            })
+            .endpoint_mut("v1/transactions", {
+                let context = self.context.clone();
+                move |query| Self::add_transaction(context.sender(), query)
+            })
     }
 }
 

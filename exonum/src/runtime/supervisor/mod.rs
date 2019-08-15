@@ -21,12 +21,12 @@ pub use self::{
 use exonum_merkledb::Snapshot;
 
 use crate::{
-    api::ServiceApiBuilder,
     blockchain,
     crypto::Hash,
     runtime::{
-        rust::{AfterCommitContext, Service, ServiceDescriptor, Transaction, TransactionContext},
-        ServiceInstanceId,
+        api::ServiceApiBuilder,
+        rust::{AfterCommitContext, Service, Transaction, TransactionContext},
+        InstanceDescriptor, InstanceId,
     },
 };
 
@@ -46,12 +46,12 @@ mod transactions;
 pub struct Supervisor;
 
 impl Service for Supervisor {
-    fn state_hash(&self, descriptor: ServiceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        Schema::new(descriptor.service_name(), snapshot).state_hash()
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        Schema::new(descriptor.name, snapshot).state_hash()
     }
 
-    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        api::wire(&descriptor, builder)
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::wire(builder)
     }
 
     fn before_commit(&self, context: TransactionContext) {
@@ -122,6 +122,6 @@ impl Service for Supervisor {
 }
 
 impl Supervisor {
-    pub const BUILTIN_ID: ServiceInstanceId = 0;
+    pub const BUILTIN_ID: InstanceId = 0;
     pub const BUILTIN_NAME: &'static str = "supervisor";
 }

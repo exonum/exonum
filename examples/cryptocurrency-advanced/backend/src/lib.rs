@@ -30,10 +30,7 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::{
-    api::ServiceApiBuilder,
-    runtime::rust::{Service, ServiceDescriptor},
-};
+use exonum::runtime::{api::ServiceApiBuilder, rust::Service};
 
 use crate::api::PublicApi as CryptocurrencyApi;
 
@@ -46,7 +43,7 @@ pub const INITIAL_BALANCE: u64 = 100;
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {
-    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut ServiceApiBuilder) {
-        CryptocurrencyApi::new(descriptor).wire(builder);
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        CryptocurrencyApi.wire(builder);
     }
 }

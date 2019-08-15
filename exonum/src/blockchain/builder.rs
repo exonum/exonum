@@ -20,6 +20,7 @@ use futures::sync::mpsc;
 use std::sync::Arc;
 
 use crate::{
+    api::ApiContext,
     blockchain::{Blockchain, GenesisConfig, Schema},
     crypto::{PublicKey, SecretKey},
     events::InternalRequest,
@@ -29,7 +30,7 @@ use crate::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
         supervisor::Supervisor,
-        InstanceSpec, Runtime, ServiceInstanceId,
+        InstanceId, InstanceSpec, Runtime,
     },
 };
 
@@ -134,8 +135,12 @@ impl BlockchainBuilder {
         };
 
         Ok(if has_genesis_block {
-            let snapshot = self.database.snapshot();
-            dispatcher.restore_state(snapshot.as_ref())?;
+            let context = ApiContext::new(
+                self.database.clone(),
+                self.service_keypair.clone(),
+                api_sender.clone(),
+            );
+            dispatcher.restore_state(&context)?;
             Blockchain::with_dispatcher(
                 self.database,
                 dispatcher,
@@ -188,10 +193,10 @@ impl InstanceCollection {
         }
     }
 
-    /// Adds a new service instance to the collection.
+    /// Add a new service instance to the collection.
     pub fn with_instance(
         mut self,
-        id: ServiceInstanceId,
+        id: InstanceId,
         name: impl Into<String>,
         params: impl Into<Any>,
     ) -> Self {

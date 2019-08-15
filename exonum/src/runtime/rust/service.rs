@@ -18,7 +18,6 @@ use failure::Error;
 use std::fmt::{self, Debug};
 
 use crate::{
-    api::ServiceApiBuilder,
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
@@ -26,9 +25,11 @@ use crate::{
     node::ApiSender,
     proto::Any,
     runtime::{
+        api::ServiceApiBuilder,
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactInfo, CallInfo, ExecutionContext, MethodId, ServiceInstanceId,
+        AnyTx, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+        MethodId,
     },
 };
 
@@ -46,14 +47,14 @@ pub trait ServiceDispatcher: Send {
 pub trait Service: ServiceDispatcher + Debug + 'static {
     fn configure(
         &self,
-        _descriptor: ServiceDescriptor,
+        _descriptor: InstanceDescriptor,
         _fork: &Fork,
         _params: Any,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: ServiceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
@@ -61,14 +62,14 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 
     fn after_commit(&self, _context: AfterCommitContext) {}
 
-    fn wire_api(&self, _descriptor: ServiceDescriptor, _builder: &mut ServiceApiBuilder) {}
+    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
     // TODO: add other hooks such as "on node startup", etc.
 }
 
 pub trait ServiceFactory: Send + Debug + 'static {
     fn artifact_id(&self) -> RustArtifactId;
 
-    fn artifact_info(&self) -> ArtifactInfo;
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec;
 
     fn create_instance(&self) -> Box<dyn Service>;
 }
@@ -83,44 +84,24 @@ where
 }
 
 #[derive(Debug)]
-pub struct ServiceDescriptor<'a> {
-    id: ServiceInstanceId,
-    name: &'a str,
-}
-
-impl<'a> ServiceDescriptor<'a> {
-    pub(crate) fn new(id: ServiceInstanceId, name: &'a str) -> Self {
-        Self { id, name }
-    }
-
-    /// Returns the current service instance identifier.
-    pub fn service_id(&self) -> ServiceInstanceId {
-        self.id
-    }
-
-    /// Returns the current service instance name.
-    pub fn service_name(&self) -> &str {
-        self.name
-    }
-}
-
-#[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    pub(super) service_descriptor: ServiceDescriptor<'a>,
+    pub(super) instance_descriptor: InstanceDescriptor<'a>,
     pub(super) runtime_context: &'a mut ExecutionContext<'b>,
     pub(super) dispatcher: &'a Dispatcher,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    pub fn service_id(&self) -> ServiceInstanceId {
-        self.service_descriptor.service_id()
+    // TODO replace this methods by the `instance_descriptor` [ECR-3222]
+
+    pub fn service_id(&self) -> InstanceId {
+        self.instance_descriptor.id
     }
 
     pub fn service_name(&self) -> &str {
-        self.service_descriptor.service_name()
+        self.instance_descriptor.name
     }
 
-    /// If the current node is a validator, returns its identifier, for other nodes return `None`.
+    /// If the current node is a validator, return its identifier, for other nodes return `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.runtime_context.fork)
@@ -155,24 +136,24 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
 pub struct AfterCommitContext<'a> {
     dispatcher: &'a DispatcherSender,
-    service_descriptor: ServiceDescriptor<'a>,
+    instance_descriptor: InstanceDescriptor<'a>,
     snapshot: &'a dyn Snapshot,
     service_keypair: &'a (PublicKey, SecretKey),
     tx_sender: &'a ApiSender,
 }
 
 impl<'a> AfterCommitContext<'a> {
-    /// Creates context for `after_commit` method.
+    /// Create context for the `after_commit` method.
     pub(crate) fn new(
         dispatcher: &'a DispatcherSender,
-        service_descriptor: ServiceDescriptor<'a>,
+        instance_descriptor: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
             dispatcher,
-            service_descriptor,
+            instance_descriptor,
             snapshot,
             service_keypair,
             tx_sender,
@@ -185,17 +166,17 @@ impl<'a> AfterCommitContext<'a> {
         self.snapshot
     }
 
-    /// Returns the current service instance identifier.
-    pub fn service_id(&self) -> ServiceInstanceId {
-        self.service_descriptor.service_id()
+    /// Return the current service instance identifier.
+    pub fn service_id(&self) -> InstanceId {
+        self.instance_descriptor.id
     }
 
-    /// Returns the current service instance name.
+    /// Return the current service instance name.
     pub fn service_name(&self) -> &str {
-        self.service_descriptor.service_name()
+        self.instance_descriptor.name
     }
 
-    /// If the current node is a validator, returns its identifier, for other nodes return `None`.
+    /// If the current node is a validator, return its identifier, for other nodes return `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot)
@@ -256,7 +237,7 @@ impl<'a> AfterCommitContext<'a> {
 impl<'a> Debug for AfterCommitContext<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
-            .field("service_descriptor", &self.service_descriptor)
+            .field("instance_descriptor", &self.instance_descriptor)
             .finish()
     }
 }
@@ -268,8 +249,8 @@ pub trait Transaction: BinaryValue {
     /// Identifier of service method which executes the given transaction.
     const METHOD_ID: MethodId;
 
-    /// Creates unsigned service transaction from the value.
-    fn into_any_tx(self, instance_id: ServiceInstanceId) -> AnyTx {
+    /// Create unsigned service transaction from the value.
+    fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
         AnyTx {
             call_info: CallInfo {
                 instance_id,
@@ -279,10 +260,10 @@ pub trait Transaction: BinaryValue {
         }
     }
 
-    /// Signs value as transaction with the specified instance identifier.
+    /// Sign the value as a transaction with the specified instance identifier.
     fn sign(
         self,
-        service_id: ServiceInstanceId,
+        service_id: InstanceId,
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Verified<AnyTx> {

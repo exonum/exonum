@@ -14,34 +14,7 @@
 
 pub use self::{
     error::Error,
-    service::{
-        AfterCommitContext, Service, ServiceDescriptor, ServiceFactory, Transaction,
-        TransactionContext,
-    },
-};
-
-use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
-use futures::{future, Future, IntoFuture};
-use semver::Version;
-
-use std::{
-    collections::{HashMap, HashSet},
-    fmt, panic,
-    str::FromStr,
-};
-
-use crate::{
-    api::ServiceApiBuilder,
-    crypto::{Hash, PublicKey, SecretKey},
-    node::ApiSender,
-    proto::Any,
-};
-
-use super::{
-    dispatcher::{self, DispatcherSender},
-    error::ExecutionError,
-    ArtifactId, ArtifactInfo, CallInfo, Caller, ExecutionContext, InstanceSpec, Runtime,
-    RuntimeIdentifier, ServiceInstanceId, StateHashAggregator,
+    service::{AfterCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
 };
 
 pub mod error;
@@ -50,31 +23,58 @@ pub mod service;
 #[cfg(test)]
 pub mod tests;
 
+use exonum_merkledb::{Fork, Snapshot};
+use futures::{future, Future, IntoFuture};
+use semver::Version;
+
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    fmt,
+    str::FromStr,
+};
+
+use crate::{
+    crypto::{Hash, PublicKey, SecretKey},
+    node::ApiSender,
+    proto::Any,
+};
+
+use super::{
+    api::{ApiContext, ServiceApiBuilder},
+    dispatcher::{self, DispatcherSender},
+    error::{catch_panic, ExecutionError},
+    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+    InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+};
+
 #[derive(Debug, Default)]
 pub struct RustRuntime {
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
-    started_services: HashMap<ServiceInstanceId, Instance>,
-    started_services_by_name: HashMap<String, ServiceInstanceId>,
+    started_services: BTreeMap<InstanceId, Instance>,
+    started_services_by_name: HashMap<String, InstanceId>,
 }
 
 #[derive(Debug)]
 struct Instance {
-    id: ServiceInstanceId,
+    id: InstanceId,
     name: String,
     service: Box<dyn Service>,
 }
 
 impl Instance {
-    pub fn new(id: ServiceInstanceId, name: String, service: Box<dyn Service>) -> Self {
+    pub fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
         Self { id, name, service }
     }
 
-    pub fn descriptor(&self) -> ServiceDescriptor {
-        ServiceDescriptor::new(self.id, &self.name)
+    pub fn descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor {
+            id: self.id,
+            name: &self.name,
+        }
     }
 
-    pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (ServiceInstanceId, Vec<Hash>) {
+    pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
         (
             self.id,
             self.service.state_hash(self.descriptor(), snapshot),
@@ -223,10 +223,10 @@ impl Runtime for RustRuntime {
         Box::new(self.deploy(&artifact).into_future())
     }
 
-    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo> {
+    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
         let id = self.parse_artifact(id).ok()?;
         self.deployed_artifact(&id)
-            .map(ServiceFactory::artifact_info)
+            .map(ServiceFactory::artifact_protobuf_spec)
     }
 
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
@@ -258,33 +258,25 @@ impl Runtime for RustRuntime {
     fn configure_service(
         &self,
         fork: &Fork,
-        spec: &InstanceSpec,
+        descriptor: InstanceDescriptor,
         parameters: Any,
     ) -> Result<(), ExecutionError> {
-        let artifact = self.parse_artifact(&spec.artifact)?;
+        trace!("Configure service instance {}", descriptor);
 
-        trace!(
-            "Configure service {} instance with id: {}",
-            artifact,
-            spec.id
-        );
-
-        let service_instance = self
+        let instance = self
             .started_services
-            .get(&spec.id)
+            .get(&descriptor.id)
             .ok_or(dispatcher::Error::ServiceNotStarted)?;
-        service_instance
+        instance
             .as_ref()
-            .configure(service_instance.descriptor(), fork, parameters)
+            .configure(instance.descriptor(), fork, parameters)
     }
 
-    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        let artifact = self.parse_artifact(&spec.artifact)?;
-
-        trace!("Stop service {} instance with id: {}", artifact, spec.id);
+    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
+        trace!("Stop service instance {}", descriptor);
 
         self.started_services
-            .remove(&spec.id)
+            .remove(&descriptor.id)
             .ok_or(dispatcher::Error::ServiceNotStarted)
             .map(drop)
             .map_err(From::from)
@@ -297,13 +289,13 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let service_instance = self.started_services.get(&call_info.instance_id).unwrap();
-        service_instance
+        let instance = self.started_services.get(&call_info.instance_id).unwrap();
+        instance
             .as_ref()
             .call(
                 call_info.method_id,
                 TransactionContext {
-                    service_descriptor: service_instance.descriptor(),
+                    instance_descriptor: instance.descriptor(),
                     runtime_context,
                     dispatcher,
                 },
@@ -324,24 +316,24 @@ impl Runtime for RustRuntime {
     }
 
     fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {
-        for service in self.started_services.values() {
-            match panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                service.as_ref().before_commit(TransactionContext {
+        for instance in self.started_services.values() {
+            let result = catch_panic(|| {
+                instance.as_ref().before_commit(TransactionContext {
                     dispatcher,
                     runtime_context: &mut ExecutionContext::new(fork, Caller::Blockchain),
-                    service_descriptor: service.descriptor(),
-                })
-            })) {
-                Ok(..) => fork.flush(),
-                Err(err) => {
-                    if err.is::<StorageError>() {
-                        // Continue panic unwind if the reason is StorageError.
-                        panic::resume_unwind(err);
-                    }
-                    fork.rollback();
+                    instance_descriptor: instance.descriptor(),
+                });
+                Ok(())
+            });
 
-                    // TODO add service name
-                    error!("Service before_commit failed with error: {:?}", err);
+            match result {
+                Ok(..) => fork.flush(),
+                Err(e) => {
+                    fork.rollback();
+                    error!(
+                        "Service \"{}\" `before_commit` failed with error: {:?}",
+                        instance.name, e
+                    );
                 }
             }
         }
@@ -365,15 +357,19 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    fn api_endpoints(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         self.started_services
             .values()
-            .map(|service_instance| {
-                let mut builder = ServiceApiBuilder::new();
-                service_instance
-                    .as_ref()
-                    .wire_api(service_instance.descriptor(), &mut builder);
-                (service_instance.name.clone(), builder)
+            .map(|instance| {
+                let mut builder = ServiceApiBuilder::new(
+                    context.clone(),
+                    InstanceDescriptor {
+                        id: instance.id,
+                        name: instance.name.as_ref(),
+                    },
+                );
+                instance.as_ref().wire_api(&mut builder);
+                (["services/", &instance.name].concat(), builder)
             })
             .collect()
     }
