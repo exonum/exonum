@@ -17,14 +17,14 @@ use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
 use std::{collections::HashSet, convert::TryFrom};
 
 use crate::{
-    blockchain::Schema,
+    blockchain::{Schema, contains_transaction},
     crypto::{Hash, PublicKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
     messages::{
-        AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, SignedMessage, TransactionsRequest,
-        TransactionsResponse, Verified,
+        AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, PoolTransactionsRequest,
+        Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage,
+        TransactionsRequest, TransactionsResponse, Verified,
     },
     node::{NodeHandler, RequestData},
 };
@@ -489,11 +489,22 @@ impl NodeHandler {
 
         // Merge changes into storage
         let (committed_txs, proposer) = {
-            // FIXME: Avoid of clone here. (ECR-171)
-            let block_state = self.state.block(&block_hash).unwrap().clone();
-            self.blockchain
-                .commit(block_state.patch(), block_hash, precommits)
-                .unwrap();
+            let (committed_txs, proposer) = {
+                let block_state = self.state.block_mut(&block_hash).unwrap();
+                let committed_txs = block_state.txs().len();
+                let proposer = block_state.proposer_id();
+
+                self.blockchain
+                    .commit(
+                        block_state.patch(),
+                        block_hash,
+                        precommits,
+                        self.state.tx_cache_mut(),
+                    )
+                    .unwrap();
+
+                (committed_txs, proposer)
+            };
             // Update node state.
             self.state
                 .update_config(Schema::new(&self.blockchain.snapshot()).actual_configuration());
@@ -501,7 +512,7 @@ impl NodeHandler {
             let block_hash = self.blockchain.last_hash();
             self.state
                 .new_height(&block_hash, self.system_state.current_time());
-            (block_state.txs().len(), block_state.proposer_id())
+            (committed_txs, proposer)
         };
 
         self.api_state.broadcast(&block_hash);
@@ -545,25 +556,20 @@ impl NodeHandler {
         let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
-        if Schema::new(&snapshot).transactions().contains(&hash) {
+        let schema = Schema::new(&snapshot);
+
+        if contains_transaction(&hash, &schema.transactions(), self.state.tx_cache()) {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
-        // TODO We have to check transaction correctness.
+        // TODO We have to check transaction correctness.        
 
         // if let Err(e) = self.blockchain.tx_from_raw(msg.payload().clone()) {
         //     error!("Received invalid transaction {:?}, result: {}", msg, e);
         //     bail!("Received malicious transaction.")
         // }
 
-        let fork = self.blockchain.fork();
-        {
-            let mut schema = Schema::new(&fork);
-            schema.add_transaction_into_pool(msg);
-        }
-        self.blockchain
-            .merge(fork.into_patch())
-            .expect("Unable to save transaction to persistent pool.");
+        self.state.tx_cache_mut().insert(hash, msg);
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();
@@ -814,7 +820,12 @@ impl NodeHandler {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
-        self.blockchain.create_patch(proposer_id, height, tx_hashes)
+        self.blockchain.create_patch(
+            proposer_id,
+            height,
+            tx_hashes,
+            &mut self.state.tx_cache_mut(),
+        )
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the

@@ -158,17 +158,17 @@ fn test_block() {
     ];
     let transactions = [
         Verified::from_value(
-            Status::new(Height(2), crypto::hash(&[])),
+            Status::new(Height(2), crypto::hash(&[]), 0),
             pub_key,
             &secret_key,
         ),
         Verified::from_value(
-            Status::new(Height(4), crypto::hash(&[2])),
+            Status::new(Height(4), crypto::hash(&[2]), 0),
             pub_key,
             &secret_key,
         ),
         Verified::from_value(
-            Status::new(Height(7), crypto::hash(&[3])),
+            Status::new(Height(7), crypto::hash(&[3]), 0),
             pub_key,
             &secret_key,
         ),
@@ -261,14 +261,4 @@ fn test_precommit_serde_wrong_signature() {
     let precommit_json = serde_json::to_string(&precommit).unwrap();
     let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
     assert_eq!(precommit2, precommit);
-}
-
-#[test]
-fn test_raw_transaction_small_size() {
-    assert!(ServiceTransaction::from_bytes(Cow::from(&vec![0_u8; 1])).is_err());
-    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 2])).is_err());
-    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 3])).is_err());
-    let tx = RawTransaction::from_bytes(Cow::from(&vec![0_u8; 4])).unwrap();
-    assert_eq!(tx.service_id, 0);
-    assert_eq!(tx.service_transaction.transaction_id, 0);
 }

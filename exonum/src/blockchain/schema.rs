@@ -433,7 +433,7 @@ where
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
-    pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx: Signed<RawTransaction>) {
+    pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx: Verified<AnyTx>) {
         if !self.transactions().contains(hash) {
             self.transactions().put(hash, tx)
         }

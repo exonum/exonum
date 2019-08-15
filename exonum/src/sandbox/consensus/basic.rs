@@ -30,7 +30,7 @@ use crate::{
         self,
         sandbox_tests_helper::*,
         timestamping::{TimestampingService, TimestampingTxGenerator, DATA_SIZE},
-        timestamping_sandbox,
+        timestamping_sandbox, timestamping_sandbox_builder
     },
 };
 
@@ -73,6 +73,7 @@ fn test_check_leader() {
         sandbox.public_key(ValidatorId(0)),
         Height(1),
         sandbox.last_block().object_hash(),
+        1,
         sandbox.secret_key(ValidatorId(0)),
     ));
 
@@ -303,7 +304,7 @@ fn tx_cache_with_tx_block_limit() {
     let num_txs = 10;
     let txs = generator
         .take(num_txs)
-        .map(|tx| (tx.hash(), tx))
+        .map(|tx| (tx.object_hash(), tx))
         .collect::<BTreeMap<_, _>>();
 
     for tx in txs.values() {

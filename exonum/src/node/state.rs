@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys, contains_transaction},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
@@ -95,7 +95,7 @@ pub struct State {
     incomplete_block: Option<IncompleteBlock>,
 
     // Cache that stores transactions before adding to persistent pool.
-    tx_cache: BTreeMap<Hash, Signed<RawTransaction>>,
+    tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
 }
 
 /// State of a validator-node.
@@ -144,11 +144,11 @@ pub struct ProposeState {
 }
 
 /// State of a block.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
-    patch: Patch,
+    patch: Option<Patch>,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
 }
@@ -345,7 +345,7 @@ impl BlockState {
     pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
         Self {
             hash,
-            patch,
+            patch: Some(patch),
             txs,
             proposer_id,
         }
@@ -357,8 +357,8 @@ impl BlockState {
     }
 
     /// Returns the changes that should be made for block committing.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    pub fn patch(&mut self) -> Patch {
+        self.patch.take().expect("Patch is already committed")
     }
 
     /// Returns block's transactions.
@@ -555,11 +555,6 @@ impl State {
     /// Returns `ConsensusConfig`.
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
-    }
-
-    /// Returns `BTreeMap` with service configs identified by name.
-    pub fn services_config(&self) -> &BTreeMap<String, Value> {
-        &self.config.services
     }
 
     /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node
@@ -983,7 +978,7 @@ impl State {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => Some(e.insert(BlockState {
                 hash: block_hash,
-                patch,
+                patch: Some(patch),
                 txs,
                 proposer_id,
             })),
@@ -1007,8 +1002,8 @@ impl State {
 
         let mut unknown_txs = HashSet::new();
         for hash in &msg.payload().transactions {
-            if txs.get(hash).is_some() {
-                if !txs_pool.contains(hash) {
+            if contains_transaction(hash, &txs, &self.tx_cache) {
+                if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
                     panic!(
                         "Received block with already \
                          committed transaction"
@@ -1229,12 +1224,12 @@ impl State {
     }
 
     /// Returns reference to the transactions cache.
-    pub fn tx_cache(&self) -> &BTreeMap<Hash, Signed<RawTransaction>> {
+    pub fn tx_cache(&self) -> &BTreeMap<Hash, Verified<AnyTx>> {
         &self.tx_cache
     }
 
     /// Returns mutable reference to the transactions cache.
-    pub fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Signed<RawTransaction>> {
+    pub fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
         &mut self.tx_cache
     }
 }

@@ -15,12 +15,13 @@
 use std::mem;
 
 use crate::{
-    blockchain::Schema,
+    blockchain::{Schema, get_transaction},
     messages::{
-        BinaryValue, BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests,
-        TransactionsRequest, TransactionsResponse, Verified, TX_RES_EMPTY_SIZE,
-        TX_RES_PB_OVERHEAD_PAYLOAD,
+        BinaryValue, BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest,
+        ProposeRequest, Requests, TransactionsRequest, TransactionsResponse, Verified,
+        TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
     },
+    crypto::{PublicKey, Hash},
 };
 
 use super::NodeHandler;
@@ -78,11 +79,11 @@ impl NodeHandler {
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &Verified<TransactionsRequest>) {
         trace!("HANDLE TRANSACTIONS REQUEST");
-        self.send_transactions_by_hash(&msg.author(), &msg.txs);
+        self.send_transactions_by_hash(msg.author(), &msg.payload().txs);
     }
 
     /// Handles `PoolTransactionsRequest` message. For details see the message documentation.
-    pub fn handle_request_pool_txs(&mut self, msg: &Signed<PoolTransactionsRequest>) {
+    pub fn handle_request_pool_txs(&mut self, msg: &Verified<PoolTransactionsRequest>) {
         trace!("HANDLE POOL TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -90,29 +91,27 @@ impl NodeHandler {
         let mut hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
         hashes.extend(self.state.tx_cache().keys().cloned());
 
-        self.send_transactions_by_hash(&msg.author(), &hashes);
+        self.send_transactions_by_hash(msg.author(), &hashes);
     }
 
-    fn send_transactions_by_hash(&mut self, author: &PublicKey, hashes: &[Hash]) {
-        use std::mem;
+    fn send_transactions_by_hash(&mut self, author: PublicKey, hashes: &[Hash]) {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let mut txs = Vec::new();
         let mut txs_size = 0;
-        let unoccupied_message_size =
-            self.state.config().consensus.max_message_len as usize - TX_RES_EMPTY_SIZE;
+        let unoccupied_message_size = self.state.config().consensus.max_message_len as usize
+            - TX_RES_EMPTY_SIZE;
 
-        for hash in &msg.payload().txs {
-            let tx = schema.transactions().get(hash);
-            if let Some(tx) = tx {
+        for hash in hashes {
+            if let Some(tx) = get_transaction(&hash, &schema.transactions(), &self.state.tx_cache()) {
                 let raw = tx.as_raw().to_bytes();
                 if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
-                        msg.author(),
+                        author,
                         mem::replace(&mut txs, vec![]),
                     ));
 
-                    self.send_to_peer(msg.author(), txs_response);
+                    self.send_to_peer(author, txs_response);
                     txs_size = 0;
                 }
                 txs_size += raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD;
@@ -121,9 +120,8 @@ impl NodeHandler {
         }
 
         if !txs.is_empty() {
-            let txs_response = self.sign_message(TransactionsResponse::new(msg.author(), txs));
-
-            self.send_to_peer(msg.author(), txs_response);
+            let txs_response = self.sign_message(TransactionsResponse::new(author, txs));
+            self.send_to_peer(author, txs_response);
         }
     }
 

@@ -798,7 +798,7 @@ mod tests {
         let context = ApiContext::new(
             db.clone(),
             crypto::gen_keypair(),
-            ApiSender::new(mpsc::unbounded().0),
+            ApiSender::new(mpsc::channel(0).0),
         );
         assert!(dispatcher.notify_api_changes(&context));
         let expected_api_changes = vec![

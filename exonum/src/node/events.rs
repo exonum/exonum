@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
-use crate::blockchain::{get_tx, Schema};
-use crate::events::{
-    error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent,
+
+use crate::{
+    blockchain::{get_transaction, Schema},
+    events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent},
 };
 
 impl EventHandler for NodeHandler {
@@ -123,7 +124,7 @@ impl NodeHandler {
 
         for tx_hash in txs {
             self.broadcast(
-                get_tx(&tx_hash, &schema.transactions(), &self.state.tx_cache())
+                get_transaction(&tx_hash, &schema.transactions(), &self.state.tx_cache())
                     .expect("Rebroadcast: invalid transaction hash"),
             )
         }

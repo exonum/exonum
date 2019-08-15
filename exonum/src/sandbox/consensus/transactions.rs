@@ -210,6 +210,7 @@ fn tx_pool_size_overflow() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        1,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }

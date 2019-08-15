@@ -31,8 +31,9 @@ use std::{
 use crate::{
     api::node::SharedNodeState,
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, IndexCoordinates,
-        IndexOwner, InstanceCollection, Schema, StoredConfiguration, ValidatorKeys,
+        contains_transaction, Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig,
+        IndexCoordinates, IndexOwner, InstanceCollection, Schema, StoredConfiguration,
+        ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -42,8 +43,8 @@ use crate::{
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
-        Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status,
-        TransactionsRequest, TransactionsResponse, Verified,
+        PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
+        SignedMessage, Status, TransactionsRequest, TransactionsResponse, Verified,
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
@@ -92,7 +93,7 @@ pub struct SandboxInner {
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
-    pub api_requests_rx: mpsc::UnboundedReceiver<ExternalMessage>,
+    pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl SandboxInner {
@@ -239,9 +240,14 @@ impl Sandbox {
         author: PublicKey,
         height: Height,
         last_hash: Hash,
+        pool_size: u64,
         secret_key: &SecretKey,
     ) -> Verified<Status> {
-        Verified::from_value(Status::new(height, last_hash), author, secret_key)
+        Verified::from_value(
+            Status::new(height, last_hash, pool_size),
+            author,
+            secret_key,
+        )
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
@@ -290,6 +296,16 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Verified<PeersRequest> {
         Verified::from_value(PeersRequest::new(to), public_key, secret_key)
+    }
+
+    /// Creates a `PoolTransactionsRequest` message signed by this validator.
+    pub fn create_pool_transactions_request(
+        &self,
+        public_key: PublicKey,
+        to: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Verified<PoolTransactionsRequest> {
+        Verified::from_value(PoolTransactionsRequest::new(to), public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -587,6 +603,7 @@ impl Sandbox {
             self.node_public_key(),
             height,
             block_hash,
+            0,
             &self.node_secret_key(),
         ));
     }
@@ -653,7 +670,11 @@ impl Sandbox {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if schema_transactions.contains(&hash_elem) {
+                if contains_transaction(
+                    &hash_elem,
+                    &schema_transactions,
+                    self.node_state().tx_cache(),
+                ) {
                     return false;
                 }
                 true
@@ -691,7 +712,8 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain.create_patch(ValidatorId(0), height, &hashes);
+            let (_, patch) =
+                blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
             fork.merge(patch);
             fork
         };
@@ -843,7 +865,7 @@ impl Sandbox {
     pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
-        let api_channel = mpsc::unbounded();
+        let api_channel = mpsc::channel(100);
 
         let address: SocketAddr = self
             .address(ValidatorId(0))
@@ -1102,7 +1124,7 @@ fn sandbox_with_services_uninitialized(
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
-    let api_channel = mpsc::unbounded();
+    let api_channel = mpsc::channel(100);
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
         services,

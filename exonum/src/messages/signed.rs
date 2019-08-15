@@ -215,6 +215,7 @@ mod tests {
         let msg = Status {
             height: Height(0),
             last_hash: Hash::zero(),
+            pool_size: 0,
         };
         let protocol_message = ExonumMessage::from(msg.clone());
         let signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
@@ -237,6 +238,7 @@ mod tests {
         let msg = Status {
             height: Height(0),
             last_hash: Hash::zero(),
+            pool_size: 0,
         };
         let protocol_message = ExonumMessage::from(msg.clone());
         let mut signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
@@ -254,6 +256,7 @@ mod tests {
             Status {
                 height: Height(0),
                 last_hash: Hash::zero(),
+                pool_size: 0,
             },
             keypair.0,
             &keypair.1,

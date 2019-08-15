@@ -135,5 +135,6 @@ message ExonumMessage {
     PrevotesRequest prevotes_request = 11;
     PeersRequest peers_request = 12;
     BlockRequest block_request = 13;
+    PoolTransactionsRequest pool_transactions_request = 14;
   }
 }

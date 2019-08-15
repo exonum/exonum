@@ -173,7 +173,7 @@ impl NodeHandler {
             self.request(RequestData::Block(height), peer);
         }
 
-        if self.uncommitted_txs_count() == 0 && msg.pool_size() > 0 {
+        if self.uncommitted_txs_count() == 0 && msg.payload().pool_size > 0 {
             self.request(RequestData::PoolTransactions, peer);
         }
     }
@@ -237,8 +237,11 @@ impl NodeHandler {
 
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
-        let hash = self.blockchain.last_hash();
-        let status = Status::new(self.state.height(), hash);
+        let status = Status {
+            height: self.state.height(),
+            last_hash: self.blockchain.last_hash(),
+            pool_size: self.uncommitted_txs_count(),
+        };
         trace!("Broadcast status: {:?}", status);
 
         let message = self.sign_message(status);
