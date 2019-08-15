@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys, contains_transaction},
+    blockchain::{contains_transaction, ConsensusConfig, StoredConfiguration, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
@@ -936,7 +936,12 @@ impl State {
             Entry::Vacant(e) => {
                 let mut unknown_txs = HashSet::new();
                 for hash in &msg.payload().transactions {
-                    if transactions.get(hash).is_some() {
+                    if self.tx_cache.contains_key(hash) {
+                        // Tx with `hash` is  not committed yet.
+                        continue;
+                    }
+
+                    if transactions.contains(hash) {
                         if !transaction_pool.contains(hash) {
                             bail!(
                                 "Received propose with already \

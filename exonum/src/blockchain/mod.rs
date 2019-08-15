@@ -345,6 +345,7 @@ impl Blockchain {
             .transaction_results()
             .put(&tx_hash, ExecutionStatus(tx_result));
         schema.commit_transaction(&tx_hash, transaction);
+        tx_cache.remove(&tx_hash);
         schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);

@@ -775,12 +775,13 @@ impl Sandbox {
         self.first_round_timeout() + previous_round * self.round_timeout_increase()
     }
 
-    #[allow(clippy::let_and_return)]
     pub fn transactions_hashes(&self) -> Vec<Hash> {
         let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
-        let vec = idx.iter().collect();
+
+        let mut vec: Vec<Hash> = idx.iter().collect();
+        vec.extend(self.node_state().tx_cache().keys().cloned());
         vec
     }
 

@@ -759,7 +759,8 @@ impl NodeHandler {
 
     fn need_faster_propose(&self) -> bool {
         let snapshot = self.blockchain.snapshot();
-        let pending_tx_count = Schema::new(&snapshot).transactions_pool_len();
+        let pending_tx_count =
+            Schema::new(&snapshot).transactions_pool_len() + self.state.tx_cache_len() as u64;
         pending_tx_count >= u64::from(self.propose_timeout_threshold())
     }
 
