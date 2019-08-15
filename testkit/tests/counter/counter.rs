@@ -15,17 +15,21 @@
 //! Sample counter service.
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
-    api::backends::actix::{HttpRequest, RawHandler, RequestHandler},
-    api::{self, ServiceApiBackend},
+    api::{
+        self,
+        backends::actix::{HttpRequest, RawHandler, RequestHandler},
+        ApiBackend,
+    },
     crypto::Hash,
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{RustArtifactId, Service, ServiceDescriptor, ServiceFactory, TransactionContext},
-        ArtifactInfo, ServiceInstanceId,
+        api::{ServiceApiBuilder, ServiceApiState},
+        rust::{Service, TransactionContext},
+        InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert};
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash};
+use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
@@ -34,8 +38,8 @@ use std::sync::Arc;
 use super::proto;
 
 pub const SERVICE_NAME: &str = "counter";
-pub const SERVICE_ID: ServiceInstanceId = 2;
-/// "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
+pub const SERVICE_ID: InstanceId = 2;
+/// "correct horse battery staple" brainwallet pubkey in Ed25519 with a SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 
 pub struct CounterSchema<T> {
@@ -137,7 +141,7 @@ struct CounterApi;
 
 impl CounterApi {
     fn increment(
-        state: &api::ServiceApiState,
+        state: &ServiceApiState,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
@@ -147,14 +151,13 @@ impl CounterApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn count(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
-        let snapshot = state.snapshot();
-        let schema = CounterSchema::new(&snapshot);
+    fn count(snapshot: &dyn Snapshot) -> api::Result<u64> {
+        let schema = CounterSchema::new(snapshot);
         Ok(schema.count().unwrap_or_default())
     }
 
     fn reset(
-        state: &api::ServiceApiState,
+        state: &ServiceApiState,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
@@ -164,20 +167,21 @@ impl CounterApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn wire(builder: &mut api::ServiceApiBuilder) {
+    fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .private_scope()
-            .endpoint("count", Self::count)
+            .endpoint("count", |state, _query: ()| Self::count(state.snapshot()))
             .endpoint_mut("reset", Self::reset);
         builder
             .public_scope()
-            .endpoint("count", Self::count)
+            .endpoint("count", |state, _query: ()| Self::count(state.snapshot()))
             .endpoint_mut("count", Self::increment);
 
         // Check processing of custom HTTP headers. We test this using simple authorization
         // with a fixed bearer token; for practical apps, the tokens might
         // be [JSON Web Tokens](https://jwt.io/).
-        let handler = |request: HttpRequest| -> api::Result<u64> {
+        let context = builder.context().clone();
+        let handler = move |request: HttpRequest| -> api::Result<u64> {
             let auth_header = request
                 .headers()
                 .get("Authorization")
@@ -188,8 +192,8 @@ impl CounterApi {
                 return Err(api::Error::Unauthorized);
             }
 
-            let state = request.state();
-            Self::count(&state, ())
+            let snapshot = context.snapshot();
+            Self::count(snapshot.as_ref())
         };
         let handler: Arc<RawHandler> = Arc::new(move |request| {
             Box::new(
@@ -213,27 +217,16 @@ impl CounterApi {
 
 // // // // Service // // // //
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "counter-service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto"
+)]
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn wire_api(&self, _descriptor: ServiceDescriptor, builder: &mut api::ServiceApiBuilder) {
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CounterApi::wire(builder)
-    }
-}
-
-impl ServiceFactory for CounterService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "counter-service:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }

@@ -85,9 +85,9 @@ pub fn implement_service_factory(input: TokenStream) -> TokenStream {
                 concat!(#artifact_name, ":", #artifact_version).parse().unwrap()
             }
 
-            fn artifact_info(&self) -> #cr::runtime::ArtifactInfo {
-                #cr::runtime::ArtifactInfo {
-                    proto_sources: #proto_sources_mod::PROTO_SOURCES.as_ref(),
+            fn artifact_protobuf_spec(&self) -> #cr::runtime::ArtifactProtobufSpec {
+                #cr::runtime::ArtifactProtobufSpec {
+                    sources: #proto_sources_mod::PROTO_SOURCES.as_ref(),
                 }
             }
 

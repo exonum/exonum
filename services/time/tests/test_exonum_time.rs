@@ -25,7 +25,7 @@ use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::{Height, ValidatorId},
     messages::Verified,
-    runtime::{rust::Transaction, AnyTx, ServiceInstanceId},
+    runtime::{rust::Transaction, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
@@ -36,7 +36,7 @@ use exonum_time::{
 
 use std::{collections::HashMap, iter::FromIterator, rc::Rc};
 
-const INSTANCE_ID: ServiceInstanceId = 112;
+const INSTANCE_ID: InstanceId = 112;
 const INSTANCE_NAME: &str = "my-time";
 
 struct TimeServiceInstance;

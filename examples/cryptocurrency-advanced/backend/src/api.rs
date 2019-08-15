@@ -17,12 +17,11 @@
 use exonum_merkledb::{ListProof, MapProof};
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof, IndexCoordinates, IndexOwner, TransactionMessage},
     crypto::{Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
-    runtime::{rust::ServiceDescriptor, ServiceInstanceId},
+    runtime::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
 use crate::{wallet::Wallet, Schema};
@@ -64,30 +63,19 @@ pub struct WalletInfo {
 }
 
 /// Public service API description.
-#[derive(Debug, Clone)]
-pub struct PublicApi {
-    service_name: String,
-    service_id: ServiceInstanceId,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct PublicApi;
 
 impl PublicApi {
-    /// Creates a new public API for the specified service instance.
-    pub fn new(descriptor: ServiceDescriptor) -> Self {
-        Self {
-            service_name: descriptor.service_name().to_owned(),
-            service_id: descriptor.service_id(),
-        }
-    }
-
     /// Endpoint for getting a single wallet.
     pub fn wallet_info(
-        &self,
+        self,
         state: &ServiceApiState,
         pub_key: PublicKey,
     ) -> api::Result<WalletInfo> {
         let snapshot = state.snapshot();
-        let blockchain_schema = blockchain::Schema::new(&snapshot);
-        let currency_schema = Schema::new(&self.service_name, &snapshot);
+        let blockchain_schema = blockchain::Schema::new(snapshot);
+        let currency_schema = Schema::new(state.instance().name, snapshot);
 
         let max_height = blockchain_schema.block_hashes_by_height().len() - 1;
 
@@ -97,7 +85,7 @@ impl PublicApi {
 
         let to_table = blockchain_schema
             .state_hash_aggregator()
-            .get_proof(IndexOwner::Service(self.service_id).coordinate_for(0));
+            .get_proof(IndexOwner::Service(state.instance().id).coordinate_for(0));
 
         let to_wallet = currency_schema.wallets().get_proof(pub_key);
 
@@ -108,7 +96,7 @@ impl PublicApi {
 
         let wallet = currency_schema.wallet(&pub_key);
 
-        let explorer = BlockchainExplorer::new(state.blockchain());
+        let explorer = BlockchainExplorer::new(snapshot);
 
         let wallet_history = wallet.map(|_| {
             let history = currency_schema.wallet_history(&pub_key);

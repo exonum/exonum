@@ -19,13 +19,15 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use crate::{helpers::ValidateInput, proto::schema};
 
+use super::InstanceDescriptor;
+
 /// Unique service instance identifier.
 ///
-/// * This is the secondary identifier, mainly used in transaction messages.
-/// The primary one is the service instance name.
+/// * This is a secondary identifier, mainly used in transaction messages.
+/// The primary one is a service instance name.
 ///
 /// * The core assigns this identifier when the service is started.
-pub type ServiceInstanceId = u32;
+pub type InstanceId = u32;
 /// Identifier of the method in the service interface required for the call.
 pub type MethodId = u32;
 
@@ -37,7 +39,7 @@ pub type MethodId = u32;
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
     /// corresponding runtime to execute a transaction.
-    pub instance_id: ServiceInstanceId,
+    pub instance_id: InstanceId,
     /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
 }
@@ -212,9 +214,15 @@ impl FromStr for ArtifactId {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
-    /// Unique service instance identifier.
-    pub id: ServiceInstanceId,
-    /// Unique service instance name.
+    /// Unique numeric ID of the service instance.
+    ///
+    ///  Exonum assigns an ID to the service on instantiation. It is mainly used to route
+    /// transaction messages belonging to this instance.
+    pub id: InstanceId,
+    /// Unique name of the service instance.
+    ///
+    /// The name serves as a primary identifier of this service in most operations.
+    /// It is assigned by the network administrators.
     ///
     /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
     pub name: String,
@@ -223,10 +231,10 @@ pub struct InstanceSpec {
 }
 
 impl InstanceSpec {
-    /// Creates a new instance specification or returns an error
+    /// Create a new instance specification or return an error
     /// if the resulting specification is not correct.
     pub fn new(
-        id: ServiceInstanceId,
+        id: InstanceId,
         name: impl Into<String>,
         artifact: impl AsRef<str>,
     ) -> Result<Self, failure::Error> {
@@ -251,6 +259,14 @@ impl InstanceSpec {
             "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
         );
         Ok(())
+    }
+
+    /// Return the corresponding descriptor of this instance specification.
+    pub fn as_descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor {
+            id: self.id,
+            name: self.name.as_ref(),
+        }
     }
 }
 

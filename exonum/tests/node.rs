@@ -20,7 +20,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory},
-        ArtifactInfo,
+        ArtifactProtobufSpec,
     },
 };
 use exonum_derive::exonum_service;
@@ -57,8 +57,8 @@ impl ServiceFactory for CommitWatcherService {
         "after-commit:1.0.0".parse().unwrap()
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {
@@ -84,8 +84,8 @@ impl ServiceFactory for StartCheckerServiceFactory {
         "configure:1.0.0".parse().unwrap()
     }
 
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo::default()
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        ArtifactProtobufSpec::default()
     }
 
     fn create_instance(&self) -> Box<dyn Service> {

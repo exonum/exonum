@@ -24,7 +24,7 @@ use crate::{
     helpers::{Height, Round},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     proto,
-    runtime::ServiceInstanceId,
+    runtime::InstanceId,
 };
 
 use super::{config::StoredConfiguration, Block, BlockProof, ExecutionStatus};
@@ -474,7 +474,7 @@ pub enum IndexOwner {
     /// This index is a part of runtime schema.
     Runtime(u32),
     /// This index is a part of some service schema.
-    Service(ServiceInstanceId),
+    Service(InstanceId),
 }
 
 impl IndexOwner {

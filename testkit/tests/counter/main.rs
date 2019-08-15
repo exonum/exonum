@@ -21,6 +21,7 @@ use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
     blockchain::{ExecutionError, ExecutionErrorKind},
     crypto::{self, PublicKey},
+    explorer::BlockchainExplorer,
     helpers::Height,
     messages::{AnyTx, Verified},
     runtime::rust::Transaction,
@@ -481,7 +482,13 @@ fn test_explorer_blocks_basic() {
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=1&add_precommits=true")
         .unwrap();
-    let precommit = testkit.explorer().block(Height(1)).unwrap().precommits()[0].clone();
+
+    let snapshot = testkit.snapshot();
+    let precommit = BlockchainExplorer::new(snapshot.as_ref())
+        .block(Height(1))
+        .unwrap()
+        .precommits()[0]
+        .clone();
     assert_eq!(
         response,
         json!({
@@ -702,7 +709,6 @@ fn test_explorer_blocks_loaded_info() {
 
 #[test]
 fn test_explorer_single_block() {
-    use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
     use std::collections::HashSet;
 
@@ -718,7 +724,8 @@ fn test_explorer_single_block() {
     assert_eq!(testkit.majority_count(), 3);
 
     {
-        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let snapshot = testkit.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         let block = explorer.block(Height(0)).unwrap();
         assert_eq!(block.height(), Height(0));
         assert_eq!(*block.header().prev_hash(), crypto::Hash::default());
@@ -733,7 +740,8 @@ fn test_explorer_single_block() {
     testkit.create_block(); // height == 1
 
     {
-        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let snapshot = testkit.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         let block = explorer.block(Height(1)).unwrap();
         assert_eq!(block.height(), Height(1));
         assert_eq!(block.len(), 1);
@@ -815,7 +823,8 @@ fn test_explorer_transaction_info() {
     assert_eq!(committed.location().block_height(), Height(1));
     assert!(committed.status().is_ok());
 
-    let explorer = BlockchainExplorer::new(testkit.blockchain());
+    let snapshot = testkit.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let block = explorer.block(Height(1)).unwrap();
     assert!(committed
         .location_proof()

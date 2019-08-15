@@ -23,10 +23,7 @@ use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{ExecutionError, Schema},
     crypto::gen_keypair,
-    runtime::{
-        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        ArtifactInfo,
-    },
+    runtime::rust::{Service, Transaction, TransactionContext},
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
@@ -58,7 +55,12 @@ trait TimestampingInterface {
     ) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "timestamping",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto"
+)]
 struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
@@ -73,25 +75,9 @@ impl TimestampingInterface for TimestampingService {
 
 impl Service for TimestampingService {}
 
-impl ServiceFactory for TimestampingService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "timestamping:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_info(&self) -> ArtifactInfo {
-        ArtifactInfo {
-            proto_sources: proto::PROTO_SOURCES.as_ref(),
-        }
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
-
 fn main() {
     let instance_id = 512;
-    // Create testkit for network with four validators.
+    // Create a testkit for a network with four validators.
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(InstanceCollection::new(TimestampingService).with_instance(

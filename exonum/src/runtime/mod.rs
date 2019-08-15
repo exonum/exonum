@@ -77,15 +77,15 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-//!
 
 pub use self::{
     error::{ErrorKind, ExecutionError},
-    types::{AnyTx, ArtifactId, CallInfo, InstanceSpec, MethodId, ServiceInstanceId},
+    types::{AnyTx, ArtifactId, CallInfo, InstanceId, InstanceSpec, MethodId},
 };
 
 #[macro_use]
 pub mod rust;
+pub mod api;
 pub mod dispatcher;
 pub mod error;
 pub mod supervisor;
@@ -96,13 +96,16 @@ use futures::Future;
 use std::fmt::Debug;
 
 use crate::{
-    api::ServiceApiBuilder,
+    api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
     node::ApiSender,
     proto::Any,
 };
 
-use self::dispatcher::{Dispatcher, DispatcherSender};
+use self::{
+    api::ServiceApiBuilder,
+    dispatcher::{Dispatcher, DispatcherSender},
+};
 
 mod types;
 
@@ -168,7 +171,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// # Notes for Runtime Developers
     ///
     /// * Ensure that the deployed artifact has the following information, even if it is empty.
-    fn artifact_info(&self, id: &ArtifactId) -> Option<ArtifactInfo>;
+    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec>;
 
     /// Start a new service instance with the given specification.
     ///
@@ -198,7 +201,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn configure_service(
         &self,
         fork: &Fork,
-        spec: &InstanceSpec,
+        descriptor: InstanceDescriptor,
         parameters: Any,
     ) -> Result<(), ExecutionError>;
 
@@ -209,7 +212,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
-    fn stop_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
+    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
 
     /// Execute service transaction.
     ///
@@ -255,9 +258,23 @@ pub trait Runtime: Send + Debug + 'static {
         tx_sender: &ApiSender,
     );
 
-    fn services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+    /// Collect the full list of API handlers from the runtime for the built-in Exonum API server.
+    ///
+    /// This method is called during the API server restart. Use this method if you do not plan to
+    /// use your own API processing mechanism.
+    ///
+    /// Warning! It is a temporary method which retains the existing `RustRuntime` code.
+    /// It will be removed in the future.
+    #[doc(hidden)]
+    fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
         Vec::new()
     }
+
+    /// Notify the runtime about the changes in the list of service instances.
+    ///
+    /// The purpose of this method is to provide building blocks to create your own
+    /// API processing mechanisms.
+    fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
 }
 
 impl<T> From<T> for Box<dyn Runtime>
@@ -269,23 +286,23 @@ where
     }
 }
 
-/// Useful artifact information for Exonum clients.
+/// Artifact Protobuf specification for the Exonum clients.
 #[derive(Debug, PartialEq)]
-pub struct ArtifactInfo<'a> {
+pub struct ArtifactProtobufSpec<'a> {
     /// List of Protobuf files that make up the service interface. The first element in the tuple
     /// is the file name, the second one is its content.
     ///
     /// The common interface entry point is always in the `service.proto` file.
-    pub proto_sources: &'a [(&'a str, &'a str)],
+    pub sources: &'a [(&'a str, &'a str)],
 }
 
-impl<'a> Default for ArtifactInfo<'a> {
-    /// Creates blank artifact information without any proto sources.
+impl<'a> Default for ArtifactProtobufSpec<'a> {
+    /// Create blank artifact information without any proto sources.
     fn default() -> Self {
         const EMPTY_SOURCES: [(&str, &str); 0] = [];
 
         Self {
-            proto_sources: EMPTY_SOURCES.as_ref(),
+            sources: EMPTY_SOURCES.as_ref(),
         }
     }
 }
@@ -297,7 +314,7 @@ pub struct StateHashAggregator {
     /// List of hashes of the root objects of the runtime information schemas.
     pub runtime: Vec<Hash>,
     /// List of hashes of the root objects of the service instances schemas.
-    pub instances: Vec<(ServiceInstanceId, Vec<Hash>)>,
+    pub instances: Vec<(InstanceId, Vec<Hash>)>,
 }
 
 /// The initiator of the transaction execution.
@@ -359,10 +376,36 @@ impl<'a> ExecutionContext<'a> {
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
         self.actions.push(action);
     }
+}
 
-    pub(crate) fn take_actions(&mut self) -> Vec<dispatcher::Action> {
-        let mut other = Vec::new();
-        std::mem::swap(&mut self.actions, &mut other);
-        other
+/// Instance descriptor contains information to access running service instance.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct InstanceDescriptor<'a> {
+    /// The unique numeric ID of the service instance.
+    /// [Read more.](struct.InstanceSpec.html#structfield.id)
+    pub id: InstanceId,
+    /// The unique name of the service instance.
+    /// [Read more.](struct.InstanceSpec.html#structfield.name)
+    pub name: &'a str,
+}
+
+impl std::fmt::Display for InstanceDescriptor<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.id, self.name)
     }
+}
+
+impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
+    fn from(descriptor: InstanceDescriptor) -> Self {
+        (descriptor.id, descriptor.name.to_owned())
+    }
+}
+
+/// Change in the list of service instances.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ApiChange {
+    /// New instance has been added.
+    InstanceAdded(InstanceId),
+    /// Instance has been removed.
+    InstanceRemoved(InstanceId),
 }

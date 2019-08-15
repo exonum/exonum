@@ -177,7 +177,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
     proto::Any,
-    runtime::{rust::ServiceFactory, ServiceInstanceId},
+    runtime::{rust::ServiceFactory, InstanceId},
 };
 use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
@@ -229,7 +229,7 @@ impl TestKit {
     pub fn for_service(
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
-        id: ServiceInstanceId,
+        id: InstanceId,
         constructor: impl Into<Any>,
     ) -> Self {
         TestKitBuilder::validator()
@@ -490,7 +490,8 @@ impl TestKit {
 
         self.poll_events();
 
-        BlockchainExplorer::new(&self.blockchain)
+        let snapshot = self.snapshot();
+        BlockchainExplorer::new(snapshot.as_ref())
             .block_with_txs(self.height())
             .unwrap()
     }
@@ -685,12 +686,7 @@ impl TestKit {
         self.blockchain.last_block().height()
     }
 
-    /// Returns the blockchain explorer instance.
-    pub fn explorer(&self) -> BlockchainExplorer {
-        BlockchainExplorer::new(&self.blockchain)
-    }
-
-    /// Returns the actual blockchain configuration.
+    /// Return an actual blockchain configuration.
     pub fn actual_configuration(&self) -> StoredConfiguration {
         CoreSchema::new(&self.snapshot()).actual_configuration()
     }

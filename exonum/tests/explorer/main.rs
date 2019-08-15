@@ -58,7 +58,8 @@ fn test_explorer_basics() {
         .sign(SERVICE_ID, pk_alice, &key_alice);
 
     {
-        let explorer = BlockchainExplorer::new(&blockchain);
+        let snapshot = blockchain.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         assert_eq!(explorer.height(), Height(0));
         let block = explorer.block(Height(0)).unwrap();
         assert_eq!(block.len(), 0);
@@ -71,7 +72,8 @@ fn test_explorer_basics() {
     create_block(&mut blockchain, vec![tx_alice.clone()]);
 
     {
-        let explorer = BlockchainExplorer::new(&blockchain);
+        let snapshot = blockchain.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         let snapshot = blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(explorer.height(), Height(1));
@@ -118,7 +120,8 @@ fn test_explorer_basics() {
 
     create_block(&mut blockchain, vec![tx_bob.clone(), tx_transfer.clone()]);
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     assert_eq!(explorer.height(), Height(2));
@@ -179,7 +182,8 @@ fn test_explorer_pool_transaction() {
     let tx_hash = tx_alice.object_hash();
 
     {
-        let explorer = BlockchainExplorer::new(&blockchain);
+        let snapshot = blockchain.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         assert!(explorer.transaction(&tx_hash).is_none());
     }
 
@@ -190,7 +194,8 @@ fn test_explorer_pool_transaction() {
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let tx_info = explorer.transaction(&tx_hash).unwrap();
     assert!(tx_info.is_in_pool());
     assert!(!tx_info.is_committed());
@@ -234,7 +239,8 @@ fn test_explorer_block_iter() {
     create_block(&mut blockchain, txs.take(5).collect()); // Height(9)
     assert_eq!(blockchain.last_block().height(), Height(9));
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
 
     let mut count = 0;
     for (i, block) in explorer.blocks(..).enumerate() {
@@ -337,7 +343,8 @@ fn test_transaction_iterator() {
     create_block(&mut blockchain, txs.take(5).collect());
 
     {
-        let explorer = BlockchainExplorer::new(&blockchain);
+        let snapshot = blockchain.snapshot();
+        let explorer = BlockchainExplorer::new(snapshot.as_ref());
         let block = explorer.block(Height(1)).unwrap();
         for tx in &block {
             assert_eq!(tx.status(), Ok(()));
@@ -365,7 +372,8 @@ fn test_transaction_iterator() {
         vec![tx_alice.clone(), tx_bob.clone(), tx_transfer.clone()],
     );
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
 
     let block = explorer.block(Height(2)).unwrap();
     let failed_tx_hashes: Vec<_> = block
@@ -392,7 +400,8 @@ fn test_block_with_transactions() {
     let txs: Vec<_> = tx_generator().take(5).collect();
     create_block(&mut blockchain, txs);
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let block = explorer.block_with_txs(Height(1)).unwrap();
     assert_eq!(block.len(), 5);
     assert!(!block.is_empty());
@@ -409,7 +418,8 @@ fn test_block_with_transactions_index_overflow() {
     let txs: Vec<_> = tx_generator().take(5).collect();
     create_block(&mut blockchain, txs);
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let block = explorer.block_with_txs(Height(1)).unwrap();
     assert!(block[6].status().is_ok());
 }
@@ -420,7 +430,8 @@ fn test_committed_transaction_roundtrip() {
     let tx = tx_generator().next().unwrap();
     create_block(&mut blockchain, vec![tx.clone()]);
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let tx_copy: &CommittedTransaction = &explorer.block_with_txs(Height(1)).unwrap()[0];
     let json = serde_json::to_value(tx_copy).unwrap();
     let tx_copy: CommittedTransaction = serde_json::from_value(json).unwrap();
@@ -440,7 +451,8 @@ fn test_transaction_info_roundtrip() {
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let info: TransactionInfo = explorer.transaction(&tx.object_hash()).unwrap();
     let json = serde_json::to_value(&info).unwrap();
     let info: TransactionInfo = serde_json::from_value(json).unwrap();
@@ -457,7 +469,8 @@ fn test_block_with_transactions_roundtrip() {
 
     create_block(&mut blockchain, vec![tx.clone()]);
 
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let block = explorer.block_with_txs(Height(1)).unwrap();
     let block_json = serde_json::to_value(&block).unwrap();
     let block_copy: BlockWithTransactions = serde_json::from_value(block_json).unwrap();

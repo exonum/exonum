@@ -258,11 +258,11 @@ impl RunDev {
         ctx.set_arg(PRIVATE_API_ADDRESS, "127.0.0.1:8081".to_string());
         ctx.set_arg(
             PUBLIC_ALLOW_ORIGIN,
-            "http://127.0.0.1, http://localhost".to_string(),
+            "http://127.0.0.1:8080, http://localhost:8080".to_string(),
         );
         ctx.set_arg(
             PRIVATE_ALLOW_ORIGIN,
-            "http://127.0.0.1, http://localhost".to_string(),
+            "http://127.0.0.1:8081, http://localhost:8081".to_string(),
         );
         ctx.set_arg("SECRET_CONFIG", sec_config_path.clone());
         ctx.set_arg("OUTPUT_CONFIG_PATH", output_config_path.clone());

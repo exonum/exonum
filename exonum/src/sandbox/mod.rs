@@ -1208,18 +1208,14 @@ where
 #[cfg(test)]
 mod tests {
     use exonum_merkledb::BinaryValue;
-    use semver::Version;
 
     use crate::{
         blockchain::ExecutionError,
         crypto::{gen_keypair_from_seed, Seed},
-        proto::schema::{tests::TxAfterCommit, PROTO_SOURCES},
+        proto::schema::tests::TxAfterCommit,
         runtime::{
-            rust::{
-                AfterCommitContext, RustArtifactId, Service, ServiceFactory, Transaction,
-                TransactionContext,
-            },
-            AnyTx, ArtifactInfo, ServiceInstanceId,
+            rust::{AfterCommitContext, Service, Transaction, TransactionContext},
+            AnyTx, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1235,7 +1231,13 @@ mod tests {
         ) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(
+        crate = "crate",
+        artifact_name = "after_commit",
+        artifact_version = "0.1.0",
+        proto_sources = "crate::proto::schema"
+    )]
     pub struct AfterCommitService;
 
     impl AfterCommitInterface for AfterCommitService {
@@ -1255,27 +1257,8 @@ mod tests {
         }
     }
 
-    impl ServiceFactory for AfterCommitService {
-        fn artifact_id(&self) -> RustArtifactId {
-            RustArtifactId {
-                name: "after_commit".into(),
-                version: Version::new(0, 1, 0),
-            }
-        }
-
-        fn artifact_info(&self) -> ArtifactInfo {
-            ArtifactInfo {
-                proto_sources: PROTO_SOURCES.as_ref(),
-            }
-        }
-
-        fn create_instance(&self) -> Box<dyn Service> {
-            Box::new(Self)
-        }
-    }
-
     impl AfterCommitService {
-        pub const ID: ServiceInstanceId = 2;
+        pub const ID: InstanceId = 2;
     }
 
     impl TxAfterCommit {

@@ -43,6 +43,7 @@ use std::{
 };
 
 use crate::{
+    api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
@@ -68,7 +69,7 @@ pub type TransactionMessage = Verified<AnyTx>;
 /// into a single network.
 #[derive(Debug, Clone)]
 pub struct Blockchain {
-    db: Arc<dyn Database>,
+    pub(crate) db: Arc<dyn Database>,
     // FIXME fix visibility [ECR-3222]
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
@@ -377,8 +378,9 @@ impl Blockchain {
         // Invokes `after_commit` for each service in order of their identifiers
         let mut dispatcher = self.dispatcher();
         dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
-        // Sends `RestartApi` request if dispatcher state was been modified.
-        if dispatcher.take_modified_state() {
+        // Send `RestartApi` request if the dispatcher state has been modified.
+        let context = ApiContext::with_blockchain(self);
+        if dispatcher.notify_api_changes(&context) {
             self.internal_requests
                 .clone()
                 .send(InternalRequest::RestartApi)
