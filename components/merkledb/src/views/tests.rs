@@ -17,7 +17,7 @@ use std::panic;
 
 use crate::{
     db,
-    views::{is_valid_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
+    views::{is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
     Database, DbOptions, Entry, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
 
