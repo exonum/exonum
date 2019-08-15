@@ -26,25 +26,30 @@ use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
+/// Enum that represents the type of the `ProofMap` node.
 #[derive(Debug)]
 pub enum Node {
+    /// Leaf node that contains a hash of the leaf value.
     Leaf(Hash),
+    /// Branch node.
     Branch(BranchNode),
 }
 
+/// Structure that encapsulates a raw representation of the branch node.
 #[derive(Clone, PartialEq)]
 pub struct BranchNode {
     raw: Vec<u8>,
 }
 
 impl BranchNode {
+    /// Create empty `BranchNode`.
     pub fn empty() -> Self {
         Self {
             raw: vec![0_u8; BRANCH_NODE_SIZE],
         }
     }
 
-    pub fn child_hash(&self, kind: ChildKind) -> Hash {
+    pub(crate) fn child_hash(&self, kind: ChildKind) -> Hash {
         let from = match kind {
             ChildKind::Right => HASH_SIZE,
             ChildKind::Left => 0,
@@ -52,7 +57,7 @@ impl BranchNode {
         Hash::read(&self.raw[from..from + HASH_SIZE])
     }
 
-    pub fn child_path(&self, kind: ChildKind) -> ProofPath {
+    pub(crate) fn child_path(&self, kind: ChildKind) -> ProofPath {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
@@ -60,7 +65,7 @@ impl BranchNode {
         ProofPath::read(&self.raw[from..from + PROOF_PATH_SIZE])
     }
 
-    pub fn set_child_path(&mut self, kind: ChildKind, prefix: &ProofPath) {
+    pub(crate) fn set_child_path(&mut self, kind: ChildKind, prefix: &ProofPath) {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
@@ -68,7 +73,7 @@ impl BranchNode {
         prefix.write(&mut self.raw[from..from + PROOF_PATH_SIZE]);
     }
 
-    pub fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
+    pub(crate) fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
         let from = match kind {
             ChildKind::Right => HASH_SIZE,
             ChildKind::Left => 0,
@@ -76,7 +81,7 @@ impl BranchNode {
         self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
     }
 
-    pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &Hash) {
+    pub(crate) fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &Hash) {
         self.set_child_path(kind, prefix);
         self.set_child_hash(kind, hash);
     }

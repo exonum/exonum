@@ -46,11 +46,11 @@ function Check-CreateTx ($tx) {
   $error = $False;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;
-    if (($respJson.type -ne 'Committed') -or ($respJson.content.body.name -ne $tx.name)) {
-      $error = true;
+    if (($respJson.type -ne 'committed') -or ($respJson.content.debug.name -ne $tx.name)) {
+      $error = $True;
     }
   } else {
-    $error = true;
+    $error = $True;
   }
 
   if ($error) {

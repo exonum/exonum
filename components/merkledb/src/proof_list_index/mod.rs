@@ -167,7 +167,7 @@ where
         }
     }
 
-    pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         let (base, state) = IndexBuilder::from_address(address, access)
             .index_type(IndexType::ProofList)
             .build();
@@ -179,7 +179,7 @@ where
         }
     }
 
-    pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         IndexBuilder::from_address(address, access)
             .index_type(IndexType::ProofList)
             .build_existed()

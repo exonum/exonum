@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -51,15 +51,15 @@ chrono = { version = "0.4.6", features = ["serde"] }
 uuid = { version = "0.7.1", features = ["serde"] }
 snow = { version = "0.6.0", default-features = false }
 rust_decimal = "1.0"
-protobuf = { version = "2.6.0", features = ["with-serde"] }
+protobuf = { version = "2.8.0", features = ["with-serde"] }
 ctrlc = "3.1.1"
 rpassword = "4.0.1"
 zeroize = "0.9.1"
 
 exonum_sodiumoxide = { version = "0.0.22", optional = true }
-exonum-crypto = { version = "0.11.0", path = "../components/crypto" }
-exonum-derive = { version = "0.11.0", path = "../components/derive" }
-exonum-merkledb = { version = "0.11.0", path = "../components/merkledb" }
+exonum-crypto = { version = "0.12.0", path = "../components/crypto" }
+exonum-derive = { version = "0.12.0", path = "../components/derive" }
+exonum-merkledb = { version = "0.12.0", path = "../components/merkledb" }
 
 [dev-dependencies]
 criterion = "0.2.8"
@@ -92,7 +92,7 @@ rocksdb_zstd = ["exonum-merkledb/rocksdb_zstd"]
 rocksdb_bzip2 = ["exonum-merkledb/rocksdb_bzip2"]
 
 [build-dependencies]
-exonum-build = { version = "0.11.0", path = "../components/build" }
+exonum-build = { version = "0.12.0", path = "../components/build" }
 
 [package.metadata.docs.rs]
 dependencies = [ "protobuf-compiler" ]
