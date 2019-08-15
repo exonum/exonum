@@ -24,7 +24,7 @@ use exonum::{
     runtime::{
         rust::{service::ServiceFactory, Transaction},
         supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor},
-        ArtifactId, RuntimeIdentifier, ServiceInstanceId,
+        ArtifactId, InstanceId, RuntimeIdentifier,
     },
 };
 
@@ -36,7 +36,7 @@ mod proto;
 fn artifact_default() -> ArtifactId {
     ArtifactId {
         runtime_id: RuntimeIdentifier::Rust as _,
-        name: IncService::new().artifact_id().to_string(),
+        name: IncService.artifact_id().to_string(),
     }
 }
 
@@ -63,7 +63,7 @@ fn does_service_instance_exist(api: &TestKitApi, name: &str) -> bool {
     services.iter().any(|s| s.name == name)
 }
 
-fn find_instance_id(api: &TestKitApi, instance_name: &str) -> ServiceInstanceId {
+fn find_instance_id(api: &TestKitApi, instance_name: &str) -> InstanceId {
     let services = &api.exonum_api().services().services;
     services
         .iter()
@@ -184,7 +184,7 @@ fn deploy_default(testkit: &mut TestKit) {
     assert!(does_artifact_exist(&api, &artifact.name));
 }
 
-fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> ServiceInstanceId {
+fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
     let api = testkit.api();
 
     assert!(!does_service_instance_exist(&api, instance_name));
@@ -224,7 +224,7 @@ fn testkit_with_inc_service_auditor_validator() -> TestKit {
 }
 
 fn testkit_with_inc_service_and_static_instance() -> TestKit {
-    let service = IncService::new();
+    let service = IncService;
     let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()

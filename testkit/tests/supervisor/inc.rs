@@ -17,17 +17,17 @@ use serde_derive::{Deserialize, Serialize};
 use crate::proto;
 
 use exonum::{
-    api,
     blockchain::ExecutionError,
     runtime::{
-        rust::{Service, ServiceDescriptor, TransactionContext},
-        ServiceInstanceId,
+        api::{self, ServiceApiBuilder},
+        rust::{Service, TransactionContext},
+        InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess};
 
-pub const SERVICE_ID: ServiceInstanceId = 512;
+pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
 #[derive(Debug)]
@@ -93,44 +93,25 @@ impl IncInterface for IncService {
     }
 }
 
-impl IncService {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PublicApi {
-    service_name: String,
-    service_id: ServiceInstanceId,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct PublicApi;
 
 impl PublicApi {
-    pub fn new(descriptor: ServiceDescriptor) -> Self {
-        Self {
-            service_name: descriptor.service_name().to_owned(),
-            service_id: descriptor.service_id(),
-        }
-    }
-
-    fn counter(&self, state: &api::ServiceApiState) -> api::Result<u64> {
+    fn counter(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
         let snapshot = state.snapshot();
-        let schema = Schema::new(&self.service_name, &snapshot);
+        let schema = Schema::new(&state.instance().name, snapshot);
         schema
             .count()
             .ok_or_else(|| api::Error::NotFound("Counter is not set yet".to_owned()))
     }
 
-    fn wire(self, builder: &mut api::ServiceApiBuilder) {
-        builder.public_scope().endpoint(
-            "v1/counter",
-            move |state: &api::ServiceApiState, _query: ()| self.counter(state),
-        );
+    fn wire(builder: &mut ServiceApiBuilder) {
+        builder.public_scope().endpoint("v1/counter", Self::counter);
     }
 }
 
 impl Service for IncService {
-    fn wire_api(&self, descriptor: ServiceDescriptor, builder: &mut api::ServiceApiBuilder) {
-        PublicApi::new(descriptor).wire(builder);
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        PublicApi::wire(builder);
     }
 }
