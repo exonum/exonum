@@ -336,7 +336,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// [`Transaction`]: ../blockchain/trait.Transaction.html
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
-/// [`ListProof`]: ../../exonum_merkledb/enum.ListProof.html
+/// [`ListProof`]: ../../exonum_merkledb/struct.ListProof.html
 /// [`Hash`]: ../../exonum_crypto/struct.Hash.html
 /// [`TransactionResult`]: ../blockchain/struct.TransactionResult.html
 /// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html

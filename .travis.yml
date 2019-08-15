@@ -54,7 +54,7 @@ sudo: required
 
 env:
   global:
-  - DEADLINKS_VERS=0.3.0
+  - DEADLINKS_VERS=0.4.1
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
