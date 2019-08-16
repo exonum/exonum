@@ -12,22 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::blockchain::{GenesisConfig, ValidatorKeys};
+use exonum::crypto::generate_keys_file;
+use exonum::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
+use failure::Error;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use failure::{Error, ResultExt};
 
-use std::net::SocketAddr;
-use std::path::{PathBuf, Path};
-
-use crate::password::{PassInputMethod, SecretKeyType, ZeroizeOnDrop};
-use exonum::node::{NodeConfig, ConnectListConfig, NodeApiConfig, ConnectInfo};
-use std::sync::Arc;
-use fabric::{CommonConfigTemplate, GeneralConfig, NodePublicConfig, SharedConfig, NodePrivateConfig};
-use exonum::crypto::generate_keys_file;
-use crate::config::{save_config_file, load_config_file};
-use std::fs;
-use exonum::blockchain::{ValidatorKeys, GenesisConfig};
 use std::collections::BTreeMap;
+use std::fs;
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+
+use crate::config::{load_config_file, save_config_file};
+use crate::fabric::{
+    CommonConfigTemplate, GeneralConfig, NodePrivateConfig, NodePublicConfig, SharedConfig,
+};
+use crate::password::{PassInputMethod, SecretKeyType, ZeroizeOnDrop};
 
 mod config;
 mod fabric;
@@ -155,7 +156,9 @@ impl ExonumCommand for GenerateConfig {
         let consensus_secret_key_path = self.output_dir.join(CONSENSUS_SECRET_KEY_NAME);
         let service_secret_key_path = self.output_dir.join(SERVICE_SECRET_KEY_NAME);
 
-        let listen_address: SocketAddr = self.listen_address.unwrap_or_else(|| SocketAddr::new("0.0.0.0".parse().unwrap(), self.peer_address.port()));
+        let listen_address: SocketAddr = self.listen_address.unwrap_or_else(|| {
+            SocketAddr::new("0.0.0.0".parse().unwrap(), self.peer_address.port())
+        });
 
         let consensus_public_key = {
             let passphrase = Self::get_passphrase(
@@ -277,7 +280,10 @@ impl Finalize {
         )
     }
 
-    fn create_connect_list_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> ConnectListConfig {
+    fn create_connect_list_config(
+        list: &[NodePublicConfig],
+        node: &NodePrivateConfig,
+    ) -> ConnectListConfig {
         let peers = list
             .iter()
             .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
@@ -293,12 +299,12 @@ impl Finalize {
 
 impl ExonumCommand for Finalize {
     fn execute(self) -> Result<StandardResult, Error> {
-        let secret_config: NodePrivateConfig =
-            load_config_file(&self.secret_config_path)?;
+        let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
         let secret_config_dir = std::env::current_dir()
             .expect("Failed to get current dir")
             .join(self.secret_config_path.parent().unwrap());
-        let public_configs: Vec<SharedConfig> = self.public_configs
+        let public_configs: Vec<SharedConfig> = self
+            .public_configs
             .into_iter()
             .map(|path| load_config_file(path))
             .collect::<Result<_, _>>()?;
@@ -306,7 +312,7 @@ impl ExonumCommand for Finalize {
         let public_allow_origin = self.public_allow_origin.map(|s| s.parse().unwrap());
         let private_allow_origin = self.private_allow_origin.map(|s| s.parse().unwrap());
 
-        let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
+        let (common, list, _our) = Self::reduce_configs(public_configs, &secret_config);
 
         let validators_count = common.general_config.validators_count as usize;
 
@@ -391,10 +397,20 @@ impl ExonumCommand for Run {
             config.api.private_api_address = Some(private_api_address);
         }
 
-        let consensus_passphrase = self.consensus_key_pass.unwrap_or_default().get_passphrase(SecretKeyType::Consensus, true);
-        let service_passphrase = self.service_key_pass.unwrap_or_default().get_passphrase(SecretKeyType::Service, true);
+        let consensus_passphrase = self
+            .consensus_key_pass
+            .unwrap_or_default()
+            .get_passphrase(SecretKeyType::Consensus, true);
+        let service_passphrase = self
+            .service_key_pass
+            .unwrap_or_default()
+            .get_passphrase(SecretKeyType::Service, true);
 
-        let config = config.read_secret_keys(&config_path, consensus_passphrase.as_bytes(), service_passphrase.as_bytes());
+        let config = config.read_secret_keys(
+            &config_path,
+            consensus_passphrase.as_bytes(),
+            service_passphrase.as_bytes(),
+        );
 
         let run_config = NodeRunConfig {
             node_config: config,

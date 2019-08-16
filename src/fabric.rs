@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::blockchain::{ValidatorKeys, ConsensusConfig};
+use exonum::blockchain::{ConsensusConfig, ValidatorKeys};
 use exonum::crypto::PublicKey;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use std::net::SocketAddr;
 use std::path::PathBuf;

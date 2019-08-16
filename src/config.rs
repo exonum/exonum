@@ -20,33 +20,30 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{Read, Write},
-    mem::drop,
-    path::{Path, PathBuf},
-    sync::mpsc,
-    thread,
+    path::Path,
 };
 
-    /// Loads TOML-encoded file.
-    pub fn load_config_file<P, T>(path: P) -> Result<T, Error>
-        where
-            T: for<'r> Deserialize<'r>,
-            P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        let res = do_load(path).context(format!("loading config from {}", path.display()))?;
-        Ok(res)
-    }
+/// Loads TOML-encoded file.
+pub fn load_config_file<P, T>(path: P) -> Result<T, Error>
+where
+    T: for<'r> Deserialize<'r>,
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    let res = do_load(path).context(format!("loading config from {}", path.display()))?;
+    Ok(res)
+}
 
-    /// Saves TOML-encoded file.
-    pub fn save_config_file<P, T>(value: &T, path: P) -> Result<(), Error>
-        where
-            T: Serialize,
-            P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        do_save(value, path).with_context(|_| format!("saving config to {}", path.display()))?;
-        Ok(())
-    }
+/// Saves TOML-encoded file.
+pub fn save_config_file<P, T>(value: &T, path: P) -> Result<(), Error>
+where
+    T: Serialize,
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    do_save(value, path).with_context(|_| format!("saving config to {}", path.display()))?;
+    Ok(())
+}
 
 fn do_load<T: DeserializeOwned>(path: &Path) -> Result<T, Error> {
     let mut file = File::open(path)?;
