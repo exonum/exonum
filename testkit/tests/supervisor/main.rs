@@ -14,10 +14,11 @@
 
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
-use serde_json::json;
 
 use exonum::{
-    api, crypto,
+    api,
+    blockchain::{ExecutionError, ExecutionErrorKind},
+    crypto,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     proto::Any,
@@ -298,12 +299,11 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
     let system_api = api.exonum_api();
-    let expected_status = json!({
-       "type": "service_error",
-       "code": 2,
-       "description": "Deadline exceeded for the current transaction.",
+    let expected_status = Err(ExecutionError {
+        kind: ExecutionErrorKind::Service { code: 2 },
+        description: "Deadline exceeded for the current transaction.".into(),
     });
-    system_api.assert_tx_status(hash, &expected_status);
+    system_api.assert_tx_status(hash, &expected_status.into());
 }
 
 #[test]
@@ -320,12 +320,11 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_status = json!({
-       "type": "service_error",
-       "code": 2,
-       "description": "Deadline exceeded for the current transaction.",
+    let expected_status = Err(ExecutionError {
+        kind: ExecutionErrorKind::Service { code: 2 },
+        description: "Deadline exceeded for the current transaction.".into(),
     });
-    system_api.assert_tx_status(hash, &expected_status);
+    system_api.assert_tx_status(hash, &expected_status.into());
 }
 
 #[test]
@@ -346,12 +345,11 @@ fn test_try_run_unregistered_service_instance() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_status = json!({
-       "type": "dispatcher_error",
-       "code": 3,
-       "description": "Artifact with the given identifier is not deployed.",
+    let expected_status = Err(ExecutionError {
+        kind: ExecutionErrorKind::Dispatcher { code: 3 },
+        description: "Artifact with the given identifier is not deployed.".into(),
     });
-    system_api.assert_tx_status(hash, &expected_status);
+    system_api.assert_tx_status(hash, &expected_status.into());
 }
 
 #[test]
@@ -428,12 +426,11 @@ fn test_empty_service_instance_name() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_status = json!({
-       "type": "service_error",
-       "code": 7,
-       "description": "Service instance name should not be empty",
+    let expected_status = Err(ExecutionError {
+        kind: ExecutionErrorKind::Service { code: 7 },
+        description: "Service instance name should not be empty".into(),
     });
-    system_api.assert_tx_status(hash, &expected_status);
+    system_api.assert_tx_status(hash, &expected_status.into());
 }
 
 #[test]
@@ -450,12 +447,13 @@ fn test_bad_service_instance_name() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_status = json!({
-       "type": "service_error",
-       "code": 7,
-       "description": "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-.",
+    let expected_description =
+        "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-.";
+    let expected_status = Err(ExecutionError {
+        kind: ExecutionErrorKind::Service { code: 7 },
+        description: expected_description.into(),
     });
-    system_api.assert_tx_status(hash, &expected_status);
+    system_api.assert_tx_status(hash, &expected_status.into());
 }
 
 #[test]
@@ -490,12 +488,11 @@ fn test_start_service_instance_twice() {
         testkit.create_block();
 
         let system_api = api.exonum_api();
-        let expected_status = json!({
-           "type": "service_error",
-           "code": 3,
-           "description": "Instance with the given name already exists.",
+        let expected_status = Err(ExecutionError {
+            kind: ExecutionErrorKind::Service { code: 3 },
+            description: "Instance with the given name already exists.".into(),
         });
-        system_api.assert_tx_status(hash, &expected_status);
+        system_api.assert_tx_status(hash, &expected_status.into());
     }
 }
 
@@ -753,12 +750,14 @@ fn test_auditor_cant_send_requests() {
     system_api.assert_tx_success(deploy_artifact_validator_tx_hash);
 
     // ... but the auditor's request is failed as expected.
-    let expected_status = json!({
-       "type": "service_error",
-       "code": 1,
-       "description": "Transaction author is not a validator.",
+    let expected_status = Err(ExecutionError {
+        kind: ExecutionErrorKind::Service { code: 1 },
+        description: "Transaction author is not a validator.".into(),
     });
-    system_api.assert_tx_status(deploy_request_from_auditor.object_hash(), &expected_status);
+    system_api.assert_tx_status(
+        deploy_request_from_auditor.object_hash(),
+        &expected_status.into(),
+    );
 }
 
 /// This test emulates a normal workflow with a validator and an auditor.

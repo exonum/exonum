@@ -19,7 +19,6 @@ pub use exonum::api::ApiAccess;
 use actix_web::{test::TestServer, App};
 use reqwest::{Client, RequestBuilder as ReqwestBuilder, Response, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::json;
 
 use std::fmt::{self, Display};
 
@@ -32,6 +31,7 @@ use exonum::{
         },
         ApiAggregator,
     },
+    blockchain::ExecutionStatus,
     crypto::Hash,
     messages::{AnyTx, Verified},
     node::ApiSender,
@@ -347,7 +347,7 @@ impl<'a> ExonumNodeApi<'a> {
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
-    pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: &serde_json::Value) {
+    pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: &ExecutionStatus) {
         let info: serde_json::Value = self
             .inner
             .public(ApiKind::Explorer)
@@ -355,15 +355,16 @@ impl<'a> ExonumNodeApi<'a> {
             .get("v1/transactions")
             .unwrap();
         if let serde_json::Value::Object(info) = info {
-            let tx_status = info.get("status").unwrap();
-            assert_eq!(tx_status, expected_status);
+            let tx_status_raw = info.get("status").unwrap().clone();
+            let tx_status: ExecutionStatus = serde_json::from_value(tx_status_raw).unwrap();
+            assert_eq!(&tx_status, expected_status);
         } else {
             panic!("Invalid transaction info format, object expected");
         }
     }
 
     pub fn assert_tx_success(&self, tx_hash: Hash) {
-        self.assert_tx_status(tx_hash, &json!({ "type": "success" }));
+        self.assert_tx_status(tx_hash, &ExecutionStatus::ok());
     }
 
     pub fn assert_txs_success(&self, tx_hashes: &[Hash]) {
