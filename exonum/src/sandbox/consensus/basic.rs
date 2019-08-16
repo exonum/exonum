@@ -30,7 +30,7 @@ use crate::{
         self,
         sandbox_tests_helper::*,
         timestamping::{TimestampingService, TimestampingTxGenerator, DATA_SIZE},
-        timestamping_sandbox, timestamping_sandbox_builder
+        timestamping_sandbox, timestamping_sandbox_builder,
     },
 };
 

@@ -15,13 +15,13 @@
 use std::mem;
 
 use crate::{
-    blockchain::{Schema, get_transaction},
+    blockchain::{get_transaction, Schema},
+    crypto::{Hash, PublicKey},
     messages::{
         BinaryValue, BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest,
         ProposeRequest, Requests, TransactionsRequest, TransactionsResponse, Verified,
         TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
     },
-    crypto::{PublicKey, Hash},
 };
 
 use super::NodeHandler;
@@ -99,11 +99,12 @@ impl NodeHandler {
         let schema = Schema::new(&snapshot);
         let mut txs = Vec::new();
         let mut txs_size = 0;
-        let unoccupied_message_size = self.state.config().consensus.max_message_len as usize
-            - TX_RES_EMPTY_SIZE;
+        let unoccupied_message_size =
+            self.state.config().consensus.max_message_len as usize - TX_RES_EMPTY_SIZE;
 
         for hash in hashes {
-            if let Some(tx) = get_transaction(&hash, &schema.transactions(), &self.state.tx_cache()) {
+            if let Some(tx) = get_transaction(&hash, &schema.transactions(), &self.state.tx_cache())
+            {
                 let raw = tx.as_raw().to_bytes();
                 if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(

@@ -32,6 +32,8 @@ use exonum_merkledb::{ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
 use semver::Version;
 
+use std::collections::BTreeMap;
+
 pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
@@ -134,7 +136,7 @@ pub fn create_blockchain() -> Blockchain {
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
         config.genesis,
         service_keypair,
-        ApiSender(mpsc::unbounded().0),
+        ApiSender(mpsc::channel(0).0),
         mpsc::channel(0).0,
     )
 }
@@ -158,7 +160,9 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyT
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
+    let mut tx_cache = BTreeMap::new();
+    let (block_hash, patch) =
+        blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &mut tx_cache);
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
     let propose = Verified::from_value(
@@ -186,6 +190,6 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyT
     );
 
     blockchain
-        .commit(&patch, block_hash, vec![precommit].into_iter())
+        .commit(patch, block_hash, vec![precommit], &mut tx_cache)
         .unwrap();
 }

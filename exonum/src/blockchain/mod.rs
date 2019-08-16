@@ -364,7 +364,7 @@ impl Blockchain {
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> Result<(), failure::Error>
     where
-        I: Iterator<Item = Verified<Precommit>>,
+        I: IntoIterator<Item = Verified<Precommit>>,
     {
         let patch = {
             let fork: Fork = patch.into();

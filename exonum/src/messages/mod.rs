@@ -49,6 +49,7 @@
 //! let payload = Status {
 //!     height: Height(15),
 //!     last_hash: Hash::zero(),
+//!     pool_size: 12,
 //! };
 //! // Sign the message with some keypair to get a trusted "Status" message.
 //! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
@@ -72,6 +73,7 @@
 //! #   let payload = Status {
 //! #       height: Height(15),
 //! #       last_hash: Hash::zero(),
+//! #       pool_size: 0,
 //! #   };
 //! #   Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
 //! # }
@@ -209,7 +211,7 @@ pub enum Requests {
     /// Block request message.
     BlockRequest(Verified<BlockRequest>),
     /// Request of uncommitted transactions.
-    PoolTransactionsRequest(Verified<PoolTransactionsRequest>),    
+    PoolTransactionsRequest(Verified<PoolTransactionsRequest>),
 }
 
 impl Requests {

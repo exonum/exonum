@@ -17,7 +17,7 @@ use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
 use std::{collections::HashSet, convert::TryFrom};
 
 use crate::{
-    blockchain::{Schema, contains_transaction},
+    blockchain::{contains_transaction, Schema},
     crypto::{Hash, PublicKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
@@ -562,7 +562,7 @@ impl NodeHandler {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
-        // TODO We have to check transaction correctness.        
+        // TODO We have to check transaction correctness.
 
         // if let Err(e) = self.blockchain.tx_from_raw(msg.payload().clone()) {
         //     error!("Received invalid transaction {:?}, result: {}", msg, e);
