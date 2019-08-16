@@ -844,13 +844,11 @@ where
                             branch.set_child_hash(suffix_path.bit(0), &hash);
                             self.base.put(&prefix, branch);
                         }
-                        RemoveAction::KeyNotFound => return,
+                        RemoveAction::KeyNotFound => {}
                     }
-                } else {
-                    return;
                 }
             }
-            None => return,
+            None => {}
         }
     }
 
