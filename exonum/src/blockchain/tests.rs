@@ -17,10 +17,12 @@ use exonum_merkledb::{
 };
 use futures::{sync::mpsc, Future};
 
-use std::{collections::BTreeMap, sync::Mutex};
+use std::{collections::BTreeMap, panic, sync::Mutex};
 
 use crate::{
-    blockchain::{Blockchain, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema},
+    blockchain::{
+        Blockchain, ExecutionErrorKind, ExecutionStatus, FatalError, InstanceCollection, Schema,
+    },
     crypto,
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
@@ -572,13 +574,13 @@ fn test_dispatcher_deploy_good() {
     let artifact_id = ServiceGoodImpl.artifact_id().into();
 
     // Tests deployment procedure for the available artifact.
-    assert!(!blockchain.dispatcher().is_deployed(&artifact_id));
+    assert!(!blockchain.dispatcher().is_artifact_deployed(&artifact_id));
     blockchain
         .dispatcher()
         .deploy_artifact(artifact_id.clone(), ())
         .wait()
         .unwrap();
-    assert!(blockchain.dispatcher().is_deployed(&artifact_id));
+    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact_id));
 
     // Tests the register artifact action for the deployed artifact.
     let snapshot = blockchain.snapshot();
@@ -607,7 +609,7 @@ fn test_dispatcher_already_deployed() {
     let artifact_id = ServiceGoodImpl.artifact_id().into();
 
     // Tests that we get an error if we try to deploy already deployed artifact.
-    assert!(blockchain.dispatcher().is_deployed(&artifact_id));
+    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact_id));
     let err = blockchain
         .dispatcher()
         .deploy_artifact(artifact_id.clone(), ())
@@ -626,7 +628,7 @@ fn test_dispatcher_already_deployed() {
 }
 
 #[test]
-fn test_dispatcher_register_rollback() {
+fn test_dispatcher_register_unavailable() {
     let keypair = crypto::gen_keypair();
     let mut blockchain = create_blockchain(vec![
         InstanceCollection::new(TestDispatcherService).with_instance(TEST_SERVICE_ID, IDX_NAME, ()),
@@ -653,19 +655,19 @@ fn test_dispatcher_register_rollback() {
         None
     );
     // Tests that an unavailable artifact will not be registered.
-    let artifact_id: ArtifactId = ServicePanicImpl.artifact_id().into();
-    execute_transaction(
-        &mut blockchain,
-        TestDeploy { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
-    );
-    let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
-        .artifacts()
-        .contains(&artifact_id.name));
-    assert_eq!(
-        Entry::<_, u64>::new(IDX_NAME, snapshot.as_ref()).get(),
-        None
-    );
+    let error_string = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        execute_transaction(
+            &mut blockchain,
+            TestDeploy { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+        )
+        .0
+    }))
+    .unwrap_err()
+    .downcast_ref::<FatalError>()
+    .unwrap()
+    .to_string();
+
+    assert!(error_string.contains("Unable to deploy registered artifact"));
 }
 
 #[test]

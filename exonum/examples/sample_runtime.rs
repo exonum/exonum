@@ -93,6 +93,10 @@ impl Runtime for SampleRuntime {
         )
     }
 
+    fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
+        self.deployed_artifacts.contains_key(id)
+    }
+
     /// `start_service` request creates a new `SampleService` instance with the specified ID.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {

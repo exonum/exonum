@@ -165,6 +165,9 @@ pub trait Runtime: Send + Debug + 'static {
         deploy_spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
+    /// Return true if the specified artifact is deployed in this runtime.
+    fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
+
     /// Return Protobuf description of the deployed artifact with the specified identifier.
     /// If the artifact is not deployed, return `None`.
     ///
