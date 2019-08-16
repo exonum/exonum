@@ -1,3 +1,17 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 use failure::{Error, ResultExt};
@@ -6,9 +20,9 @@ use std::net::SocketAddr;
 use std::path::{PathBuf, Path};
 
 use crate::password::{PassInputMethod, SecretKeyType, ZeroizeOnDrop};
-use exonum::node::{NodeConfig, ConnectListConfig, NodeApiConfig};
+use exonum::node::{NodeConfig, ConnectListConfig, NodeApiConfig, ConnectInfo};
 use std::sync::Arc;
-use exonum::helpers::fabric::{CommonConfigTemplate, GeneralConfig, NodePublicConfig, SharedConfig, NodePrivateConfig};
+use fabric::{CommonConfigTemplate, GeneralConfig, NodePublicConfig, SharedConfig, NodePrivateConfig};
 use exonum::crypto::generate_keys_file;
 use crate::config::{save_config_file, load_config_file};
 use std::fs;
@@ -16,6 +30,7 @@ use exonum::blockchain::{ValidatorKeys, GenesisConfig};
 use std::collections::BTreeMap;
 
 mod config;
+mod fabric;
 mod password;
 
 /// Default port value.
@@ -261,6 +276,19 @@ impl Finalize {
             map.get(&our_config.consensus_public_key).cloned(),
         )
     }
+
+    fn create_connect_list_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> ConnectListConfig {
+        let peers = list
+            .iter()
+            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
+            .map(|config| ConnectInfo {
+                public_key: config.validator_keys.consensus_key,
+                address: config.address.clone(),
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
 }
 
 impl ExonumCommand for Finalize {
@@ -293,7 +321,7 @@ impl ExonumCommand for Finalize {
             list.iter().map(|c| c.validator_keys),
         );
 
-        let connect_list = ConnectListConfig::from_node_config(&list, &secret_config);
+        let connect_list = Self::create_connect_list_config(&list, &secret_config);
 
         let config = {
             NodeConfig {
