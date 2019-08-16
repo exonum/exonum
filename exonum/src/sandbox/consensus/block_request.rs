@@ -77,6 +77,7 @@ fn handle_block_response_tx_in_pool() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -106,6 +107,7 @@ fn handle_block_response_tx_in_pool() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }
@@ -164,6 +166,7 @@ fn handle_block_response_with_unknown_tx() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -210,6 +213,7 @@ fn handle_block_response_with_unknown_tx() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }
@@ -267,6 +271,7 @@ fn handle_block_response_with_invalid_txs_order() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -349,6 +354,7 @@ fn handle_block_response_with_invalid_precommits() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block1.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -434,6 +440,7 @@ fn handle_block_response_with_known_transaction() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -480,6 +487,7 @@ fn handle_block_response_with_known_transaction() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }
@@ -541,6 +549,7 @@ fn handle_block_response_with_all_known_transactions() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -569,6 +578,7 @@ fn handle_block_response_with_all_known_transactions() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }
@@ -605,6 +615,7 @@ fn received_block_while_there_is_full_propose() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -694,6 +705,7 @@ fn received_block_while_there_is_full_propose() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }
@@ -725,6 +737,7 @@ fn received_block_while_there_is_pending_block() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -813,6 +826,7 @@ fn received_block_while_there_is_pending_block() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }
@@ -850,6 +864,7 @@ fn transactions_request_to_multiple_nodes() {
         sandbox.public_key(ValidatorId(2)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(2)),
     ));
 
@@ -857,6 +872,7 @@ fn transactions_request_to_multiple_nodes() {
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -943,6 +959,7 @@ fn transactions_request_to_multiple_nodes() {
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
+        0,
         sandbox.secret_key(ValidatorId(0)),
     ));
 }

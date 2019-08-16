@@ -17,7 +17,7 @@ use exonum_merkledb::{
 };
 use futures::{sync::mpsc, Future};
 
-use std::sync::Mutex;
+use std::{collections::BTreeMap, sync::Mutex};
 
 use crate::{
     blockchain::{Blockchain, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema},
@@ -308,7 +308,8 @@ fn create_entry<T: IndexAccess>(fork: T) -> Entry<T, u64> {
 }
 
 fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    let (_, patch) =
+        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index = ListIndex::new(IDX_NAME, &snapshot);
@@ -317,7 +318,8 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
 }
 
 fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    let (_, patch) =
+        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
@@ -340,7 +342,12 @@ fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) -> Exec
     blockchain
         .merge(
             blockchain
-                .create_patch(ValidatorId::zero(), Height::zero(), &[tx.object_hash()])
+                .create_patch(
+                    ValidatorId::zero(),
+                    Height::zero(),
+                    &[tx.object_hash()],
+                    &mut BTreeMap::new(),
+                )
                 .1,
         )
         .unwrap();
@@ -355,7 +362,7 @@ fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) -> Exec
 fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> Blockchain {
     let config = generate_testnet_config(1, 0)[0].clone();
     let service_keypair = config.service_keypair();
-    let api_channel = mpsc::unbounded();
+    let api_channel = mpsc::channel(1);
     let internal_sender = mpsc::channel(1).0;
 
     Blockchain::new(
@@ -402,6 +409,7 @@ fn handling_tx_panic_error() {
             tx_failed.object_hash(),
             tx_ok2.object_hash(),
         ],
+        &mut BTreeMap::new(),
     );
 
     blockchain.merge(patch).unwrap();
@@ -463,6 +471,7 @@ fn handling_tx_panic_storage_error() {
             tx_storage_error.object_hash(),
             tx_ok2.object_hash(),
         ],
+        &mut BTreeMap::new(),
     );
 }
 
@@ -525,7 +534,12 @@ fn error_discards_transaction_changes() {
             blockchain.merge(fork.into_patch()).unwrap();
         }
 
-        let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(index), &[hash]);
+        let (_, patch) = blockchain.create_patch(
+            ValidatorId::zero(),
+            Height(index),
+            &[hash],
+            &mut BTreeMap::new(),
+        );
 
         db.merge(patch).unwrap();
 

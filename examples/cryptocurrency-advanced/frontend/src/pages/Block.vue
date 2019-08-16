@@ -64,7 +64,7 @@
               <li v-for="(transaction) in transactions" class="list-group-item">
                 <div class="row">
                   <div class="col-sm-12">
-                    <router-link :to="{ name: 'transaction', params: { hash: transaction } }">{{ transaction }}</router-link>
+                    <router-link :to="{ name: 'transaction', params: { hash: transaction.tx_hash } }">{{ transaction.tx_hash }}</router-link>
                   </div>
                 </div>
               </li>
@@ -132,7 +132,7 @@
 
         try {
           const data = await this.$blockchain.getBlock(this.height)
-          this.block = data.block
+          this.block = data
           this.transactions = data.txs
           this.isSpinnerVisible = false
         } catch (error) {

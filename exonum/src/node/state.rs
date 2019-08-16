@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{contains_transaction, ConsensusConfig, StoredConfiguration, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
@@ -93,6 +93,9 @@ pub struct State {
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
     incomplete_block: Option<IncompleteBlock>,
+
+    // Cache that stores transactions before adding to persistent pool.
+    tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
 }
 
 /// State of a validator-node.
@@ -109,6 +112,8 @@ pub struct ValidatorState {
 pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
+    /// Represents `PoolTransactionsRequest` message.
+    PoolTransactions,
     /// Represents `TransactionsRequest` message for `Propose`.
     ProposeTransactions(Hash),
     /// Represents `TransactionsRequest` message for `BlockResponse`.
@@ -139,11 +144,11 @@ pub struct ProposeState {
 }
 
 /// State of a block.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
-    patch: Patch,
+    patch: Option<Patch>,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
 }
@@ -257,9 +262,9 @@ impl RequestData {
     pub fn timeout(&self) -> Duration {
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
-                TRANSACTIONS_REQUEST_TIMEOUT
-            }
+            RequestData::ProposeTransactions(..)
+            | RequestData::BlockTransactions
+            | RequestData::PoolTransactions => TRANSACTIONS_REQUEST_TIMEOUT,
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
@@ -340,7 +345,7 @@ impl BlockState {
     pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
         Self {
             hash,
-            patch,
+            patch: Some(patch),
             txs,
             proposer_id,
         }
@@ -352,8 +357,8 @@ impl BlockState {
     }
 
     /// Returns the changes that should be made for block committing.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    pub fn patch(&mut self) -> Patch {
+        self.patch.take().expect("Patch is already committed")
     }
 
     /// Returns block's transactions.
@@ -484,6 +489,8 @@ impl State {
             config: stored,
 
             incomplete_block: None,
+
+            tx_cache: BTreeMap::new(),
         }
     }
 
@@ -778,6 +785,11 @@ impl State {
         self.blocks.get(hash)
     }
 
+    /// Returns a mutable block with the specified hash.
+    pub fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
+        self.blocks.get_mut(hash)
+    }
+
     /// Updates mode's round.
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
@@ -924,7 +936,12 @@ impl State {
             Entry::Vacant(e) => {
                 let mut unknown_txs = HashSet::new();
                 for hash in &msg.payload().transactions {
-                    if transactions.get(hash).is_some() {
+                    if self.tx_cache.contains_key(hash) {
+                        // Tx with `hash` is  not committed yet.
+                        continue;
+                    }
+
+                    if transactions.contains(hash) {
                         if !transaction_pool.contains(hash) {
                             bail!(
                                 "Received propose with already \
@@ -966,7 +983,7 @@ impl State {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => Some(e.insert(BlockState {
                 hash: block_hash,
-                patch,
+                patch: Some(patch),
                 txs,
                 proposer_id,
             })),
@@ -990,8 +1007,8 @@ impl State {
 
         let mut unknown_txs = HashSet::new();
         for hash in &msg.payload().transactions {
-            if txs.get(hash).is_some() {
-                if !txs_pool.contains(hash) {
+            if contains_transaction(hash, &txs, &self.tx_cache) {
+                if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
                     panic!(
                         "Received block with already \
                          committed transaction"
@@ -1204,5 +1221,20 @@ impl State {
             .write()
             .expect("ConnectList write lock");
         list.add(peer);
+    }
+
+    /// Returns the transactions cache length.
+    pub fn tx_cache_len(&self) -> usize {
+        self.tx_cache.len()
+    }
+
+    /// Returns reference to the transactions cache.
+    pub fn tx_cache(&self) -> &BTreeMap<Hash, Verified<AnyTx>> {
+        &self.tx_cache
+    }
+
+    /// Returns mutable reference to the transactions cache.
+    pub fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
+        &mut self.tx_cache
     }
 }

@@ -248,7 +248,7 @@ impl ServiceApiScope {
 /// #     let context = ApiContext::new(
 /// #         TemporaryDB::new().into(),
 /// #         crypto::gen_keypair(),
-/// #         ApiSender::new(mpsc::unbounded().0),
+/// #         ApiSender::new(mpsc::channel(0).0),
 /// #     );
 /// #     let mut builder = ServiceApiBuilder::new(
 /// #         context,

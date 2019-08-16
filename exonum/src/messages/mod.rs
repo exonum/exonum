@@ -49,6 +49,7 @@
 //! let payload = Status {
 //!     height: Height(15),
 //!     last_hash: Hash::zero(),
+//!     pool_size: 12,
 //! };
 //! // Sign the message with some keypair to get a trusted "Status" message.
 //! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
@@ -72,6 +73,7 @@
 //! #   let payload = Status {
 //! #       height: Height(15),
 //! #       last_hash: Hash::zero(),
+//! #       pool_size: 0,
 //! #   };
 //! #   Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
 //! # }
@@ -208,6 +210,8 @@ pub enum Requests {
     PeersRequest(Verified<PeersRequest>),
     /// Block request message.
     BlockRequest(Verified<BlockRequest>),
+    /// Request of uncommitted transactions.
+    PoolTransactionsRequest(Verified<PoolTransactionsRequest>),
 }
 
 impl Requests {
@@ -218,6 +222,7 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.as_raw(),
             Requests::PeersRequest(ref msg) => msg.as_raw(),
             Requests::BlockRequest(ref msg) => msg.as_raw(),
+            Requests::PoolTransactionsRequest(ref msg) => msg.as_raw(),
         }
     }
 }
@@ -327,7 +332,8 @@ impl_message_from_verified! {
     PeersRequest: Requests,
     PrevotesRequest: Requests,
     ProposeRequest: Requests,
-    TransactionsRequest: Requests
+    TransactionsRequest: Requests,
+    PoolTransactionsRequest: Requests
 }
 
 impl Requests {
@@ -339,6 +345,7 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.payload().to,
             Requests::PeersRequest(ref msg) => msg.payload().to,
             Requests::BlockRequest(ref msg) => msg.payload().to,
+            Requests::PoolTransactionsRequest(ref msg) => msg.payload().to,
         }
     }
 
@@ -350,6 +357,7 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.author(),
             Requests::PeersRequest(ref msg) => msg.author(),
             Requests::BlockRequest(ref msg) => msg.author(),
+            Requests::PoolTransactionsRequest(ref msg) => msg.author(),
         }
     }
 }

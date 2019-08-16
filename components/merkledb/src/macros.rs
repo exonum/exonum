@@ -45,6 +45,7 @@ macro_rules! concat_keys {
     });
 }
 
+/// Implement `ObjectHash` trait for any type that implements `BinaryValue`.
 #[macro_export]
 macro_rules! impl_object_hash_for_binary_value {
     ($( $type:ty ),*) => {

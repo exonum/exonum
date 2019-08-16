@@ -47,6 +47,7 @@ message Connect {
 message Status {
   uint64 height = 1;
   exonum.Hash last_hash = 2;
+  uint64 pool_size = 3;
 }
 
 message Propose {
@@ -112,6 +113,10 @@ message BlockRequest {
   uint64 height = 2;
 }
 
+message PoolTransactionsRequest {
+  exonum.PublicKey to = 1;
+}
+
 message ExonumMessage {
   oneof message {
     exonum.runtime.AnyTx any_tx = 1;
@@ -130,5 +135,6 @@ message ExonumMessage {
     PrevotesRequest prevotes_request = 11;
     PeersRequest peers_request = 12;
     BlockRequest block_request = 13;
+    PoolTransactionsRequest pool_transactions_request = 14;
   }
 }

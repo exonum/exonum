@@ -1,6 +1,6 @@
 [package]
 name = "exonum-derive"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -22,10 +22,9 @@ quote = "0.6"
 syn = "0.15"
 
 [dev-dependencies]
-exonum = { version = "0.11.0", path = "../../exonum" }
-# TODO: Remove when merkledb becomes public [ECR-3134]
-exonum-merkledb = { version = "0.11.0", path = "../merkledb" }
+exonum = { version = "0.12.0", path = "../../exonum" }
+exonum-merkledb = { version = "0.12.0", path = "../merkledb" }
 failure = "0.1.5"
-protobuf = "2.7.0"
+protobuf = "2.8.0"
 serde = "1.0"
 serde_derive = "1.0"
