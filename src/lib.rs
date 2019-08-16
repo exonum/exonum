@@ -25,13 +25,27 @@ pub const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
 pub const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
 pub const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
 
+pub enum StandardResult {
+    GenerateTemplate {
+        template_config_path: PathBuf,
+    },
+    GenerateConfig {
+        public_config_path: PathBuf,
+        secret_config_path: PathBuf,
+    },
+    Finalize {
+        node_config_path: PathBuf,
+    },
+    Run(NodeRunConfig),
+}
+
 pub struct NodeRunConfig {
     pub node_config: NodeConfig,
     pub db_path: PathBuf,
 }
 
 pub trait ExonumCommand {
-    fn execute(self) -> Result<Option<NodeRunConfig>, Error>;
+    fn execute(self) -> Result<StandardResult, Error>;
 }
 
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
@@ -53,7 +67,7 @@ impl Command {
 }
 
 impl ExonumCommand for Command {
-    fn execute(self) -> Result<Option<NodeRunConfig>, Error> {
+    fn execute(self) -> Result<StandardResult, Error> {
         match self {
             Command::GenerateTemplate(command) => command.execute(),
             Command::GenerateConfig(command) => command.execute(),
@@ -72,15 +86,17 @@ pub struct GenerateTemplate {
 }
 
 impl ExonumCommand for GenerateTemplate {
-    fn execute(self) -> Result<Option<NodeRunConfig>, Error> {
+    fn execute(self) -> Result<StandardResult, Error> {
         let config_template = CommonConfigTemplate {
             consensus_config: Default::default(),
             general_config: GeneralConfig {
                 validators_count: self.validators_count,
             },
         };
-        save_config_file(&config_template, self.common_config)?;
-        Ok(None)
+        save_config_file(&config_template, &self.common_config)?;
+        Ok(StandardResult::GenerateTemplate {
+            template_config_path: self.common_config,
+        })
     }
 }
 
@@ -116,7 +132,7 @@ impl GenerateConfig {
 }
 
 impl ExonumCommand for GenerateConfig {
-    fn execute(self) -> Result<Option<NodeRunConfig>, Error> {
+    fn execute(self) -> Result<StandardResult, Error> {
         let common_config: CommonConfigTemplate = load_config_file(self.common_config.clone())?;
 
         let pub_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
@@ -167,9 +183,12 @@ impl ExonumCommand for GenerateConfig {
             service_secret_key: SERVICE_SECRET_KEY_NAME.into(),
         };
 
-        save_config_file(&private_config, private_config_path)?;
+        save_config_file(&private_config, &private_config_path)?;
 
-        Ok(None)
+        Ok(StandardResult::GenerateConfig {
+            public_config_path: pub_config_path,
+            secret_config_path: private_config_path,
+        })
     }
 }
 
@@ -245,7 +264,7 @@ impl Finalize {
 }
 
 impl ExonumCommand for Finalize {
-    fn execute(self) -> Result<Option<NodeRunConfig>, Error> {
+    fn execute(self) -> Result<StandardResult, Error> {
         let secret_config: NodePrivateConfig =
             load_config_file(&self.secret_config_path)?;
         let secret_config_dir = std::env::current_dir()
@@ -301,9 +320,11 @@ impl ExonumCommand for Finalize {
             }
         };
 
-        save_config_file(&config, self.output_config_path)?;
+        save_config_file(&config, &self.output_config_path)?;
 
-        Ok(None)
+        Ok(StandardResult::Finalize {
+            node_config_path: self.output_config_path,
+        })
     }
 }
 
@@ -326,7 +347,7 @@ pub struct Run {
 }
 
 impl ExonumCommand for Run {
-    fn execute(self) -> Result<Option<NodeRunConfig>, Error> {
+    fn execute(self) -> Result<StandardResult, Error> {
         let config_path = self.node_config;
 
         let mut config: NodeConfig<PathBuf> = load_config_file(&config_path)?;
@@ -352,6 +373,6 @@ impl ExonumCommand for Run {
             db_path: self.db_path,
         };
 
-        Ok(Some(run_config))
+        Ok(StandardResult::Run(run_config))
     }
 }
