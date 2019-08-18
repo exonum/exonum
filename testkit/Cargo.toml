@@ -17,7 +17,6 @@ synchronously.
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
-circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix-web = { version = "0.7.18", default-features = false }
