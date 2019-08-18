@@ -16,7 +16,6 @@ links = "exonum_protobuf"
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
-circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix = "0.7.9"

@@ -13,7 +13,6 @@ description = "Exonum blockchain example implementing a cryptocurrency."
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
-circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.12.0", path = "../../../exonum" }

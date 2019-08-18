@@ -15,7 +15,6 @@ description = "This example demonstrates how to use the testkit together with cl
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
-circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.12.0", path = "../../exonum" }

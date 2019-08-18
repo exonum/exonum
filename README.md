@@ -2,9 +2,6 @@
 
 **Status:**
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.com/exonum/exonum)
-[![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum/master.svg?label=MacOS)](https://circleci.com/gh/exonum/exonum/tree/master)
-[![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/6i9x2msmgwieqs8f/branch/master?svg=true)](https://ci.appveyor.com/project/aleksuss/exonum/branch/master)
-
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
 [![codecov](https://codecov.io/gh/exonum/exonum/branch/master/graph/badge.svg)](https://codecov.io/gh/exonum/exonum)
 
