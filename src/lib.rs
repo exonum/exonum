@@ -96,8 +96,10 @@ impl ExonumCommand for Command {
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct GenerateTemplate {
+    /// Path to a node configuration template file.
     pub common_config: PathBuf,
     #[structopt(long)]
+    /// Number of validators in the network.
     pub validators_count: u32,
 }
 
@@ -119,17 +121,35 @@ impl ExonumCommand for GenerateTemplate {
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct GenerateConfig {
+    /// Path to node configuration template file.
     pub common_config: PathBuf,
+    /// Path to a directory where public and private node configuration files
+    /// will be saved.
     pub output_dir: PathBuf,
     #[structopt(long, short = "a")]
+    /// External IP address of the node used for communications between nodes.
     pub peer_address: SocketAddr,
     #[structopt(long, short = "l")]
+    /// Listen IP address of the node used for communications between nodes.
     pub listen_address: Option<SocketAddr>,
     #[structopt(long, short = "n")]
+    /// Don't prompt for passwords when generating private keys.
     pub no_password: bool,
     #[structopt(long)]
+    /// Passphrase entry method for consensus key.
+    ///
+    /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
+    /// Default Value is `stdin`.
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// by default.
     pub consensus_key_pass: Option<PassInputMethod>,
     #[structopt(long)]
+    /// Passphrase entry method for service key.
+    ///
+    /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
+    /// Default Value is `stdin`.
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// by default.
     pub service_key_pass: Option<PassInputMethod>,
 }
 
@@ -231,17 +251,30 @@ fn create_secret_key_file(
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Finalize {
+    /// Path to a secret part of a node configuration.
     pub secret_config_path: PathBuf,
+    /// Path to a node configuration file which will be created after
+    /// running this command.
     pub output_config_path: PathBuf,
     #[structopt(long, short = "p")]
+    /// List of paths to public parts of configuration of all the nodes
+    /// in the network.
     pub public_configs: Vec<PathBuf>,
     #[structopt(long)]
+    /// Listen address for node public API.
+    ///
+    /// Public API is used mainly for sending API requests to user services.
     pub public_api_address: Option<SocketAddr>,
     #[structopt(long)]
+    /// Listen address for node private API.
+    ///
+    /// Private API is used by node administrators for node monitoring and control.
     pub private_api_address: Option<SocketAddr>,
     #[structopt(long)]
+    /// Cross-origin resource sharing options for responses returned by public API handlers.
     pub public_allow_origin: Option<String>,
     #[structopt(long)]
+    /// Cross-origin resource sharing options for responses returned by private API handlers.
     pub private_allow_origin: Option<String>,
 }
 
@@ -367,16 +400,36 @@ impl ExonumCommand for Finalize {
 
 pub struct Run {
     #[structopt(long, short = "c")]
+    /// Path to a node configuration file.
     pub node_config: PathBuf,
     #[structopt(long, short = "d")]
+    /// Path to a database directory.
     pub db_path: PathBuf,
     #[structopt(long)]
+    /// Listen address for node public API.
+    ///
+    /// Public API is used mainly for sending API requests to user services.
     pub public_api_address: Option<SocketAddr>,
     #[structopt(long)]
+    /// Listen address for node private API.
+    ///
+    /// Private API is used by node administrators for node monitoring and control.
     pub private_api_address: Option<SocketAddr>,
     #[structopt(long)]
+    /// Passphrase entry method for consensus key.
+    ///
+    /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
+    /// Default Value is `stdin`.
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// by default.
     pub consensus_key_pass: Option<PassInputMethod>,
     #[structopt(long)]
+    /// Passphrase entry method for service key.
+    ///
+    /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
+    /// Default Value is `stdin`.
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// by default.
     pub service_key_pass: Option<PassInputMethod>,
 }
 
