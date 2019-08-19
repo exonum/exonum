@@ -254,11 +254,7 @@ impl Runtime for RustRuntime {
             return Err(dispatcher::Error::ServiceNameExists.into());
         }
 
-        let service = self
-            .available_artifacts
-            .get(&artifact)
-            .unwrap()
-            .create_instance();
+        let service = self.available_artifacts[&artifact].create_instance();
         self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
         Ok(())
     }
@@ -297,7 +293,11 @@ impl Runtime for RustRuntime {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let instance = self.started_services.get(&call_info.instance_id).unwrap();
+        let instance = self
+            .started_services
+            .get(&call_info.instance_id)
+            .expect("BUG: an attempt to execute transaction of unknown service.");
+
         instance
             .as_ref()
             .call(

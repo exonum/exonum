@@ -386,10 +386,7 @@ impl Dispatcher {
 
         let has_changes = !api_changes.is_empty();
         for (runtime_id, changes) in api_changes {
-            self.runtimes
-                .get(&runtime_id)
-                .unwrap()
-                .notify_api_changes(context, &changes)
+            self.runtimes[&runtime_id].notify_api_changes(context, &changes)
         }
         has_changes
     }
