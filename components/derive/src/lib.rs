@@ -14,7 +14,6 @@
 
 //! This crate provides macros for deriving some useful methods and traits for the exonum services.
 
-#![recursion_limit = "256"]
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
@@ -26,16 +25,11 @@ mod pb_convert;
 mod service_factory;
 
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
+use syn::{Lit, Meta};
 
 // Exonum derive attribute names, used as
 // `#[exonum( [ ATTRIBUTE_NAME = ATTRIBUTE_VALUE or ATTRIBUTE_NAME ],* )]`
 const CRATE_PATH_ATTRIBUTE: &str = "crate";
-const ARTIFACT_NAME: &str = "artifact_name";
-const ARTIFACT_VERSION: &str = "artifact_version";
-const PROTO_SOURCES: &str = "proto_sources";
-const SERVICE_CONSTRUCTOR: &str = "with_constructor";
 const SERVICE_DISPATCHER: &str = "dispatcher";
 
 /// Derives `ProtobufConvert` trait.
@@ -185,68 +179,4 @@ pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(IntoExecutionError, attributes(exonum))]
 pub fn generate_into_execution_error(input: TokenStream) -> TokenStream {
     execution_error::implement_execution_error(input)
-}
-
-/// Exonum types should be imported with `crate::` prefix if inside crate
-/// or with `exonum::` when outside.
-fn get_exonum_types_prefix(attrs: &[Meta]) -> impl quote::ToTokens {
-    let map_attrs = get_exonum_name_value_attributes(attrs);
-    let crate_path = map_attrs.into_iter().find_map(|nv| match &nv {
-        MetaNameValue {
-            lit: Lit::Str(path),
-            ident,
-            ..
-        } if ident == CRATE_PATH_ATTRIBUTE => Some(
-            path.parse::<Path>()
-                .expect("failed to parse crate path in the attribute"),
-        ),
-        _ => None,
-    });
-
-    if let Some(path) = crate_path {
-        quote!(#path)
-    } else {
-        quote!(exonum)
-    }
-}
-
-/// Extract attributes in the form of `#[exonum(name = "value")]`
-fn get_exonum_attributes(exonum_meta: Option<Meta>) -> Vec<Meta> {
-    match exonum_meta {
-        Some(Meta::List(MetaList { nested: list, .. })) => list
-            .into_iter()
-            .filter_map(|n| match n {
-                NestedMeta::Meta(meta) => Some(meta),
-                _ => None,
-            })
-            .collect(),
-        Some(_) => panic!("`exonum` attribute should contain list of name value pairs"),
-        None => vec![],
-    }
-}
-
-fn get_exonum_name_value_attributes(meta_attrs: &[Meta]) -> Vec<MetaNameValue> {
-    let exonum_meta = meta_attrs.iter().find(|m| m.name() == "exonum").cloned();
-
-    get_exonum_attributes(exonum_meta)
-        .into_iter()
-        .filter_map(|meta| match meta {
-            Meta::NameValue(name_value) => Some(name_value),
-            _ => None,
-        })
-        .collect()
-}
-
-fn find_attribute_path(meta_attrs: &[Meta], name: &str) -> Option<Path> {
-    let map_attrs = get_exonum_name_value_attributes(meta_attrs);
-    map_attrs.into_iter().find_map(|nv| {
-        if nv.ident == name {
-            match nv.lit {
-                Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    })
 }
