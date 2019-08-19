@@ -223,6 +223,14 @@ impl Runtime for RustRuntime {
         Box::new(self.deploy(&artifact).into_future())
     }
 
+    fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
+        if let Ok(artifact) = self.parse_artifact(id) {
+            self.deployed_artifacts.contains(&artifact)
+        } else {
+            false
+        }
+    }
+
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
         let id = self.parse_artifact(id).ok()?;
         self.deployed_artifact(&id)
