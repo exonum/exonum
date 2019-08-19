@@ -187,6 +187,10 @@ pub trait Runtime: Send + Debug + 'static {
 
     /// Configure a service instance with the given parameters.
     ///
+    /// The configuration parameters passed to the method are not saved anywhere,
+    /// so the service instance should save them by itself if it is important for
+    /// the service business logic.
+    ///
     /// This method is called in two cases:
     ///
     /// * After creating a new service instance by the [`start_service`] invocation. In this case,
