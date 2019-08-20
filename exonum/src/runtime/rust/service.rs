@@ -116,10 +116,12 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.runtime_context.fork
     }
 
+    // Method for backward compatibility with the existing code.
     pub fn tx_hash(&self) -> Hash {
         self.runtime_context.caller.transaction_hash().unwrap()
     }
 
+    // Method for backward compatibility with the existing code.
     pub fn author(&self) -> PublicKey {
         self.runtime_context.caller.author().unwrap()
     }

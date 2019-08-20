@@ -359,7 +359,8 @@ impl ProtobufConvert {
         quote! {
             impl exonum_merkledb::ObjectHash for #name {
                 fn object_hash(&self) -> #cr::crypto::Hash {
-                    let v = self.to_pb().write_to_bytes().unwrap();
+                    use exonum_merkledb::BinaryValue;
+                    let v = self.to_bytes();
                     #cr::crypto::hash(&v)
                 }
             }
