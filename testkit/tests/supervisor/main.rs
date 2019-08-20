@@ -553,47 +553,51 @@ fn test_restart_node_and_start_service_instance() {
     }
 }
 
-// TODO: This test shouldn't panic.
 #[test]
-#[should_panic(expected = "called `Result::unwrap()` on an `Err` value: NotFound")]
-fn test_restart_node_during_artifact_deployment() {
-    let testkit = TestKitBuilder::validator()
-        .with_logger()
-        .with_service(InstanceCollection::new(IncService))
-        .create();
+fn test_restart_node_during_artifact_deployment_with_two_validators() {
+    let mut testkit = testkit_with_inc_service_and_two_validators();
 
     let artifact = artifact_default();
+    let api = testkit.api();
 
-    assert!(!does_artifact_exist(&testkit.api(), &artifact.name));
+    assert!(!does_artifact_exist(&api, &artifact.name));
 
-    let request = deploy_request(artifact.clone(), testkit.height().next());
-    let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
-    let hash = deploy_artifact(&testkit.api(), request);
+    let request_deploy = deploy_request(artifact.clone(), testkit.height().next().next());
 
-    // Restart the node after the deploy request was sent.
-    let mut testkit = testkit.stop().resume(vec![IncService]);
+    let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
+    let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
+
+    // Send an artifact deploy request from this validator.
+    let deploy_artifact_0_tx_hash = deploy_artifact(&api, request_deploy.clone());
+
+    // Emulate an artifact deploy request from the second validator.
+    let deploy_artifact_1_tx_hash =
+        deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
 
     testkit.create_block();
 
-    testkit.api().exonum_api().assert_tx_success(hash);
+    api.exonum_api()
+        .assert_txs_success(&[deploy_artifact_0_tx_hash, deploy_artifact_1_tx_hash]);
+
+    // Confirmation is ready.
+    assert!(testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
+    testkit.create_block();
 
     // Restart the node again after the first block was created.
     let mut testkit = testkit.stop().resume(vec![IncService]);
 
-    testkit.api().exonum_api().assert_tx_success(hash);
-
-    // Confirmation is ready.
-    assert!(testkit.is_tx_in_pool(&deploy_confirmation_hash));
+    // Emulate a confirmation from the second validator.
+    testkit.add_tx(deploy_confirmation_1.clone());
+    assert!(testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
 
     testkit.create_block();
 
-    // Restart the node after the artifact was deployed.
-    let testkit = testkit.stop().resume(vec![IncService]);
+    // Both confirmations are gone now.
+    assert!(!testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
+    assert!(!testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
 
-    // Confirmation is gone now.
-    assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
-
-    assert!(does_artifact_exist(&testkit.api(), &artifact.name));
+    let api = testkit.api(); // update the API
+    assert!(does_artifact_exist(&api, &artifact.name));
 }
 
 /// This test emulates a normal workflow with two validators.
