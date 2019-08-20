@@ -183,7 +183,7 @@ mod test {
 
         let raw = {
             let (pk, sk) = gen_keypair();
-            let msg = Verified::from_value(Status::new(Height(0), Hash::zero()), pk, &sk);
+            let msg = Verified::from_value(Status::new(Height(0), Hash::zero(), 0), pk, &sk);
             msg.into_raw()
         };
         let data = raw.to_bytes();

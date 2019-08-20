@@ -37,7 +37,7 @@ use crate::views::IndexAddress;
 #[derive(Debug)]
 pub struct ValueSetIndex<T: IndexAccess, V> {
     base: View<T>,
-    state: IndexState<T, u64>,
+    state: IndexState<T, ()>,
     _v: PhantomData<V>,
 }
 
@@ -152,7 +152,7 @@ where
             .index_type(IndexType::ValueSet)
             .index_name(family_name)
             .family_id(index_id)
-            .build();
+            .build::<()>();
         Self {
             base,
             state,
@@ -160,10 +160,10 @@ where
         }
     }
 
-    pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         IndexBuilder::from_address(address, access)
             .index_type(IndexType::ValueSet)
-            .build_existed()
+            .build_existed::<()>()
             .map(|(base, state)| Self {
                 base,
                 state,
@@ -171,10 +171,10 @@ where
             })
     }
 
-    pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         let (base, state) = IndexBuilder::from_address(address, access)
             .index_type(IndexType::ValueSet)
-            .build();
+            .build::<()>();
 
         Self {
             base,
@@ -339,8 +339,7 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn insert(&mut self, item: V) {
-        self.base.put(&item.object_hash(), item);
-        self.set_len(self.len() + 1);
+        self.base.put(&item.object_hash(), item)
     }
 
     /// Removes a value from the set.
@@ -386,8 +385,7 @@ where
     /// index.remove_by_hash(&data_hash);
     /// assert!(!index.contains_by_hash(&data_hash));
     pub fn remove_by_hash(&mut self, hash: &Hash) {
-        self.base.remove(hash);
-        self.set_len(self.len().saturating_sub(1));
+        self.base.remove(hash)
     }
 
     /// Clears the set, removing all values.
@@ -414,52 +412,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn clear(&mut self) {
-        self.base.clear();
-        self.state.clear();
-    }
-
-    /// Returns the number of elements in the set.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new("index", &fork);
-    /// assert_eq!(0, index.len());
-    ///
-    /// index.insert(10);
-    ///
-    /// assert_eq!(1, index.len());
-    /// ```
-    pub fn len(&self) -> u64 {
-        self.state.get()
-    }
-
-    /// Returns `true` if the map contains no elements.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
-    /// assert!(index.is_empty());
-    ///
-    /// index.insert(10);
-    /// assert!(!index.is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    fn set_len(&mut self, len: u64) {
-        self.state.set(len)
+        self.base.clear()
     }
 }
 
@@ -507,23 +460,17 @@ mod tests {
 
         assert!(!index.contains(&1_u8));
         assert!(!index.contains_by_hash(&1_u8.object_hash()));
-        assert_eq!(index.len(), 0);
 
         index.insert(1_u8);
-        assert_eq!(index.len(), 1);
         assert!(index.contains(&1_u8));
         assert!(index.contains_by_hash(&1_u8.object_hash()));
 
         index.insert(2_u8);
-        assert_eq!(index.len(), 2);
-
         let hash = index.hashes().next().unwrap();
         index.remove_by_hash(&hash);
-
-        assert_eq!(index.len(), 1);
         assert!(!index.contains(&1_u8));
 
         index.clear();
-        assert!(index.is_empty());
+        assert!(!index.contains(&2_u8));
     }
 }

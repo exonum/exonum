@@ -1581,7 +1581,7 @@ fn broadcast_prevote_with_tx_positive() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx.object_hash()]) //ordinary propose, but with this received tx
+        .with_tx_hashes(&[tx.object_hash()]) // ordinary propose, but with this received tx
         .build();
     sandbox.recv(&propose);
 

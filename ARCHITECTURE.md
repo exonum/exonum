@@ -29,17 +29,18 @@ This document currently describes only the `exonum` crate.
 
 ## Storage
 
-Storage module can be found at `src/storage`. It provides an abstraction over an
-embedded key-value store: the `Database` trait. The keys and values are just
-slices of bytes: `&[u8]`.
+Storage module can be found at `components/merkledb`. It provides an abstraction
+over an embedded key-value store: the `Database` trait. The keys and values can
+be represented as slices of bytes: `&[u8]`.
 
-To transform raw bytes into native Rust data structures, the `StorageKey` and
-`StorageValue` traits are used.
+To transform raw bytes into native Rust data structures and vice versa, the
+`BinaryKey`, `BinaryValue` and `ProtobufConvert` traits are used.
 
 On top of raw storage, collections like sets, lists and maps are provided: see
-various `*Index` structs. Of particular interest are `storage/proof_map_index`
-and `storage/proof_list_index` modules, which provide Merkelized collections,
-capable of providing compact proofs for search queries.
+various `*Index` structs. Of particular interest are
+`components/merkledb/src/proof_map_index` and
+`components/merkledb/src/proof_list_index` modules, which provide
+Merkelized collections, capable of providing compact proofs for search queries.
 
 Note that indexes are used both by the Exonum core and by the services. The core
 uses indexes to store the internal blockchain state, which is described in the
@@ -49,9 +50,9 @@ service-specific data.
 ## Blockchain
 
 The format of the block of the Exonum blockchain is described in
-`src/blockchain/block.rs`. Blocks are stored in the `Database`. The schema at
-`src/blockchain/schema.rs` describes the indexes used for blocks, transactions
-and some other data used by Exonum core.
+`exonum/src/blockchain/block.rs`. Blocks are stored in the `Database`.
+The schema at `exonum/src/blockchain/schema.rs` describes the indices used for blocks,
+transactions and some other data used by Exonum core.
 
 The heart of the `Blockchain` is `Blockchain::create_patch` method, which, given
 a list of transactions, executes them and produces a new `Block`.
@@ -65,19 +66,19 @@ that there are several `impl` blocks for `NodeHandler`.
 The entry point is `Node::run`, and the event dispatch loop is started in
 `Node::run_handler`.
 
-The event dispatch itself happens in `src/node/base.rs` module.
+The event dispatch itself happens in `exonum/src/node/basic.rs` module.
 
 Events specific to the consensus protocol messages are handled in the
-`src/node/consensus.rs` module. The messages themselves are defined in
-the `src/messages/protocol.rs` module.
+`exonum/src/node/consensus.rs` module. The messages themselves are defined in
+the `exonum/src/messages/protocol.rs` module.
 
 `Node` is also responsible for starting an HTTP API server. The API is assembled
-from the built-in part, specified in `src/api` and parts, provided by each
-service. The entry point of API construction is `create_private_api_handler` and
-`create_public_api_handler` functions.
+from the built-in part, specified in `exonum/src/api` and parts, provided by each
+service. The entry point of API construction is a `create_app` function of
+`exonum/src/api/backend/actix.rs` module.
 
 ## Configuration
 
 The code responsible for assembling a node with a particular set of services and
-configuration lives in `src/helpers/fabric`. `NodeBuilder::run` is the "`fn
+configuration lives in `exonum/src/helpers/fabric`. `NodeBuilder::run` is the "`fn
 main`" of Exonum.

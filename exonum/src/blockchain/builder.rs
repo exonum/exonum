@@ -232,7 +232,7 @@ mod tests {
             Vec::new(),
             config.genesis,
             service_keypair,
-            ApiSender::new(mpsc::unbounded().0),
+            ApiSender::new(mpsc::channel(0).0),
             mpsc::channel(0).0,
         );
 
@@ -256,7 +256,7 @@ mod tests {
             )],
             config.genesis,
             service_keypair,
-            ApiSender::new(mpsc::unbounded().0),
+            ApiSender::new(mpsc::channel(0).0),
             mpsc::channel(0).0,
         );
     }

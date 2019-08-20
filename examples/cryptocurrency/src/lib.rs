@@ -23,8 +23,12 @@
 //! [docs]: https://exonum.com/doc/version/latest/get-started/create-service
 //! [readme]: https://github.com/exonum/cryptocurrency#readme
 
-#![deny(unsafe_code, bare_trait_objects)]
-#![warn(missing_docs, missing_debug_implementations)]
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
 
 #[macro_use]
 extern crate exonum_derive;

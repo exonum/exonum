@@ -116,12 +116,18 @@ pub struct Status {
     pub height: Height,
     /// Hash of the last committed block.
     pub last_hash: Hash,
+    /// Transactions pool size.
+    pub pool_size: u64,
 }
 
 impl Status {
     /// Create new `Status` message.
-    pub fn new(height: Height, last_hash: Hash) -> Self {
-        Self { height, last_hash }
+    pub fn new(height: Height, last_hash: Hash, pool_size: u64) -> Self {
+        Self {
+            height,
+            last_hash,
+            pool_size,
+        }
     }
 
     /// The height to which the message is related.
@@ -132,6 +138,11 @@ impl Status {
     /// Hash of the last committed block.
     pub fn last_hash(&self) -> &Hash {
         &self.last_hash
+    }
+
+    /// Pool size.
+    pub fn pool_size(&self) -> u64 {
+        self.pool_size
     }
 }
 
@@ -541,9 +552,32 @@ impl TransactionsRequest {
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
+
     /// The list of the transaction hashes.
     pub fn txs(&self) -> &[Hash] {
         &self.txs
+    }
+}
+
+/// Request for pool transactions.
+///
+/// ### Processing
+/// All transactions from mempool are sent to the recipient.
+///
+/// ### Generation
+/// A node can send `PoolTransactionsRequest` during `Status` message
+/// handling.
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[exonum(pb = "consensus::PoolTransactionsRequest", crate = "crate")]
+pub struct PoolTransactionsRequest {
+    /// Public key of the recipient.
+    pub to: PublicKey,
+}
+
+impl PoolTransactionsRequest {
+    /// Create new `TransactionsRequest`.
+    pub fn new(to: PublicKey) -> Self {
+        Self { to }
     }
 }
 
@@ -715,6 +749,8 @@ pub enum ExonumMessage {
     PeersRequest(PeersRequest),
     /// Request of some future block.
     BlockRequest(BlockRequest),
+    /// Request of uncommitted transactions.
+    PoolTransactionsRequest(PoolTransactionsRequest),
 }
 
 impl TryFrom<SignedMessage> for ExonumMessage {
@@ -760,5 +796,5 @@ impl_exonum_msg_try_from_signed! {
     AnyTx, Connect, Status, Precommit,
     Propose, Prevote, TransactionsResponse,
     BlockResponse, ProposeRequest, TransactionsRequest,
-    PrevotesRequest, PeersRequest, BlockRequest
+    PrevotesRequest, PeersRequest, BlockRequest, PoolTransactionsRequest
 }

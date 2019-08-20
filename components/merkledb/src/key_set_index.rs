@@ -35,7 +35,7 @@ use crate::{
 #[derive(Debug)]
 pub struct KeySetIndex<T: IndexAccess, K> {
     base: View<T>,
-    state: IndexState<T, u64>,
+    state: IndexState<T, ()>,
     _k: PhantomData<K>,
 }
 
@@ -98,7 +98,7 @@ where
         let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::KeySet)
             .index_name(index_name)
-            .build();
+            .build::<()>();
 
         Self {
             base,
@@ -147,10 +147,10 @@ where
         }
     }
 
-    pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         IndexBuilder::from_address(address, access)
             .index_type(IndexType::KeySet)
-            .build_existed()
+            .build_existed::<()>()
             .map(|(base, state)| Self {
                 base,
                 state,
@@ -158,7 +158,7 @@ where
             })
     }
 
-    pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         let (base, state) = IndexBuilder::from_address(address, access)
             .index_type(IndexType::KeySet)
             .build();
@@ -256,8 +256,7 @@ where
     /// ```
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn insert(&mut self, item: K) {
-        self.base.put(&item, ());
-        self.set_len(self.len() + 1);
+        self.base.put(&item, ())
     }
 
     /// Removes a key from the set.
@@ -283,8 +282,7 @@ where
         K: Borrow<Q>,
         Q: BinaryKey + ?Sized,
     {
-        self.base.remove(item);
-        self.set_len(self.len().saturating_sub(1));
+        self.base.remove(item)
     }
 
     /// Clears the set, removing all values.
@@ -311,52 +309,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn clear(&mut self) {
-        self.base.clear();
-        self.state.clear();
-    }
-
-    /// Returns the number of elements in the set.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new("index", &fork);
-    /// assert_eq!(0, index.len());
-    ///
-    /// index.insert(10);
-    ///
-    /// assert_eq!(1, index.len());
-    /// ```
-    pub fn len(&self) -> u64 {
-        self.state.get()
-    }
-
-    /// Returns `true` if the map contains no elements.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
-    /// assert!(index.is_empty());
-    ///
-    /// index.insert(10);
-    /// assert!(!index.is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    fn set_len(&mut self, len: u64) {
-        self.state.set(len)
+        self.base.clear()
     }
 }
 
@@ -431,22 +384,16 @@ mod tests {
         let mut index = KeySetIndex::new(INDEX_NAME, &fork);
 
         assert!(!index.contains(&1_u8));
-        assert_eq!(index.len(), 0);
 
         index.insert(1_u8);
-        assert_eq!(index.len(), 1);
         assert!(index.contains(&1_u8));
 
         index.insert(2_u8);
-        assert_eq!(index.len(), 2);
-
         let key = index.iter().next().unwrap();
         index.remove(&key);
 
-        assert_eq!(index.len(), 1);
         assert!(!index.contains(&1_u8));
-
         index.clear();
-        assert!(index.is_empty());
+        assert!(!index.contains(&2_u8));
     }
 }

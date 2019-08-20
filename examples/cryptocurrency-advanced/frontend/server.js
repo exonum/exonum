@@ -23,7 +23,10 @@ app.use(express.static(__dirname + '/'));
 // Proxy middleware options
 var apiProxy = proxy({
   target: apiRoot,
-  ws: true
+  ws: true,
+  headers: {
+    'Origin': 'http://localhost'
+  }
 });
 
 app.use('/api', apiProxy);

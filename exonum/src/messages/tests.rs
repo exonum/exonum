@@ -158,17 +158,17 @@ fn test_block() {
     ];
     let transactions = [
         Verified::from_value(
-            Status::new(Height(2), crypto::hash(&[])),
+            Status::new(Height(2), crypto::hash(&[]), 0),
             pub_key,
             &secret_key,
         ),
         Verified::from_value(
-            Status::new(Height(4), crypto::hash(&[2])),
+            Status::new(Height(4), crypto::hash(&[2]), 0),
             pub_key,
             &secret_key,
         ),
         Verified::from_value(
-            Status::new(Height(7), crypto::hash(&[3])),
+            Status::new(Height(7), crypto::hash(&[3]), 0),
             pub_key,
             &secret_key,
         ),

@@ -66,7 +66,7 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    /// Creates a new dispatcher with the specified runtimes.
+    /// Create a new dispatcher with the specified runtimes.
     pub(crate) fn with_runtimes(
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
     ) -> Self {
@@ -94,7 +94,7 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Adds built-in service with predefined identifier.
+    /// Add a built-in service with the predefined identifier.
     ///
     /// # Panics
     ///
@@ -196,13 +196,23 @@ impl Dispatcher {
         spec: impl Into<Any>,
     ) -> Result<(), ExecutionError> {
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
-        debug_assert!(
-            self.is_deployed(&artifact),
-            "An attempt to register artifact which is not be deployed: {:?}",
-            artifact
-        );
 
-        Schema::new(fork).add_artifact(artifact, spec.into())?;
+        // If for some reasons the artifact is not deployed, deploy it again.
+        let spec = spec.into();
+        if !self.is_artifact_deployed(&artifact) {
+            self.deploy_artifact(artifact.clone(), spec.clone())
+                .wait()
+                .unwrap_or_else(|e| {
+                    // In this case artifact deployment error is fatal because there are
+                    // confirmation that this node can deploy this artifact.
+                    panic!(FatalError::new(format!(
+                        "Unable to deploy registered artifact. {}",
+                        e
+                    )))
+                });
+        }
+
+        Schema::new(fork).add_artifact(artifact, spec)?;
         info!(
             "Registered artifact {} in runtime with id {}",
             artifact.name, artifact.runtime_id
@@ -358,8 +368,12 @@ impl Dispatcher {
     }
 
     /// Return true if the artifact with the given identifier is deployed.
-    pub(crate) fn is_deployed(&self, id: &ArtifactId) -> bool {
-        self.artifact_protobuf_spec(id).is_some()
+    pub(crate) fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
+        if let Some(runtime) = self.runtimes.get(&id.runtime_id) {
+            runtime.is_artifact_deployed(id)
+        } else {
+            false
+        }
     }
 
     /// Notify the runtime about API changes and return true if there are such changes.
@@ -605,6 +619,10 @@ mod tests {
             )
         }
 
+        fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
+            id.runtime_id == self.runtime_type
+        }
+
         fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
             if spec.artifact.runtime_id == self.runtime_type {
                 Ok(())
@@ -798,7 +816,7 @@ mod tests {
         let context = ApiContext::new(
             db.clone(),
             crypto::gen_keypair(),
-            ApiSender::new(mpsc::unbounded().0),
+            ApiSender::new(mpsc::channel(0).0),
         );
         assert!(dispatcher.notify_api_changes(&context));
         let expected_api_changes = vec![

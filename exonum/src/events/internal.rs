@@ -162,7 +162,7 @@ mod tests {
 
     fn get_signed_message() -> SignedMessage {
         let (pk, sk) = gen_keypair();
-        Verified::from_value(Status::new(Height(0), Hash::zero()), pk, &sk).into_raw()
+        Verified::from_value(Status::new(Height(0), Hash::zero(), 0), pk, &sk).into_raw()
     }
 
     #[test]

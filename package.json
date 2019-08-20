@@ -10,7 +10,7 @@
   },
   "scripts": {
     "cspell": "./cspell.sh",
-    "md": "find . -not -path \"*/node_modules/*\" -not -path \"*/target/*\" -name \"*.md\" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc"
+    "md": "find . -not -path \"*/node_modules/*\" -and -not -path \"*/target/*\" -name \"*.md\" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc"
   },
   "repository": {
     "type": "git",
