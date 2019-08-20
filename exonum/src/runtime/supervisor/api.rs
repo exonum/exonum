@@ -32,7 +32,7 @@ pub trait PrivateApi {
     /// by the current node, and returns its hash.
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
     /// Creates and broadcasts the `StartService` transaction, which is signed
-    /// by the current node, and returns its hash.    
+    /// by the current node, and returns its hash.
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
 }
 

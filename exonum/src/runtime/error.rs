@@ -47,7 +47,7 @@ pub enum ErrorKind {
     Service {
         /// User-defined error code.
         /// Error codes can have different meanings for the different transactions
-        /// and services.        
+        /// and services.
         code: u8,
     },
 }
@@ -333,18 +333,18 @@ mod execution_result {
 
     #[serde(tag = "type", rename_all = "snake_case")]
     #[derive(Debug, Serialize, Deserialize)]
-    enum ExecutionStatus<'a> {
+    enum ExecutionStatus {
         Success,
-        Panic { description: &'a str },
-        DispatcherError { description: &'a str, code: u8 },
-        RuntimeError { description: &'a str, code: u8 },
-        ServiceError { description: &'a str, code: u8 },
+        Panic { description: String },
+        DispatcherError { description: String, code: u8 },
+        RuntimeError { description: String, code: u8 },
+        ServiceError { description: String, code: u8 },
     }
 
-    impl<'a> From<&'a Result<(), ExecutionError>> for ExecutionStatus<'a> {
-        fn from(inner: &'a Result<(), ExecutionError>) -> Self {
+    impl From<&Result<(), ExecutionError>> for ExecutionStatus {
+        fn from(inner: &Result<(), ExecutionError>) -> Self {
             if let Err(err) = &inner {
-                let description = &err.description;
+                let description = err.description.clone();
                 match err.kind {
                     ErrorKind::Panic => ExecutionStatus::Panic { description },
                     ErrorKind::Dispatcher { code } => {
@@ -363,8 +363,8 @@ mod execution_result {
         }
     }
 
-    impl<'a> From<ExecutionStatus<'a>> for Result<(), ExecutionError> {
-        fn from(inner: ExecutionStatus<'a>) -> Self {
+    impl From<ExecutionStatus> for Result<(), ExecutionError> {
+        fn from(inner: ExecutionStatus) -> Self {
             match inner {
                 ExecutionStatus::Success => Ok(()),
                 ExecutionStatus::Panic { description } => {

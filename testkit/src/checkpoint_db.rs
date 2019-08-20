@@ -20,7 +20,6 @@ use std::sync::{Arc, RwLock};
 /// to the last made checkpoint.
 ///
 /// **Note:** Intended for testing purposes only. Probably inefficient.
-#[derive(Debug)]
 pub struct CheckpointDb<T> {
     inner: Arc<RwLock<CheckpointDbInner<T>>>,
 }
@@ -38,8 +37,24 @@ impl<T: Database> CheckpointDb<T> {
     /// without having the ownership to it.
     pub fn handler(&self) -> CheckpointDbHandler<T> {
         CheckpointDbHandler {
+            handle: self.clone(),
+        }
+    }
+}
+
+impl<T> Clone for CheckpointDb<T> {
+    fn clone(&self) -> Self {
+        Self {
             inner: Arc::clone(&self.inner),
         }
+    }
+}
+
+impl<T> std::fmt::Debug for CheckpointDb<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CheckpointDb")
+            .field("refs", &Arc::strong_count(&self.inner))
+            .finish()
     }
 }
 
@@ -65,21 +80,28 @@ impl<T: Database> Database for CheckpointDb<T> {
 
 impl<T: Database> From<CheckpointDb<T>> for Arc<dyn Database> {
     fn from(db: CheckpointDb<T>) -> Arc<dyn Database> {
-        Arc::from(Box::new(db) as Box<dyn Database>)
+        Arc::new(db)
+    }
+}
+
+impl<T: Database> From<T> for CheckpointDb<T> {
+    fn from(db: T) -> Self {
+        CheckpointDb::new(db)
     }
 }
 
 /// Handler to a checkpointed database, which
 /// allows rollback of transactions.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CheckpointDbHandler<T> {
-    inner: Arc<RwLock<CheckpointDbInner<T>>>,
+    handle: CheckpointDb<T>,
 }
 
 impl<T: Database> CheckpointDbHandler<T> {
     /// Sets a checkpoint for a future [`rollback`](#method.rollback).
     pub fn checkpoint(&self) {
-        self.inner
+        self.handle
+            .inner
             .write()
             .expect("Cannot lock checkpointDb for checkpoint")
             .checkpoint();
@@ -92,7 +114,8 @@ impl<T: Database> CheckpointDbHandler<T> {
     ///
     /// - Panics if there are no available checkpoints.
     pub fn rollback(&self) {
-        self.inner
+        self.handle
+            .inner
             .write()
             .expect("Cannot lock CheckpointDb for rollback")
             .rollback();
@@ -100,12 +123,19 @@ impl<T: Database> CheckpointDbHandler<T> {
 
     /// Tries to unwrap this handler.
     pub fn try_unwrap(self) -> Result<T, Self> {
-        let lock = Arc::try_unwrap(self.inner).map_err(|inner| {
-            println!("strong: {}", Arc::strong_count(&inner));
-            CheckpointDbHandler { inner }
+        let lock = Arc::try_unwrap(self.handle.inner).map_err(|inner| {
+            eprintln!("strong: {}", Arc::strong_count(&inner));
+            Self {
+                handle: CheckpointDb { inner },
+            }
         })?;
         let inner = lock.into_inner().expect("cannot unwrap `RwLock`");
         Ok(inner.db)
+    }
+
+    /// Gets the underlying checkpoint database.
+    pub fn into_inner(self) -> CheckpointDb<T> {
+        self.handle
     }
 }
 

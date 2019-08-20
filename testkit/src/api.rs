@@ -23,7 +23,16 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::{self, Display};
 
 use exonum::{
-    api::{self, node::SharedNodeState, ApiAggregator},
+    api::{
+        self,
+        node::{
+            public::{explorer::TransactionQuery, system::DispatcherInfo},
+            SharedNodeState,
+        },
+        ApiAggregator,
+    },
+    blockchain::ExecutionStatus,
+    crypto::Hash,
     messages::{AnyTx, Verified},
     node::ApiSender,
 };
@@ -119,6 +128,10 @@ impl TestKitApi {
             ApiAccess::Private,
             kind.to_string(),
         )
+    }
+
+    pub fn exonum_api(&self) -> ExonumNodeApi {
+        ExonumNodeApi::new(self)
     }
 }
 
@@ -321,4 +334,49 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     info!("Test server created on {}", server.addr());
 
     server
+}
+
+/// A convenience wrapper for Exonum node API to reduce the boilerplate code.
+pub struct ExonumNodeApi<'a> {
+    pub inner: &'a TestKitApi,
+}
+
+impl<'a> ExonumNodeApi<'a> {
+    pub fn new(api: &'a TestKitApi) -> Self {
+        Self { inner: api }
+    }
+
+    /// Asserts that the transaction with the given hash has a specified status.
+    pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: &ExecutionStatus) {
+        let info: serde_json::Value = self
+            .inner
+            .public(ApiKind::Explorer)
+            .query(&TransactionQuery::new(tx_hash))
+            .get("v1/transactions")
+            .unwrap();
+        if let serde_json::Value::Object(info) = info {
+            let tx_status_raw = info.get("status").unwrap().clone();
+            let tx_status: ExecutionStatus = serde_json::from_value(tx_status_raw).unwrap();
+            assert_eq!(&tx_status, expected_status);
+        } else {
+            panic!("Invalid transaction info format, object expected");
+        }
+    }
+
+    pub fn assert_tx_success(&self, tx_hash: Hash) {
+        self.assert_tx_status(tx_hash, &ExecutionStatus::ok());
+    }
+
+    pub fn assert_txs_success(&self, tx_hashes: &[Hash]) {
+        for &tx_hash in tx_hashes {
+            self.assert_tx_success(tx_hash);
+        }
+    }
+
+    pub fn services(&self) -> DispatcherInfo {
+        self.inner
+            .public(ApiKind::System)
+            .get("v1/services")
+            .unwrap()
+    }
 }
