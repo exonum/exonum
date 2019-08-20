@@ -17,7 +17,7 @@ use heck::SnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
-use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, NestedMeta, Path};
+use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Path};
 
 use std::convert::TryFrom;
 
@@ -46,11 +46,8 @@ impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        args.as_ref()
-            .iter()
-            .filter_map(|a| a.parse_meta().ok())
-            .find(|m| m.name() == "exonum")
-            .map(|meta| Self::from_nested_meta(&NestedMeta::from(meta)))
+        find_exonum_meta(args)
+            .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
 }

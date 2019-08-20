@@ -26,7 +26,7 @@ mod pb_convert;
 mod service_factory;
 
 use proc_macro::TokenStream;
-use syn::{Attribute, Lit, Meta, NestedMeta};
+use syn::{Attribute, NestedMeta};
 
 /// Derives `ProtobufConvert` trait.
 ///
@@ -181,6 +181,6 @@ pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
     args.as_ref()
         .iter()
         .filter_map(|a| a.parse_meta().ok())
-        .find(|m| m.name() == "exonum")
+        .find(|m| m.path().is_ident("exonum"))
         .map(NestedMeta::from)
 }

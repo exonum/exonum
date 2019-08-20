@@ -27,7 +27,7 @@ use super::find_exonum_meta;
 #[derive(Debug)]
 struct ServiceMethodDescriptor {
     name: Ident,
-    arg_type: Type,
+    arg_type: Box<Type>,
     id: u32,
 }
 
@@ -39,12 +39,12 @@ impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
             TraitItem::Method(m) => m,
             _ => unreachable!(),
         };
-        let mut method_args_iter = method.sig.decl.inputs.iter();
+        let mut method_args_iter = method.sig.inputs.iter();
 
         method_args_iter
             .next()
             .and_then(|arg| match arg {
-                FnArg::SelfRef(_) => Some(()),
+                FnArg::Receiver(_) => Some(()),
                 _ => None,
             })
             .ok_or_else(|| {
@@ -59,7 +59,7 @@ impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
             .next()
             .ok_or_else(|| darling::Error::unexpected_type("Expected argument with transaction"))
             .and_then(|arg| match arg {
-                FnArg::Captured(captured) => Ok(captured.ty.clone()),
+                FnArg::Typed(arg) => Ok(arg.ty.clone()),
                 _ => Err(darling::Error::unexpected_type("Expected captured arg")),
             })?;
 
