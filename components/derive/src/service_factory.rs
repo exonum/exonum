@@ -19,6 +19,28 @@ use quote::{quote, ToTokens};
 use semver::Version;
 use syn::{DeriveInput, Ident, Path};
 
+fn is_allowed_latin1_char(c: u8) -> bool {
+    match c {
+          48..=57   // 0..9
+        | 65..=90   // A..Z
+        | 97..=122  // a..z
+        | 45..=46   // -.
+        | 95        // _
+        | 58        // :
+          => true,
+        _ => false,
+    }
+}
+
+/// Check that the artifact name contains only allowed characters and is not empty.
+///
+/// Only these combination of symbols are allowed:
+///
+/// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`, `.`, ':'
+fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
+    name.as_ref().iter().copied().all(is_allowed_latin1_char)
+}
+
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(exonum), forward_attrs(allow, doc, cfg))]
 #[darling(default)]
@@ -48,7 +70,11 @@ impl Default for ServiceFactory {
 impl ServiceFactory {
     fn artifact_name(&self) -> impl ToTokens {
         if let Some(ref artifact_name) = self.artifact_name {
-            // TODO check artifact name
+            // Check that artifact name contains only allowed characters and is not empty.
+            if !check_artifact_name(artifact_name) {
+                panic!("Wrong characters using in artifact name. Use: a-zA-Z0-9 and one of _-.:")
+            }
+
             quote! { #artifact_name }
         } else {
             quote! { env!("CARGO_PKG_NAME") }
