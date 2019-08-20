@@ -21,6 +21,8 @@ use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, NestedMeta, Path};
 
 use std::convert::TryFrom;
 
+use super::find_exonum_meta;
+
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ProtobufConvertStructAttrs {
@@ -78,11 +80,8 @@ impl TryFrom<&[Attribute]> for ProtobufConvertEnumAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        args.as_ref()
-            .iter()
-            .filter_map(|a| a.parse_meta().ok())
-            .find(|m| m.name() == "exonum")
-            .map(|meta| Self::from_nested_meta(&NestedMeta::from(meta)))
+        find_exonum_meta(args)
+            .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
 }

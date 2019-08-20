@@ -14,6 +14,7 @@
 
 //! This crate provides macros for deriving some useful methods and traits for the exonum services.
 
+#![recursion_limit = "128"]
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
@@ -25,12 +26,7 @@ mod pb_convert;
 mod service_factory;
 
 use proc_macro::TokenStream;
-use syn::{Lit, Meta};
-
-// Exonum derive attribute names, used as
-// `#[exonum( [ ATTRIBUTE_NAME = ATTRIBUTE_VALUE or ATTRIBUTE_NAME ],* )]`
-const CRATE_PATH_ATTRIBUTE: &str = "crate";
-const SERVICE_DISPATCHER: &str = "dispatcher";
+use syn::{Attribute, Lit, Meta, NestedMeta};
 
 /// Derives `ProtobufConvert` trait.
 ///
@@ -179,4 +175,12 @@ pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(IntoExecutionError, attributes(exonum))]
 pub fn generate_into_execution_error(input: TokenStream) -> TokenStream {
     execution_error::implement_execution_error(input)
+}
+
+pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
+    args.as_ref()
+        .iter()
+        .filter_map(|a| a.parse_meta().ok())
+        .find(|m| m.name() == "exonum")
+        .map(NestedMeta::from)
 }
