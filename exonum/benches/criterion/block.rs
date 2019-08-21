@@ -108,8 +108,8 @@ mod timestamping {
         crypto::Hash,
         messages::Verified,
         runtime::{
-            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            AnyTx, ArtifactProtobufSpec, InstanceId,
+            rust::{Service, Transaction, TransactionContext},
+            AnyTx, InstanceId,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -120,7 +120,7 @@ mod timestamping {
 
     const TIMESTAMPING_SERVICE_ID: InstanceId = 254;
 
-    #[exonum_service(dispatcher = "Timestamping")]
+    #[exonum_service]
     pub trait TimestampingInterface {
         fn timestamp(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
 
@@ -131,7 +131,12 @@ mod timestamping {
         ) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(
+        artifact_name = "timestamping",
+        proto_sources = "crate::proto",
+        service_interface = "TimestampingInterface"
+    )]
     pub struct Timestamping;
 
     impl TimestampingInterface for Timestamping {
@@ -148,20 +153,6 @@ mod timestamping {
     }
 
     impl Service for Timestamping {}
-
-    impl ServiceFactory for Timestamping {
-        fn artifact_id(&self) -> RustArtifactId {
-            "timestamping/0.0.1".parse().unwrap()
-        }
-
-        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-            ArtifactProtobufSpec::default()
-        }
-
-        fn create_instance(&self) -> Box<dyn Service> {
-            Box::new(Self)
-        }
-    }
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
@@ -208,8 +199,8 @@ mod cryptocurrency {
         crypto::PublicKey,
         messages::Verified,
         runtime::{
-            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            AnyTx, ArtifactProtobufSpec, ErrorKind, InstanceId,
+            rust::{Service, Transaction, TransactionContext},
+            AnyTx, ErrorKind, InstanceId,
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex};
@@ -225,7 +216,7 @@ mod cryptocurrency {
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    #[exonum_service(dispatcher = "Cryptocurrency")]
+    #[exonum_service]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
         fn transfer(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
@@ -243,7 +234,12 @@ mod cryptocurrency {
         ) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(
+        artifact_name = "cryptocurrency",
+        proto_sources = "crate::proto",
+        service_interface = "CryptocurrencyInterface"
+    )]
     pub struct Cryptocurrency;
 
     impl CryptocurrencyInterface for Cryptocurrency {
@@ -301,20 +297,6 @@ mod cryptocurrency {
     }
 
     impl Service for Cryptocurrency {}
-
-    impl ServiceFactory for Cryptocurrency {
-        fn artifact_id(&self) -> RustArtifactId {
-            "cryptocurrency/0.0.1".parse().unwrap()
-        }
-
-        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-            ArtifactProtobufSpec::default()
-        }
-
-        fn create_instance(&self) -> Box<dyn Service> {
-            Box::new(Self)
-        }
-    }
 
     impl From<Cryptocurrency> for InstanceCollection {
         fn from(t: Cryptocurrency) -> Self {

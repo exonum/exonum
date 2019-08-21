@@ -48,11 +48,11 @@ use std::convert::TryFrom;
 use crate::{
     api::PublicApi as TimestampingApi,
     schema::{Schema, TimestampEntry},
-    transactions::{Config, Error},
+    transactions::{Config, Error, TimestampingInterface},
 };
 
 #[derive(Debug, ServiceFactory)]
-#[exonum(proto_sources = "proto")]
+#[exonum(proto_sources = "proto", service_interface = "TimestampingInterface")]
 pub struct TimestampingService;
 
 impl Service for TimestampingService {

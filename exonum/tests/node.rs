@@ -18,12 +18,9 @@ use exonum::{
     blockchain::InstanceCollection,
     helpers,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
-    runtime::{
-        rust::{AfterCommitContext, RustArtifactId, Service, ServiceFactory},
-        ArtifactProtobufSpec,
-    },
+    runtime::rust::{AfterCommitContext, Service},
 };
-use exonum_derive::exonum_service;
+use exonum_derive::{exonum_service, ServiceFactory};
 use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::oneshot, Future, IntoFuture};
 use tokio::util::FutureExt;
@@ -36,11 +33,24 @@ use std::{
     time::Duration,
 };
 
-#[exonum_service(dispatcher = "CommitWatcherService")]
+#[exonum_service]
 trait CommitWatcherInterface {}
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "after-commit",
+    artifact_version = "1.0.0",
+    proto_sources = "exonum::proto::schema",
+    service_interface = "CommitWatcherInterface",
+    service_constructor = "CommitWatcherService::new_instance"
+)]
 struct CommitWatcherService(pub RefCell<Option<oneshot::Sender<()>>>);
+
+impl CommitWatcherService {
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(Self(RefCell::new(self.0.borrow_mut().take())))
+    }
+}
 
 impl CommitWatcherInterface for CommitWatcherService {}
 
@@ -52,21 +62,7 @@ impl Service for CommitWatcherService {
     }
 }
 
-impl ServiceFactory for CommitWatcherService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "after-commit:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self(RefCell::new(self.0.borrow_mut().take())))
-    }
-}
-
-#[exonum_service(dispatcher = "StartCheckerService")]
+#[exonum_service]
 trait StartCheckerInterface {}
 
 #[derive(Debug)]
@@ -76,19 +72,19 @@ impl StartCheckerInterface for StartCheckerService {}
 
 impl Service for StartCheckerService {}
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "configure",
+    artifact_version = "1.0.2",
+    proto_sources = "exonum::proto::schema",
+    service_interface = "StartCheckerInterface",
+    service_constructor = "StartCheckerServiceFactory::new_instance",
+    service_name = "StartCheckerService"
+)]
 struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
 
-impl ServiceFactory for StartCheckerServiceFactory {
-    fn artifact_id(&self) -> RustArtifactId {
-        "configure:1.0.0".parse().unwrap()
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
+impl StartCheckerServiceFactory {
+    fn new_instance(&self) -> Box<dyn Service> {
         *self.0.lock().unwrap() += 1;
         Box::new(StartCheckerService)
     }

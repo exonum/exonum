@@ -201,7 +201,7 @@ pub mod contracts {
     const INIT_BALANCE: u64 = 100;
 
     /// Cryptocurrency service transactions.
-    #[exonum_service(dispatcher = "CryptocurrencyService")]
+    #[exonum_service]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
         fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> Result<(), Error>;
@@ -211,7 +211,10 @@ pub mod contracts {
 
     /// Cryptocurrency service implementation.
     #[derive(Debug, ServiceFactory)]
-    #[exonum(proto_sources = "crate::proto")]
+    #[exonum(
+        proto_sources = "crate::proto",
+        service_interface = "CryptocurrencyInterface"
+    )]
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {

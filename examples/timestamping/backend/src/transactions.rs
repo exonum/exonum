@@ -50,7 +50,7 @@ pub struct Config {
     pub time_service_name: String,
 }
 
-#[exonum_service(dispatcher = "TimestampingService")]
+#[exonum_service]
 pub trait TimestampingInterface {
     fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> Result<(), Error>;
 }

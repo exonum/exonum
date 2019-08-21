@@ -55,7 +55,10 @@ struct ServiceFactory {
     #[darling(default)]
     proto_sources: Option<Path>,
     #[darling(default)]
-    with_constructor: Option<Path>,
+    service_constructor: Option<Path>,
+    service_interface: Path,
+    #[darling(default)]
+    service_name: Option<Ident>,
 }
 
 impl ServiceFactory {
@@ -90,11 +93,17 @@ impl ServiceFactory {
     }
 
     fn service_constructor(&self) -> impl ToTokens {
-        if let Some(ref path) = self.with_constructor {
+        if let Some(ref path) = self.service_constructor {
             quote! { #path(self) }
         } else {
             quote! { Box::new(Self) }
         }
+    }
+
+    fn service_name(&self) -> impl ToTokens {
+        self.service_name
+            .clone()
+            .unwrap_or_else(|| self.ident.clone())
     }
 
     fn artifact_protobuf_spec(&self) -> impl ToTokens {
@@ -110,6 +119,25 @@ impl ServiceFactory {
             }
         }
     }
+
+    fn impl_service_dispatcher(&self) -> impl ToTokens {
+        let trait_name = &self.service_interface;
+        let cr = &self.cr;
+        let dispatcher = self.service_name();
+
+        quote! {
+            impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
+                fn call(
+                    &self,
+                    method: #cr::runtime::MethodId,
+                    ctx: #cr::runtime::rust::service::TransactionContext,
+                    payload: &[u8],
+                ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+                    <#dispatcher as #trait_name>::_dispatch(self, ctx, method, payload)
+                }
+            }
+        }
+    }
 }
 
 impl ToTokens for ServiceFactory {
@@ -119,6 +147,7 @@ impl ToTokens for ServiceFactory {
         let artifact_id = self.artifact_id();
         let artifact_protobuf_spec = self.artifact_protobuf_spec();
         let service_constructor = self.service_constructor();
+        let service_dispatcher = self.impl_service_dispatcher();
 
         let expanded = quote! {
             impl #cr::runtime::rust::ServiceFactory for #name {
@@ -134,6 +163,8 @@ impl ToTokens for ServiceFactory {
                     #service_constructor
                 }
             }
+
+            #service_dispatcher
         };
         tokens.extend(expanded)
     }

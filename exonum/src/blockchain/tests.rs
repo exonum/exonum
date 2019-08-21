@@ -31,8 +31,8 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        AnyTx, ArtifactId, ArtifactProtobufSpec, ExecutionError, InstanceDescriptor, InstanceId,
+        rust::{Service, ServiceFactory, Transaction, TransactionContext},
+        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 
@@ -57,7 +57,7 @@ struct TestStart {
     value: u64,
 }
 
-#[exonum_service(crate = "crate", dispatcher = "TestDispatcherService")]
+#[exonum_service(crate = "crate")]
 trait TestDispatcherInterface {
     fn test_execute(
         &self,
@@ -77,7 +77,8 @@ trait TestDispatcherInterface {
 #[exonum(
     crate = "crate",
     artifact_name = "test_dispatcher",
-    proto_sources = "crate::proto::schema"
+    proto_sources = "crate::proto::schema",
+    service_interface = "TestDispatcherInterface"
 )]
 struct TestDispatcherService;
 
@@ -176,10 +177,17 @@ impl TestDispatcherInterface for TestDispatcherService {
     }
 }
 
-#[exonum_service(crate = "crate", dispatcher = "ServiceGoodImpl")]
+#[exonum_service(crate = "crate")]
 trait ServiceGood {}
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "good_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema",
+    service_interface = "ServiceGood"
+)]
 struct ServiceGoodImpl;
 
 impl ServiceGood for ServiceGoodImpl {}
@@ -191,24 +199,17 @@ impl Service for ServiceGoodImpl {
     }
 }
 
-impl ServiceFactory for ServiceGoodImpl {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId::new("good_service", 1, 0, 0)
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
-
-#[exonum_service(crate = "crate", dispatcher = "ServicePanicImpl")]
+#[exonum_service(crate = "crate")]
 trait ServicePanic {}
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "panic_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema",
+    service_interface = "ServicePanic"
+)]
 struct ServicePanicImpl;
 
 impl ServicePanic for ServicePanicImpl {}
@@ -219,24 +220,17 @@ impl Service for ServicePanicImpl {
     }
 }
 
-impl ServiceFactory for ServicePanicImpl {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId::new("panic_service", 1, 0, 0)
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
-
-#[exonum_service(crate = "crate", dispatcher = "ServicePanicStorageErrorImpl")]
+#[exonum_service(crate = "crate")]
 trait ServicePanicStorageError {}
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "storage_error_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema",
+    service_interface = "ServicePanicStorageError"
+)]
 struct ServicePanicStorageErrorImpl;
 
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
@@ -244,20 +238,6 @@ impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 impl Service for ServicePanicStorageErrorImpl {
     fn before_commit(&self, _context: TransactionContext) {
         panic!(StorageError::new("42"));
-    }
-}
-
-impl ServiceFactory for ServicePanicStorageErrorImpl {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId::new("storage_error_service", 1, 0, 0)
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }
 
@@ -273,13 +253,20 @@ struct TxResult {
     value: u64,
 }
 
-#[derive(Debug)]
-struct TxResultCheckService;
-
-#[exonum_service(crate = "crate", dispatcher = "TxResultCheckService")]
+#[exonum_service(crate = "crate")]
 trait TxResultCheckInterface {
     fn tx_result(&self, context: TransactionContext, arg: TxResult) -> Result<(), ExecutionError>;
 }
+
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "tx_result_check",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema",
+    service_interface = "TxResultCheckInterface"
+)]
+struct TxResultCheckService;
 
 impl TxResultCheckInterface for TxResultCheckService {
     fn tx_result(&self, context: TransactionContext, arg: TxResult) -> Result<(), ExecutionError> {
@@ -290,20 +277,6 @@ impl TxResultCheckInterface for TxResultCheckService {
 }
 
 impl Service for TxResultCheckService {}
-
-impl ServiceFactory for TxResultCheckService {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId::new("good_service", 1, 0, 0)
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
 
 fn create_entry<T: IndexAccess>(fork: T) -> Entry<T, u64> {
     Entry::new("transaction_status_test", fork)

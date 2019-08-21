@@ -1249,7 +1249,7 @@ mod tests {
 
     use super::*;
 
-    #[exonum_service(crate = "crate", dispatcher = "AfterCommitService")]
+    #[exonum_service(crate = "crate")]
     pub trait AfterCommitInterface {
         fn after_commit(
             &self,
@@ -1263,7 +1263,8 @@ mod tests {
         crate = "crate",
         artifact_name = "after_commit",
         artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema"
+        proto_sources = "crate::proto::schema",
+        service_interface = "AfterCommitInterface"
     )]
     pub struct AfterCommitService;
 

@@ -46,7 +46,7 @@ impl TxTimestamp {
     }
 }
 
-#[exonum_service(dispatcher = "TimestampingService")]
+#[exonum_service]
 trait TimestampingInterface {
     fn timestamp(
         &self,
@@ -59,7 +59,8 @@ trait TimestampingInterface {
 #[exonum(
     artifact_name = "timestamping",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto"
+    proto_sources = "crate::proto",
+    service_interface = "TimestampingInterface"
 )]
 struct TimestampingService;
 

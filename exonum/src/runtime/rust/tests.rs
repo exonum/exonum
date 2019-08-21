@@ -54,7 +54,7 @@ struct TxB {
     value: u64,
 }
 
-#[exonum_service(crate = "crate", dispatcher = "TestServiceImpl")]
+#[exonum_service(crate = "crate")]
 trait TestService {
     fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
     fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
@@ -65,7 +65,8 @@ trait TestService {
     crate = "crate",
     artifact_name = "test_service",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema"
+    proto_sources = "crate::proto::schema",
+    service_interface = "TestService"
 )]
 pub struct TestServiceImpl;
 

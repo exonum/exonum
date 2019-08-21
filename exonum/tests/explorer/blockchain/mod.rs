@@ -21,25 +21,18 @@ use exonum::{
     messages::Verified,
     node::ApiSender,
     runtime::{
+        rust::{Service, TransactionContext},
         AnyTx, InstanceId,
-        {
-            rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-            ArtifactProtobufSpec,
-        },
     },
 };
 use exonum_merkledb::{ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
-use semver::Version;
 
 use std::collections::BTreeMap;
 
 pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
-
-#[derive(Debug)]
-struct MyService;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CreateWallet")]
@@ -81,11 +74,20 @@ pub enum Error {
     NotAllowed = 0,
 }
 
-#[exonum_service(dispatcher = "MyService")]
+#[exonum_service]
 pub trait ExplorerTransactions {
     fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
     fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error>;
 }
+
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "my-service",
+    artifact_version = "1.0.1",
+    proto_sources = "proto",
+    service_interface = "ExplorerTransactions"
+)]
+struct MyService;
 
 impl ExplorerTransactions for MyService {
     fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> Result<(), Error> {
@@ -102,23 +104,6 @@ impl ExplorerTransactions for MyService {
 }
 
 impl Service for MyService {}
-
-impl ServiceFactory for MyService {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId {
-            name: "my-service".into(),
-            version: Version::new(1, 0, 0),
-        }
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
 
 /// Generates a keypair from a fixed passphrase.
 pub fn consensus_keys() -> (PublicKey, SecretKey) {

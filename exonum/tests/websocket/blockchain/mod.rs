@@ -20,8 +20,8 @@ use exonum::{
     helpers,
     node::{ApiSender, Node},
     runtime::{
-        rust::{RustArtifactId, Service, ServiceFactory, TransactionContext},
-        ArtifactProtobufSpec, InstanceId,
+        rust::{Service, TransactionContext},
+        InstanceId,
     },
 };
 use exonum_merkledb::TemporaryDB;
@@ -71,13 +71,18 @@ pub enum Error {
     NotAllowed = 0,
 }
 
-#[exonum_service(dispatcher = "MyService")]
+#[exonum_service]
 pub trait MyServiceInterface {
     fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
     fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "ws-test",
+    proto_sources = "exonum::proto::schema",
+    service_interface = "MyServiceInterface"
+)]
 struct MyService;
 
 impl MyServiceInterface for MyService {
@@ -94,20 +99,6 @@ impl MyServiceInterface for MyService {
 }
 
 impl Service for MyService {}
-
-impl ServiceFactory for MyService {
-    fn artifact_id(&self) -> RustArtifactId {
-        "ws-test:0.1.0".parse().unwrap()
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
-    }
-}
 
 pub struct RunHandle {
     pub node_thread: JoinHandle<()>,
