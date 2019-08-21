@@ -12,189 +12,241 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use darling::FromMeta;
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, AttributeArgs, FnArg, Ident, ItemTrait, Lit, Meta, NestedMeta, Path,
+    parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, Path,
     TraitItem, TraitItemMethod, Type,
 };
 
+use std::convert::TryFrom;
+
+use super::find_exonum_meta;
+
+#[derive(Debug)]
 struct ServiceMethodDescriptor {
     name: Ident,
-    arg_type: Type,
+    arg_type: Box<Type>,
     id: u32,
 }
 
-fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) -> impl ToTokens {
-    let match_arms = methods
-        .iter()
-        .map(|ServiceMethodDescriptor { name, arg_type, id }| {
-            quote! {
-                #id => {
-                    let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(payload.into())?;
-                    Ok(self.#name(ctx,arg).map_err(From::from))
-                }
-            }
-        });
+impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
+    type Error = darling::Error;
 
-    quote! {
-        #[doc(hidden)]
-        fn _dispatch(
-                &self,
-                ctx: #cr::runtime::rust::TransactionContext,
-                method: #cr::runtime::MethodId,
-                payload: &[u8]
-            ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
-            match method {
-                #( #match_arms )*
-                _ => failure::bail!("Method not found"),
-            }
+    fn try_from(value: (usize, &TraitItem)) -> Result<Self, Self::Error> {
+        let method = match value.1 {
+            TraitItem::Method(m) => m,
+            _ => unreachable!(),
+        };
+        let mut method_args_iter = method.sig.inputs.iter();
+
+        method_args_iter
+            .next()
+            .and_then(|arg| match arg {
+                FnArg::Receiver(_) => Some(()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                darling::Error::unexpected_type("Expected `&self` or `&mut self` as an argument")
+            })?;
+
+        method_args_iter.next().ok_or_else(|| {
+            darling::Error::unexpected_type("Expected `TransactionContext` argument")
+        })?;
+
+        let arg_type = method_args_iter
+            .next()
+            .ok_or_else(|| darling::Error::unexpected_type("Expected argument with transaction"))
+            .and_then(|arg| match arg {
+                FnArg::Typed(arg) => Ok(arg.ty.clone()),
+                _ => Err(darling::Error::unexpected_type("Expected captured arg")),
+            })?;
+
+        if method_args_iter.next().is_some() {
+            return Err(darling::Error::unsupported_format(
+                "Function should have only one argument for transaction",
+            ));
+        }
+
+        Ok(ServiceMethodDescriptor {
+            name: method.sig.ident.clone(),
+            id: value.0 as u32,
+            arg_type,
+        })
+    }
+}
+
+#[derive(Debug, FromMeta)]
+#[darling(default)]
+struct ExonumServiceAttrs {
+    #[darling(rename = "crate")]
+    cr: Path,
+    dispatcher: Option<Path>,
+}
+
+impl Default for ExonumServiceAttrs {
+    fn default() -> Self {
+        Self {
+            cr: syn::parse_str("exonum").unwrap(),
+            dispatcher: None,
         }
     }
 }
 
-fn implement_transaction_for_methods(
-    trait_name: &Ident,
-    methods: &[ServiceMethodDescriptor],
-    cr: &dyn ToTokens,
-) -> impl quote::ToTokens {
-    let transactions_for_methods =
-        methods
+impl TryFrom<&[Attribute]> for ExonumServiceAttrs {
+    type Error = darling::Error;
+
+    fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
+        find_exonum_meta(args)
+            .map(|meta| Self::from_nested_meta(&meta))
+            .unwrap_or_else(|| Ok(Self::default()))
+    }
+}
+
+impl ExonumServiceAttrs {
+    fn dispatcher(&self) -> &Path {
+        self.dispatcher
+            .as_ref()
+            .expect("`dispatcher` attribute is not set properly")
+    }
+}
+
+#[derive(Debug)]
+struct ExonumService {
+    item_trait: ItemTrait,
+    attrs: ExonumServiceAttrs,
+    methods: Vec<ServiceMethodDescriptor>,
+}
+
+impl ExonumService {
+    fn new(item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
+        let methods = item_trait
+            .items
             .iter()
-            .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
-                quote! {
-                    impl #cr::runtime::rust::Transaction for #arg_type {
-                        type Service = &'static dyn #trait_name;
+            .enumerate()
+            .filter_map(|x| match x.1 {
+                TraitItem::Method(_) => Some(ServiceMethodDescriptor::try_from(x)),
+                _ => None,
+            })
+            .try_fold(Vec::new(), |mut v, x| {
+                v.push(x?);
+                Ok(v)
+            })?;
 
-                        const METHOD_ID: #cr::runtime::MethodId = #id;
-                    }
-                }
-            });
-
-    quote! {
-        #( #transactions_for_methods )*
+        Ok(Self {
+            item_trait,
+            attrs: ExonumServiceAttrs::from_list(&args)?,
+            methods,
+        })
     }
-}
 
-fn implement_service_dispatcher(
-    trait_name: &Ident,
-    dispatcher: &dyn ToTokens,
-    cr: &dyn ToTokens,
-) -> impl ToTokens {
-    quote! {
-        impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
-            fn call(
-                &self,
-                method: #cr::runtime::MethodId,
-                ctx: #cr::runtime::rust::service::TransactionContext,
-                payload: &[u8],
-            ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
-                <#dispatcher as #trait_name>::_dispatch(self, ctx, method, payload)
+    fn impl_dispatch_method(&self) -> impl ToTokens {
+        let cr = &self.attrs.cr;
+
+        let match_arms =
+            self.methods
+                .iter()
+                .map(|ServiceMethodDescriptor { name, arg_type, id }| {
+                    quote! {
+                        #id => {
+                            let bytes = payload.into();
+                            let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)?;
+                            Ok(self.#name(ctx,arg).map_err(From::from))
+                        }
+                    }
+                });
+
+        quote! {
+            #[doc(hidden)]
+            fn _dispatch(
+                    &self,
+                    ctx: #cr::runtime::rust::TransactionContext,
+                    method: #cr::runtime::MethodId,
+                    payload: &[u8]
+                ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+                match method {
+                    #( #match_arms )*
+                    _ => failure::bail!("Method not found"),
+                }
             }
         }
     }
+
+    fn impl_transactions(&self) -> impl ToTokens {
+        let trait_name = &self.item_trait.ident;
+        let cr = &self.attrs.cr;
+
+        let transactions_for_methods =
+            self.methods
+                .iter()
+                .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
+                    quote! {
+                        impl #cr::runtime::rust::Transaction for #arg_type {
+                            type Service = &'static dyn #trait_name;
+
+                            const METHOD_ID: #cr::runtime::MethodId = #id;
+                        }
+                    }
+                });
+
+        quote! {
+            #( #transactions_for_methods )*
+        }
+    }
+
+    fn impl_service_dispatcher(&self) -> impl ToTokens {
+        let trait_name = &self.item_trait.ident;
+        let cr = &self.attrs.cr;
+        let dispatcher = self.attrs.dispatcher();
+
+        quote! {
+            impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
+                fn call(
+                    &self,
+                    method: #cr::runtime::MethodId,
+                    ctx: #cr::runtime::rust::service::TransactionContext,
+                    payload: &[u8],
+                ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+                    <#dispatcher as #trait_name>::_dispatch(self, ctx, method, payload)
+                }
+            }
+        }
+    }
+
+    fn item_trait(&self) -> impl ToTokens {
+        let mut item_trait = self.item_trait.clone();
+        let dispatch_method: TraitItemMethod = {
+            let method_code = self.impl_dispatch_method().into_token_stream();
+            syn::parse(method_code.into()).expect("Can't parse trait item method")
+        };
+        item_trait.items.push(TraitItem::Method(dispatch_method));
+        item_trait
+    }
 }
 
-// TODO: Optimize: collect all attributes by the single pass [ECR-3222]
+impl ToTokens for ExonumService {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let item_trait = self.item_trait();
+        let impl_transactions = self.impl_transactions();
+        let impl_service_dispatcher = self.impl_service_dispatcher();
 
-fn find_attribute_path(attrs: &[Meta], name: &str) -> Option<Path> {
-    attrs
-        .iter()
-        .find_map(|meta| match meta {
-            Meta::NameValue(nv) if meta.name() == name => Some(nv),
-            _ => None,
-        })
-        .and_then(|nv| {
-            if nv.ident == name {
-                match nv.lit {
-                    Lit::Str(ref path) => Some(
-                        path.parse::<Path>()
-                            .expect("Unable to parse Path attribute"),
-                    ),
-                    _ => None,
-                }
-            } else {
-                None
-            }
-        })
+        let expanded = quote! {
+            #item_trait
+            #impl_transactions
+            #impl_service_dispatcher
+        };
+        tokens.extend(expanded);
+    }
 }
 
 pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let mut trait_item = parse_macro_input!(item as ItemTrait);
-    let args = parse_macro_input!(attr as AttributeArgs);
-    let meta_attrs = args
-        .into_iter()
-        .filter_map(|a| match a {
-            NestedMeta::Meta(m) => Some(m),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    let cr = find_attribute_path(&meta_attrs, super::CRATE_PATH_ATTRIBUTE)
-        .unwrap_or_else(|| syn::parse_str("exonum").unwrap());
-    let dispatcher = find_attribute_path(&meta_attrs, super::SERVICE_DISPATCHER).expect(
-        "Expected dispatcher attribute declaration in form (dispatcher = \"path::to::service\")",
-    );
+    let item_trait = parse_macro_input!(item as ItemTrait);
+    let attrs = parse_macro_input!(attr as AttributeArgs);
 
-    let methods = trait_item
-        .items
-        .iter()
-        .filter(|item| match item {
-            TraitItem::Method(_) => true,
-            _ => false,
-        })
-        .enumerate()
-        .map(|(n, item)| {
-            let method = match item {
-                TraitItem::Method(m) => m,
-                _ => unreachable!(),
-            };
-            let mut method_args_iter = method.sig.decl.inputs.iter();
+    let exonum_service =
+        ExonumService::new(item_trait, attrs).unwrap_or_else(|e| panic!("ExonumService: {}", e));
 
-            method_args_iter
-                .next()
-                .and_then(|arg| match arg {
-                    FnArg::SelfRef(_) => Some(()),
-                    _ => None,
-                })
-                .expect("Expected &self or &mut self as an argument");
-
-            method_args_iter
-                .next()
-                .expect("Expected TransactionContext argument");
-
-            let arg_type = method_args_iter
-                .next()
-                .map(|arg| match arg {
-                    FnArg::Captured(captured) => captured.ty.clone(),
-                    _ => panic!("Expected captured arg"),
-                })
-                .expect("Expected argument with transaction");
-
-            if method_args_iter.next().is_some() {
-                panic!("Function should have only one argument for transaction");
-            }
-
-            ServiceMethodDescriptor {
-                name: method.sig.ident.clone(),
-                id: n as u32,
-                arg_type,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let dispatch_method: TraitItemMethod = {
-        let method_code = impl_dispatch_method(&methods, &cr).into_token_stream();
-        syn::parse(method_code.into()).expect("Can't parse trait item method")
-    };
-    trait_item.items.push(TraitItem::Method(dispatch_method));
-
-    let txs_for_methods = implement_transaction_for_methods(&trait_item.ident, &methods, &cr);
-    let impl_service_dispatcher = implement_service_dispatcher(&trait_item.ident, &dispatcher, &cr);
-
-    let expanded = quote! {
-        #trait_item
-        #txs_for_methods
-        #impl_service_dispatcher
-    };
-    expanded.into()
+    let tokens = quote! {#exonum_service};
+    tokens.into()
 }

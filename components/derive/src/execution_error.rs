@@ -16,9 +16,11 @@ use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::{quote, ToTokens};
-use syn::{Attribute, Data, DeriveInput, Expr, MetaNameValue, NestedMeta, Path, Variant};
+use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Path, Variant};
 
 use std::convert::TryFrom;
+
+use super::find_exonum_meta;
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -41,11 +43,8 @@ impl TryFrom<&[Attribute]> for ExecutionErrorAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        args.as_ref()
-            .iter()
-            .filter_map(|a| a.parse_meta().ok())
-            .find(|m| m.name() == "exonum")
-            .map(|meta| Self::from_nested_meta(&NestedMeta::from(meta)))
+        find_exonum_meta(args)
+            .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
 }
@@ -86,19 +85,19 @@ impl ParsedVariant {
             .filter_map(|attr| {
                 let path = &attr.path;
                 if quote!(#path).to_string() == "doc" {
-                    attr.interpret_meta()
+                    attr.parse_meta().ok()
                 } else {
                     None
                 }
             })
             .filter_map(|attr| {
-                use crate::Lit::*;
-                use crate::Meta::*;
-                if let NameValue(MetaNameValue {
-                    ident, lit: Str(s), ..
+                if let Meta::NameValue(MetaNameValue {
+                    path,
+                    lit: Lit::Str(s),
+                    ..
                 }) = attr
                 {
-                    if ident != "doc" {
+                    if !path.is_ident("doc") {
                         return None;
                     }
                     let value = s.value();
