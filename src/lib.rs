@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![deny(missing_docs)]
+
+//! Helper crate for secure and convenient configuration of the Exonum nodes.
+
 use exonum::blockchain::{GenesisConfig, ValidatorKeys};
 use exonum::crypto::generate_keys_file;
 use exonum::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
@@ -30,53 +34,72 @@ use crate::fabric::{
 };
 use crate::password::{PassInputMethod, SecretKeyType, ZeroizeOnDrop};
 
-mod config;
-mod fabric;
-mod password;
+pub mod config;
+pub mod fabric;
+pub mod password;
 
-/// Default port value.
-pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
-pub const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
-pub const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
-pub const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
-pub const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
+const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
+const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
+const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
+const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
 
+/// Output of any of the standard Exonum Core configuration commands.
 pub enum StandardResult {
+    /// `generate-template` command output.
     GenerateTemplate {
+        /// Path to a generated common template file.
         template_config_path: PathBuf,
     },
+    /// `generate-config` command output.
     GenerateConfig {
+        /// Path to a generated public config of the node.
         public_config_path: PathBuf,
+        /// Path to a generated private config of the node.
         secret_config_path: PathBuf,
     },
+    /// `finalize` command output.
     Finalize {
+        /// Path to a generated final node config.
         node_config_path: PathBuf,
     },
+    /// `run` command output.
     Run(NodeRunConfig),
 }
 
+/// Container for node configuration parameters produced by `Run` command.
 pub struct NodeRunConfig {
+    /// Final node configuration parameters.
     pub node_config: NodeConfig,
+    /// Path to a directory containing database files, provided by user.
     pub db_path: PathBuf,
 }
 
+/// Interface of standard Exonum Core configuration commands.
 pub trait ExonumCommand {
+    /// Returns the result of the command execution.
     fn execute(self) -> Result<StandardResult, Error>;
 }
 
+/// Standard Exonum Core configuration commands.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 pub enum Command {
     #[structopt(name = "generate-template")]
+    /// Generate common part of the nodes configuration.
     GenerateTemplate(GenerateTemplate),
     #[structopt(name = "generate-config")]
+    /// Generate public and private configs of the node.
     GenerateConfig(GenerateConfig),
     #[structopt(name = "finalize")]
+    /// Generate final node configuration using public configs
+    /// of other nodes in the network.
     Finalize(Finalize),
     #[structopt(name = "run")]
+    /// Run the node with provided node config.
     Run(Run),
 }
 
 impl Command {
+    /// Wrapper around `StructOpt::from_args` method.
     pub fn from_args() -> Self {
         <Self as StructOpt>::from_args()
     }
@@ -93,6 +116,7 @@ impl ExonumCommand for Command {
     }
 }
 
+/// Generate common part of the nodes configuration.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct GenerateTemplate {
@@ -118,6 +142,7 @@ impl ExonumCommand for GenerateTemplate {
     }
 }
 
+/// Generate public and private configs of the node.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct GenerateConfig {
@@ -248,6 +273,8 @@ fn create_secret_key_file(
     }
 }
 
+/// Generate final node configuration using public configs
+/// of other nodes in the network.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Finalize {
@@ -395,9 +422,9 @@ impl ExonumCommand for Finalize {
     }
 }
 
+/// Run the node with provided node config.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
-
 pub struct Run {
     #[structopt(long, short = "c")]
     /// Path to a node configuration file.

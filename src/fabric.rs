@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains various config structures used during configuration process.
+
 use exonum::blockchain::{ConsensusConfig, ValidatorKeys};
 use exonum::crypto::PublicKey;
 use serde::{Deserialize, Serialize};

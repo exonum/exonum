@@ -60,7 +60,9 @@ pub enum PassInputMethod {
 /// Secret key types.
 #[derive(Copy, Clone)]
 pub enum SecretKeyType {
+    /// Consensus key. Used in communication between nodes during consensus.
     Consensus,
+    /// Service key. Used to sign transactions produced by the node.
     Service,
 }
 
