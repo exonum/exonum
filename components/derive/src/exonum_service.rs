@@ -22,7 +22,7 @@ use syn::{
 
 use std::convert::TryFrom;
 
-use super::find_exonum_meta;
+use super::{find_exonum_meta, CratePath};
 
 #[derive(Debug)]
 struct ServiceMethodDescriptor {
@@ -81,14 +81,14 @@ impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
 #[darling(default)]
 struct ExonumServiceAttrs {
     #[darling(rename = "crate")]
-    cr: Path,
+    cr: CratePath,
     dispatcher: Option<Path>,
 }
 
 impl Default for ExonumServiceAttrs {
     fn default() -> Self {
         Self {
-            cr: syn::parse_str("exonum").unwrap(),
+            cr: CratePath::default(),
             dispatcher: None,
         }
     }

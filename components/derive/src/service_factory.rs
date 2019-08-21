@@ -14,10 +14,11 @@
 
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use semver::Version;
 use syn::{DeriveInput, Ident, Path};
+
+use super::CratePath;
 
 fn is_allowed_latin1_char(c: u8) -> bool {
     match c {
@@ -43,28 +44,18 @@ fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(exonum), forward_attrs(allow, doc, cfg))]
-#[darling(default)]
 struct ServiceFactory {
     ident: Ident,
-    #[darling(rename = "crate")]
-    cr: Path,
+    #[darling(rename = "crate", default)]
+    cr: CratePath,
+    #[darling(default)]
     artifact_name: Option<String>,
+    #[darling(default)]
     artifact_version: Option<String>,
+    #[darling(default)]
     proto_sources: Option<Path>,
+    #[darling(default)]
     with_constructor: Option<Path>,
-}
-
-impl Default for ServiceFactory {
-    fn default() -> Self {
-        Self {
-            ident: Ident::new("unreachable", Span::call_site()),
-            cr: syn::parse_str("exonum").unwrap(),
-            artifact_name: None,
-            artifact_version: None,
-            proto_sources: None,
-            with_constructor: None,
-        }
-    }
 }
 
 impl ServiceFactory {

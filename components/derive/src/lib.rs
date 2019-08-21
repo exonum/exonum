@@ -25,7 +25,9 @@ mod exonum_service;
 mod pb_convert;
 mod service_factory;
 
+use darling::FromMeta;
 use proc_macro::TokenStream;
+use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
 /// Derives `ProtobufConvert` trait.
@@ -183,4 +185,20 @@ pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
         .filter_map(|a| a.parse_meta().ok())
         .find(|m| m.path().is_ident("exonum"))
         .map(NestedMeta::from)
+}
+
+#[derive(Debug, FromMeta, PartialEq, Eq)]
+#[darling(default)]
+struct CratePath(syn::Path);
+
+impl Default for CratePath {
+    fn default() -> Self {
+        Self(syn::parse_str("exonum").unwrap())
+    }
+}
+
+impl ToTokens for CratePath {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.0.to_tokens(tokens)
+    }
 }
