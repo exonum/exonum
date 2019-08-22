@@ -228,7 +228,6 @@ pub trait Runtime: Send + Debug + 'static {
     /// Do not process. Panic will be processed by the method caller.
     fn execute(
         &self,
-        dispatcher: &dispatcher::Dispatcher,
         context: &mut ExecutionContext,
         call_info: CallInfo,
         arguments: &[u8],
@@ -365,19 +364,30 @@ impl Caller {
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a Fork,
+    pub fork: &'a mut Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
     actions: Vec<dispatcher::Action>,
+    dispatcher: &'a Dispatcher,
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub(crate) fn new(fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,
             actions: Vec::new(),
+            dispatcher,
         }
+    }
+
+    pub(crate) fn call(
+        &mut self,
+        call_info: CallInfo,
+        arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        // TODO Modify caller from Transaction.
+        self.dispatcher.call(self, call_info, arguments)
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {

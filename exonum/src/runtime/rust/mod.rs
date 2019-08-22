@@ -288,7 +288,6 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        dispatcher: &super::dispatcher::Dispatcher,
         runtime_context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
@@ -305,7 +304,6 @@ impl Runtime for RustRuntime {
                 TransactionContext {
                     instance_descriptor: instance.descriptor(),
                     runtime_context,
-                    dispatcher,
                 },
                 payload,
             )
@@ -327,8 +325,11 @@ impl Runtime for RustRuntime {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
                 instance.as_ref().before_commit(TransactionContext {
-                    dispatcher,
-                    runtime_context: &mut ExecutionContext::new(fork, Caller::Blockchain),
+                    runtime_context: &mut ExecutionContext::new(
+                        dispatcher,
+                        fork,
+                        Caller::Blockchain,
+                    ),
                     instance_descriptor: instance.descriptor(),
                 });
                 Ok(())

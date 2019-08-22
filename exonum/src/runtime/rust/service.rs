@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Fork, IndexAccess, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use failure::Error;
 
 use std::fmt::{self, Debug};
@@ -26,7 +26,7 @@ use crate::{
     proto::Any,
     runtime::{
         api::ServiceApiBuilder,
-        dispatcher::{self, Dispatcher, DispatcherSender},
+        dispatcher::{self, DispatcherSender},
         error::ExecutionError,
         AnyTx, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         MethodId,
@@ -87,7 +87,6 @@ where
 pub struct TransactionContext<'a, 'b> {
     pub(super) instance_descriptor: InstanceDescriptor<'a>,
     pub(super) runtime_context: &'a mut ExecutionContext<'b>,
-    pub(super) dispatcher: &'a Dispatcher,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
@@ -104,7 +103,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     /// If the current node is a validator, return its identifier, for other nodes return `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
-        CoreSchema::new(self.runtime_context.fork)
+        CoreSchema::new(self.fork())
             .actual_configuration()
             .validator_keys
             .iter()
@@ -112,7 +111,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
             .map(|id| ValidatorId(id as u16))
     }
 
-    pub fn fork(&self) -> impl IndexAccess + 'b {
+    pub fn fork(&self) -> &Fork {
         self.runtime_context.fork
     }
 
@@ -127,8 +126,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     pub fn call(&mut self, call_info: CallInfo, payload: &[u8]) -> Result<(), ExecutionError> {
-        self.dispatcher
-            .call(self.runtime_context, call_info, payload)
+        self.runtime_context.call(call_info, payload)
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {

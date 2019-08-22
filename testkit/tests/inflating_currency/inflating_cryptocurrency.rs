@@ -149,7 +149,7 @@ impl CurrencyInterface for CurrencyService {
             Err(Error::Foo)?;
         }
         let view = context.fork();
-        let height = CoreSchema::new(view.clone()).height();
+        let height = CoreSchema::new(view).height();
         let schema = CurrencySchema { view };
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&arg.to);

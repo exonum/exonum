@@ -147,7 +147,6 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _dispatcher: &Dispatcher,
         _context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
