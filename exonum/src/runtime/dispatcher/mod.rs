@@ -321,8 +321,9 @@ impl Dispatcher {
     }
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
+        let mut context = ExecutionContext::new(self, fork, Caller::Blockchain);
         for runtime in self.runtimes.values() {
-            runtime.before_commit(self, fork);
+            runtime.before_commit(&mut context);
         }
     }
 
@@ -659,7 +660,7 @@ mod tests {
             StateHashAggregator::default()
         }
 
-        fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
+        fn before_commit(&self, _context: &mut ExecutionContext) {}
 
         fn after_commit(
             &self,

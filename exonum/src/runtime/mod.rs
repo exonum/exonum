@@ -248,7 +248,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
+    fn before_commit(&self, context: &mut ExecutionContext);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///

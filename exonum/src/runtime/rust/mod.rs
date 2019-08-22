@@ -43,8 +43,8 @@ use super::{
     api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, DispatcherSender},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
-    InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 #[derive(Debug, Default)]
@@ -321,24 +321,20 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {
+    fn before_commit(&self, context: &mut ExecutionContext) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
                 instance.as_ref().before_commit(TransactionContext {
-                    runtime_context: &mut ExecutionContext::new(
-                        dispatcher,
-                        fork,
-                        Caller::Blockchain,
-                    ),
+                    runtime_context: context,
                     instance_descriptor: instance.descriptor(),
                 });
                 Ok(())
             });
 
             match result {
-                Ok(..) => fork.flush(),
+                Ok(..) => context.fork.flush(),
                 Err(e) => {
-                    fork.rollback();
+                    context.fork.rollback();
                     error!(
                         "Service \"{}\" `before_commit` failed with error: {:?}",
                         instance.name, e
