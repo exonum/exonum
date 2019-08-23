@@ -88,7 +88,7 @@ pub struct IncService;
 
 impl IncInterface for IncService {
     fn inc(&self, context: TransactionContext, _arg: TxInc) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_name(), context.fork());
+        let mut schema = Schema::new(context.instance.name, context.fork());
         schema.inc();
         Ok(())
     }

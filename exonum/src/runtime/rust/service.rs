@@ -86,7 +86,7 @@ where
 /// Provide context for the currently executing transaction.
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    /// Service instance descriptor of the current transaction context.
+    /// Service instance that associated with the current context.
     pub instance: InstanceDescriptor<'a>,
     /// Underlying execution context.
     inner: &'a mut ExecutionContext<'b>,
@@ -104,7 +104,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         }
     }
 
-    /// Return a writable snapshot of the current blockchain state.
+    /// Return the writable snapshot of the current blockchain state.
     pub fn fork(&self) -> &Fork {
         self.inner.fork
     }
@@ -138,49 +138,39 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 }
 
+/// Provide context for the `after_commit` handler.
 pub struct AfterCommitContext<'a> {
+    /// Read-only snapshot of the current blockchain state.
+    pub snapshot: &'a dyn Snapshot,
+    /// Service instance that associated with the current context.
+    pub instance: InstanceDescriptor<'a>,
+    /// Service key pair of the current node.
+    pub service_keypair: &'a (PublicKey, SecretKey),
+    /// Channel to communicate with the dispatcher.
     dispatcher: &'a DispatcherSender,
-    instance_descriptor: InstanceDescriptor<'a>,
-    snapshot: &'a dyn Snapshot,
-    service_keypair: &'a (PublicKey, SecretKey),
+    /// Channel to send signed transactions to the transactions pool.
     tx_sender: &'a ApiSender,
 }
 
 impl<'a> AfterCommitContext<'a> {
-    /// Create context for the `after_commit` method.
+    /// Create a context for the `after_commit` method.
     pub(crate) fn new(
         dispatcher: &'a DispatcherSender,
-        instance_descriptor: InstanceDescriptor<'a>,
+        instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
             dispatcher,
-            instance_descriptor,
+            instance,
             snapshot,
             service_keypair,
             tx_sender,
         }
     }
 
-    /// Returns the current database snapshot. This snapshot is used to
-    /// retrieve schema information from the database.
-    pub fn snapshot(&self) -> &dyn Snapshot {
-        self.snapshot
-    }
-
-    /// Return the current service instance identifier.
-    pub fn service_id(&self) -> InstanceId {
-        self.instance_descriptor.id
-    }
-
-    /// Return the current service instance name.
-    pub fn service_name(&self) -> &str {
-        self.instance_descriptor.name
-    }
-
-    /// If the current node is a validator, return its identifier, for other nodes return `None`.
+    /// Return a validator ID if the current node is validator.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot)
@@ -191,17 +181,7 @@ impl<'a> AfterCommitContext<'a> {
             .map(|id| ValidatorId(id as u16))
     }
 
-    /// Returns the public key of the current node.
-    pub fn public_key(&self) -> &PublicKey {
-        &self.service_keypair.0
-    }
-
-    /// Returns the secret key of the current node.
-    pub fn secret_key(&self) -> &SecretKey {
-        &self.service_keypair.1
-    }
-
-    /// Returns the current blockchain height. This height is "height of the last committed block".
+    /// Return a current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot).height()
@@ -210,7 +190,7 @@ impl<'a> AfterCommitContext<'a> {
     /// Sign and broadcast transaction to other nodes in the network.
     pub fn broadcast_transaction(&self, tx: impl Transaction) {
         let msg = tx.sign(
-            self.service_id(),
+            self.instance.id,
             self.service_keypair.0,
             &self.service_keypair.1,
         );
@@ -219,7 +199,7 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Broadcast transaction to other nodes in the network.
+    /// Broadcast transaction to the other nodes in the network.
     /// This transaction should be signed externally.
     pub fn broadcast_signed_transaction(&self, msg: Verified<AnyTx>) {
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
@@ -227,7 +207,7 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Return a communication channel with dispatcher.
+    /// Return a communication channel with the dispatcher.
     pub(crate) fn dispatcher_channel(&self) -> &DispatcherSender {
         self.dispatcher
     }
@@ -241,7 +221,7 @@ impl<'a> AfterCommitContext<'a> {
 impl<'a> Debug for AfterCommitContext<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
-            .field("instance_descriptor", &self.instance_descriptor)
+            .field("instance", &self.instance)
             .finish()
     }
 }
