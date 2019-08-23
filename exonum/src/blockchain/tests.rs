@@ -110,7 +110,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         mut context: TransactionContext,
         arg: TestDeploy,
     ) -> Result<(), ExecutionError> {
-        let mut index = Entry::new(context.service_name(), context.fork());
+        let mut index = Entry::new(context.instance.name, context.fork());
         index.set(arg.value);
         drop(index);
 
@@ -137,7 +137,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         mut context: TransactionContext,
         arg: TestStart,
     ) -> Result<(), ExecutionError> {
-        let mut index = Entry::new(context.service_name(), context.fork());
+        let mut index = Entry::new(context.instance.name, context.fork());
         index.set(arg.value);
         drop(index);
 
@@ -170,7 +170,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         if arg.value == 42 {
             panic!(StorageError::new("42"))
         }
-        let mut index = ListIndex::new(context.service_name(), context.fork());
+        let mut index = ListIndex::new(context.instance.name, context.fork());
         index.push(arg.value);
         index.push(42 / arg.value);
         Ok(())

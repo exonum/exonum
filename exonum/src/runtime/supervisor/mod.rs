@@ -56,7 +56,7 @@ impl Service for Supervisor {
     }
 
     fn before_commit(&self, context: TransactionContext) {
-        let schema = Schema::new(context.service_name(), context.fork());
+        let schema = Schema::new(context.instance.name, context.fork());
         let height = blockchain::Schema::new(context.fork()).height();
 
         // Removes pending deploy requests for which deadline was exceeded.

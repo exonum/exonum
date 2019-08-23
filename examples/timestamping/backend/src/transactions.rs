@@ -57,9 +57,13 @@ pub trait TimestampingInterface {
 
 impl TimestampingInterface for TimestampingService {
     fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> Result<(), Error> {
-        let tx_hash = context.tx_hash();
+        let tx_hash = context
+            .caller()
+            .as_transaction()
+            .expect("Wrong `TxTimestamp` initiator")
+            .0;
 
-        let schema = Schema::new(context.service_name(), context.fork());
+        let schema = Schema::new(context.instance.name, context.fork());
 
         let config = schema.config().get().expect("Can't read service config");
 
@@ -75,7 +79,7 @@ impl TimestampingInterface for TimestampingService {
         }
 
         trace!("Timestamp added: {:?}", arg);
-        let entry = TimestampEntry::new(arg.content.clone(), &tx_hash, time);
+        let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);
         schema.add_timestamp(entry);
 
         Ok(())

@@ -28,8 +28,8 @@ use crate::{
         api::ServiceApiBuilder,
         dispatcher::{self, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-        MethodId,
+        AnyTx, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+        InstanceId, MethodId,
     },
 };
 
@@ -83,54 +83,58 @@ where
     }
 }
 
+/// Provide context for the currently executing transaction.
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    pub(super) instance_descriptor: InstanceDescriptor<'a>,
-    pub(super) runtime_context: &'a mut ExecutionContext<'b>,
+    /// Service instance descriptor of the current transaction context.
+    pub instance: InstanceDescriptor<'a>,
+    /// Underlying execution context.
+    inner: &'a mut ExecutionContext<'b>,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    // TODO replace this methods by the `instance_descriptor` [ECR-3222]
-
-    pub fn service_id(&self) -> InstanceId {
-        self.instance_descriptor.id
+    /// Create a new transaction context for the specified execution context and the instance descriptor.
+    pub(crate) fn new(
+        context: &'a mut ExecutionContext<'b>,
+        instance: InstanceDescriptor<'a>,
+    ) -> Self {
+        Self {
+            inner: context,
+            instance,
+        }
     }
 
-    pub fn service_name(&self) -> &str {
-        self.instance_descriptor.name
+    /// Return a writable snapshot of the current blockchain state.
+    pub fn fork(&self) -> &Fork {
+        self.inner.fork
     }
 
-    /// If the current node is a validator, return its identifier, for other nodes return `None`.
+    /// Return the initiator of the actual transaction execution.
+    pub fn caller(&self) -> &Caller {
+        &self.inner.caller
+    }
+
+    /// Return validator ID if the transaction author is validator.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
-        CoreSchema::new(self.fork())
-            .actual_configuration()
-            .validator_keys
-            .iter()
-            .position(|validator| self.author() == validator.service_key)
-            .map(|id| ValidatorId(id as u16))
+        self.caller().author().and_then(|author| {
+            CoreSchema::new(self.fork())
+                .actual_configuration()
+                .validator_keys
+                .iter()
+                .position(|validator| author == validator.service_key)
+                .map(|id| ValidatorId(id as u16))
+        })
     }
 
-    pub fn fork(&self) -> &Fork {
-        self.runtime_context.fork
-    }
-
-    // Method for backward compatibility with the existing code.
-    pub fn tx_hash(&self) -> Hash {
-        self.runtime_context.caller.transaction_hash().unwrap()
-    }
-
-    // Method for backward compatibility with the existing code.
-    pub fn author(&self) -> PublicKey {
-        self.runtime_context.caller.author().unwrap()
-    }
-
-    pub fn call(&mut self, call_info: CallInfo, payload: &[u8]) -> Result<(), ExecutionError> {
-        self.runtime_context.call(call_info, payload)
-    }
-
+    /// Enqueue dispatcher action.
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.runtime_context.dispatch_action(action)
+        self.inner.dispatch_action(action)
+    }
+
+    /// Temporary method to test interservice communications.
+    pub fn call(&mut self, call_info: CallInfo, arguments: &[u8]) -> Result<(), ExecutionError> {
+        self.inner.call(call_info, arguments)
     }
 }
 
@@ -203,7 +207,7 @@ impl<'a> AfterCommitContext<'a> {
         CoreSchema::new(self.snapshot).height()
     }
 
-    /// Signs and broadcasts transaction to other nodes in the network.
+    /// Sign and broadcast transaction to other nodes in the network.
     pub fn broadcast_transaction(&self, tx: impl Transaction) {
         let msg = tx.sign(
             self.service_id(),
@@ -223,12 +227,12 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Returns reference to communication channel with dispatcher.
+    /// Return a communication channel with dispatcher.
     pub(crate) fn dispatcher_channel(&self) -> &DispatcherSender {
         self.dispatcher
     }
 
-    /// Returns a transaction broadcaster.
+    /// Return a transaction broadcaster.
     pub fn transaction_broadcaster(&self) -> ApiSender {
         self.tx_sender.clone()
     }

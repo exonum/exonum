@@ -133,7 +133,8 @@ pub trait CurrencyInterface {
 
 impl CurrencyInterface for CurrencyService {
     fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> Result<(), Error> {
-        let author = context.author();
+        let author = context.caller().author().unwrap();
+
         let height = CoreSchema::new(context.fork()).height();
         let schema = CurrencySchema::new(context.fork());
         if schema.wallet(&author).is_none() {
@@ -144,7 +145,8 @@ impl CurrencyInterface for CurrencyService {
     }
 
     fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error> {
-        let author = context.author();
+        let author = context.caller().author().unwrap();
+
         if author == arg.to {
             Err(Error::Foo)?;
         }

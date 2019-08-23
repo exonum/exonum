@@ -349,9 +349,19 @@ impl Caller {
         self.as_transaction().map(|(hash, _)| *hash)
     }
 
-    fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
+    /// Try to reinterpret caller as an authorized transaction.
+    pub fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
         if let Caller::Transaction { hash, author } = self {
             Some((hash, author))
+        } else {
+            None
+        }
+    }
+
+    /// Try to reinterpret caller as blockchain.
+    pub fn as_blockchain(&self) -> Option<()> {
+        if let Caller::Blockchain = self {
+            Some(())
         } else {
             None
         }
@@ -367,7 +377,9 @@ pub struct ExecutionContext<'a> {
     pub fork: &'a mut Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
+    /// List of dispatcher actions that will be performed after the finish of execution.
     actions: Vec<dispatcher::Action>,
+    /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a Dispatcher,
 }
 

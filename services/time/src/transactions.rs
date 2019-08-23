@@ -125,12 +125,15 @@ pub trait TimeOracleInterface {
 
 impl TimeOracleInterface for TimeService {
     fn time(&self, context: TransactionContext, arg: TxTime) -> Result<(), Error> {
-        let author = context.author();
-        let service_name = context.service_name();
+        let author = context
+            .caller()
+            .as_transaction()
+            .expect("Wrong `TxTime` initiator")
+            .1;
 
         arg.check_signed_by_validator(context.fork(), &author)?;
-        arg.update_validator_time(service_name, context.fork(), &author)?;
-        TxTime::update_consolidated_time(service_name, context.fork());
+        arg.update_validator_time(context.instance.name, context.fork(), &author)?;
+        TxTime::update_consolidated_time(context.instance.name, context.fork());
         Ok(())
     }
 }

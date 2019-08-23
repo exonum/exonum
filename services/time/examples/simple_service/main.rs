@@ -112,7 +112,12 @@ struct MarkerService;
 
 impl MarkerInterface for MarkerService {
     fn mark(&self, context: TransactionContext, arg: TxMarker) -> Result<(), ExecutionError> {
-        let author = context.author();
+        let author = context
+            .caller()
+            .as_transaction()
+            .expect("Wrong `TxMarker` initiator")
+            .1;
+
         let time = TimeSchema::new(TIME_SERVICE_NAME, context.fork())
             .time()
             .get();

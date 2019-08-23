@@ -223,9 +223,13 @@ pub mod contracts {
             context: TransactionContext,
             arg: TxCreateWallet,
         ) -> Result<(), Error> {
-            let author = context.author();
+            let author = context
+                .caller()
+                .author()
+                .expect("Wrong 'TxCreateWallet' initiator");
+
             let view = context.fork();
-            let schema = CurrencySchema::new(context.service_name(), view);
+            let schema = CurrencySchema::new(context.instance.name, view);
             if schema.wallet(&author).is_none() {
                 let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
@@ -237,14 +241,18 @@ pub mod contracts {
         }
 
         fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error> {
-            let author = context.author();
+            let author = context
+                .caller()
+                .author()
+                .expect("Wrong 'TxTransfer' initiator");
+
             let view = context.fork();
 
             if author == arg.to {
                 Err(Error::SenderSameAsReceiver)?
             }
 
-            let schema = CurrencySchema::new(context.service_name(), view);
+            let schema = CurrencySchema::new(context.instance.name, view);
 
             let sender = match schema.wallet(&author) {
                 Some(val) => val,

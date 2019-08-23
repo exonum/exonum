@@ -288,7 +288,7 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        runtime_context: &mut ExecutionContext,
+        context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -301,10 +301,7 @@ impl Runtime for RustRuntime {
             .as_ref()
             .call(
                 call_info.method_id,
-                TransactionContext {
-                    instance_descriptor: instance.descriptor(),
-                    runtime_context,
-                },
+                TransactionContext::new(context, instance.descriptor()),
                 payload,
             )
             .map_err(|e| (Error::UnspecifiedError, e))?
@@ -324,10 +321,9 @@ impl Runtime for RustRuntime {
     fn before_commit(&self, context: &mut ExecutionContext) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
-                instance.as_ref().before_commit(TransactionContext {
-                    runtime_context: context,
-                    instance_descriptor: instance.descriptor(),
-                });
+                instance
+                    .as_ref()
+                    .before_commit(TransactionContext::new(context, instance.descriptor()));
                 Ok(())
             });
 
