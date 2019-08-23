@@ -20,20 +20,20 @@ use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Path, Va
 
 use std::convert::TryFrom;
 
-use super::find_exonum_meta;
+use super::{find_exonum_meta, CratePath};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ExecutionErrorAttrs {
     #[darling(rename = "crate")]
-    cr: Path,
+    cr: CratePath,
     kind: Path,
 }
 
 impl Default for ExecutionErrorAttrs {
     fn default() -> Self {
         Self {
-            cr: syn::parse_str("exonum").unwrap(),
+            cr: CratePath::default(),
             kind: syn::parse_str("service").unwrap(),
         }
     }

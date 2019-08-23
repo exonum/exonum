@@ -28,7 +28,7 @@ use crate::{
     },
 };
 
-#[exonum_service(crate = "crate", dispatcher = "ConfigUpdaterService")]
+#[exonum_service(crate = "crate")]
 pub trait ConfigUpdaterInterface {
     fn update_config(
         &self,
@@ -42,7 +42,8 @@ pub trait ConfigUpdaterInterface {
     crate = "crate",
     artifact_name = "config_updater",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema"
+    proto_sources = "crate::proto::schema",
+    service_interface = "ConfigUpdaterInterface"
 )]
 pub struct ConfigUpdaterService;
 

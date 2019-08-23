@@ -96,7 +96,7 @@ impl TxMarker {
     }
 }
 
-#[exonum_service(dispatcher = "MarkerService")]
+#[exonum_service]
 pub trait MarkerInterface {
     fn mark(&self, context: TransactionContext, arg: TxMarker) -> Result<(), ExecutionError>;
 }
@@ -105,7 +105,8 @@ pub trait MarkerInterface {
 #[exonum(
     artifact_name = "marker",
     artifact_version = "0.1.0",
-    proto_sources = "proto"
+    proto_sources = "proto",
+    service_interface = "MarkerInterface"
 )]
 struct MarkerService;
 

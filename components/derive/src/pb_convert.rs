@@ -21,13 +21,13 @@ use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Path};
 
 use std::convert::TryFrom;
 
-use super::find_exonum_meta;
+use super::{find_exonum_meta, CratePath};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ProtobufConvertStructAttrs {
     #[darling(rename = "crate")]
-    cr: Path,
+    cr: CratePath,
     pb: Option<Path>,
     serde_pb_convert: bool,
 }
@@ -35,7 +35,7 @@ struct ProtobufConvertStructAttrs {
 impl Default for ProtobufConvertStructAttrs {
     fn default() -> Self {
         Self {
-            cr: syn::parse_str("exonum").unwrap(),
+            cr: CratePath::default(),
             pb: None,
             serde_pb_convert: false,
         }
@@ -56,7 +56,7 @@ impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
 #[darling(default)]
 struct ProtobufConvertEnumAttrs {
     #[darling(rename = "crate")]
-    cr: Path,
+    cr: CratePath,
     pb: Option<Path>,
     serde_pb_convert: bool,
     oneof_field: Ident,
@@ -65,7 +65,7 @@ struct ProtobufConvertEnumAttrs {
 impl Default for ProtobufConvertEnumAttrs {
     fn default() -> Self {
         Self {
-            cr: syn::parse_str("exonum").unwrap(),
+            cr: CratePath::default(),
             pb: None,
             oneof_field: syn::parse_str("message").unwrap(),
             serde_pb_convert: false,
@@ -334,7 +334,7 @@ impl ProtobufConvert {
         }
     }
 
-    fn cr(&self) -> &Path {
+    fn cr(&self) -> &CratePath {
         match self {
             ProtobufConvert::Enum(inner) => &inner.attrs.cr,
             ProtobufConvert::Struct(inner) => &inner.attrs.cr,

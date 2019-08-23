@@ -16,21 +16,20 @@ pub use crate::proto::schema::tests::TimestampTx;
 
 use exonum_merkledb::{BinaryValue, Snapshot};
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
-use semver::Version;
 
 use crate::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
     runtime::{
-        rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-        AnyTx, ArtifactProtobufSpec, InstanceDescriptor, InstanceId,
+        rust::{Service, Transaction, TransactionContext},
+        AnyTx, InstanceDescriptor, InstanceId,
     },
 };
 
 pub const DATA_SIZE: usize = 64;
 
-#[exonum_service(crate = "crate", dispatcher = "TimestampingService")]
+#[exonum_service(crate = "crate")]
 pub trait TimestampingInterface {
     fn timestamp(
         &self,
@@ -39,7 +38,14 @@ pub trait TimestampingInterface {
     ) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "timestamping",
+    artifact_version = "0.1.0",
+    proto_sources = "crate::proto::schema",
+    service_interface = "TimestampingInterface"
+)]
 pub struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
@@ -55,23 +61,6 @@ impl TimestampingInterface for TimestampingService {
 impl Service for TimestampingService {
     fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
-    }
-}
-
-impl ServiceFactory for TimestampingService {
-    fn artifact_id(&self) -> RustArtifactId {
-        RustArtifactId {
-            name: "timestamping".into(),
-            version: Version::new(0, 1, 0),
-        }
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        ArtifactProtobufSpec::default()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        Box::new(Self)
     }
 }
 

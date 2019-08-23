@@ -122,7 +122,7 @@ pub enum Error {
     Foo = 0,
 }
 
-#[exonum_service(dispatcher = "CurrencyService")]
+#[exonum_service]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
     fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> Result<(), Error>;
@@ -203,7 +203,8 @@ impl CryptocurrencyApi {
 #[exonum(
     artifact_name = "cryptocurrency",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto"
+    proto_sources = "crate::proto",
+    service_interface = "CurrencyInterface"
 )]
 pub struct CurrencyService;
 

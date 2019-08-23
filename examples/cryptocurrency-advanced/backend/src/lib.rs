@@ -32,14 +32,14 @@ pub mod wallet;
 
 use exonum::runtime::{api::ServiceApiBuilder, rust::Service};
 
-use crate::api::PublicApi as CryptocurrencyApi;
+use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
 
 /// Initial balance of the wallet.
 pub const INITIAL_BALANCE: u64 = 100;
 
 /// Cryptocurrency service implementation.
 #[derive(Debug, ServiceFactory)]
-#[exonum(proto_sources = "proto")]
+#[exonum(proto_sources = "proto", service_interface = "CryptocurrencyInterface")]
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {

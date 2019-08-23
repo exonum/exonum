@@ -70,7 +70,7 @@ pub struct TxInc {
     pub seed: u64,
 }
 
-#[exonum_service(dispatcher = "IncService")]
+#[exonum_service]
 pub trait IncInterface {
     fn inc(&self, context: TransactionContext, arg: TxInc) -> Result<(), ExecutionError>;
 }
@@ -81,7 +81,8 @@ pub trait IncInterface {
 #[exonum(
     artifact_name = "inc",
     artifact_version = "1.0.0",
-    proto_sources = "proto"
+    proto_sources = "proto",
+    service_interface = "IncInterface"
 )]
 pub struct IncService;
 

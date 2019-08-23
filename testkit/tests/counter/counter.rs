@@ -102,7 +102,7 @@ pub enum Error {
     AddingZero = 0,
 }
 
-#[exonum_service(dispatcher = "CounterService")]
+#[exonum_service]
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
@@ -221,7 +221,8 @@ impl CounterApi {
 #[exonum(
     artifact_name = "counter-service",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto"
+    proto_sources = "crate::proto",
+    service_interface = "CounterServiceInterface"
 )]
 pub struct CounterService;
 

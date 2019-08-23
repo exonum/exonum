@@ -156,10 +156,7 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::{
-            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ArtifactProtobufSpec,
-        },
+        runtime::rust::{Service, Transaction, TransactionContext},
     };
     use exonum_merkledb::ObjectHash;
 
@@ -188,10 +185,15 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(
+        artifact_name = "sample-service",
+        proto_sources = "crate::proto",
+        service_interface = "SampleServiceInterface"
+    )]
     struct SampleService;
 
-    #[exonum_service(dispatcher = "SampleService")]
+    #[exonum_service]
     trait SampleServiceInterface {
         fn timestamp(
             &self,
@@ -211,20 +213,6 @@ mod tests {
     }
 
     impl Service for SampleService {}
-
-    impl ServiceFactory for SampleService {
-        fn artifact_id(&self) -> RustArtifactId {
-            "sample-service:1.0.0".parse().unwrap()
-        }
-
-        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-            ArtifactProtobufSpec::default()
-        }
-
-        fn create_instance(&self) -> Box<dyn Service> {
-            Box::new(Self)
-        }
-    }
 
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.

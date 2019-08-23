@@ -1196,8 +1196,8 @@ mod tests {
         messages::AnyTx,
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
-            rust::{RustArtifactId, Service, ServiceFactory, Transaction, TransactionContext},
-            ArtifactProtobufSpec, ExecutionError, InstanceId,
+            rust::{Service, Transaction, TransactionContext},
+            ExecutionError, InstanceId,
         },
     };
 
@@ -1207,12 +1207,19 @@ mod tests {
 
     impl_binary_value_for_pb_message! { TxSimple }
 
-    #[exonum_service(crate = "crate", dispatcher = "TestService")]
+    #[exonum_service(crate = "crate")]
     pub trait TestInterface {
         fn simple(&self, context: TransactionContext, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(
+        crate = "crate",
+        artifact_name = "test-service",
+        artifact_version = "0.1.0",
+        proto_sources = "crate::proto::schema",
+        service_interface = "TestInterface"
+    )]
     struct TestService;
 
     impl TestInterface for TestService {
@@ -1226,20 +1233,6 @@ mod tests {
     }
 
     impl Service for TestService {}
-
-    impl ServiceFactory for TestService {
-        fn artifact_id(&self) -> RustArtifactId {
-            "test-service:0.1.0".parse().unwrap()
-        }
-
-        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-            ArtifactProtobufSpec::default()
-        }
-
-        fn create_instance(&self) -> Box<dyn Service> {
-            Box::new(Self)
-        }
-    }
 
     fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
         let mut msg = TxSimple::new();

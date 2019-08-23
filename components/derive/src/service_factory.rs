@@ -14,10 +14,11 @@
 
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use semver::Version;
 use syn::{DeriveInput, Ident, Path};
+
+use super::CratePath;
 
 fn is_allowed_latin1_char(c: u8) -> bool {
     match c {
@@ -43,28 +44,21 @@ fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(exonum), forward_attrs(allow, doc, cfg))]
-#[darling(default)]
 struct ServiceFactory {
     ident: Ident,
-    #[darling(rename = "crate")]
-    cr: Path,
+    #[darling(rename = "crate", default)]
+    cr: CratePath,
+    #[darling(default)]
     artifact_name: Option<String>,
+    #[darling(default)]
     artifact_version: Option<String>,
+    #[darling(default)]
     proto_sources: Option<Path>,
-    with_constructor: Option<Path>,
-}
-
-impl Default for ServiceFactory {
-    fn default() -> Self {
-        Self {
-            ident: Ident::new("unreachable", Span::call_site()),
-            cr: syn::parse_str("exonum").unwrap(),
-            artifact_name: None,
-            artifact_version: None,
-            proto_sources: None,
-            with_constructor: None,
-        }
-    }
+    #[darling(default)]
+    service_constructor: Option<Path>,
+    service_interface: Path,
+    #[darling(default)]
+    service_name: Option<Ident>,
 }
 
 impl ServiceFactory {
@@ -99,11 +93,17 @@ impl ServiceFactory {
     }
 
     fn service_constructor(&self) -> impl ToTokens {
-        if let Some(ref path) = self.with_constructor {
+        if let Some(ref path) = self.service_constructor {
             quote! { #path(self) }
         } else {
             quote! { Box::new(Self) }
         }
+    }
+
+    fn service_name(&self) -> impl ToTokens {
+        self.service_name
+            .clone()
+            .unwrap_or_else(|| self.ident.clone())
     }
 
     fn artifact_protobuf_spec(&self) -> impl ToTokens {
@@ -119,6 +119,25 @@ impl ServiceFactory {
             }
         }
     }
+
+    fn impl_service_dispatcher(&self) -> impl ToTokens {
+        let trait_name = &self.service_interface;
+        let cr = &self.cr;
+        let dispatcher = self.service_name();
+
+        quote! {
+            impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
+                fn call(
+                    &self,
+                    method: #cr::runtime::MethodId,
+                    ctx: #cr::runtime::rust::service::TransactionContext,
+                    payload: &[u8],
+                ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+                    <#dispatcher as #trait_name>::_dispatch(self, ctx, method, payload)
+                }
+            }
+        }
+    }
 }
 
 impl ToTokens for ServiceFactory {
@@ -128,6 +147,7 @@ impl ToTokens for ServiceFactory {
         let artifact_id = self.artifact_id();
         let artifact_protobuf_spec = self.artifact_protobuf_spec();
         let service_constructor = self.service_constructor();
+        let service_dispatcher = self.impl_service_dispatcher();
 
         let expanded = quote! {
             impl #cr::runtime::rust::ServiceFactory for #name {
@@ -143,6 +163,8 @@ impl ToTokens for ServiceFactory {
                     #service_constructor
                 }
             }
+
+            #service_dispatcher
         };
         tokens.extend(expanded)
     }

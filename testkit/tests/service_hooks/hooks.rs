@@ -38,7 +38,7 @@ pub struct TxAfterCommit {
     pub height: Height,
 }
 
-#[exonum_service(dispatcher = "AfterCommitService")]
+#[exonum_service]
 pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,
@@ -58,7 +58,8 @@ impl TxAfterCommit {
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto",
-    with_constructor = "Self::new_instance"
+    service_constructor = "Self::new_instance",
+    service_interface = "AfterCommitInterface"
 )]
 pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,

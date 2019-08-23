@@ -16,13 +16,13 @@ use darling::FromMeta;
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, Path,
-    TraitItem, TraitItemMethod, Type,
+    parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, TraitItem,
+    TraitItemMethod, Type,
 };
 
 use std::convert::TryFrom;
 
-use super::find_exonum_meta;
+use super::{find_exonum_meta, CratePath};
 
 #[derive(Debug)]
 struct ServiceMethodDescriptor {
@@ -81,15 +81,13 @@ impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
 #[darling(default)]
 struct ExonumServiceAttrs {
     #[darling(rename = "crate")]
-    cr: Path,
-    dispatcher: Option<Path>,
+    cr: CratePath,
 }
 
 impl Default for ExonumServiceAttrs {
     fn default() -> Self {
         Self {
-            cr: syn::parse_str("exonum").unwrap(),
-            dispatcher: None,
+            cr: CratePath::default(),
         }
     }
 }
@@ -101,14 +99,6 @@ impl TryFrom<&[Attribute]> for ExonumServiceAttrs {
         find_exonum_meta(args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
-    }
-}
-
-impl ExonumServiceAttrs {
-    fn dispatcher(&self) -> &Path {
-        self.dispatcher
-            .as_ref()
-            .expect("`dispatcher` attribute is not set properly")
     }
 }
 
@@ -195,25 +185,6 @@ impl ExonumService {
         }
     }
 
-    fn impl_service_dispatcher(&self) -> impl ToTokens {
-        let trait_name = &self.item_trait.ident;
-        let cr = &self.attrs.cr;
-        let dispatcher = self.attrs.dispatcher();
-
-        quote! {
-            impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
-                fn call(
-                    &self,
-                    method: #cr::runtime::MethodId,
-                    ctx: #cr::runtime::rust::service::TransactionContext,
-                    payload: &[u8],
-                ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
-                    <#dispatcher as #trait_name>::_dispatch(self, ctx, method, payload)
-                }
-            }
-        }
-    }
-
     fn item_trait(&self) -> impl ToTokens {
         let mut item_trait = self.item_trait.clone();
         let dispatch_method: TraitItemMethod = {
@@ -229,12 +200,10 @@ impl ToTokens for ExonumService {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let item_trait = self.item_trait();
         let impl_transactions = self.impl_transactions();
-        let impl_service_dispatcher = self.impl_service_dispatcher();
 
         let expanded = quote! {
             #item_trait
             #impl_transactions
-            #impl_service_dispatcher
         };
         tokens.extend(expanded);
     }

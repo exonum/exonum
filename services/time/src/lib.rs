@@ -57,7 +57,7 @@ use std::sync::Arc;
 use crate::{
     schema::TimeSchema,
     time_provider::{SystemTimeProvider, TimeProvider},
-    transactions::TxTime,
+    transactions::{TimeOracleInterface, TxTime},
 };
 
 // TODO there is no way to provide provider for now.
@@ -94,7 +94,9 @@ impl Service for TimeService {
 #[derive(Debug, ServiceFactory)]
 #[exonum(
     proto_sources = "proto",
-    with_constructor = "TimeServiceFactory::create_instance"
+    service_name = "TimeService",
+    service_constructor = "TimeServiceFactory::create_instance",
+    service_interface = "TimeOracleInterface"
 )]
 pub struct TimeServiceFactory {
     time_provider: Arc<dyn TimeProvider>,
