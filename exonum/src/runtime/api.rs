@@ -53,19 +53,9 @@ impl<'a> ServiceApiState<'a> {
         }
     }
 
-    /// Return a service instance descriptor of the current API handler.
-    pub fn instance(&self) -> InstanceDescriptor {
-        self.instance
-    }
-
     /// Return a read-only snapshot of the current blockchain state.
     pub fn snapshot(&'a self) -> &dyn Snapshot {
         self.snapshot.as_ref()
-    }
-
-    /// Return reference to the service key pair of the current node.
-    pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
-        self.service_keypair
     }
 
     /// Return a reference to the transactions sender.

@@ -39,7 +39,7 @@ impl PublicApi {
         state: &api::ServiceApiState,
         _query: (),
     ) -> api::Result<Option<DateTime<Utc>>> {
-        Ok(TimeSchema::new(state.instance().name, state.snapshot())
+        Ok(TimeSchema::new(state.instance.name, state.snapshot())
             .time()
             .get())
     }
@@ -60,7 +60,7 @@ impl PrivateApi {
     /// Endpoint for getting time values for all validators.
     pub fn all_validators_times(state: &api::ServiceApiState) -> api::Result<Vec<ValidatorTime>> {
         let view = state.snapshot();
-        let schema = TimeSchema::new(state.instance().name, view);
+        let schema = TimeSchema::new(state.instance.name, view);
         let idx = schema.validators_times();
 
         // All available times of the validators.
@@ -80,7 +80,7 @@ impl PrivateApi {
     ) -> api::Result<Vec<ValidatorTime>> {
         let view = state.snapshot();
         let validator_keys = Schema::new(view).actual_configuration().validator_keys;
-        let schema = TimeSchema::new(state.instance().name, view);
+        let schema = TimeSchema::new(state.instance.name, view);
         let idx = schema.validators_times();
 
         // Times of the current validators.

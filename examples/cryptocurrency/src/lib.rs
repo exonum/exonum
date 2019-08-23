@@ -314,7 +314,7 @@ pub mod api {
             pub_key: PublicKey,
         ) -> api::Result<Wallet> {
             let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(state.instance().name, snapshot);
+            let schema = CurrencySchema::new(state.instance.name, snapshot);
             schema
                 .wallet(&pub_key)
                 .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
@@ -323,7 +323,7 @@ pub mod api {
         /// Endpoint for dumping all wallets from the storage.
         pub fn get_wallets(self, state: &ServiceApiState) -> api::Result<Vec<Wallet>> {
             let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(state.instance().name, snapshot);
+            let schema = CurrencySchema::new(state.instance.name, snapshot);
             let idx = schema.wallets();
             let wallets = idx.values().collect();
             Ok(wallets)
