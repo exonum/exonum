@@ -290,7 +290,7 @@ pub fn bench_transactions(c: &mut Criterion) {
             },
             item_counts,
         )
-        .throughput(|&s| Throughput::Elements((s.txs_in_block * s.blocks) as u32))
+        .throughput(|&s| Throughput::Elements(s.txs_in_block * s.blocks))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
         .sample_size(SAMPLE_SIZE),
     );

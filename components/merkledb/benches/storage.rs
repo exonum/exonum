@@ -310,7 +310,7 @@ where
             move |b: &mut Bencher, &len: &usize| benchmark(b, len),
             item_counts,
         )
-        .throughput(|s| Throughput::Elements(*s as u32))
+        .throughput(|s| Throughput::Elements(*s))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
         .sample_size(SAMPLE_SIZE),
     );
