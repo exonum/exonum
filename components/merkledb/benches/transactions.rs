@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, collections::HashMap};
-
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
+use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
@@ -290,7 +289,7 @@ pub fn bench_transactions(c: &mut Criterion) {
             },
             item_counts,
         )
-        .throughput(|&s| Throughput::Elements(s.txs_in_block * s.blocks))
+        .throughput(|&s| Throughput::Elements((s.txs_in_block * s.blocks).try_into().unwrap()))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
         .sample_size(SAMPLE_SIZE),
     );
