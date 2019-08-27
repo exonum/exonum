@@ -64,7 +64,6 @@ use crate::{
     },
     helpers::{
         config::ConfigManager,
-        fabric::{NodePrivateConfig, NodePublicConfig},
         user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
@@ -437,20 +436,6 @@ pub struct ConnectListConfig {
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectListConfig` from validators public configs.
-    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
-        let peers = list
-            .iter()
-            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
-            .map(|config| ConnectInfo {
-                public_key: config.validator_keys.consensus_key,
-                address: config.address.clone(),
-            })
-            .collect();
-
-        ConnectListConfig { peers }
-    }
-
     /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
         let peers = peers
