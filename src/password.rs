@@ -159,8 +159,7 @@ fn prompt_passphrase(prompt: &str, node_run: bool) -> io::Result<ZeroizeOnDrop<S
 mod tests {
     use std::str::FromStr;
 
-    use super::PassInputMethod;
-    use crate::helpers::ZeroizeOnDrop;
+    use super::{PassInputMethod, ZeroizeOnDrop};
 
     #[test]
     fn test_pass_input_method_parse() {

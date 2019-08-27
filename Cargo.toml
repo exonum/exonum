@@ -13,5 +13,9 @@ zeroize = "0.9"
 rpassword = "4.0"
 toml = "0.5"
 
+[dev-dependencies]
+pretty_assertions = "0.6.1"
+tempfile = "3.1.0"
+
 [patch.crates-io]
 exonum = { git = "https://github.com/exonum/exonum", branch = "dynamic_services" }
