@@ -52,7 +52,7 @@ use futures::sync::mpsc;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempdir::TempDir;
 
-use std::{collections::BTreeMap, iter};
+use std::{collections::BTreeMap, convert::TryInto, iter};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -528,7 +528,7 @@ fn execute_block_rocksdb(
             TXS_IN_BLOCK,
         )
         .sample_size(50)
-        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
+        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block.try_into().unwrap())),
     );
 }
 
