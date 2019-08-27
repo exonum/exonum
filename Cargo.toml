@@ -12,3 +12,6 @@ failure = "0.1"
 zeroize = "0.9"
 rpassword = "4.0"
 toml = "0.5"
+
+[patch.crates-io]
+exonum = { git = "https://github.com/exonum/exonum", branch = "dynamic_services" }

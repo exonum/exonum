@@ -16,9 +16,10 @@
 
 //! Helper crate for secure and convenient configuration of the Exonum nodes.
 
-use exonum::blockchain::{GenesisConfig, ValidatorKeys};
+use exonum::blockchain::{GenesisConfig, InstanceCollection, ValidatorKeys};
 use exonum::crypto::generate_keys_file;
-use exonum::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
+use exonum::exonum_merkledb::RocksDB;
+use exonum::node::{ConnectInfo, ConnectListConfig, Node, NodeApiConfig, NodeConfig};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -27,6 +28,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::config::{load_config_file, save_config_file};
 use crate::fabric::{
@@ -42,6 +44,25 @@ const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
 const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
 const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
 const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
+
+/// Reads user input from the stdin and runs the node with a provided parameters.
+///
+/// Enables Rust runtime only.
+pub fn run_node(
+    services: impl IntoIterator<Item = InstanceCollection>,
+) -> Result<(), failure::Error> {
+    let command = Command::from_args();
+    if let StandardResult::Run(run_config) = command.execute()? {
+        let database = Arc::new(RocksDB::open(
+            run_config.db_path,
+            &run_config.node_config.database,
+        )?) as Arc<_>;
+        let node = Node::new(database, services, run_config.node_config, None);
+        node.run()
+    } else {
+        Ok(())
+    }
+}
 
 /// Output of any of the standard Exonum Core configuration commands.
 pub enum StandardResult {
