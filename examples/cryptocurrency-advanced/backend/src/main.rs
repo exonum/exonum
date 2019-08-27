@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::fabric::NodeBuilder;
 use exonum_cryptocurrency_advanced as cryptocurrency;
+use exonum_parameters::run_node;
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new()
-        .with_service(cryptocurrency::CryptocurrencyService)
-        .run()
+    run_node(vec![Box::new(cryptocurrency::CryptocurrencyService) as Box<_>])
+    .unwrap();
 }

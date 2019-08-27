@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::fabric::NodeBuilder;
+use exonum_parameters::run_node;
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new()
-        .with_service(exonum_time::TimeServiceFactory::default())
-        .with_service(exonum_timestamping::TimestampingService)
-        .run();
+    run_node(vec![
+        Box::new(exonum_time::TimeServiceFactory::default()) as Box<_>,
+        Box::new(exonum_timestamping::TimestampingService) as Box<_>,
+    ])
+    .unwrap();
 }
