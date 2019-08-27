@@ -20,6 +20,7 @@ use exonum::blockchain::{GenesisConfig, InstanceCollection, ValidatorKeys};
 use exonum::crypto::generate_keys_file;
 use exonum::exonum_merkledb::RocksDB;
 use exonum::node::{ConnectInfo, ConnectListConfig, Node, NodeApiConfig, NodeConfig};
+use exonum::runtime::rust::ServiceFactory;
 use failure::Error;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -49,7 +50,7 @@ const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
 ///
 /// Enables Rust runtime only.
 pub fn run_node(
-    services: impl IntoIterator<Item = InstanceCollection>,
+    services: impl IntoIterator<Item = Box<dyn ServiceFactory>>,
 ) -> Result<(), failure::Error> {
     let command = Command::from_args();
     if let StandardResult::Run(run_config) = command.execute()? {
@@ -57,7 +58,12 @@ pub fn run_node(
             run_config.db_path,
             &run_config.node_config.database,
         )?) as Arc<_>;
-        let node = Node::new(database, services, run_config.node_config, None);
+        let node = Node::new(
+            database,
+            services.into_iter().map(InstanceCollection::new),
+            run_config.node_config,
+            None,
+        );
         node.run()
     } else {
         Ok(())
