@@ -33,8 +33,10 @@ use crate::{
 /// and other parts of the blockchain.
 #[derive(Debug)]
 pub struct ServiceApiState<'a> {
-    service_keypair: (&'a PublicKey, &'a SecretKey),
-    instance_descriptor: InstanceDescriptor<'a>,
+    /// Service instance descriptor of the current API handler.
+    pub instance: InstanceDescriptor<'a>,
+    /// Service key pair of the current node.
+    pub service_keypair: &'a (PublicKey, SecretKey),
     api_sender: &'a ApiSender,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
@@ -42,31 +44,18 @@ pub struct ServiceApiState<'a> {
 
 impl<'a> ServiceApiState<'a> {
     /// Create service API state snapshot from the given context and instance descriptor.
-    pub fn from_api_context(
-        context: &'a ApiContext,
-        instance_descriptor: InstanceDescriptor<'a>,
-    ) -> Self {
+    pub fn from_api_context(context: &'a ApiContext, instance: InstanceDescriptor<'a>) -> Self {
         Self {
             service_keypair: context.service_keypair(),
-            instance_descriptor,
+            instance,
             api_sender: context.sender(),
             snapshot: context.snapshot(),
         }
     }
 
-    /// Return a service instance descriptor of the current API handler.
-    pub fn instance(&self) -> InstanceDescriptor {
-        self.instance_descriptor
-    }
-
     /// Return a read-only snapshot of the current blockchain state.
     pub fn snapshot(&'a self) -> &dyn Snapshot {
         self.snapshot.as_ref()
-    }
-
-    /// Return reference to the service key pair of the current node.
-    pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
-        (&self.service_keypair.0, &self.service_keypair.1)
     }
 
     /// Return a reference to the transactions sender.

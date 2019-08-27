@@ -60,7 +60,7 @@ impl PublicApi {
         hash: &Hash,
     ) -> api::Result<Option<TimestampEntry>> {
         let snapshot = state.snapshot();
-        let schema = Schema::new(state.instance().name, snapshot);
+        let schema = Schema::new(state.instance.name, snapshot);
         Ok(schema.timestamps().get(hash))
     }
 
@@ -79,10 +79,10 @@ impl PublicApi {
                 .unwrap();
             let state_proof = blockchain_schema
                 .state_hash_aggregator()
-                .get_proof(IndexOwner::Service(state.instance().id).coordinate_for(0));
+                .get_proof(IndexOwner::Service(state.instance.id).coordinate_for(0));
             (state_proof, block_proof)
         };
-        let schema = Schema::new(state.instance().name, snapshot);
+        let schema = Schema::new(state.instance.name, snapshot);
         let timestamp_proof = schema.timestamps().get_proof(hash);
         Ok(TimestampProof {
             block_info,

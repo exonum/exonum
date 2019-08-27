@@ -280,11 +280,12 @@ impl Dispatcher {
     // TODO documentation [ECR-3275]
     pub(crate) fn execute(
         &mut self,
-        fork: &Fork,
+        fork: &mut Fork,
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let mut context = ExecutionContext::new(
+            self,
             fork,
             Caller::Transaction {
                 author: tx.author(),
@@ -316,12 +317,13 @@ impl Dispatcher {
             .get(&runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
 
-        runtime.execute(self, context, call_info, arguments)
+        runtime.execute(context, call_info, arguments)
     }
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
+        let mut context = ExecutionContext::new(self, fork, Caller::Blockchain);
         for runtime in self.runtimes.values() {
-            runtime.before_commit(self, fork);
+            runtime.before_commit(&mut context);
         }
     }
 
@@ -643,7 +645,6 @@ mod tests {
 
         fn execute(
             &self,
-            _: &Dispatcher,
             _: &mut ExecutionContext,
             call_info: CallInfo,
             _: &[u8],
@@ -659,7 +660,7 @@ mod tests {
             StateHashAggregator::default()
         }
 
-        fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
+        fn before_commit(&self, _context: &mut ExecutionContext) {}
 
         fn after_commit(
             &self,
@@ -741,7 +742,7 @@ mod tests {
         };
 
         // Check if the services are ready for deploy.
-        let fork = db.fork();
+        let mut fork = db.fork();
         dispatcher
             .deploy_and_register_artifact(&fork, &sample_rust_spec, Any::default())
             .unwrap();
@@ -776,7 +777,7 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
+        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
         dispatcher
             .call(
                 &mut context,
@@ -872,7 +873,7 @@ mod tests {
         );
 
         // Check if the services are ready to start.
-        let fork = db.fork();
+        let mut fork = db.fork();
 
         assert_eq!(
             dispatcher
@@ -892,7 +893,7 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let mut context = ExecutionContext::new(&fork, Caller::Blockchain);
+        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
         dispatcher
             .call(
                 &mut context,

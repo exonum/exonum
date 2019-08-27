@@ -75,7 +75,7 @@ impl PublicApi {
     ) -> api::Result<WalletInfo> {
         let snapshot = state.snapshot();
         let blockchain_schema = blockchain::Schema::new(snapshot);
-        let currency_schema = Schema::new(state.instance().name, snapshot);
+        let currency_schema = Schema::new(state.instance.name, snapshot);
 
         let max_height = blockchain_schema.block_hashes_by_height().len() - 1;
 
@@ -85,7 +85,7 @@ impl PublicApi {
 
         let to_table = blockchain_schema
             .state_hash_aggregator()
-            .get_proof(IndexOwner::Service(state.instance().id).coordinate_for(0));
+            .get_proof(IndexOwner::Service(state.instance.id).coordinate_for(0));
 
         let to_wallet = currency_schema.wallets().get_proof(pub_key);
 

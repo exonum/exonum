@@ -56,7 +56,7 @@ impl Service for Supervisor {
     }
 
     fn before_commit(&self, context: TransactionContext) {
-        let schema = Schema::new(context.service_name(), context.fork());
+        let schema = Schema::new(context.instance.name, context.fork());
         let height = blockchain::Schema::new(context.fork()).height();
 
         // Removes pending deploy requests for which deadline was exceeded.
@@ -74,7 +74,7 @@ impl Service for Supervisor {
     }
 
     fn after_commit(&self, context: AfterCommitContext) {
-        let schema = Schema::new(context.service_name(), context.snapshot());
+        let schema = Schema::new(context.instance.name, context.snapshot);
         let pending_deployments = schema.pending_deployments();
 
         // Sends confirmation transaction for unconfirmed deployment requests.
@@ -84,7 +84,7 @@ impl Service for Supervisor {
                 let confirmation = DeployConfirmation::from(request.clone());
                 !schema
                     .deploy_confirmations()
-                    .confirmed_by(&confirmation, context.public_key())
+                    .confirmed_by(&confirmation, &context.service_keypair.0)
             })
             .for_each(|unconfirmed_request| {
                 let artifact = unconfirmed_request.artifact.clone();
@@ -93,8 +93,8 @@ impl Service for Supervisor {
                 // if the request for deployment completes successfully and node is validator.
                 let and_then = {
                     let tx_sender = context.transaction_broadcaster();
-                    let keypair = (*context.public_key(), context.secret_key().clone());
-                    let service_id = context.service_id();
+                    let keypair = context.service_keypair.clone();
+                    let instance_id = context.instance.id;
                     let is_validator = context.validator_id().is_some();
                     move || {
                         if is_validator {
@@ -105,9 +105,11 @@ impl Service for Supervisor {
 
                             let transaction = DeployConfirmation::from(unconfirmed_request);
                             tx_sender
-                                .broadcast_transaction(
-                                    transaction.sign(service_id, keypair.0, &keypair.1),
-                                )
+                                .broadcast_transaction(transaction.sign(
+                                    instance_id,
+                                    keypair.0,
+                                    &keypair.1,
+                                ))
                                 .map_err(|e| error!("Couldn't broadcast transaction {}.", e))
                                 .ok();
                         }

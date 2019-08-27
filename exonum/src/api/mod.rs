@@ -340,7 +340,7 @@ impl ApiContext {
     }
 
     /// Return reference to the service key pair of the current node.
-    pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
-        (&self.service_keypair.0, &self.service_keypair.1)
+    pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
+        &self.service_keypair
     }
 }
