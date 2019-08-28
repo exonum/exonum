@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_cli::NodeBuilder;
 use exonum_cryptocurrency_advanced as cryptocurrency;
-use exonum_parameters::NodeBuilder;
 
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();

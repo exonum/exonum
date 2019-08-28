@@ -19,7 +19,7 @@ exonum = "0.12.0"
 exonum-derive = "0.12.0"
 exonum-crypto = "0.12.0"
 exonum-merkledb = "0.12.0"
-exonum-parameters = { git = "https://github.com/exonum/exonum-parameters" }
+exonum-cli = { git = "https://github.com/exonum/exonum-cli" }
 serde = "1.0.0"
 serde_derive = "1.0.0"
 failure = "0.1.5"

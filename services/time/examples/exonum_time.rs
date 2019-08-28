@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_parameters::NodeBuilder;
+use exonum_cli::NodeBuilder;
 use exonum_time::TimeServiceFactory;
 
 fn main() -> Result<(), failure::Error> {
