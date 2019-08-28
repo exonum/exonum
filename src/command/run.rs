@@ -24,7 +24,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use crate::command::{ExonumCommand, StandardResult};
-use crate::config::load_config_file;
+use crate::io::load_config_file;
 use crate::password::{PassInputMethod, SecretKeyType};
 
 /// Container for node configuration parameters produced by `Run` command.

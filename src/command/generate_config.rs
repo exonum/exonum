@@ -26,8 +26,8 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use crate::command::{ExonumCommand, StandardResult};
-use crate::config::{load_config_file, save_config_file};
-use crate::fabric::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
+use crate::io::{load_config_file, save_config_file};
+use crate::config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
 use crate::password::{PassInputMethod, SecretKeyType, ZeroizeOnDrop};
 
 const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";

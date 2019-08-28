@@ -21,8 +21,8 @@ use structopt::StructOpt;
 use std::path::PathBuf;
 
 use crate::command::{ExonumCommand, StandardResult};
-use crate::config::save_config_file;
-use crate::fabric::{CommonConfigTemplate, GeneralConfig};
+use crate::io::save_config_file;
+use crate::config::{CommonConfigTemplate, GeneralConfig};
 
 /// Generate common part of the nodes configuration.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]

@@ -12,52 +12,62 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Loading and saving TOML-encoded configurations.
+//! Contains various config structures used during configuration process.
 
-use failure::{Error, ResultExt};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use exonum::blockchain::{ConsensusConfig, ValidatorKeys};
+use exonum::crypto::PublicKey;
+use serde::{Deserialize, Serialize};
 
-use std::{
-    fs::{self, File},
-    io::{Read, Write},
-    path::Path,
-};
+use std::net::SocketAddr;
+use std::path::PathBuf;
 
-/// Loads TOML-encoded file.
-pub fn load_config_file<P, T>(path: P) -> Result<T, Error>
-where
-    T: for<'r> Deserialize<'r>,
-    P: AsRef<Path>,
-{
-    let path = path.as_ref();
-    let res = do_load(path).context(format!("loading config from {}", path.display()))?;
-    Ok(res)
+/// Base config.
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
+pub struct CommonConfigTemplate {
+    /// Consensus configuration.
+    pub consensus_config: ConsensusConfig,
+    /// General configuration.
+    pub general_config: GeneralConfig,
 }
 
-/// Saves TOML-encoded file.
-pub fn save_config_file<P, T>(value: &T, path: P) -> Result<(), Error>
-where
-    T: Serialize,
-    P: AsRef<Path>,
-{
-    let path = path.as_ref();
-    do_save(value, path).with_context(|_| format!("saving config to {}", path.display()))?;
-    Ok(())
+/// TODO: General config
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
+pub struct GeneralConfig {
+    /// TODO: validators count
+    pub validators_count: u32,
 }
 
-fn do_load<T: DeserializeOwned>(path: &Path) -> Result<T, Error> {
-    let mut file = File::open(path)?;
-    let mut toml = String::new();
-    file.read_to_string(&mut toml)?;
-    Ok(toml::de::from_str(&toml)?)
+/// Node public configurations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodePublicConfig {
+    /// Network address.
+    pub address: String,
+    /// Public keys of a validator.
+    pub validator_keys: ValidatorKeys,
 }
 
-fn do_save<T: Serialize>(value: &T, path: &Path) -> Result<(), Error> {
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    let mut file = File::create(path)?;
-    let value_toml = toml::Value::try_from(value)?;
-    file.write_all(value_toml.to_string().as_bytes())?;
-    Ok(())
+/// `SharedConfig` contain all public information that should be shared in the handshake process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedConfig {
+    /// Template for common configuration
+    pub common: CommonConfigTemplate,
+    /// Public node
+    pub node: NodePublicConfig,
+}
+
+/// `NodePrivateConfig` collects all public and secret keys.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodePrivateConfig {
+    /// Listen address.
+    pub listen_address: SocketAddr,
+    /// External address.
+    pub external_address: String,
+    /// Consensus public key.
+    pub consensus_public_key: PublicKey,
+    /// Path to the consensus secret key file.
+    pub consensus_secret_key: PathBuf,
+    /// Service public key.
+    pub service_public_key: PublicKey,
+    /// Path to the service secret key file.
+    pub service_secret_key: PathBuf,
 }
