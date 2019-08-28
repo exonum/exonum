@@ -248,7 +248,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, context: &mut ExecutionContext);
+    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -388,7 +388,7 @@ impl Caller {
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a mut Fork,
+    pub fork: &'a Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
     /// List of dispatcher actions that will be performed after the finish of execution.
@@ -398,7 +398,7 @@ pub struct ExecutionContext<'a> {
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,

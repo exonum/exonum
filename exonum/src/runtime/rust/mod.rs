@@ -41,10 +41,10 @@ use crate::{
 
 use super::{
     api::{ApiContext, ServiceApiBuilder},
-    dispatcher::{self, DispatcherSender},
+    dispatcher::{self, Dispatcher, DispatcherSender},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+    InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 #[derive(Debug, Default)]
@@ -319,19 +319,21 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, context: &mut ExecutionContext) {
+    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
-                instance
-                    .as_ref()
-                    .before_commit(TransactionContext::new(context, instance.descriptor()));
+                // TODO implement special BeforeCommitContext [ECR-3222]
+                instance.as_ref().before_commit(TransactionContext::new(
+                    &mut ExecutionContext::new(dispatcher, fork, Caller::Blockchain),
+                    instance.descriptor(),
+                ));
                 Ok(())
             });
 
             match result {
-                Ok(..) => context.fork.flush(),
+                Ok(..) => fork.flush(),
                 Err(e) => {
-                    context.fork.rollback();
+                    fork.rollback();
                     error!(
                         "Service \"{}\" `before_commit` failed with error: {:?}",
                         instance.name, e

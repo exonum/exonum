@@ -165,8 +165,8 @@ fn test_basic_rust_runtime() {
             interface_name: String::default(),
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
-        let mut fork = db.fork();
-        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+        let fork = db.fork();
+        let mut context = ExecutionContext::new(&dispatcher, &fork, Caller::Blockchain);
         dispatcher.call(&mut context, &call_info, &payload).unwrap();
 
         {
@@ -189,8 +189,8 @@ fn test_basic_rust_runtime() {
             interface_name: String::default(),
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
-        let mut fork = db.fork();
-        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+        let fork = db.fork();
+        let mut context = ExecutionContext::new(&dispatcher, &fork, Caller::Blockchain);
         dispatcher.call(&mut context, &call_info, &payload).unwrap();
 
         {
