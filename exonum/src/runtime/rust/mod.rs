@@ -300,6 +300,7 @@ impl Runtime for RustRuntime {
         instance
             .as_ref()
             .call(
+                &call_info.interface_name,
                 call_info.method_id,
                 TransactionContext::new(context, instance.descriptor()),
                 payload,

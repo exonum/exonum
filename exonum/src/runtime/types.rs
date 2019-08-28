@@ -32,9 +32,7 @@ pub type InstanceId = u32;
 pub type MethodId = u32;
 
 /// Unique service transaction identifier.
-#[derive(
-    Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
-)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the

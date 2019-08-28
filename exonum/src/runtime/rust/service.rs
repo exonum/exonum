@@ -38,6 +38,7 @@ use super::RustArtifactId;
 pub trait ServiceDispatcher: Send {
     fn call(
         &self,
+        interface_name: &str,
         method: MethodId,
         ctx: TransactionContext,
         payload: &[u8],

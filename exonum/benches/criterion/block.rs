@@ -143,6 +143,7 @@ mod timestamping {
         fn timestamp(&self, _context: TransactionContext, _arg: Tx) -> Result<(), ExecutionError> {
             Ok(())
         }
+
         fn timestamp_panic(
             &self,
             _context: TransactionContext,
@@ -375,6 +376,180 @@ mod cryptocurrency {
     }
 }
 
+mod foreign_interface_call {
+    use exonum::{
+        blockchain::{ExecutionError, InstanceCollection},
+        crypto::Hash,
+        messages::Verified,
+        runtime::{
+            rust::{
+                service::{Service, ServiceDispatcher},
+                RustArtifactId, ServiceFactory, Transaction, TransactionContext,
+            },
+            AnyTx, ArtifactProtobufSpec, CallInfo, InstanceId, MethodId,
+        },
+    };
+    use exonum_merkledb::{BinaryValue, ObjectHash};
+    use rand::rngs::StdRng;
+
+    use super::gen_keypair_from_rng;
+    use crate::proto;
+
+    const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
+    const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TimestampTx")]
+    pub struct SelfTx {
+        data: Hash,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TimestampTx")]
+    pub struct ForeignTx {
+        data: Hash,
+    }
+
+    #[exonum_service]
+    pub trait TimestampingInterface {
+        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
+            -> Result<(), ExecutionError>;
+
+        fn timestamp_foreign(
+            &self,
+            context: TransactionContext,
+            arg: ForeignTx,
+        ) -> Result<(), ExecutionError>;
+    }
+
+    pub trait ForeignInterface {
+        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
+            -> Result<(), ExecutionError>;
+
+        fn _dispatch(
+            &self,
+            ctx: TransactionContext,
+            method: MethodId,
+            payload: &[u8],
+        ) -> Result<Result<(), ExecutionError>, failure::Error> {
+            match method {
+                0u32 => {
+                    let bytes = payload.into();
+                    let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)?;
+                    Ok(self.timestamp(ctx, arg).map_err(From::from))
+                }
+                _ => failure::bail!("Method not found"),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct Timestamping;
+
+    impl TimestampingInterface for Timestamping {
+        fn timestamp(
+            &self,
+            _context: TransactionContext,
+            _arg: SelfTx,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+
+        fn timestamp_foreign(
+            &self,
+            mut context: TransactionContext,
+            arg: ForeignTx,
+        ) -> Result<(), ExecutionError> {
+            let call_info = CallInfo {
+                instance_id: FOREIGN_INTERFACE_SERVICE_ID,
+                method_id: 0,
+                interface_name: "ForeignInterface".to_owned(),
+            };
+            let tx = SelfTx { data: arg.data };
+
+            context.call(&call_info, tx.into_bytes().as_ref())
+        }
+    }
+
+    impl ForeignInterface for Timestamping {
+        fn timestamp(
+            &self,
+            _context: TransactionContext,
+            _arg: SelfTx,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+    }
+
+    impl Service for Timestamping {}
+
+    // Manual implementation of ServiceFactory
+
+    impl ServiceDispatcher for Timestamping {
+        fn call(
+            &self,
+            interface_name: &str,
+            method: MethodId,
+            ctx: TransactionContext,
+            payload: &[u8],
+        ) -> Result<Result<(), ExecutionError>, failure::Error> {
+            match interface_name {
+                "" => <Self as TimestampingInterface>::_dispatch(self, ctx, method, payload),
+                "ForeignInterface" => {
+                    <Self as ForeignInterface>::_dispatch(self, ctx, method, payload)
+                }
+                // Some additional interfaces to make the match closer to reality.
+                "Configurable" => unreachable!(),
+                "Events" => unreachable!(),
+                "ERC30Tokens" => unreachable!(),
+                other => failure::bail!("Unknown interface called: {}", other),
+            }
+        }
+    }
+
+    impl ServiceFactory for Timestamping {
+        fn artifact_id(&self) -> RustArtifactId {
+            "timestamping-foreign:1.0.0".parse().unwrap()
+        }
+
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
+            Box::new(Self)
+        }
+    }
+
+    impl From<Timestamping> for InstanceCollection {
+        fn from(t: Timestamping) -> Self {
+            Self::new(t)
+                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", ())
+                .with_instance(FOREIGN_INTERFACE_SERVICE_ID, "timestamping-foreign", ())
+        }
+    }
+
+    pub fn self_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
+        (0_u32..).map(move |i| {
+            let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
+            SelfTx {
+                data: i.object_hash(),
+            }
+            .sign(SELF_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+        })
+    }
+
+    pub fn foreign_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
+        (0_u32..).map(move |i| {
+            let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
+            ForeignTx {
+                data: i.object_hash(),
+            }
+            .sign(FOREIGN_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+        })
+    }
+}
+
 /// Writes transactions to the pool and returns their hashes.
 fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
     let fork = blockchain.fork();
@@ -527,5 +702,19 @@ pub fn bench_block(criterion: &mut Criterion) {
         "block/cryptocurrency_rollback",
         cryptocurrency::Cryptocurrency,
         cryptocurrency::rollback_transactions(SeedableRng::from_seed([4; 32])),
+    );
+
+    execute_block_rocksdb(
+        criterion,
+        "block/foreign_interface_call/self_tx",
+        foreign_interface_call::Timestamping,
+        foreign_interface_call::self_transactions(SeedableRng::from_seed([2; 32])),
+    );
+
+    execute_block_rocksdb(
+        criterion,
+        "block/foreign_interface_call/foreign_tx",
+        foreign_interface_call::Timestamping,
+        foreign_interface_call::foreign_transactions(SeedableRng::from_seed([2; 32])),
     );
 }

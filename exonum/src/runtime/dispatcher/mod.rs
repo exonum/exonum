@@ -116,7 +116,10 @@ impl Dispatcher {
         // Built-in services should not have an additional specification.
         let artifact_spec = Any::default();
         // Register service artifact in the runtime.
-        self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
+        // TODO Write test for such situations [ECR-3222]
+        if !self.is_artifact_deployed(&spec.artifact) {
+            self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
+        }
         // Start the built-in service instance.
         self.start_service(fork, spec, constructor)
     }

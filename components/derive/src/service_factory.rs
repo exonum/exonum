@@ -129,6 +129,7 @@ impl ServiceFactory {
             impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
                 fn call(
                     &self,
+                    interface_name: &str,
                     method: #cr::runtime::MethodId,
                     ctx: #cr::runtime::rust::service::TransactionContext,
                     payload: &[u8],

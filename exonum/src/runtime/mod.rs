@@ -340,7 +340,7 @@ pub enum Caller {
     Service {
         /// Identifier of the service instance which invoked this transaction.
         instance_id: InstanceId,
-    }
+    },
 }
 
 impl Caller {
@@ -378,7 +378,7 @@ impl Caller {
             Some(*instance_id)
         } else {
             None
-        }        
+        }
     }
 }
 
