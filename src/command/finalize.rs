@@ -1,0 +1,179 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Standard Exonum CLI command used to combine a secret and all the public parts of the
+//! node configuration in a single file.
+
+use exonum::blockchain::GenesisConfig;
+use exonum::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
+use failure::Error;
+use serde::{Deserialize, Serialize};
+
+use std::collections::BTreeMap;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use structopt::StructOpt;
+
+use crate::command::{ExonumCommand, StandardResult};
+use crate::config::{load_config_file, save_config_file};
+use crate::fabric::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
+
+/// Generate final node configuration using public configs
+/// of other nodes in the network.
+#[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[structopt(rename_all = "kebab-case")]
+pub struct Finalize {
+    /// Path to a secret part of a node configuration.
+    pub secret_config_path: PathBuf,
+    /// Path to a node configuration file which will be created after
+    /// running this command.
+    pub output_config_path: PathBuf,
+    #[structopt(long, short = "p")]
+    /// List of paths to public parts of configuration of all the nodes
+    /// in the network.
+    pub public_configs: Vec<PathBuf>,
+    #[structopt(long)]
+    /// Listen address for node public API.
+    ///
+    /// Public API is used mainly for sending API requests to user services.
+    pub public_api_address: Option<SocketAddr>,
+    #[structopt(long)]
+    /// Listen address for node private API.
+    ///
+    /// Private API is used by node administrators for node monitoring and control.
+    pub private_api_address: Option<SocketAddr>,
+    #[structopt(long)]
+    /// Cross-origin resource sharing options for responses returned by public API handlers.
+    pub public_allow_origin: Option<String>,
+    #[structopt(long)]
+    /// Cross-origin resource sharing options for responses returned by private API handlers.
+    pub private_allow_origin: Option<String>,
+}
+
+impl Finalize {
+    fn reduce_configs(
+        public_configs: Vec<SharedConfig>,
+        our_config: &NodePrivateConfig,
+    ) -> (
+        CommonConfigTemplate,
+        Vec<NodePublicConfig>,
+        Option<NodePublicConfig>,
+    ) {
+        let mut map = BTreeMap::new();
+        let mut config_iter = public_configs.into_iter();
+        let first = config_iter
+            .next()
+            .expect("Expected at least one config in PUBLIC_CONFIGS");
+        let common = first.common;
+        map.insert(first.node.validator_keys.consensus_key, first.node);
+
+        for config in config_iter {
+            if common != config.common {
+                panic!("Found config with different common part.");
+            };
+            if map
+                .insert(config.node.validator_keys.consensus_key, config.node)
+                .is_some()
+            {
+                panic!("Found duplicate consensus keys in PUBLIC_CONFIGS");
+            }
+        }
+        (
+            common,
+            map.iter().map(|(_, c)| c.clone()).collect(),
+            map.get(&our_config.consensus_public_key).cloned(),
+        )
+    }
+
+    fn create_connect_list_config(
+        list: &[NodePublicConfig],
+        node: &NodePrivateConfig,
+    ) -> ConnectListConfig {
+        let peers = list
+            .iter()
+            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
+            .map(|config| ConnectInfo {
+                public_key: config.validator_keys.consensus_key,
+                address: config.address.clone(),
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+}
+
+impl ExonumCommand for Finalize {
+    fn execute(self) -> Result<StandardResult, Error> {
+        let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
+        let secret_config_dir = std::env::current_dir()
+            .expect("Failed to get current dir")
+            .join(self.secret_config_path.parent().unwrap());
+        let public_configs: Vec<SharedConfig> = self
+            .public_configs
+            .into_iter()
+            .map(|path| load_config_file(path))
+            .collect::<Result<_, _>>()?;
+
+        let public_allow_origin = self.public_allow_origin.map(|s| s.parse().unwrap());
+        let private_allow_origin = self.private_allow_origin.map(|s| s.parse().unwrap());
+
+        let (common, list, _our) = Self::reduce_configs(public_configs, &secret_config);
+
+        let validators_count = common.general_config.validators_count as usize;
+
+        if validators_count != list.len() {
+            panic!(
+                "The number of validators configs does not match the number of validators keys."
+            );
+        }
+
+        let genesis = GenesisConfig::new_with_consensus(
+            common.clone().consensus_config,
+            list.iter().map(|c| c.validator_keys),
+        );
+
+        let connect_list = Self::create_connect_list_config(&list, &secret_config);
+
+        let config = {
+            NodeConfig {
+                listen_address: secret_config.listen_address,
+                external_address: secret_config.external_address,
+                network: Default::default(),
+                consensus_public_key: secret_config.consensus_public_key,
+                consensus_secret_key: secret_config_dir.join(&secret_config.consensus_secret_key),
+                service_public_key: secret_config.service_public_key,
+                service_secret_key: secret_config_dir.join(&secret_config.service_secret_key),
+                genesis,
+                api: NodeApiConfig {
+                    public_api_address: self.public_api_address,
+                    private_api_address: self.private_api_address,
+                    public_allow_origin,
+                    private_allow_origin,
+                    ..Default::default()
+                },
+                mempool: Default::default(),
+                services_configs: Default::default(),
+                database: Default::default(),
+                connect_list,
+                thread_pool_size: Default::default(),
+            }
+        };
+
+        save_config_file(&config, &self.output_config_path)?;
+
+        Ok(StandardResult::Finalize {
+            node_config_path: self.output_config_path,
+        })
+    }
+}
