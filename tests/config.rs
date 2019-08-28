@@ -188,6 +188,7 @@ fn is_run_node_config(result: StandardResult) -> bool {
     }
 }
 
+#[allow(dead_code)] // TODO: ECR-3479
 fn touch(path: impl AsRef<Path>) {
     OpenOptions::new()
         .create(true)
