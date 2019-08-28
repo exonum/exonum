@@ -1,0 +1,15 @@
+language: rust
+rust:
+  - stable
+matrix:
+  allow_failures:
+    - rust: nightly
+  fast_finish: true
+
+env:
+  global:
+    - RUSTFLAGS="-D warnings"
+
+script:
+  - cargo fmt -- --check
+  - cargo test
