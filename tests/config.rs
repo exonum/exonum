@@ -452,27 +452,26 @@ fn test_full_workflow() {
     }
 }
 
-// TODO: ECR-3479
-//#[test]
-//fn test_run_dev() {
-//    let env = ConfigSpec::new_without_pass();
-//
-//    let artifacts_dir = env.output_dir().join("artifacts");
-//    // Mocks existence of old DB files that are supposed to be cleaned up.
-//    let db_dir = artifacts_dir.join("db");
-//    fs::create_dir_all(&db_dir).unwrap();
-//    let old_db_file = db_dir.join("content.foo");
-//    touch(&old_db_file);
-//    // Checks run-dev command.
-//    let feedback = env
-//        .command("run-dev")
-//        .with_arg("-a")
-//        .with_arg(&artifacts_dir)
-//        .run();
-//    assert!(is_run_node_config(feedback.unwrap()));
-//    // Tests cleaning up.
-//    assert!(!old_db_file.exists());
-//}
+#[test]
+fn test_run_dev() {
+    let env = ConfigSpec::new_without_pass();
+
+    let artifacts_dir = env.output_dir().join("artifacts");
+    // Mocks existence of old DB files that are supposed to be cleaned up.
+    let db_dir = artifacts_dir.join("db");
+    fs::create_dir_all(&db_dir).unwrap();
+    let old_db_file = db_dir.join("content.foo");
+    touch(&old_db_file);
+    // Checks run-dev command.
+    let feedback = env
+        .command("run-dev")
+        .with_arg("-a")
+        .with_arg(&artifacts_dir)
+        .run();
+    assert!(is_run_node_config(feedback.unwrap()));
+    // Tests cleaning up.
+    assert!(!old_db_file.exists());
+}
 
 #[test]
 fn test_update_config() {

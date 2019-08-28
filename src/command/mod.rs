@@ -18,6 +18,7 @@ pub mod finalize;
 pub mod generate_config;
 pub mod generate_template;
 pub mod run;
+pub mod run_dev;
 
 use failure::Error;
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,7 @@ use crate::command::finalize::Finalize;
 use crate::command::generate_config::GenerateConfig;
 use crate::command::generate_template::GenerateTemplate;
 use crate::command::run::{NodeRunConfig, Run};
+use crate::command::run_dev::RunDev;
 
 /// Interface of standard Exonum Core configuration command.
 pub trait ExonumCommand {
@@ -52,6 +54,9 @@ pub enum Command {
     #[structopt(name = "run")]
     /// Run the node with provided node config.
     Run(Run),
+    #[structopt(name = "run-dev")]
+    /// Run the node with auto-generated config.
+    RunDev(RunDev),
 }
 
 impl Command {
@@ -68,6 +73,7 @@ impl ExonumCommand for Command {
             Command::GenerateConfig(command) => command.execute(),
             Command::Finalize(command) => command.execute(),
             Command::Run(command) => command.execute(),
+            Command::RunDev(command) => command.execute(),
         }
     }
 }
