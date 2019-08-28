@@ -26,8 +26,8 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use crate::command::{ExonumCommand, StandardResult};
-use crate::io::{load_config_file, save_config_file};
 use crate::config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
+use crate::io::{load_config_file, save_config_file};
 
 /// Generate final node configuration using public configs
 /// of other nodes in the network.

@@ -26,8 +26,8 @@ use std::sync::Arc;
 use crate::command::{Command, ExonumCommand, StandardResult};
 
 pub mod command;
-pub mod io;
 pub mod config;
+pub mod io;
 pub mod password;
 
 /// Rust-runtime specific node builder used for constructing a node with a list
