@@ -13,10 +13,9 @@
 // limitations under the License.
 
 use exonum_cryptocurrency_advanced as cryptocurrency;
-use exonum_parameters::run_node;
+use exonum_parameters::NodeBuilder;
 
-fn main() {
+fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
-    run_node(vec![Box::new(cryptocurrency::CryptocurrencyService) as Box<_>])
-    .unwrap();
+    NodeBuilder::new().with_service(cryptocurrency::CryptocurrencyService).run()
 }
