@@ -1,5 +1,5 @@
 [package]
-name = "exonum-parameters"
+name = "exonum-cli"
 version = "0.1.0"
 authors = ["Exonum Team <exonum@bifury.com>"]
 edition = "2018"
