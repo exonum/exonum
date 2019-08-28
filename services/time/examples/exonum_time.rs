@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_time::TimeServiceFactory;
 use exonum_parameters::NodeBuilder;
+use exonum_time::TimeServiceFactory;
 
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new().with_service(TimeServiceFactory::default()).run()
+    NodeBuilder::new()
+        .with_service(TimeServiceFactory::default())
+        .run()
 }

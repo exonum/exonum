@@ -17,5 +17,7 @@ use exonum_parameters::NodeBuilder;
 
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new().with_service(cryptocurrency::CryptocurrencyService).run()
+    NodeBuilder::new()
+        .with_service(cryptocurrency::CryptocurrencyService)
+        .run()
 }

@@ -63,8 +63,7 @@ use crate::{
         TimeoutRequest,
     },
     helpers::{
-        config::ConfigManager,
-        user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
+        config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
