@@ -277,6 +277,7 @@ mod tests {
                 call_info: CallInfo {
                     instance_id: 5,
                     method_id: 2,
+                    interface_name: "Foo".to_owned(),
                 },
                 arguments: vec![1, 2, 3, 4],
             },

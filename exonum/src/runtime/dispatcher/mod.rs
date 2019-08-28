@@ -292,7 +292,7 @@ impl Dispatcher {
                 hash: tx_id,
             },
         );
-        self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().arguments)?;
+        self.call(&mut context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
         // Execute pending dispatcher actions.
         for action in context.actions.drain(..) {
             action.execute(self, fork)?;
@@ -304,7 +304,7 @@ impl Dispatcher {
     pub(crate) fn call(
         &self,
         context: &mut ExecutionContext,
-        call_info: CallInfo,
+        call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         let runtime_id = self
@@ -646,7 +646,7 @@ mod tests {
         fn execute(
             &self,
             _: &mut ExecutionContext,
-            call_info: CallInfo,
+            call_info: &CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
             if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
@@ -781,7 +781,7 @@ mod tests {
         dispatcher
             .call(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
+                &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx rust");
@@ -789,7 +789,7 @@ mod tests {
         dispatcher
             .call(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
+                &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx rust");
@@ -797,7 +797,7 @@ mod tests {
         dispatcher
             .call(
                 &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
+                &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx java");
@@ -805,7 +805,7 @@ mod tests {
         dispatcher
             .call(
                 &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
+                &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx java");
@@ -897,7 +897,7 @@ mod tests {
         dispatcher
             .call(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
+                &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("execute succeed");

@@ -133,7 +133,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     /// Temporary method to test interservice communications.
-    pub fn call(&mut self, call_info: CallInfo, arguments: &[u8]) -> Result<(), ExecutionError> {
+    pub fn call(&mut self, call_info: &CallInfo, arguments: &[u8]) -> Result<(), ExecutionError> {
         self.inner.call(call_info, arguments)
     }
 }
@@ -239,6 +239,8 @@ pub trait Transaction: BinaryValue {
             call_info: CallInfo {
                 instance_id,
                 method_id: Self::METHOD_ID,
+                // Only main interface can execute user transactions.
+                interface_name: String::new(),
             },
             arguments: self.into_bytes(),
         }

@@ -80,13 +80,10 @@ impl TestService for TestServiceImpl {
 
         // Test calling one service from another.
         // TODO: It should be improved to support service auth in the future.
-        let call_info = CallInfo {
-            instance_id: SERVICE_INSTANCE_ID,
-            method_id: 1,
-        };
+        let call_info = CallInfo::new(SERVICE_INSTANCE_ID, 1);
         let payload = TxB { value: arg.value }.into_bytes();
         context
-            .call(call_info, &payload)
+            .call(&call_info, &payload)
             .expect("Failed to dispatch call");
         Ok(())
     }
@@ -165,11 +162,12 @@ fn test_basic_rust_runtime() {
         let call_info = CallInfo {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 0,
+            interface_name: String::default(),
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-        dispatcher.call(&mut context, call_info, &payload).unwrap();
+        dispatcher.call(&mut context, &call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_a_entry", &fork);
@@ -188,11 +186,12 @@ fn test_basic_rust_runtime() {
         let call_info = CallInfo {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 1,
+            interface_name: String::default(),
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let mut fork = db.fork();
         let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-        dispatcher.call(&mut context, call_info, &payload).unwrap();
+        dispatcher.call(&mut context, &call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_b_entry", &fork);

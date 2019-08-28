@@ -289,7 +289,7 @@ impl Runtime for RustRuntime {
     fn execute(
         &self,
         context: &mut ExecutionContext,
-        call_info: CallInfo,
+        call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let instance = self

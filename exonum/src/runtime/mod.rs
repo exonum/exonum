@@ -229,7 +229,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn execute(
         &self,
         context: &mut ExecutionContext,
-        call_info: CallInfo,
+        call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
@@ -409,7 +409,7 @@ impl<'a> ExecutionContext<'a> {
 
     pub(crate) fn call(
         &mut self,
-        call_info: CallInfo,
+        call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         // TODO Modify caller from Transaction.

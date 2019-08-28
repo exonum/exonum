@@ -148,7 +148,7 @@ impl Runtime for SampleRuntime {
     fn execute(
         &self,
         _context: &mut ExecutionContext,
-        call_info: CallInfo,
+        call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let service = self
@@ -331,6 +331,7 @@ fn main() {
                     call_info: CallInfo {
                         instance_id,
                         method_id: 0,
+                        interface_name: String::default(),
                     },
                     arguments: 1_000_u64.into_bytes(),
                 },
@@ -346,6 +347,7 @@ fn main() {
                     call_info: CallInfo {
                         instance_id,
                         method_id: 1,
+                        interface_name: String::default(),
                     },
                     arguments: Vec::default(),
                 },

@@ -20,10 +20,13 @@ import "google/protobuf/empty.proto";
 
 // Unique service transaction identifier.
 message CallInfo {
-  // Service instance identifier.
+  // Unique service instance identifier. The dispatcher uses this identifier to find the
+  // corresponding runtime to execute a transaction.
   uint32 instance_id = 1;
-  // Identifier of method in service interface to call.
+  // Identifier of the method in the service interface required for the call.
   uint32 method_id = 2;
+  // Identifier of the additional service interface.
+  string interface_name = 3;
 }
 
 message AnyTx {
