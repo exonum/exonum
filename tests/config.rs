@@ -25,8 +25,7 @@ use exonum::{
 };
 use serde::{Deserialize, Serialize};
 
-use exonum_parameters::ExonumCommand;
-use exonum_parameters::{Command, StandardResult};
+use exonum_cli::{command::{Command, ExonumCommand, StandardResult}};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
