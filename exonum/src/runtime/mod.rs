@@ -336,6 +336,11 @@ pub enum Caller {
     // This transaction is invoked on behalf of the blockchain itself,
     // for example [`before_commit`](trait.Runtime#before_commit) event.
     Blockchain,
+    // This transaction is invoked during the transaction execution of the other service.
+    Service {
+        /// Identifier of the service instance which invoked this transaction.
+        instance_id: InstanceId,
+    }
 }
 
 impl Caller {
@@ -365,6 +370,15 @@ impl Caller {
         } else {
             None
         }
+    }
+
+    /// Try to reinterpret caller as service.
+    pub fn as_service(&self) -> Option<InstanceId> {
+        if let Caller::Service { instance_id } = self {
+            Some(*instance_id)
+        } else {
+            None
+        }        
     }
 }
 
