@@ -46,27 +46,47 @@ const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
 const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
 const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
 
-/// Reads user input from the stdin and runs the node with a provided parameters.
-///
-/// Enables Rust runtime only.
-pub fn run_node(
-    services: impl IntoIterator<Item = Box<dyn ServiceFactory>>,
-) -> Result<(), failure::Error> {
-    let command = Command::from_args();
-    if let StandardResult::Run(run_config) = command.execute()? {
-        let database = Arc::new(RocksDB::open(
-            run_config.db_path,
-            &run_config.node_config.database,
-        )?) as Arc<_>;
-        let node = Node::new(
-            database,
-            services.into_iter().map(InstanceCollection::new),
-            run_config.node_config,
-            None,
-        );
-        node.run()
-    } else {
-        Ok(())
+/// Rust-runtime specific node builder used for constructing a node with a list
+/// of provided services.
+#[derive(Debug)]
+pub struct NodeBuilder {
+    services: Vec<Box<dyn ServiceFactory>>,
+}
+
+impl NodeBuilder {
+    /// Creates new builder.
+    pub fn new() -> Self {
+        NodeBuilder {
+            services: Default::default(),
+        }
+    }
+
+    /// Adds new Rust service to the list of available services.
+    pub fn with_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        self.services.push(service.into());
+        self
+    }
+
+    /// Configures the node using parameters provided by user from stdin and then runs it.
+    ///
+    /// Rust runtime enabled only.
+    pub fn run(self) -> Result<(), failure::Error> {
+        let command = Command::from_args();
+        if let StandardResult::Run(run_config) = command.execute()? {
+            let database = Arc::new(RocksDB::open(
+                run_config.db_path,
+                &run_config.node_config.database,
+            )?) as Arc<_>;
+            let node = Node::new(
+                database,
+                self.services.into_iter().map(InstanceCollection::new),
+                run_config.node_config,
+                None,
+            );
+            node.run()
+        } else {
+            Ok(())
+        }
     }
 }
 
