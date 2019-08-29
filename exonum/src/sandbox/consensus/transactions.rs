@@ -61,20 +61,6 @@ fn tx_hashes(transactions: &[Verified<AnyTx>]) -> Vec<Hash> {
     hashes
 }
 
-/// sends transactions into pool and returns this transactions in processing order
-fn send_txs_into_pool(
-    sandbox: &Sandbox,
-    mut transactions: Vec<Verified<AnyTx>>,
-) -> Vec<Verified<AnyTx>> {
-    for tx in &transactions {
-        sandbox.recv(tx);
-    }
-
-    transactions.sort_by(|tx1, tx2| tx1.object_hash().cmp(&tx2.object_hash()));
-
-    transactions
-}
-
 /// idea of the test is to verify request transaction scenario: other node requests
 /// transaction from our node
 #[test]
@@ -251,22 +237,6 @@ fn duplicate_tx_in_pool() {
         vec![tx1.clone()],
         sandbox.secret_key(ValidatorId(2)),
     ));
-}
-
-#[test]
-fn rebroadcast_transactions() {
-    let sandbox = timestamping_sandbox();
-
-    let transactions = send_txs_into_pool(
-        &sandbox,
-        TimestampingTxGenerator::new(DATA_SIZE).take(5).collect(),
-    );
-
-    sandbox.recv_rebroadcast();
-
-    for tx in &transactions {
-        sandbox.broadcast(tx)
-    }
 }
 
 // TODO: transaction verification logic is duplicated,
