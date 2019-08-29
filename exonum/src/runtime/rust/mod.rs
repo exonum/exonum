@@ -14,7 +14,10 @@
 
 pub use self::{
     error::Error,
-    service::{AfterCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
+    service::{
+        AfterCommitContext, BeforeCommitContext, Service, ServiceFactory, Transaction,
+        TransactionContext,
+    },
 };
 
 pub mod error;
@@ -43,7 +46,7 @@ use super::{
     api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, Dispatcher, DispatcherSender},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor,
     InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
@@ -288,7 +291,7 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        context: &mut ExecutionContext,
+        context: &ExecutionContext,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -322,10 +325,10 @@ impl Runtime for RustRuntime {
     fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
-                // TODO implement special BeforeCommitContext [ECR-3222]
-                instance.as_ref().before_commit(TransactionContext::new(
-                    &mut ExecutionContext::new(dispatcher, fork, Caller::Blockchain),
+                instance.as_ref().before_commit(BeforeCommitContext::new(
                     instance.descriptor(),
+                    fork,
+                    dispatcher,
                 ));
                 Ok(())
             });
@@ -352,9 +355,9 @@ impl Runtime for RustRuntime {
     ) {
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
-                dispatcher,
                 service.descriptor(),
                 snapshot,
+                dispatcher,
                 service_keypair,
                 tx_sender,
             ));

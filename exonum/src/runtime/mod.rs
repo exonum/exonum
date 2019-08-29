@@ -93,7 +93,7 @@ pub mod supervisor;
 use exonum_merkledb::{Fork, Snapshot};
 use futures::Future;
 
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     api::ApiContext,
@@ -228,7 +228,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// Do not process. Panic will be processed by the method caller.
     fn execute(
         &self,
-        context: &mut ExecutionContext,
+        context: &ExecutionContext,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -333,9 +333,6 @@ pub enum Caller {
         /// Public key of the user who signed this transaction.
         author: PublicKey,
     },
-    // This transaction is invoked on behalf of the blockchain itself,
-    // for example [`before_commit`](trait.Runtime#before_commit) event.
-    Blockchain,
     // This transaction is invoked during the transaction execution of the other service.
     Service {
         /// Identifier of the service instance which invoked this transaction.
@@ -363,15 +360,6 @@ impl Caller {
         }
     }
 
-    /// Try to reinterpret caller as blockchain.
-    pub fn as_blockchain(&self) -> Option<()> {
-        if let Caller::Blockchain = self {
-            Some(())
-        } else {
-            None
-        }
-    }
-
     /// Try to reinterpret caller as service.
     pub fn as_service(&self) -> Option<InstanceId> {
         if let Caller::Service { instance_id } = self {
@@ -392,32 +380,50 @@ pub struct ExecutionContext<'a> {
     /// The initiator of the transaction execution.
     pub caller: Caller,
     /// List of dispatcher actions that will be performed after the finish of execution.
-    actions: Vec<dispatcher::Action>,
+    actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a Dispatcher,
+    /// Identifier of the called service instance.
+    instance_id: InstanceId,
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(
+        dispatcher: &'a Dispatcher,
+        fork: &'a Fork,
+        caller: Caller,
+        instance_id: InstanceId,
+    ) -> Self {
         Self {
             fork,
             caller,
-            actions: Vec::new(),
+            actions: Rc::default(),
             dispatcher,
+            instance_id,
         }
     }
 
     pub(crate) fn call(
-        &mut self,
+        &self,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        // TODO Modify caller from Transaction.
-        self.dispatcher.call(self, call_info, arguments)
+        let call_context = Self {
+            fork: self.fork,
+            caller: Caller::Service { instance_id: self.instance_id },
+            dispatcher: self.dispatcher,
+            actions: self.actions.clone(),
+            instance_id: call_info.instance_id,
+        };
+        self.dispatcher.call(&call_context, call_info, arguments)
     }
 
-    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.actions.push(action);
+    pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
+        self.actions.borrow_mut().push(action);
+    }
+
+    pub(crate) fn take_actions(&self) -> Vec<dispatcher::Action> {
+        self.actions.borrow_mut().drain(..).collect()
     }
 }
 

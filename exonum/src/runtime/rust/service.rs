@@ -26,7 +26,7 @@ use crate::{
     proto::Any,
     runtime::{
         api::ServiceApiBuilder,
-        dispatcher::{self, DispatcherSender},
+        dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
         AnyTx, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
         InstanceId, MethodId,
@@ -48,18 +48,18 @@ pub trait ServiceDispatcher: Send {
 pub trait Service: ServiceDispatcher + Debug + 'static {
     fn configure(
         &self,
-        _descriptor: InstanceDescriptor,
+        _instance: InstanceDescriptor,
         _fork: &Fork,
         _params: Any,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn before_commit(&self, _context: TransactionContext) {}
+    fn before_commit(&self, _context: BeforeCommitContext) {}
 
     fn after_commit(&self, _context: AfterCommitContext) {}
 
@@ -84,21 +84,49 @@ where
     }
 }
 
+/// Transaction specification for the concrete service interface.
+pub trait Transaction: BinaryValue {
+    /// Service interface associated for the given transaction.
+    type Service;
+    /// Identifier of service method which executes the given transaction.
+    const METHOD_ID: MethodId;
+
+    /// Create unsigned service transaction from the value.
+    fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
+        AnyTx {
+            call_info: CallInfo {
+                instance_id,
+                method_id: Self::METHOD_ID,
+                // Only main interface can execute user transactions.
+                interface_name: String::new(),
+            },
+            arguments: self.into_bytes(),
+        }
+    }
+
+    /// Sign the value as a transaction with the specified instance identifier.
+    fn sign(
+        self,
+        service_id: InstanceId,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Verified<AnyTx> {
+        Verified::from_value(self.into_any_tx(service_id), public_key, secret_key)
+    }
+}
+
 /// Provide context for the currently executing transaction.
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
     /// Service instance that associated with the current context.
     pub instance: InstanceDescriptor<'a>,
     /// Underlying execution context.
-    inner: &'a mut ExecutionContext<'b>,
+    inner: &'a ExecutionContext<'b>,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
     /// Create a new transaction context for the specified execution context and the instance descriptor.
-    pub(crate) fn new(
-        context: &'a mut ExecutionContext<'b>,
-        instance: InstanceDescriptor<'a>,
-    ) -> Self {
+    pub(crate) fn new(context: &'a ExecutionContext<'b>, instance: InstanceDescriptor<'a>) -> Self {
         Self {
             inner: context,
             instance,
@@ -139,12 +167,39 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 }
 
-/// Provide context for the `after_commit` handler.
-pub struct AfterCommitContext<'a> {
-    /// Read-only snapshot of the current blockchain state.
-    pub snapshot: &'a dyn Snapshot,
+/// Provide context for the `before_commit` handler.
+#[derive(Debug)]
+pub struct BeforeCommitContext<'a> {
     /// Service instance that associated with the current context.
     pub instance: InstanceDescriptor<'a>,
+    /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
+    /// the database made by the previous transactions already executed in this block.
+    pub fork: &'a Fork,
+    /// Reference to the underlying runtime dispatcher.
+    dispatcher: &'a Dispatcher,
+}
+
+impl<'a> BeforeCommitContext<'a> {
+    /// Create a new before commit context.
+    pub(crate) fn new(
+        instance: InstanceDescriptor<'a>,
+        fork: &'a Fork,
+        dispatcher: &'a Dispatcher,
+    ) -> Self {
+        Self {
+            instance,
+            fork,
+            dispatcher,
+        }
+    }
+}
+
+/// Provide context for the `after_commit` handler.
+pub struct AfterCommitContext<'a> {
+    /// Service instance that associated with the current context.
+    pub instance: InstanceDescriptor<'a>,
+    /// Read-only snapshot of the current blockchain state.
+    pub snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
     /// Channel to communicate with the dispatcher.
@@ -154,11 +209,11 @@ pub struct AfterCommitContext<'a> {
 }
 
 impl<'a> AfterCommitContext<'a> {
-    /// Create a context for the `after_commit` method.
+    /// Create a new after commit context.
     pub(crate) fn new(
-        dispatcher: &'a DispatcherSender,
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
+        dispatcher: &'a DispatcherSender,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
@@ -224,36 +279,5 @@ impl<'a> Debug for AfterCommitContext<'a> {
         f.debug_struct("AfterCommitContext")
             .field("instance", &self.instance)
             .finish()
-    }
-}
-
-/// Transaction specification for the concrete service interface.
-pub trait Transaction: BinaryValue {
-    /// Service interface associated for the given transaction.
-    type Service;
-    /// Identifier of service method which executes the given transaction.
-    const METHOD_ID: MethodId;
-
-    /// Create unsigned service transaction from the value.
-    fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
-        AnyTx {
-            call_info: CallInfo {
-                instance_id,
-                method_id: Self::METHOD_ID,
-                // Only main interface can execute user transactions.
-                interface_name: String::new(),
-            },
-            arguments: self.into_bytes(),
-        }
-    }
-
-    /// Sign the value as a transaction with the specified instance identifier.
-    fn sign(
-        self,
-        service_id: InstanceId,
-        public_key: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
-        Verified::from_value(self.into_any_tx(service_id), public_key, secret_key)
     }
 }

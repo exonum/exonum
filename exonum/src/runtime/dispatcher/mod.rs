@@ -287,17 +287,18 @@ impl Dispatcher {
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        let mut context = ExecutionContext::new(
+        let context = ExecutionContext::new(
             self,
             fork,
             Caller::Transaction {
                 author: tx.author(),
                 hash: tx_id,
             },
+            tx.as_ref().call_info.instance_id,
         );
-        self.call(&mut context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
+        self.call(&context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
         // Execute pending dispatcher actions.
-        for action in context.actions.drain(..) {
+        for action in context.take_actions() {
             action.execute(self, fork)?;
         }
         Ok(())
@@ -306,7 +307,7 @@ impl Dispatcher {
     /// Call the corresponding runtime method.
     pub(crate) fn call(
         &self,
-        context: &mut ExecutionContext,
+        context: &ExecutionContext,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -647,7 +648,7 @@ mod tests {
 
         fn execute(
             &self,
-            _: &mut ExecutionContext,
+            _: &ExecutionContext,
             call_info: &CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -779,10 +780,11 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let mut context = ExecutionContext::new(&dispatcher, &fork, Caller::Blockchain);
+        let context =
+            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 1 }, 0);
         dispatcher
             .call(
-                &mut context,
+                &context,
                 &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
@@ -790,7 +792,7 @@ mod tests {
 
         dispatcher
             .call(
-                &mut context,
+                &context,
                 &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
@@ -798,7 +800,7 @@ mod tests {
 
         dispatcher
             .call(
-                &mut context,
+                &context,
                 &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
@@ -806,7 +808,7 @@ mod tests {
 
         dispatcher
             .call(
-                &mut context,
+                &context,
                 &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
@@ -895,10 +897,11 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let mut context = ExecutionContext::new(&dispatcher, &fork, Caller::Blockchain);
+        let context =
+            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 15 }, 0);
         dispatcher
             .call(
-                &mut context,
+                &context,
                 &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )

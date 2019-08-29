@@ -31,7 +31,7 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{Service, ServiceFactory, Transaction, TransactionContext},
+        rust::{Service, ServiceFactory, Transaction, TransactionContext, BeforeCommitContext},
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
@@ -193,8 +193,8 @@ struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
-    fn before_commit(&self, context: TransactionContext) {
-        let mut index = ListIndex::new(IDX_NAME, context.fork());
+    fn before_commit(&self, context: BeforeCommitContext) {
+        let mut index = ListIndex::new(IDX_NAME, context.fork);
         index.push(1);
     }
 }
@@ -215,7 +215,7 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn before_commit(&self, _context: TransactionContext) {
+    fn before_commit(&self, _context: BeforeCommitContext) {
         panic!("42");
     }
 }
@@ -236,7 +236,7 @@ struct ServicePanicStorageErrorImpl;
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn before_commit(&self, _context: TransactionContext) {
+    fn before_commit(&self, _context: BeforeCommitContext) {
         panic!(StorageError::new("42"));
     }
 }

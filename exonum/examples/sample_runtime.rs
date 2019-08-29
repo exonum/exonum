@@ -147,7 +147,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _context: &mut ExecutionContext,
+        _context: &ExecutionContext,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {

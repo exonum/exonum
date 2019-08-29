@@ -25,7 +25,7 @@ use crate::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, Service, Transaction, TransactionContext},
+        rust::{AfterCommitContext, Service, Transaction, BeforeCommitContext},
         InstanceDescriptor, InstanceId,
     },
 };
@@ -55,9 +55,9 @@ impl Service for Supervisor {
         api::wire(builder)
     }
 
-    fn before_commit(&self, context: TransactionContext) {
-        let schema = Schema::new(context.instance.name, context.fork());
-        let height = blockchain::Schema::new(context.fork()).height();
+    fn before_commit(&self, context: BeforeCommitContext) {
+        let schema = Schema::new(context.instance.name, context.fork);
+        let height = blockchain::Schema::new(context.fork).height();
 
         // Removes pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema

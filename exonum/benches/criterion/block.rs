@@ -474,9 +474,13 @@ mod foreign_interface_call {
     impl ForeignInterface for Timestamping {
         fn timestamp(
             &self,
-            _context: TransactionContext,
+            context: TransactionContext,
             _arg: SelfTx,
         ) -> Result<(), ExecutionError> {
+            assert_eq!(
+                context.caller().as_service().unwrap(),
+                SELF_INTERFACE_SERVICE_ID
+            );
             Ok(())
         }
     }
@@ -545,7 +549,7 @@ mod foreign_interface_call {
             ForeignTx {
                 data: i.object_hash(),
             }
-            .sign(FOREIGN_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+            .sign(SELF_INTERFACE_SERVICE_ID, pub_key, &sec_key)
         })
     }
 }
