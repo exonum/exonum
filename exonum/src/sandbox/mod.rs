@@ -1264,7 +1264,7 @@ mod tests {
         artifact_name = "after_commit",
         artifact_version = "0.1.0",
         proto_sources = "crate::proto::schema",
-        service_interface = "AfterCommitInterface"
+        interfaces(default = "AfterCommitInterface")
     )]
     pub struct AfterCommitService;
 

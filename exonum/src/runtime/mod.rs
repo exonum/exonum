@@ -410,7 +410,9 @@ impl<'a> ExecutionContext<'a> {
     ) -> Result<(), ExecutionError> {
         let call_context = Self {
             fork: self.fork,
-            caller: Caller::Service { instance_id: self.instance_id },
+            caller: Caller::Service {
+                instance_id: self.instance_id,
+            },
             dispatcher: self.dispatcher,
             actions: self.actions.clone(),
             instance_id: call_info.instance_id,

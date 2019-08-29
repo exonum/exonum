@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use darling::FromDeriveInput;
+use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use semver::Version;
-use syn::{DeriveInput, Ident, Path};
+use syn::{DeriveInput, Ident, Lit, NestedMeta, Path};
+
+use std::iter;
 
 use super::CratePath;
 
@@ -42,6 +44,55 @@ fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
     name.as_ref().iter().copied().all(is_allowed_latin1_char)
 }
 
+#[derive(Debug, Default)]
+struct AdditionalInterfaces(Vec<Path>);
+
+impl FromMeta for AdditionalInterfaces {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        Path::from_string(value).map(|path| Self(vec![path]))
+    }
+
+    fn from_value(value: &Lit) -> darling::Result<Self> {
+        Path::from_value(value).map(|path| Self(vec![path]))
+    }
+
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        items
+            .iter()
+            .map(|meta| match meta {
+                NestedMeta::Lit(lit) => Path::from_value(lit),
+                _ => Err(darling::Error::unsupported_format(
+                    "Additional services should be in format: `additional(\"First\", \"Second\")`",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(AdditionalInterfaces)
+    }
+}
+
+#[derive(Debug, FromMeta)]
+struct ServiceInterfaces {
+    default: Path,
+    #[darling(default)]
+    additional: AdditionalInterfaces,
+}
+
+impl ServiceInterfaces {
+    fn list_all(&self) -> impl IntoIterator<Item = (String, &Path)> {
+        // Only the additional interfaces use the explicit interface names.
+        let additional_interfaces = self.additional.0.iter().map(|path| {
+            let interface_name = path
+                .segments
+                .last()
+                .expect("Interface should not be an empty string")
+                .ident
+                .to_string();
+            (interface_name, path)
+        });
+        iter::once((String::new(), &self.default)).chain(additional_interfaces)
+    }
+}
+
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(exonum), forward_attrs(allow, doc, cfg))]
 struct ServiceFactory {
@@ -56,7 +107,7 @@ struct ServiceFactory {
     proto_sources: Option<Path>,
     #[darling(default)]
     service_constructor: Option<Path>,
-    service_interface: Path,
+    interfaces: ServiceInterfaces,
     #[darling(default)]
     service_name: Option<Ident>,
 }
@@ -121,9 +172,17 @@ impl ServiceFactory {
     }
 
     fn impl_service_dispatcher(&self) -> impl ToTokens {
-        let trait_name = &self.service_interface;
         let cr = &self.cr;
         let dispatcher = self.service_name();
+
+        let match_arms = self
+            .interfaces.list_all()
+            .into_iter()
+            .map(|(interface_name, trait_name)| {
+                quote! {
+                    #interface_name => <#dispatcher as #trait_name>::dispatch(self, ctx, method, payload),
+                }
+            });
 
         quote! {
             impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
@@ -134,7 +193,10 @@ impl ServiceFactory {
                     ctx: #cr::runtime::rust::service::TransactionContext,
                     payload: &[u8],
                 ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
-                    <#dispatcher as #trait_name>::_dispatch(self, ctx, method, payload)
+                    match interface_name {
+                        #( #match_arms )*
+                        other => failure::bail!("Unknown interface called: {}", other),
+                    }
                 }
             }
         }

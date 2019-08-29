@@ -31,7 +31,7 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{Service, ServiceFactory, Transaction, TransactionContext, BeforeCommitContext},
+        rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
@@ -78,7 +78,7 @@ trait TestDispatcherInterface {
     crate = "crate",
     artifact_name = "test_dispatcher",
     proto_sources = "crate::proto::schema",
-    service_interface = "TestDispatcherInterface"
+    interfaces(default = "TestDispatcherInterface")
 )]
 struct TestDispatcherService;
 
@@ -186,7 +186,7 @@ trait ServiceGood {}
     artifact_name = "good_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "ServiceGood"
+    interfaces(default = "ServiceGood")
 )]
 struct ServiceGoodImpl;
 
@@ -208,7 +208,7 @@ trait ServicePanic {}
     artifact_name = "panic_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "ServicePanic"
+    interfaces(default = "ServicePanic")
 )]
 struct ServicePanicImpl;
 
@@ -229,7 +229,7 @@ trait ServicePanicStorageError {}
     artifact_name = "storage_error_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "ServicePanicStorageError"
+    interfaces(default = "ServicePanicStorageError")
 )]
 struct ServicePanicStorageErrorImpl;
 
@@ -264,7 +264,7 @@ trait TxResultCheckInterface {
     artifact_name = "tx_result_check",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "TxResultCheckInterface"
+    interfaces(default = "TxResultCheckInterface")
 )]
 struct TxResultCheckService;
 

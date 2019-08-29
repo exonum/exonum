@@ -66,7 +66,7 @@ trait TestService {
     artifact_name = "test_service",
     artifact_version = "0.1.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "TestService"
+    interfaces(default = "TestService")
 )]
 pub struct TestServiceImpl;
 

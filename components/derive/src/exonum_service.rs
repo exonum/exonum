@@ -149,7 +149,7 @@ impl ExonumService {
 
         quote! {
             #[doc(hidden)]
-            fn _dispatch(
+            fn dispatch(
                     &self,
                     ctx: #cr::runtime::rust::TransactionContext,
                     method: #cr::runtime::MethodId,

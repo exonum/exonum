@@ -25,7 +25,7 @@ use crate::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, Service, Transaction, BeforeCommitContext},
+        rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
         InstanceDescriptor, InstanceId,
     },
 };
@@ -42,7 +42,7 @@ mod transactions;
     crate = "crate",
     proto_sources = "proto::schema",
     artifact_name = "exonum-supervisor",
-    service_interface = "transactions::Transactions"
+    interfaces(default = "transactions::Transactions")
 )]
 pub struct Supervisor;
 

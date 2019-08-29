@@ -135,7 +135,7 @@ mod timestamping {
     #[exonum(
         artifact_name = "timestamping",
         proto_sources = "crate::proto",
-        service_interface = "TimestampingInterface"
+        interfaces(default = "TimestampingInterface")
     )]
     pub struct Timestamping;
 
@@ -239,7 +239,7 @@ mod cryptocurrency {
     #[exonum(
         artifact_name = "cryptocurrency",
         proto_sources = "crate::proto",
-        service_interface = "CryptocurrencyInterface"
+        interfaces(default = "CryptocurrencyInterface")
     )]
     pub struct Cryptocurrency;
 
@@ -382,11 +382,8 @@ mod foreign_interface_call {
         crypto::Hash,
         messages::Verified,
         runtime::{
-            rust::{
-                service::{Service, ServiceDispatcher},
-                RustArtifactId, ServiceFactory, Transaction, TransactionContext,
-            },
-            AnyTx, ArtifactProtobufSpec, CallInfo, InstanceId, MethodId,
+            rust::{Service, Transaction, TransactionContext},
+            AnyTx, CallInfo, InstanceId, MethodId,
         },
     };
     use exonum_merkledb::{BinaryValue, ObjectHash};
@@ -411,7 +408,7 @@ mod foreign_interface_call {
     }
 
     #[exonum_service]
-    pub trait TimestampingInterface {
+    pub trait SelfInterface {
         fn timestamp(&self, context: TransactionContext, arg: SelfTx)
             -> Result<(), ExecutionError>;
 
@@ -426,7 +423,7 @@ mod foreign_interface_call {
         fn timestamp(&self, context: TransactionContext, arg: SelfTx)
             -> Result<(), ExecutionError>;
 
-        fn _dispatch(
+        fn dispatch(
             &self,
             ctx: TransactionContext,
             method: MethodId,
@@ -443,10 +440,27 @@ mod foreign_interface_call {
         }
     }
 
-    #[derive(Debug)]
+    #[exonum_service]
+    pub trait Configure {}
+
+    #[exonum_service]
+    pub trait Events {}
+
+    #[exonum_service]
+    pub trait ERC30Tokens {}
+
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(
+        artifact_name = "timestamping",
+        proto_sources = "crate::proto",
+        interfaces(
+            default = "SelfInterface",
+            additional("ForeignInterface", "Configure", "Events", "ERC30Tokens")
+        )
+    )]
     pub struct Timestamping;
 
-    impl TimestampingInterface for Timestamping {
+    impl SelfInterface for Timestamping {
         fn timestamp(
             &self,
             _context: TransactionContext,
@@ -466,7 +480,6 @@ mod foreign_interface_call {
                 interface_name: "ForeignInterface".to_owned(),
             };
             let tx = SelfTx { data: arg.data };
-
             context.call(&call_info, tx.into_bytes().as_ref())
         }
     }
@@ -485,45 +498,13 @@ mod foreign_interface_call {
         }
     }
 
+    impl Configure for Timestamping {}
+
+    impl Events for Timestamping {}
+
+    impl ERC30Tokens for Timestamping {}
+
     impl Service for Timestamping {}
-
-    // Manual implementation of ServiceFactory
-
-    impl ServiceDispatcher for Timestamping {
-        fn call(
-            &self,
-            interface_name: &str,
-            method: MethodId,
-            ctx: TransactionContext,
-            payload: &[u8],
-        ) -> Result<Result<(), ExecutionError>, failure::Error> {
-            match interface_name {
-                "" => <Self as TimestampingInterface>::_dispatch(self, ctx, method, payload),
-                "ForeignInterface" => {
-                    <Self as ForeignInterface>::_dispatch(self, ctx, method, payload)
-                }
-                // Some additional interfaces to make the match closer to reality.
-                "Configurable" => unreachable!(),
-                "Events" => unreachable!(),
-                "ERC30Tokens" => unreachable!(),
-                other => failure::bail!("Unknown interface called: {}", other),
-            }
-        }
-    }
-
-    impl ServiceFactory for Timestamping {
-        fn artifact_id(&self) -> RustArtifactId {
-            "timestamping-foreign:1.0.0".parse().unwrap()
-        }
-
-        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-            ArtifactProtobufSpec::default()
-        }
-
-        fn create_instance(&self) -> Box<dyn Service> {
-            Box::new(Self)
-        }
-    }
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
