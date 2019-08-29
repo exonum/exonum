@@ -27,7 +27,8 @@ use log::SetLoggerError;
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::blockchain::{GenesisConfig, ValidatorKeys};
+use crate::blockchain::{GenesisConfig, ValidatorKeys, Schema};
+use crate::exonum_merkledb::Fork;
 use crate::crypto::gen_keypair;
 use crate::node::{ConnectListConfig, NodeConfig};
 
@@ -136,6 +137,13 @@ pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Opt
         }
         Some(comps.iter().map(|c| c.as_os_str()).collect())
     }
+}
+
+/// Clears consensus messages cache.
+///
+/// Used in `exonum-cli` to implement `clear-cache` maintenance action.
+pub fn clear_consensus_messages_cache(fork: &Fork) {
+    Schema::new(fork).consensus_messages_cache().clear();
 }
 
 #[test]
