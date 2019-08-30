@@ -63,6 +63,7 @@ use crate::helpers::{
 use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
 use exonum_merkledb::{Database, DbOptions};
+use exonum_crypto::read_keys_from_file_new;
 
 mod basic;
 mod connect_list;
@@ -267,9 +268,12 @@ pub struct NodeConfig<T = SecretKey> {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
+
+    /// TODO
+    pub master_key_path: PathBuf,
 }
 
-impl NodeConfig<PathBuf> {
+impl NodeConfig<SecretKey> {
     /// Converts `NodeConfig<PathBuf>` to `NodeConfig<SecretKey>` reading the key files.
     pub fn read_secret_keys(
         self,
@@ -278,38 +282,32 @@ impl NodeConfig<PathBuf> {
         service_passphrase: &[u8],
     ) -> NodeConfig {
         let config_folder = config_file_path.as_ref().parent().unwrap();
-        let consensus_key_path = if self.consensus_secret_key.is_absolute() {
-            self.consensus_secret_key
+        let master_key_path = if self.master_key_path.is_absolute() {
+            self.master_key_path.clone()
         } else {
-            config_folder.join(&self.consensus_secret_key)
-        };
-        let service_key_path = if self.service_secret_key.is_absolute() {
-            self.service_secret_key
-        } else {
-            config_folder.join(&self.service_secret_key)
+            config_folder.join(&self.master_key_path)
         };
 
-        let consensus_secret_key = read_keys_from_file(&consensus_key_path, consensus_passphrase)
-            .expect("Could not read consensus_secret_key from file")
-            .1;
-        let service_secret_key = read_keys_from_file(&service_key_path, service_passphrase)
-            .expect("Could not read service_secret_key from file")
-            .1;
+        let keys = read_keys_from_file_new(&master_key_path, consensus_passphrase)
+            .expect("Could not read master_key_path from file");
+
+        //TODO: change to real keys readed from file
         NodeConfig {
-            consensus_secret_key,
-            service_secret_key,
+            consensus_secret_key: keys.consensus_sk,
+            service_secret_key: keys.service_sk,
             genesis: self.genesis,
             listen_address: self.listen_address,
             external_address: self.external_address,
             network: self.network,
-            consensus_public_key: self.consensus_public_key,
-            service_public_key: self.service_public_key,
+            consensus_public_key: keys.consensus_pk,
+            service_public_key: keys.service_pk,
             api: self.api,
             mempool: self.mempool,
             services_configs: self.services_configs,
             database: self.database,
             connect_list: self.connect_list,
             thread_pool_size: self.thread_pool_size,
+            master_key_path: self.master_key_path,
         }
     }
 }

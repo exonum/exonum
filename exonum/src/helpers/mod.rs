@@ -78,6 +78,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             services_configs: Default::default(),
             database: Default::default(),
             thread_pool_size: Default::default(),
+            master_key_path: Default::default(),
         })
         .collect::<Vec<_>>()
 }

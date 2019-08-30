@@ -17,7 +17,9 @@
 use super::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
-use rand::thread_rng;
+use secret_tree::{Name, SecretTree};
+use exonum_sodiumoxide::crypto::kx::{PublicKey as PublicKeyKX, SecretKey as SecretKeyKX, Seed as SeedKx, keypair_from_seed as keypair_from_seed_kx};
+use rand::{thread_rng};
 use std::borrow::Cow;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -26,6 +28,7 @@ use std::{
     io::{Error, ErrorKind, Read, Write},
     path::Path,
 };
+use exonum_sodiumoxide::crypto::pwhash::{Salt, gen_salt};
 
 /// Creates a TOML file that contains encrypted `SecretKey` and returns `PublicKey` for the secret key.
 pub fn generate_keys_file<P: AsRef<Path>, W: AsRef<[u8]>>(
@@ -136,6 +139,125 @@ impl EncryptedKeys {
             Err(Error::new(ErrorKind::Other, "Different public keys"))
         }
     }
+}
+
+pub struct Keys {
+    pub consensus_pk: PublicKey,
+    pub consensus_sk: SecretKey,
+    pub service_pk: PublicKey,
+    pub service_sk: SecretKey,
+    pub identity_pk: PublicKeyKX,
+    pub identity_sk: SecretKeyKX,
+}
+
+pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
+    path: P,
+    pass_phrase: W,
+    key: Salt,
+) -> Result<(), Error> {
+    let encrypted_key = EncryptedMasterKey::encrypt(key, pass_phrase)?;
+    let file_content =
+        toml::to_string_pretty(&encrypted_key).map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let mut open_options = OpenOptions::new();
+    open_options.create(true).write(true);
+    #[cfg(unix)]
+        open_options.mode(0o_600);
+    let mut file = open_options.open(path.as_ref())?;
+    file.write_all(file_content.as_bytes())?;
+
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+struct EncryptedMasterKey {
+    key: ErasedPwBox,
+}
+
+impl EncryptedMasterKey {
+    fn encrypt(
+        key: Salt,
+        pass_phrase: impl AsRef<[u8]>,
+    ) -> Result<EncryptedMasterKey, Error> {
+        let mut rng = thread_rng();
+        let mut eraser = Eraser::new();
+        eraser.add_suite::<Sodium>();
+        let pwbox = Sodium::build_box(&mut rng)
+            .seal(pass_phrase, key)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't create a pw box"))?;
+        let encrypted_key = eraser
+            .erase(&pwbox)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't convert a pw box"))?;
+
+        Ok(EncryptedMasterKey {
+            key: encrypted_key,
+        })
+    }
+
+    fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<Salt, Error> {
+        let mut eraser = Eraser::new();
+        eraser.add_suite::<Sodium>();
+        let restored = eraser
+            .restore(&self.key)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't restore a secret key"))?;
+        assert_eq!(restored.len(), SEED_LENGTH);
+        let seed_bytes = restored
+            .open(pass_phrase)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))?;
+        let salt = Salt::from_slice(&seed_bytes[..])
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Couldn't create seed from slice"))?;
+
+        Ok(salt)
+    }
+}
+
+pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Keys {
+    let salt = gen_salt();
+    save_master_key(path, passphrase, salt);
+    generate_keys_from_master_password(salt)
+}
+
+fn generate_keys_from_master_password(salt: Salt) -> Keys {
+    let tree = SecretTree::from_seed(salt.as_ref()).unwrap();
+    let mut buffer = [0_u8; 32];
+
+    tree.child(Name::new("consensus")).fill(&mut buffer);
+    let seed = Seed::from_slice(&buffer).unwrap();
+    let (consensus_pk, consensus_sk) = gen_keypair_from_seed(&seed);
+
+    tree.child(Name::new("service")).fill(&mut buffer);
+    let seed = Seed::from_slice(&buffer).unwrap();
+    let (service_pk, service_sk) = gen_keypair_from_seed(&seed);
+
+    tree.child(Name::new("identity")).fill(&mut buffer);
+    let seed = SeedKx::from_slice(&buffer).unwrap();
+    let (identity_pk, identity_sk) = keypair_from_seed_kx(&seed);
+
+    Keys {
+        consensus_pk,
+        consensus_sk,
+        service_pk,
+        service_sk,
+        identity_pk,
+        identity_sk,
+    }
+}
+
+pub fn read_keys_from_file_new<P: AsRef<Path>, W: AsRef<[u8]>>(
+    path: P,
+    pass_phrase: W,
+) -> Result<Keys, Error> {
+    let mut key_file = File::open(path)?;
+
+    #[cfg(unix)]
+    validate_file_mode(key_file.metadata()?.mode())?;
+
+    let mut file_content = vec![];
+    key_file.read_to_end(&mut file_content)?;
+    let keys: EncryptedMasterKey =
+        toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let salt = keys.decrypt(pass_phrase)?;
+
+    Ok(generate_keys_from_master_password(salt))
 }
 
 #[cfg(test)]

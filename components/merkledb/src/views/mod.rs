@@ -178,6 +178,8 @@ where
         let (index_address, index_state) =
             metadata::index_metadata(self.index_access.clone(), &self.address, self.index_type);
 
+        dbg!(&index_address);
+
         let index_view = View::new(self.index_access, index_address);
 
         (index_view, index_state)

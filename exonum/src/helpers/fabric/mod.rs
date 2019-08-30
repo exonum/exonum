@@ -146,7 +146,7 @@ impl Argument {
 
 /// Keys describing various pieces of data one can get from `Context`.
 pub mod keys {
-    use std::{collections::BTreeMap, path::PathBuf};
+    use std::{collections::BTreeMap};
 
     use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig, NodeRunConfig};
     use super::ContextKey;
@@ -154,7 +154,7 @@ pub mod keys {
 
     /// Configuration for this node.
     /// Set by `finalize` and `run` commands.
-    pub const NODE_CONFIG: ContextKey<NodeConfig<PathBuf>> = context_key!("node_config");
+    pub const NODE_CONFIG: ContextKey<NodeConfig> = context_key!("node_config");
 
     /// Configuration file path for this node. If set, `ConfigManager` will be created.
     /// Set by `run` command.

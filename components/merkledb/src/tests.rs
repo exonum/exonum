@@ -14,10 +14,7 @@
 
 use exonum_crypto::Hash;
 
-use crate::{
-    Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, SparseListIndex,
-    ValueSetIndex,
-};
+use crate::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex, TemporaryDB, Database, View, IndexAddress};
 
 // This should compile to ensure ?Sized bound on `new_in_family` (see #1024).
 #[allow(dead_code, unreachable_code, unused_variables)]
@@ -31,4 +28,31 @@ fn should_compile() {
     let _: ProofMapIndex<_, Hash, ()> = ProofMapIndex::new_in_family("", "", &fork);
     let _: SparseListIndex<_, ()> = SparseListIndex::new_in_family("", "", &fork);
     let _: ValueSetIndex<_, ()> = ValueSetIndex::new_in_family("", "", &fork);
+}
+
+#[test]
+fn data_interference() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+
+    {
+        let mut index: ListIndex<_, i32> = ListIndex::new("index", &fork);
+        index.push(1);
+    }
+
+    db.merge(fork.into_patch());
+
+    let fork = db.fork();
+    {
+        let address = IndexAddress::new().append_bytes(&vec![0_u8; 8]);
+        let mut view = View::new(&fork, address.clone());
+
+        view.clear();
+    }
+    db.merge(fork.into_patch());
+
+    let snapshot = db.snapshot();
+    let index: ListIndex<_, i32> = ListIndex::new("index", &snapshot);
+
+    assert_eq!(index.get(0), None);
 }

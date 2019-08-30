@@ -17,7 +17,7 @@
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 
 use crate::blockchain::config::{ConsensusConfig, ValidatorKeys};
-use crate::crypto::PublicKey;
+use crate::crypto::{SecretKey, PublicKey};
 
 /// Abstract configuration.
 pub type AbstractConfig = BTreeMap<String, toml::Value>;
@@ -77,14 +77,16 @@ pub struct NodePrivateConfig {
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Path to the consensus secret key file.
-    pub consensus_secret_key: PathBuf,
+    pub consensus_secret_key: SecretKey,
     /// Service public key.
     pub service_public_key: PublicKey,
     /// Path to the service secret key file.
-    pub service_secret_key: PathBuf,
+    pub service_secret_key: SecretKey,
     /// Additional service secret config.
     #[serde(default)]
     pub services_secret_configs: AbstractConfig,
+
+    pub master_key_path: PathBuf,
 }
 
 /// Used for passing configuration for starting node from the command line that is not in the `NodeConfig`.

@@ -40,6 +40,7 @@ use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use exonum_merkledb::{Database, DbOptions, RocksDB};
+use exonum_crypto::{Keys, generate_keys};
 
 const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -70,7 +71,7 @@ impl Run {
             .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH))
     }
 
-    fn node_config(path: String) -> NodeConfig<PathBuf> {
+    fn node_config(path: String) -> NodeConfig {
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
@@ -582,26 +583,18 @@ impl Command for GenerateNodeConfig {
         let services_public_configs = new_context.get(keys::SERVICES_PUBLIC_CONFIGS).unwrap();
         let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
-        let consensus_public_key = {
+        let keys = {
             let passphrase = Self::get_passphrase(
                 &new_context,
                 consensus_key_pass_method,
                 SecretKeyType::Consensus,
             );
-            create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())
-        };
-        let service_public_key = {
-            let passphrase = Self::get_passphrase(
-                &new_context,
-                service_key_pass_method,
-                SecretKeyType::Service,
-            );
-            create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
+            create_keys_and_files(&consensus_secret_key_path, passphrase.as_bytes())
         };
 
         let validator_keys = ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
+            consensus_key: keys.consensus_pk,
+            service_key: keys.service_pk,
         };
         let node_pub_config = NodePublicConfig {
             address: addresses.0.clone(),
@@ -619,12 +612,13 @@ impl Command for GenerateNodeConfig {
         let private_config = NodePrivateConfig {
             listen_address: addresses.1,
             external_address: addresses.0.clone(),
-            consensus_public_key,
-            consensus_secret_key: consensus_secret_key_name.into(),
-            service_public_key,
-            service_secret_key: service_secret_key_name.into(),
+            consensus_public_key: keys.consensus_pk,
+            consensus_secret_key: keys.consensus_sk,
+            service_public_key: keys.service_pk,
+            service_secret_key: keys.service_sk,
             services_secret_configs: services_secret_configs
                 .expect("services_secret_configs not found after exts call"),
+            master_key_path: consensus_secret_key_path,
         };
 
         ConfigFile::save(&private_config, private_config_path)
@@ -805,9 +799,9 @@ impl Command for Finalize {
                 external_address: secret_config.external_address,
                 network: Default::default(),
                 consensus_public_key: secret_config.consensus_public_key,
-                consensus_secret_key: secret_config_dir.join(&secret_config.consensus_secret_key),
+                consensus_secret_key: secret_config.consensus_secret_key,
                 service_public_key: secret_config.service_public_key,
-                service_secret_key: secret_config_dir.join(&secret_config.service_secret_key),
+                service_secret_key: secret_config.service_secret_key,
                 genesis,
                 api: NodeApiConfig {
                     public_api_address,
@@ -821,6 +815,8 @@ impl Command for Finalize {
                 database: Default::default(),
                 connect_list,
                 thread_pool_size: Default::default(),
+                //TODO: change to real path
+                master_key_path: secret_config_path.into(),
             }
         };
 
@@ -852,12 +848,30 @@ fn create_secret_key_file(
         panic!(
             "Failed to create secret key file. File exists: {}",
             secret_key_path.to_string_lossy(),
-        );
+        )
     } else {
         if let Some(dir) = secret_key_path.parent() {
             fs::create_dir_all(dir).unwrap();
         }
         generate_keys_file(&secret_key_path, &passphrase).unwrap()
+    }
+}
+
+fn create_keys_and_files(
+    secret_key_path: impl AsRef<Path>,
+    passphrase: impl AsRef<[u8]>,
+) -> Keys {
+    let secret_key_path = secret_key_path.as_ref();
+    if secret_key_path.exists() {
+        panic!(
+            "Failed to create secret key file. File exists: {}",
+            secret_key_path.to_string_lossy(),
+        )
+    } else {
+        if let Some(dir) = secret_key_path.parent() {
+            fs::create_dir_all(dir).unwrap();
+        }
+        generate_keys(&secret_key_path, passphrase.as_ref())
     }
 }
 
