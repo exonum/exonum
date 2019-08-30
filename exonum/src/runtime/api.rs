@@ -191,11 +191,11 @@ impl ServiceApiScope {
 ///             .map(|hash| BlockInfo { hash }))
 ///     }
 ///
-///     // Mutable handler which sends `Rebroadcast` request to the node.
-///     pub fn rebroadcast(state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///     // Mutable handler which sends `Shutdown` request to the node.
+///     pub fn shutdown(state: &ServiceApiState, _query: ()) -> api::Result<()> {
 ///         state
 ///             .sender()
-///             .send_external_message(ExternalMessage::Rebroadcast)
+///             .send_external_message(ExternalMessage::Shutdown)
 ///             .map_err(From::from)
 ///     }
 ///
@@ -222,10 +222,10 @@ impl ServiceApiScope {
 ///         .endpoint("v1/ping", MyApi::ping)
 ///         .endpoint("v1/block_hash", MyApi::block_hash)
 ///         .endpoint("v1/async_operation", MyApi::async_operation);
-///     // Add a mutable endpoint for to the private API.
+///     // Add a mutable endpoint to the private API.
 ///     builder
 ///         .private_scope()
-///         .endpoint_mut("v1/rebroadcast", MyApi::rebroadcast);
+///         .endpoint_mut("v1/shutdown", MyApi::shutdown);
 ///     builder
 /// }
 ///

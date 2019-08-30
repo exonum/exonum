@@ -15,7 +15,7 @@
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 
 use crate::{
-    blockchain::{get_transaction, Schema},
+    blockchain::Schema,
     events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent},
 };
 
@@ -86,7 +86,6 @@ impl NodeHandler {
                 }
             }
             ExternalMessage::Shutdown => self.handle_shutdown(),
-            ExternalMessage::Rebroadcast => self.handle_rebroadcast(),
         }
     }
 
@@ -108,28 +107,12 @@ impl NodeHandler {
         }
     }
 
-    /// Schedule execution for later time
+    /// Schedule execution for later time.
     pub(crate) fn execute_later(&mut self, event: InternalRequest) {
         self.channel.internal_requests.send(event).log_error();
     }
 
-    /// Broadcasts all transactions from the pool to other validators.
-    pub(crate) fn handle_rebroadcast(&mut self) {
-        use exonum_crypto::Hash;
-        let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-
-        let mut txs: Vec<Hash> = self.state.tx_cache().keys().cloned().collect();
-        txs.extend(schema.transactions_pool().iter());
-
-        for tx_hash in txs {
-            self.broadcast(
-                get_transaction(&tx_hash, &schema.transactions(), &self.state.tx_cache())
-                    .expect("Rebroadcast: invalid transaction hash"),
-            )
-        }
-    }
-
+    /// Shutdown current node.
     pub(crate) fn handle_shutdown(&mut self) {
         // Send `Shutdown` to stop event-loop.
         self.execute_later(InternalRequest::Shutdown);

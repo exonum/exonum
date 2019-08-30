@@ -5,6 +5,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Breaking changes
+
+- `system/v1/rebroadcast` endpoint has been removed. (#1445)
+
 ## 0.12.0 - 2019-08-14
 
 ### Breaking changes
