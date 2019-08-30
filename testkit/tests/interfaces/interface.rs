@@ -15,12 +15,15 @@
 //! Interfaces definition for the tests of interservice calls.
 
 use exonum::{
-    runtime::{ExecutionError, rust::{TransactionContext, service::CallContext}},
     crypto::PublicKey,
     merkledb::BinaryValue,
+    runtime::{
+        rust::{service::CallContext, TransactionContext},
+        ExecutionError,
+    },
 };
-use exonum_derive::{ProtobufConvert, exonum_service};
-use serde_derive::{Serialize, Deserialize};
+use exonum_derive::{exonum_service, ProtobufConvert};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::proto;
 

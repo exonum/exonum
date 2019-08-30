@@ -386,11 +386,7 @@ pub struct ExecutionContext<'a> {
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub(crate) fn new(
-        dispatcher: &'a Dispatcher,
-        fork: &'a Fork,
-        caller: Caller,
-    ) -> Self {
+    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,

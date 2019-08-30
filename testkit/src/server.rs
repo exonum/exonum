@@ -189,7 +189,7 @@ mod tests {
     #[exonum(
         artifact_name = "sample-service",
         proto_sources = "crate::proto",
-        interfaces ( default = "SampleServiceInterface" )
+        interfaces(default = "SampleServiceInterface")
     )]
     struct SampleService;
 

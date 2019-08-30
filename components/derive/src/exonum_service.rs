@@ -135,26 +135,25 @@ impl ExonumService {
         let trait_name = &self.item_trait.ident;
         let cr = &self.attrs.cr;
 
-        let match_arms =
-            self.methods
-                .iter()
-                .map(|ServiceMethodDescriptor { name, arg_type, id }| {
-                    quote! {
-                        #id => {
-                            let bytes = payload.into();
-                            let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                                .map_err(|error_msg|
-                                    (
-                                        #cr::runtime::rust::error::Error::ArgumentsParseError,
-                                        format!("Unable to parse argument for the `{}#{}` method. {}",
-                                            stringify!(#trait_name), stringify!(#name), error_msg
-                                        )
+        let match_arms = self.methods.iter().map(
+            |ServiceMethodDescriptor { name, arg_type, id }| {
+                quote! {
+                    #id => {
+                        let bytes = payload.into();
+                        let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
+                            .map_err(|error_msg|
+                                (
+                                    #cr::runtime::rust::error::Error::ArgumentsParseError,
+                                    format!("Unable to parse argument for the `{}#{}` method. {}",
+                                        stringify!(#trait_name), stringify!(#name), error_msg
                                     )
-                                )?;
-                            self.#name(ctx,arg).map_err(From::from)
-                        }
+                                )
+                            )?;
+                        self.#name(ctx,arg).map_err(From::from)
                     }
-                });
+                }
+            },
+        );
 
         quote! {
             #[doc(hidden)]

@@ -52,7 +52,7 @@ use crate::{
 };
 
 #[derive(Debug, ServiceFactory)]
-#[exonum(proto_sources = "proto", interfaces ( default = "TimestampingInterface" ))]
+#[exonum(proto_sources = "proto", interfaces(default = "TimestampingInterface"))]
 pub struct TimestampingService;
 
 impl Service for TimestampingService {

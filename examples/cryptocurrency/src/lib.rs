@@ -213,7 +213,7 @@ pub mod contracts {
     #[derive(Debug, ServiceFactory)]
     #[exonum(
         proto_sources = "crate::proto",
-        interfaces ( default = "CryptocurrencyInterface" )
+        interfaces(default = "CryptocurrencyInterface")
     )]
     pub struct CryptocurrencyService;
 

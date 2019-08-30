@@ -59,7 +59,7 @@ impl TxAfterCommit {
     artifact_version = "1.0.0",
     proto_sources = "crate::proto",
     service_constructor = "Self::new_instance",
-    interfaces ( default = "AfterCommitInterface" )
+    interfaces(default = "AfterCommitInterface")
 )]
 pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,

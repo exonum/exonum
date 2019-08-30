@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::PublicKey, merkledb::{MapIndex, IndexAccess}};
-use exonum_derive::{ProtobufConvert};
+use exonum::{
+    crypto::PublicKey,
+    merkledb::{IndexAccess, MapIndex},
+};
+use exonum_derive::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto;
@@ -27,7 +30,7 @@ pub struct Wallet {
 
 pub struct WalletSchema<T>(T);
 
-impl<T:IndexAccess> WalletSchema<T> {
+impl<T: IndexAccess> WalletSchema<T> {
     pub fn new(access: T) -> Self {
         Self(access)
     }

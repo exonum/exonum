@@ -96,7 +96,7 @@ impl Service for TimeService {
     proto_sources = "proto",
     service_name = "TimeService",
     service_constructor = "TimeServiceFactory::create_instance",
-    interfaces ( default = "TimeOracleInterface" )
+    interfaces(default = "TimeOracleInterface")
 )]
 pub struct TimeServiceFactory {
     time_provider: Arc<dyn TimeProvider>,

@@ -779,8 +779,7 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let context =
-            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 1 });
+        let context = ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 1 });
         dispatcher
             .call(
                 &context,

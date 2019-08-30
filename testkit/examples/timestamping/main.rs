@@ -60,7 +60,7 @@ trait TimestampingInterface {
     artifact_name = "timestamping",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto",
-    interfaces ( default = "TimestampingInterface" )
+    interfaces(default = "TimestampingInterface")
 )]
 struct TimestampingService;
 
