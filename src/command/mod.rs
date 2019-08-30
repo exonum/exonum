@@ -17,6 +17,7 @@
 pub mod finalize;
 pub mod generate_config;
 pub mod generate_template;
+pub mod maintenance;
 pub mod run;
 pub mod run_dev;
 
@@ -29,6 +30,7 @@ use std::path::PathBuf;
 use crate::command::finalize::Finalize;
 use crate::command::generate_config::GenerateConfig;
 use crate::command::generate_template::GenerateTemplate;
+use crate::command::maintenance::{Action, Maintenance};
 use crate::command::run::{NodeRunConfig, Run};
 use crate::command::run_dev::RunDev;
 
@@ -57,6 +59,9 @@ pub enum Command {
     #[structopt(name = "run-dev")]
     /// Run the node with auto-generated config.
     RunDev(RunDev),
+    #[structopt(name = "maintenance")]
+    /// Perform different maintenance actions.
+    Maintenance(Maintenance),
 }
 
 impl Command {
@@ -74,6 +79,7 @@ impl ExonumCommand for Command {
             Command::Finalize(command) => command.execute(),
             Command::Run(command) => command.execute(),
             Command::RunDev(command) => command.execute(),
+            Command::Maintenance(command) => command.execute(),
         }
     }
 }
@@ -99,4 +105,13 @@ pub enum StandardResult {
     },
     /// `run` command output.
     Run(NodeRunConfig),
+    /// `maintenance` command output.
+    Maintenance {
+        /// Path to a node configuration file.
+        node_config_path: PathBuf,
+        /// Path to a database directory.
+        db_path: PathBuf,
+        /// Performed action.
+        performed_action: Action,
+    },
 }

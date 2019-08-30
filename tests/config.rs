@@ -495,3 +495,16 @@ fn test_update_config() {
     let new_connect_list = config.connect_list;
     assert_eq!(new_connect_list.peers, connect_list.peers);
 }
+
+#[test]
+fn test_clear_cache() {
+    let env = ConfigSpec::new_without_pass();
+    let db_path = env.expected_dir().join("db0");
+
+    env.command("maintenance")
+        .with_named_arg("--node-config", &env.expected_node_config_file(0))
+        .with_named_arg("--db-path", &db_path)
+        .with_arg("clear-cache")
+        .run()
+        .unwrap();
+}
