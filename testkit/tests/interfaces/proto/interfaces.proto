@@ -17,6 +17,7 @@ syntax = "proto3";
 package exonum.testkit;
 
 import "helpers.proto";
+import "runtime.proto";
 
 message CreateWallet {
   string name = 1;
@@ -30,4 +31,9 @@ message Issue {
 message Wallet {
   string name = 1;
   uint64 balance = 2;
+}
+
+message AnyCall {
+  exonum.runtime.CallInfo call_info = 1;
+  bytes args = 2;
 }

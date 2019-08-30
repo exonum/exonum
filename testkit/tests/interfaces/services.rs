@@ -18,7 +18,7 @@ pub use crate::interface::TxIssue;
 
 use exonum::runtime::{
     rust::{Service, TransactionContext},
-    ExecutionError, InstanceId,
+    CallInfo, ExecutionError, InstanceId,
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
 use serde_derive::{Deserialize, Serialize};
@@ -124,3 +124,35 @@ impl IssueReceiver for DepositService {
             .issue(arg)
     }
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::AnyCall")]
+pub struct TxAnyCall {
+    pub call_info: CallInfo,
+    pub args: Vec<u8>,
+}
+
+#[exonum_service]
+pub trait AnyCall {
+    fn call_any(&self, context: TransactionContext, arg: TxAnyCall) -> Result<(), ExecutionError>;
+}
+
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "any-call-service",
+    proto_sources = "proto",
+    interfaces(default = "AnyCall")
+)]
+pub struct AnyCallService;
+
+impl AnyCallService {
+    pub const ID: InstanceId = 26;
+}
+
+impl AnyCall for AnyCallService {
+    fn call_any(&self, context: TransactionContext, tx: TxAnyCall) -> Result<(), ExecutionError> {
+        context.call(&tx.call_info, tx.args.as_ref())
+    }
+}
+
+impl Service for AnyCallService {}

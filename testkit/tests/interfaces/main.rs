@@ -14,14 +14,18 @@
 
 use exonum::{
     crypto,
+    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
     proto::Any,
-    runtime::{rust::Transaction, ExecutionError},
+    runtime::{self, dispatcher, rust::Transaction, CallInfo, ExecutionError},
 };
 use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
 
-use schema::WalletSchema;
-use services::{DepositService, TxCreateWallet, TxIssue, WalletService};
+use crate::{
+    error::Error,
+    schema::WalletSchema,
+    services::{AnyCallService, DepositService, TxAnyCall, TxCreateWallet, TxIssue, WalletService},
+};
 
 mod error;
 mod interface;
@@ -42,6 +46,11 @@ fn testkit_with_interfaces() -> TestKit {
             "deposit",
             Any::default(),
         ))
+        .with_service(InstanceCollection::new(AnyCallService).with_instance(
+            AnyCallService::ID,
+            "any-call",
+            Any::default(),
+        ))
         .create()
 }
 
@@ -52,7 +61,7 @@ fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(),
 }
 
 #[test]
-fn test_create_wallet() {
+fn test_create_wallet_ok() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
@@ -67,7 +76,7 @@ fn test_create_wallet() {
 }
 
 #[test]
-fn test_deposit() {
+fn test_deposit_ok() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
@@ -99,4 +108,192 @@ fn test_deposit() {
             .balance,
         10_000
     );
+}
+
+#[test]
+fn test_deposit_err_issue_without_wallet() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    let err = execute_transaction(
+        &mut testkit,
+        TxIssue {
+            to: keypair.0,
+            amount: 10_000,
+        }
+        .sign(DepositService::ID, keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind, Error::WalletNotFound.into());
+}
+
+#[test]
+fn test_any_call_ok_deposit() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    execute_transaction(
+        &mut testkit,
+        TxCreateWallet {
+            name: "Alice".into(),
+        }
+        .sign(WalletService::ID, keypair.0, &keypair.1),
+    )
+    .expect("Unable to create wallet");
+
+    execute_transaction(
+        &mut testkit,
+        TxAnyCall {
+            call_info: CallInfo {
+                interface_name: String::default(),
+                instance_id: DepositService::ID,
+                method_id: 0,
+            },
+            args: TxIssue {
+                to: keypair.0,
+                amount: 10_000,
+            }
+            .into_bytes(),
+        }
+        .sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .expect("Unable to deposit wallet");
+
+    let snapshot = testkit.snapshot();
+    assert_eq!(
+        WalletSchema::new(&snapshot)
+            .wallets()
+            .get(&keypair.0)
+            .unwrap()
+            .balance,
+        10_000
+    );
+}
+
+#[test]
+fn test_any_call_err_deposit_unauthorized() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    execute_transaction(
+        &mut testkit,
+        TxCreateWallet {
+            name: "Alice".into(),
+        }
+        .sign(WalletService::ID, keypair.0, &keypair.1),
+    )
+    .expect("Unable to create wallet");
+
+    let err = execute_transaction(
+        &mut testkit,
+        TxAnyCall {
+            call_info: CallInfo {
+                interface_name: "IssueReceiver".to_owned(),
+                instance_id: WalletService::ID,
+                method_id: 0,
+            },
+            args: TxIssue {
+                to: keypair.0,
+                amount: 10_000,
+            }
+            .into_bytes(),
+        }
+        .sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind, Error::UnauthorizedIssuer.into());
+}
+
+#[test]
+fn test_any_call_err_unknown_instance() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    let err = execute_transaction(
+        &mut testkit,
+        TxAnyCall {
+            call_info: CallInfo::new(10_000, 0),
+            args: vec![],
+        }
+        .sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind, dispatcher::Error::IncorrectInstanceId.into());
+}
+
+#[test]
+fn test_any_call_err_unknown_interface() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    let err = execute_transaction(
+        &mut testkit,
+        TxAnyCall {
+            call_info: CallInfo {
+                interface_name: "FooFace".to_owned(),
+                instance_id: WalletService::ID,
+                method_id: 0,
+            },
+            args: vec![],
+        }
+        .sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind, dispatcher::Error::NoSuchInterface.into());
+}
+
+#[test]
+fn test_any_call_err_unknown_method() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    let err = execute_transaction(
+        &mut testkit,
+        TxAnyCall {
+            call_info: CallInfo {
+                interface_name: "IssueReceiver".to_owned(),
+                instance_id: WalletService::ID,
+                method_id: 1,
+            },
+            args: TxIssue {
+                to: keypair.0,
+                amount: 10_000,
+            }
+            .into_bytes(),
+        }
+        .sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind, dispatcher::Error::NoSuchMethod.into());
+}
+
+#[test]
+fn test_any_call_err_wrong_arg() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    let err = execute_transaction(
+        &mut testkit,
+        TxAnyCall {
+            call_info: CallInfo {
+                interface_name: String::default(),
+                instance_id: WalletService::ID,
+                method_id: 0,
+            },
+            args: TxAnyCall {
+                call_info: CallInfo::new(10_000, 0),
+                args: vec![],
+            }
+            .into_bytes(),
+        }
+        .sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind, runtime::rust::Error::ArgumentsParseError.into());
 }

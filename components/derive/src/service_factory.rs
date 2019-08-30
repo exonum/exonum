@@ -198,7 +198,7 @@ impl ServiceFactory {
                         other => {
                             let kind = #cr::runtime::dispatcher::Error::NoSuchInterface;
                             let message = format!(
-                                "Service instance `{}` does not implement the `{}` interface.",
+                                "Service instance `{}` does not implement a `{}` interface.",
                                 ctx.instance.name,
                                 other
                             );

@@ -18,7 +18,7 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::interfaces::{CreateWallet, Issue, Wallet};
+pub use self::interfaces::{CreateWallet, Issue, Wallet, AnyCall};
 
 include!(concat!(env!("OUT_DIR"), "/interfaces_protobuf_mod.rs"));
 
