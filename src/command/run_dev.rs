@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::command::finalize::Finalize;
-use crate::command::generate_config::GenerateConfig;
+use crate::command::generate_config::{GenerateConfig, PUB_CONFIG_FILE_NAME, SEC_CONFIG_FILE_NAME};
 use crate::command::generate_template::GenerateTemplate;
 use crate::command::run::Run;
 use crate::command::{ExonumCommand, StandardResult};
@@ -77,10 +77,12 @@ impl ExonumCommand for RunDev {
         };
         generate_config.execute()?;
 
+        let node_config_file_name = "node.toml";
+
         let finalize = Finalize {
-            secret_config_path: self.artifact_path("sec.toml"),
-            output_config_path: self.artifact_path("node.toml"),
-            public_configs: vec![self.artifact_path("pub.toml")],
+            secret_config_path: self.artifact_path(SEC_CONFIG_FILE_NAME),
+            output_config_path: self.artifact_path(node_config_file_name),
+            public_configs: vec![self.artifact_path(PUB_CONFIG_FILE_NAME)],
             public_api_address: Some("127.0.0.1:8080".parse().unwrap()),
             private_api_address: Some("127.0.0.1:8081".parse().unwrap()),
             public_allow_origin: Some("http://127.0.0.1:8080, http://localhost:8080".to_string()),
@@ -89,7 +91,7 @@ impl ExonumCommand for RunDev {
         finalize.execute()?;
 
         let run = Run {
-            node_config: self.artifact_path("node.toml"),
+            node_config: self.artifact_path(node_config_file_name),
             db_path: self.artifact_path("db"),
             public_api_address: None,
             private_api_address: None,
