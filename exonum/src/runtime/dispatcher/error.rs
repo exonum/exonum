@@ -34,4 +34,8 @@ pub enum Error {
     ServiceNotStarted = 6,
     /// Suitable runtime for the given service instance ID is not found.
     IncorrectInstanceId = 7,
+    /// No such interface in the service.
+    NoSuchInterface = 8,
+    /// No such method in the service interface.
+    NoSuchMethod = 9,
 }

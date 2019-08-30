@@ -12,24 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+use exonum_derive::IntoExecutionError;
 
-import "helpers.proto";
-
-package exonum.tests.explorer;
-
-message CreateWallet {
-  exonum.PublicKey pubkey = 1;
-  string name = 2;
-}
-
-message Transfer {
-  exonum.PublicKey from = 1;
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
-}
-
-message Issue {
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
+/// Common errors emitted by transactions during execution.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
+pub enum Error {
+    WalletNotFound = 0,
+    WalletAlreadyExists = 1,
+    WrongInterfaceCaller = 2,
+    UnauthorizedIssuer = 3,
 }

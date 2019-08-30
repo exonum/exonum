@@ -12,24 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+//! Module of the rust-protobuf generated files.
 
-import "helpers.proto";
+// For protobuf generated files.
+#![allow(bare_trait_objects)]
+#![allow(renamed_and_removed_lints)]
 
-package exonum.tests.explorer;
+pub use self::interfaces::{CreateWallet, Issue, Wallet};
 
-message CreateWallet {
-  exonum.PublicKey pubkey = 1;
-  string name = 2;
-}
+include!(concat!(env!("OUT_DIR"), "/interfaces_protobuf_mod.rs"));
 
-message Transfer {
-  exonum.PublicKey from = 1;
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
-}
-
-message Issue {
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
-}
+use exonum::proto::schema::*;

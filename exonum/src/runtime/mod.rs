@@ -383,8 +383,6 @@ pub struct ExecutionContext<'a> {
     actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a Dispatcher,
-    /// Identifier of the called service instance.
-    instance_id: InstanceId,
 }
 
 impl<'a> ExecutionContext<'a> {
@@ -392,32 +390,13 @@ impl<'a> ExecutionContext<'a> {
         dispatcher: &'a Dispatcher,
         fork: &'a Fork,
         caller: Caller,
-        instance_id: InstanceId,
     ) -> Self {
         Self {
             fork,
             caller,
             actions: Rc::default(),
             dispatcher,
-            instance_id,
         }
-    }
-
-    pub(crate) fn call(
-        &self,
-        call_info: &CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        let call_context = Self {
-            fork: self.fork,
-            caller: Caller::Service {
-                instance_id: self.instance_id,
-            },
-            dispatcher: self.dispatcher,
-            actions: self.actions.clone(),
-            instance_id: call_info.instance_id,
-        };
-        self.dispatcher.call(&call_context, call_info, arguments)
     }
 
     pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {

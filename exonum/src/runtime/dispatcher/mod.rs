@@ -294,7 +294,6 @@ impl Dispatcher {
                 author: tx.author(),
                 hash: tx_id,
             },
-            tx.as_ref().call_info.instance_id,
         );
         self.call(&context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
         // Execute pending dispatcher actions.
@@ -781,7 +780,7 @@ mod tests {
         let tx_payload = [0x00_u8; 1];
 
         let context =
-            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 1 }, 0);
+            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 1 });
         dispatcher
             .call(
                 &context,
@@ -898,7 +897,7 @@ mod tests {
         let tx_payload = [0x00_u8; 1];
 
         let context =
-            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 15 }, 0);
+            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 15 });
         dispatcher
             .call(
                 &context,

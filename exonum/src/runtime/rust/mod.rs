@@ -300,15 +300,12 @@ impl Runtime for RustRuntime {
             .get(&call_info.instance_id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
-        instance
-            .as_ref()
-            .call(
-                &call_info.interface_name,
-                call_info.method_id,
-                TransactionContext::new(context, instance.descriptor()),
-                payload,
-            )
-            .map_err(|e| (Error::UnspecifiedError, e))?
+        instance.as_ref().call(
+            &call_info.interface_name,
+            call_info.method_id,
+            TransactionContext::new(context, instance.descriptor()),
+            payload,
+        )
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {

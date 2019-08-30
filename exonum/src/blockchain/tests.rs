@@ -107,7 +107,7 @@ impl Service for TestDispatcherService {
 impl TestDispatcherInterface for TestDispatcherService {
     fn test_deploy(
         &self,
-        mut context: TransactionContext,
+        context: TransactionContext,
         arg: TestDeploy,
     ) -> Result<(), ExecutionError> {
         let mut index = Entry::new(context.instance.name, context.fork());
@@ -134,7 +134,7 @@ impl TestDispatcherInterface for TestDispatcherService {
 
     fn test_start(
         &self,
-        mut context: TransactionContext,
+        context: TransactionContext,
         arg: TestStart,
     ) -> Result<(), ExecutionError> {
         let mut index = Entry::new(context.instance.name, context.fork());

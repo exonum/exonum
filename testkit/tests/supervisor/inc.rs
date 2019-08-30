@@ -82,7 +82,7 @@ pub trait IncInterface {
     artifact_name = "inc",
     artifact_version = "1.0.0",
     proto_sources = "proto",
-    interfaces ( default = "IncInterface" )
+    interfaces(default = "IncInterface")
 )]
 pub struct IncService;
 

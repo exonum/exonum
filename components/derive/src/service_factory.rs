@@ -192,10 +192,18 @@ impl ServiceFactory {
                     method: #cr::runtime::MethodId,
                     ctx: #cr::runtime::rust::service::TransactionContext,
                     payload: &[u8],
-                ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+                ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match interface_name {
                         #( #match_arms )*
-                        other => failure::bail!("Unknown interface called: {}", other),
+                        other => {
+                            let kind = #cr::runtime::dispatcher::Error::NoSuchInterface;
+                            let message = format!(
+                                "Service instance `{}` does not implement the `{}` interface.",
+                                ctx.instance.name,
+                                other
+                            );
+                            Err((kind, message)).map_err(From::from)
+                        }
                     }
                 }
             }

@@ -382,6 +382,7 @@ mod foreign_interface_call {
         crypto::Hash,
         messages::Verified,
         runtime::{
+            self, dispatcher,
             rust::{Service, Transaction, TransactionContext},
             AnyTx, CallInfo, InstanceId, MethodId,
         },
@@ -428,14 +429,15 @@ mod foreign_interface_call {
             ctx: TransactionContext,
             method: MethodId,
             payload: &[u8],
-        ) -> Result<Result<(), ExecutionError>, failure::Error> {
+        ) -> Result<(), ExecutionError> {
             match method {
                 0u32 => {
                     let bytes = payload.into();
-                    let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)?;
-                    Ok(self.timestamp(ctx, arg).map_err(From::from))
+                    let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
+                        .map_err(|e| (runtime::rust::Error::ArgumentsParseError, e))?;
+                    self.timestamp(ctx, arg)
                 }
-                _ => failure::bail!("Method not found"),
+                _ => Err(dispatcher::Error::NoSuchMethod).map_err(From::from),
             }
         }
     }
@@ -471,7 +473,7 @@ mod foreign_interface_call {
 
         fn timestamp_foreign(
             &self,
-            mut context: TransactionContext,
+            context: TransactionContext,
             arg: ForeignTx,
         ) -> Result<(), ExecutionError> {
             let call_info = CallInfo {

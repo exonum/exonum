@@ -71,7 +71,7 @@ trait TestService {
 pub struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
-    fn method_a(&self, mut context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
+    fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
         {
             let fork = context.fork();
             let mut entry = Entry::new("method_a_entry", fork);
@@ -172,7 +172,6 @@ fn test_basic_rust_runtime() {
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
             },
-            SERVICE_INSTANCE_ID,
         );
         dispatcher.call(&context, &call_info, &payload).unwrap();
 
@@ -203,7 +202,6 @@ fn test_basic_rust_runtime() {
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
             },
-            SERVICE_INSTANCE_ID,
         );
         dispatcher.call(&context, &call_info, &payload).unwrap();
 

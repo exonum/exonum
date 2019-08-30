@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-use failure::Error;
 
 use std::fmt::{self, Debug};
 
@@ -42,7 +41,7 @@ pub trait ServiceDispatcher: Send {
         method: MethodId,
         ctx: TransactionContext,
         payload: &[u8],
-    ) -> Result<Result<(), ExecutionError>, Error>;
+    ) -> Result<(), ExecutionError>;
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
@@ -157,13 +156,32 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     /// Enqueue dispatcher action.
-    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
+    pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
         self.inner.dispatch_action(action)
     }
 
     /// Temporary method to test interservice communications.
-    pub fn call(&mut self, call_info: &CallInfo, arguments: &[u8]) -> Result<(), ExecutionError> {
-        self.inner.call(call_info, arguments)
+    pub fn call(&self, call_info: &CallInfo, arguments: &[u8]) -> Result<(), ExecutionError> {
+        let call_context = ExecutionContext {
+            fork: self.inner.fork,
+            caller: Caller::Service {
+                instance_id: self.instance.id,
+            },
+            dispatcher: self.inner.dispatcher,
+            actions: self.inner.actions.clone(),
+        };
+        self.inner
+            .dispatcher
+            .call(&call_context, call_info, arguments)
+    }
+
+    pub fn interface<T: From<CallContext<'a>>>(&self, instance_id: InstanceId) -> T {
+        let context = CallContext {
+            caller_id: self.instance.id,
+            inner: self.inner,
+            instance_id,
+        };
+        T::from(context)
     }
 }
 
@@ -279,5 +297,37 @@ impl<'a> Debug for AfterCommitContext<'a> {
         f.debug_struct("AfterCommitContext")
             .field("instance", &self.instance)
             .finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct CallContext<'a> {
+    inner: &'a ExecutionContext<'a>,
+    caller_id: InstanceId,
+    instance_id: InstanceId,
+}
+
+impl<'a> CallContext<'a> {
+    pub fn call(
+        &self,
+        interface_name: String,
+        method_id: MethodId,
+        arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        let context = ExecutionContext {
+            fork: self.inner.fork,
+            dispatcher: self.inner.dispatcher,
+            actions: self.inner.actions.clone(),
+            caller: Caller::Service {
+                instance_id: self.caller_id,
+            },
+        };
+        let call_info = CallInfo {
+            interface_name,
+            method_id,
+            instance_id: self.instance_id,
+        };
+
+        self.inner.dispatcher.call(&context, &call_info, arguments)
     }
 }

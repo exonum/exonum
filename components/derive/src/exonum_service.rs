@@ -132,6 +132,7 @@ impl ExonumService {
     }
 
     fn impl_dispatch_method(&self) -> impl ToTokens {
+        let trait_name = &self.item_trait.ident;
         let cr = &self.attrs.cr;
 
         let match_arms =
@@ -141,8 +142,16 @@ impl ExonumService {
                     quote! {
                         #id => {
                             let bytes = payload.into();
-                            let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)?;
-                            Ok(self.#name(ctx,arg).map_err(From::from))
+                            let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
+                                .map_err(|error_msg|
+                                    (
+                                        #cr::runtime::rust::error::Error::ArgumentsParseError,
+                                        format!("Unable to parse argument for the `{}#{}` method. {}",
+                                            stringify!(#trait_name), stringify!(#name), error_msg
+                                        )
+                                    )
+                                )?;
+                            self.#name(ctx,arg).map_err(From::from)
                         }
                     }
                 });
@@ -154,10 +163,17 @@ impl ExonumService {
                     ctx: #cr::runtime::rust::TransactionContext,
                     method: #cr::runtime::MethodId,
                     payload: &[u8]
-                ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+                ) -> Result<(), #cr::runtime::error::ExecutionError> {
                 match method {
                     #( #match_arms )*
-                    _ => failure::bail!("Method not found"),
+                    other => {
+                        let kind = #cr::runtime::dispatcher::Error::NoSuchMethod;
+                        let message = format!(
+                            "Method with ID {} is absent in the '{}' interface of the instance `{}`",
+                            other, stringify!(#trait_name), ctx.instance.name,
+                        );
+                        Err((kind, message)).map_err(From::from)
+                    }
                 }
             }
         }

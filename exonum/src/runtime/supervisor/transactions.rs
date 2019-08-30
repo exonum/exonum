@@ -138,7 +138,7 @@ impl Transactions for Supervisor {
 
     fn confirm_artifact_deploy(
         &self,
-        mut context: TransactionContext,
+        context: TransactionContext,
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
@@ -191,7 +191,7 @@ impl Transactions for Supervisor {
 
     fn start_service(
         &self,
-        mut context: TransactionContext,
+        context: TransactionContext,
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;
