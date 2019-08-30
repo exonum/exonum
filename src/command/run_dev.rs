@@ -69,7 +69,7 @@ impl ExonumCommand for RunDev {
         let generate_config = GenerateConfig {
             common_config: common_config.clone(),
             output_dir: self.artifacts_dir.clone(),
-            peer_address: "127.0.0.1".parse().unwrap(),
+            peer_address: "127.0.0.1:6200".parse().unwrap(),
             listen_address: None,
             no_password: true,
             consensus_key_pass: None,
