@@ -19,7 +19,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum_merkledb::{ListProof, ObjectHash, Snapshot};
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 
 use std::{
     cell::{Ref, RefCell},

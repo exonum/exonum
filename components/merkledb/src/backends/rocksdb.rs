@@ -20,7 +20,9 @@ pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksD
 
 use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
+use rocksdb::{
+    self, ColumnFamily, DBCompressionType, DBIterator, Options as RocksDbOptions, WriteBatch,
+};
 
 use crate::{
     db::{check_database, Change},
@@ -48,6 +50,10 @@ impl From<&DbOptions> for RocksDbOptions {
         let mut defaults = Self::default();
         defaults.create_if_missing(opts.create_if_missing);
         defaults.set_max_open_files(opts.max_open_files.unwrap_or(-1));
+        defaults.set_compression_type(
+            opts.compression_type
+                .map_or(DBCompressionType::None, Into::into),
+        );
         defaults
     }
 }
