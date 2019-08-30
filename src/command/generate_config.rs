@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::fs;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use crate::command::{ExonumCommand, StandardResult};
@@ -30,10 +30,17 @@ use crate::config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, S
 use crate::io::{load_config_file, save_config_file};
 use crate::password::{PassInputMethod, SecretKeyType, ZeroizeOnDrop};
 
-const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
-const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
-const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
-const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
+/// Name for a file containing consensus secret key.
+pub const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
+/// Name for a file containing service secret key.
+pub const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
+/// Name for a file containing the public part of the node configuration.
+pub const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
+/// Name for a file containing the secret part of the node configuration.
+pub const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
+
+/// Default port number used by Exonum for communication between nodes.
+pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 
 /// Generate public and private configs of the node.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
@@ -44,11 +51,20 @@ pub struct GenerateConfig {
     /// Path to a directory where public and private node configuration files
     /// will be saved.
     pub output_dir: PathBuf,
-    #[structopt(long, short = "a")]
+    #[structopt(
+        long,
+        short = "a",
+        parse(try_from_str = "GenerateConfig::parse_external_address")
+    )]
     /// External IP address of the node used for communications between nodes.
+    ///
+    /// If no port is provided, the default Exonum port 6333 is used.
     pub peer_address: SocketAddr,
     #[structopt(long, short = "l")]
     /// Listen IP address of the node used for communications between nodes.
+    ///
+    /// If not provided it combined from all-zeros (0.0.0.0) IP address and
+    /// the port number of the `peer-address`.
     pub listen_address: Option<SocketAddr>,
     #[structopt(long, short = "n")]
     /// Don't prompt for passwords when generating private keys.
@@ -83,6 +99,33 @@ impl GenerateConfig {
             method.get_passphrase(secret_key_type, false)
         }
     }
+
+    /// If no port is provided by user, uses `DEFAULT_EXONUM_LISTEN_PORT`.
+    fn parse_external_address(input: &str) -> Result<SocketAddr, Error> {
+        if let Ok(address) = input.parse() {
+            Ok(address)
+        } else {
+            let ip_address = input.parse()?;
+            Ok(SocketAddr::new(ip_address, DEFAULT_EXONUM_LISTEN_PORT))
+        }
+    }
+
+    /// Returns `provided` address or and address combined from all-zeros
+    /// IP address and the port number from `external_address`.
+    fn get_listen_address(
+        provided: Option<SocketAddr>,
+        external_address: SocketAddr,
+    ) -> SocketAddr {
+        if provided.is_some() {
+            provided.unwrap()
+        } else {
+            let ip_address = match external_address.ip() {
+                IpAddr::V4(_) => "0.0.0.0".parse().unwrap(),
+                IpAddr::V6(_) => "::".parse().unwrap(),
+            };
+            SocketAddr::new(ip_address, external_address.port())
+        }
+    }
 }
 
 impl ExonumCommand for GenerateConfig {
@@ -94,9 +137,7 @@ impl ExonumCommand for GenerateConfig {
         let consensus_secret_key_path = self.output_dir.join(CONSENSUS_SECRET_KEY_NAME);
         let service_secret_key_path = self.output_dir.join(SERVICE_SECRET_KEY_NAME);
 
-        let listen_address: SocketAddr = self.listen_address.unwrap_or_else(|| {
-            SocketAddr::new("0.0.0.0".parse().unwrap(), self.peer_address.port())
-        });
+        let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
         let consensus_public_key = {
             let passphrase = Self::get_passphrase(

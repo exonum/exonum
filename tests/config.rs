@@ -293,30 +293,29 @@ fn test_generate_config_key_files() {
     assert_eq!(sec_cfg["service_secret_key"], "service.key.toml".into());
 }
 
-// TODO: ECR-3456
-//#[test]
-//fn test_generate_config_ipv4() {
-//    let env = ConfigSpec::new_without_pass();
-//    env.command("generate-config")
-//        .with_arg(&env.expected_template_file())
-//        .with_arg(&env.output_node_config_dir(0))
-//        .with_named_arg("-a", "127.0.0.1")
-//        .with_arg("--no-password")
-//        .run()
-//        .unwrap();
-//}
-//
-//#[test]
-//fn test_generate_config_ipv6() {
-//    let env = ConfigSpec::new_without_pass();
-//    env.command("generate-config")
-//        .with_arg(&env.expected_template_file())
-//        .with_arg(&env.output_node_config_dir(0))
-//        .with_named_arg("-a", "::1")
-//        .with_arg("--no-password")
-//        .run()
-//        .unwrap();
-//}
+#[test]
+fn test_generate_config_ipv4() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file())
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "127.0.0.1")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
+
+#[test]
+fn test_generate_config_ipv6() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file())
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "::1")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
 
 #[test]
 fn test_finalize_run_without_pass() {
