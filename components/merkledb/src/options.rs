@@ -41,16 +41,16 @@ pub struct DbOptions {
     ///
     /// Defaults to `true`.
     pub create_if_missing: bool,
-    /// A compression type used to compress a block.
+    /// An algorithm used for database compression.
     ///
     /// Defaults to `None`, meaning there is no compression.
     pub compression_type: Option<CompressionType>,
 }
 
-/// Types of compression for the database.
+/// Algorithms of compression for the database.
 ///
 /// Database contents are stored in a set of blocks, each of which holds a
-/// sequence of key, value pairs. Each block may be compressed before
+/// sequence of key-value pairs. Each block may be compressed before
 /// being stored in a file. The following enum describes which
 /// compression type (if any) is used to compress a block.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
