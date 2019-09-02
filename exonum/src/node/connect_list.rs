@@ -40,23 +40,23 @@ pub struct ConnectList {
     /// Peers to which we can connect.
     #[serde(default)]
     pub peers: BTreeMap<PublicKey, PeerAddress>,
-}
-
-struct IdentityKeys {
-    identity_key: PublicKeyKx,
-    consensus_key: PublicKey,
+    pub identity: BTreeMap<PublicKey, Option<PublicKeyKx>>,
 }
 
 impl ConnectList {
     /// Creates `ConnectList` from config.
     pub fn from_config(config: ConnectListConfig) -> Self {
+        let mut identity = BTreeMap::new();
         let peers: BTreeMap<PublicKey, PeerAddress> = config
             .peers
             .into_iter()
-            .map(|peer| (peer.public_key, PeerAddress::new(peer.address)))
+            .map(|peer| {
+                identity.insert(peer.public_key, peer.identity_key);
+                (peer.public_key, PeerAddress::new(peer.address))
+            })
             .collect();
 
-        ConnectList { peers }
+        ConnectList { peers, identity }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
@@ -78,6 +78,8 @@ impl ConnectList {
     pub fn add(&mut self, peer: ConnectInfo) {
         self.peers
             .insert(peer.public_key, PeerAddress::new(peer.address));
+
+        self.identity.insert(peer.public_key, peer.identity_key);
     }
 
     /// Update peer address.

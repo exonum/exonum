@@ -286,6 +286,7 @@ impl NodeConfig<SecretKey> {
         service_passphrase: &[u8],
     ) -> NodeConfig {
         let config_folder = config_file_path.as_ref().parent().unwrap();
+        dbg!(&self.master_key_path);
         let master_key_path = if self.master_key_path.is_absolute() {
             self.master_key_path.clone()
         } else {

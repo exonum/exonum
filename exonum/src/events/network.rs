@@ -620,7 +620,7 @@ impl NetworkHandler {
     {
         let mut handshake_params = handshake_params.clone();
         //TODO: change revert
-//        handshake_params.set_remote_key(key);
+        //        handshake_params.set_remote_key(key);
         NoiseHandshake::initiator(&handshake_params, &stream.peer_addr().unwrap()).send(stream)
     }
 }

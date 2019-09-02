@@ -163,7 +163,7 @@ pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
     #[cfg(unix)]
-        open_options.mode(0o_600);
+    open_options.mode(0o_600);
     let mut file = open_options.open(path.as_ref())?;
     file.write_all(file_content.as_bytes())?;
 
@@ -176,10 +176,7 @@ struct EncryptedMasterKey {
 }
 
 impl EncryptedMasterKey {
-    fn encrypt(
-        key: Salt,
-        pass_phrase: impl AsRef<[u8]>,
-    ) -> Result<EncryptedMasterKey, Error> {
+    fn encrypt(key: Salt, pass_phrase: impl AsRef<[u8]>) -> Result<EncryptedMasterKey, Error> {
         let mut rng = thread_rng();
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
@@ -190,9 +187,7 @@ impl EncryptedMasterKey {
             .erase(&pwbox)
             .map_err(|_| Error::new(ErrorKind::Other, "Couldn't convert a pw box"))?;
 
-        Ok(EncryptedMasterKey {
-            key: encrypted_key,
-        })
+        Ok(EncryptedMasterKey { key: encrypted_key })
     }
 
     fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<Salt, Error> {

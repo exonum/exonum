@@ -151,7 +151,7 @@ impl NoiseHandshake {
         self.connect_list
             .peers()
             .iter()
-            .map(|info|info.identity_key)
+            .map(|info| info.identity_key)
             .any(|key| {
                 if let Some(key) = key {
                     remote_static_key == &key

@@ -414,6 +414,8 @@ impl SharedConnectList {
 
     /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
+        let identity = self.inner.read().unwrap().identity.clone();
+
         self.inner
             .read()
             .expect("ConnectList read lock")
@@ -422,7 +424,7 @@ impl SharedConnectList {
             .map(|(pk, a)| ConnectInfo {
                 address: a.address.clone(),
                 public_key: *pk,
-                identity_key: None,
+                identity_key: *identity.get(&pk).unwrap(),
             })
             .collect()
     }

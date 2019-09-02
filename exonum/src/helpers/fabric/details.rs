@@ -39,8 +39,8 @@ use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
 use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
+use exonum_crypto::{generate_keys, Keys};
 use exonum_merkledb::{Database, DbOptions, RocksDB};
-use exonum_crypto::{Keys, generate_keys};
 
 const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -621,7 +621,7 @@ impl Command for GenerateNodeConfig {
             service_secret_key: keys.service_sk,
             services_secret_configs: services_secret_configs
                 .expect("services_secret_configs not found after exts call"),
-            master_key_path: consensus_secret_key_path,
+            master_key_path: consensus_secret_key_name.into(),
         };
 
         ConfigFile::save(&private_config, private_config_path)
@@ -819,7 +819,7 @@ impl Command for Finalize {
                 connect_list,
                 thread_pool_size: Default::default(),
                 //TODO: change to real path
-                master_key_path: secret_config_path.into(),
+                master_key_path: secret_config_dir.join(&secret_config.master_key_path),
                 keys: secret_config.keys,
             }
         };
@@ -861,10 +861,7 @@ fn create_secret_key_file(
     }
 }
 
-fn create_keys_and_files(
-    secret_key_path: impl AsRef<Path>,
-    passphrase: impl AsRef<[u8]>,
-) -> Keys {
+fn create_keys_and_files(secret_key_path: impl AsRef<Path>, passphrase: impl AsRef<[u8]>) -> Keys {
     let secret_key_path = secret_key_path.as_ref();
     if secret_key_path.exists() {
         panic!(

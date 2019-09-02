@@ -146,7 +146,7 @@ impl Argument {
 
 /// Keys describing various pieces of data one can get from `Context`.
 pub mod keys {
-    use std::{collections::BTreeMap};
+    use std::collections::BTreeMap;
 
     use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig, NodeRunConfig};
     use super::ContextKey;
