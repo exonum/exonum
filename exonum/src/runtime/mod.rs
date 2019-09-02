@@ -90,7 +90,6 @@ pub mod dispatcher;
 pub mod error;
 pub mod supervisor;
 
-use exonum_merkledb::{Fork, Snapshot};
 use futures::Future;
 
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
@@ -98,6 +97,7 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc};
 use crate::{
     api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
+    merkledb::{BinaryValue, Fork, Snapshot},
     node::ApiSender,
     proto::Any,
 };
@@ -383,15 +383,21 @@ pub struct ExecutionContext<'a> {
     actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a Dispatcher,
+    /// Depth of call stack.
+    call_stack_depth: usize,
 }
 
 impl<'a> ExecutionContext<'a> {
+    /// Maximum depth of call stack.
+    const MAX_CALL_STACK_DEPTH: usize = 256;
+
     pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,
             actions: Rc::default(),
             dispatcher,
+            call_stack_depth: 0,
         }
     }
 
@@ -434,4 +440,61 @@ pub enum ApiChange {
     InstanceAdded(InstanceId),
     /// Instance has been removed.
     InstanceRemoved(InstanceId),
+}
+
+// TODO Write a full documentation when the interservice communications are fully implemented. [ECR-3493]
+/// Provide a low level context for the call of methods of the other service instance.
+#[derive(Debug)]
+pub struct CallContext<'a> {
+    /// Underlying execution context.
+    inner: &'a ExecutionContext<'a>,
+    /// Identifier of the caller service instance.
+    caller: InstanceId,
+    /// Identifier of the called service instance.
+    called: InstanceId,
+}
+
+impl<'a> CallContext<'a> {
+    /// Create a new call context for the specified execution context.
+    pub fn new(inner: &'a ExecutionContext<'a>, caller: InstanceId, called: InstanceId) -> Self {
+        Self {
+            inner,
+            caller,
+            called,
+        }
+    }
+
+    /// Perform the method call of the specified service interface.
+    pub fn call(
+        &self,
+        interface_name: impl AsRef<str>,
+        method_id: MethodId,
+        arguments: impl BinaryValue,
+        // TODO ExecutionError here mislead about the true cause of an occurred error. [ECR-3222]
+    ) -> Result<(), ExecutionError> {
+        let context = ExecutionContext {
+            fork: self.inner.fork,
+            dispatcher: self.inner.dispatcher,
+            actions: self.inner.actions.clone(),
+            caller: Caller::Service {
+                instance_id: self.caller,
+            },
+            call_stack_depth: self.inner.call_stack_depth + 1,
+        };
+        let call_info = CallInfo {
+            interface_name: interface_name.as_ref().to_owned(),
+            method_id,
+            instance_id: self.called,
+        };
+
+        assert!(
+            context.call_stack_depth < ExecutionContext::MAX_CALL_STACK_DEPTH,
+            "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
+            ExecutionContext::MAX_CALL_STACK_DEPTH
+        );
+
+        self.inner
+            .dispatcher
+            .call(&context, &call_info, arguments.into_bytes().as_ref())
+    }
 }

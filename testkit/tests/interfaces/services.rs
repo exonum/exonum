@@ -132,9 +132,21 @@ pub struct TxAnyCall {
     pub args: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::RecursiveCall")]
+pub struct TxRecursiveCall {
+    pub depth: u64,
+}
+
 #[exonum_service]
 pub trait AnyCall {
     fn call_any(&self, context: TransactionContext, arg: TxAnyCall) -> Result<(), ExecutionError>;
+
+    fn call_recursive(
+        &self,
+        context: TransactionContext,
+        arg: TxRecursiveCall,
+    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -151,7 +163,29 @@ impl AnyCallService {
 
 impl AnyCall for AnyCallService {
     fn call_any(&self, context: TransactionContext, tx: TxAnyCall) -> Result<(), ExecutionError> {
-        context.call(&tx.call_info, tx.args.as_ref())
+        context.call_context(tx.call_info.instance_id).call(
+            tx.call_info.interface_name,
+            tx.call_info.method_id,
+            tx.args,
+        )
+    }
+
+    fn call_recursive(
+        &self,
+        context: TransactionContext,
+        arg: TxRecursiveCall,
+    ) -> Result<(), ExecutionError> {
+        if arg.depth == 1 {
+            return Ok(())
+        }
+
+        context.call_context(context.instance.id).call(
+            "",
+            1,
+            TxRecursiveCall {
+                depth: arg.depth - 1,
+            },
+        )
     }
 }
 

@@ -24,7 +24,10 @@ use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
 use crate::{
     error::Error,
     schema::WalletSchema,
-    services::{AnyCallService, DepositService, TxAnyCall, TxCreateWallet, TxIssue, WalletService},
+    services::{
+        AnyCallService, DepositService, TxAnyCall, TxCreateWallet, TxIssue, TxRecursiveCall,
+        WalletService,
+    },
 };
 
 mod error;
@@ -296,4 +299,26 @@ fn test_any_call_err_wrong_arg() {
     .unwrap_err();
 
     assert_eq!(err.kind, runtime::rust::Error::ArgumentsParseError.into());
+}
+
+#[test]
+fn test_any_call_panic_recursion_limit() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    execute_transaction(
+        &mut testkit,
+        TxRecursiveCall { depth: 256 }.sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .expect("Call stack depth is enough");
+
+    let err = execute_transaction(
+        &mut testkit,
+        TxRecursiveCall { depth: 300 }.sign(AnyCallService::ID, keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("Maximum depth of call stack has been reached"));
 }

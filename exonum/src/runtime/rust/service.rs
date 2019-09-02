@@ -27,8 +27,8 @@ use crate::{
         api::ServiceApiBuilder,
         dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
-        InstanceId, MethodId,
+        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ExecutionContext,
+        InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
@@ -160,28 +160,21 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.inner.dispatch_action(action)
     }
 
-    /// Temporary method to test interservice communications.
-    pub fn call(&self, call_info: &CallInfo, arguments: &[u8]) -> Result<(), ExecutionError> {
-        let call_context = ExecutionContext {
-            fork: self.inner.fork,
-            caller: Caller::Service {
-                instance_id: self.instance.id,
-            },
-            dispatcher: self.inner.dispatcher,
-            actions: self.inner.actions.clone(),
-        };
-        self.inner
-            .dispatcher
-            .call(&call_context, call_info, arguments)
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a client to call interface methods of the specified service instance.
+    pub fn interface<T>(&self, called: InstanceId) -> T
+    where
+        T: From<CallContext<'a>>,
+    {
+        self.call_context(called).into()
     }
 
-    pub fn interface<T: From<CallContext<'a>>>(&self, instance_id: InstanceId) -> T {
-        let context = CallContext {
-            caller_id: self.instance.id,
-            inner: self.inner,
-            instance_id,
-        };
-        T::from(context)
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a context to call interfaces of the specified service instance.
+    pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
+        CallContext::new(self.inner, self.instance.id, called)
     }
 }
 
@@ -297,37 +290,5 @@ impl<'a> Debug for AfterCommitContext<'a> {
         f.debug_struct("AfterCommitContext")
             .field("instance", &self.instance)
             .finish()
-    }
-}
-
-#[derive(Debug)]
-pub struct CallContext<'a> {
-    inner: &'a ExecutionContext<'a>,
-    caller_id: InstanceId,
-    instance_id: InstanceId,
-}
-
-impl<'a> CallContext<'a> {
-    pub fn call(
-        &self,
-        interface_name: String,
-        method_id: MethodId,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        let context = ExecutionContext {
-            fork: self.inner.fork,
-            dispatcher: self.inner.dispatcher,
-            actions: self.inner.actions.clone(),
-            caller: Caller::Service {
-                instance_id: self.caller_id,
-            },
-        };
-        let call_info = CallInfo {
-            interface_name,
-            method_id,
-            instance_id: self.instance_id,
-        };
-
-        self.inner.dispatcher.call(&context, &call_info, arguments)
     }
 }

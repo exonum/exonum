@@ -16,11 +16,7 @@
 
 use exonum::{
     crypto::PublicKey,
-    merkledb::BinaryValue,
-    runtime::{
-        rust::{service::CallContext, TransactionContext},
-        ExecutionError,
-    },
+    runtime::{rust::TransactionContext, CallContext, ExecutionError},
 };
 use exonum_derive::{exonum_service, ProtobufConvert};
 use serde_derive::{Deserialize, Serialize};
@@ -39,23 +35,18 @@ pub trait IssueReceiver {
     fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError>;
 }
 
-pub struct IssueReceiverClient<'a> {
-    interface_name: String,
-    context: CallContext<'a>,
-}
+pub struct IssueReceiverClient<'a>(CallContext<'a>);
 
 impl<'a> IssueReceiverClient<'a> {
+    const INTERFACE_NAME: &'static str = "IssueReceiver";
+
     pub fn issue(&self, arg: TxIssue) -> Result<(), ExecutionError> {
-        self.context
-            .call(self.interface_name.clone(), 0, arg.into_bytes().as_ref())
+        self.0.call(Self::INTERFACE_NAME, 0, arg)
     }
 }
 
 impl<'a> From<CallContext<'a>> for IssueReceiverClient<'a> {
     fn from(context: CallContext<'a>) -> Self {
-        Self {
-            context,
-            interface_name: "IssueReceiver".to_owned(),
-        }
+        Self(context)
     }
 }

@@ -37,3 +37,7 @@ message AnyCall {
   exonum.runtime.CallInfo call_info = 1;
   bytes args = 2;
 }
+
+message RecursiveCall {
+  uint64 depth = 1;
+}

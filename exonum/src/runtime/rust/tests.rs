@@ -23,8 +23,8 @@ use crate::{
         Any,
     },
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, CallInfo, Caller, ExecutionContext,
-        InstanceDescriptor, InstanceId, InstanceSpec,
+        dispatcher::Dispatcher, error::ExecutionError, CallContext, CallInfo, Caller,
+        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -70,6 +70,21 @@ trait TestService {
 )]
 pub struct TestServiceImpl;
 
+#[derive(Debug)]
+struct TestServiceClient<'a>(CallContext<'a>);
+
+impl<'a> From<CallContext<'a>> for TestServiceClient<'a> {
+    fn from(context: CallContext<'a>) -> Self {
+        Self(context)
+    }
+}
+
+impl<'a> TestServiceClient<'a> {
+    fn method_b(&self, arg: TxB) -> Result<(), ExecutionError> {
+        self.0.call("", 1, arg)
+    }
+}
+
 impl TestService for TestServiceImpl {
     fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
         {
@@ -79,11 +94,9 @@ impl TestService for TestServiceImpl {
         }
 
         // Test calling one service from another.
-        // TODO: It should be improved to support service auth in the future.
-        let call_info = CallInfo::new(SERVICE_INSTANCE_ID, 1);
-        let payload = TxB { value: arg.value }.into_bytes();
         context
-            .call(&call_info, &payload)
+            .interface::<TestServiceClient>(SERVICE_INSTANCE_ID)
+            .method_b(TxB { value: arg.value })
             .expect("Failed to dispatch call");
         Ok(())
     }

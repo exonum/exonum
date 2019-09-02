@@ -380,14 +380,15 @@ mod foreign_interface_call {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
         crypto::Hash,
+        merkledb::ObjectHash,
         messages::Verified,
+        proto::Any,
         runtime::{
             self, dispatcher,
             rust::{Service, Transaction, TransactionContext},
-            AnyTx, CallInfo, InstanceId, MethodId,
+            AnyTx, InstanceId, MethodId, CallContext,
         },
     };
-    use exonum_merkledb::{BinaryValue, ObjectHash};
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -442,6 +443,23 @@ mod foreign_interface_call {
         }
     }
 
+    #[derive(Debug)]
+    pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
+
+    impl<'a> ForeignInterfaceClient<'a> {
+        const INTERFACE_NAME: &'static str = "ForeignInterface";
+
+        fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
+            self.0.call(Self::INTERFACE_NAME, 0, arg)
+        }
+    }
+
+    impl<'a> From<CallContext<'a>> for ForeignInterfaceClient<'a> {
+        fn from(context: CallContext<'a>) -> Self {
+            Self(context)
+        }
+    }
+
     #[exonum_service]
     pub trait Configure {}
 
@@ -476,13 +494,9 @@ mod foreign_interface_call {
             context: TransactionContext,
             arg: ForeignTx,
         ) -> Result<(), ExecutionError> {
-            let call_info = CallInfo {
-                instance_id: FOREIGN_INTERFACE_SERVICE_ID,
-                method_id: 0,
-                interface_name: "ForeignInterface".to_owned(),
-            };
-            let tx = SelfTx { data: arg.data };
-            context.call(&call_info, tx.into_bytes().as_ref())
+            context
+                .interface::<ForeignInterfaceClient>(FOREIGN_INTERFACE_SERVICE_ID)
+                .timestamp(SelfTx { data: arg.data })
         }
     }
 
@@ -511,8 +525,12 @@ mod foreign_interface_call {
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
             Self::new(t)
-                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", ())
-                .with_instance(FOREIGN_INTERFACE_SERVICE_ID, "timestamping-foreign", ())
+                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", Any::default())
+                .with_instance(
+                    FOREIGN_INTERFACE_SERVICE_ID,
+                    "timestamping-foreign",
+                    Any::default(),
+                )
         }
     }
 
