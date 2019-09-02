@@ -142,7 +142,7 @@ impl EncryptedKeys {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Keys {
     pub consensus_pk: PublicKey,
     pub consensus_sk: SecretKey,

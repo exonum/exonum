@@ -25,7 +25,7 @@ use std::{
 };
 
 use crate::blockchain::{check_tx, ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crate::crypto::{Hash, PublicKey, SecretKey};
+use crate::crypto::{Hash, PublicKey, PublicKeyKx, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
 use crate::messages::{
@@ -36,6 +36,7 @@ use crate::node::{
     connect_list::{ConnectList, PeerAddress},
     ConnectInfo,
 };
+use exonum_crypto::{Keys, SecretKeyKx};
 use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, Patch};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -96,6 +97,8 @@ pub struct State {
 
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Signed<RawTransaction>>,
+
+    keys: Keys,
 }
 
 /// State of a validator-node.
@@ -452,6 +455,7 @@ impl State {
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
+        keys: Keys,
     ) -> Self {
         Self {
             validator_state: validator_id.map(ValidatorState::new),
@@ -491,6 +495,8 @@ impl State {
             incomplete_block: None,
 
             tx_cache: BTreeMap::new(),
+
+            keys,
         }
     }
 
@@ -637,6 +643,14 @@ impl State {
     /// Returns the consensus public key of the current node.
     pub fn consensus_public_key(&self) -> &PublicKey {
         &self.consensus_public_key
+    }
+
+    pub fn identity_public_key(&self) -> &PublicKeyKx {
+        &self.keys.identity_pk
+    }
+
+    pub fn identity_secret_key(&self) -> &SecretKeyKx {
+        &self.keys.identity_sk
     }
 
     /// Returns the consensus secret key of the current node.

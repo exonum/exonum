@@ -48,7 +48,9 @@ use crate::api::{
 use crate::blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
-use crate::crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
+use crate::crypto::{
+    self, read_keys_from_file, CryptoHash, Hash, PublicKey, PublicKeyKx, SecretKey, SecretKeyKx,
+};
 use crate::events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
@@ -62,8 +64,8 @@ use crate::helpers::{
 };
 use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
+use exonum_crypto::{read_keys_from_file_new, Keys};
 use exonum_merkledb::{Database, DbOptions};
-use exonum_crypto::read_keys_from_file_new;
 
 mod basic;
 mod connect_list;
@@ -271,6 +273,8 @@ pub struct NodeConfig<T = SecretKey> {
 
     /// TODO
     pub master_key_path: PathBuf,
+
+    pub keys: Keys,
 }
 
 impl NodeConfig<SecretKey> {
@@ -308,6 +312,7 @@ impl NodeConfig<SecretKey> {
             connect_list: self.connect_list,
             thread_pool_size: self.thread_pool_size,
             master_key_path: self.master_key_path,
+            keys: self.keys,
         }
     }
 }
@@ -357,6 +362,8 @@ pub struct Configuration {
     pub peer_discovery: Vec<String>,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
+
+    pub keys: Keys,
 }
 
 /// Channel for messages, timeouts and api requests.
@@ -511,6 +518,7 @@ impl NodeHandler {
             last_hash,
             last_height,
             system_state.current_time(),
+            config.keys,
         );
 
         let node_role = NodeRole::new(validator_id);
@@ -962,6 +970,7 @@ impl Node {
             mempool: node_cfg.mempool,
             network: node_cfg.network,
             peer_discovery: peers,
+            keys: node_cfg.keys,
         };
 
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
@@ -1079,8 +1088,8 @@ impl Node {
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            *self.state().consensus_public_key(),
-            self.state().consensus_secret_key().clone(),
+            *self.state().identity_public_key(),
+            self.state().identity_secret_key().clone(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
             self.max_message_len,

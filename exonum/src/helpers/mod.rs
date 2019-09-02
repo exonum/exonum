@@ -42,45 +42,52 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
-    let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair()))
-        .unzip();
-    let genesis =
-        GenesisConfig::new(
-            validators
-                .iter()
-                .zip(services.iter())
-                .map(|x| ValidatorKeys {
-                    consensus_key: (x.0).0,
-                    service_key: (x.1).0,
-                }),
-        );
-    let peers = (0..validators.len())
-        .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
-        .collect::<Vec<_>>();
-
-    validators
-        .into_iter()
-        .zip(services.into_iter())
-        .enumerate()
-        .map(|(idx, (validator, service))| NodeConfig {
-            listen_address: peers[idx].parse().unwrap(),
-            external_address: peers[idx].clone(),
-            network: Default::default(),
-            consensus_public_key: validator.0,
-            consensus_secret_key: validator.1,
-            service_public_key: service.0,
-            service_secret_key: service.1,
-            genesis: genesis.clone(),
-            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
-            api: Default::default(),
-            mempool: Default::default(),
-            services_configs: Default::default(),
-            database: Default::default(),
-            thread_pool_size: Default::default(),
-            master_key_path: Default::default(),
-        })
-        .collect::<Vec<_>>()
+    //TODO: change revert
+    unimplemented!()
+    //
+    //
+    //    let (validators, services, identity): (Vec<_>, Vec<_>, Vec<_>) = (0..count as usize)
+    //        .map(|_| (gen_keypair(), gen_keypair(), gen_keypair_kx()))
+    //        .unzip();
+    //
+    //    let genesis =
+    //        GenesisConfig::new(
+    //            validators
+    //                .iter()
+    //                .zip(services.iter())
+    //                .map(|x| ValidatorKeys {
+    //                    consensus_key: (x.0).0,
+    //                    service_key: (x.1).0,
+    //                }),
+    //        );
+    //    let peers = (0..validators.len())
+    //        .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
+    //        .collect::<Vec<_>>();
+    //
+    //    validators
+    //        .into_iter()
+    //        .zip(services.into_iter())
+    //        .enumerate()
+    //        .map(|(idx, (validator, service, identity))| NodeConfig {
+    //            listen_address: peers[idx].parse().unwrap(),
+    //            external_address: peers[idx].clone(),
+    //            network: Default::default(),
+    //            consensus_public_key: validator.0,
+    //            consensus_secret_key: validator.1,
+    //            service_public_key: service.0,
+    //            service_secret_key: service.1,
+    //            identity_public_key: identity.0,
+    //            identity_secret_key: identity.1,
+    //            genesis: genesis.clone(),
+    //            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
+    //            api: Default::default(),
+    //            mempool: Default::default(),
+    //            services_configs: Default::default(),
+    //            database: Default::default(),
+    //            thread_pool_size: Default::default(),
+    //            master_key_path: Default::default(),
+    //        })
+    //        .collect::<Vec<_>>()
 }
 
 /// This routine is adapted from the *old* Path's `path_relative_from`

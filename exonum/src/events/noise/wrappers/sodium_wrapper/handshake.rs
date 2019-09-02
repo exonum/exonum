@@ -24,7 +24,7 @@ use super::wrapper::NoiseWrapper;
 use crate::{
     crypto::{
         x25519::{self, into_x25519_keypair, into_x25519_public_key},
-        PublicKey, SecretKey,
+        PublicKey, PublicKeyKx, SecretKey, SecretKeyKx,
     },
     events::{
         codec::MessagesCodec,
@@ -37,9 +37,9 @@ use crate::{
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
-    pub public_key: x25519::PublicKey,
-    pub secret_key: x25519::SecretKey,
-    pub remote_key: Option<x25519::PublicKey>,
+    pub public_key: PublicKeyKx,
+    pub secret_key: SecretKeyKx,
+    pub remote_key: Option<PublicKeyKx>,
     pub connect_list: SharedConnectList,
     pub connect: Signed<Connect>,
     max_message_len: u32,
@@ -47,14 +47,12 @@ pub struct HandshakeParams {
 
 impl HandshakeParams {
     pub fn new(
-        public_key: PublicKey,
-        secret_key: SecretKey,
+        public_key: PublicKeyKx,
+        secret_key: SecretKeyKx,
         connect_list: SharedConnectList,
         connect: Signed<Connect>,
         max_message_len: u32,
     ) -> Self {
-        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
-
         HandshakeParams {
             public_key,
             secret_key,
@@ -65,8 +63,8 @@ impl HandshakeParams {
         }
     }
 
-    pub fn set_remote_key(&mut self, remote_key: PublicKey) {
-        self.remote_key = Some(into_x25519_public_key(remote_key));
+    pub fn set_remote_key(&mut self, remote_key: PublicKeyKx) {
+        self.remote_key = Some(remote_key);
     }
 }
 
@@ -136,12 +134,13 @@ impl NoiseHandshake {
                 .state
                 .get_remote_static()
                 .expect("Remote static key is not present!");
-            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
+            PublicKeyKx::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
 
-        if !self.is_peer_allowed(&remote_static_key) {
-            bail!("peer is not in ConnectList")
-        }
+        //TODO: change revert
+//        if !self.is_peer_allowed(&remote_static_key) {
+//            bail!("peer is not in ConnectList")
+//        }
 
         let noise = self.noise.into_transport_wrapper()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);

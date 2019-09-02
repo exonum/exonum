@@ -18,6 +18,7 @@ use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 
 use crate::blockchain::config::{ConsensusConfig, ValidatorKeys};
 use crate::crypto::{SecretKey, PublicKey};
+use exonum_crypto::Keys;
 
 /// Abstract configuration.
 pub type AbstractConfig = BTreeMap<String, toml::Value>;
@@ -87,6 +88,8 @@ pub struct NodePrivateConfig {
     pub services_secret_configs: AbstractConfig,
 
     pub master_key_path: PathBuf,
+
+    pub keys: Keys,
 }
 
 /// Used for passing configuration for starting node from the command line that is not in the `NodeConfig`.

@@ -619,7 +619,8 @@ impl NetworkHandler {
     ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error>
     {
         let mut handshake_params = handshake_params.clone();
-        handshake_params.set_remote_key(key);
+        //TODO: change revert
+//        handshake_params.set_remote_key(key);
         NoiseHandshake::initiator(&handshake_params, &stream.peer_addr().unwrap()).send(stream)
     }
 }

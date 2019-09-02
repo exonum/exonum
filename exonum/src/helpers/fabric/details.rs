@@ -610,6 +610,8 @@ impl Command for GenerateNodeConfig {
             .expect("Could not write public config file.");
 
         let private_config = NodePrivateConfig {
+            //TODO: change remove clone
+            keys: keys.clone(),
             listen_address: addresses.1,
             external_address: addresses.0.clone(),
             consensus_public_key: keys.consensus_pk,
@@ -817,6 +819,7 @@ impl Command for Finalize {
                 thread_pool_size: Default::default(),
                 //TODO: change to real path
                 master_key_path: secret_config_path.into(),
+                keys: secret_config.keys,
             }
         };
 
