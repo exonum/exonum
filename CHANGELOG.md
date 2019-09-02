@@ -9,7 +9,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `system/v1/rebroadcast` endpoint has been removed. (#1445)
 
-- Added a possibility to specify compression type for the database. (#1447)
+- Added a possibility to specify compression algorithm for the database. (#1447)
 
 ## 0.12.0 - 2019-08-14
 

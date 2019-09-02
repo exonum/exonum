@@ -43,8 +43,8 @@ pub struct DbOptions {
     pub create_if_missing: bool,
     /// An algorithm used for database compression.
     ///
-    /// Defaults to `None`, meaning there is no compression.
-    pub compression_type: Option<CompressionType>,
+    /// Defaults to `CompressionType::None`, meaning there is no compression.
+    pub compression_type: CompressionType,
 }
 
 /// Algorithms of compression for the database.
@@ -52,7 +52,7 @@ pub struct DbOptions {
 /// Database contents are stored in a set of blocks, each of which holds a
 /// sequence of key-value pairs. Each block may be compressed before
 /// being stored in a file. The following enum describes which
-/// compression type (if any) is used to compress a block.
+/// compression algorithm (if any) is used to compress a block.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum CompressionType {
@@ -84,7 +84,7 @@ impl Default for DbOptions {
         Self {
             max_open_files: None,
             create_if_missing: true,
-            compression_type: None,
+            compression_type: CompressionType::None,
         }
     }
 }
