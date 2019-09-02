@@ -46,8 +46,8 @@ use super::{
     api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, Dispatcher, DispatcherSender},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor,
-    InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 #[derive(Debug, Default)]

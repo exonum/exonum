@@ -176,7 +176,7 @@ impl AnyCall for AnyCallService {
         arg: TxRecursiveCall,
     ) -> Result<(), ExecutionError> {
         if arg.depth == 1 {
-            return Ok(())
+            return Ok(());
         }
 
         context.call_context(context.instance.id).call(

@@ -85,9 +85,9 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 ///
 /// * `#[exonum(interfaces(default = "path", additional("Configure")))]`
 ///
-///   * `default = "Path"` - path to the corresponding service interface trait which marked by the 
+///   * `default = "Path"` - path to the corresponding service interface trait which marked by the
 ///     `exonum_service` attribute.
-///   * `additional("path_1", "path_2")` - optional list of paths to the additional interfaces which have been 
+///   * `additional("path_1", "path_2")` - optional list of paths to the additional interfaces which have been
 ///     implemented by the service.
 ///
 /// ## Optional

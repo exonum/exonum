@@ -386,7 +386,7 @@ mod foreign_interface_call {
         runtime::{
             self, dispatcher,
             rust::{Service, Transaction, TransactionContext},
-            AnyTx, InstanceId, MethodId, CallContext,
+            AnyTx, CallContext, InstanceId, MethodId,
         },
     };
     use rand::rngs::StdRng;
