@@ -15,11 +15,13 @@
 // spell-checker:ignore cipherparams ciphertext
 
 use super::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use crate::{gen_keypair_from_seed_kx, gen_keypair_kx, PublicKeyKx, SecretKeyKx};
+use exonum_sodiumoxide::crypto::kx::Seed as SeedKx;
+use exonum_sodiumoxide::crypto::pwhash::{gen_salt, Salt};
 use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
+use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
-use exonum_sodiumoxide::crypto::kx::{PublicKey as PublicKeyKX, SecretKey as SecretKeyKX, Seed as SeedKx, keypair_from_seed as keypair_from_seed_kx};
-use rand::{thread_rng};
 use std::borrow::Cow;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -28,7 +30,6 @@ use std::{
     io::{Error, ErrorKind, Read, Write},
     path::Path,
 };
-use exonum_sodiumoxide::crypto::pwhash::{Salt, gen_salt};
 
 /// Creates a TOML file that contains encrypted `SecretKey` and returns `PublicKey` for the secret key.
 pub fn generate_keys_file<P: AsRef<Path>, W: AsRef<[u8]>>(
@@ -141,13 +142,14 @@ impl EncryptedKeys {
     }
 }
 
+#[derive(Debug)]
 pub struct Keys {
     pub consensus_pk: PublicKey,
     pub consensus_sk: SecretKey,
     pub service_pk: PublicKey,
     pub service_sk: SecretKey,
-    pub identity_pk: PublicKeyKX,
-    pub identity_sk: SecretKeyKX,
+    pub identity_pk: PublicKeyKx,
+    pub identity_sk: SecretKeyKx,
 }
 
 pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
@@ -229,8 +231,8 @@ fn generate_keys_from_master_password(salt: Salt) -> Keys {
     let (service_pk, service_sk) = gen_keypair_from_seed(&seed);
 
     tree.child(Name::new("identity")).fill(&mut buffer);
-    let seed = SeedKx::from_slice(&buffer).unwrap();
-    let (identity_pk, identity_sk) = keypair_from_seed_kx(&seed);
+    let seed = Seed::from_slice(&buffer).unwrap();
+    let (identity_pk, identity_sk) = gen_keypair_from_seed_kx(&seed);
 
     Keys {
         consensus_pk,

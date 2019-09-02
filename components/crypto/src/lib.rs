@@ -25,11 +25,14 @@ extern crate serde_derive;
 
 #[doc(inline)]
 pub use self::crypto_impl::{
-    HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
+    gen_keypair_from_seed_kx, gen_keypair_kx, PublicKeyKx, SecretKeyKx, HASH_SIZE,
+    PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-pub use self::utils::{Keys, read_keys_from_file_new, generate_keys, generate_keys_file, read_keys_from_file};
+pub use self::utils::{
+    generate_keys, generate_keys_file, read_keys_from_file, read_keys_from_file_new, Keys,
+};
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
