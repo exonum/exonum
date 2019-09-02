@@ -35,6 +35,7 @@ use crate::{
 /// use different databases.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
+    options: DbOptions,
 }
 
 impl From<DbOptions> for RocksDbOptions {
@@ -83,6 +84,7 @@ impl RocksDB {
         };
         let mut db = Self {
             db: Arc::new(inner),
+            options: *options,
         };
         check_database(&mut db)?;
         Ok(db)
@@ -93,10 +95,7 @@ impl RocksDB {
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
-                None => self
-                    .db
-                    .create_cf(&cf_name, &DbOptions::default().into())
-                    .unwrap(),
+                None => self.db.create_cf(&cf_name, &self.options.into()).unwrap(),
             };
 
             for prefix in changes.prefixes_to_remove() {
