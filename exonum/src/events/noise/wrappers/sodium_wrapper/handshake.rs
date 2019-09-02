@@ -138,21 +138,27 @@ impl NoiseHandshake {
         };
 
         //TODO: change revert
-//        if !self.is_peer_allowed(&remote_static_key) {
-//            bail!("peer is not in ConnectList")
-//        }
+        if !self.is_peer_allowed(&remote_static_key) {
+            bail!("peer is not in ConnectList")
+        }
 
         let noise = self.noise.into_transport_wrapper()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
         Ok((framed, message))
     }
 
-    fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
+    fn is_peer_allowed(&self, remote_static_key: &PublicKeyKx) -> bool {
         self.connect_list
             .peers()
             .iter()
-            .map(|info| into_x25519_public_key(info.public_key))
-            .any(|key| remote_static_key == &key)
+            .map(|info|info.identity_key)
+            .any(|key| {
+                if let Some(key) = key {
+                    remote_static_key == &key
+                } else {
+                    false
+                }
+            })
     }
 }
 

@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 
 use crate::crypto::PublicKey;
 use crate::node::{ConnectInfo, ConnectListConfig};
+use exonum_crypto::PublicKeyKx;
 
 /// Network address of the peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +40,11 @@ pub struct ConnectList {
     /// Peers to which we can connect.
     #[serde(default)]
     pub peers: BTreeMap<PublicKey, PeerAddress>,
+}
+
+struct IdentityKeys {
+    identity_key: PublicKeyKx,
+    consensus_key: PublicKey,
 }
 
 impl ConnectList {

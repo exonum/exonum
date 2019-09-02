@@ -595,6 +595,7 @@ impl Command for GenerateNodeConfig {
         let validator_keys = ValidatorKeys {
             consensus_key: keys.consensus_pk,
             service_key: keys.service_pk,
+            identity_key: keys.identity_pk,
         };
         let node_pub_config = NodePublicConfig {
             address: addresses.0.clone(),

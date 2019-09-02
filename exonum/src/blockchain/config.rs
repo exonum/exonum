@@ -30,6 +30,7 @@ use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
 use crate::helpers::{Height, Milliseconds};
 use crate::messages::EMPTY_SIGNED_MESSAGE_SIZE;
 use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_crypto::PublicKeyKx;
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
@@ -41,6 +42,7 @@ pub struct ValidatorKeys {
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
+    pub identity_key: PublicKeyKx,
 }
 
 /// Exonum blockchain global configuration. Services

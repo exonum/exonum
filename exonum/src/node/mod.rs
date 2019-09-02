@@ -434,6 +434,7 @@ impl ConnectListConfig {
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
+                identity_key: Some(config.validator_keys.identity_key),
             })
             .collect();
 
@@ -448,6 +449,7 @@ impl ConnectListConfig {
             .map(|(a, v)| ConnectInfo {
                 address: a.clone(),
                 public_key: v.consensus_key,
+                identity_key: Some(v.identity_key),
             })
             .collect();
 
@@ -856,6 +858,8 @@ pub struct ConnectInfo {
     pub address: String,
     /// Peer public key.
     pub public_key: PublicKey,
+
+    pub identity_key: Option<PublicKeyKx>,
 }
 
 impl fmt::Display for ConnectInfo {

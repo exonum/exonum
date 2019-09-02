@@ -422,6 +422,7 @@ impl SharedConnectList {
             .map(|(pk, a)| ConnectInfo {
                 address: a.address.clone(),
                 public_key: *pk,
+                identity_key: None,
             })
             .collect()
     }
