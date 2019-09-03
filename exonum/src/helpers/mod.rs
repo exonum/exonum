@@ -30,6 +30,7 @@ use std::path::{Component, Path, PathBuf};
 use crate::blockchain::{GenesisConfig, ValidatorKeys};
 use crate::crypto::gen_keypair;
 use crate::node::{ConnectListConfig, NodeConfig};
+use exonum_crypto::{gen_keypair_kx, Keys};
 
 mod types;
 
@@ -43,51 +44,53 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
     //TODO: change revert
-    unimplemented!()
-    //
-    //
-    //    let (validators, services, identity): (Vec<_>, Vec<_>, Vec<_>) = (0..count as usize)
-    //        .map(|_| (gen_keypair(), gen_keypair(), gen_keypair_kx()))
-    //        .unzip();
-    //
-    //    let genesis =
-    //        GenesisConfig::new(
-    //            validators
-    //                .iter()
-    //                .zip(services.iter())
-    //                .map(|x| ValidatorKeys {
-    //                    consensus_key: (x.0).0,
-    //                    service_key: (x.1).0,
-    //                }),
-    //        );
-    //    let peers = (0..validators.len())
-    //        .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
-    //        .collect::<Vec<_>>();
-    //
-    //    validators
-    //        .into_iter()
-    //        .zip(services.into_iter())
-    //        .enumerate()
-    //        .map(|(idx, (validator, service, identity))| NodeConfig {
-    //            listen_address: peers[idx].parse().unwrap(),
-    //            external_address: peers[idx].clone(),
-    //            network: Default::default(),
-    //            consensus_public_key: validator.0,
-    //            consensus_secret_key: validator.1,
-    //            service_public_key: service.0,
-    //            service_secret_key: service.1,
-    //            identity_public_key: identity.0,
-    //            identity_secret_key: identity.1,
-    //            genesis: genesis.clone(),
-    //            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
-    //            api: Default::default(),
-    //            mempool: Default::default(),
-    //            services_configs: Default::default(),
-    //            database: Default::default(),
-    //            thread_pool_size: Default::default(),
-    //            master_key_path: Default::default(),
-    //        })
-    //        .collect::<Vec<_>>()
+//    unimplemented!()
+        let keys: (Vec<_>) = (0..count as usize)
+            .map(|_| (gen_keypair(), gen_keypair(), gen_keypair_kx()))
+            .map(|(v, s, i)| {
+               Keys {
+                   consensus_pk: v.0,
+                   consensus_sk: v.1,
+                   service_pk: s.0,
+                   service_sk: s.1,
+                   identity_pk: i.0,
+                   identity_sk: i.1,
+               }
+            })
+            .collect();
+
+        let genesis =
+            GenesisConfig::new(
+                keys
+                    .iter()
+                    .map(|keys| ValidatorKeys {
+                        consensus_key: keys.consensus_pk,
+                        service_key: keys.service_pk,
+                        identity_key: keys.identity_pk,
+                    }),
+            );
+        let peers = (0..keys.len())
+            .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
+            .collect::<Vec<_>>();
+
+        keys
+            .into_iter()
+            .enumerate()
+            .map(|(idx, keys)| NodeConfig {
+                listen_address: peers[idx].parse().unwrap(),
+                external_address: peers[idx].clone(),
+                network: Default::default(),
+                genesis: genesis.clone(),
+                connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
+                api: Default::default(),
+                mempool: Default::default(),
+                services_configs: Default::default(),
+                database: Default::default(),
+                thread_pool_size: Default::default(),
+                master_key_path: Default::default(),
+                keys,
+            })
+            .collect::<Vec<_>>()
 }
 
 /// This routine is adapted from the *old* Path's `path_relative_from`

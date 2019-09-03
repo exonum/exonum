@@ -41,6 +41,7 @@ use crate::{
     messages::{Connect, Message, Service, Signed, SignedMessage},
     node::state::SharedConnectList,
 };
+use exonum_crypto::PublicKeyKx;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -359,6 +360,7 @@ impl NetworkHandler {
         let timeout = self.network_config.tcp_connect_retry_timeout;
         let max_tries = self.network_config.tcp_connect_max_retries as usize;
         let max_connections = self.network_config.max_outgoing_connections;
+        let identity_key = self.connect_list.identity_key(&key);
         let strategy = FixedInterval::from_millis(timeout)
             .map(jitter)
             .take(max_tries);
@@ -381,7 +383,7 @@ impl NetworkHandler {
                     .map_err(into_failure)
                     .and_then(move |socket| Self::configure_socket(socket, network_config))
                     .and_then(move |outgoing_connection| {
-                        Self::build_handshake_initiator(outgoing_connection, key, &handshake_params)
+                        Self::build_handshake_initiator(outgoing_connection, identity_key, &handshake_params)
                     })
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
@@ -614,13 +616,12 @@ impl NetworkHandler {
 
     fn build_handshake_initiator(
         stream: TcpStream,
-        key: PublicKey,
+        key: PublicKeyKx,
         handshake_params: &HandshakeParams,
     ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error>
     {
         let mut handshake_params = handshake_params.clone();
-        //TODO: change revert
-        //        handshake_params.set_remote_key(key);
+        handshake_params.set_remote_key(key);
         NoiseHandshake::initiator(&handshake_params, &stream.peer_addr().unwrap()).send(stream)
     }
 }

@@ -47,7 +47,7 @@ impl PassInputMethod {
         match self {
             PassInputMethod::Terminal => {
                 let prompt = match key_type {
-                    SecretKeyType::Consensus => "Enter consensus key passphrase",
+                    SecretKeyType::Consensus => "Enter master key passphrase",
                     SecretKeyType::Service => "Enter service key passphrase",
                 };
                 prompt_passphrase(prompt, node_run).expect("Failed to read password from stdin")

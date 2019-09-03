@@ -56,11 +56,6 @@ pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Signed<Connect>,
 
-    consensus_public_key: PublicKey,
-    consensus_secret_key: SecretKey,
-    service_public_key: PublicKey,
-    service_secret_key: SecretKey,
-
     config: StoredConfiguration,
     connect_list: SharedConnectList,
 
@@ -440,6 +435,12 @@ impl SharedConnectList {
         let connect_list = self.inner.read().expect("ConnectList read lock");
         connect_list.find_address_by_pubkey(public_key).cloned()
     }
+
+    /// TODO
+    pub fn identity_key(&self, public_key: &PublicKey) -> PublicKeyKx {
+        let connect_list = self.inner.read().expect("ConnectList read lock");
+        connect_list.identity.get(public_key).unwrap().unwrap()
+    }
 }
 
 impl State {
@@ -447,10 +448,6 @@ impl State {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
         validator_id: Option<ValidatorId>,
-        consensus_public_key: PublicKey,
-        consensus_secret_key: SecretKey,
-        service_public_key: PublicKey,
-        service_secret_key: SecretKey,
         connect_list: ConnectList,
         stored: StoredConfiguration,
         connect: Signed<Connect>,
@@ -462,10 +459,6 @@ impl State {
     ) -> Self {
         Self {
             validator_state: validator_id.map(ValidatorState::new),
-            consensus_public_key,
-            consensus_secret_key,
-            service_public_key,
-            service_secret_key,
             connect_list: SharedConnectList::from_connect_list(connect_list),
             peers,
             connections: HashMap::new(),
@@ -645,30 +638,32 @@ impl State {
 
     /// Returns the consensus public key of the current node.
     pub fn consensus_public_key(&self) -> &PublicKey {
-        &self.consensus_public_key
+        &self.keys.consensus_pk
     }
 
+    /// TODO
     pub fn identity_public_key(&self) -> &PublicKeyKx {
         &self.keys.identity_pk
     }
 
+    /// TODO
     pub fn identity_secret_key(&self) -> &SecretKeyKx {
         &self.keys.identity_sk
     }
 
     /// Returns the consensus secret key of the current node.
     pub fn consensus_secret_key(&self) -> &SecretKey {
-        &self.consensus_secret_key
+        &self.keys.consensus_sk
     }
 
     /// Returns the service public key of the current node.
     pub fn service_public_key(&self) -> &PublicKey {
-        &self.service_public_key
+        &self.keys.service_pk
     }
 
     /// Returns the service secret key of the current node.
     pub fn service_secret_key(&self) -> &SecretKey {
-        &self.service_secret_key
+        &self.keys.service_sk
     }
 
     /// Returns the leader id for the specified round and current height.

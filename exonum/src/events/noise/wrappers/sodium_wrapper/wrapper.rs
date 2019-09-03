@@ -20,8 +20,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use snow::{Builder, HandshakeState, TransportState};
 
-use crate::crypto::{PublicKeyKx, SecretKeyKx};
-
 use std::fmt::{self, Error, Formatter};
 
 use super::{handshake::HandshakeParams, resolver::SodiumResolver};

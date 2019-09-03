@@ -17,7 +17,6 @@
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 
 use crate::blockchain::config::{ConsensusConfig, ValidatorKeys};
-use crate::crypto::{PublicKey, SecretKey};
 use exonum_crypto::Keys;
 
 /// Abstract configuration.
@@ -75,20 +74,13 @@ pub struct NodePrivateConfig {
     pub listen_address: SocketAddr,
     /// External address.
     pub external_address: String,
-    /// Consensus public key.
-    pub consensus_public_key: PublicKey,
-    /// Path to the consensus secret key file.
-    pub consensus_secret_key: SecretKey,
-    /// Service public key.
-    pub service_public_key: PublicKey,
-    /// Path to the service secret key file.
-    pub service_secret_key: SecretKey,
     /// Additional service secret config.
     #[serde(default)]
     pub services_secret_configs: AbstractConfig,
 
+    /// TODO
     pub master_key_path: PathBuf,
-
+    /// TODO
     pub keys: Keys,
 }
 

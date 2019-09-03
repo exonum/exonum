@@ -42,6 +42,7 @@ pub struct ValidatorKeys {
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
+    /// TODO
     pub identity_key: PublicKeyKx,
 }
 

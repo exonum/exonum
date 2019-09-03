@@ -36,7 +36,6 @@ use super::{
 };
 use crate::api::backends::actix::AllowOrigin;
 use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
-use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use exonum_crypto::{generate_keys, Keys};
@@ -554,18 +553,11 @@ impl Command for GenerateNodeConfig {
             .unwrap_or_default()
             .parse()
             .expect("expected correct passphrase input method for consensus key");
-        let service_key_pass_method: PassInputMethod = context
-            .arg::<String>(SERVICE_KEY_PASS_METHOD)
-            .unwrap_or_default()
-            .parse()
-            .expect("expected correct passphrase input method for service key");
 
         let pub_config_path = output_dir.join("pub.toml");
         let private_config_path = output_dir.join("sec.toml");
-        let consensus_secret_key_name = "consensus.key.toml";
-        let service_secret_key_name = "service.key.toml";
-        let consensus_secret_key_path = output_dir.join(consensus_secret_key_name);
-        let service_secret_key_path = output_dir.join(service_secret_key_name);
+        let master_key_file_name = "master.key.toml";
+        let master_key_path = output_dir.join(master_key_file_name);
 
         let addresses = Self::addresses(&context);
         let common: CommonConfigTemplate =
@@ -589,7 +581,7 @@ impl Command for GenerateNodeConfig {
                 consensus_key_pass_method,
                 SecretKeyType::Consensus,
             );
-            create_keys_and_files(&consensus_secret_key_path, passphrase.as_bytes())
+            create_keys_and_files(&master_key_path, passphrase.as_bytes())
         };
 
         let validator_keys = ValidatorKeys {
@@ -615,13 +607,9 @@ impl Command for GenerateNodeConfig {
             keys: keys.clone(),
             listen_address: addresses.1,
             external_address: addresses.0.clone(),
-            consensus_public_key: keys.consensus_pk,
-            consensus_secret_key: keys.consensus_sk,
-            service_public_key: keys.service_pk,
-            service_secret_key: keys.service_sk,
             services_secret_configs: services_secret_configs
                 .expect("services_secret_configs not found after exts call"),
-            master_key_path: consensus_secret_key_name.into(),
+            master_key_path: master_key_file_name.into(),
         };
 
         ConfigFile::save(&private_config, private_config_path)
@@ -675,7 +663,7 @@ impl Finalize {
         (
             common,
             map.iter().map(|(_, c)| c.clone()).collect(),
-            map.get(&our_config.consensus_public_key).cloned(),
+            map.get(&our_config.keys.consensus_pk).cloned(),
         )
     }
 
@@ -777,18 +765,19 @@ impl Command for Finalize {
 
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
 
-        let validators_count = common
-            .general_config
-            .get("validators_count")
-            .expect("validators_count not found in common config.")
-            .as_integer()
-            .unwrap() as usize;
+        //TODO: change revert
+//        let validators_count = common
+//            .general_config
+//            .get("validators_count")
+//            .expect("validators_count not found in common config.")
+//            .as_integer()
+//            .unwrap() as usize;
 
-        if validators_count != list.len() {
-            panic!(
-                "The number of validators configs does not match the number of validators keys."
-            );
-        }
+//        if validators_count != list.len() {
+//            panic!(
+//                "The number of validators configs does not match the number of validators keys."
+//            );
+//        }
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 
@@ -801,10 +790,6 @@ impl Command for Finalize {
                 listen_address: secret_config.listen_address,
                 external_address: secret_config.external_address,
                 network: Default::default(),
-                consensus_public_key: secret_config.consensus_public_key,
-                consensus_secret_key: secret_config.consensus_secret_key,
-                service_public_key: secret_config.service_public_key,
-                service_secret_key: secret_config.service_secret_key,
                 genesis,
                 api: NodeApiConfig {
                     public_api_address,
@@ -840,24 +825,6 @@ impl Command for Finalize {
         ConfigFile::save(&config, output_config_path).expect("Could not write config file.");
 
         Feedback::None
-    }
-}
-
-fn create_secret_key_file(
-    secret_key_path: impl AsRef<Path>,
-    passphrase: impl AsRef<[u8]>,
-) -> PublicKey {
-    let secret_key_path = secret_key_path.as_ref();
-    if secret_key_path.exists() {
-        panic!(
-            "Failed to create secret key file. File exists: {}",
-            secret_key_path.to_string_lossy(),
-        )
-    } else {
-        if let Some(dir) = secret_key_path.parent() {
-            fs::create_dir_all(dir).unwrap();
-        }
-        generate_keys_file(&secret_key_path, &passphrase).unwrap()
     }
 }
 

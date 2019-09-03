@@ -23,8 +23,7 @@ use exonum_merkledb::BinaryValue;
 use super::wrapper::NoiseWrapper;
 use crate::{
     crypto::{
-        x25519::{self, into_x25519_keypair, into_x25519_public_key},
-        PublicKey, PublicKeyKx, SecretKey, SecretKeyKx,
+        PublicKeyKx, SecretKeyKx,
     },
     events::{
         codec::MessagesCodec,
