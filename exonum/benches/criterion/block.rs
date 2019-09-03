@@ -664,7 +664,7 @@ fn execute_block_rocksdb(
             },
             TXS_IN_BLOCK,
         )
-        .sample_size(50)
+        .sample_size(100)
         .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
     );
 }
