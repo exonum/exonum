@@ -41,7 +41,7 @@ use crate::{
     messages::{Connect, Message, Service, Signed, SignedMessage},
     node::state::SharedConnectList,
 };
-use exonum_crypto::PublicKeyKx;
+use exonum_crypto::kx;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -620,7 +620,7 @@ impl NetworkHandler {
 
     fn build_handshake_initiator(
         stream: TcpStream,
-        key: PublicKeyKx,
+        key: kx::PublicKey,
         handshake_params: &HandshakeParams,
     ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error>
     {

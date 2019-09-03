@@ -18,10 +18,7 @@ use std::{
 };
 
 use crate::{write_short_hex, Seed};
-use exonum_sodiumoxide::crypto::kx::{
-    gen_keypair as gen_keypair_kx, keypair_from_seed as gen_keypair_from_seed_kx,
-    PublicKey as PublicKeyKx, SecretKey as SecretKeyKx, Seed as SeedKx,
-};
+use exonum_sodiumoxide::crypto::kx;
 use hex::{encode as encode_hex, FromHex, FromHexError};
 
 use serde::{
@@ -30,26 +27,26 @@ use serde::{
 };
 
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
-    let (pk, sk) = gen_keypair_kx();
+    let (pk, sk) = kx::gen_keypair();
 
     (PublicKey(pk), SecretKey(sk))
 }
 
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
-    let (pk, sk) = gen_keypair_from_seed_kx(&SeedKx::from_slice(&seed[..]).unwrap());
+    let (pk, sk) = kx::keypair_from_seed(&kx::Seed::from_slice(&seed[..]).unwrap());
 
     (PublicKey(pk), SecretKey(sk))
 }
 
 #[derive(Debug, Copy, Hash, Clone, PartialEq, Eq, Ord, PartialOrd)]
-pub struct PublicKey(PublicKeyKx);
+pub struct PublicKey(kx::PublicKey);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecretKey(SecretKeyKx);
+pub struct SecretKey(kx::SecretKey);
 
 impl PublicKey {
     pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
-        PublicKeyKx::from_slice(bytes_slice).map(PublicKey)
+        kx::PublicKey::from_slice(bytes_slice).map(PublicKey)
     }
 }
 
@@ -61,7 +58,7 @@ impl fmt::Display for PublicKey {
 
 impl SecretKey {
     pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
-        SecretKeyKx::from_slice(bytes_slice).map(SecretKey)
+        kx::SecretKey::from_slice(bytes_slice).map(SecretKey)
     }
 }
 

@@ -48,7 +48,7 @@ use crate::api::{
 use crate::blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
-use crate::crypto::{self, CryptoHash, Hash, PublicKey, PublicKeyKx, SecretKey};
+use crate::crypto::{self, kx, CryptoHash, Hash, PublicKey, SecretKey};
 use crate::events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
@@ -417,7 +417,7 @@ impl ConnectListConfig {
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
-                identity_key: Some(config.validator_keys.identity_key),
+                identity_key: config.validator_keys.identity_key,
             })
             .collect();
 
@@ -432,7 +432,7 @@ impl ConnectListConfig {
             .map(|(a, v)| ConnectInfo {
                 address: a.clone(),
                 public_key: v.consensus_key,
-                identity_key: Some(v.identity_key),
+                identity_key: v.identity_key,
             })
             .collect();
 
@@ -838,7 +838,7 @@ pub struct ConnectInfo {
     /// Peer public key.
     pub public_key: PublicKey,
     /// Peer identity key.
-    pub identity_key: Option<PublicKeyKx>,
+    pub identity_key: kx::PublicKey,
 }
 
 impl fmt::Display for ConnectInfo {

@@ -25,7 +25,7 @@ use std::{
 };
 
 use crate::blockchain::{check_tx, ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crate::crypto::{Hash, PublicKey, PublicKeyKx, SecretKey};
+use crate::crypto::{kx, Hash, PublicKey, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
 use crate::messages::{
@@ -36,7 +36,7 @@ use crate::node::{
     connect_list::{ConnectList, PeerAddress},
     ConnectInfo,
 };
-use exonum_crypto::{Keys, SecretKeyKx};
+use exonum_crypto::Keys;
 use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, Patch};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -437,9 +437,9 @@ impl SharedConnectList {
     }
 
     /// TODO
-    pub fn identity_key(&self, public_key: &PublicKey) -> PublicKeyKx {
+    pub fn identity_key(&self, public_key: &PublicKey) -> kx::PublicKey {
         let connect_list = self.inner.read().expect("ConnectList read lock");
-        connect_list.identity.get(public_key).unwrap().unwrap()
+        *connect_list.identity.get(public_key).unwrap()
     }
 }
 
@@ -642,12 +642,12 @@ impl State {
     }
 
     /// TODO
-    pub fn identity_public_key(&self) -> &PublicKeyKx {
+    pub fn identity_public_key(&self) -> &kx::PublicKey {
         &self.keys.identity_pk
     }
 
     /// TODO
-    pub fn identity_secret_key(&self) -> &SecretKeyKx {
+    pub fn identity_secret_key(&self) -> &kx::SecretKey {
         &self.keys.identity_sk
     }
 

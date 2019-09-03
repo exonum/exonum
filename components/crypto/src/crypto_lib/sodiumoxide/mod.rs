@@ -56,7 +56,6 @@ pub use self::sha256::State as HashState;
 
 pub use self::kx::{
     gen_keypair as gen_keypair_kx, gen_keypair_from_seed as gen_keypair_from_seed_kx,
-    PublicKey as PublicKeyKx, SecretKey as SecretKeyKx,
 };
 
 use self::sodiumoxide::crypto::{hash::sha256, sign::ed25519};

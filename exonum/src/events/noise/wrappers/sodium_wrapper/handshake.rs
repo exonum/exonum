@@ -22,7 +22,7 @@ use exonum_merkledb::BinaryValue;
 
 use super::wrapper::NoiseWrapper;
 use crate::{
-    crypto::{PublicKeyKx, SecretKeyKx},
+    crypto::kx,
     events::{
         codec::MessagesCodec,
         noise::{Handshake, HandshakeRawMessage, HandshakeResult},
@@ -34,9 +34,9 @@ use crate::{
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
-    pub public_key: PublicKeyKx,
-    pub secret_key: SecretKeyKx,
-    pub remote_key: Option<PublicKeyKx>,
+    pub public_key: kx::PublicKey,
+    pub secret_key: kx::SecretKey,
+    pub remote_key: Option<kx::PublicKey>,
     pub connect_list: SharedConnectList,
     pub connect: Signed<Connect>,
     max_message_len: u32,
@@ -44,8 +44,8 @@ pub struct HandshakeParams {
 
 impl HandshakeParams {
     pub fn new(
-        public_key: PublicKeyKx,
-        secret_key: SecretKeyKx,
+        public_key: kx::PublicKey,
+        secret_key: kx::SecretKey,
         connect_list: SharedConnectList,
         connect: Signed<Connect>,
         max_message_len: u32,
@@ -60,7 +60,7 @@ impl HandshakeParams {
         }
     }
 
-    pub fn set_remote_key(&mut self, remote_key: PublicKeyKx) {
+    pub fn set_remote_key(&mut self, remote_key: kx::PublicKey) {
         self.remote_key = Some(remote_key);
     }
 }
@@ -131,7 +131,7 @@ impl NoiseHandshake {
                 .state
                 .get_remote_static()
                 .expect("Remote static key is not present!");
-            PublicKeyKx::from_slice(rs).expect("Remote static key is not valid x25519 key!")
+            kx::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
 
         if !self.is_peer_allowed(&remote_static_key) {
@@ -143,18 +143,12 @@ impl NoiseHandshake {
         Ok((framed, message))
     }
 
-    fn is_peer_allowed(&self, remote_static_key: &PublicKeyKx) -> bool {
+    fn is_peer_allowed(&self, remote_static_key: &kx::PublicKey) -> bool {
         self.connect_list
             .peers()
             .iter()
             .map(|info| info.identity_key)
-            .any(|key| {
-                if let Some(key) = key {
-                    remote_static_key == &key
-                } else {
-                    false
-                }
-            })
+            .any(|key| remote_static_key == &key)
     }
 }
 

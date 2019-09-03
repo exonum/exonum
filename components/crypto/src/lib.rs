@@ -25,8 +25,7 @@ extern crate serde_derive;
 
 #[doc(inline)]
 pub use self::crypto_impl::{
-    gen_keypair_from_seed_kx, gen_keypair_kx, PublicKeyKx, SecretKeyKx, HASH_SIZE,
-    PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
+    kx, HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;

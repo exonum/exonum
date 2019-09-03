@@ -26,10 +26,9 @@ use serde_json::Error as JsonError;
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
+use crate::crypto::{hash, kx, CryptoHash, Hash, PublicKey};
 use crate::helpers::{Height, Milliseconds};
 use crate::messages::EMPTY_SIGNED_MESSAGE_SIZE;
-use exonum_crypto::PublicKeyKx;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -43,7 +42,7 @@ pub struct ValidatorKeys {
     /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
     /// TODO
-    pub identity_key: PublicKeyKx,
+    pub identity_key: kx::PublicKey,
 }
 
 /// Exonum blockchain global configuration. Services

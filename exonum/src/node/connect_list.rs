@@ -16,9 +16,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::crypto::PublicKey;
+use crate::crypto::{kx, PublicKey};
 use crate::node::{ConnectInfo, ConnectListConfig};
-use exonum_crypto::PublicKeyKx;
 
 /// Network address of the peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +40,7 @@ pub struct ConnectList {
     #[serde(default)]
     pub peers: BTreeMap<PublicKey, PeerAddress>,
     ///TODO: workaround to use identity keys only for handshake
-    pub identity: BTreeMap<PublicKey, Option<PublicKeyKx>>,
+    pub identity: BTreeMap<PublicKey, kx::PublicKey>,
 }
 
 impl ConnectList {

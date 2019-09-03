@@ -14,8 +14,7 @@
 
 // spell-checker:ignore cipherparams ciphertext
 
-use super::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use crate::{gen_keypair_from_seed_kx, PublicKeyKx, SecretKeyKx};
+use super::{gen_keypair, gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use exonum_sodiumoxide::crypto::pwhash::{gen_salt, Salt};
 use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
@@ -147,8 +146,8 @@ pub struct Keys {
     pub consensus_sk: SecretKey,
     pub service_pk: PublicKey,
     pub service_sk: SecretKey,
-    pub identity_pk: PublicKeyKx,
-    pub identity_sk: SecretKeyKx,
+    pub identity_pk: kx::PublicKey,
+    pub identity_sk: kx::SecretKey,
 }
 
 pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
@@ -226,7 +225,7 @@ fn generate_keys_from_master_password(salt: Salt) -> Keys {
 
     tree.child(Name::new("identity")).fill(&mut buffer);
     let seed = Seed::from_slice(&buffer).unwrap();
-    let (identity_pk, identity_sk) = gen_keypair_from_seed_kx(&seed);
+    let (identity_pk, identity_sk) = kx::gen_keypair_from_seed(&seed);
 
     Keys {
         consensus_pk,

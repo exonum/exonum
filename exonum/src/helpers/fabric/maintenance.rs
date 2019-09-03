@@ -14,10 +14,7 @@
 
 //! This module implements node maintenance actions.
 
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::Path};
 
 use super::{
     internal::{CollectedCommand, Command, Feedback},
@@ -42,7 +39,7 @@ const MAINTENANCE_ACTION_PATH: &str = "MAINTENANCE_ACTION_PATH";
 pub struct Maintenance;
 
 impl Maintenance {
-    fn node_config(ctx: &Context) -> NodeConfig<PathBuf> {
+    fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx
             .arg::<String>(NODE_CONFIG_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH));

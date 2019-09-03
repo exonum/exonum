@@ -30,7 +30,7 @@ use std::path::{Component, Path, PathBuf};
 use crate::blockchain::{GenesisConfig, ValidatorKeys};
 use crate::crypto::gen_keypair;
 use crate::node::{ConnectListConfig, NodeConfig};
-use exonum_crypto::{gen_keypair_kx, Keys};
+use exonum_crypto::{kx, Keys};
 
 mod types;
 
@@ -44,7 +44,7 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
     let keys: (Vec<_>) = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair(), gen_keypair_kx()))
+        .map(|_| (gen_keypair(), gen_keypair(), kx::gen_keypair()))
         .map(|(v, s, i)| Keys {
             consensus_pk: v.0,
             consensus_sk: v.1,
