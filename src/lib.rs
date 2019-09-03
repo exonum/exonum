@@ -40,7 +40,7 @@
 //!   public parts of the node configurations.
 
 use exonum::blockchain::InstanceCollection;
-use exonum::exonum_merkledb::RocksDB;
+use exonum::exonum_merkledb::{Database, RocksDB};
 use exonum::node::Node;
 use exonum::runtime::rust::ServiceFactory;
 
@@ -53,7 +53,7 @@ pub mod config;
 pub mod io;
 pub mod password;
 
-/// Rust-runtime specific node builder used for constructing a node with a list
+/// Rust-specific node builder used for constructing a node with a list
 /// of provided services.
 #[derive(Debug)]
 pub struct NodeBuilder {
@@ -76,20 +76,22 @@ impl NodeBuilder {
 
     /// Configures the node using parameters provided by user from stdin and then runs it.
     ///
-    /// Rust runtime enabled only.
+    /// Only Rust runtime is enabled.
     pub fn run(self) -> Result<(), failure::Error> {
         let command = Command::from_args();
         if let StandardResult::Run(run_config) = command.execute()? {
-            let database = Arc::new(RocksDB::open(
-                run_config.db_path,
-                &run_config.node_config.database,
-            )?) as Arc<_>;
+            let db_options = &run_config.node_config.database;
+            let database: Arc<dyn Database> =
+                Arc::new(RocksDB::open(run_config.db_path, db_options)?);
+
+            let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
             let node = Node::new(
                 database,
                 self.services.into_iter().map(InstanceCollection::new),
                 run_config.node_config,
-                None,
+                Some(node_config_path),
             );
+
             node.run()
         } else {
             Ok(())

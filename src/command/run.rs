@@ -25,7 +25,7 @@ use std::path::PathBuf;
 
 use crate::command::{ExonumCommand, StandardResult};
 use crate::io::load_config_file;
-use crate::password::{PassInputMethod, SecretKeyType};
+use crate::password::{PassInputMethod, SecretKeyType, PassphraseUsage};
 
 /// Container for node configuration parameters produced by `Run` command.
 pub struct NodeRunConfig {
@@ -33,6 +33,8 @@ pub struct NodeRunConfig {
     pub node_config: NodeConfig,
     /// Path to a directory containing database files, provided by user.
     pub db_path: PathBuf,
+    /// User-provided path to the node configuration file.
+    pub node_config_path: PathBuf,
 }
 
 /// Run the node with provided node config.
@@ -75,7 +77,7 @@ pub struct Run {
 
 impl ExonumCommand for Run {
     fn execute(self) -> Result<StandardResult, Error> {
-        let config_path = self.node_config;
+        let config_path = self.node_config.clone();
 
         let mut config: NodeConfig<PathBuf> = load_config_file(&config_path)?;
         let public_addr = self.public_api_address;
@@ -93,11 +95,11 @@ impl ExonumCommand for Run {
         let consensus_passphrase = self
             .consensus_key_pass
             .unwrap_or_default()
-            .get_passphrase(SecretKeyType::Consensus, true);
+            .get_passphrase(SecretKeyType::Consensus, PassphraseUsage::Using)?;
         let service_passphrase = self
             .service_key_pass
             .unwrap_or_default()
-            .get_passphrase(SecretKeyType::Service, true);
+            .get_passphrase(SecretKeyType::Service, PassphraseUsage::Using)?;
 
         let config = config.read_secret_keys(
             &config_path,
@@ -108,6 +110,7 @@ impl ExonumCommand for Run {
         let run_config = NodeRunConfig {
             node_config: config,
             db_path: self.db_path,
+            node_config_path: self.node_config,
         };
 
         Ok(StandardResult::Run(run_config))

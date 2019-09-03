@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use crate::command::{ExonumCommand, StandardResult};
 use crate::config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
 use crate::io::{load_config_file, save_config_file};
-use crate::password::{PassInputMethod, SecretKeyType, ZeroizeOnDrop};
+use crate::password::{PassInputMethod, Passphrase, SecretKeyType, PassphraseUsage};
 
 /// Name for a file containing consensus secret key.
 pub const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
@@ -82,7 +82,7 @@ pub struct GenerateConfig {
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
-    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_SERVICE_PASS` is used
     /// by default.
     pub service_key_pass: Option<PassInputMethod>,
 }
@@ -92,11 +92,11 @@ impl GenerateConfig {
         no_password: bool,
         method: PassInputMethod,
         secret_key_type: SecretKeyType,
-    ) -> ZeroizeOnDrop<String> {
+    ) -> Result<Passphrase, Error> {
         if no_password {
-            ZeroizeOnDrop::default()
+            Ok(Passphrase::default())
         } else {
-            method.get_passphrase(secret_key_type, false)
+            method.get_passphrase(secret_key_type, PassphraseUsage::SettingUp)
         }
     }
 
@@ -144,7 +144,7 @@ impl ExonumCommand for GenerateConfig {
                 self.no_password,
                 self.consensus_key_pass.unwrap_or_default(),
                 SecretKeyType::Consensus,
-            );
+            )?;
             create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())
         };
         let service_public_key = {
@@ -152,7 +152,7 @@ impl ExonumCommand for GenerateConfig {
                 self.no_password,
                 self.service_key_pass.unwrap_or_default(),
                 SecretKeyType::Service,
-            );
+            )?;
             create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
         };
 
