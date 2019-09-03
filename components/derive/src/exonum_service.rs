@@ -17,7 +17,7 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
     parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, TraitItem,
-    TraitItemMethod, Type,
+    Type,
 };
 
 use std::convert::TryFrom;
@@ -141,53 +141,6 @@ impl ExonumService {
             .unwrap_or_default()
     }
 
-    fn impl_dispatch_method(&self) -> impl ToTokens {
-        let trait_name = &self.item_trait.ident;
-        let cr = &self.attrs.cr;
-
-        let match_arms = self.methods.iter().map(
-            |ServiceMethodDescriptor { name, arg_type, id }| {
-                quote! {
-                    #id => {
-                        let bytes = payload.into();
-                        let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                            .map_err(|error_msg|
-                                (
-                                    #cr::runtime::rust::error::Error::ArgumentsParseError,
-                                    format!("Unable to parse argument for the `{}#{}` method. {}",
-                                        stringify!(#trait_name), stringify!(#name), error_msg
-                                    )
-                                )
-                            )?;
-                        self.#name(ctx,arg).map_err(From::from)
-                    }
-                }
-            },
-        );
-
-        quote! {
-            #[doc(hidden)]
-            fn dispatch(
-                    &self,
-                    ctx: #cr::runtime::rust::TransactionContext,
-                    method: #cr::runtime::MethodId,
-                    payload: &[u8]
-                ) -> Result<(), #cr::runtime::error::ExecutionError> {
-                match method {
-                    #( #match_arms )*
-                    other => {
-                        let kind = #cr::runtime::dispatcher::Error::NoSuchMethod;
-                        let message = format!(
-                            "Method with ID {} is absent in the '{}' interface of the instance `{}`",
-                            other, stringify!(#trait_name), ctx.instance.name,
-                        );
-                        Err((kind, message)).map_err(From::from)
-                    }
-                }
-            }
-        }
-    }
-
     fn impl_transactions(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
         let trait_name = &self.item_trait.ident;
@@ -212,39 +165,68 @@ impl ExonumService {
         }
     }
 
-    fn impl_interface_describe(&self) -> impl ToTokens {
+    fn impl_interface(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
         let trait_name = &self.item_trait.ident;
         let interface_name = self.interface_name();
 
+        let match_arms = self.methods.iter().map(
+            |ServiceMethodDescriptor { name, arg_type, id }| {
+                quote! {
+                    #id => {
+                        let bytes = payload.into();
+                        let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
+                            .map_err(|error_msg|
+                                (
+                                    #cr::runtime::rust::error::Error::ArgumentsParseError,
+                                    format!("Unable to parse argument for the `{}#{}` method. {}",
+                                        stringify!(#trait_name), stringify!(#name), error_msg
+                                    )
+                                )
+                            )?;
+                        self.#name(ctx,arg).map_err(From::from)
+                    }
+                }
+            },
+        );
+
         quote! {
-            impl #cr::runtime::rust::service::InterfaceDescribe for dyn #trait_name {
-                const INTERFACE_NAME: &'static str = #interface_name;
+            impl #cr::runtime::rust::service::Interface for dyn #trait_name {
+                const NAME: &'static str = #interface_name;
+
+                fn dispatch(
+                        &self,
+                        ctx: #cr::runtime::rust::TransactionContext,
+                        method: #cr::runtime::MethodId,
+                        payload: &[u8]
+                    ) -> Result<(), #cr::runtime::error::ExecutionError> {
+                    match method {
+                        #( #match_arms )*
+                        other => {
+                            let kind = #cr::runtime::dispatcher::Error::NoSuchMethod;
+                            let message = format!(
+                                "Method with ID {} is absent in the '{}' interface of the instance `{}`",
+                                other, stringify!(#trait_name), ctx.instance.name,
+                            );
+                            Err((kind, message)).map_err(From::from)
+                        }
+                    }
+                }
             }
         }
-    }
-
-    fn item_trait(&self) -> impl ToTokens {
-        let mut item_trait = self.item_trait.clone();
-        let dispatch_method: TraitItemMethod = {
-            let method_code = self.impl_dispatch_method().into_token_stream();
-            syn::parse(method_code.into()).expect("Can't parse trait item method")
-        };
-        item_trait.items.push(TraitItem::Method(dispatch_method));
-        item_trait
     }
 }
 
 impl ToTokens for ExonumService {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let item_trait = self.item_trait();
+        let item_trait = &self.item_trait;
         let impl_transactions = self.impl_transactions();
-        let impl_interface_describe = self.impl_interface_describe();
+        let impl_interface = self.impl_interface();
 
         let expanded = quote! {
             #item_trait
             #impl_transactions
-            #impl_interface_describe
+            #impl_interface
         };
         tokens.extend(expanded);
     }

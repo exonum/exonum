@@ -17,7 +17,7 @@
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{InterfaceDescribe, TransactionContext},
+        rust::{Interface, TransactionContext},
         CallContext, ExecutionError,
     },
 };
@@ -42,7 +42,7 @@ pub struct IssueReceiverClient<'a>(CallContext<'a>);
 
 impl<'a> IssueReceiverClient<'a> {
     pub fn issue(&self, arg: TxIssue) -> Result<(), ExecutionError> {
-        self.0.call(IssueReceiver::INTERFACE_NAME, 0, arg)
+        self.0.call(IssueReceiver::NAME, 0, arg)
     }
 }
 

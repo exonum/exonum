@@ -385,7 +385,7 @@ mod foreign_interface_call {
         proto::Any,
         runtime::{
             self, dispatcher,
-            rust::{service::InterfaceDescribe, Service, Transaction, TransactionContext},
+            rust::{Interface, Service, Transaction, TransactionContext},
             AnyTx, CallContext, InstanceId, MethodId,
         },
     };
@@ -424,6 +424,10 @@ mod foreign_interface_call {
     pub trait ForeignInterface {
         fn timestamp(&self, context: TransactionContext, arg: SelfTx)
             -> Result<(), ExecutionError>;
+    }
+
+    impl Interface for dyn ForeignInterface {
+        const NAME: &'static str = "ForeignInterface";
 
         fn dispatch(
             &self,
@@ -443,16 +447,12 @@ mod foreign_interface_call {
         }
     }
 
-    impl InterfaceDescribe for dyn ForeignInterface {
-        const INTERFACE_NAME: &'static str = "ForeignInterface";
-    }
-
     #[derive(Debug)]
     pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
 
     impl<'a> ForeignInterfaceClient<'a> {
         fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
-            self.0.call(ForeignInterface::INTERFACE_NAME, 0, arg)
+            self.0.call(ForeignInterface::NAME, 0, arg)
         }
     }
 

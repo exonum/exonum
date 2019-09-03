@@ -151,12 +151,12 @@ impl ServiceFactory {
         let dispatcher = self.service_name();
 
         let match_arms = self.implements.0.iter().map(|trait_name| {
-            let interface_name = quote! {
-                <dyn #trait_name as #cr::runtime::rust::service::InterfaceDescribe>::INTERFACE_NAME
+            let interface_trait = quote! {
+                <dyn #trait_name as #cr::runtime::rust::service::Interface>
             };
 
             quote! {
-                #interface_name => <Self as #trait_name>::dispatch(self, ctx, method, payload),
+                #interface_trait::NAME => #interface_trait::dispatch(self, ctx, method, payload),
             }
         });
 

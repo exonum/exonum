@@ -16,7 +16,7 @@ pub use self::{
     error::Error,
     service::{
         AfterCommitContext, BeforeCommitContext, Service, ServiceFactory, Transaction,
-        TransactionContext, InterfaceDescribe,
+        TransactionContext, Interface,
     },
 };
 

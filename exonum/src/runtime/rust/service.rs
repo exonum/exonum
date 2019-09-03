@@ -294,6 +294,13 @@ impl<'a> Debug for AfterCommitContext<'a> {
     }
 }
 
-pub trait InterfaceDescribe {
-    const INTERFACE_NAME: &'static str;
+pub trait Interface {
+    const NAME: &'static str;
+
+    fn dispatch(
+        &self,
+        ctx: TransactionContext,
+        method: MethodId,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError>;
 }

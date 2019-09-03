@@ -149,7 +149,7 @@ fn test_any_call_ok_deposit() {
         &mut testkit,
         TxAnyCall {
             call_info: CallInfo {
-                interface_name: String::default(),
+                interface_name: "IssueReceiver".into(),
                 instance_id: DepositService::ID,
                 method_id: 0,
             },
