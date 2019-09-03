@@ -42,7 +42,7 @@ mod transactions;
     crate = "crate",
     proto_sources = "proto::schema",
     artifact_name = "exonum-supervisor",
-    interfaces(default = "transactions::Transactions")
+    implements("transactions::Transactions")
 )]
 pub struct Supervisor;
 

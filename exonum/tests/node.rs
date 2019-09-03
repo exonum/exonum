@@ -41,7 +41,7 @@ trait CommitWatcherInterface {}
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
     proto_sources = "exonum::proto::schema",
-    interfaces(default = "CommitWatcherInterface"),
+    implements("CommitWatcherInterface"),
     service_constructor = "CommitWatcherService::new_instance"
 )]
 struct CommitWatcherService(pub RefCell<Option<oneshot::Sender<()>>>);
@@ -77,7 +77,7 @@ impl Service for StartCheckerService {}
     artifact_name = "configure",
     artifact_version = "1.0.2",
     proto_sources = "exonum::proto::schema",
-    interfaces(default = "StartCheckerInterface"),
+    implements("StartCheckerInterface"),
     service_constructor = "StartCheckerServiceFactory::new_instance",
     service_name = "StartCheckerService"
 )]

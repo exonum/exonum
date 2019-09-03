@@ -222,7 +222,7 @@ impl CounterApi {
     artifact_name = "counter-service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto",
-    interfaces(default = "CounterServiceInterface")
+    implements("CounterServiceInterface")
 )]
 pub struct CounterService;
 

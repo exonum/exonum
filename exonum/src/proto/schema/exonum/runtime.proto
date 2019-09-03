@@ -25,7 +25,7 @@ message CallInfo {
   uint32 instance_id = 1;
   // Identifier of the method in the service interface required for the call.
   uint32 method_id = 2;
-  // Identifier of the additional service interface.
+  // Identifier of the service interface required for the call.
   string interface_name = 3;
 }
 

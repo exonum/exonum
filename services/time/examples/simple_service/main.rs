@@ -106,7 +106,7 @@ pub trait MarkerInterface {
     artifact_name = "marker",
     artifact_version = "0.1.0",
     proto_sources = "proto",
-    interfaces(default = "MarkerInterface")
+    implements("MarkerInterface")
 )]
 struct MarkerService;
 

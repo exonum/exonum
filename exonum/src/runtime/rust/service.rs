@@ -87,6 +87,8 @@ where
 pub trait Transaction: BinaryValue {
     /// Service interface associated for the given transaction.
     type Service;
+    /// Identifier of the service interface required for the call.
+    const INTERFACE_NAME: &'static str;
     /// Identifier of service method which executes the given transaction.
     const METHOD_ID: MethodId;
 
@@ -96,8 +98,7 @@ pub trait Transaction: BinaryValue {
             call_info: CallInfo {
                 instance_id,
                 method_id: Self::METHOD_ID,
-                // Only main interface can execute user transactions.
-                interface_name: String::new(),
+                interface_name: Self::INTERFACE_NAME.to_owned(),
             },
             arguments: self.into_bytes(),
         }
@@ -117,7 +118,7 @@ pub trait Transaction: BinaryValue {
 /// Provide context for the currently executing transaction.
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    /// Service instance that associated with the current context.
+    /// Service instance associated with the current context.
     pub instance: InstanceDescriptor<'a>,
     /// Underlying execution context.
     inner: &'a ExecutionContext<'b>,
@@ -181,7 +182,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 /// Provide context for the `before_commit` handler.
 #[derive(Debug)]
 pub struct BeforeCommitContext<'a> {
-    /// Service instance that associated with the current context.
+    /// Service instance associated with the current context.
     pub instance: InstanceDescriptor<'a>,
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
@@ -207,7 +208,7 @@ impl<'a> BeforeCommitContext<'a> {
 
 /// Provide context for the `after_commit` handler.
 pub struct AfterCommitContext<'a> {
-    /// Service instance that associated with the current context.
+    /// Service instance associated with the current context.
     pub instance: InstanceDescriptor<'a>,
     /// Read-only snapshot of the current blockchain state.
     pub snapshot: &'a dyn Snapshot,
@@ -291,4 +292,8 @@ impl<'a> Debug for AfterCommitContext<'a> {
             .field("instance", &self.instance)
             .finish()
     }
+}
+
+pub trait InterfaceDescribe {
+    const INTERFACE_NAME: &'static str;
 }

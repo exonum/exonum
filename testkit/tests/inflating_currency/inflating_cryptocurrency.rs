@@ -206,7 +206,7 @@ impl CryptocurrencyApi {
     artifact_name = "cryptocurrency",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto",
-    interfaces(default = "CurrencyInterface")
+    implements("CurrencyInterface")
 )]
 pub struct CurrencyService;
 

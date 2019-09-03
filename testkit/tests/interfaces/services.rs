@@ -49,7 +49,7 @@ pub trait WalletInterface {
 #[exonum(
     artifact_name = "wallet-service",
     proto_sources = "proto",
-    interfaces(default = "WalletInterface", additional("IssueReceiver"))
+    implements("WalletInterface", "IssueReceiver")
 )]
 pub struct WalletService;
 
@@ -107,7 +107,7 @@ impl IssueReceiver for WalletService {
 #[exonum(
     artifact_name = "deposit-service",
     proto_sources = "proto",
-    interfaces(default = "IssueReceiver")
+    implements("IssueReceiver")
 )]
 pub struct DepositService;
 
@@ -153,7 +153,7 @@ pub trait AnyCall {
 #[exonum(
     artifact_name = "any-call-service",
     proto_sources = "proto",
-    interfaces(default = "AnyCall")
+    implements("AnyCall")
 )]
 pub struct AnyCallService;
 

@@ -135,7 +135,7 @@ mod timestamping {
     #[exonum(
         artifact_name = "timestamping",
         proto_sources = "crate::proto",
-        interfaces(default = "TimestampingInterface")
+        implements("TimestampingInterface")
     )]
     pub struct Timestamping;
 
@@ -239,7 +239,7 @@ mod cryptocurrency {
     #[exonum(
         artifact_name = "cryptocurrency",
         proto_sources = "crate::proto",
-        interfaces(default = "CryptocurrencyInterface")
+        implements("CryptocurrencyInterface")
     )]
     pub struct Cryptocurrency;
 
@@ -385,7 +385,7 @@ mod foreign_interface_call {
         proto::Any,
         runtime::{
             self, dispatcher,
-            rust::{Service, Transaction, TransactionContext},
+            rust::{service::InterfaceDescribe, Service, Transaction, TransactionContext},
             AnyTx, CallContext, InstanceId, MethodId,
         },
     };
@@ -443,14 +443,16 @@ mod foreign_interface_call {
         }
     }
 
+    impl InterfaceDescribe for dyn ForeignInterface {
+        const INTERFACE_NAME: &'static str = "ForeignInterface";
+    }
+
     #[derive(Debug)]
     pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
 
     impl<'a> ForeignInterfaceClient<'a> {
-        const INTERFACE_NAME: &'static str = "ForeignInterface";
-
         fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
-            self.0.call(Self::INTERFACE_NAME, 0, arg)
+            self.0.call(ForeignInterface::INTERFACE_NAME, 0, arg)
         }
     }
 
@@ -460,22 +462,25 @@ mod foreign_interface_call {
         }
     }
 
-    #[exonum_service]
+    #[exonum_service(interface = "Configure")]
     pub trait Configure {}
 
-    #[exonum_service]
+    #[exonum_service(interface = "Events")]
     pub trait Events {}
 
-    #[exonum_service]
+    #[exonum_service(interface = "ERC30Tokens")]
     pub trait ERC30Tokens {}
 
     #[derive(Debug, ServiceFactory)]
     #[exonum(
         artifact_name = "timestamping",
         proto_sources = "crate::proto",
-        interfaces(
-            default = "SelfInterface",
-            additional("ForeignInterface", "Configure", "Events", "ERC30Tokens")
+        implements(
+            "SelfInterface",
+            "ForeignInterface",
+            "Configure",
+            "Events",
+            "ERC30Tokens"
         )
     )]
     pub struct Timestamping;

@@ -16,7 +16,10 @@
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{rust::TransactionContext, CallContext, ExecutionError},
+    runtime::{
+        rust::{InterfaceDescribe, TransactionContext},
+        CallContext, ExecutionError,
+    },
 };
 use exonum_derive::{exonum_service, ProtobufConvert};
 use serde_derive::{Deserialize, Serialize};
@@ -30,7 +33,7 @@ pub struct TxIssue {
     pub amount: u64,
 }
 
-#[exonum_service]
+#[exonum_service(interface = "IssueReceiver")]
 pub trait IssueReceiver {
     fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError>;
 }
@@ -38,10 +41,8 @@ pub trait IssueReceiver {
 pub struct IssueReceiverClient<'a>(CallContext<'a>);
 
 impl<'a> IssueReceiverClient<'a> {
-    const INTERFACE_NAME: &'static str = "IssueReceiver";
-
     pub fn issue(&self, arg: TxIssue) -> Result<(), ExecutionError> {
-        self.0.call(Self::INTERFACE_NAME, 0, arg)
+        self.0.call(IssueReceiver::INTERFACE_NAME, 0, arg)
     }
 }
 

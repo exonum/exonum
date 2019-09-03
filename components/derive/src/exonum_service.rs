@@ -82,12 +82,14 @@ impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
 struct ExonumServiceAttrs {
     #[darling(rename = "crate")]
     cr: CratePath,
+    interface: Option<String>,
 }
 
 impl Default for ExonumServiceAttrs {
     fn default() -> Self {
         Self {
             cr: CratePath::default(),
+            interface: None,
         }
     }
 }
@@ -129,6 +131,14 @@ impl ExonumService {
             attrs: ExonumServiceAttrs::from_list(&args)?,
             methods,
         })
+    }
+
+    fn interface_name(&self) -> &str {
+        self.attrs
+            .interface
+            .as_ref()
+            .map(String::as_ref)
+            .unwrap_or_default()
     }
 
     fn impl_dispatch_method(&self) -> impl ToTokens {
@@ -179,8 +189,9 @@ impl ExonumService {
     }
 
     fn impl_transactions(&self) -> impl ToTokens {
-        let trait_name = &self.item_trait.ident;
         let cr = &self.attrs.cr;
+        let trait_name = &self.item_trait.ident;
+        let interface_name = self.interface_name();
 
         let transactions_for_methods =
             self.methods
@@ -190,6 +201,7 @@ impl ExonumService {
                         impl #cr::runtime::rust::Transaction for #arg_type {
                             type Service = &'static dyn #trait_name;
 
+                            const INTERFACE_NAME: &'static str = #interface_name;
                             const METHOD_ID: #cr::runtime::MethodId = #id;
                         }
                     }
@@ -197,6 +209,18 @@ impl ExonumService {
 
         quote! {
             #( #transactions_for_methods )*
+        }
+    }
+
+    fn impl_interface_describe(&self) -> impl ToTokens {
+        let cr = &self.attrs.cr;
+        let trait_name = &self.item_trait.ident;
+        let interface_name = self.interface_name();
+
+        quote! {
+            impl #cr::runtime::rust::service::InterfaceDescribe for dyn #trait_name {
+                const INTERFACE_NAME: &'static str = #interface_name;
+            }
         }
     }
 
@@ -215,10 +239,12 @@ impl ToTokens for ExonumService {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let item_trait = self.item_trait();
         let impl_transactions = self.impl_transactions();
+        let impl_interface_describe = self.impl_interface_describe();
 
         let expanded = quote! {
             #item_trait
             #impl_transactions
+            #impl_interface_describe
         };
         tokens.extend(expanded);
     }

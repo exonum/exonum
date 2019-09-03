@@ -81,7 +81,7 @@ pub trait MyServiceInterface {
 #[exonum(
     artifact_name = "ws-test",
     proto_sources = "exonum::proto::schema",
-    interfaces(default = "MyServiceInterface")
+    implements("MyServiceInterface")
 )]
 struct MyService;
 

@@ -43,7 +43,7 @@ pub trait ConfigUpdaterInterface {
     artifact_name = "config_updater",
     artifact_version = "0.1.0",
     proto_sources = "crate::proto::schema",
-    interfaces(default = "ConfigUpdaterInterface")
+    implements("ConfigUpdaterInterface")
 )]
 pub struct ConfigUpdaterService;
 

@@ -18,8 +18,6 @@ use quote::{quote, ToTokens};
 use semver::Version;
 use syn::{DeriveInput, Ident, Lit, NestedMeta, Path};
 
-use std::iter;
-
 use super::CratePath;
 
 fn is_allowed_latin1_char(c: u8) -> bool {
@@ -45,9 +43,9 @@ fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
 }
 
 #[derive(Debug, Default)]
-struct AdditionalInterfaces(Vec<Path>);
+struct ServiceInterfaces(Vec<Path>);
 
-impl FromMeta for AdditionalInterfaces {
+impl FromMeta for ServiceInterfaces {
     fn from_string(value: &str) -> darling::Result<Self> {
         Path::from_string(value).map(|path| Self(vec![path]))
     }
@@ -62,34 +60,11 @@ impl FromMeta for AdditionalInterfaces {
             .map(|meta| match meta {
                 NestedMeta::Lit(lit) => Path::from_value(lit),
                 _ => Err(darling::Error::unsupported_format(
-                    "Additional services should be in format: `additional(\"First\", \"Second\")`",
+                    "Services should be in format: `implements(\"First\", \"Second\")`",
                 )),
             })
             .collect::<Result<Vec<_>, _>>()
-            .map(AdditionalInterfaces)
-    }
-}
-
-#[derive(Debug, FromMeta)]
-struct ServiceInterfaces {
-    default: Path,
-    #[darling(default)]
-    additional: AdditionalInterfaces,
-}
-
-impl ServiceInterfaces {
-    fn list_all(&self) -> impl IntoIterator<Item = (String, &Path)> {
-        // Only the additional interfaces use the explicit interface names.
-        let additional_interfaces = self.additional.0.iter().map(|path| {
-            let interface_name = path
-                .segments
-                .last()
-                .expect("Interface should not be an empty string")
-                .ident
-                .to_string();
-            (interface_name, path)
-        });
-        iter::once((String::new(), &self.default)).chain(additional_interfaces)
+            .map(Self)
     }
 }
 
@@ -107,7 +82,7 @@ struct ServiceFactory {
     proto_sources: Option<Path>,
     #[darling(default)]
     service_constructor: Option<Path>,
-    interfaces: ServiceInterfaces,
+    implements: ServiceInterfaces,
     #[darling(default)]
     service_name: Option<Ident>,
 }
@@ -175,14 +150,15 @@ impl ServiceFactory {
         let cr = &self.cr;
         let dispatcher = self.service_name();
 
-        let match_arms = self
-            .interfaces.list_all()
-            .into_iter()
-            .map(|(interface_name, trait_name)| {
-                quote! {
-                    #interface_name => <#dispatcher as #trait_name>::dispatch(self, ctx, method, payload),
-                }
-            });
+        let match_arms = self.implements.0.iter().map(|trait_name| {
+            let interface_name = quote! {
+                <dyn #trait_name as #cr::runtime::rust::service::InterfaceDescribe>::INTERFACE_NAME
+            };
+
+            quote! {
+                #interface_name => <Self as #trait_name>::dispatch(self, ctx, method, payload),
+            }
+        });
 
         quote! {
             impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {

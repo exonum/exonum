@@ -78,7 +78,7 @@ trait TestDispatcherInterface {
     crate = "crate",
     artifact_name = "test_dispatcher",
     proto_sources = "crate::proto::schema",
-    interfaces(default = "TestDispatcherInterface")
+    implements("TestDispatcherInterface")
 )]
 struct TestDispatcherService;
 
@@ -186,7 +186,7 @@ trait ServiceGood {}
     artifact_name = "good_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    interfaces(default = "ServiceGood")
+    implements("ServiceGood")
 )]
 struct ServiceGoodImpl;
 
@@ -208,7 +208,7 @@ trait ServicePanic {}
     artifact_name = "panic_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    interfaces(default = "ServicePanic")
+    implements("ServicePanic")
 )]
 struct ServicePanicImpl;
 
@@ -229,7 +229,7 @@ trait ServicePanicStorageError {}
     artifact_name = "storage_error_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    interfaces(default = "ServicePanicStorageError")
+    implements("ServicePanicStorageError")
 )]
 struct ServicePanicStorageErrorImpl;
 
@@ -264,7 +264,7 @@ trait TxResultCheckInterface {
     artifact_name = "tx_result_check",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    interfaces(default = "TxResultCheckInterface")
+    implements("TxResultCheckInterface")
 )]
 struct TxResultCheckService;
 
