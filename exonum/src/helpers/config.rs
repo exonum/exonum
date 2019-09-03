@@ -21,7 +21,7 @@ use std::{
     fs::{self, File},
     io::{Read, Write},
     mem::drop,
-    path::{Path, },
+    path::Path,
     sync::mpsc,
     thread,
 };

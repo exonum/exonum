@@ -30,9 +30,7 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-pub use self::utils::{
-    generate_keys, generate_keys_file, read_keys_from_file, read_keys_from_file_new, Keys,
-};
+pub use self::utils::{generate_keys, generate_keys_file, read_keys_from_file, Keys};
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};

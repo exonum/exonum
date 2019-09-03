@@ -15,8 +15,7 @@
 // spell-checker:ignore cipherparams ciphertext
 
 use super::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use crate::{gen_keypair_from_seed_kx, gen_keypair_kx, PublicKeyKx, SecretKeyKx};
-use exonum_sodiumoxide::crypto::kx::Seed as SeedKx;
+use crate::{gen_keypair_from_seed_kx, PublicKeyKx, SecretKeyKx};
 use exonum_sodiumoxide::crypto::pwhash::{gen_salt, Salt};
 use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
@@ -50,22 +49,22 @@ pub fn generate_keys_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     Ok(pk)
 }
 
-/// Reads and returns `PublicKey` and `SecretKey` from encrypted file located by path and returns its.
-pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
-    path: P,
-    pass_phrase: W,
-) -> Result<(PublicKey, SecretKey), Error> {
-    let mut key_file = File::open(path)?;
-
-    #[cfg(unix)]
-    validate_file_mode(key_file.metadata()?.mode())?;
-
-    let mut file_content = vec![];
-    key_file.read_to_end(&mut file_content)?;
-    let keys: EncryptedKeys =
-        toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
-    keys.decrypt(pass_phrase)
-}
+///// Reads and returns `PublicKey` and `SecretKey` from encrypted file located by path and returns its.
+//pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
+//    path: P,
+//    pass_phrase: W,
+//) -> Result<(PublicKey, SecretKey), Error> {
+//    let mut key_file = File::open(path)?;
+//
+//    #[cfg(unix)]
+//    validate_file_mode(key_file.metadata()?.mode())?;
+//
+//    let mut file_content = vec![];
+//    key_file.read_to_end(&mut file_content)?;
+//    let keys: EncryptedKeys =
+//        toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
+//    keys.decrypt(pass_phrase)
+//}
 
 #[cfg(unix)]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::verbose_bit_mask))]
@@ -209,7 +208,7 @@ impl EncryptedMasterKey {
 
 pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Keys {
     let salt = gen_salt();
-    save_master_key(path, passphrase, salt);
+    save_master_key(path, passphrase, salt).expect("Error generating master key.");
     generate_keys_from_master_password(salt)
 }
 
@@ -239,7 +238,7 @@ fn generate_keys_from_master_password(salt: Salt) -> Keys {
     }
 }
 
-pub fn read_keys_from_file_new<P: AsRef<Path>, W: AsRef<[u8]>>(
+pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     path: P,
     pass_phrase: W,
 ) -> Result<Keys, Error> {

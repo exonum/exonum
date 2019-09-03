@@ -22,9 +22,7 @@ use exonum_merkledb::BinaryValue;
 
 use super::wrapper::NoiseWrapper;
 use crate::{
-    crypto::{
-        PublicKeyKx, SecretKeyKx,
-    },
+    crypto::{PublicKeyKx, SecretKeyKx},
     events::{
         codec::MessagesCodec,
         noise::{Handshake, HandshakeRawMessage, HandshakeResult},
@@ -136,7 +134,6 @@ impl NoiseHandshake {
             PublicKeyKx::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
 
-        //TODO: change revert
         if !self.is_peer_allowed(&remote_static_key) {
             bail!("peer is not in ConnectList")
         }

@@ -766,18 +766,18 @@ impl Command for Finalize {
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
 
         //TODO: change revert
-//        let validators_count = common
-//            .general_config
-//            .get("validators_count")
-//            .expect("validators_count not found in common config.")
-//            .as_integer()
-//            .unwrap() as usize;
+        //        let validators_count = common
+        //            .general_config
+        //            .get("validators_count")
+        //            .expect("validators_count not found in common config.")
+        //            .as_integer()
+        //            .unwrap() as usize;
 
-//        if validators_count != list.len() {
-//            panic!(
-//                "The number of validators configs does not match the number of validators keys."
-//            );
-//        }
+        //        if validators_count != list.len() {
+        //            panic!(
+        //                "The number of validators configs does not match the number of validators keys."
+        //            );
+        //        }
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 
@@ -803,7 +803,6 @@ impl Command for Finalize {
                 database: Default::default(),
                 connect_list,
                 thread_pool_size: Default::default(),
-                //TODO: change to real path
                 master_key_path: secret_config_dir.join(&secret_config.master_key_path),
                 keys: secret_config.keys,
             }

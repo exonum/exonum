@@ -48,9 +48,7 @@ use crate::api::{
 use crate::blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
-use crate::crypto::{
-    self, CryptoHash, Hash, PublicKey, PublicKeyKx, SecretKey,
-};
+use crate::crypto::{self, CryptoHash, Hash, PublicKey, PublicKeyKx, SecretKey};
 use crate::events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
@@ -64,7 +62,7 @@ use crate::helpers::{
 };
 use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
-use exonum_crypto::{read_keys_from_file_new, Keys};
+use exonum_crypto::{read_keys_from_file, Keys};
 use exonum_merkledb::{Database, DbOptions};
 
 mod basic;
@@ -281,7 +279,7 @@ impl NodeConfig {
             config_folder.join(&self.master_key_path)
         };
 
-        let keys = read_keys_from_file_new(&master_key_path, master_key_passphrase)
+        let keys = read_keys_from_file(&master_key_path, master_key_passphrase)
             .expect("Could not read master_key_path from file");
 
         NodeConfig {

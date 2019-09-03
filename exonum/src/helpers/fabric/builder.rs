@@ -163,10 +163,7 @@ impl NodeBuilder {
                 .expect("Incorrect passphrase input method for consensus key.")
                 .get_passphrase(SecretKeyType::Consensus, true);
 
-            config.read_secret_keys(
-                &config_file_path,
-                consensus_passphrase.as_bytes(),
-            )
+            config.read_secret_keys(&config_file_path, consensus_passphrase.as_bytes())
         };
         Node::new(db, services, config, Some(config_file_path))
     }

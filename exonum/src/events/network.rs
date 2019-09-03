@@ -383,7 +383,11 @@ impl NetworkHandler {
                     .map_err(into_failure)
                     .and_then(move |socket| Self::configure_socket(socket, network_config))
                     .and_then(move |outgoing_connection| {
-                        Self::build_handshake_initiator(outgoing_connection, identity_key, &handshake_params)
+                        Self::build_handshake_initiator(
+                            outgoing_connection,
+                            identity_key,
+                            &handshake_params,
+                        )
                     })
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {

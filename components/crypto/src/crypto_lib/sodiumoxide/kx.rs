@@ -19,11 +19,10 @@ use std::{
 
 use crate::{write_short_hex, Seed};
 use exonum_sodiumoxide::crypto::kx::{
-    self, gen_keypair as gen_keypair_kx, keypair_from_seed as gen_keypair_from_seed_kx,
-    PublicKey as PublicKeyKx, SecretKey as SecretKeyKx, Seed as SeedKx, PUBLICKEYBYTES,
-    SECRETKEYBYTES,
+    gen_keypair as gen_keypair_kx, keypair_from_seed as gen_keypair_from_seed_kx,
+    PublicKey as PublicKeyKx, SecretKey as SecretKeyKx, Seed as SeedKx,
 };
-use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
+use hex::{encode as encode_hex, FromHex, FromHexError};
 
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
