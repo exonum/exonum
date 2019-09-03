@@ -38,4 +38,6 @@ pub enum Error {
     NoSuchInterface = 8,
     /// No such method in the service interface.
     NoSuchMethod = 9,
+    /// Maximum depth of call stack has been reached.
+    StackOverflow = 10,
 }

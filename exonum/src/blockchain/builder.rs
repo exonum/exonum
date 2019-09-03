@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ExecutionError { kind: Dispatcher { code: 5 }")]
+    #[should_panic(expected = "Specified service identifier is already used")]
     fn finalize_duplicate_services() {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();

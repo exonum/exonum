@@ -487,11 +487,14 @@ impl<'a> CallContext<'a> {
             instance_id: self.called,
         };
 
-        assert!(
-            context.call_stack_depth < ExecutionContext::MAX_CALL_STACK_DEPTH,
-            "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
-            ExecutionContext::MAX_CALL_STACK_DEPTH
-        );
+        if context.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
+            let kind = dispatcher::Error::StackOverflow;
+            let msg = format!(
+                "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
+                ExecutionContext::MAX_CALL_STACK_DEPTH
+            );
+            return Err((kind, msg).into());
+        }
 
         self.inner
             .dispatcher

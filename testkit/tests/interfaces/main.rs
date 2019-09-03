@@ -318,7 +318,5 @@ fn test_any_call_panic_recursion_limit() {
     )
     .unwrap_err();
 
-    assert!(err
-        .to_string()
-        .contains("Maximum depth of call stack has been reached"));
+    assert_eq!(err.kind, runtime::dispatcher::Error::StackOverflow.into());
 }
