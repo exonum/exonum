@@ -1,0 +1,37 @@
+language: rust
+rust:
+  - stable
+
+addons:
+  apt:
+    sources:
+      - sourceline: 'ppa:maarten-fonville/protobuf'
+      - sourceline: 'ppa:exonum/rocksdb'
+      - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
+    packages:
+      - build-essential
+      - libprotobuf-dev
+      - protobuf-compiler
+      - librocksdb5.17
+      - libsodium-dev
+      - libssl-dev
+      - pkg-config
+
+matrix:
+  allow_failures:
+    - rust: nightly
+  fast_finish: true
+
+env:
+  global:
+    - RUSTFLAGS="-D warnings"
+    - ROCKSDB_LIB_DIR="/usr/lib"
+
+jobs:
+  include:
+    - name: tests
+      script: cargo test
+    - name: fmt
+      script:
+        - rustup component add rustfmt
+        - cargo fmt -- --check
