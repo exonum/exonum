@@ -88,7 +88,7 @@ pub struct IncService;
 
 impl IncInterface for IncService {
     fn inc(&self, context: TransactionContext, _arg: TxInc) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_name(), context.fork());
+        let mut schema = Schema::new(context.instance.name, context.fork());
         schema.inc();
         Ok(())
     }
@@ -100,7 +100,7 @@ pub struct PublicApi;
 impl PublicApi {
     fn counter(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
         let snapshot = state.snapshot();
-        let schema = Schema::new(&state.instance().name, snapshot);
+        let schema = Schema::new(&state.instance.name, snapshot);
         schema
             .count()
             .ok_or_else(|| api::Error::NotFound("Counter is not set yet".to_owned()))

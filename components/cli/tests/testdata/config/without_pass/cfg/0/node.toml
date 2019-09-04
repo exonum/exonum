@@ -21,6 +21,7 @@ public_key = "faa0b61e5ba0be4836ce8400dbfc44cfd1c3eb363ec93a7a8a89bf1d21dcef8b"
 
 [database]
 create_if_missing = true
+compression_type = "none"
 [[genesis.validator_keys]]
 consensus_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
 service_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"

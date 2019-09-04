@@ -14,6 +14,7 @@
 
 //! Abstract settings for databases.
 
+use rocksdb::DBCompressionType;
 use serde_derive::{Deserialize, Serialize};
 
 /// Options for the database.
@@ -40,6 +41,42 @@ pub struct DbOptions {
     ///
     /// Defaults to `true`.
     pub create_if_missing: bool,
+    /// An algorithm used for database compression.
+    ///
+    /// Defaults to `CompressionType::None`, meaning there is no compression.
+    pub compression_type: CompressionType,
+}
+
+/// Algorithms of compression for the database.
+///
+/// Database contents are stored in a set of blocks, each of which holds a
+/// sequence of key-value pairs. Each block may be compressed before
+/// being stored in a file. The following enum describes which
+/// compression algorithm (if any) is used to compress a block.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum CompressionType {
+    Bz2,
+    Lz4,
+    Lz4hc,
+    Snappy,
+    Zlib,
+    Zstd,
+    None,
+}
+
+impl From<CompressionType> for DBCompressionType {
+    fn from(compression_type: CompressionType) -> Self {
+        match compression_type {
+            CompressionType::Bz2 => DBCompressionType::Bz2,
+            CompressionType::Lz4 => DBCompressionType::Lz4,
+            CompressionType::Lz4hc => DBCompressionType::Lz4hc,
+            CompressionType::Snappy => DBCompressionType::Snappy,
+            CompressionType::Zlib => DBCompressionType::Zlib,
+            CompressionType::Zstd => DBCompressionType::Zstd,
+            CompressionType::None => DBCompressionType::None,
+        }
+    }
 }
 
 impl Default for DbOptions {
@@ -47,6 +84,7 @@ impl Default for DbOptions {
         Self {
             max_open_files: None,
             create_if_missing: true,
+            compression_type: CompressionType::None,
         }
     }
 }

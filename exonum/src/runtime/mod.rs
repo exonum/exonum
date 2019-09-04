@@ -228,7 +228,6 @@ pub trait Runtime: Send + Debug + 'static {
     /// Do not process. Panic will be processed by the method caller.
     fn execute(
         &self,
-        dispatcher: &dispatcher::Dispatcher,
         context: &mut ExecutionContext,
         call_info: CallInfo,
         arguments: &[u8],
@@ -249,7 +248,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
+    fn before_commit(&self, context: &mut ExecutionContext);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -350,9 +349,19 @@ impl Caller {
         self.as_transaction().map(|(hash, _)| *hash)
     }
 
-    fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
+    /// Try to reinterpret caller as an authorized transaction.
+    pub fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
         if let Caller::Transaction { hash, author } = self {
             Some((hash, author))
+        } else {
+            None
+        }
+    }
+
+    /// Try to reinterpret caller as blockchain.
+    pub fn as_blockchain(&self) -> Option<()> {
+        if let Caller::Blockchain = self {
+            Some(())
         } else {
             None
         }
@@ -365,19 +374,32 @@ impl Caller {
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a Fork,
+    pub fork: &'a mut Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
+    /// List of dispatcher actions that will be performed after the finish of execution.
     actions: Vec<dispatcher::Action>,
+    /// Reference to the underlying runtime dispatcher.
+    dispatcher: &'a Dispatcher,
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub(crate) fn new(fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,
             actions: Vec::new(),
+            dispatcher,
         }
+    }
+
+    pub(crate) fn call(
+        &mut self,
+        call_info: CallInfo,
+        arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        // TODO Modify caller from Transaction.
+        self.dispatcher.call(self, call_info, arguments)
     }
 
     pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {

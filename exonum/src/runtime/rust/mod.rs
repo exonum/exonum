@@ -43,8 +43,8 @@ use super::{
     api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, DispatcherSender},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
-    InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 #[derive(Debug, Default)]
@@ -288,8 +288,7 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        dispatcher: &super::dispatcher::Dispatcher,
-        runtime_context: &mut ExecutionContext,
+        context: &mut ExecutionContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -302,11 +301,7 @@ impl Runtime for RustRuntime {
             .as_ref()
             .call(
                 call_info.method_id,
-                TransactionContext {
-                    instance_descriptor: instance.descriptor(),
-                    runtime_context,
-                    dispatcher,
-                },
+                TransactionContext::new(context, instance.descriptor()),
                 payload,
             )
             .map_err(|e| (Error::UnspecifiedError, e))?
@@ -323,21 +318,19 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, dispatcher: &super::dispatcher::Dispatcher, fork: &mut Fork) {
+    fn before_commit(&self, context: &mut ExecutionContext) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
-                instance.as_ref().before_commit(TransactionContext {
-                    dispatcher,
-                    runtime_context: &mut ExecutionContext::new(fork, Caller::Blockchain),
-                    instance_descriptor: instance.descriptor(),
-                });
+                instance
+                    .as_ref()
+                    .before_commit(TransactionContext::new(context, instance.descriptor()));
                 Ok(())
             });
 
             match result {
-                Ok(..) => fork.flush(),
+                Ok(..) => context.fork.flush(),
                 Err(e) => {
-                    fork.rollback();
+                    context.fork.rollback();
                     error!(
                         "Service \"{}\" `before_commit` failed with error: {:?}",
                         instance.name, e

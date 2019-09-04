@@ -100,7 +100,7 @@ impl Transactions for Supervisor {
         if deploy.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
         }
-        let schema = Schema::new(context.service_name(), context.fork());
+        let schema = Schema::new(context.instance.name, context.fork());
 
         // Verifies that the deployment request is not yet registered.
         if schema.pending_deployments().contains(&deploy.artifact) {
@@ -109,7 +109,11 @@ impl Transactions for Supervisor {
 
         // Verifies that transaction author is validator.
         let mut deploy_requests = schema.deploy_requests();
-        let author = context.author();
+        let author = context
+            .caller()
+            .author()
+            .expect("Wrong `DeployRequest` initiator");
+
         deploy_requests
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
@@ -144,11 +148,15 @@ impl Transactions for Supervisor {
         if confirmation.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded)?;
         }
-        let schema = Schema::new(context.service_name(), context.fork());
+        let schema = Schema::new(context.instance.name, context.fork());
 
         // Verifies that transaction author is validator.
         let mut deploy_confirmations = schema.deploy_confirmations();
-        let author = context.author();
+        let author = context
+            .caller()
+            .author()
+            .expect("Wrong `DeployConfirmation` initiator");
+
         deploy_confirmations
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
@@ -195,8 +203,11 @@ impl Transactions for Supervisor {
             return Err(Error::DeadlineExceeded)?;
         }
         let mut pending_instances =
-            Schema::new(context.service_name(), context.fork()).pending_instances();
-        let author = context.author();
+            Schema::new(context.instance.name, context.fork()).pending_instances();
+        let author = context
+            .caller()
+            .author()
+            .expect("Wrong `StartService` initiator");
 
         // Verifies that transaction author is validator.
         pending_instances
