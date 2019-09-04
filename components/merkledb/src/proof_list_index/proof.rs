@@ -308,10 +308,12 @@ impl<V: BinaryValue> ListProof<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exonum_crypto::CryptoHash;
 
     fn entry(height: u8, index: u64) -> HashedEntry {
-        HashedEntry::new(ProofListKey::new(height, index), index.hash())
+        HashedEntry::new(
+            ProofListKey::new(height, index),
+            HashTag::hash_leaf(&index.to_bytes()),
+        )
     }
 
     #[test]
@@ -360,9 +362,15 @@ mod tests {
 
         assert_eq!(
             hashed[0].hash,
-            HashTag::hash_node(&0_u64.hash(), &1_u64.hash())
+            HashTag::hash_node(
+                &HashTag::hash_leaf(&0_u64.to_bytes()),
+                &HashTag::hash_leaf(&1_u64.to_bytes()),
+            )
         );
-        assert_eq!(hashed[2].hash, HashTag::hash_single_node(&8_u64.hash()));
+        assert_eq!(
+            hashed[2].hash,
+            HashTag::hash_single_node(&HashTag::hash_leaf(&8_u64.to_bytes()))
+        );
 
         // layer[0] has odd index
         let layer = vec![entry(1, 1), entry(1, 2)];

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{CryptoHash, Hash};
+use exonum_crypto::Hash;
 use rand::{thread_rng, Rng};
 use serde_json::{self, json};
 
@@ -440,9 +440,9 @@ fn same_merkle_root() {
 #[test]
 fn proof_json_serialization() {
     let mut proof = ListProof::new(vec![(1, "foo".to_owned()), (2, "bar".to_owned())]);
-    proof.push_hash(1, 0, 4_u64.hash());
-    proof.push_hash(2, 1, 2_u64.hash());
-    proof.push_hash(3, 1, 1_u64.hash());
+    proof.push_hash(1, 0, HashTag::hash_leaf(&[4]));
+    proof.push_hash(2, 1, HashTag::hash_leaf(&[2]));
+    proof.push_hash(3, 1, HashTag::hash_leaf(&[1]));
 
     let json = serde_json::to_value(&proof).unwrap();
     assert_eq!(
@@ -450,9 +450,9 @@ fn proof_json_serialization() {
         json!({
             "values": [(1, "foo"), (2, "bar")],
             "hashes": [
-                { "height": 1, "index": 0, "hash": 4_u64.hash() },
-                { "height": 2, "index": 1, "hash": 2_u64.hash() },
-                { "height": 3, "index": 1, "hash": 1_u64.hash() },
+                { "height": 1, "index": 0, "hash": HashTag::hash_leaf(&[4]) },
+                { "height": 2, "index": 1, "hash": HashTag::hash_leaf(&[2]) },
+                { "height": 3, "index": 1, "hash": HashTag::hash_leaf(&[1]) },
             ],
         })
     );
