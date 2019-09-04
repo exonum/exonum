@@ -8,16 +8,9 @@ members = [
     "testkit",
     "testkit/server",
     "components/build",
+    "components/cli",
     "components/crypto",
     "components/derive",
     "components/merkledb",
 ]
 exclude = [ "exonum/fuzz" ]
-
-[patch.crates-io]
-exonum = { version = "0.12.0", path = "exonum" }
-exonum-derive = { version = "0.12.0", path = "components/derive" }
-exonum-merkledb = { version = "0.12.0", path = "components/merkledb" }
-exonum-crypto = { version = "0.12.0", path = "components/crypto" }
-exonum-testkit = { version = "0.12.0", path = "testkit" }
-exonum-build = { version = "0.12.0", path = "components/build" }
