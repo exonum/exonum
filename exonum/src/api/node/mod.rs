@@ -172,11 +172,7 @@ impl SharedNodeState {
             .incoming_connections
             .iter()
             .chain(lock.outgoing_connections.iter())
-            .filter(|ci| {
-                lock.validators
-                    .iter()
-                    .any(|v| v.consensus_key == ci.public_key)
-            })
+            .filter(|ci| lock.validators.iter().any(|v| v.consensus == ci.public_key))
             .count();
 
         if lock.node_role.is_validator() {

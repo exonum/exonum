@@ -149,9 +149,9 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.caller().author().and_then(|author| {
             CoreSchema::new(self.fork())
                 .actual_configuration()
-                .validator_keys
+                .validators
                 .iter()
-                .position(|validator| author == validator.service_key)
+                .position(|validator_keys| author == validator_keys.service)
                 .map(|id| ValidatorId(id as u16))
         })
     }
@@ -243,9 +243,9 @@ impl<'a> AfterCommitContext<'a> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot)
             .actual_configuration()
-            .validator_keys
+            .validators
             .iter()
-            .position(|validator| self.service_keypair.0 == validator.service_key)
+            .position(|validator_keys| self.service_keypair.0 == validator_keys.service)
             .map(|id| ValidatorId(id as u16))
     }
 

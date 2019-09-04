@@ -51,9 +51,7 @@ use crate::{
         node::SharedNodeState,
         ApiAccess, ApiAggregator,
     },
-    blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema, ValidatorKeys,
-    },
+    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
     crypto::{self, read_keys_from_file, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
@@ -243,7 +241,7 @@ impl Default for MemoryPoolConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeConfig<T = SecretKey> {
     /// Initial config that will be written in the first block.
-    pub genesis: GenesisConfig,
+    pub genesis: ConsensusConfig,
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
@@ -356,7 +354,7 @@ impl<T> ValidateInput for NodeConfig<T> {
             capacity.network_requests_capacity,
             sanity_max,
         );
-        Ok(())
+        self.genesis.validate()
     }
 }
 
@@ -439,9 +437,9 @@ impl ConnectListConfig {
     pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
         let peers = list
             .iter()
-            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
+            .filter(|config| config.validator_keys.consensus != node.consensus_public_key)
             .map(|config| ConnectInfo {
-                public_key: config.validator_keys.consensus_key,
+                public_key: config.validator_keys.consensus,
                 address: config.address.clone(),
             })
             .collect();
@@ -456,7 +454,7 @@ impl ConnectListConfig {
             .zip(validators_keys.iter())
             .map(|(a, v)| ConnectInfo {
                 address: a.clone(),
-                public_key: v.consensus_key,
+                public_key: v.consensus,
             })
             .collect();
 
@@ -498,9 +496,9 @@ impl NodeHandler {
         info!("Creating a node with config: {:#?}", stored);
 
         let validator_id = stored
-            .validator_keys
+            .validators
             .iter()
-            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
+            .position(|pk| pk.consensus == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
         let connect = Verified::from_value(
@@ -1047,7 +1045,7 @@ impl Node {
             handler,
             channel,
             network_config,
-            max_message_len: node_cfg.genesis.consensus.max_message_len,
+            max_message_len: node_cfg.genesis.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
             api_runtime_config,
         }

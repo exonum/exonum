@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{contains_transaction, ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{contains_transaction, ConsensusConfig, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
@@ -60,7 +60,7 @@ pub struct State {
     service_public_key: PublicKey,
     service_secret_key: SecretKey,
 
-    config: StoredConfiguration,
+    config: ConsensusConfig,
     connect_list: SharedConnectList,
 
     peers: HashMap<PublicKey, Verified<Connect>>,
@@ -446,7 +446,7 @@ impl State {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         connect_list: ConnectList,
-        stored: StoredConfiguration,
+        config: ConsensusConfig,
         connect: Verified<Connect>,
         peers: HashMap<PublicKey, Verified<Connect>>,
         last_hash: Hash,
@@ -486,7 +486,7 @@ impl State {
 
             requests: HashMap::new(),
 
-            config: stored,
+            config,
 
             incomplete_block: None,
 
@@ -536,11 +536,11 @@ impl State {
 
     /// Returns public (consensus and service) keys of known validators.
     pub fn validators(&self) -> &[ValidatorKeys] {
-        &self.config.validator_keys
+        &self.config.validators
     }
 
-    /// Returns `StoredConfiguration`.
-    pub fn config(&self) -> &StoredConfiguration {
+    /// Returns `ConsensusConfig`.
+    pub fn config(&self) -> &ConsensusConfig {
         &self.config
     }
 
@@ -548,27 +548,27 @@ impl State {
     pub fn find_validator(&self, peer: PublicKey) -> Option<ValidatorId> {
         self.validators()
             .iter()
-            .position(|pk| pk.consensus_key == peer)
+            .position(|pk| pk.consensus == peer)
             .map(|id| ValidatorId(id as u16))
     }
 
     /// Returns `ConsensusConfig`.
     pub fn consensus_config(&self) -> &ConsensusConfig {
-        &self.config.consensus
+        &self.config
     }
 
-    /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node
+    /// Replaces `ConsensusConfig` with a new one and updates validator id of the current node
     /// if the new config is different from the previous one.
-    pub fn update_config(&mut self, config: StoredConfiguration) {
+    pub fn update_config(&mut self, config: ConsensusConfig) {
         if self.config == config {
             return;
         }
 
         trace!("Updating node config={:#?}", config);
         let validator_id = config
-            .validator_keys
+            .validators
             .iter()
-            .position(|pk| pk.consensus_key == self.consensus_public_key())
+            .position(|pk| pk.consensus == self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
 
         // TODO: update connect list (ECR-1745)
@@ -603,9 +603,9 @@ impl State {
     /// Checks if this node considers a peer to be a validator.
     pub fn peer_is_validator(&self, pubkey: &PublicKey) -> bool {
         self.config
-            .validator_keys
+            .validators
             .iter()
-            .any(|x| x.consensus_key == *pubkey)
+            .any(|x| &x.consensus == pubkey)
     }
 
     /// Checks if a peer is in this node's connection list.
@@ -626,7 +626,7 @@ impl State {
     /// Returns public key of a validator identified by id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         let id: usize = id.into();
-        self.validators().get(id).map(|x| x.consensus_key)
+        self.validators().get(id).map(|x| x.consensus)
     }
 
     /// Returns the consensus public key of the current node.

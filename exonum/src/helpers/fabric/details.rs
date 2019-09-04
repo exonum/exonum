@@ -17,6 +17,8 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts, rsplitn
 
+use exonum_merkledb::{Database, DbOptions, RocksDB};
+
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -34,12 +36,13 @@ use super::{
     },
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
-use crate::api::backends::actix::AllowOrigin;
-use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
-use crate::crypto::{generate_keys_file, PublicKey};
-use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
-use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
-use exonum_merkledb::{Database, DbOptions, RocksDB};
+use crate::{
+    api::backends::actix::AllowOrigin,
+    blockchain::{config::ValidatorKeys, ConsensusConfig},
+    crypto::{generate_keys_file, PublicKey},
+    helpers::{config::ConfigFile, ZeroizeOnDrop},
+    node::{ConnectListConfig, NodeApiConfig, NodeConfig},
+};
 
 const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -600,8 +603,8 @@ impl Command for GenerateNodeConfig {
         };
 
         let validator_keys = ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
+            consensus: consensus_public_key,
+            service: service_public_key,
         };
         let node_pub_config = NodePublicConfig {
             address: addresses.0.clone(),
@@ -641,11 +644,11 @@ impl Finalize {
     fn genesis_from_template(
         template: CommonConfigTemplate,
         configs: &[NodePublicConfig],
-    ) -> GenesisConfig {
-        GenesisConfig::new_with_consensus(
-            template.consensus_config,
-            configs.iter().map(|c| c.validator_keys),
-        )
+    ) -> ConsensusConfig {
+        ConsensusConfig {
+            validators: configs.iter().map(|c| c.validator_keys).collect(),
+            ..template.consensus_config
+        }
     }
 
     fn reduce_configs(
@@ -662,14 +665,14 @@ impl Finalize {
             .next()
             .expect("Expected at least one config in PUBLIC_CONFIGS");
         let common = first.common;
-        map.insert(first.node.validator_keys.consensus_key, first.node);
+        map.insert(first.node.validator_keys.consensus, first.node);
 
         for config in config_iter {
             if common != config.common {
                 panic!("Found config with different common part.");
             };
             if map
-                .insert(config.node.validator_keys.consensus_key, config.node)
+                .insert(config.node.validator_keys.consensus, config.node)
                 .is_some()
             {
                 panic!("Found duplicate consensus keys in PUBLIC_CONFIGS");

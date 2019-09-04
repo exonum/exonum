@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use crate::{
     api::ApiContext,
-    blockchain::{Blockchain, GenesisConfig, Schema},
+    blockchain::{Blockchain, ConsensusConfig, Schema},
     crypto::{PublicKey, SecretKey},
     events::InternalRequest,
     node::ApiSender,
@@ -43,7 +43,7 @@ pub struct BlockchainBuilder {
     /// The database which works under the hood.
     pub database: Arc<dyn Database>,
     /// Blockchain configuration used to create the genesis block.
-    pub genesis_config: GenesisConfig,
+    pub genesis_config: ConsensusConfig,
     /// Keypair, which  is used to sign service transactions on behalf of this node.
     pub service_keypair: (PublicKey, SecretKey),
     /// List of the supported runtimes.
@@ -58,7 +58,7 @@ impl BlockchainBuilder {
     /// the service keypair without any runtimes. The user must add them by himself/herself.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        genesis_config: GenesisConfig,
+        genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
     ) -> Self {
         Self {

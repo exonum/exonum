@@ -24,7 +24,7 @@ pub use crate::runtime::{
 pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
-    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    config::{ConsensusConfig, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
 };
@@ -46,7 +46,7 @@ use crate::{
     api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
-    helpers::{Height, Round, ValidatorId},
+    helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
     runtime::{dispatcher::Dispatcher, error::catch_panic},
@@ -84,12 +84,12 @@ impl Blockchain {
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
         services: impl IntoIterator<Item = InstanceCollection>,
-        config: GenesisConfig,
+        genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
         internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        BlockchainBuilder::new(database, config, service_keypair)
+        BlockchainBuilder::new(database, genesis_config, service_keypair)
             .with_default_runtime(services)
             .finalize(api_sender, internal_requests)
             .expect("Unable to create blockchain instance")
@@ -162,25 +162,13 @@ impl Blockchain {
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
-    fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), failure::Error> {
-        let config_propose = StoredConfiguration {
-            previous_cfg_hash: Hash::zero(),
-            actual_from: Height::zero(),
-            validator_keys: cfg.validator_keys,
-            consensus: cfg.consensus,
-        };
+    fn create_genesis_block(&mut self, config: ConsensusConfig) -> Result<(), failure::Error> {
+        config.validate()?;
 
         let patch = {
             let fork = self.fork();
-            // Commit actual configuration
-            {
-                let mut schema = Schema::new(&fork);
-                if schema.block_hash_by_height(Height::zero()).is_some() {
-                    // TODO create genesis block for MemoryDB and compare it hash with zero block. (ECR-1630)
-                    return Ok(());
-                }
-                schema.commit_configuration(config_propose);
-            };
+            Schema::new(&fork).consensus_config().set(config);
+
             self.merge(fork.into_patch())?;
             self.create_patch(
                 ValidatorId::zero(),
