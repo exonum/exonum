@@ -51,39 +51,39 @@ pub struct GenerateConfig {
     /// Path to a directory where public and private node configuration files
     /// will be saved.
     pub output_dir: PathBuf,
+    /// External IP address of the node used for communications between nodes.
+    ///
+    /// If no port is provided, the default Exonum port 6333 is used.
     #[structopt(
         long,
         short = "a",
         parse(try_from_str = "GenerateConfig::parse_external_address")
     )]
-    /// External IP address of the node used for communications between nodes.
-    ///
-    /// If no port is provided, the default Exonum port 6333 is used.
     pub peer_address: SocketAddr,
-    #[structopt(long, short = "l")]
     /// Listen IP address of the node used for communications between nodes.
     ///
     /// If not provided it combined from all-zeros (0.0.0.0) IP address and
     /// the port number of the `peer-address`.
+    #[structopt(long, short = "l")]
     pub listen_address: Option<SocketAddr>,
-    #[structopt(long, short = "n")]
     /// Don't prompt for passwords when generating private keys.
+    #[structopt(long, short = "n")]
     pub no_password: bool,
-    #[structopt(long)]
     /// Passphrase entry method for consensus key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
     /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
     /// by default.
-    pub consensus_key_pass: Option<PassInputMethod>,
     #[structopt(long)]
+    pub consensus_key_pass: Option<PassInputMethod>,
     /// Passphrase entry method for service key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
     /// If `ENV_VAR_NAME` is not specified `$EXONUM_SERVICE_PASS` is used
     /// by default.
+    #[structopt(long)]
     pub service_key_pass: Option<PassInputMethod>,
 }
 

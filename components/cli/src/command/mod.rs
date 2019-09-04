@@ -43,24 +43,24 @@ pub trait ExonumCommand {
 /// Standard Exonum Core configuration command.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 pub enum Command {
-    #[structopt(name = "generate-template")]
     /// Generate common part of the nodes configuration.
+    #[structopt(name = "generate-template")]
     GenerateTemplate(GenerateTemplate),
-    #[structopt(name = "generate-config")]
     /// Generate public and private configs of the node.
+    #[structopt(name = "generate-config")]
     GenerateConfig(GenerateConfig),
-    #[structopt(name = "finalize")]
     /// Generate final node configuration using public configs
     /// of other nodes in the network.
+    #[structopt(name = "finalize")]
     Finalize(Finalize),
-    #[structopt(name = "run")]
     /// Run the node with provided node config.
+    #[structopt(name = "run")]
     Run(Run),
-    #[structopt(name = "run-dev")]
     /// Run the node with auto-generated config.
+    #[structopt(name = "run-dev")]
     RunDev(RunDev),
-    #[structopt(name = "maintenance")]
     /// Perform different maintenance actions.
+    #[structopt(name = "maintenance")]
     Maintenance(Maintenance),
 }
 

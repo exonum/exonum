@@ -39,25 +39,25 @@ pub struct Finalize {
     /// Path to a node configuration file which will be created after
     /// running this command.
     pub output_config_path: PathBuf,
-    #[structopt(long, short = "p")]
     /// List of paths to public parts of configuration of all the nodes
     /// in the network.
+    #[structopt(long, short = "p")]
     pub public_configs: Vec<PathBuf>,
-    #[structopt(long)]
     /// Listen address for node public API.
     ///
     /// Public API is used mainly for sending API requests to user services.
-    pub public_api_address: Option<SocketAddr>,
     #[structopt(long)]
+    pub public_api_address: Option<SocketAddr>,
     /// Listen address for node private API.
     ///
     /// Private API is used by node administrators for node monitoring and control.
+    #[structopt(long)]
     pub private_api_address: Option<SocketAddr>,
-    #[structopt(long)]
     /// Cross-origin resource sharing options for responses returned by public API handlers.
-    pub public_allow_origin: Option<String>,
     #[structopt(long)]
+    pub public_allow_origin: Option<String>,
     /// Cross-origin resource sharing options for responses returned by private API handlers.
+    #[structopt(long)]
     pub private_allow_origin: Option<String>,
 }
 

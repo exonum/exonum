@@ -30,8 +30,8 @@ use crate::io::save_config_file;
 pub struct GenerateTemplate {
     /// Path to a node configuration template file.
     pub common_config: PathBuf,
-    #[structopt(long)]
     /// Number of validators in the network.
+    #[structopt(long)]
     pub validators_count: u32,
 }
 

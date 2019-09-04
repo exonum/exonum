@@ -30,22 +30,22 @@ use crate::io::load_config_file;
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Maintenance {
-    #[structopt(long, short = "c")]
     /// Path to a node configuration file.
+    #[structopt(long, short = "c")]
     pub node_config: PathBuf,
-    #[structopt(long, short = "d")]
     /// Path to a database directory.
+    #[structopt(long, short = "d")]
     pub db_path: PathBuf,
-    #[structopt(subcommand)]
     /// Action to be performed.
+    #[structopt(subcommand)]
     pub action: Action,
 }
 
 /// Available maintenance actions.
 #[derive(StructOpt, Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
-    #[structopt(name = "clear-cache")]
     /// Clear consensus messages cache.
+    #[structopt(name = "clear-cache")]
     ClearCache,
 }
 

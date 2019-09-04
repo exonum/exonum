@@ -29,12 +29,12 @@ use crate::command::generate_template::GenerateTemplate;
 use crate::command::run::Run;
 use crate::command::{ExonumCommand, StandardResult};
 
+/// Run application in development mode (generate configuration and db files automatically).
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
-/// Run application in development mode (generate configuration and db files automatically).
 pub struct RunDev {
-    #[structopt(long, short = "a")]
     /// The path where configuration and db files will be generated.
+    #[structopt(long, short = "a")]
     pub artifacts_dir: PathBuf,
 }
 

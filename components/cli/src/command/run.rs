@@ -41,37 +41,37 @@ pub struct NodeRunConfig {
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Run {
-    #[structopt(long, short = "c")]
     /// Path to a node configuration file.
+    #[structopt(long, short = "c")]
     pub node_config: PathBuf,
-    #[structopt(long, short = "d")]
     /// Path to a database directory.
+    #[structopt(long, short = "d")]
     pub db_path: PathBuf,
-    #[structopt(long)]
     /// Listen address for node public API.
     ///
     /// Public API is used mainly for sending API requests to user services.
-    pub public_api_address: Option<SocketAddr>,
     #[structopt(long)]
+    pub public_api_address: Option<SocketAddr>,
     /// Listen address for node private API.
     ///
     /// Private API is used by node administrators for node monitoring and control.
-    pub private_api_address: Option<SocketAddr>,
     #[structopt(long)]
+    pub private_api_address: Option<SocketAddr>,
     /// Passphrase entry method for consensus key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
     /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
     /// by default.
-    pub consensus_key_pass: Option<PassInputMethod>,
     #[structopt(long)]
+    pub consensus_key_pass: Option<PassInputMethod>,
     /// Passphrase entry method for service key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
     /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
     /// by default.
+    #[structopt(long)]
     pub service_key_pass: Option<PassInputMethod>,
 }
 
