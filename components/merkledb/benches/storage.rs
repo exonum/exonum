@@ -56,7 +56,18 @@ fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
         (Hash::new(k), v)
     };
 
-    (0..len).map(kv_generator).collect::<Vec<_>>()
+    (0..len).map(kv_generator).collect()
+}
+
+fn generate_random_values(len: usize) -> Vec<Vec<u8>> {
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
+    (0..len)
+        .map(|_| {
+            let mut value = vec![0; CHUNK_SIZE];
+            rng.fill_bytes(&mut value);
+            value
+        })
+        .collect()
 }
 
 fn plain_map_index_insert(b: &mut Bencher, len: usize) {
@@ -253,6 +264,49 @@ fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
     );
 }
 
+fn proof_list_index_build_proofs(b: &mut Bencher, len: usize) {
+    let data = generate_random_values(len);
+    let db = TemporaryDB::default();
+    let storage = db.fork();
+    let mut table = ProofListIndex::new(NAME, &storage);
+
+    for item in &data {
+        table.push(item.clone());
+    }
+    let mut proofs = Vec::with_capacity(data.len());
+
+    b.iter(|| {
+        proofs.clear();
+        proofs.extend((0..len).map(|i| table.get_proof(i as u64)));
+    });
+
+    let table_root_hash = table.object_hash();
+    for proof in proofs {
+        let items = proof.validate(table_root_hash, table.len()).unwrap();
+        assert_eq!(items.len(), 1);
+    }
+}
+
+fn proof_list_index_verify_proofs(b: &mut Bencher, len: usize) {
+    let data = generate_random_values(len);
+    let db = TemporaryDB::default();
+    let storage = db.fork();
+    let mut table = ProofListIndex::new(NAME, &storage);
+
+    for item in &data {
+        table.push(item.clone());
+    }
+    let table_root_hash = table.object_hash();
+    let proofs: Vec<_> = (0..len).map(|i| table.get_proof(i as u64)).collect();
+
+    b.iter(|| {
+        for proof in &proofs {
+            let items = proof.validate(table_root_hash, table.len()).unwrap();
+            assert_eq!(items.len(), 1);
+        }
+    });
+}
+
 fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
@@ -339,6 +393,16 @@ pub fn bench_storage(c: &mut Criterion) {
     );
     // ProofListIndex
     bench_fn(c, "storage/proof_list/append", proof_list_append);
+    bench_fn(
+        c,
+        "storage/proof_list/proofs/build",
+        proof_list_index_build_proofs,
+    );
+    bench_fn(
+        c,
+        "storage/proof_list/proofs/validate",
+        proof_list_index_verify_proofs,
+    );
     // ProofMapIndex
     bench_fn(
         c,
