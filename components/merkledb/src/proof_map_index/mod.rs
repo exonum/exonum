@@ -824,6 +824,7 @@ where
                     self.update_root_path(None);
                 }
             }
+
             Some((prefix, Node::Branch(mut branch))) => {
                 // Truncate prefix
                 let i = prefix.common_prefix_len(&proof_path);
