@@ -29,8 +29,9 @@ use std::collections::HashSet;
 
 use crate::{
     crypto::{Hash, PublicKey},
-    helpers::{Height, Milliseconds},
+    helpers::{Height, Milliseconds, ValidateInput},
     messages::SIGNED_MESSAGE_MIN_SIZE,
+    proto::schema::blockchain,
 };
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -258,10 +259,216 @@ impl BinaryValue for StoredConfiguration {
     }
 }
 
+/// Public keys of a validator. Each validator has two public keys: the
+/// `consensus` is used for internal operations in the consensus process,
+/// while the `service` is used in services.
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, ProtobufConvert)]
+#[exonum(crate = "crate", pb = "blockchain::ValidatorKeys")]
+pub struct ValidatorKeys2 {
+    /// Consensus key is used for messages related to the consensus algorithm.
+    pub consensus: PublicKey,
+    /// Service key is used for services, for example, the configuration
+    /// updater service, the anchoring service, etc.
+    pub service: PublicKey,
+}
+
+impl ValidateInput for ValidatorKeys2 {
+    type Error = failure::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        if self.consensus == self.service {
+            bail!("Consensus and service keys must be different.");
+        }
+        Ok(())
+    }
+}
+
+/// Consensus algorithm parameters.
+///
+/// This configuration is initially created with default recommended values,
+/// which can later be edited as required.
+/// The parameters in this configuration should be the same for all nodes in the network and can
+/// be changed using the
+/// [configuration update service](https://exonum.com/doc/version/latest/advanced/configuration-updater/).
+///
+/// Default propose timeout value, along with the threshold, is chosen for maximal performance. In order
+/// to slow down block generation,hence consume less disk space, these values can be increased.
+///
+/// For additional information on the Exonum consensus algorithm, refer to
+/// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ProtobufConvert)]
+#[exonum(crate = "crate", pb = "blockchain::Config")]
+pub struct ConsensusConfig2 {
+    /// List of validators public keys.
+    pub validators: Vec<ValidatorKeys2>,
+    /// Interval between first two rounds. This interval defines the time that passes
+    /// between the moment a new block is committed to the blockchain and the
+    /// time when second round starts, regardless of whether a new block has
+    /// been committed during this period or not.
+    /// Each consecutive round will be longer then previous by constant factor determined
+    /// by ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT constant.
+    ///
+    /// Note that rounds in Exonum
+    /// do not have a defined end time. Nodes in a new round can
+    /// continue to vote for proposals and process messages related to previous
+    /// rounds.
+    pub first_round_timeout: Milliseconds,
+    /// Period of sending a Status message. This parameter defines the frequency
+    /// with which a node broadcasts its status message to the network.
+    pub status_timeout: Milliseconds,
+    /// Peer exchange timeout. This parameter defines the frequency with which
+    /// a node requests collected `Connect` messages from a random peer
+    /// node in the network.
+    pub peers_timeout: Milliseconds,
+    /// Maximum number of transactions per block.
+    pub txs_block_limit: u32,
+    /// Maximum message length (in bytes). This parameter determines the maximum
+    /// size of both consensus messages and transactions. The default value of the
+    /// parameter is 1 MB (1024 * 1024 bytes). The range of possible values for this
+    /// parameter is between 1MB and 2^32-1 bytes.
+    pub max_message_len: u32,
+    /// Minimal propose timeout.
+    pub min_propose_timeout: Milliseconds,
+    /// Maximal propose timeout.
+    pub max_propose_timeout: Milliseconds,
+    /// Amount of transactions in pool to start use `min_propose_timeout`.
+    ///
+    /// Default value is equal to half of the `txs_block_limit` in order to gather more transactions
+    /// in a block if the transaction pool is almost empty, and create blocks faster when there are
+    /// enough transactions in the pool.
+    pub propose_timeout_threshold: u32,
+}
+
+impl Default for ConsensusConfig2 {
+    fn default() -> Self {
+        Self {
+            validators: Vec::default(),
+            first_round_timeout: 3000,
+            status_timeout: 5000,
+            peers_timeout: 10_000,
+            txs_block_limit: 1000,
+            max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
+            min_propose_timeout: 10,
+            max_propose_timeout: 200,
+            propose_timeout_threshold: 500,
+        }
+    }
+}
+
+impl ConsensusConfig2 {
+    /// Default value for max_message_len.
+    pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
+    /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
+    pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; //default value 10%
+
+    /// Check that validator keys is correct. Configuration should have at least
+    /// a single validator key. And each key should meet only once.
+    fn validate_keys(&self) -> Result<(), failure::Error> {
+        ensure!(
+            !self.validators.is_empty(),
+            "There must be at least single validator in the consensus configuration."
+        );
+
+        let mut exist_keys = HashSet::with_capacity(self.validators.len() * 2);
+        for keys in &self.validators {
+            keys.validate()?;
+            if exist_keys.contains(&keys.consensus) || exist_keys.contains(&keys.service) {
+                bail!("Duplicated keys are found: each consensus and service key must be unique");
+            }
+
+            exist_keys.insert(keys.consensus);
+            exist_keys.insert(keys.service);
+        }
+
+        Ok(())
+    }
+
+    /// Produce warnings if configuration contains non-optimal values.
+    ///
+    /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
+    /// method, but some values can decrease consensus performance.
+    #[doc(hidden)]
+    pub fn warn_if_nonoptimal(&self) {
+        const MIN_TXS_BLOCK_LIMIT: u32 = 100;
+        const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
+
+        if self.first_round_timeout <= 2 * self.max_propose_timeout {
+            warn!(
+                "It is recommended that first_round_timeout ({}) be at least twice as large \
+                 as max_propose_timeout ({})",
+                self.first_round_timeout, self.max_propose_timeout
+            );
+        }
+
+        if self.txs_block_limit < MIN_TXS_BLOCK_LIMIT || self.txs_block_limit > MAX_TXS_BLOCK_LIMIT
+        {
+            warn!(
+                "It is recommended that txs_block_limit ({}) is in [{}..{}] range",
+                self.txs_block_limit, MIN_TXS_BLOCK_LIMIT, MAX_TXS_BLOCK_LIMIT
+            );
+        }
+
+        if self.max_message_len < Self::DEFAULT_MAX_MESSAGE_LEN {
+            warn!(
+                "It is recommended that max_message_len ({}) is at least {}.",
+                self.max_message_len,
+                Self::DEFAULT_MAX_MESSAGE_LEN
+            );
+        }
+    }
+}
+
+impl ValidateInput for ConsensusConfig2 {
+    type Error = failure::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        const MINIMAL_BODY_SIZE: usize = 256;
+        const MINIMAL_MESSAGE_LENGTH: u32 = (MINIMAL_BODY_SIZE + SIGNED_MESSAGE_MIN_SIZE) as u32;
+
+        self.validate_keys()?;
+
+        // Check timeouts.
+        if self.min_propose_timeout > self.max_propose_timeout {
+            bail!(
+                "Invalid propose timeouts: min_propose_timeout should be less or equal then \
+                 max_propose_timeout: min = {}, max = {}",
+                self.min_propose_timeout,
+                self.max_propose_timeout
+            );
+        }
+
+        if self.first_round_timeout <= self.max_propose_timeout {
+            bail!(
+                "first_round_timeout({}) must be strictly larger than max_propose_timeout({})",
+                self.first_round_timeout,
+                self.max_propose_timeout
+            );
+        }
+
+        // Check transactions limit.
+        if self.txs_block_limit == 0 {
+            bail!("txs_block_limit should not be equal to zero",);
+        }
+
+        // Check maximum message length for sanity.
+        if self.max_message_len < MINIMAL_MESSAGE_LENGTH {
+            bail!(
+                "max_message_len ({}) must be at least {}",
+                self.max_message_len,
+                MINIMAL_MESSAGE_LENGTH
+            );
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::fmt::Display;
+
     use super::*;
-    use crate::crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
+    use crate::crypto::{self, gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
@@ -378,5 +585,171 @@ mod tests {
     fn serialize_deserialize(configuration: &StoredConfiguration) -> StoredConfiguration {
         let serialized = configuration.try_serialize().unwrap();
         StoredConfiguration::try_deserialize(&serialized).unwrap()
+    }
+
+    fn assert_err(actual: impl Display, expected: impl AsRef<str>) {
+        let actual = actual.to_string();
+        let expected = expected.as_ref();
+        assert!(
+            actual.contains(expected),
+            "Actual is {}, expected: {}",
+            actual,
+            expected
+        );
+    }
+
+    fn gen_validator_keys(i: u8) -> ValidatorKeys2 {
+        ValidatorKeys2 {
+            consensus: gen_keypair_from_seed(&Seed::new([i + 1; SEED_LENGTH])).0,
+            service: gen_keypair_from_seed(&Seed::new([(i + 1) * 10; SEED_LENGTH])).0,
+        }
+    }
+
+    fn gen_keys_pool(count: usize) -> Vec<PublicKey> {
+        (0..count)
+            .map(|_| crypto::gen_keypair().0)
+            .collect::<Vec<_>>()
+    }
+
+    fn gen_consensus_config() -> ConsensusConfig2 {
+        ConsensusConfig2 {
+            validators: (0..4).map(gen_validator_keys).collect(),
+            ..ConsensusConfig2::default()
+        }
+    }
+
+    #[test]
+    fn test_consensus_validate_validator_keys_err_same() {
+        let pk = crypto::gen_keypair().0;
+
+        let keys = ValidatorKeys2 {
+            consensus: pk,
+            service: pk,
+        };
+        let e = keys.validate().unwrap_err();
+        assert_err(e, "Consensus and service keys must be different");
+    }
+
+    #[test]
+    fn test_consensus_config_validate_ok() {
+        let cfg = ConsensusConfig2 {
+            validators: (0..4).map(gen_validator_keys).collect(),
+            ..ConsensusConfig2::default()
+        };
+
+        cfg.validate().expect("Expected valid consensus config");
+    }
+
+    #[test]
+    fn test_consensus_config_validate_err_duplicate_keys_consensus() {
+        let keys = gen_keys_pool(4);
+
+        let cfg = ConsensusConfig2 {
+            validators: vec![
+                ValidatorKeys2 {
+                    consensus: keys[0],
+                    service: keys[1],
+                },
+                ValidatorKeys2 {
+                    consensus: keys[0],
+                    service: keys[2],
+                },
+            ],
+            ..ConsensusConfig2::default()
+        };
+
+        assert_err(cfg.validate().unwrap_err(), "Duplicated keys are found");
+    }
+
+    #[test]
+    fn test_consensus_config_validate_err_duplicate_keys_service() {
+        let keys = gen_keys_pool(4);
+
+        let cfg = ConsensusConfig2 {
+            validators: vec![
+                ValidatorKeys2 {
+                    consensus: keys[0],
+                    service: keys[1],
+                },
+                ValidatorKeys2 {
+                    consensus: keys[2],
+                    service: keys[1],
+                },
+            ],
+            ..ConsensusConfig2::default()
+        };
+
+        assert_err(cfg.validate().unwrap_err(), "Duplicated keys are found");
+    }
+
+    #[test]
+    fn test_consensus_config_validate_err_duplicate_keys_different() {
+        let keys = gen_keys_pool(4);
+
+        let cfg = ConsensusConfig2 {
+            validators: vec![
+                ValidatorKeys2 {
+                    consensus: keys[0],
+                    service: keys[1],
+                },
+                ValidatorKeys2 {
+                    consensus: keys[1],
+                    service: keys[2],
+                },
+            ],
+            ..ConsensusConfig2::default()
+        };
+
+        assert_err(cfg.validate().unwrap_err(), "Duplicated keys are found");
+    }
+
+    #[test]
+    fn test_consensus_config_validate_err_min_propose_timeout() {
+        let cfg = ConsensusConfig2 {
+            min_propose_timeout: 10,
+            max_propose_timeout: 5,
+            ..gen_consensus_config()
+        };
+        assert_err(
+            cfg.validate().unwrap_err(),
+            "min_propose_timeout should be less or",
+        );
+    }
+
+    #[test]
+    fn test_consensus_config_validate_err_first_round_timeout() {
+        let cfg = ConsensusConfig2 {
+            first_round_timeout: 10,
+            max_propose_timeout: 15,
+            ..gen_consensus_config()
+        };
+        assert_err(
+            cfg.validate().unwrap_err(),
+            "first_round_timeout(10) must be strictly larger than max_propose_timeout(15)",
+        );
+    }
+
+    #[test]
+    fn test_consensus_config_validate_err_txs_block_limit() {
+        let cfg = ConsensusConfig2 {
+            txs_block_limit: 0,
+            ..gen_consensus_config()
+        };
+        assert_err(
+            cfg.validate().unwrap_err(),
+            "txs_block_limit should not be equal to zero",
+        );
+    }
+
+    #[test]
+    fn test_consensus_config_validate_err_max_message_len() {
+        let cfg = ConsensusConfig2 {
+            max_message_len: 0,
+            ..gen_consensus_config()
+        };
+        assert_err(
+            cfg.validate().unwrap_err(),
+            "max_message_len (0) must be at least",
+        );
     }
 }
