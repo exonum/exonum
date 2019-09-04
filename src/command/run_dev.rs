@@ -15,7 +15,7 @@
 //! Standard Exonum CLI command used to run the node with default parameters
 //! for developing purposes.
 
-use failure::Error;
+use failure::{Error, ResultExt};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -45,18 +45,19 @@ impl RunDev {
         path
     }
 
-    fn cleanup(&self) {
+    fn cleanup(&self) -> Result<(), Error> {
         let database_dir = self.artifact_path("db");
         if database_dir.exists() {
             fs::remove_dir_all(self.artifacts_dir.clone())
-                .expect("Expected DATABASE_PATH folder being removable.");
+                .context("Expected DATABASE_PATH folder being removable.")?;
         }
+        Ok(())
     }
 }
 
 impl ExonumCommand for RunDev {
     fn execute(self) -> Result<StandardResult, Error> {
-        self.cleanup();
+        self.cleanup()?;
 
         let common_config = self.artifact_path("template.toml");
 
