@@ -30,10 +30,10 @@ pub struct CommonConfigTemplate {
     pub general_config: GeneralConfig,
 }
 
-/// TODO: General config
+/// Part of the template configuration.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct GeneralConfig {
-    /// TODO: validators count
+    /// Count of the validator nodes in the network.
     pub validators_count: u32,
 }
 
