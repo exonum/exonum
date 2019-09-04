@@ -191,7 +191,7 @@ impl ExonumService {
         );
 
         quote! {
-            impl #cr::runtime::rust::service::Interface for dyn #trait_name {
+            impl #cr::runtime::rust::Interface for dyn #trait_name {
                 const NAME: &'static str = #interface_name;
 
                 fn dispatch(

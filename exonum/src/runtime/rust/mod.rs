@@ -15,16 +15,12 @@
 pub use self::{
     error::Error,
     service::{
-        AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceFactory, Transaction,
-        TransactionContext,
+        AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
+        ServiceFactory, Transaction, TransactionContext,
     },
 };
 
 pub mod error;
-#[macro_use]
-pub mod service;
-#[cfg(test)]
-pub mod tests;
 
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
@@ -49,6 +45,10 @@ use super::{
     ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
+
+mod service;
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug, Default)]
 pub struct RustRuntime {

@@ -28,7 +28,7 @@ use toml::Value;
 
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::runtime::rust::service;
+use crate::runtime::rust;
 
 mod builder;
 mod clap_backend;
@@ -356,21 +356,21 @@ pub trait ServiceFactory: 'static {
     }
 
     /// Creates a new service instance from the context returned by the `Run` command.
-    fn make_service_builder(&self, run_context: &Context) -> Box<dyn service::ServiceFactory>;
+    fn make_service_builder(&self, run_context: &Context) -> Box<dyn rust::ServiceFactory>;
 }
 
 impl<T> ServiceFactory for T
 where
-    T: service::ServiceFactory + Clone,
+    T: rust::ServiceFactory + Clone,
 {
-    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn service::ServiceFactory> {
+    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn rust::ServiceFactory> {
         Box::new(self.clone())
     }
 }
 
 impl<T> From<T> for Box<dyn ServiceFactory>
 where
-    T: service::ServiceFactory + Clone,
+    T: rust::ServiceFactory + Clone,
 {
     fn from(inner: T) -> Self {
         Box::new(inner)

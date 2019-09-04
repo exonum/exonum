@@ -152,7 +152,7 @@ impl ServiceFactory {
 
         let match_arms = self.implements.0.iter().map(|trait_name| {
             let interface_trait = quote! {
-                <dyn #trait_name as #cr::runtime::rust::service::Interface>
+                <dyn #trait_name as #cr::runtime::rust::Interface>
             };
 
             quote! {
@@ -161,12 +161,12 @@ impl ServiceFactory {
         });
 
         quote! {
-            impl #cr::runtime::rust::service::ServiceDispatcher for #dispatcher {
+            impl #cr::runtime::rust::ServiceDispatcher for #dispatcher {
                 fn call(
                     &self,
                     interface_name: &str,
                     method: #cr::runtime::MethodId,
-                    ctx: #cr::runtime::rust::service::TransactionContext,
+                    ctx: #cr::runtime::rust::TransactionContext,
                     payload: &[u8],
                 ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match interface_name {

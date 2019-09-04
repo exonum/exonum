@@ -455,7 +455,7 @@ pub struct CallContext<'a> {
 }
 
 impl<'a> CallContext<'a> {
-    /// Create a new call context for the specified execution context.
+    /// Create a new call context for the given execution context.
     pub fn new(inner: &'a ExecutionContext<'a>, caller: InstanceId, called: InstanceId) -> Self {
         Self {
             inner,
