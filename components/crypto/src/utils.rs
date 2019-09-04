@@ -15,7 +15,6 @@
 // spell-checker:ignore cipherparams ciphertext
 
 use super::{gen_keypair, gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use exonum_sodiumoxide::crypto::pwhash::{gen_salt, Salt};
 use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
 use rand::thread_rng;
@@ -47,23 +46,6 @@ pub fn generate_keys_file<P: AsRef<Path>, W: AsRef<[u8]>>(
 
     Ok(pk)
 }
-
-///// Reads and returns `PublicKey` and `SecretKey` from encrypted file located by path and returns its.
-//pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
-//    path: P,
-//    pass_phrase: W,
-//) -> Result<(PublicKey, SecretKey), Error> {
-//    let mut key_file = File::open(path)?;
-//
-//    #[cfg(unix)]
-//    validate_file_mode(key_file.metadata()?.mode())?;
-//
-//    let mut file_content = vec![];
-//    key_file.read_to_end(&mut file_content)?;
-//    let keys: EncryptedKeys =
-//        toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
-//    keys.decrypt(pass_phrase)
-//}
 
 #[cfg(unix)]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::verbose_bit_mask))]
@@ -153,7 +135,7 @@ pub struct Keys {
 pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
     path: P,
     pass_phrase: W,
-    key: Salt,
+    key: &secret_tree::Seed,
 ) -> Result<(), Error> {
     let encrypted_key = EncryptedMasterKey::encrypt(key, pass_phrase)?;
     let file_content =
@@ -174,7 +156,7 @@ struct EncryptedMasterKey {
 }
 
 impl EncryptedMasterKey {
-    fn encrypt(key: Salt, pass_phrase: impl AsRef<[u8]>) -> Result<EncryptedMasterKey, Error> {
+    fn encrypt(key: &secret_tree::Seed, pass_phrase: impl AsRef<[u8]>) -> Result<EncryptedMasterKey, Error> {
         let mut rng = thread_rng();
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
@@ -188,7 +170,7 @@ impl EncryptedMasterKey {
         Ok(EncryptedMasterKey { key: encrypted_key })
     }
 
-    fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<Salt, Error> {
+    fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<secret_tree::Seed, Error> {
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
         let restored = eraser
@@ -198,21 +180,20 @@ impl EncryptedMasterKey {
         let seed_bytes = restored
             .open(pass_phrase)
             .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))?;
-        let salt = Salt::from_slice(&seed_bytes[..])
-            .ok_or_else(|| Error::new(ErrorKind::Other, "Couldn't create seed from slice"))?;
 
-        Ok(salt)
+        let mut seed: [u8; 32] = [0; 32];
+        seed.copy_from_slice(&seed_bytes[..]);
+        Ok(seed)
     }
 }
 
 pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Keys {
-    let salt = gen_salt();
-    save_master_key(path, passphrase, salt).expect("Error generating master key.");
-    generate_keys_from_master_password(salt)
+    let tree = SecretTree::new(&mut thread_rng());
+    save_master_key(path, passphrase, tree.seed()).expect("Error generating master key.");
+    generate_keys_from_master_password(tree)
 }
 
-fn generate_keys_from_master_password(salt: Salt) -> Keys {
-    let tree = SecretTree::from_seed(salt.as_ref()).unwrap();
+fn generate_keys_from_master_password(tree: SecretTree) -> Keys {
     let mut buffer = [0_u8; 32];
 
     tree.child(Name::new("consensus")).fill(&mut buffer);
@@ -250,9 +231,10 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     key_file.read_to_end(&mut file_content)?;
     let keys: EncryptedMasterKey =
         toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
-    let salt = keys.decrypt(pass_phrase)?;
+    let seed = keys.decrypt(pass_phrase)?;
 
-    Ok(generate_keys_from_master_password(salt))
+    let tree = SecretTree::from_seed(&seed).expect("Error creating secret tree from seed.");
+    Ok(generate_keys_from_master_password(tree))
 }
 
 #[cfg(test)]
