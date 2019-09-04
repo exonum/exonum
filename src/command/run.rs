@@ -25,7 +25,7 @@ use std::path::PathBuf;
 
 use crate::command::{ExonumCommand, StandardResult};
 use crate::io::load_config_file;
-use crate::password::{PassInputMethod, SecretKeyType, PassphraseUsage};
+use crate::password::{PassInputMethod, PassphraseUsage, SecretKeyType};
 
 /// Container for node configuration parameters produced by `Run` command.
 pub struct NodeRunConfig {

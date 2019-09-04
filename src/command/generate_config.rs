@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use crate::command::{ExonumCommand, StandardResult};
 use crate::config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
 use crate::io::{load_config_file, save_config_file};
-use crate::password::{PassInputMethod, Passphrase, SecretKeyType, PassphraseUsage};
+use crate::password::{PassInputMethod, Passphrase, PassphraseUsage, SecretKeyType};
 
 /// Name for a file containing consensus secret key.
 pub const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";

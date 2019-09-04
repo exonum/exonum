@@ -17,7 +17,7 @@
 
 use exonum::blockchain::GenesisConfig;
 use exonum::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
-use failure::Error;
+use failure::{bail, format_err, Error};
 use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
@@ -61,48 +61,47 @@ pub struct Finalize {
     pub private_allow_origin: Option<String>,
 }
 
+struct ValidatedConfigs {
+    common: CommonConfigTemplate,
+    public_configs: Vec<NodePublicConfig>,
+}
+
 impl Finalize {
-    fn reduce_configs(
-        public_configs: Vec<SharedConfig>,
-        our_config: &NodePrivateConfig,
-    ) -> (
-        CommonConfigTemplate,
-        Vec<NodePublicConfig>,
-        Option<NodePublicConfig>,
-    ) {
+    fn validate_configs(public_configs: Vec<SharedConfig>) -> Result<ValidatedConfigs, Error> {
         let mut map = BTreeMap::new();
         let mut config_iter = public_configs.into_iter();
-        let first = config_iter
-            .next()
-            .expect("Expected at least one config in PUBLIC_CONFIGS");
+        let first = config_iter.next().ok_or(format_err!(
+            "Expected at least one config in PUBLIC_CONFIGS"
+        ))?;
         let common = first.common;
         map.insert(first.node.validator_keys.consensus_key, first.node);
 
         for config in config_iter {
             if common != config.common {
-                panic!("Found config with different common part.");
+                bail!("Found config with different common part.");
             };
             if map
                 .insert(config.node.validator_keys.consensus_key, config.node)
                 .is_some()
             {
-                panic!("Found duplicate consensus keys in PUBLIC_CONFIGS");
+                bail!("Found duplicate consensus keys in PUBLIC_CONFIGS");
             }
         }
-        (
+        Ok(ValidatedConfigs {
             common,
-            map.iter().map(|(_, c)| c.clone()).collect(),
-            map.get(&our_config.consensus_public_key).cloned(),
-        )
+            public_configs: map.values().cloned().collect(),
+        })
     }
 
     fn create_connect_list_config(
-        list: &[NodePublicConfig],
-        node: &NodePrivateConfig,
+        public_configs: &[NodePublicConfig],
+        secret_config: &NodePrivateConfig,
     ) -> ConnectListConfig {
-        let peers = list
+        let peers = public_configs
             .iter()
-            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
+            .filter(|config| {
+                config.validator_keys.consensus_key != secret_config.consensus_public_key
+            })
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
@@ -116,9 +115,8 @@ impl Finalize {
 impl ExonumCommand for Finalize {
     fn execute(self) -> Result<StandardResult, Error> {
         let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
-        let secret_config_dir = std::env::current_dir()
-            .expect("Failed to get current dir")
-            .join(self.secret_config_path.parent().unwrap());
+        let secret_config_dir =
+            std::env::current_dir()?.join(self.secret_config_path.parent().unwrap());
         let public_configs: Vec<SharedConfig> = self
             .public_configs
             .into_iter()
@@ -128,22 +126,23 @@ impl ExonumCommand for Finalize {
         let public_allow_origin = self.public_allow_origin.map(|s| s.parse().unwrap());
         let private_allow_origin = self.private_allow_origin.map(|s| s.parse().unwrap());
 
-        let (common, list, _our) = Self::reduce_configs(public_configs, &secret_config);
+        let ValidatedConfigs {
+            common,
+            public_configs,
+        } = Self::validate_configs(public_configs)?;
 
         let validators_count = common.general_config.validators_count as usize;
 
-        if validators_count != list.len() {
-            panic!(
-                "The number of validators configs does not match the number of validators keys."
-            );
+        if validators_count != public_configs.len() {
+            bail!("The number of validators does not match the number of validators keys.");
         }
 
         let genesis = GenesisConfig::new_with_consensus(
             common.clone().consensus_config,
-            list.iter().map(|c| c.validator_keys),
+            public_configs.iter().map(|c| c.validator_keys),
         );
 
-        let connect_list = Self::create_connect_list_config(&list, &secret_config);
+        let connect_list = Self::create_connect_list_config(&public_configs, &secret_config);
 
         let config = {
             NodeConfig {
