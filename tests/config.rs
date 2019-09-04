@@ -370,9 +370,7 @@ fn test_finalize_run_with_pass() {
 }
 
 #[test]
-#[should_panic(
-    expected = "The number of validators does not match the number of validators keys."
-)]
+#[should_panic(expected = "The number of validators does not match the number of validators keys.")]
 fn test_less_validators_count() {
     let env = ConfigSpec::new_more_validators();
 
@@ -388,9 +386,7 @@ fn test_less_validators_count() {
 }
 
 #[test]
-#[should_panic(
-    expected = "The number of validators does not match the number of validators keys."
-)]
+#[should_panic(expected = "The number of validators does not match the number of validators keys.")]
 fn test_more_validators_count() {
     let env = ConfigSpec::new_more_validators();
 
