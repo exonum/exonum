@@ -16,8 +16,8 @@
 //! of the node using provided common configuration file.
 
 use exonum::blockchain::ValidatorKeys;
-use exonum::crypto::generate_keys_file;
-use failure::Error;
+use exonum::crypto::{generate_keys_file, PublicKey};
+use failure::{bail, Error};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -145,7 +145,7 @@ impl ExonumCommand for GenerateConfig {
                 self.consensus_key_pass.unwrap_or_default(),
                 SecretKeyType::Consensus,
             )?;
-            create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())
+            create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())?
         };
         let service_public_key = {
             let passphrase = Self::get_passphrase(
@@ -153,7 +153,7 @@ impl ExonumCommand for GenerateConfig {
                 self.service_key_pass.unwrap_or_default(),
                 SecretKeyType::Service,
             )?;
-            create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
+            create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())?
         };
 
         let validator_keys = ValidatorKeys {
@@ -192,17 +192,17 @@ impl ExonumCommand for GenerateConfig {
 fn create_secret_key_file(
     secret_key_path: impl AsRef<Path>,
     passphrase: impl AsRef<[u8]>,
-) -> exonum::crypto::PublicKey {
+) -> Result<PublicKey, Error> {
     let secret_key_path = secret_key_path.as_ref();
     if secret_key_path.exists() {
-        panic!(
+        bail!(
             "Failed to create secret key file. File exists: {}",
             secret_key_path.to_string_lossy(),
         );
     } else {
         if let Some(dir) = secret_key_path.parent() {
-            fs::create_dir_all(dir).unwrap();
+            fs::create_dir_all(dir)?;
         }
-        generate_keys_file(&secret_key_path, &passphrase).unwrap()
+        generate_keys_file(&secret_key_path, &passphrase).map_err(Into::into)
     }
 }
