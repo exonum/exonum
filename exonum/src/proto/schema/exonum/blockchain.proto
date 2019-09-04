@@ -36,3 +36,36 @@ message TxLocation {
   uint64 block_height = 1;
   uint64 position_in_block = 2;
 }
+
+// Consensus configuration parameters
+
+// Public keys of a validator.
+message ValidatorKeys {
+  // Consensus key is used for messages related to the consensus algorithm.
+  exonum.PublicKey consensus = 1;
+  // Service key is used for services, for example, the configuration
+  // updater service, the anchoring service, etc.
+  exonum.PublicKey service = 2;
+}
+
+// Consensus algorithm parameters.
+message Config {
+  // List of validators public keys.
+  repeated ValidatorKeys validators = 1;
+  // Interval between first two rounds.
+  uint64 first_round_timeout = 2;
+  // Period of sending a Status message.
+  uint64 status_timeout = 3;
+  // Peer exchange timeout.
+  uint64 peers_timeout = 4;
+  // Maximum number of transactions per block.
+  uint32 txs_block_limit = 5;
+  // Maximum message length (in bytes).
+  uint32 max_message_len = 6;
+  // Minimal propose timeout.
+  uint64 min_propose_timeout = 7;
+  // Maximal propose timeout.
+  uint64 max_propose_timeout = 8;
+  // Amount of transactions in pool to start use `min_propose_timeout`.
+  uint32 propose_timeout_threshold = 9;
+}
