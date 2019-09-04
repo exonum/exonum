@@ -23,7 +23,7 @@ use exonum::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
         TransactionContext, TransactionSet,
     },
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, kx, Hash, PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
     node::ApiSender,
 };
@@ -139,6 +139,7 @@ pub fn create_blockchain() -> Blockchain {
     let keys = ValidatorKeys {
         consensus_key,
         service_key: service_keys.0,
+        identity_key: kx::gen_keypair().0,
     };
     blockchain
         .initialize(GenesisConfig::new(vec![keys].into_iter()))

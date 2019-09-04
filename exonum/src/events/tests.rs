@@ -23,7 +23,9 @@ use std::{
 };
 
 use crate::blockchain::ConsensusConfig;
-use crate::crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use crate::crypto::{
+    gen_keypair, gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, SEED_LENGTH,
+};
 use crate::events::{
     error::log_error,
     network::{NetworkConfiguration, NetworkPart},
@@ -225,6 +227,7 @@ impl HandshakeParams {
     #[doc(hidden)]
     pub fn with_default_params() -> Self {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+        let (identity_pk, identity_sk) = kx::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
         let address = "127.0.0.1:8000";
 
         let connect = Message::concrete(
@@ -234,14 +237,14 @@ impl HandshakeParams {
         );
 
         let mut params = HandshakeParams::new(
-            public_key,
-            secret_key.clone(),
+            identity_pk,
+            identity_sk.clone(),
             SharedConnectList::default(),
             connect,
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
         );
 
-        params.set_remote_key(public_key);
+        params.set_remote_key(identity_pk);
         params
     }
 }
@@ -249,10 +252,11 @@ impl HandshakeParams {
 impl ConnectionParams {
     pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
+        let (identity_pk, identity_sk) = kx::gen_keypair();
         let connect = connect_message(address, &public_key, &secret_key);
         let handshake_params = HandshakeParams::new(
-            public_key,
-            secret_key.clone(),
+            identity_pk,
+            identity_sk.clone(),
             SharedConnectList::default(),
             connect.clone(),
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
@@ -260,6 +264,7 @@ impl ConnectionParams {
         let connect_info = ConnectInfo {
             address: address.to_string(),
             public_key,
+            identity_key: identity_pk,
         };
 
         ConnectionParams {

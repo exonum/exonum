@@ -18,7 +18,7 @@ use std::{
 };
 
 use crate::{write_short_hex, Seed};
-use exonum_sodiumoxide::crypto::kx;
+use exonum_sodiumoxide::crypto::{kx, kx::PublicKey as PublicKeySodium};
 use hex::{encode as encode_hex, FromHex, FromHexError};
 
 use serde::{
@@ -47,6 +47,10 @@ pub struct SecretKey(kx::SecretKey);
 impl PublicKey {
     pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
         kx::PublicKey::from_slice(bytes_slice).map(PublicKey)
+    }
+
+    pub fn zero() -> Self {
+        Self::from_slice(&[0u8; 32]).unwrap()
     }
 }
 

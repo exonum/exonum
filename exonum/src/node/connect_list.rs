@@ -135,11 +135,13 @@ mod test {
         connect_list.add(ConnectInfo {
             public_key: regular[0],
             address: address.clone(),
+            identity_key: kx::PublicKey::zero(),
         });
         check_in_connect_list(&connect_list, &regular, &[0], &[1, 2, 3]);
         connect_list.add(ConnectInfo {
             public_key: regular[2],
             address: address.clone(),
+            identity_key: kx::PublicKey::zero(),
         });
         check_in_connect_list(&connect_list, &regular, &[0, 2], &[1, 3]);
 
@@ -167,6 +169,7 @@ mod test {
             connect_list.add(ConnectInfo {
                 public_key: *peer,
                 address: address.clone(),
+                identity_key: kx::PublicKey::zero(),
             })
         }
     }
@@ -190,6 +193,7 @@ mod test {
     #[test]
     fn test_address_allowed() {
         let (public_key, _) = gen_keypair();
+        let (identity, _) = kx::gen_keypair();
         let address = "127.0.0.1:80".to_owned();
 
         let mut connect_list = ConnectList::default();
@@ -198,6 +202,7 @@ mod test {
         connect_list.add(ConnectInfo {
             public_key,
             address: address.clone(),
+            identity_key: identity,
         });
         assert!(connect_list.is_address_allowed(&address));
     }

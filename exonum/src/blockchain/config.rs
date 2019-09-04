@@ -327,6 +327,7 @@ mod tests {
         configuration.validator_keys.push(ValidatorKeys {
             consensus_key: PublicKey::zero(),
             service_key: PublicKey::zero(),
+            identity_key: kx::PublicKey::zero(),
         });
         serialize_deserialize(&configuration);
     }
@@ -372,6 +373,7 @@ mod tests {
             .map(|i| ValidatorKeys {
                 consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
                 service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
+                identity_key: kx::gen_keypair_from_seed(&Seed::new([i * 20; SEED_LENGTH])).0,
             })
             .collect();
 

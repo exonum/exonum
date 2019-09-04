@@ -156,7 +156,10 @@ struct EncryptedMasterKey {
 }
 
 impl EncryptedMasterKey {
-    fn encrypt(key: &secret_tree::Seed, pass_phrase: impl AsRef<[u8]>) -> Result<EncryptedMasterKey, Error> {
+    fn encrypt(
+        key: &secret_tree::Seed,
+        pass_phrase: impl AsRef<[u8]>,
+    ) -> Result<EncryptedMasterKey, Error> {
         let mut rng = thread_rng();
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
@@ -247,8 +250,8 @@ mod tests {
         let dir = TempDir::new("test_utils").expect("Couldn't create TempDir");
         let file_path = dir.path().join("private_key.toml");
         let pass_phrase = b"passphrase";
-        let pk1 = generate_keys_file(file_path.as_path(), pass_phrase).unwrap();
-        let (pk2, _) = read_keys_from_file(file_path.as_path(), pass_phrase).unwrap();
+        let pk1 = generate_keys(file_path.as_path(), pass_phrase);
+        let pk2 = read_keys_from_file(file_path.as_path(), pass_phrase).unwrap();
         assert_eq!(pk1, pk2);
     }
 
