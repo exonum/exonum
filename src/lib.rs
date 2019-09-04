@@ -38,6 +38,53 @@
 //!   step. If the secret keys are protected with passwords, the user need to enter the password.
 //!   Running node will automatically connect to other nodes in the network using IP addresses from
 //!   public parts of the node configurations.
+//!
+//! ## Additional Commands
+//!
+//! `exonum-cli` also supports additional CLI commands for performing maintenance actions by node
+//! administrators and easier debugging.
+//!
+//! * `run-dev` command automatically generates network configuration with a single node and runs
+//! it. This command can be useful for fast testing of the services during development process.
+//! * `maintenance` command contains only `clear-cache` functionality at the moment. It allows to
+//! clear node's consensus messages cache to fix rare node desync issues.
+//!
+//! ## How to Extend Parameters
+//!
+//! `exonum-cli` allows to extend the list of the parameters for any command and even add new CLI
+//! commands with arbitrary behavior. To do so, you need to implement a structure with a list of
+//! additional parameters and use `flatten` macro atribute of [`serde`][serde] and
+//! [`structopt`][structopt] libraries.
+//!
+//! ```ignore
+//! #[derive(Serialize, Deserialize, StructOpt)]
+//! struct MyRunCommand {
+//!     #[serde(flatten)]
+//!     #[structopt(flatten)]
+//!     default: Run
+//!     /// My awesome parameter
+//!     secret_number: i32
+//! }
+//! ```
+//!
+//! You can also create own list of commands by implementing an enum with a similar principle:
+//!
+//! ```ignore
+//! #[derive(StructOpt)]
+//! enum MyCommands {
+//!     #[structopt(name = "run")
+//!     DefaultRun(Run),
+//!     #[structopt(name = "my-run")
+//!     MyAwesomeRun(MyRunCommand),
+//! }
+//! ```
+//!
+//! While implementing custom behavior for your commands, you may use
+//! [`StandardResult`](./command/enum.StandardResult.html) enum for
+//! accessing node configuration files created and filled by the standard Exonum commands.
+//!
+//! [serde]: https://crates.io/crates/serde
+//! [structopt]: https://crates.io/crates/structopt
 
 use exonum::blockchain::InstanceCollection;
 use exonum::exonum_merkledb::{Database, RocksDB};
