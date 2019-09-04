@@ -298,7 +298,7 @@ impl<'a> Debug for AfterCommitContext<'a> {
 pub trait Interface {
     /// Fully qualified name of this interface for the [call info].
     ///
-    /// [call info]: ../../struct.CallInfo.html
+    /// [call info]: ../struct.CallInfo.html
     const NAME: &'static str;
     /// Invoke the specified method handler of the service instance.
     fn dispatch(
