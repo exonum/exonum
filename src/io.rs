@@ -30,11 +30,13 @@ where
     P: AsRef<Path>,
 {
     let path = path.as_ref();
-    let res = do_load(path).context(format!("loading config from {}", path.display()))?;
+    let res = do_load(path).with_context(|_| format!("loading config from {}", path.display()))?;
     Ok(res)
 }
 
 /// Saves TOML-encoded file.
+///
+/// Creates directory if needed.
 pub fn save_config_file<P, T>(value: &T, path: P) -> Result<(), Error>
 where
     T: Serialize,
