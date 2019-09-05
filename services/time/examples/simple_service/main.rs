@@ -21,7 +21,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex, Snapshot};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
@@ -31,7 +31,7 @@ use exonum::{
     messages::Verified,
     runtime::{
         rust::{Service, Transaction, TransactionContext},
-        AnyTx, InstanceId,
+        AnyTx, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
@@ -56,19 +56,27 @@ const SERVICE_NAME: &str = "marker";
 
 /// Marker service database schema.
 #[derive(Debug)]
-pub struct MarkerSchema<T> {
+pub struct MarkerSchema<'a, T> {
     access: T,
+    service_name: &'a str,
 }
 
-impl<T: IndexAccess> MarkerSchema<T> {
+impl<'a, T: IndexAccess> MarkerSchema<'a, T> {
     /// Constructs schema for the given `snapshot`.
-    pub fn new(access: T) -> Self {
-        MarkerSchema { access }
+    pub fn new(service_name: &'a str, access: T) -> Self {
+        MarkerSchema {
+            service_name,
+            access,
+        }
+    }
+
+    fn index_name(&self, name: &str) -> String {
+        [self.service_name, ".", name].concat()
     }
 
     /// Returns the table mapping `i32` value to public keys authoring marker transactions.
     pub fn marks(&self) -> ProofMapIndex<T, PublicKey, i32> {
-        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.access.clone())
+        ProofMapIndex::new(self.index_name("marks"), self.access.clone())
     }
 
     /// Returns hashes for stored table.
@@ -123,7 +131,7 @@ impl MarkerInterface for MarkerService {
             .get();
         match time {
             Some(current_time) if current_time <= arg.time => {
-                let schema = MarkerSchema::new(context.fork());
+                let schema = MarkerSchema::new(context.instance.name, context.fork());
                 schema.marks().put(&author, arg.mark);
             }
             _ => {}
@@ -132,7 +140,11 @@ impl MarkerInterface for MarkerService {
     }
 }
 
-impl Service for MarkerService {}
+impl Service for MarkerService {
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        MarkerSchema::new(descriptor.name, snapshot).state_hash()
+    }
+}
 
 fn main() {
     let mock_provider = Arc::new(MockTimeProvider::default());
@@ -180,7 +192,7 @@ fn main() {
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(&snapshot);
+    let schema = MarkerSchema::new(SERVICE_NAME, &snapshot);
     assert_eq!(schema.marks().get(&keypair1.0), Some(1));
     assert_eq!(schema.marks().get(&keypair2.0), Some(2));
     assert_eq!(schema.marks().get(&keypair3.0), None);
@@ -189,6 +201,6 @@ fn main() {
     testkit.create_block_with_transactions(txvec![tx4]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(&snapshot);
+    let schema = MarkerSchema::new(SERVICE_NAME, &snapshot);
     assert_eq!(schema.marks().get(&keypair3.0), Some(4));
 }

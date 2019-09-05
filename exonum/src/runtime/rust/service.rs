@@ -54,9 +54,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     fn before_commit(&self, _context: TransactionContext) {}
 

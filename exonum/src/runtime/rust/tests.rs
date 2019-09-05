@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use exonum_derive::exonum_service;
-use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB};
 
 use std::convert::TryFrom;
 
 use crate::{
+    crypto::Hash,
     proto::{
         schema::tests::{TestServiceInit, TestServiceTx},
         Any,
@@ -111,6 +112,10 @@ impl Service for TestServiceImpl {
         let mut entry = Entry::new("constructor_entry", fork);
         entry.set(arg.msg);
         Ok(())
+    }
+
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }
 

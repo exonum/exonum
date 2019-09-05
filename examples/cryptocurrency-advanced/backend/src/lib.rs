@@ -30,7 +30,11 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::runtime::{api::ServiceApiBuilder, rust::Service};
+use exonum::{
+    crypto::Hash,
+    runtime::{api::ServiceApiBuilder, rust::Service, InstanceDescriptor},
+};
+use exonum_merkledb::Snapshot;
 
 use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
 
@@ -45,5 +49,9 @@ pub struct CryptocurrencyService;
 impl Service for CryptocurrencyService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi.wire(builder);
+    }
+
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        Schema::new(descriptor.name, snapshot).state_hash()
     }
 }
