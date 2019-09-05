@@ -331,6 +331,40 @@ impl<V: BinaryValue> ListProof<V> {
         self.values_unchecked().iter().map(|(index, _)| *index)
     }
 
+    /// Estimates the number of hash operations necessary to validate the proof.
+    ///
+    /// An error will be returned if the proof fails basic integrity checks. Not returning an error
+    /// does not guarantee that the proof is valid, however; the estimation skips most
+    /// of the checks for speed.
+    pub fn hash_ops(&self) -> Result<usize, ListProofError> {
+        let mut hash_ops = self.values.len();
+        let mut hashes_on_this_level = hash_ops;
+        let mut height = 1;
+        for HashedEntry { key, .. } in &self.hashes {
+            if key.height() < height {
+                return Err(if height == 0 {
+                    ListProofError::UnexpectedLeaf
+                } else {
+                    ListProofError::Unordered
+                });
+            }
+            while key.height() > height {
+                hashes_on_this_level = (hashes_on_this_level + 1) / 2;
+                hash_ops += hashes_on_this_level;
+                height += 1;
+            }
+            debug_assert_eq!(key.height(), height);
+            hashes_on_this_level += 1;
+        }
+
+        while hashes_on_this_level > 1 {
+            hashes_on_this_level = (hashes_on_this_level + 1) / 2;
+            hash_ops += hashes_on_this_level;
+        }
+
+        Ok(hash_ops)
+    }
+
     /// Verifies the correctness of the proof by the trusted Merkle root hash and the number of
     /// elements in the tree.
     ///
@@ -391,6 +425,7 @@ pub enum ListProofError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Database, ProofListIndex, TemporaryDB};
 
     fn entry(height: u8, index: u64) -> HashedEntry {
         HashedEntry::new(
@@ -472,5 +507,108 @@ mod tests {
         // layer[-1] has index lesser that the layer length
         let layer = vec![entry(1, 0), entry(1, 1), entry(1, 4)];
         assert!(hash_layer(&layer, 6).is_err());
+    }
+
+    #[test]
+    fn hash_ops_examples() {
+        // Empty proof.
+        let proof = ListProof::<u32>::empty(5, Hash::zero());
+        assert_eq!(proof.hash_ops().unwrap(), 0);
+
+        // Proof for a single-element tree.
+        let proof = ListProof::new(vec![(0, 0_u32)]);
+        assert_eq!(proof.hash_ops().unwrap(), 1);
+
+        // Proof for index 1 in a 3-element tree.
+        let mut proof = ListProof::new(vec![(1, 1_u32)]);
+        proof.push_hash(1, 0, Hash::zero());
+        proof.push_hash(2, 1, Hash::zero());
+        assert_eq!(proof.hash_ops().unwrap(), 3);
+        // 1 ops to hash values + 1 ops on level 1 + 1 op on level 2:
+        //
+        //   root
+        //  /    \
+        //  *    x   Level #2
+        // / \
+        // x *       Level #1
+        //   |
+        //   x       Values
+
+        // Proof for index 4 in a 5-element tree.
+        let mut proof = ListProof::new(vec![(4, 4_u32)]);
+        proof.push_hash(3, 0, Hash::zero());
+        assert_eq!(proof.hash_ops().unwrap(), 4);
+        // 1 ops to hash values + 1 op per levels 1..=3:
+        //
+        //   root
+        //  /    \
+        //  x    *   Level #3
+        //       |
+        //       *   Level #2
+        //       |
+        //       *   Level #1
+        //       |
+        //       x   Values
+
+        // Proof for indices 1..=2 in a 3-element tree.
+        let mut proof = ListProof::new(vec![(1, 1_u32), (2, 2)]);
+        proof.push_hash(1, 0, Hash::zero());
+        assert_eq!(proof.hash_ops().unwrap(), 5);
+        // 2 ops to hash values + 2 ops on level 1 + 1 op on level 2:
+        //
+        //   root
+        //  /    \
+        //  *    *   Level #2
+        // / \   |
+        // x *   *   Level #1
+        //   |   |
+        //   x   x   Values
+    }
+
+    #[test]
+    fn hash_ops_in_full_tree() {
+        // Consider a graph for computing Merkle root of the tree, such as one depicted above.
+        // Denote `l` the number of lists in this tree (i.e., nodes with degree 1),
+        // `v2` number of nodes with degree 2, and `v3` the number of nodes with degree 3.
+        // For example, in the tree above, `l = 3`, `v2 = 3`, `v3 = 1`.
+        //
+        // We have
+        //
+        //     l = proof.values.len() + proof.hashes.len().
+        //
+        // The number of edges in the tree is `|E| = (l + 2*v2 + 3*v3) / 2`; on the other hand,
+        // it is connected to the number of nodes `|E| = l + v2 + v3 - 1`. Hence,
+        //
+        //     v3 = l - 2.
+        //
+        // The number of hash operations is
+        //
+        //     Ops = v2 + v3 = l + v2 - 2.
+        //
+        // `v2` counts at least values and the root node (provided there is >1 node in the tree);
+        // i.e.,
+        //
+        //     v2  >= proof.values.len() + 1;
+        //     Ops >= 2 * proof.values.len() + proof.hashes.len() - 1.
+        //
+        // For a full Merkle tree, this becomes an equality, as there can be no other degree-2
+        // nodes in the proof.
+
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let mut list = ProofListIndex::new("test", &fork);
+        list.extend(0_u32..8);
+
+        for len in 1..8 {
+            for i in 0..(8 - len) {
+                let proof = list.get_range_proof(i..(i + len));
+                assert_eq!(
+                    proof.hash_ops().unwrap(),
+                    2 * proof.values.len() + proof.hashes.len() - 1,
+                    "{:?}",
+                    proof
+                );
+            }
+        }
     }
 }
