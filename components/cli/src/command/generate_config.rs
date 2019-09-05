@@ -15,20 +15,26 @@
 //! Standard Exonum CLI command used to generate public and secret config files
 //! of the node using provided common configuration file.
 
-use exonum::blockchain::ValidatorKeys;
-use exonum::crypto::{generate_keys_file, PublicKey};
+use exonum::{
+    blockchain::ValidatorKeys,
+    crypto::{generate_keys_file, PublicKey},
+};
 use failure::{bail, Error};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
-use std::fs;
-use std::net::{IpAddr, SocketAddr};
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    net::{IpAddr, SocketAddr},
+    path::{Path, PathBuf},
+};
 
-use crate::command::{ExonumCommand, StandardResult};
-use crate::config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
-use crate::io::{load_config_file, save_config_file};
-use crate::password::{PassInputMethod, Passphrase, PassphraseUsage, SecretKeyType};
+use crate::{
+    command::{ExonumCommand, StandardResult},
+    config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig},
+    io::{load_config_file, save_config_file},
+    password::{PassInputMethod, Passphrase, PassphraseUsage, SecretKeyType},
+};
 
 /// Name for a file containing consensus secret key.
 pub const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";

@@ -15,19 +15,21 @@
 //! Standard Exonum CLI command used to combine a secret and all the public parts of the
 //! node configuration in a single file.
 
-use exonum::blockchain::GenesisConfig;
-use exonum::node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig};
+use exonum::{
+    blockchain::GenesisConfig,
+    node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig},
+};
 use failure::{bail, format_err, Error};
 use serde::{Deserialize, Serialize};
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
 
-use crate::command::{ExonumCommand, StandardResult};
-use crate::config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig};
-use crate::io::{load_config_file, save_config_file};
+use crate::{
+    command::{ExonumCommand, StandardResult},
+    config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig},
+    io::{load_config_file, save_config_file},
+};
 
 /// Generate final node configuration using public configs
 /// of other nodes in the network.

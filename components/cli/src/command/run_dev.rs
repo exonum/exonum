@@ -19,15 +19,15 @@ use failure::{Error, ResultExt};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
-use std::fs;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{fs, path::PathBuf, str::FromStr};
 
-use crate::command::finalize::Finalize;
-use crate::command::generate_config::{GenerateConfig, PUB_CONFIG_FILE_NAME, SEC_CONFIG_FILE_NAME};
-use crate::command::generate_template::GenerateTemplate;
-use crate::command::run::Run;
-use crate::command::{ExonumCommand, StandardResult};
+use crate::command::{
+    finalize::Finalize,
+    generate_config::{GenerateConfig, PUB_CONFIG_FILE_NAME, SEC_CONFIG_FILE_NAME},
+    generate_template::GenerateTemplate,
+    run::Run,
+    ExonumCommand, StandardResult,
+};
 
 /// Run application in development mode (generate configuration and db files automatically).
 #[derive(StructOpt, Debug, Serialize, Deserialize)]

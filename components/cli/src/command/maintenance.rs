@@ -14,17 +14,21 @@
 
 //! Standard Exonum CLI command used to perform different maintenance actions.
 
-use exonum::exonum_merkledb::{Database, RocksDB};
-use exonum::helpers::clear_consensus_messages_cache;
-use exonum::node::NodeConfig;
+use exonum::{
+    exonum_merkledb::{Database, RocksDB},
+    helpers::clear_consensus_messages_cache,
+    node::NodeConfig,
+};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::path::PathBuf;
 
-use crate::command::{ExonumCommand, StandardResult};
-use crate::io::load_config_file;
+use crate::{
+    command::{ExonumCommand, StandardResult},
+    io::load_config_file,
+};
 
 /// Perform different maintenance actions.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]

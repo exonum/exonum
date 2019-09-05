@@ -27,12 +27,14 @@ use structopt::StructOpt;
 
 use std::path::PathBuf;
 
-use crate::command::finalize::Finalize;
-use crate::command::generate_config::GenerateConfig;
-use crate::command::generate_template::GenerateTemplate;
-use crate::command::maintenance::{Action, Maintenance};
-use crate::command::run::{NodeRunConfig, Run};
-use crate::command::run_dev::RunDev;
+use crate::command::{
+    finalize::Finalize,
+    generate_config::GenerateConfig,
+    generate_template::GenerateTemplate,
+    maintenance::{Action, Maintenance},
+    run::{NodeRunConfig, Run},
+    run_dev::RunDev,
+};
 
 /// Interface of standard Exonum Core configuration command.
 pub trait ExonumCommand {

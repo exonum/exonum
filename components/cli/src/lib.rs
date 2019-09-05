@@ -86,10 +86,12 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
-use exonum::blockchain::InstanceCollection;
-use exonum::exonum_merkledb::{Database, RocksDB};
-use exonum::node::Node;
-use exonum::runtime::rust::ServiceFactory;
+use exonum::{
+    blockchain::InstanceCollection,
+    exonum_merkledb::{Database, RocksDB},
+    node::Node,
+    runtime::rust::ServiceFactory,
+};
 
 use std::sync::Arc;
 

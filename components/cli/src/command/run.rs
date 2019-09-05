@@ -20,12 +20,13 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
-use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::{net::SocketAddr, path::PathBuf};
 
-use crate::command::{ExonumCommand, StandardResult};
-use crate::io::load_config_file;
-use crate::password::{PassInputMethod, PassphraseUsage, SecretKeyType};
+use crate::{
+    command::{ExonumCommand, StandardResult},
+    io::load_config_file,
+    password::{PassInputMethod, PassphraseUsage, SecretKeyType},
+};
 
 /// Container for node configuration parameters produced by `Run` command.
 pub struct NodeRunConfig {

@@ -23,9 +23,10 @@ use exonum::{
     helpers::config::{ConfigFile, ConfigManager},
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
-use serde::{Deserialize, Serialize};
-
 use exonum_cli::command::{Command, ExonumCommand, StandardResult};
+use serde::{Deserialize, Serialize};
+use structopt::StructOpt;
+
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -35,7 +36,6 @@ use std::{
     panic,
     path::{Path, PathBuf},
 };
-use structopt::StructOpt;
 
 #[derive(Debug)]
 struct ConfigSpec {

@@ -19,8 +19,11 @@ use rpassword::read_password_from_tty;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-use std::ops::{Deref, DerefMut};
-use std::{env, str::FromStr};
+use std::{
+    env,
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 /// Default name of the environment variable with a consensus key passphrase.
 pub const DEFAULT_CONSENSUS_PASS_ENV_VAR: &str = "EXONUM_CONSENSUS_PASS";
