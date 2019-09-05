@@ -16,7 +16,6 @@ byteorder = { version = "1.2.7", features = [ "i128" ] }
 chrono = "0.4.6"
 hex = "0.3.2"
 hex-buffer-serde = "0.2.0"
-pwbox = { version = "0.2.0", path = "../../../pwbox-rs" }
 rand = "0.7"
 rust_decimal = "1.0"
 serde = "1.0.10"
@@ -25,8 +24,9 @@ serde_json = "1.0.19"
 failure = "0.1.5"
 toml = "0.5.0"
 uuid = "0.7.1"
+pwbox = { git = "https://github.com/pavel-mukhanov/pwbox-rs", branch = "updated-sodium" }
 exonum_sodiumoxide = { git = "http://github.com/pavel-mukhanov/exonum_sodiumoxide/", branch = "key-exchange-mod", optional = true }
-secret-tree = { version = "0.2.0-pre.0", path = "../../../secret-tree/" }
+secret-tree = { git = "https://github.com/slowli/secret-tree", branch = "master" }
 
 [dev-dependencies]
 tempdir = "0.3.7"
