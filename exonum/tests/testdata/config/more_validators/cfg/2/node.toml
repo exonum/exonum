@@ -4,6 +4,7 @@ external_address = "0.0.0.0:8002"
 listen_address = "0.0.0.0:8002"
 service_public_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
 service_secret_key = "service.key.toml"
+master_key_path = "master.key.toml"
 
 [api]
 state_update_timeout = 10000

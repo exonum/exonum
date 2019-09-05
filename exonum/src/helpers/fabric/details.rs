@@ -764,20 +764,18 @@ impl Command for Finalize {
             .collect();
 
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
+        let validators_count = common
+            .general_config
+            .get("validators_count")
+            .expect("validators_count not found in common config.")
+            .as_integer()
+            .unwrap() as usize;
 
-        //TODO: change revert
-        //        let validators_count = common
-        //            .general_config
-        //            .get("validators_count")
-        //            .expect("validators_count not found in common config.")
-        //            .as_integer()
-        //            .unwrap() as usize;
-
-        //        if validators_count != list.len() {
-        //            panic!(
-        //                "The number of validators configs does not match the number of validators keys."
-        //            );
-        //        }
+        if validators_count != list.len() {
+            panic!(
+                "The number of validators configs does not match the number of validators keys."
+            );
+        }
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 

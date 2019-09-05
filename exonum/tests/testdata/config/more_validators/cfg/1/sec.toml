@@ -4,5 +4,6 @@ external_address = "0.0.0.0:8001"
 listen_address = "0.0.0.0:8001"
 service_public_key = "f4fc481e910d79027fbadb200a1e79435319d2c781d114a0b9687b3babaa2ccf"
 service_secret_key = "service.key.toml"
+master_key_path = "master.key.toml"
 
 [services_secret_configs]

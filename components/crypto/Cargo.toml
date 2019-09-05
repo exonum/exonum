@@ -22,9 +22,10 @@ rust_decimal = "1.0"
 serde = "1.0.10"
 serde_derive = "1.0.64"
 serde_json = "1.0.19"
+failure = "0.1.5"
 toml = "0.5.0"
 uuid = "0.7.1"
-exonum_sodiumoxide = { version = "0.0.22", path = "../../../exonum_sodiumoxide/", optional = true }
+exonum_sodiumoxide = { git = "http://github.com/pavel-mukhanov/exonum_sodiumoxide/", branch = "key-exchange-mod", optional = true }
 secret-tree = { version = "0.2.0-pre.0", path = "../../../secret-tree/" }
 
 [dev-dependencies]

@@ -877,7 +877,15 @@ impl Sandbox {
             api_requests: api_channel.0.clone().wait(),
         };
 
-        let connect_list = ConnectList::from_peers(inner.handler.state.peers());
+        let peers = inner.handler.state.connect_list().peers();
+        let saved_peers = inner.handler.state.peers();
+
+        let peers: Vec<ConnectInfo> = peers
+            .into_iter()
+            .filter(|c| saved_peers.contains_key(&c.public_key))
+            .collect();
+
+        let connect_list = ConnectList::from_peers(&peers);
 
         let keys = Keys {
             consensus_pk: *inner.handler.state.consensus_public_key(),
@@ -987,15 +995,17 @@ impl ConnectList {
     /// Helper method to populate ConnectList after sandbox node restarts and
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
-    pub fn from_peers(peers: &HashMap<PublicKey, Signed<Connect>>) -> Self {
+    pub fn from_peers(peers: &[ConnectInfo]) -> Self {
+        let mut identity = BTreeMap::new();
+
         let peers: BTreeMap<PublicKey, PeerAddress> = peers
             .iter()
-            .map(|(p, c)| (*p, PeerAddress::new(c.pub_addr().to_owned())))
+            .map(|c| {
+                identity.insert(c.public_key, c.identity_key);
+                (c.public_key, PeerAddress::new(c.address.to_owned()))
+            })
             .collect();
-        ConnectList {
-            peers,
-            identity: BTreeMap::new(),
-        }
+        ConnectList { peers, identity }
     }
 }
 
@@ -1082,7 +1092,7 @@ fn sandbox_with_services_uninitialized(
             (
                 gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
                 gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
-                kx::gen_keypair(),
+                kx::gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
             )
         })
         .map(|(v, s, i)| Keys {

@@ -422,6 +422,9 @@ fn should_restore_peers_after_restart() {
     let secret_key1 = sandbox.secret_key(v1).clone();
     let address1 = sandbox.address(v1);
 
+    dbg!(public_key0);
+    dbg!(public_key1);
+
     let time = sandbox.time();
     let connect_from_0 = sandbox.create_connect(
         &public_key0,

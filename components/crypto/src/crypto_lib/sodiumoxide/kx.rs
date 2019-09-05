@@ -18,7 +18,7 @@ use std::{
 };
 
 use crate::{write_short_hex, Seed};
-use exonum_sodiumoxide::crypto::{kx, kx::PublicKey as PublicKeySodium};
+use exonum_sodiumoxide::crypto::kx;
 use hex::{encode as encode_hex, FromHex, FromHexError};
 
 use serde::{

@@ -87,8 +87,7 @@ impl ConfigSpec {
         [
             "pub.toml",
             "sec.toml",
-            "service.key.toml",
-            "consensus.key.toml",
+            "master.key.toml",
         ]
         .iter()
         .try_for_each(|file| copy_secured(src.join(file), dest.join(file)))
@@ -236,9 +235,8 @@ fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
 fn assert_node_config_files_eq(actual: impl AsRef<Path>, expected: impl AsRef<Path>) {
     let (actual, expected) = (actual.as_ref(), expected.as_ref());
 
-    let config_dir = actual.parent().unwrap();
     let actual = load_node_config(actual);
-    let mut expected = load_node_config(expected);
+    let expected = load_node_config(expected);
 
     assert_eq!(actual, expected);
 }
@@ -291,8 +289,7 @@ fn test_generate_config_key_files() {
         .unwrap();
 
     let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
-    assert_eq!(sec_cfg["consensus_secret_key"], "consensus.key.toml".into());
-    assert_eq!(sec_cfg["service_secret_key"], "service.key.toml".into());
+    assert_eq!(sec_cfg["master_key_path"], "master.key.toml".into());
 }
 
 #[test]
