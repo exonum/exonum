@@ -333,7 +333,7 @@ pub enum Caller {
         /// Public key of the user who signed this transaction.
         author: PublicKey,
     },
-    // This transaction is invoked during the transaction execution of the other service.
+    // This transaction is invoked during the transaction execution of a different service.
     Service {
         /// Identifier of the service instance which invoked this transaction.
         instance_id: InstanceId,
@@ -384,7 +384,7 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field can only contains a core interfaces like `Configure` and
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
-    /// List of dispatcher actions that will be performed after the finish of execution.
+    /// List of dispatcher actions that will be performed after execution finishes.
     actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a Dispatcher,
@@ -393,7 +393,7 @@ pub struct ExecutionContext<'a> {
 }
 
 impl<'a> ExecutionContext<'a> {
-    /// Maximum depth of call stack.
+    /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
     pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
@@ -449,7 +449,7 @@ pub enum ApiChange {
 }
 
 // TODO Write a full documentation when the interservice communications are fully implemented. [ECR-3493]
-/// Provide a low level context for the call of methods of the other service instance.
+/// Provide a low level context for the call of methods of a different service instance.
 #[derive(Debug)]
 pub struct CallContext<'a> {
     /// Underlying execution context.

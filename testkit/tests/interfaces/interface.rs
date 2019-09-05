@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Interfaces definition for the tests of interservice calls.
+//! Definition of the interfaces for tests of interservice calls.
 
 use exonum::{
     crypto::PublicKey,

@@ -26,6 +26,6 @@ pub enum Error {
     ConfigParseError = 2,
     /// Unspecified error during the call invocation.
     UnspecifiedError = 3,
-    /// Unable to parse service interface method arguments.
+    /// Unable to parse the method arguments of the service interface.
     ArgumentsParseError = 4,
 }

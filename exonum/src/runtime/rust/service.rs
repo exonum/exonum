@@ -83,14 +83,14 @@ where
     }
 }
 
-/// Transaction specification for the concrete service interface.
+/// Transaction specification for a specific service interface.
 pub trait Transaction: BinaryValue {
-    /// Service interface associated for the given transaction.
+    /// Service interface associated with the given transaction.
     type Service;
     /// Identifier of the service interface required for the call.
     #[doc(hidden)]
     const INTERFACE_NAME: &'static str;
-    /// Identifier of service method which executes the given transaction.
+    /// Identifier of the service method which executes the given transaction.
     const METHOD_ID: MethodId;
 
     /// Create unsigned service transaction from the value.
@@ -115,7 +115,7 @@ pub trait Transaction: BinaryValue {
     }
 }
 
-/// Provide context for the currently executing transaction.
+/// Provide the context for the transaction under execution.
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
     /// Service instance associated with the current context.
@@ -192,7 +192,7 @@ pub struct BeforeCommitContext<'a> {
 }
 
 impl<'a> BeforeCommitContext<'a> {
-    /// Create a new before commit context.
+    /// Create a new `BeforeCommit` context.
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
@@ -221,7 +221,7 @@ pub struct AfterCommitContext<'a> {
 }
 
 impl<'a> AfterCommitContext<'a> {
-    /// Create a new after commit context.
+    /// Create a new `AfterCommit` context.
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
