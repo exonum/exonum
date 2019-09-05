@@ -351,12 +351,6 @@ where
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
     }
-
-    /// Returns the next height of the blockchain.
-    /// Its value is equal to "height of the latest committed block" + 1.
-    fn next_height(&self) -> Height {
-        Height(self.block_hashes_by_height().len())
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

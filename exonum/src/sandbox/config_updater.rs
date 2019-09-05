@@ -14,7 +14,7 @@
 
 pub use crate::proto::schema::tests::TxConfig;
 
-use exonum_merkledb::{BinaryValue, IndexAccess, MapIndex};
+use exonum_merkledb::BinaryValue;
 
 use crate::{
     blockchain::{ConsensusConfig, ExecutionError, Schema},
@@ -27,21 +27,6 @@ use crate::{
         InstanceId,
     },
 };
-
-#[derive(Debug)]
-pub struct ConfigUpdaterSchema<T: IndexAccess> {
-    access: T,
-}
-
-impl<T: IndexAccess> ConfigUpdaterSchema<T> {
-    pub fn new(access: T) -> Self {
-        Self { access }
-    }
-
-    pub fn configs_actual_from(&self) -> MapIndex<T, u64, ConsensusConfig> {
-        MapIndex::new("config.updater.actual_from", self.access.clone())
-    }
-}
 
 #[exonum_service(crate = "crate")]
 pub trait ConfigUpdaterInterface {

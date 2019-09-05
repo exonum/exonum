@@ -21,15 +21,11 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
-use exonum_merkledb::{BinaryValue, ObjectHash};
-use serde::de::Error;
-use serde_json::Error as JsonError;
-
 use std::collections::HashSet;
 
 use crate::{
-    crypto::{Hash, PublicKey},
-    helpers::{Height, Milliseconds, ValidateInput},
+    crypto::PublicKey,
+    helpers::{Milliseconds, ValidateInput},
     messages::SIGNED_MESSAGE_MIN_SIZE,
     proto::schema::blockchain,
 };
@@ -141,7 +137,7 @@ impl ConsensusConfig {
     fn validate_keys(&self) -> Result<(), failure::Error> {
         ensure!(
             !self.validators.is_empty(),
-            "There must be at least single validator in the consensus configuration."
+            "Consensus configuration must have at least one validator."
         );
 
         let mut exist_keys = HashSet::with_capacity(self.validators.len() * 2);
@@ -280,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_validate_validator_keys_err_same() {
+    fn consensus_validate_validator_keys_err_same() {
         let pk = crypto::gen_keypair().0;
 
         let keys = ValidatorKeys {
@@ -292,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_ok() {
+    fn consensus_config_validate_ok() {
         let cfg = ConsensusConfig {
             validators: (0..4).map(gen_validator_keys).collect(),
             ..ConsensusConfig::default()
@@ -302,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_err_duplicate_keys_consensus() {
+    fn consensus_config_validate_err_duplicate_keys_consensus() {
         let keys = gen_keys_pool(4);
 
         let cfg = ConsensusConfig {
@@ -323,7 +319,15 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_err_duplicate_keys_service() {
+    fn consensus_config_validate_err_empty_validators() {
+        assert_err(
+            ConsensusConfig::default().validate().unwrap_err(),
+            "Consensus configuration must have at least one validator",
+        );
+    }
+
+    #[test]
+    fn consensus_config_validate_err_duplicate_keys_service() {
         let keys = gen_keys_pool(4);
 
         let cfg = ConsensusConfig {
@@ -344,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_err_duplicate_keys_different() {
+    fn consensus_config_validate_err_duplicate_keys_different() {
         let keys = gen_keys_pool(4);
 
         let cfg = ConsensusConfig {
@@ -365,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_err_min_propose_timeout() {
+    fn consensus_config_validate_err_min_propose_timeout() {
         let cfg = ConsensusConfig {
             min_propose_timeout: 10,
             max_propose_timeout: 5,
@@ -378,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_err_first_round_timeout() {
+    fn consensus_config_validate_err_first_round_timeout() {
         let cfg = ConsensusConfig {
             first_round_timeout: 10,
             max_propose_timeout: 15,
@@ -391,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_err_txs_block_limit() {
+    fn consensus_config_validate_err_txs_block_limit() {
         let cfg = ConsensusConfig {
             txs_block_limit: 0,
             ..gen_consensus_config()
@@ -403,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_config_validate_err_max_message_len() {
+    fn consensus_config_validate_err_max_message_len() {
         let cfg = ConsensusConfig {
             max_message_len: 0,
             ..gen_consensus_config()

@@ -218,6 +218,7 @@ mod tests {
     use crate::{
         helpers::{generate_testnet_config, Height},
         runtime::supervisor::Supervisor,
+        crypto,
     };
 
     use super::*;
@@ -260,4 +261,20 @@ mod tests {
             mpsc::channel(0).0,
         );
     }
+
+    #[test]
+    #[should_panic(expected = "Consensus configuration must have at least one validator")]
+    fn finalize_invalid_consensus_config() {
+        let genesis = ConsensusConfig::default();
+        let service_keypair = crypto::gen_keypair();
+
+        Blockchain::new(
+            TemporaryDB::new(),
+            Vec::new(),
+            genesis,
+            service_keypair,
+            ApiSender::new(mpsc::channel(0).0),
+            mpsc::channel(0).0,
+        );
+    }    
 }
