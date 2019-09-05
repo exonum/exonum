@@ -16,7 +16,12 @@ syntax = "proto3";
 
 package exonum.service.time;
 
+import "service_interface.proto";
+
 import "google/protobuf/timestamp.proto";
+
+/// Service interface name for the transactions in this file.
+option (service_interface_name) = "TimeOracleInterface";
 
 // Transaction that is sent by the validator after the commit of the block.
 message TxTime {

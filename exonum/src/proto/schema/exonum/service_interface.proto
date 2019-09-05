@@ -14,16 +14,11 @@
 
 syntax = "proto3";
 
-package exonum.service.time.example;
+package exonum;
 
-import "service_interface.proto";
+import "google/protobuf/descriptor.proto";
 
-import "google/protobuf/timestamp.proto";
-
-/// Service interface name for the transactions in this file.
-option (service_interface_name) = "MarkerInterface";
-
-message TxMarker {
-  int32 mark = 1;
-  google.protobuf.Timestamp time = 2;
+extend google.protobuf.FileOptions {
+  // String denoting the interface name for the file.
+  string service_interface_name = 50000;
 }

@@ -17,7 +17,11 @@ syntax = "proto3";
 package exonum.examples.timestamping;
 
 import "helpers.proto";
+import "service_interface.proto";
 import "google/protobuf/timestamp.proto";
+
+/// Service interface name for the transactions in this file.
+option (service_interface_name) = "TimestampingInterface";
 
 /// Timestamping transaction.
 message TxTimestamp { Timestamp content = 1; }

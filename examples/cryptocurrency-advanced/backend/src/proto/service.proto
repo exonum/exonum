@@ -17,6 +17,10 @@ syntax = "proto3";
 package exonum.examples.cryptocurrency_advanced;
 
 import "helpers.proto";
+import "service_interface.proto";
+
+/// Service interface name for the transactions in this file.
+option (service_interface_name) = "CryptocurrencyInterface";
 
 /// Transfer `amount` of the currency from one wallet to another.
 message Transfer {
