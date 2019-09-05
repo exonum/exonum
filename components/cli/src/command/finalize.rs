@@ -70,9 +70,9 @@ impl Finalize {
     fn validate_configs(public_configs: Vec<SharedConfig>) -> Result<ValidatedConfigs, Error> {
         let mut map = BTreeMap::new();
         let mut config_iter = public_configs.into_iter();
-        let first = config_iter.next().ok_or(format_err!(
-            "Expected at least one config in PUBLIC_CONFIGS"
-        ))?;
+        let first = config_iter
+            .next()
+            .ok_or_else(|| format_err!("Expected at least one config in PUBLIC_CONFIGS"))?;
         let common = first.common;
         map.insert(first.node.validator_keys.consensus_key, first.node);
 
@@ -116,15 +116,16 @@ impl ExonumCommand for Finalize {
     fn execute(self) -> Result<StandardResult, Error> {
         let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
         let secret_config_dir = {
-            let directory = self.secret_config_path.parent().ok_or(format_err!(
-                "Cannot get the directory of the secret config path"
-            ))?;
+            let directory = self
+                .secret_config_path
+                .parent()
+                .ok_or_else(|| format_err!("Cannot get the directory of the secret config path"))?;
             std::env::current_dir()?.join(directory)
         };
         let public_configs: Vec<SharedConfig> = self
             .public_configs
             .into_iter()
-            .map(|path| load_config_file(path))
+            .map(load_config_file)
             .collect::<Result<_, _>>()?;
 
         let public_allow_origin = self.public_allow_origin.map(|s| s.parse().unwrap());

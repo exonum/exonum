@@ -102,7 +102,7 @@ pub mod password;
 
 /// Rust-specific node builder used for constructing a node with a list
 /// of provided services.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NodeBuilder {
     services: Vec<Box<dyn ServiceFactory>>,
 }
@@ -110,9 +110,7 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
-        NodeBuilder {
-            services: Default::default(),
-        }
+        Default::default()
     }
 
     /// Adds new Rust service to the list of available services.

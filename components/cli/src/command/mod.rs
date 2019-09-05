@@ -85,6 +85,7 @@ impl ExonumCommand for Command {
 }
 
 /// Output of any of the standard Exonum Core configuration commands.
+#[allow(clippy::large_enum_variant)]
 pub enum StandardResult {
     /// `generate-template` command output.
     GenerateTemplate {

@@ -137,7 +137,7 @@ impl PassInputMethod {
                 }
             }
             PassInputMethod::EnvVariable(name) => {
-                let variable_name = name.unwrap_or(key_type.default_env_var().to_owned());
+                let variable_name = name.unwrap_or_else(|| key_type.default_env_var().to_owned());
                 let passphrase = env::var(&variable_name).with_context(|e| {
                     format!(
                         "Failed to get password from env variable {}: {}",
