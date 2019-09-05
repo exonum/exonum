@@ -548,9 +548,53 @@ where
     where
         I: IntoIterator<Item = V>,
     {
+        let mut first_index = self.len();
+        let mut last_index = first_index;
+
         for value in iter {
-            self.push(value)
+            self.base.put(
+                &ProofListKey::new(1, last_index),
+                HashTag::hash_leaf(&value.to_bytes()),
+            );
+            self.base.put(&ProofListKey::new(0, last_index), value);
+            last_index += 1;
         }
+
+        if last_index == first_index {
+            // No elements in the iterator; we're done.
+            return;
+        }
+        // Need to set length first in order not to trip the debug assertion
+        // in `get_branch_unchecked()`.
+        self.set_len(last_index);
+        last_index -= 1;
+
+        for height in 1..self.height() {
+            debug_assert!(first_index <= last_index && last_index > 0);
+
+            let mut index = first_index & !1; // make the starting index even
+            while index < last_index {
+                let key = ProofListKey::new(height, index);
+                let branch_hash = HashTag::hash_node(
+                    &self.get_branch_unchecked(key),
+                    &self.get_branch_unchecked(key.as_right()),
+                );
+                self.base.put(&key.parent(), branch_hash);
+                index += 2;
+            }
+
+            if last_index % 2 == 0 {
+                let key = ProofListKey::new(height, last_index);
+                let branch_hash = HashTag::hash_single_node(&self.get_branch_unchecked(key));
+                self.base.put(&key.parent(), branch_hash);
+            }
+
+            first_index >>= 1;
+            last_index >>= 1;
+        }
+
+        debug_assert_eq!(first_index, 0);
+        debug_assert_eq!(last_index, 0);
     }
 
     /// Changes a value at the specified position.

@@ -67,6 +67,65 @@ fn list_methods() {
 }
 
 #[test]
+fn extend_is_equivalent_to_sequential_pushes() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+
+    for _ in 0..10 {
+        index.clear();
+        let values: [u8; 32] = thread_rng().gen();
+        for &value in &values {
+            index.push(value);
+        }
+        let hash_after_pushes = index.object_hash();
+
+        index.clear();
+        index.extend(values.iter().cloned());
+        assert_eq!(index.object_hash(), hash_after_pushes);
+    }
+
+    // Try extending list in several calls.
+    for _ in 0..10 {
+        index.clear();
+        let values: [u8; 32] = thread_rng().gen();
+        for &value in &values {
+            index.push(value);
+        }
+        let hash_after_pushes = index.object_hash();
+
+        index.clear();
+        let mut iter = values.iter().cloned();
+        index.extend(iter.by_ref().take(5));
+        index.extend(iter.by_ref().take(8));
+        index.extend(iter.by_ref().take(3));
+        index.extend(iter);
+        assert_eq!(index.object_hash(), hash_after_pushes);
+    }
+
+    // Try mixing extensions and pushes
+    for _ in 0..10 {
+        index.clear();
+        let values: [u8; 32] = thread_rng().gen();
+        for &value in &values {
+            index.push(value);
+        }
+        let hash_after_pushes = index.object_hash();
+
+        index.clear();
+        let mut iter = values.iter().cloned();
+        index.extend(iter.by_ref().take(5));
+        for value in iter.by_ref().take(3) {
+            index.push(value);
+        }
+        index.extend(iter.by_ref().take(7));
+        index.push(iter.by_ref().next().unwrap());
+        index.extend(iter);
+        assert_eq!(index.object_hash(), hash_after_pushes);
+    }
+}
+
+#[test]
 fn tree_height() {
     let db = TemporaryDB::new();
     let fork = db.fork();
