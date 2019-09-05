@@ -42,8 +42,6 @@ pub struct CallInfo {
     pub instance_id: InstanceId,
     /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
-    /// Identifier of the service interface required for the call.
-    pub interface_name: String,
 }
 
 impl CallInfo {
@@ -52,7 +50,6 @@ impl CallInfo {
         Self {
             instance_id,
             method_id,
-            interface_name: String::default(),
         }
     }
 }

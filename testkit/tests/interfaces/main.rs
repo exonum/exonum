@@ -149,10 +149,10 @@ fn test_any_call_ok_deposit() {
         &mut testkit,
         TxAnyCall {
             call_info: CallInfo {
-                interface_name: "IssueReceiver".into(),
                 instance_id: DepositService::ID,
                 method_id: 0,
             },
+            interface_name: String::default(),
             args: TxIssue {
                 to: keypair.0,
                 amount: 10_000,
@@ -192,10 +192,10 @@ fn test_any_call_err_deposit_unauthorized() {
         &mut testkit,
         TxAnyCall {
             call_info: CallInfo {
-                interface_name: "IssueReceiver".to_owned(),
                 instance_id: WalletService::ID,
                 method_id: 0,
             },
+            interface_name: "IssueReceiver".to_owned(),
             args: TxIssue {
                 to: keypair.0,
                 amount: 10_000,
@@ -218,6 +218,7 @@ fn test_any_call_err_unknown_instance() {
         &mut testkit,
         TxAnyCall {
             call_info: CallInfo::new(10_000, 0),
+            interface_name: String::new(),
             args: vec![],
         }
         .sign(AnyCallService::ID, keypair.0, &keypair.1),
@@ -236,10 +237,10 @@ fn test_any_call_err_unknown_interface() {
         &mut testkit,
         TxAnyCall {
             call_info: CallInfo {
-                interface_name: "FooFace".to_owned(),
                 instance_id: WalletService::ID,
                 method_id: 0,
             },
+            interface_name: "FooFace".to_owned(),
             args: vec![],
         }
         .sign(AnyCallService::ID, keypair.0, &keypair.1),
@@ -258,10 +259,10 @@ fn test_any_call_err_unknown_method() {
         &mut testkit,
         TxAnyCall {
             call_info: CallInfo {
-                interface_name: "IssueReceiver".to_owned(),
                 instance_id: WalletService::ID,
                 method_id: 1,
             },
+            interface_name: "IssueReceiver".to_owned(),
             args: TxIssue {
                 to: keypair.0,
                 amount: 10_000,
@@ -284,11 +285,12 @@ fn test_any_call_err_wrong_arg() {
         &mut testkit,
         TxAnyCall {
             call_info: CallInfo {
-                interface_name: String::default(),
                 instance_id: WalletService::ID,
                 method_id: 0,
             },
+            interface_name: String::default(),
             args: TxAnyCall {
+                interface_name: String::default(),
                 call_info: CallInfo::new(10_000, 0),
                 args: vec![],
             }

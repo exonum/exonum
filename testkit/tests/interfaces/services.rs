@@ -14,11 +14,14 @@
 
 //! Services set to test interservice calls.
 
-pub use crate::interface::TxIssue;
+pub use crate::interface::Issue;
 
-use exonum::runtime::{
-    rust::{Service, TransactionContext},
-    CallInfo, ExecutionError, InstanceId,
+use exonum::{
+    crypto::PublicKey,
+    runtime::{
+        rust::{Service, TransactionContext},
+        CallInfo, ExecutionError, InstanceId,
+    },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
 use serde_derive::{Deserialize, Serialize};
@@ -86,7 +89,7 @@ impl WalletInterface for WalletService {
 }
 
 impl IssueReceiver for WalletService {
-    fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError> {
+    fn issue(&self, context: TransactionContext, arg: Issue) -> Result<(), ExecutionError> {
         let instance_id = context
             .caller()
             .as_service()
@@ -103,11 +106,23 @@ impl IssueReceiver for WalletService {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::Issue")]
+pub struct TxIssue {
+    pub to: PublicKey,
+    pub amount: u64,
+}
+
+#[exonum_service]
+pub trait DepositInterface {
+    fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError>;
+}
+
 #[derive(Debug, ServiceFactory)]
 #[exonum(
     artifact_name = "deposit-service",
     proto_sources = "proto",
-    implements("IssueReceiver")
+    implements("DepositInterface")
 )]
 pub struct DepositService;
 
@@ -117,11 +132,14 @@ impl DepositService {
 
 impl Service for DepositService {}
 
-impl IssueReceiver for DepositService {
+impl DepositInterface for DepositService {
     fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError> {
         context
             .interface::<IssueReceiverClient>(WalletService::ID)
-            .issue(arg)
+            .issue(Issue {
+                to: arg.to,
+                amount: arg.amount,
+            })
     }
 }
 
@@ -129,6 +147,7 @@ impl IssueReceiver for DepositService {
 #[exonum(pb = "proto::AnyCall")]
 pub struct TxAnyCall {
     pub call_info: CallInfo,
+    pub interface_name: String,
     pub args: Vec<u8>,
 }
 
@@ -164,7 +183,7 @@ impl AnyCallService {
 impl AnyCall for AnyCallService {
     fn call_any(&self, context: TransactionContext, tx: TxAnyCall) -> Result<(), ExecutionError> {
         context.call_context(tx.call_info.instance_id).call(
-            tx.call_info.interface_name,
+            tx.interface_name,
             tx.call_info.method_id,
             tx.args,
         )

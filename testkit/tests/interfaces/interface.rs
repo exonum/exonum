@@ -28,20 +28,20 @@ use crate::proto;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::Issue")]
-pub struct TxIssue {
+pub struct Issue {
     pub to: PublicKey,
     pub amount: u64,
 }
 
 #[exonum_service(interface = "IssueReceiver")]
 pub trait IssueReceiver {
-    fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError>;
+    fn issue(&self, context: TransactionContext, arg: Issue) -> Result<(), ExecutionError>;
 }
 
 pub struct IssueReceiverClient<'a>(CallContext<'a>);
 
 impl<'a> IssueReceiverClient<'a> {
-    pub fn issue(&self, arg: TxIssue) -> Result<(), ExecutionError> {
+    pub fn issue(&self, arg: Issue) -> Result<(), ExecutionError> {
         self.0.call(IssueReceiver::NAME, 0, arg)
     }
 }

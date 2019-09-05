@@ -88,6 +88,7 @@ pub trait Transaction: BinaryValue {
     /// Service interface associated for the given transaction.
     type Service;
     /// Identifier of the service interface required for the call.
+    #[doc(hidden)]
     const INTERFACE_NAME: &'static str;
     /// Identifier of service method which executes the given transaction.
     const METHOD_ID: MethodId;
@@ -98,7 +99,6 @@ pub trait Transaction: BinaryValue {
             call_info: CallInfo {
                 instance_id,
                 method_id: Self::METHOD_ID,
-                interface_name: Self::INTERFACE_NAME.to_owned(),
             },
             arguments: self.into_bytes(),
         }

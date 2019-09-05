@@ -35,7 +35,8 @@ message Wallet {
 
 message AnyCall {
   exonum.runtime.CallInfo call_info = 1;
-  bytes args = 2;
+  string interface_name = 2;
+  bytes args = 3;
 }
 
 message RecursiveCall {

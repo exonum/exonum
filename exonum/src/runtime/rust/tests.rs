@@ -175,7 +175,6 @@ fn test_basic_rust_runtime() {
         let call_info = CallInfo {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 0,
-            interface_name: String::default(),
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let fork = db.fork();
@@ -205,7 +204,6 @@ fn test_basic_rust_runtime() {
         let call_info = CallInfo {
             instance_id: SERVICE_INSTANCE_ID,
             method_id: 1,
-            interface_name: String::default(),
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let fork = db.fork();

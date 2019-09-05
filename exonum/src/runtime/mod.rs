@@ -379,6 +379,11 @@ pub struct ExecutionContext<'a> {
     pub fork: &'a Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
+    /// Identifier of the service interface required for the call. Keep in mind that this field in
+    /// fact is a part of unfinished "interfaces feature" and will be replaced in future releases.
+    /// At the moment this field can only contains a core interfaces like `Configure` and
+    /// always empty for the common the service interfaces.
+    pub interface_name: &'a str,
     /// List of dispatcher actions that will be performed after the finish of execution.
     actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
@@ -397,6 +402,7 @@ impl<'a> ExecutionContext<'a> {
             caller,
             actions: Rc::default(),
             dispatcher,
+            interface_name: "",
             call_stack_depth: 0,
         }
     }
@@ -479,10 +485,10 @@ impl<'a> CallContext<'a> {
             caller: Caller::Service {
                 instance_id: self.caller,
             },
+            interface_name: interface_name.as_ref(),
             call_stack_depth: self.inner.call_stack_depth + 1,
         };
         let call_info = CallInfo {
-            interface_name: interface_name.as_ref().to_owned(),
             method_id,
             instance_id: self.called,
         };
