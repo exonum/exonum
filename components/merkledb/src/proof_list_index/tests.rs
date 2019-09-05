@@ -476,7 +476,7 @@ fn proof_with_range_start_exceeding_list_size() {
 }
 
 #[test]
-fn same_merkle_root() {
+fn setting_elements_leads_to_correct_list_hash() {
     let db = TemporaryDB::new();
     let hash1 = {
         let fork = db.fork();
@@ -502,6 +502,38 @@ fn same_merkle_root() {
         list.merkle_root()
     };
     assert_eq!(hash1, hash2);
+}
+
+#[test]
+fn setting_elements_leads_to_correct_list_hash_randomized() {
+    let mut rng = thread_rng();
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+
+    for _ in 0..10 {
+        // Prepare two copies of values with sufficient intersection.
+        let values: [u16; 32] = rng.gen();
+        let mut new_values: [u16; 32] = rng.gen();
+        for i in 0..values.len() {
+            if rng.gen::<bool>() {
+                new_values[i] = values[i];
+            }
+        }
+
+        list.clear();
+        list.extend(new_values.iter().cloned());
+        let list_hash = list.object_hash();
+
+        list.clear();
+        list.extend(values.iter().cloned());
+        for i in 0..values.len() {
+            if values[i] != new_values[i] {
+                list.set(i as u64, new_values[i]);
+            }
+        }
+        assert_eq!(list.object_hash(), list_hash);
+    }
 }
 
 #[test]

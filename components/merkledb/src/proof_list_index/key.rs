@@ -69,10 +69,6 @@ impl ProofListKey {
         self.index.trailing_zeros() >= 1
     }
 
-    pub fn as_left(&self) -> Self {
-        Self::new(self.height, self.index & !1)
-    }
-
     pub fn as_right(&self) -> Self {
         Self::new(self.height, self.index | 1)
     }

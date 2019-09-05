@@ -17,6 +17,7 @@
 pub use self::proof::{ListProof, ListProofError};
 
 use std::{
+    cmp, iter,
     marker::PhantomData,
     ops::{Bound, RangeBounds},
 };
@@ -256,11 +257,6 @@ where
         self.state.set(len)
     }
 
-    fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
-        debug_assert!(key.height() > 0);
-        self.base.put(&key, hash)
-    }
-
     /// Returns the element at the indicated position or `None` if the indicated position
     /// is out of bounds.
     ///
@@ -493,6 +489,49 @@ where
         }
     }
 
+    /// Updates levels of the tree with heights `2..` after the values in the range
+    /// `[first_index, last_index]` were updated.
+    ///
+    /// # Invariants
+    ///
+    /// - `self.len()` / `self.height()` is assumed to be correctly set.
+    /// - Value hashes (i.e., tree branches on level 1) are assumed to be updated.
+    fn update_range(&mut self, mut first_index: u64, mut last_index: u64) {
+        let mut last_level_index = self.len() - 1;
+        for height in 1..self.height() {
+            // Check consistency of the index range.
+            debug_assert!(first_index <= last_index);
+            // Check consistency with the level length.
+            debug_assert!(last_index <= last_level_index);
+
+            let mut index = first_index & !1; // make the starting index even
+            let stop_index = cmp::min(last_index | 1, last_level_index);
+            while index < stop_index {
+                let key = ProofListKey::new(height, index);
+                let branch_hash = HashTag::hash_node(
+                    &self.get_branch_unchecked(key),
+                    &self.get_branch_unchecked(key.as_right()),
+                );
+                self.base.put(&key.parent(), branch_hash);
+                index += 2;
+            }
+
+            if stop_index % 2 == 0 {
+                let key = ProofListKey::new(height, stop_index);
+                let branch_hash = HashTag::hash_single_node(&self.get_branch_unchecked(key));
+                self.base.put(&key.parent(), branch_hash);
+            }
+
+            first_index >>= 1;
+            last_index >>= 1;
+            last_level_index >>= 1;
+        }
+
+        debug_assert_eq!(first_index, 0);
+        debug_assert_eq!(last_index, 0);
+        debug_assert_eq!(last_level_index, 0);
+    }
+
     /// Appends an element to the back of the proof list.
     ///
     /// # Examples
@@ -509,24 +548,7 @@ where
     /// assert!(!index.is_empty());
     /// ```
     pub fn push(&mut self, value: V) {
-        let len = self.len();
-        self.set_len(len + 1);
-        let mut key = ProofListKey::new(1, len);
-
-        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
-        self.base.put(&ProofListKey::leaf(len), value);
-        while key.height() < self.height() {
-            let hash = if key.is_left() {
-                HashTag::hash_single_node(&self.get_branch_unchecked(key))
-            } else {
-                HashTag::hash_node(
-                    &self.get_branch_unchecked(key.as_left()),
-                    &self.get_branch_unchecked(key),
-                )
-            };
-            key = key.parent();
-            self.set_branch(key, hash);
-        }
+        self.extend(iter::once(value));
     }
 
     /// Extends the proof list with the contents of an iterator.
@@ -548,7 +570,7 @@ where
     where
         I: IntoIterator<Item = V>,
     {
-        let mut first_index = self.len();
+        let first_index = self.len();
         let mut last_index = first_index;
 
         for value in iter {
@@ -556,7 +578,7 @@ where
                 &ProofListKey::new(1, last_index),
                 HashTag::hash_leaf(&value.to_bytes()),
             );
-            self.base.put(&ProofListKey::new(0, last_index), value);
+            self.base.put(&ProofListKey::leaf(last_index), value);
             last_index += 1;
         }
 
@@ -564,37 +586,8 @@ where
             // No elements in the iterator; we're done.
             return;
         }
-        // Need to set length first in order not to trip the debug assertion
-        // in `get_branch_unchecked()`.
         self.set_len(last_index);
-        last_index -= 1;
-
-        for height in 1..self.height() {
-            debug_assert!(first_index <= last_index && last_index > 0);
-
-            let mut index = first_index & !1; // make the starting index even
-            while index < last_index {
-                let key = ProofListKey::new(height, index);
-                let branch_hash = HashTag::hash_node(
-                    &self.get_branch_unchecked(key),
-                    &self.get_branch_unchecked(key.as_right()),
-                );
-                self.base.put(&key.parent(), branch_hash);
-                index += 2;
-            }
-
-            if last_index % 2 == 0 {
-                let key = ProofListKey::new(height, last_index);
-                let branch_hash = HashTag::hash_single_node(&self.get_branch_unchecked(key));
-                self.base.put(&key.parent(), branch_hash);
-            }
-
-            first_index >>= 1;
-            last_index >>= 1;
-        }
-
-        debug_assert_eq!(first_index, 0);
-        debug_assert_eq!(last_index, 0);
+        self.update_range(first_index, last_index - 1);
     }
 
     /// Changes a value at the specified position.
@@ -627,22 +620,12 @@ where
                 index
             );
         }
-        let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
+        self.base.put(
+            &ProofListKey::new(1, index),
+            HashTag::hash_leaf(&value.to_bytes()),
+        );
         self.base.put(&ProofListKey::leaf(index), value);
-        while key.height() < self.height() {
-            let (left, right) = (key.as_left(), key.as_right());
-            let hash = if self.has_branch(right) {
-                HashTag::hash_node(
-                    &self.get_branch_unchecked(left),
-                    &self.get_branch_unchecked(right),
-                )
-            } else {
-                HashTag::hash_single_node(&self.get_branch_unchecked(left))
-            };
-            key = key.parent();
-            self.set_branch(key, hash);
-        }
+        self.update_range(index, index);
     }
 
     /// Clears the proof list, removing all values.
