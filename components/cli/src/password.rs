@@ -19,11 +19,7 @@ use rpassword::read_password_from_tty;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-use std::{
-    env,
-    ops::{Deref, DerefMut},
-    str::FromStr,
-};
+use std::{env, str::FromStr};
 
 /// Default name of the environment variable with a consensus key passphrase.
 pub const DEFAULT_CONSENSUS_PASS_ENV_VAR: &str = "EXONUM_CONSENSUS_PASS";
@@ -32,7 +28,7 @@ pub const DEFAULT_SERVICE_PASS_ENV_VAR: &str = "EXONUM_SERVICE_PASS";
 
 /// A wrapper around `String` which securely erases itself on drop.
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
-pub struct Passphrase(pub String);
+pub struct Passphrase(String);
 
 impl Drop for Passphrase {
     fn drop(&mut self) {
@@ -40,24 +36,25 @@ impl Drop for Passphrase {
     }
 }
 
-impl Deref for Passphrase {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Passphrase {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl Passphrase {
-    /// Read the passphrase from stdin.
+    /// Creates new passphrase
+    pub fn new(passphrase: String) -> Self {
+        Self(passphrase)
+    }
+
+    /// Reads the passphrase from stdin.
     pub fn read_from_tty(prompt: &str) -> Result<Self, Error> {
         Ok(Self(read_password_from_tty(Some(prompt))?))
+    }
+
+    /// Returns true if the passphrase is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns byte representation of the passphrase.
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
     }
 }
 
