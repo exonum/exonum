@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore upup
+
 use exonum_crypto::Hash;
 use rand::{thread_rng, Rng};
 use serde_json::{self, json};
@@ -659,4 +661,53 @@ fn invalid_proofs_with_no_values() {
         proof.validate(HashTag::empty_list_hash(), 5).unwrap_err(),
         ListProofError::UnexpectedBranch // the hash is at an incorrect position
     );
+}
+
+mod root_hash {
+    use crate::{
+        hash::HashTag, proof_list_index::ProofListIndex, Database, ObjectHash, TemporaryDB,
+    };
+    use exonum_crypto::{self, Hash};
+
+    /// Cross-verify `object_hash()` with `ProofListIndex` against expected root hash value.
+    fn assert_object_hash_correct(hashes: &[Hash]) {
+        let root_actual = HashTag::hash_list(hashes);
+        let root_index = proof_list_index_root(hashes);
+        assert_eq!(root_actual, root_index);
+    }
+
+    fn proof_list_index_root(hashes: &[Hash]) -> Hash {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let mut index = ProofListIndex::new("merkle_root", &fork);
+        index.extend(hashes.iter().cloned());
+        index.object_hash()
+    }
+
+    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
+        bytes
+            .iter()
+            .map(|chunk| exonum_crypto::hash(chunk))
+            .collect()
+    }
+
+    #[test]
+    fn object_hash_single() {
+        assert_object_hash_correct(&hash_list(&[b"1"]));
+    }
+
+    #[test]
+    fn object_hash_even() {
+        assert_object_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4"]));
+    }
+
+    #[test]
+    fn object_hash_odd() {
+        assert_object_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4", b"5"]));
+    }
+
+    #[test]
+    fn object_hash_empty() {
+        assert_object_hash_correct(&hash_list(&[]));
+    }
 }
