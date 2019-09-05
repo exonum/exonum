@@ -93,7 +93,7 @@ where
 impl<T, V> ProofListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -632,7 +632,7 @@ where
 impl<T, V> ObjectHash for ProofListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Returns a list hash of the proof list or a hash value of the empty list.
     ///
@@ -673,7 +673,7 @@ where
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     type Item = V;
     type IntoIter = ProofListIndexIter<'a, V>;
@@ -685,7 +685,7 @@ where
 
 impl<'a, V> Iterator for ProofListIndexIter<'a, V>
 where
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     type Item = V;
 
