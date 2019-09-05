@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "cli",
     "exonum",
     "examples/cryptocurrency",
     "examples/cryptocurrency-advanced/backend",
@@ -8,7 +9,6 @@ members = [
     "testkit",
     "testkit/server",
     "components/build",
-    "components/cli",
     "components/crypto",
     "components/derive",
     "components/merkledb",
