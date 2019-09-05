@@ -45,7 +45,7 @@ pub struct CallInfo {
 }
 
 impl CallInfo {
-    /// Create an ordinary `CallInfo` instance without an additional interface.
+    /// Create an ordinary `CallInfo` instance.
     pub fn new(instance_id: u32, method_id: u32) -> Self {
         Self {
             instance_id,
