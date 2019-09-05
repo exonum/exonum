@@ -151,6 +151,16 @@ impl<V: BinaryValue> ListProof<V> {
         }
     }
 
+    pub(super) fn empty(height: u8, merkle_root: Hash) -> Self {
+        Self {
+            values: vec![],
+            hashes: vec![HashedEntry {
+                key: ProofListKey::new(height, 0),
+                hash: merkle_root,
+            }],
+        }
+    }
+
     pub(super) fn push_hash(&mut self, height: u8, index: u64, hash: Hash) -> &mut Self {
         debug_assert!(height > 0);
 
@@ -245,6 +255,35 @@ impl<V: BinaryValue> ListProof<V> {
         debug_assert_eq!(layer[0].key, ProofListKey::new(tree_height, 0));
         Ok(layer[0].hash)
     }
+
+    /// Returns indices and references to elements in the proof without verifying it.
+    pub fn values_unchecked(&self) -> &[(u64, V)] {
+        &self.values
+    }
+
+    /// Returns iterator over indexes of the elements in the proof without verifying
+    /// proof integrity.
+    pub fn indexes_unchecked<'s>(&'s self) -> impl Iterator<Item = u64> + 's {
+        self.values_unchecked().iter().map(|(index, _)| *index)
+    }
+
+    /// Verifies the correctness of the proof by the trusted Merkle root hash and the number of
+    /// elements in the tree.
+    ///
+    /// If the proof is valid, a vector with indices and references to elements is returned.
+    /// Otherwise, an error is returned.
+    pub fn validate(
+        &self,
+        expected_list_hash: Hash,
+        len: u64,
+    ) -> Result<&[(u64, V)], ListProofError> {
+        let tree_root = self.collect(len)?;
+        if HashTag::hash_list_node(len, tree_root) == expected_list_hash {
+            Ok(&self.values)
+        } else {
+            Err(ListProofError::UnmatchedRootHash)
+        }
+    }
 }
 
 /// An error that is returned when the list proof is invalid.
@@ -283,26 +322,6 @@ pub enum ListProofError {
     /// or hashes from.
     #[fail(display = "non-empty proof for an empty list")]
     NonEmptyProof,
-}
-
-impl<V: BinaryValue> ListProof<V> {
-    /// Verifies the correctness of the proof by the trusted Merkle root hash and the number of
-    /// elements in the tree.
-    ///
-    /// If the proof is valid, a vector with indices and references to elements is returned.
-    /// Otherwise, an error is returned.
-    pub fn validate(
-        &self,
-        expected_list_hash: Hash,
-        len: u64,
-    ) -> Result<&[(u64, V)], ListProofError> {
-        let tree_root = self.collect(len)?;
-        if HashTag::hash_list_node(len, tree_root) == expected_list_hash {
-            Ok(&self.values)
-        } else {
-            Err(ListProofError::UnmatchedRootHash)
-        }
-    }
 }
 
 #[cfg(test)]

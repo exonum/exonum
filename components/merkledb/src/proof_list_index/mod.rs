@@ -223,9 +223,7 @@ where
     /// The caller must ensure that `to > from`.
     fn construct_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if from >= self.len() {
-            let mut proof = ListProof::new(iter::empty());
-            proof.push_hash(self.height(), 0, self.merkle_root());
-            return proof;
+            return ListProof::empty(self.height(), self.merkle_root());
         }
 
         let items = (from..to).zip(self.iter_from(from).take((to - from) as usize));
@@ -430,6 +428,11 @@ where
             Bound::Included(from) => *from,
             Bound::Excluded(from) => *from + 1,
         };
+        if from >= self.len() && range.end_bound() == Bound::Unbounded {
+            // We assume this is a "legal" case of the caller not knowing the list length,
+            // so we don't want to panic in the `to > from` assertion below.
+            return ListProof::empty(self.height(), self.merkle_root());
+        }
 
         // Exclusive upper boundary of the proof range.
         let to = match range.end_bound() {
@@ -437,7 +440,6 @@ where
             Bound::Included(to) => *to + 1,
             Bound::Excluded(to) => *to,
         };
-
         assert!(
             to > from,
             "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",

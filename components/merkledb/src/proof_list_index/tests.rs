@@ -406,6 +406,12 @@ fn proof_with_range_start_exceeding_list_size() {
         .validate(index.object_hash(), index.len())
         .unwrap()
         .is_empty());
+
+    let proof = index.get_range_proof(8..);
+    assert!(proof
+        .validate(index.object_hash(), index.len())
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
