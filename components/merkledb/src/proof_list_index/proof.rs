@@ -33,11 +33,75 @@ impl HashedEntry {
     }
 }
 
-/// TODO
+/// View of a `ProofListIndex`, i.e., a subset of its elements coupled with a *proof*,
+/// which jointly allow restoring the `object_hash()` of the index. Apart from proving
+/// elements in the list, `ListProof` can assert that the list is shorter than the requested
+/// range of indexes.
+///
+/// # Workflow
+///
+/// You can create `ListProof`s with [`get_proof()`] and [`get_range_proof()`] methods of
+/// `ProofListIndex`. Proofs can be verified on the server side with the help of
+/// [`validate()`]. Prior to the `validate` conversion, you may use `*unchecked` methods
+/// to obtain information about the proof.
+///
+/// ```
+/// # use exonum_merkledb::{
+/// #     Database, TemporaryDB, BinaryValue, ListProof, ProofListIndex, ObjectHash,
+/// # };
+/// # use exonum_crypto::hash;
+/// let fork = { let db = TemporaryDB::new(); db.fork() };
+/// let mut list = ProofListIndex::new("index", &fork);
+/// list.extend(vec![100_u32, 200_u32, 300_u32]);
+///
+/// // Get the proof from the index
+/// let proof = list.get_range_proof(1..);
+///
+/// // Check the proof consistency
+/// let elements = proof.validate(list.object_hash(), list.len()).unwrap();
+/// assert_eq!(*elements, [(1, 200_u32), (2, 300_u32)]);
+/// ```
+///
+/// # JSON serialization
+///
+/// `ListProof` is serialized to JSON as an object with 2 array fields:
+///
+/// - `hashes` is an array of `{ height: number, index: number, hash: Hash }` objects.
+/// - `values` is an array with list elements and their indexes, that is,
+///   tuples `[number, V]`.
+///
+/// ```
+/// # use serde_json::{self, json};
+/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, HashTag, ListProof, ProofListIndex};
+/// # fn main() {
+/// let fork = { let db = TemporaryDB::new(); db.fork() };
+/// let mut list = ProofListIndex::new("index", &fork);
+/// list.extend(vec![1_u32, 2, 3]);
+/// let h1 = HashTag::hash_leaf(&1_u32.to_bytes());
+/// let h3 = HashTag::hash_leaf(&3_u32.to_bytes());
+/// let h33 = HashTag::hash_single_node(&h3);
+///
+/// let proof = list.get_proof(1);
+/// assert_eq!(
+///     serde_json::to_value(&proof).unwrap(),
+///     json!({
+///         "hashes": [
+///             { "index": 0, "height": 1, "hash": h1 },
+///             { "index": 1, "height": 2, "hash": h33 },
+///         ],
+///         "values": [ [1, 2] ],
+///     })
+/// );
+/// # }
+/// ```
+///
+/// [`get_proof()`]: struct.ProofListIndex.html#method.get_proof
+/// [`get_range_proof()`]: struct.ProofListIndex.html#method.get_range_proof
+/// [`validate()`]: #method.validate
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ListProof<V> {
     hashes: Vec<HashedEntry>,
-    pub(super) values: Vec<(u64, V)>,
+    values: Vec<(u64, V)>,
 }
 
 fn merge(

@@ -17,7 +17,6 @@
 pub use self::proof::{ListProof, ListProofError};
 
 use std::{
-    iter,
     marker::PhantomData,
     ops::{Bound, RangeBounds},
 };
@@ -259,7 +258,6 @@ where
 
     fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
         debug_assert!(key.height() > 0);
-
         self.base.put(&key, hash)
     }
 
@@ -347,7 +345,10 @@ where
         self.state.get()
     }
 
-    /// Returns the height of the proof list.
+    /// Returns the height of the Merkle tree built based on the list.
+    ///
+    /// The height of the empty list is 0; otherwise, the height is computed as `ceil(log2(l)) + 1`,
+    /// where `l` is the list length.
     ///
     /// # Examples
     ///
@@ -358,13 +359,11 @@ where
     /// let name = "name";
     /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &fork);
+    /// assert_eq!(0, index.height());
+    /// index.push(1);
     /// assert_eq!(1, index.height());
-    ///
     /// index.push(1);
-    /// assert_eq!(1, index.len());
-    ///
-    /// index.push(1);
-    /// assert_eq!(2, index.len());
+    /// assert_eq!(2, index.height());
     /// ```
     pub fn height(&self) -> u8 {
         tree_height_by_length(self.len())
@@ -385,9 +384,7 @@ where
     /// let mut index = ProofListIndex::new(name, &fork);
     ///
     /// index.push(1);
-    ///
     /// let proof = index.get_proof(0);
-    ///
     /// let proof_of_absence = index.get_proof(1);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
@@ -412,14 +409,16 @@ where
     /// let name = "name";
     /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &fork);
+    /// index.extend(vec![1, 2, 3, 4, 5]);
     ///
-    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
-    ///
-    /// let list_proof = index.get_range_proof(1..3);
-    ///
-    /// // Range (1..10) doesn't exist in index.
-    /// let list_proof_of_absence = index.get_range_proof(1..10);
-    ///
+    /// let range_proof = index.get_range_proof(1..3);
+    /// assert!(range_proof.indexes_unchecked().eq(vec![1, 2]));
+    /// // This proof will contain only 4 elements with indexes 1..5.
+    /// let intersection_proof = index.get_range_proof(1..10);
+    /// assert!(range_proof.indexes_unchecked().eq(1..5));
+    /// // This proof does not contain any elements at all.
+    /// let empty_proof = index.get_range_proof(100..10000);
+    /// assert!(empty_proof.values_unchecked().is_empty());
     /// ```
     pub fn get_range_proof<R: RangeBounds<u64>>(&self, range: R) -> ListProof<V> {
         // Inclusive lower boundary of the proof range.
@@ -619,10 +618,8 @@ where
     /// let name = "name";
     /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &fork);
-    ///
     /// index.push(1);
     /// assert!(!index.is_empty());
-    ///
     /// index.clear();
     /// assert!(index.is_empty());
     /// ```
@@ -640,14 +637,16 @@ where
     /// Returns a list hash of the proof list or a hash value of the empty list.
     ///
     /// List hash is calculated as follows:
+    ///
     /// ```text
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )
     /// ```
+    ///
     /// Empty list hash:
+    ///
     /// ```text
     /// h = sha-256( HashTag::List || 0 || Hash::default() )
     /// ```
-    ///
     ///
     /// # Examples
     ///
@@ -662,7 +661,6 @@ where
     ///
     /// let default_hash = index.object_hash();
     /// assert_eq!(HashTag::empty_list_hash(), default_hash);
-    ///
     /// index.push(1);
     /// let hash = index.object_hash();
     /// assert_ne!(hash, default_hash);
