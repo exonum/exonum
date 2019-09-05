@@ -44,7 +44,6 @@ fn test_exclude_validator_from_consensus() {
     };
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
-    add_one_height(&sandbox, &sandbox_state);
     // node loses validator status
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
 }
