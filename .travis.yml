@@ -92,6 +92,11 @@ jobs:
     - mkdir -p target/std/string
     - touch target/std/string/struct.String.html
     - touch target/std/primitive.usize.html
+    - mkdir -p target/doc/std
+    - touch target/doc/exonum_cli/password/struct.String.html
+    - touch target/doc/std/option/enum.Option.html
+    - touch target/doc/std/primitive.usize.html
+    - touch target/doc/std/primitive.char.html
     # https://github.com/deadlinks/cargo-deadlinks/issues/37
     - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc
