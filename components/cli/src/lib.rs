@@ -17,8 +17,8 @@
 //! Helper crate for secure and convenient configuration of the Exonum nodes.
 //!
 //! `exonum-cli` supports multi-stage configuration process made with safety in mind. It involves
-//! 4 steps (or stages) and allows to configure and run mutliple blockchain nodes without need in
-//! exchanging private keys between administrators.
+//! 4 steps (or stages) and allows to configure and run multiple blockchain nodes without
+//! need in exchanging private keys between administrators.
 //!
 //! # How to Run the Network
 //!
@@ -47,13 +47,13 @@
 //! * `run-dev` command automatically generates network configuration with a single node and runs
 //! it. This command can be useful for fast testing of the services during development process.
 //! * `maintenance` command contains only `clear-cache` functionality at the moment. It allows to
-//! clear node's consensus messages cache to fix rare node desync issues.
+//! clear node's consensus messages cache to fix rare node out-of-sync issues.
 //!
 //! ## How to Extend Parameters
 //!
 //! `exonum-cli` allows to extend the list of the parameters for any command and even add new CLI
 //! commands with arbitrary behavior. To do so, you need to implement a structure with a list of
-//! additional parameters and use `flatten` macro atribute of [`serde`][serde] and
+//! additional parameters and use `flatten` macro attribute of [`serde`][serde] and
 //! [`structopt`][structopt] libraries.
 //!
 //! ```ignore
