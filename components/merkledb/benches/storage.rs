@@ -233,6 +233,27 @@ fn proof_list_append(b: &mut Bencher, len: usize) {
     );
 }
 
+fn proof_list_extend(b: &mut Bencher, len: usize) {
+    let mut rng: StdRng = SeedableRng::from_seed(SEED);
+    let data = (0..len)
+        .map(|_| {
+            let mut chunk = vec![0; CHUNK_SIZE];
+            rng.fill_bytes(&mut chunk);
+            chunk
+        })
+        .collect::<Vec<_>>();
+
+    let db = TemporaryDB::default();
+    b.iter_with_setup(
+        || (db.fork(), data.clone()),
+        |(storage, data)| {
+            let mut table = ProofListIndex::new(NAME, &storage);
+            assert!(table.is_empty());
+            table.extend(data);
+        },
+    );
+}
+
 fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
     let db = TemporaryDB::default();
     let data = generate_random_kv(len);
@@ -393,6 +414,7 @@ pub fn bench_storage(c: &mut Criterion) {
     );
     // ProofListIndex
     bench_fn(c, "storage/proof_list/append", proof_list_append);
+    bench_fn(c, "storage/proof_list/extend", proof_list_extend);
     bench_fn(
         c,
         "storage/proof_list/proofs/build",
