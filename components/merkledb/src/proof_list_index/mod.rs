@@ -415,7 +415,7 @@ where
     /// assert!(range_proof.indexes_unchecked().eq(vec![1, 2]));
     /// // This proof will contain only 4 elements with indexes 1..5.
     /// let intersection_proof = index.get_range_proof(1..10);
-    /// assert!(range_proof.indexes_unchecked().eq(1..5));
+    /// assert!(intersection_proof.indexes_unchecked().eq(1..5));
     /// // This proof does not contain any elements at all.
     /// let empty_proof = index.get_range_proof(100..10000);
     /// assert!(empty_proof.values_unchecked().is_empty());
