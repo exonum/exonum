@@ -31,9 +31,8 @@ use std::{
 use crate::{
     api::node::SharedNodeState,
     blockchain::{
-        contains_transaction, Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig,
-        IndexCoordinates, IndexOwner, InstanceCollection, Schema, StoredConfiguration,
-        ValidatorKeys,
+        contains_transaction, Block, BlockProof, Blockchain, ConsensusConfig, IndexCoordinates,
+        IndexOwner, InstanceCollection, Schema, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -436,11 +435,7 @@ impl Sandbox {
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
-        self.cfg()
-            .validator_keys
-            .iter()
-            .map(|x| x.consensus_key)
-            .collect()
+        self.cfg().validators.iter().map(|x| x.consensus).collect()
     }
 
     #[allow(clippy::let_and_return)]
@@ -740,10 +735,10 @@ impl Sandbox {
     pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.configs().object_hash()
+        schema.consensus_config().object_hash()
     }
 
-    pub fn cfg(&self) -> StoredConfiguration {
+    pub fn cfg(&self) -> ConsensusConfig {
         let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.actual_configuration()
@@ -754,13 +749,11 @@ impl Sandbox {
     }
 
     pub fn first_round_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.first_round_timeout
+        self.cfg().first_round_timeout
     }
 
     pub fn round_timeout_increase(&self) -> Milliseconds {
-        (self.cfg().consensus.first_round_timeout
-            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT)
-            / 100
+        (self.cfg().first_round_timeout * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
     }
 
     pub fn current_round_timeout(&self) -> Milliseconds {
@@ -942,12 +935,12 @@ impl Sandbox {
     }
 
     fn add_peer_to_connect_list(&self, addr: SocketAddr, validator_keys: ValidatorKeys) {
-        let public_key = validator_keys.consensus_key;
+        let public_key = validator_keys.consensus;
         let config = {
             let inner = &self.inner.borrow_mut();
             let state = &inner.handler.state;
             let mut config = state.config().clone();
-            config.validator_keys.push(validator_keys);
+            config.validators.push(validator_keys);
             config
         };
 
@@ -962,7 +955,7 @@ impl Sandbox {
             });
     }
 
-    fn update_config(&self, config: StoredConfiguration) {
+    fn update_config(&self, config: ConsensusConfig) {
         self.inner.borrow_mut().handler.state.update_config(config);
     }
 }
@@ -1010,7 +1003,7 @@ impl SandboxBuilder {
                 min_propose_timeout: PROPOSE_TIMEOUT,
                 max_propose_timeout: PROPOSE_TIMEOUT,
                 propose_timeout_threshold: std::u32::MAX,
-                configuration_service_majority_count: None,
+                validators: Vec::default(),
             },
         }
     }
@@ -1104,19 +1097,20 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
-    let genesis = GenesisConfig::new_with_consensus(
-        consensus,
-        validators
+    let genesis = ConsensusConfig {
+        validators: validators
             .iter()
             .zip(service_keys.iter())
             .map(|x| ValidatorKeys {
-                consensus_key: (x.0).0,
-                service_key: (x.1).0,
-            }),
-    );
+                consensus: (x.0).0,
+                service: (x.1).0,
+            })
+            .collect(),
+        ..consensus
+    };
 
     let connect_list_config =
-        ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
+        ConnectListConfig::from_validator_keys(&genesis.validators, &str_addresses);
 
     let api_channel = mpsc::channel(100);
     let blockchain = Blockchain::new(
@@ -1304,11 +1298,11 @@ mod tests {
         // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
+        let consensus = gen_keypair();
+        let service = gen_keypair();
         let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
+            consensus: consensus.0,
+            service: service.0,
         };
 
         let new_peer_addr = gen_primitive_socket_addr(2);
@@ -1317,14 +1311,14 @@ mod tests {
         s.add_peer_to_connect_list(new_peer_addr, validator_keys);
 
         s.recv(&s.create_connect(
-            &public,
+            &consensus.0,
             new_peer_addr.to_string(),
             s.time().into(),
             &user_agent::get(),
-            &secret,
+            &consensus.1,
         ));
         s.send(
-            public,
+            consensus.0,
             &s.create_connect(
                 &s.public_key(ValidatorId(0)),
                 s.address(ValidatorId(0)),
@@ -1369,8 +1363,8 @@ mod tests {
         let (public, secret) = gen_keypair();
         let (service, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
+            consensus: public,
+            service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1400,8 +1394,8 @@ mod tests {
         let (public, secret) = gen_keypair();
         let (service, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
+            consensus: public,
+            service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1421,8 +1415,8 @@ mod tests {
         let (public, secret) = gen_keypair();
         let (service, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
+            consensus: public,
+            service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1450,8 +1444,8 @@ mod tests {
         let (public, secret) = gen_keypair();
         let (service, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
+            consensus: public,
+            service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(

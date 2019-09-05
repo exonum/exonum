@@ -39,7 +39,7 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
-    blockchain::{Blockchain, GenesisConfig, InstanceCollection, Schema, ValidatorKeys},
+    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
@@ -78,15 +78,18 @@ fn create_blockchain(
 ) -> Blockchain {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
-    let config = GenesisConfig::new(iter::once(ValidatorKeys {
-        consensus_key: consensus_keypair.0,
-        service_key: service_keypair.0,
-    }));
+    let genesis_config = ConsensusConfig {
+        validators: vec![ValidatorKeys {
+            consensus: consensus_keypair.0,
+            service: service_keypair.0,
+        }],
+        ..ConsensusConfig::default()
+    };
 
     Blockchain::new(
         db,
         services,
-        config,
+        genesis_config,
         service_keypair,
         ApiSender::new(mpsc::channel(0).0),
         mpsc::channel(0).0,

@@ -25,7 +25,6 @@ pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
-    genesis::GenesisConfig,
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
 };
 
@@ -54,7 +53,6 @@ use crate::{
 
 mod block;
 mod builder;
-mod genesis;
 mod schema;
 #[cfg(test)]
 mod tests;
