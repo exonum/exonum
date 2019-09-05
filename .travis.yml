@@ -56,7 +56,7 @@ sudo: required
 
 env:
   global:
-  - DEADLINKS_VERS=0.3.0
+  - DEADLINKS_VERS=0.4.1
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
@@ -73,7 +73,7 @@ jobs:
     - rustup component add rustfmt
     - rustfmt -V
     - rustup component add clippy
-    - cargo clippy --version    
+    - cargo clippy --version
     - nvm install 8 && nvm use 8
     - npm install
     - ./node_modules/.bin/cspell --version
@@ -87,11 +87,6 @@ jobs:
     - cargo fmt --all -- --check
     - cargo clean --doc
     - cargo doc --no-deps
-    # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
-    - mkdir -p target/doc/exonum_configuration
-    - mkdir -p target/std/string
-    - touch target/std/string/struct.String.html
-    - touch target/std/primitive.usize.html
     # https://github.com/deadlinks/cargo-deadlinks/issues/37
     - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc
@@ -135,7 +130,7 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     script:
     - echo "TODO"
-    # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308] 
+    # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308]
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
