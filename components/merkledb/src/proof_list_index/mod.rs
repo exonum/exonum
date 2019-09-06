@@ -628,6 +628,61 @@ where
         self.update_range(index, index);
     }
 
+    /// TODO
+    pub fn truncate(&mut self, new_length: u64) {
+        if self.len() <= new_length {
+            return;
+        }
+        if new_length == 0 {
+            self.clear();
+            return;
+        }
+
+        let mut old_last_index = self.len() - 1;
+        let old_height = self.height();
+        self.set_len(new_length);
+        let mut last_index = Some(new_length - 1);
+
+        // Remove values.
+        for index in new_length..=old_last_index {
+            self.base.remove(&ProofListKey::leaf(index));
+        }
+
+        let mut started_updating_hashes = false;
+        for height in 1..old_height {
+            // Remove excessive branches on the level.
+            for index in last_index.map_or(0, |i| i + 1)..=old_last_index {
+                self.base.remove(&ProofListKey::new(height, index));
+            }
+
+            // Recalculate the hash of the last element on the next level if it has changed.
+            if let Some(last_index) = last_index {
+                // We start updating hashes once the `last_index` becomes a single hashed node.
+                if last_index > 0 && last_index < old_last_index && last_index % 2 == 0 {
+                    started_updating_hashes = true;
+                }
+
+                if started_updating_hashes && last_index > 0 {
+                    let key = ProofListKey::new(height, last_index);
+                    let hash = self.get_branch_unchecked(key);
+                    let parent_hash = if key.is_left() {
+                        HashTag::hash_single_node(&hash)
+                    } else {
+                        let left_sibling = self.get_branch_unchecked(key.as_left());
+                        HashTag::hash_node(&left_sibling, &hash)
+                    };
+                    self.base.put(&key.parent(), parent_hash);
+                }
+            }
+
+            last_index = match last_index {
+                Some(0) | None => None,
+                Some(i) => Some(i >> 1),
+            };
+            old_last_index >>= 1;
+        }
+    }
+
     /// Clears the proof list, removing all values.
     ///
     /// # Notes

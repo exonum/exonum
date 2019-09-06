@@ -20,7 +20,7 @@ use serde_json::{self, json};
 
 use std::cmp;
 
-use super::{ListProof, ListProofError, ProofListIndex};
+use super::{key::ProofListKey, tree_height_by_length, ListProof, ListProofError, ProofListIndex};
 use crate::{BinaryValue, Database, HashTag, ObjectHash, TemporaryDB};
 
 const IDX_NAME: &str = "idx_name";
@@ -506,6 +506,8 @@ fn setting_elements_leads_to_correct_list_hash() {
 
 #[test]
 fn setting_elements_leads_to_correct_list_hash_randomized() {
+    const LIST_LEN: usize = 32;
+
     let mut rng = thread_rng();
     let db = TemporaryDB::new();
     let fork = db.fork();
@@ -513,17 +515,28 @@ fn setting_elements_leads_to_correct_list_hash_randomized() {
 
     for _ in 0..10 {
         // Prepare two copies of values with sufficient intersection.
-        let values: [u16; 32] = rng.gen();
-        let mut new_values: [u16; 32] = rng.gen();
-        for i in 0..values.len() {
+        let values: [u16; LIST_LEN] = rng.gen();
+        let mut new_values: [u16; LIST_LEN] = rng.gen();
+        for i in 0..LIST_LEN {
             if rng.gen::<bool>() {
                 new_values[i] = values[i];
             }
         }
+        let proof_ranges: Vec<_> = (0..50)
+            .map(|_| {
+                let start = rng.gen_range(0, LIST_LEN as u64);
+                let end = rng.gen_range(start, LIST_LEN as u64) + 1;
+                start..end
+            })
+            .collect();
 
         list.clear();
         list.extend(new_values.iter().cloned());
         let list_hash = list.object_hash();
+        let expected_proofs: Vec<_> = proof_ranges
+            .iter()
+            .map(|range| list.get_range_proof(range.clone()))
+            .collect();
 
         list.clear();
         list.extend(values.iter().cloned());
@@ -532,6 +545,104 @@ fn setting_elements_leads_to_correct_list_hash_randomized() {
                 list.set(i as u64, new_values[i]);
             }
         }
+        assert_eq!(list.object_hash(), list_hash);
+        for (i, range) in proof_ranges.into_iter().enumerate() {
+            let proof = list.get_range_proof(range.clone());
+            assert_eq!(
+                proof, expected_proofs[i],
+                "Unexpected proof for range {:?}",
+                range
+            );
+        }
+    }
+}
+
+#[test]
+fn truncating_list() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    list.extend(0_u32..30);
+    list.truncate(5);
+    assert_eq!(list.len(), 5);
+    assert_eq!(list.get(3), Some(3));
+    assert_eq!(list.get(7), None);
+    assert!(list.iter().eq(0_u32..5));
+    assert!(list.iter_from(3).eq(3_u32..5));
+
+    // Check that the branches are removed.
+    let level_lengths = vec![5, 5, 3, 2, 1];
+    for height in 1..tree_height_by_length(30) {
+        let level_len = level_lengths
+            .get(height as usize)
+            .copied()
+            .unwrap_or_default();
+        if level_len > 0 {
+            assert!(list
+                .get_branch(ProofListKey::new(height, level_len - 1))
+                .is_some());
+        }
+        for index in level_len..(level_len + 30) {
+            let key = ProofListKey::new(height, index);
+            assert!(
+                list.get_branch(key).is_none(),
+                "Branch wasn't removed: {:?}",
+                key
+            );
+        }
+    }
+}
+
+#[test]
+fn truncating_list_leads_to_expected_hash() {
+    let mut rng = thread_rng();
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+
+    for _ in 0..10 {
+        let values: [u32; 32] = rng.gen();
+        let truncated_len = rng.gen_range(5, 25);
+        let proof_ranges: Vec<_> = (0..50)
+            .map(|_| {
+                let start = rng.gen_range(0, truncated_len as u64);
+                let end = rng.gen_range(start, truncated_len as u64) + 1;
+                start..end
+            })
+            .collect();
+
+        list.clear();
+        list.extend(values[..truncated_len].iter().copied());
+        let list_hash = list.object_hash();
+        let expected_proofs: Vec<_> = proof_ranges
+            .iter()
+            .map(|range| list.get_range_proof(range.clone()))
+            .collect();
+
+        list.clear();
+        list.extend(values.iter().copied());
+        list.truncate(truncated_len as u64);
+        assert_eq!(list.object_hash(), list_hash);
+        for (i, range) in proof_ranges.into_iter().enumerate() {
+            let proof = list.get_range_proof(range.clone());
+            assert_eq!(
+                proof, expected_proofs[i],
+                "Unexpected proof for range {:?}",
+                range
+            );
+        }
+    }
+
+    // Check different values of `truncated_len` (including extreme ones).
+    let values: [u32; 17] = rng.gen();
+    for truncated_len in 0..=values.len() {
+        list.clear();
+        list.extend(values[..truncated_len].iter().copied());
+        let list_hash = list.object_hash();
+
+        list.clear();
+        list.extend(values.iter().copied());
+        list.truncate(truncated_len as u64);
         assert_eq!(list.object_hash(), list_hash);
     }
 }
