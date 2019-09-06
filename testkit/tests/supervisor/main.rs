@@ -23,7 +23,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     proto::Any,
     runtime::{
-        rust::{service::ServiceFactory, Transaction},
+        rust::{ServiceFactory, Transaction},
         supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor},
         ArtifactId, InstanceId, RuntimeIdentifier,
     },

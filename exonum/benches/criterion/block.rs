@@ -135,7 +135,7 @@ mod timestamping {
     #[exonum(
         artifact_name = "timestamping",
         proto_sources = "crate::proto",
-        service_interface = "TimestampingInterface"
+        implements("TimestampingInterface")
     )]
     pub struct Timestamping;
 
@@ -143,6 +143,7 @@ mod timestamping {
         fn timestamp(&self, _context: TransactionContext, _arg: Tx) -> Result<(), ExecutionError> {
             Ok(())
         }
+
         fn timestamp_panic(
             &self,
             _context: TransactionContext,
@@ -238,7 +239,7 @@ mod cryptocurrency {
     #[exonum(
         artifact_name = "cryptocurrency",
         proto_sources = "crate::proto",
-        service_interface = "CryptocurrencyInterface"
+        implements("CryptocurrencyInterface")
     )]
     pub struct Cryptocurrency;
 
@@ -375,6 +376,190 @@ mod cryptocurrency {
     }
 }
 
+mod foreign_interface_call {
+    use exonum::{
+        blockchain::{ExecutionError, InstanceCollection},
+        crypto::Hash,
+        merkledb::ObjectHash,
+        messages::Verified,
+        proto::Any,
+        runtime::{
+            self, dispatcher,
+            rust::{Interface, Service, Transaction, TransactionContext},
+            AnyTx, CallContext, InstanceId, MethodId,
+        },
+    };
+    use rand::rngs::StdRng;
+
+    use super::gen_keypair_from_rng;
+    use crate::proto;
+
+    const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
+    const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TimestampTx")]
+    pub struct SelfTx {
+        data: Hash,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TimestampTx")]
+    pub struct ForeignTx {
+        data: Hash,
+    }
+
+    #[exonum_service]
+    pub trait SelfInterface {
+        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
+            -> Result<(), ExecutionError>;
+
+        fn timestamp_foreign(
+            &self,
+            context: TransactionContext,
+            arg: ForeignTx,
+        ) -> Result<(), ExecutionError>;
+    }
+
+    pub trait ForeignInterface {
+        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
+            -> Result<(), ExecutionError>;
+    }
+
+    impl Interface for dyn ForeignInterface {
+        const NAME: &'static str = "ForeignInterface";
+
+        fn dispatch(
+            &self,
+            ctx: TransactionContext,
+            method: MethodId,
+            payload: &[u8],
+        ) -> Result<(), ExecutionError> {
+            match method {
+                0u32 => {
+                    let bytes = payload.into();
+                    let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
+                        .map_err(|e| (runtime::rust::Error::ArgumentsParseError, e))?;
+                    self.timestamp(ctx, arg)
+                }
+                _ => Err(dispatcher::Error::NoSuchMethod).map_err(From::from),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
+
+    impl<'a> ForeignInterfaceClient<'a> {
+        fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
+            self.0.call(ForeignInterface::NAME, 0, arg)
+        }
+    }
+
+    impl<'a> From<CallContext<'a>> for ForeignInterfaceClient<'a> {
+        fn from(context: CallContext<'a>) -> Self {
+            Self(context)
+        }
+    }
+
+    #[exonum_service(interface = "Configure")]
+    pub trait Configure {}
+
+    #[exonum_service(interface = "Events")]
+    pub trait Events {}
+
+    #[exonum_service(interface = "ERC30Tokens")]
+    pub trait ERC30Tokens {}
+
+    #[derive(Debug, ServiceFactory)]
+    #[exonum(
+        artifact_name = "timestamping",
+        proto_sources = "crate::proto",
+        implements(
+            "SelfInterface",
+            "ForeignInterface",
+            "Configure",
+            "Events",
+            "ERC30Tokens"
+        )
+    )]
+    pub struct Timestamping;
+
+    impl SelfInterface for Timestamping {
+        fn timestamp(
+            &self,
+            _context: TransactionContext,
+            _arg: SelfTx,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+
+        fn timestamp_foreign(
+            &self,
+            context: TransactionContext,
+            arg: ForeignTx,
+        ) -> Result<(), ExecutionError> {
+            context
+                .interface::<ForeignInterfaceClient>(FOREIGN_INTERFACE_SERVICE_ID)
+                .timestamp(SelfTx { data: arg.data })
+        }
+    }
+
+    impl ForeignInterface for Timestamping {
+        fn timestamp(
+            &self,
+            context: TransactionContext,
+            _arg: SelfTx,
+        ) -> Result<(), ExecutionError> {
+            assert_eq!(
+                context.caller().as_service().unwrap(),
+                SELF_INTERFACE_SERVICE_ID
+            );
+            Ok(())
+        }
+    }
+
+    impl Configure for Timestamping {}
+
+    impl Events for Timestamping {}
+
+    impl ERC30Tokens for Timestamping {}
+
+    impl Service for Timestamping {}
+
+    impl From<Timestamping> for InstanceCollection {
+        fn from(t: Timestamping) -> Self {
+            Self::new(t)
+                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", Any::default())
+                .with_instance(
+                    FOREIGN_INTERFACE_SERVICE_ID,
+                    "timestamping-foreign",
+                    Any::default(),
+                )
+        }
+    }
+
+    pub fn self_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
+        (0_u32..).map(move |i| {
+            let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
+            SelfTx {
+                data: i.object_hash(),
+            }
+            .sign(SELF_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+        })
+    }
+
+    pub fn foreign_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
+        (0_u32..).map(move |i| {
+            let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
+            ForeignTx {
+                data: i.object_hash(),
+            }
+            .sign(SELF_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+        })
+    }
+}
+
 /// Writes transactions to the pool and returns their hashes.
 fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
     let fork = blockchain.fork();
@@ -479,7 +664,7 @@ fn execute_block_rocksdb(
             },
             TXS_IN_BLOCK,
         )
-        .sample_size(50)
+        .sample_size(100)
         .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
     );
 }
@@ -527,5 +712,19 @@ pub fn bench_block(criterion: &mut Criterion) {
         "block/cryptocurrency_rollback",
         cryptocurrency::Cryptocurrency,
         cryptocurrency::rollback_transactions(SeedableRng::from_seed([4; 32])),
+    );
+
+    execute_block_rocksdb(
+        criterion,
+        "block/foreign_interface_call/self_tx",
+        foreign_interface_call::Timestamping,
+        foreign_interface_call::self_transactions(SeedableRng::from_seed([2; 32])),
+    );
+
+    execute_block_rocksdb(
+        criterion,
+        "block/foreign_interface_call/foreign_tx",
+        foreign_interface_call::Timestamping,
+        foreign_interface_call::foreign_transactions(SeedableRng::from_seed([2; 32])),
     );
 }

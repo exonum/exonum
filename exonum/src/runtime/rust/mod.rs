@@ -14,14 +14,13 @@
 
 pub use self::{
     error::Error,
-    service::{AfterCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
+    service::{
+        AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
+        ServiceFactory, Transaction, TransactionContext,
+    },
 };
 
 pub mod error;
-#[macro_use]
-pub mod service;
-#[cfg(test)]
-pub mod tests;
 
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
@@ -41,11 +40,15 @@ use crate::{
 
 use super::{
     api::{ApiContext, ServiceApiBuilder},
-    dispatcher::{self, DispatcherSender},
+    dispatcher::{self, Dispatcher, DispatcherSender},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
+
+mod service;
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug, Default)]
 pub struct RustRuntime {
@@ -288,8 +291,8 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        context: &mut ExecutionContext,
-        call_info: CallInfo,
+        context: &ExecutionContext,
+        call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let instance = self
@@ -297,14 +300,12 @@ impl Runtime for RustRuntime {
             .get(&call_info.instance_id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
-        instance
-            .as_ref()
-            .call(
-                call_info.method_id,
-                TransactionContext::new(context, instance.descriptor()),
-                payload,
-            )
-            .map_err(|e| (Error::UnspecifiedError, e))?
+        instance.as_ref().call(
+            context.interface_name,
+            call_info.method_id,
+            TransactionContext::new(context, instance.descriptor()),
+            payload,
+        )
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
@@ -318,19 +319,21 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, context: &mut ExecutionContext) {
+    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
-                instance
-                    .as_ref()
-                    .before_commit(TransactionContext::new(context, instance.descriptor()));
+                instance.as_ref().before_commit(BeforeCommitContext::new(
+                    instance.descriptor(),
+                    fork,
+                    dispatcher,
+                ));
                 Ok(())
             });
 
             match result {
-                Ok(..) => context.fork.flush(),
+                Ok(..) => fork.flush(),
                 Err(e) => {
-                    context.fork.rollback();
+                    fork.rollback();
                     error!(
                         "Service \"{}\" `before_commit` failed with error: {:?}",
                         instance.name, e
@@ -349,9 +352,9 @@ impl Runtime for RustRuntime {
     ) {
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
-                dispatcher,
                 service.descriptor(),
                 snapshot,
+                dispatcher,
                 service_keypair,
                 tx_sender,
             ));

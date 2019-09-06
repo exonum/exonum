@@ -24,8 +24,8 @@ use crate::{
         Any,
     },
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, CallInfo, Caller, ExecutionContext,
-        InstanceDescriptor, InstanceId, InstanceSpec,
+        dispatcher::Dispatcher, error::ExecutionError, CallContext, CallInfo, Caller,
+        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -67,12 +67,27 @@ trait TestService {
     artifact_name = "test_service",
     artifact_version = "0.1.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "TestService"
+    implements("TestService")
 )]
 pub struct TestServiceImpl;
 
+#[derive(Debug)]
+struct TestServiceClient<'a>(CallContext<'a>);
+
+impl<'a> From<CallContext<'a>> for TestServiceClient<'a> {
+    fn from(context: CallContext<'a>) -> Self {
+        Self(context)
+    }
+}
+
+impl<'a> TestServiceClient<'a> {
+    fn method_b(&self, arg: TxB) -> Result<(), ExecutionError> {
+        self.0.call("", 1, arg)
+    }
+}
+
 impl TestService for TestServiceImpl {
-    fn method_a(&self, mut context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
+    fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
         {
             let fork = context.fork();
             let mut entry = Entry::new("method_a_entry", fork);
@@ -80,14 +95,9 @@ impl TestService for TestServiceImpl {
         }
 
         // Test calling one service from another.
-        // TODO: It should be improved to support service auth in the future.
-        let call_info = CallInfo {
-            instance_id: SERVICE_INSTANCE_ID,
-            method_id: 1,
-        };
-        let payload = TxB { value: arg.value }.into_bytes();
         context
-            .call(call_info, &payload)
+            .interface::<TestServiceClient>(SERVICE_INSTANCE_ID)
+            .method_b(TxB { value: arg.value })
             .expect("Failed to dispatch call");
         Ok(())
     }
@@ -172,9 +182,15 @@ fn test_basic_rust_runtime() {
             method_id: 0,
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
-        let mut fork = db.fork();
-        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-        dispatcher.call(&mut context, call_info, &payload).unwrap();
+        let fork = db.fork();
+        let context = ExecutionContext::new(
+            &dispatcher,
+            &fork,
+            Caller::Service {
+                instance_id: SERVICE_INSTANCE_ID,
+            },
+        );
+        dispatcher.call(&context, &call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_a_entry", &fork);
@@ -195,9 +211,15 @@ fn test_basic_rust_runtime() {
             method_id: 1,
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
-        let mut fork = db.fork();
-        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-        dispatcher.call(&mut context, call_info, &payload).unwrap();
+        let fork = db.fork();
+        let context = ExecutionContext::new(
+            &dispatcher,
+            &fork,
+            Caller::Service {
+                instance_id: SERVICE_INSTANCE_ID,
+            },
+        );
+        dispatcher.call(&context, &call_info, &payload).unwrap();
 
         {
             let entry = Entry::new("method_b_entry", &fork);

@@ -12,24 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+use exonum::{
+    crypto::PublicKey,
+    merkledb::{IndexAccess, MapIndex},
+};
+use exonum_derive::ProtobufConvert;
+use serde_derive::{Deserialize, Serialize};
 
-import "helpers.proto";
+use crate::proto;
 
-package exonum.tests.explorer;
-
-message CreateWallet {
-  exonum.PublicKey pubkey = 1;
-  string name = 2;
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::Wallet")]
+pub struct Wallet {
+    pub name: String,
+    pub balance: u64,
 }
 
-message Transfer {
-  exonum.PublicKey from = 1;
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
-}
+pub struct WalletSchema<T>(T);
 
-message Issue {
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
+impl<T: IndexAccess> WalletSchema<T> {
+    pub fn new(access: T) -> Self {
+        Self(access)
+    }
+
+    pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
+        MapIndex::new("wallets", self.0.clone())
+    }
 }

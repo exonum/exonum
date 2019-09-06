@@ -32,7 +32,7 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{Service, ServiceFactory, Transaction, TransactionContext},
+        rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
@@ -79,7 +79,7 @@ trait TestDispatcherInterface {
     crate = "crate",
     artifact_name = "test_dispatcher",
     proto_sources = "crate::proto::schema",
-    service_interface = "TestDispatcherInterface"
+    implements("TestDispatcherInterface")
 )]
 struct TestDispatcherService;
 
@@ -112,7 +112,7 @@ impl Service for TestDispatcherService {
 impl TestDispatcherInterface for TestDispatcherService {
     fn test_deploy(
         &self,
-        mut context: TransactionContext,
+        context: TransactionContext,
         arg: TestDeploy,
     ) -> Result<(), ExecutionError> {
         let mut index = Entry::new(context.instance.name, context.fork());
@@ -139,7 +139,7 @@ impl TestDispatcherInterface for TestDispatcherService {
 
     fn test_start(
         &self,
-        mut context: TransactionContext,
+        context: TransactionContext,
         arg: TestStart,
     ) -> Result<(), ExecutionError> {
         let mut index = Entry::new(context.instance.name, context.fork());
@@ -191,15 +191,15 @@ trait ServiceGood {}
     artifact_name = "good_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "ServiceGood"
+    implements("ServiceGood")
 )]
 struct ServiceGoodImpl;
 
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
-    fn before_commit(&self, context: TransactionContext) {
-        let mut index = ListIndex::new(IDX_NAME, context.fork());
+    fn before_commit(&self, context: BeforeCommitContext) {
+        let mut index = ListIndex::new(IDX_NAME, context.fork);
         index.push(1);
     }
 
@@ -217,14 +217,14 @@ trait ServicePanic {}
     artifact_name = "panic_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "ServicePanic"
+    implements("ServicePanic")
 )]
 struct ServicePanicImpl;
 
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn before_commit(&self, _context: TransactionContext) {
+    fn before_commit(&self, _context: BeforeCommitContext) {
         panic!("42");
     }
 
@@ -242,14 +242,14 @@ trait ServicePanicStorageError {}
     artifact_name = "storage_error_service",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "ServicePanicStorageError"
+    implements("ServicePanicStorageError")
 )]
 struct ServicePanicStorageErrorImpl;
 
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn before_commit(&self, _context: TransactionContext) {
+    fn before_commit(&self, _context: BeforeCommitContext) {
         panic!(StorageError::new("42"));
     }
 
@@ -281,7 +281,7 @@ trait TxResultCheckInterface {
     artifact_name = "tx_result_check",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "TxResultCheckInterface"
+    implements("TxResultCheckInterface")
 )]
 struct TxResultCheckService;
 

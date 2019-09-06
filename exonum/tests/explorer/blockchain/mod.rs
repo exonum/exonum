@@ -85,7 +85,7 @@ pub trait ExplorerTransactions {
     artifact_name = "my-service",
     artifact_version = "1.0.1",
     proto_sources = "proto",
-    service_interface = "ExplorerTransactions"
+    implements("ExplorerTransactions")
 )]
 struct MyService;
 

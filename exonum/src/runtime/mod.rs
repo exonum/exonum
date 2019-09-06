@@ -90,14 +90,14 @@ pub mod dispatcher;
 pub mod error;
 pub mod supervisor;
 
-use exonum_merkledb::{Fork, Snapshot};
 use futures::Future;
 
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
+    merkledb::{BinaryValue, Fork, Snapshot},
     node::ApiSender,
     proto::Any,
 };
@@ -228,8 +228,8 @@ pub trait Runtime: Send + Debug + 'static {
     /// Do not process. Panic will be processed by the method caller.
     fn execute(
         &self,
-        context: &mut ExecutionContext,
-        call_info: CallInfo,
+        context: &ExecutionContext,
+        call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
@@ -248,7 +248,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, context: &mut ExecutionContext);
+    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -333,9 +333,11 @@ pub enum Caller {
         /// Public key of the user who signed this transaction.
         author: PublicKey,
     },
-    // This transaction is invoked on behalf of the blockchain itself,
-    // for example [`before_commit`](trait.Runtime#before_commit) event.
-    Blockchain,
+    // This transaction is invoked during the transaction execution of a different service.
+    Service {
+        /// Identifier of the service instance which invoked this transaction.
+        instance_id: InstanceId,
+    },
 }
 
 impl Caller {
@@ -358,10 +360,10 @@ impl Caller {
         }
     }
 
-    /// Try to reinterpret caller as blockchain.
-    pub fn as_blockchain(&self) -> Option<()> {
-        if let Caller::Blockchain = self {
-            Some(())
+    /// Try to reinterpret caller as service.
+    pub fn as_service(&self) -> Option<InstanceId> {
+        if let Caller::Service { instance_id } = self {
+            Some(*instance_id)
         } else {
             None
         }
@@ -374,36 +376,43 @@ impl Caller {
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a mut Fork,
+    pub fork: &'a Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
-    /// List of dispatcher actions that will be performed after the finish of execution.
-    actions: Vec<dispatcher::Action>,
+    /// Identifier of the service interface required for the call. Keep in mind that this field in
+    /// fact is a part of unfinished "interfaces feature" and will be replaced in future releases.
+    /// At the moment this field can only contains a core interfaces like `Configure` and
+    /// always empty for the common the service interfaces.
+    pub interface_name: &'a str,
+    /// List of dispatcher actions that will be performed after execution finishes.
+    actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a Dispatcher,
+    /// Depth of call stack.
+    call_stack_depth: usize,
 }
 
 impl<'a> ExecutionContext<'a> {
-    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
+    /// Maximum depth of the call stack.
+    const MAX_CALL_STACK_DEPTH: usize = 256;
+
+    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,
-            actions: Vec::new(),
+            actions: Rc::default(),
             dispatcher,
+            interface_name: "",
+            call_stack_depth: 0,
         }
     }
 
-    pub(crate) fn call(
-        &mut self,
-        call_info: CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        // TODO Modify caller from Transaction.
-        self.dispatcher.call(self, call_info, arguments)
+    pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
+        self.actions.borrow_mut().push(action);
     }
 
-    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
-        self.actions.push(action);
+    pub(crate) fn take_actions(&self) -> Vec<dispatcher::Action> {
+        self.actions.borrow_mut().drain(..).collect()
     }
 }
 
@@ -437,4 +446,64 @@ pub enum ApiChange {
     InstanceAdded(InstanceId),
     /// Instance has been removed.
     InstanceRemoved(InstanceId),
+}
+
+// TODO Write a full documentation when the interservice communications are fully implemented. [ECR-3493]
+/// Provide a low level context for the call of methods of a different service instance.
+#[derive(Debug)]
+pub struct CallContext<'a> {
+    /// Underlying execution context.
+    inner: &'a ExecutionContext<'a>,
+    /// Identifier of the caller service instance.
+    caller: InstanceId,
+    /// Identifier of the called service instance.
+    called: InstanceId,
+}
+
+impl<'a> CallContext<'a> {
+    /// Create a new call context for the given execution context.
+    pub fn new(inner: &'a ExecutionContext<'a>, caller: InstanceId, called: InstanceId) -> Self {
+        Self {
+            inner,
+            caller,
+            called,
+        }
+    }
+
+    /// Perform the method call of the specified service interface.
+    pub fn call(
+        &self,
+        interface_name: impl AsRef<str>,
+        method_id: MethodId,
+        arguments: impl BinaryValue,
+        // TODO ExecutionError here mislead about the true cause of an occurred error. [ECR-3222]
+    ) -> Result<(), ExecutionError> {
+        let context = ExecutionContext {
+            fork: self.inner.fork,
+            dispatcher: self.inner.dispatcher,
+            actions: self.inner.actions.clone(),
+            caller: Caller::Service {
+                instance_id: self.caller,
+            },
+            interface_name: interface_name.as_ref(),
+            call_stack_depth: self.inner.call_stack_depth + 1,
+        };
+        let call_info = CallInfo {
+            method_id,
+            instance_id: self.called,
+        };
+
+        if context.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
+            let kind = dispatcher::Error::StackOverflow;
+            let msg = format!(
+                "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
+                ExecutionContext::MAX_CALL_STACK_DEPTH
+            );
+            return Err((kind, msg).into());
+        }
+
+        self.inner
+            .dispatcher
+            .call(&context, &call_info, arguments.into_bytes().as_ref())
+    }
 }
