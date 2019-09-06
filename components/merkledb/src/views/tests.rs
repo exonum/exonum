@@ -681,6 +681,8 @@ fn mutable_and_immutable_prefixed_borrows() {
 
 #[test]
 fn views_based_on_rc_fork() {
+    fn test_lifetime<T: 'static>(_: T) {}
+
     const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
     const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
 
@@ -690,7 +692,6 @@ fn views_based_on_rc_fork() {
     let view1 = View::new(fork.clone(), IDX_1);
     let view2 = View::new(fork.clone(), IDX_2);
     // Test that views have 'static lifetime.
-    fn test_lifetime<T: 'static>(_: T) {}
     test_lifetime(view1);
     test_lifetime(view2);
 
