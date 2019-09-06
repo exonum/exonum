@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -568,7 +568,7 @@ mod tests {
     #[test]
     fn hash_ops_in_full_tree() {
         // Consider a graph for computing Merkle root of the tree, such as one depicted above.
-        // Denote `l` the number of lists in this tree (i.e., nodes with degree 1),
+        // Denote `l` the number of leaves in this tree (i.e., nodes with degree 1),
         // `v2` number of nodes with degree 2, and `v3` the number of nodes with degree 3.
         // For example, in the tree above, `l = 3`, `v2 = 3`, `v3 = 1`.
         //
