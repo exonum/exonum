@@ -127,7 +127,7 @@ where
                 list.push(val);
             }
             ListAction::Pop => {
-                unimplemented!();
+                list.pop();
             }
             ListAction::Extend(vec) => {
                 list.extend(vec);
@@ -167,7 +167,7 @@ impl<V: BinaryValue> FromFork for ProofListIndex<Rc<Fork>, V> {
 fn generate_action() -> impl Strategy<Value = ListAction<i32>> {
     prop_oneof![
         num::i32::ANY.prop_map(ListAction::Push),
-        //strategy::Just(ListAction::Pop),
+        strategy::Just(ListAction::Pop),
         vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
         num::u64::ANY.prop_map(ListAction::Truncate),
         (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),

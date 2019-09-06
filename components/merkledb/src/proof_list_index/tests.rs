@@ -648,6 +648,23 @@ fn truncating_list_leads_to_expected_hash() {
 }
 
 #[test]
+fn popping_element_from_list() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    list.extend(0_i32..10);
+
+    let mut count = 0;
+    while let Some(last) = list.pop() {
+        count += 1;
+        assert_eq!(last, 10 - count);
+        assert_eq!(list.len(), 10 - count as u64);
+    }
+    assert!(list.is_empty());
+    assert_eq!(list.object_hash(), HashTag::empty_list_hash());
+}
+
+#[test]
 fn proof_json_serialization() {
     let mut proof = ListProof::new(vec![(1, "foo".to_owned()), (2, "bar".to_owned())]);
     proof.push_hash(1, 0, HashTag::hash_leaf(&[4]));

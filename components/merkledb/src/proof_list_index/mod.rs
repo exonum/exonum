@@ -683,6 +683,17 @@ where
         }
     }
 
+    /// TODO
+    pub fn pop(&mut self) -> Option<V> {
+        if self.is_empty() {
+            None
+        } else {
+            let last_element = self.get(self.len() - 1); // is always `Some(_)`
+            self.truncate(self.len() - 1);
+            last_element
+        }
+    }
+
     /// Clears the proof list, removing all values.
     ///
     /// # Notes
