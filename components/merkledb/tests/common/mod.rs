@@ -14,43 +14,47 @@
 
 //! Tests that compare exonum collections and corresponding rust types using proptest.
 
+use modifier::Modifier;
+use proptest::test_runner::TestCaseResult;
+
+use std::rc::Rc;
+
+use exonum_merkledb::{Database, Fork, TemporaryDB};
+
 // Max size of the generated sequence of actions.
 pub const ACTIONS_MAX_LEN: usize = 100;
 
-#[macro_export]
-macro_rules! proptest_compare_collections {
-    ($name:ident, $collection:ident, $reference:ident, $action:ident) => {
-        use proptest::proptest;
-        proptest! {
-            #[test]
-            fn $name(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN)) {
-                use exonum_merkledb::{Database, TemporaryDB};
+pub trait FromFork {
+    fn from_fork(fork: Rc<Fork>) -> Self;
+}
 
-                let db = TemporaryDB::new();
+pub struct MergeFork;
 
-                let mut fork = db.fork();
-                let mut reference = $reference::new();
+pub fn compare_collections<A, R, T>(
+    actions: &[A],
+    compare: impl Fn(&T, &R) -> TestCaseResult,
+) -> TestCaseResult
+where
+    A: Clone + PartialEq<MergeFork> + Modifier<R> + Modifier<T>,
+    R: Default,
+    T: FromFork,
+{
+    let db = TemporaryDB::new();
+    let mut fork = Rc::new(db.fork());
+    let mut reference = R::default();
 
-                for action in actions {
-                    match action {
-                        $action::MergeFork => {
-                            db.merge(fork.into_patch()).unwrap();
-                            fork = db.fork();
-                        }
-                        _ => {
-                            let mut collection = $collection::new("test", &fork);
-                            action.clone().modify(&mut collection);
-                            action.clone().modify(&mut reference);
-                            compare_collections(&collection, &reference)?;
-                        }
-                    }
-                }
-                db.merge(fork.into_patch()).unwrap();
-
-                let fork = db.fork();
-                let collection = $collection::new("test", &fork);
-                compare_collections(&collection, &reference)?;
-            }
+    for action in actions {
+        if *action == MergeFork {
+            let patch = Rc::try_unwrap(fork).expect("fork ref leaked").into_patch();
+            db.merge(patch).unwrap();
+            fork = Rc::new(db.fork());
+        } else {
+            let mut collection = T::from_fork(fork.clone());
+            action.clone().modify(&mut collection);
+            action.clone().modify(&mut reference);
+            compare(&collection, &reference)?;
         }
-    };
+    }
+    let collection = T::from_fork(fork);
+    compare(&collection, &reference)
 }
