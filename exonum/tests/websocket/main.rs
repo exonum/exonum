@@ -25,10 +25,9 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use exonum::{
-    api::websocket::*, crypto::gen_keypair, node::ExternalMessage,
-    runtime::rust::service::Transaction,
+    api::websocket::*, crypto::gen_keypair, merkledb::ObjectHash, node::ExternalMessage,
+    runtime::rust::Transaction,
 };
-use exonum_merkledb::ObjectHash;
 use std::{
     thread::sleep,
     time::{Duration, Instant},

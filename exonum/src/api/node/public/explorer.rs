@@ -407,7 +407,8 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
                             .unwrap()
                             .content()
                             .payload()
-                            .call_info,
+                            .call_info
+                            .clone(),
                     })
                     .collect(),
             ),

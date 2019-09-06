@@ -170,8 +170,8 @@ impl IntoExecutionError {
         });
 
         quote! {
-            impl ::std::fmt::Display for #name {
-                fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+            impl std::fmt::Display for #name {
+                fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                     match self {
                         #( #match_arms )*
                     }

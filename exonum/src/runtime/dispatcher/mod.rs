@@ -116,7 +116,10 @@ impl Dispatcher {
         // Built-in services should not have an additional specification.
         let artifact_spec = Any::default();
         // Register service artifact in the runtime.
-        self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
+        // TODO Write test for such situations [ECR-3222]
+        if !self.is_artifact_deployed(&spec.artifact) {
+            self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
+        }
         // Start the built-in service instance.
         self.start_service(fork, spec, constructor)
     }
@@ -284,7 +287,7 @@ impl Dispatcher {
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        let mut context = ExecutionContext::new(
+        let context = ExecutionContext::new(
             self,
             fork,
             Caller::Transaction {
@@ -292,9 +295,9 @@ impl Dispatcher {
                 hash: tx_id,
             },
         );
-        self.call(&mut context, tx.as_ref().call_info, &tx.as_ref().arguments)?;
+        self.call(&context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
         // Execute pending dispatcher actions.
-        for action in context.actions.drain(..) {
+        for action in context.take_actions() {
             action.execute(self, fork)?;
         }
         Ok(())
@@ -303,8 +306,8 @@ impl Dispatcher {
     /// Call the corresponding runtime method.
     pub(crate) fn call(
         &self,
-        context: &mut ExecutionContext,
-        call_info: CallInfo,
+        context: &ExecutionContext,
+        call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         let runtime_id = self
@@ -321,9 +324,8 @@ impl Dispatcher {
     }
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
-        let mut context = ExecutionContext::new(self, fork, Caller::Blockchain);
         for runtime in self.runtimes.values() {
-            runtime.before_commit(&mut context);
+            runtime.before_commit(self, fork);
         }
     }
 
@@ -645,8 +647,8 @@ mod tests {
 
         fn execute(
             &self,
-            _: &mut ExecutionContext,
-            call_info: CallInfo,
+            _: &ExecutionContext,
+            call_info: &CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
             if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
@@ -660,7 +662,7 @@ mod tests {
             StateHashAggregator::default()
         }
 
-        fn before_commit(&self, _context: &mut ExecutionContext) {}
+        fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
 
         fn after_commit(
             &self,
@@ -742,7 +744,7 @@ mod tests {
         };
 
         // Check if the services are ready for deploy.
-        let mut fork = db.fork();
+        let fork = db.fork();
         dispatcher
             .deploy_and_register_artifact(&fork, &sample_rust_spec, Any::default())
             .unwrap();
@@ -777,35 +779,35 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+        let context = ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 1 });
         dispatcher
             .call(
-                &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
+                &context,
+                &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx rust");
 
         dispatcher
             .call(
-                &mut context,
-                CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
+                &context,
+                &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx rust");
 
         dispatcher
             .call(
-                &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
+                &context,
+                &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx java");
 
         dispatcher
             .call(
-                &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
+                &context,
+                &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx java");
@@ -873,7 +875,7 @@ mod tests {
         );
 
         // Check if the services are ready to start.
-        let mut fork = db.fork();
+        let fork = db.fork();
 
         assert_eq!(
             dispatcher
@@ -893,11 +895,12 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+        let context =
+            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 15 });
         dispatcher
             .call(
-                &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
+                &context,
+                &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("execute succeed");

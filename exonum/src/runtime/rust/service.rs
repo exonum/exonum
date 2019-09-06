@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-use failure::Error;
 
 use std::fmt::{self, Debug};
 
@@ -26,10 +25,10 @@ use crate::{
     proto::Any,
     runtime::{
         api::ServiceApiBuilder,
-        dispatcher::{self, DispatcherSender},
+        dispatcher::{self, Dispatcher, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
-        InstanceId, MethodId,
+        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ExecutionContext,
+        InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
@@ -38,27 +37,28 @@ use super::RustArtifactId;
 pub trait ServiceDispatcher: Send {
     fn call(
         &self,
+        interface_name: &str,
         method: MethodId,
         ctx: TransactionContext,
         payload: &[u8],
-    ) -> Result<Result<(), ExecutionError>, Error>;
+    ) -> Result<(), ExecutionError>;
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
     fn configure(
         &self,
-        _descriptor: InstanceDescriptor,
+        _instance: InstanceDescriptor,
         _fork: &Fork,
         _params: Any,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn before_commit(&self, _context: TransactionContext) {}
+    fn before_commit(&self, _context: BeforeCommitContext) {}
 
     fn after_commit(&self, _context: AfterCommitContext) {}
 
@@ -83,21 +83,50 @@ where
     }
 }
 
-/// Provide context for the currently executing transaction.
+/// Transaction specification for a specific service interface.
+pub trait Transaction: BinaryValue {
+    /// Service interface associated with the given transaction.
+    type Service;
+    /// Identifier of the service interface required for the call.
+    #[doc(hidden)]
+    const INTERFACE_NAME: &'static str;
+    /// Identifier of the service method which executes the given transaction.
+    const METHOD_ID: MethodId;
+
+    /// Create unsigned service transaction from the value.
+    fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
+        AnyTx {
+            call_info: CallInfo {
+                instance_id,
+                method_id: Self::METHOD_ID,
+            },
+            arguments: self.into_bytes(),
+        }
+    }
+
+    /// Sign the value as a transaction with the specified instance identifier.
+    fn sign(
+        self,
+        service_id: InstanceId,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Verified<AnyTx> {
+        Verified::from_value(self.into_any_tx(service_id), public_key, secret_key)
+    }
+}
+
+/// Provide the context for the transaction under execution.
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'b> {
-    /// Service instance that associated with the current context.
+    /// Service instance associated with the current context.
     pub instance: InstanceDescriptor<'a>,
     /// Underlying execution context.
-    inner: &'a mut ExecutionContext<'b>,
+    inner: &'a ExecutionContext<'b>,
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
     /// Create a new transaction context for the specified execution context and the instance descriptor.
-    pub(crate) fn new(
-        context: &'a mut ExecutionContext<'b>,
-        instance: InstanceDescriptor<'a>,
-    ) -> Self {
+    pub(crate) fn new(context: &'a ExecutionContext<'b>, instance: InstanceDescriptor<'a>) -> Self {
         Self {
             inner: context,
             instance,
@@ -128,22 +157,61 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     /// Enqueue dispatcher action.
-    pub(crate) fn dispatch_action(&mut self, action: dispatcher::Action) {
+    pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
         self.inner.dispatch_action(action)
     }
 
-    /// Temporary method to test interservice communications.
-    pub fn call(&mut self, call_info: CallInfo, arguments: &[u8]) -> Result<(), ExecutionError> {
-        self.inner.call(call_info, arguments)
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a client to call interface methods of the specified service instance.
+    pub fn interface<T>(&self, called: InstanceId) -> T
+    where
+        T: From<CallContext<'a>>,
+    {
+        self.call_context(called).into()
+    }
+
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a context to call interfaces of the specified service instance.
+    pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
+        CallContext::new(self.inner, self.instance.id, called)
+    }
+}
+
+/// Provide context for the `before_commit` handler.
+#[derive(Debug)]
+pub struct BeforeCommitContext<'a> {
+    /// Service instance associated with the current context.
+    pub instance: InstanceDescriptor<'a>,
+    /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
+    /// the database made by the previous transactions already executed in this block.
+    pub fork: &'a Fork,
+    /// Reference to the underlying runtime dispatcher.
+    dispatcher: &'a Dispatcher,
+}
+
+impl<'a> BeforeCommitContext<'a> {
+    /// Create a new `BeforeCommit` context.
+    pub(crate) fn new(
+        instance: InstanceDescriptor<'a>,
+        fork: &'a Fork,
+        dispatcher: &'a Dispatcher,
+    ) -> Self {
+        Self {
+            instance,
+            fork,
+            dispatcher,
+        }
     }
 }
 
 /// Provide context for the `after_commit` handler.
 pub struct AfterCommitContext<'a> {
+    /// Service instance associated with the current context.
+    pub instance: InstanceDescriptor<'a>,
     /// Read-only snapshot of the current blockchain state.
     pub snapshot: &'a dyn Snapshot,
-    /// Service instance that associated with the current context.
-    pub instance: InstanceDescriptor<'a>,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
     /// Channel to communicate with the dispatcher.
@@ -153,11 +221,11 @@ pub struct AfterCommitContext<'a> {
 }
 
 impl<'a> AfterCommitContext<'a> {
-    /// Create a context for the `after_commit` method.
+    /// Create a new `AfterCommit` context.
     pub(crate) fn new(
-        dispatcher: &'a DispatcherSender,
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
+        dispatcher: &'a DispatcherSender,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
@@ -226,31 +294,17 @@ impl<'a> Debug for AfterCommitContext<'a> {
     }
 }
 
-/// Transaction specification for the concrete service interface.
-pub trait Transaction: BinaryValue {
-    /// Service interface associated for the given transaction.
-    type Service;
-    /// Identifier of service method which executes the given transaction.
-    const METHOD_ID: MethodId;
-
-    /// Create unsigned service transaction from the value.
-    fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
-        AnyTx {
-            call_info: CallInfo {
-                instance_id,
-                method_id: Self::METHOD_ID,
-            },
-            arguments: self.into_bytes(),
-        }
-    }
-
-    /// Sign the value as a transaction with the specified instance identifier.
-    fn sign(
-        self,
-        service_id: InstanceId,
-        public_key: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
-        Verified::from_value(self.into_any_tx(service_id), public_key, secret_key)
-    }
+/// A service interface specification.
+pub trait Interface {
+    /// Fully qualified name of this interface for the [call info].
+    ///
+    /// [call info]: ../struct.CallInfo.html
+    const NAME: &'static str;
+    /// Invoke the specified method handler of the service instance.
+    fn dispatch(
+        &self,
+        ctx: TransactionContext,
+        method: MethodId,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError>;
 }

@@ -27,6 +27,11 @@ fn main() {
             "supervisor_example_protobuf_mod.rs",
         ),
         (
+            "tests/interfaces/proto",
+            vec!["tests/interfaces/proto", &exonum_protos],
+            "interfaces_protobuf_mod.rs",
+        ),
+        (
             "examples/timestamping/proto",
             vec!["examples/timestamping/proto"],
             "timestamping_example_protobuf_mod.rs",

@@ -33,7 +33,7 @@ pub type MethodId = u32;
 
 /// Unique service transaction identifier.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
+    Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
 )]
 #[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
@@ -45,7 +45,7 @@ pub struct CallInfo {
 }
 
 impl CallInfo {
-    /// Creates a new `CallInfo` instance.
+    /// Create an ordinary `CallInfo` instance.
     pub fn new(instance_id: u32, method_id: u32) -> Self {
         Self {
             instance_id,
@@ -74,6 +74,7 @@ impl CallInfo {
 ///             instance_id: 1024,
 ///             // Specific method of the service interface.
 ///             method_id: 0,
+///             ..CallInfo::default()
 ///         },
 ///         // Transaction payload.
 ///         arguments: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()

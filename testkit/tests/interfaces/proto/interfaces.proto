@@ -14,22 +14,31 @@
 
 syntax = "proto3";
 
-import "helpers.proto";
+package exonum.testkit;
 
-package exonum.tests.explorer;
+import "helpers.proto";
+import "runtime.proto";
 
 message CreateWallet {
-  exonum.PublicKey pubkey = 1;
-  string name = 2;
-}
-
-message Transfer {
-  exonum.PublicKey from = 1;
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
+  string name = 1;
 }
 
 message Issue {
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
+  exonum.PublicKey to = 1;
+  uint64 amount = 2;
+}
+
+message Wallet {
+  string name = 1;
+  uint64 balance = 2;
+}
+
+message AnyCall {
+  exonum.runtime.CallInfo call_info = 1;
+  string interface_name = 2;
+  bytes args = 3;
+}
+
+message RecursiveCall {
+  uint64 depth = 1;
 }

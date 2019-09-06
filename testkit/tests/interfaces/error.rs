@@ -12,20 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The set of specific for the Rust runtime implementation errors.
+use exonum_derive::IntoExecutionError;
 
-/// List of possible Rust runtime errors.
+/// Common errors emitted by transactions during execution.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(crate = "crate", kind = "runtime")]
 pub enum Error {
-    /// Unable to parse artifact identifier or specified artifact has non-empty spec.
-    IncorrectArtifactId = 0,
-    /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
-    UnableToDeploy = 1,
-    /// Unable to parse service configuration.
-    ConfigParseError = 2,
-    /// Unspecified error during the call invocation.
-    UnspecifiedError = 3,
-    /// Unable to parse the method arguments of the service interface.
-    ArgumentsParseError = 4,
+    WalletNotFound = 0,
+    WalletAlreadyExists = 1,
+    WrongInterfaceCaller = 2,
+    UnauthorizedIssuer = 3,
 }

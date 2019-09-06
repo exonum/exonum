@@ -44,7 +44,7 @@ pub trait TimestampingInterface {
     artifact_name = "timestamping",
     artifact_version = "0.1.0",
     proto_sources = "crate::proto::schema",
-    service_interface = "TimestampingInterface"
+    implements("TimestampingInterface")
 )]
 pub struct TimestampingService;
 
