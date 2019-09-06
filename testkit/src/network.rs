@@ -19,6 +19,7 @@ use exonum::{
     crypto::{self, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Propose, Verified},
+    proto::Any,
 };
 use exonum_merkledb::ObjectHash;
 
@@ -252,6 +253,7 @@ pub struct TestNetworkConfiguration {
     us: TestNode,
     validators: Vec<TestNode>,
     consensus_config: ConsensusConfig,
+    actual_from: Height,
 }
 
 impl TestNetworkConfiguration {
@@ -260,6 +262,7 @@ impl TestNetworkConfiguration {
             us: network.us().clone(),
             validators: network.validators().into(),
             consensus_config,
+            actual_from: Height::zero(),
         }
     }
 
@@ -286,12 +289,12 @@ impl TestNetworkConfiguration {
 
     /// Return the height, starting from which this configuration becomes actual.
     pub fn actual_from(&self) -> Height {
-        unimplemented!()
+        self.actual_from
     }
 
     /// Modifies the height, starting from which this configuration becomes actual.
-    pub fn set_actual_from(&mut self, _actual_from: Height) {
-        unimplemented!()
+    pub fn set_actual_from(&mut self, actual_from: Height) {
+        self.actual_from = actual_from;
     }
 
     /// Modifies the current consensus configuration.
@@ -332,7 +335,7 @@ impl TestNetworkConfiguration {
     /// Modifies the configuration of the service with the given identifier.
     pub fn set_service_config<D>(&mut self, _id: &str, _config: D)
     where
-        D: Serialize,
+        D: Into<Any>,
     {
         unimplemented!();
     }

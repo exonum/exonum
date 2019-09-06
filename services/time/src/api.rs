@@ -79,7 +79,7 @@ impl PrivateApi {
         state: &api::ServiceApiState,
     ) -> api::Result<Vec<ValidatorTime>> {
         let view = state.snapshot();
-        let validator_keys = Schema::new(view).actual_configuration().validators;
+        let validator_keys = Schema::new(view).consensus_config().validators;
         let schema = TimeSchema::new(state.instance.name, view);
         let idx = schema.validators_times();
 

@@ -25,7 +25,7 @@ use std::collections::HashSet;
 
 use crate::{
     crypto::PublicKey,
-    helpers::{Milliseconds, ValidateInput},
+    helpers::{Milliseconds, ValidateInput, ValidatorId},
     messages::SIGNED_MESSAGE_MIN_SIZE,
     proto::schema::blockchain,
 };
@@ -130,7 +130,7 @@ impl ConsensusConfig {
     /// Default value for max_message_len.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
     /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
-    pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; //default value 10%
+    pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
 
     /// Check that validator keys is correct. Configuration should have at least
     /// a single validator key. And each key should meet only once.
@@ -152,6 +152,48 @@ impl ConsensusConfig {
         }
 
         Ok(())
+    }
+
+    /// Search for identifier of the validator which satisfies the condition in predicate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::{
+    ///     blockchain::{ConsensusConfig, ValidatorKeys},
+    ///     crypto,
+    ///     helpers::ValidatorId,
+    /// };
+    ///
+    /// fn main() {
+    ///     let config = ConsensusConfig {
+    ///         validators: (0..4)
+    ///             .map(|_| ValidatorKeys {
+    ///                 consensus: crypto::gen_keypair().0,
+    ///                 service: crypto::gen_keypair().0,
+    ///             })
+    ///             .collect(),
+    ///         ..ConsensusConfig::default()
+    ///     };
+    ///
+    ///     let some_validator_consensus_key = config.validators[2].consensus;
+    ///     // Try to find validator ID for this key.
+    ///     assert_eq!(
+    ///         config.find_validator(|validator_keys| {
+    ///             validator_keys.consensus == some_validator_consensus_key
+    ///         }),
+    ///         Some(ValidatorId(2)),
+    ///     );
+    /// }
+    /// ```
+    pub fn find_validator(
+        &self,
+        predicate: impl Fn(&ValidatorKeys) -> bool,
+    ) -> Option<ValidatorId> {
+        self.validators
+            .iter()
+            .position(predicate)
+            .map(|id| ValidatorId(id as u16))
     }
 
     /// Produce warnings if configuration contains non-optimal values.

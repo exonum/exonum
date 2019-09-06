@@ -165,7 +165,7 @@ impl Blockchain {
 
         let patch = {
             let fork = self.fork();
-            Schema::new(&fork).consensus_config().set(config);
+            Schema::new(&fork).consensus_config_entry().set(config);
 
             self.merge(fork.into_patch())?;
             self.create_patch(

@@ -148,11 +148,8 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         self.caller().author().and_then(|author| {
             CoreSchema::new(self.fork())
-                .actual_configuration()
-                .validators
-                .iter()
-                .position(|validator_keys| author == validator_keys.service)
-                .map(|id| ValidatorId(id as u16))
+                .consensus_config()
+                .find_validator(|validator_keys| author == validator_keys.service)
         })
     }
 
@@ -242,11 +239,8 @@ impl<'a> AfterCommitContext<'a> {
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot)
-            .actual_configuration()
-            .validators
-            .iter()
-            .position(|validator_keys| self.service_keypair.0 == validator_keys.service)
-            .map(|id| ValidatorId(id as u16))
+            .consensus_config()
+            .find_validator(|validator_keys| self.service_keypair.0 == validator_keys.service)
     }
 
     /// Return a current blockchain height. This height is "height of the last committed block".

@@ -209,7 +209,7 @@ where
     }
 
     /// Returns an actual consensus configuration entry.
-    pub fn consensus_config(&self) -> Entry<T, ConsensusConfig> {
+    pub fn consensus_config_entry(&self) -> Entry<T, ConsensusConfig> {
         Entry::new(CONSENSUS_CONFIG, self.access.clone())
     }
 
@@ -296,13 +296,13 @@ where
         Height(len - 1)
     }
 
-    /// Returns the consensus config for the latest height of the blockchain.
+    /// Returns an actual consensus configuration of the blockchain.
     ///
     /// # Panics
     ///
     /// Panics if the "genesis block" was not created.
-    pub fn actual_configuration(&self) -> ConsensusConfig {
-        self.consensus_config()
+    pub fn consensus_config(&self) -> ConsensusConfig {
+        self.consensus_config_entry()
             .get()
             .expect("Consensus configuration is absent")
     }
@@ -310,7 +310,7 @@ where
     /// Returns the `state_hash` table for core tables.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.consensus_config().object_hash(),
+            self.consensus_config_entry().object_hash(),
             self.transaction_results().object_hash(),
         ]
     }

@@ -492,10 +492,10 @@ impl NodeHandler {
 
         let snapshot = blockchain.snapshot();
 
-        let stored = Schema::new(&snapshot).actual_configuration();
-        info!("Creating a node with config: {:#?}", stored);
+        let consensus_config = Schema::new(&snapshot).consensus_config();
+        info!("Creating a node with config: {:#?}", consensus_config);
 
-        let validator_id = stored
+        let validator_id = consensus_config
             .validators
             .iter()
             .position(|pk| pk.consensus == config.listener.consensus_public_key)
@@ -519,7 +519,7 @@ impl NodeHandler {
             config.service.service_public_key,
             config.service.service_secret_key,
             connect_list,
-            stored,
+            consensus_config,
             connect,
             blockchain.get_saved_peers(),
             last_hash,

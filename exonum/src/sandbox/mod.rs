@@ -741,7 +741,7 @@ impl Sandbox {
     pub fn cfg(&self) -> ConsensusConfig {
         let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.actual_configuration()
+        schema.consensus_config()
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {

@@ -99,7 +99,7 @@ where
 {
     pub fn new(index_name: impl Into<String>, access: I) -> Self {
         let validator_keys = blockchain::Schema::new(access.clone())
-            .actual_configuration()
+            .consensus_config()
             .validators;
         Self {
             index_name: index_name.into(),

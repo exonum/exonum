@@ -53,10 +53,9 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
         context: TransactionContext,
         arg: TxConfig,
     ) -> Result<(), ExecutionError> {
-        let consensus_config = ConsensusConfig::from_bytes(arg.config.into()).unwrap();
         Schema::new(context.fork())
-            .consensus_config()
-            .set(consensus_config);
+            .consensus_config_entry()
+            .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
     }
 }

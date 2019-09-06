@@ -216,9 +216,9 @@ mod tests {
     use exonum_merkledb::TemporaryDB;
 
     use crate::{
+        crypto,
         helpers::{generate_testnet_config, Height},
         runtime::supervisor::Supervisor,
-        crypto,
     };
 
     use super::*;
@@ -276,5 +276,5 @@ mod tests {
             ApiSender::new(mpsc::channel(0).0),
             mpsc::channel(0).0,
         );
-    }    
+    }
 }
