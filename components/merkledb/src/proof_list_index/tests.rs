@@ -867,18 +867,25 @@ fn invalid_proofs_with_no_values() {
 
 mod root_hash {
     use crate::{
-        hash::HashTag, proof_list_index::ProofListIndex, Database, ObjectHash, TemporaryDB,
+        hash::HashTag, proof_list_index::ProofListIndex, BinaryValue, Database, ObjectHash,
+        TemporaryDB,
     };
     use exonum_crypto::{self, Hash};
 
     /// Cross-verify `object_hash()` with `ProofListIndex` against expected root hash value.
-    fn assert_object_hash_correct(hashes: &[Hash]) {
-        let root_actual = HashTag::hash_list(hashes);
-        let root_index = proof_list_index_root(hashes);
+    fn assert_object_hash_correct<V>(values: &[V])
+    where
+        V: BinaryValue + Clone,
+    {
+        let root_actual = HashTag::hash_list(values);
+        let root_index = proof_list_index_root(values);
         assert_eq!(root_actual, root_index);
     }
 
-    fn proof_list_index_root(hashes: &[Hash]) -> Hash {
+    fn proof_list_index_root<V>(hashes: &[V]) -> Hash
+    where
+        V: BinaryValue + Clone,
+    {
         let db = TemporaryDB::new();
         let fork = db.fork();
         let mut index = ProofListIndex::new("merkle_root", &fork);
@@ -886,7 +893,7 @@ mod root_hash {
         index.object_hash()
     }
 
-    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
+    fn to_list_of_hashes(bytes: &[&[u8]]) -> Vec<Hash> {
         bytes
             .iter()
             .map(|chunk| exonum_crypto::hash(chunk))
@@ -895,21 +902,53 @@ mod root_hash {
 
     #[test]
     fn object_hash_single() {
-        assert_object_hash_correct(&hash_list(&[b"1"]));
+        assert_object_hash_correct(&to_list_of_hashes(&[b"1"]));
     }
 
     #[test]
     fn object_hash_even() {
-        assert_object_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4"]));
+        assert_object_hash_correct(&to_list_of_hashes(&[b"1", b"2", b"3", b"4"]));
     }
 
     #[test]
     fn object_hash_odd() {
-        assert_object_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4", b"5"]));
+        assert_object_hash_correct(&to_list_of_hashes(&[b"1", b"2", b"3", b"4", b"5"]));
+    }
+
+    #[test]
+    fn object_hash_with_integers() {
+        let numbers = [2_u32, 3, 5, 8, 13, 21, 34, 55];
+        for i in 1..numbers.len() {
+            assert_object_hash_correct(&numbers[..i]);
+        }
+    }
+
+    #[test]
+    fn object_hash_with_bytes() {
+        let bytes: Vec<_> = [b"foo" as &[_], b"bar", b"bazz", b"lorem", b"ipsum"]
+            .iter()
+            .map(|slice| slice.to_vec())
+            .collect();
+        for i in 1..bytes.len() {
+            assert_object_hash_correct(&bytes[..i]);
+        }
+    }
+
+    #[test]
+    fn object_hash_with_strings() {
+        const STRING: &str =
+            "All human beings are born free and equal in dignity and rights. \
+             They are endowed with reason and conscience and should act towards one another \
+             in a spirit of brotherhood.";
+
+        let words: Vec<_> = STRING.split_whitespace().map(str::to_owned).collect();
+        for i in 1..words.len() {
+            assert_object_hash_correct(&words[..i]);
+        }
     }
 
     #[test]
     fn object_hash_empty() {
-        assert_object_hash_correct(&hash_list(&[]));
+        assert_object_hash_correct(&to_list_of_hashes(&[]));
     }
 }

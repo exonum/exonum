@@ -107,8 +107,8 @@ impl HashTag {
     }
 
     /// Computes a list hash for the given list of hashes.
-    pub fn hash_list(hashes: &[Hash]) -> Hash {
-        Self::hash_list_node(hashes.len() as u64, root_hash(hashes))
+    pub fn hash_list<V: BinaryValue + ?Sized>(values: &[V]) -> Hash {
+        Self::hash_list_node(values.len() as u64, root_hash(values))
     }
 
     /// Hash of the map object.
@@ -162,7 +162,7 @@ impl HashTag {
 /// Computes a Merkle root hash for a the given list of hashes.
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
-pub fn root_hash(hashes: &[Hash]) -> Hash {
+pub fn root_hash<V: BinaryValue + ?Sized>(hashes: &[V]) -> Hash {
     if hashes.is_empty() {
         return Hash::zero();
     }
