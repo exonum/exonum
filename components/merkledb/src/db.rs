@@ -25,6 +25,7 @@ use std::{
     iter::{Iterator as StdIterator, Peekable},
     mem,
     ops::{Deref, DerefMut},
+    rc::Rc,
 };
 
 use crate::{
@@ -143,10 +144,25 @@ pub struct WorkingPatch {
     changes: RefCell<HashMap<IndexAddress, Option<ViewChanges>>>,
 }
 
+#[derive(Debug)]
+enum WorkingPatchRef<'a> {
+    Borrowed(&'a WorkingPatch),
+    Owned(Rc<Fork>),
+}
+
+impl WorkingPatchRef<'_> {
+    fn patch(&self) -> &WorkingPatch {
+        match self {
+            WorkingPatchRef::Borrowed(patch) => patch,
+            WorkingPatchRef::Owned(ref fork) => &fork.working_patch,
+        }
+    }
+}
+
 /// `RefMut`, but dumber.
 #[derive(Debug)]
 pub struct ChangesRef<'a> {
-    parent: &'a WorkingPatch,
+    parent: WorkingPatchRef<'a>,
     key: IndexAddress,
     changes: Option<ViewChanges>,
 }
@@ -171,7 +187,7 @@ impl DerefMut for ChangesRef<'_> {
 
 impl Drop for ChangesRef<'_> {
     fn drop(&mut self) {
-        let mut change_map = self.parent.changes.borrow_mut();
+        let mut change_map = self.parent.patch().changes.borrow_mut();
         let changes = change_map.get_mut(&self.key).unwrap_or_else(|| {
             panic!("insertion point for changes disappeared at {:?}", self.key);
         });
@@ -193,12 +209,7 @@ impl WorkingPatch {
         self.changes.borrow().is_empty()
     }
 
-    /// Returns a mutable reference to the changes corresponding to a certain index.
-    ///
-    /// # Panics
-    ///
-    /// If an index with the `address` already exists in `Fork` that uses this patch.
-    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
+    fn take_view_changes(&self, address: &IndexAddress) -> Option<ViewChanges> {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
             let view_changes = changes.get_mut(address).map(Option::take);
@@ -215,11 +226,19 @@ impl WorkingPatch {
             "multiple mutable borrows of an index at {:?}",
             address
         );
+        view_changes
+    }
 
+    /// Returns a mutable reference to the changes corresponding to a certain index.
+    ///
+    /// # Panics
+    ///
+    /// If an index with the `address` already exists in `Fork` that uses this patch.
+    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
         ChangesRef {
-            changes: view_changes,
+            changes: self.take_view_changes(address),
             key: address.clone(),
-            parent: self,
+            parent: WorkingPatchRef::Borrowed(self),
         }
     }
 
@@ -620,6 +639,23 @@ impl<'a> IndexAccess for &'a Fork {
 
     fn changes(&self, address: &IndexAddress) -> Self::Changes {
         self.working_patch.changes_mut(address)
+    }
+}
+
+impl IndexAccess for Rc<Fork> {
+    type Changes = ChangesRef<'static>;
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        &self.patch
+    }
+
+   fn changes(&self, address: &IndexAddress) -> Self::Changes {
+        let changes = self.working_patch.take_view_changes(address);
+        ChangesRef {
+            changes,
+            key: address.clone(),
+            parent: WorkingPatchRef::Owned(Self::clone(self)),
+        }
     }
 }
 
