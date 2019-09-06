@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::{
+    any::Any,
     cell::RefCell,
     cmp::Ordering::{Equal, Greater, Less},
     collections::{
@@ -382,6 +383,24 @@ enum NextIterValue {
     Finished,
 }
 
+/// Helper trait to get `&self` as `&dyn Any`.
+pub trait AsAny: Any {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T: Any> AsAny for T {
+    /// Returns `&self` as `&dyn Any`.
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    /// Returns `&mut self` as `&mut dyn Any`.
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
 /// Low-level storage backend implementing a collection of named key-value stores
 /// (aka column families).
 ///
@@ -415,7 +434,7 @@ enum NextIterValue {
 /// [`fork`]: #method.fork
 /// [`merge`]: #tymethod.merge
 /// [interior-mut]: https://doc.rust-lang.org/book/second-edition/ch15-05-interior-mutability.html
-pub trait Database: Send + Sync + 'static {
+pub trait Database: AsAny + Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
     fn snapshot(&self) -> Box<dyn Snapshot>;
 
@@ -453,6 +472,18 @@ pub trait Database: Send + Sync + 'static {
     /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
+}
+
+impl dyn Database {
+    /// Returns `&self` as `&T` if `Self` is of type `T`, or `None` if it isn't.
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        Any::downcast_ref(self.as_any())
+    }
+
+    /// Returns `&mut self` as `&mut T` if `Self` is of type `T`, or `None` if it isn't.
+    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
+        Any::downcast_mut(self.as_any_mut())
+    }
 }
 
 /// A read-only snapshot of a storage backend.
