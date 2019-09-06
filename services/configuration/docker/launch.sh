@@ -35,7 +35,7 @@ for i in $(seq 0 $((node_count - 1)))
 do
   public_port=$((start_public_port + i))
   private_port=$((public_port + node_count))
-  $path_to_app run --node-config $((i + 1))/node.toml --db-path $((i + 1))/db --public-api-address 0.0.0.0:${public_port} --consensus-key-pass pass --service-key-pass pass &
+  $path_to_app run --node-config $((i + 1))/node.toml --db-path $((i + 1))/db --public-api-address 0.0.0.0:${public_port} --master-key-pass pass --service-key-pass pass &
   echo "new node with ports: $public_port (public) and $private_port (private)"
   sleep 1
 done

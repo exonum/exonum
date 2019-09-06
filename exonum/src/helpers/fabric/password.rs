@@ -57,7 +57,7 @@ impl PassInputMethod {
                     name
                 } else {
                     match key_type {
-                        SecretKeyType::Consensus => "EXONUM_CONSENSUS_PASS",
+                        SecretKeyType::Consensus => "EXONUM_MASTER_PASS",
                         SecretKeyType::Service => "EXONUM_SERVICE_PASS",
                     }
                 };

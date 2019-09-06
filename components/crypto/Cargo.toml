@@ -24,8 +24,8 @@ serde_json = "1.0.19"
 failure = "0.1.5"
 toml = "0.5.0"
 uuid = "0.7.1"
-pwbox = { git = "https://github.com/pavel-mukhanov/pwbox-rs", branch = "updated-sodium" }
-exonum_sodiumoxide = { git = "http://github.com/pavel-mukhanov/exonum_sodiumoxide/", branch = "key-exchange-mod", optional = true }
+pwbox = "0.2.1"
+exonum_sodiumoxide = {version = "0.0.23", optional = true}
 secret-tree = { git = "https://github.com/slowli/secret-tree", branch = "master" }
 
 [dev-dependencies]

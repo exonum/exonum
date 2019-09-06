@@ -110,20 +110,20 @@ configuration finalize --public-api-address 0.0.0.0:8203 --private-api-address 0
 To run the network, use the following commands:
 
 ```sh
-configuration run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --consensus-key-pass pass --service-key-pass pass
+configuration run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --master-key-pass pass --service-key-pass pass
 
-configuration run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --consensus-key-pass pass --service-key-pass pass
+configuration run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --master-key-pass pass --service-key-pass pass
 
-configuration run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --consensus-key-pass pass --service-key-pass pass
+configuration run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --master-key-pass pass --service-key-pass pass
 
-configuration run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --consensus-key-pass pass --service-key-pass pass
+configuration run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass --service-key-pass pass
 ```
 
 <!-- markdownlint-enable MD013 -->
 
 - `--node-config` is a path to the node configuration
 - `--db-path` is a path to the database
-- `--consensus-key-pass` is a password to the file with the consensus key of the
+- `--master-key-pass` is a password to the file with the consensus key of the
   node
 - `--service-key-pass` is a password to the file with the service key of the
   node

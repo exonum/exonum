@@ -41,7 +41,7 @@ use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use exonum_crypto::{generate_keys, Keys};
 use exonum_merkledb::{Database, DbOptions, RocksDB};
 
-const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
+const MASTER_KEY_PASS_METHOD: &str = "MASTER_KEY_PASS_METHOD";
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const LISTEN_ADDRESS: &str = "LISTEN_ADDRESS";
 const NO_PASSWORD: &str = "NO_PASSWORD";
@@ -51,7 +51,6 @@ const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
 const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
 const PUBLIC_ALLOW_ORIGIN: &str = "PUBLIC_ALLOW_ORIGIN";
 const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
-const SERVICE_KEY_PASS_METHOD: &str = "SERVICE_KEY_PASS_METHOD";
 
 /// Run command.
 pub struct Run;
@@ -80,14 +79,6 @@ impl Run {
 
     fn private_api_address(ctx: &Context) -> Option<SocketAddr> {
         ctx.arg(PRIVATE_API_ADDRESS).ok()
-    }
-
-    fn pass_input_method(ctx: &Context, key_type: SecretKeyType) -> String {
-        let arg_key = match key_type {
-            SecretKeyType::Consensus => CONSENSUS_KEY_PASS_METHOD,
-            SecretKeyType::Service => SERVICE_KEY_PASS_METHOD,
-        };
-        ctx.arg(arg_key).unwrap_or_default()
     }
 }
 
@@ -127,23 +118,13 @@ impl Command for Run {
                 false,
             ),
             Argument::new_named(
-                CONSENSUS_KEY_PASS_METHOD,
+                MASTER_KEY_PASS_METHOD,
                 false,
-                "Passphrase entry method for consensus key.\n\
+                "Passphrase entry method for master key.\n\
                  Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
-                 If ENV_VAR_NAME is not specified $EXONUM_CONSENSUS_PASS is used",
+                 If ENV_VAR_NAME is not specified $EXONUM_MASTER_PASS is used",
                 None,
-                "consensus-key-pass",
-                false,
-            ),
-            Argument::new_named(
-                SERVICE_KEY_PASS_METHOD,
-                false,
-                "Passphrase entry method for service key.\n\
-                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
-                 If ENV_VAR_NAME is not specified $EXONUM_SERVICE_PASS is used",
-                None,
-                "service-key-pass",
+                "master-key-pass",
                 false,
             ),
         ]
@@ -186,15 +167,9 @@ impl Command for Run {
 
         new_context.set(keys::NODE_CONFIG, config);
 
-        let run_config = {
-            let consensus_pass_method =
-                Run::pass_input_method(&new_context, SecretKeyType::Consensus);
-            let service_pass_method = Run::pass_input_method(&new_context, SecretKeyType::Service);
-            NodeRunConfig {
-                consensus_pass_method,
-                service_pass_method,
-            }
-        };
+        let run_config = NodeRunConfig {
+                master_pass_method: new_context.arg(MASTER_KEY_PASS_METHOD).unwrap_or_default(),
+            };
         new_context.set(keys::RUN_CONFIG, run_config);
 
         Feedback::RunNode(new_context)
@@ -269,8 +244,7 @@ impl RunDev {
 
         // Arguments for run command.
         ctx.set_arg(NODE_CONFIG_PATH, output_config_path.clone());
-        ctx.set_arg(CONSENSUS_KEY_PASS_METHOD, "pass:".to_owned());
-        ctx.set_arg(SERVICE_KEY_PASS_METHOD, "pass:".to_owned());
+        ctx.set_arg(MASTER_KEY_PASS_METHOD, "pass:".to_owned());
     }
 
     fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: Context) -> Context {
@@ -506,23 +480,13 @@ impl Command for GenerateNodeConfig {
                 false,
             ),
             Argument::new_named(
-                CONSENSUS_KEY_PASS_METHOD,
+                MASTER_KEY_PASS_METHOD,
                 false,
-                "Passphrase entry method for consensus key.\n\
+                "Passphrase entry method for master key.\n\
                  Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
-                 If ENV_VAR_NAME is not specified $EXONUM_CONSENSUS_PASS is used",
+                 If ENV_VAR_NAME is not specified $EXONUM_MASTER_PASS is used",
                 None,
-                "consensus-key-pass",
-                false,
-            ),
-            Argument::new_named(
-                SERVICE_KEY_PASS_METHOD,
-                false,
-                "Passphrase entry method for service key.\n\
-                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
-                 If ENV_VAR_NAME is not specified $EXONUM_SERVICE_PASS is used",
-                None,
-                "service-key-pass",
+                "master-key-pass",
                 false,
             ),
         ]
@@ -549,7 +513,7 @@ impl Command for GenerateNodeConfig {
             .arg("OUTPUT_DIR")
             .expect("expected output directory for the node configuration");
         let consensus_key_pass_method: PassInputMethod = context
-            .arg::<String>(CONSENSUS_KEY_PASS_METHOD)
+            .arg::<String>(MASTER_KEY_PASS_METHOD)
             .unwrap_or_default()
             .parse()
             .expect("expected correct passphrase input method for consensus key");

@@ -1,9 +1,13 @@
-consensus_public_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
-consensus_secret_key = "consensus.key.toml"
-external_address = "0.0.0.0:8002"
-listen_address = "0.0.0.0:8002"
-service_public_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
-service_secret_key = "service.key.toml"
+external_address = "127.0.0.3:6333"
+listen_address = "0.0.0.0:6333"
 master_key_path = "master.key.toml"
+
+[keys]
+consensus_pk = "11a318bace9595a13c7d14b48cd77177a9202fe8aba8d99ce573803c16935156"
+consensus_sk = "d98fa96f3607ba222282908aa1bb8209995e0968dbcbfd0c3b4de2a2317a68d911a318bace9595a13c7d14b48cd77177a9202fe8aba8d99ce573803c16935156"
+identity_pk = "3624a73e651733d52a4774bb1295eb738b3b8fe2ff9af85d7249ff2e03296063"
+identity_sk = "36f2c130ce20fa13c1498947d8b85161569522e7f0c13c5ca6aabf3ae1a631c4"
+service_pk = "493a092187f48e56bc8181a2531d809f2877d63e31c161ff82b5c0ce43781cc1"
+service_sk = "d8de21eddbaaaa75248c40422abc8ff4a80d1d26e18ee155ccf4e66620fbdc9a493a092187f48e56bc8181a2531d809f2877d63e31c161ff82b5c0ce43781cc1"
 
 [services_secret_configs]

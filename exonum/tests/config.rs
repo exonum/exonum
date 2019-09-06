@@ -19,15 +19,10 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
-use exonum::{
-    api::backends::actix::AllowOrigin,
-    crypto::{kx, PublicKey, PUBLIC_KEY_LENGTH},
-    helpers::{
-        config::{ConfigFile, ConfigManager},
-        fabric::NodeBuilder,
-    },
-    node::{ConnectInfo, ConnectListConfig, NodeConfig},
-};
+use exonum::{api::backends::actix::AllowOrigin, crypto::{kx, PublicKey, PUBLIC_KEY_LENGTH}, helpers::{
+    config::{ConfigFile, ConfigManager},
+    fabric::NodeBuilder,
+}, node::{ConnectInfo, ConnectListConfig, NodeConfig}, helpers};
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -38,6 +33,7 @@ use std::{
     panic,
     path::{Path, PathBuf},
 };
+use std::io::Write;
 
 #[derive(Debug)]
 struct ConfigSpec {
@@ -335,8 +331,7 @@ fn test_finalize_run_without_pass() {
             .command("run")
             .with_named_arg("-c", &node_config)
             .with_named_arg("-d", env.output_dir().join("foo"))
-            .with_named_arg("--service-key-pass", "pass:")
-            .with_named_arg("--consensus-key-pass", "pass:")
+            .with_named_arg("--master-key-pass", "pass:")
             .run();
         assert!(feedback.is_none());
     }
@@ -346,8 +341,7 @@ fn test_finalize_run_without_pass() {
 fn test_finalize_run_with_pass() {
     let env = ConfigSpec::new_with_pass();
 
-    env::set_var("EXONUM_CONSENSUS_PASS", "some passphrase");
-    env::set_var("EXONUM_SERVICE_PASS", "another passphrase");
+    env::set_var("EXONUM_MASTER_PASS", "some passphrase");
     env.copy_node_config_to_output(0);
     let node_config = env.output_node_config(0);
     env.command("finalize")
@@ -363,8 +357,7 @@ fn test_finalize_run_with_pass() {
         .command("run")
         .with_named_arg("-c", &node_config)
         .with_named_arg("-d", env.output_dir().join("foo"))
-        .with_named_arg("--service-key-pass", "env")
-        .with_named_arg("--consensus-key-pass", "env")
+        .with_named_arg("--master-key-pass", "env")
         .run();
     assert!(feedback.is_none());
 }
@@ -421,14 +414,12 @@ fn test_full_workflow() {
             .with_arg(&output_template_file)
             .with_arg(&env.output_node_config_dir(i))
             .with_named_arg("-a", format!("0.0.0.0:{}", 8000 + i))
-            .with_named_arg("--service-key-pass", "pass:12345678")
-            .with_named_arg("--consensus-key-pass", "pass:12345678")
+            .with_named_arg("--master-key-pass", "pass:12345678")
             .run()
             .unwrap();
     }
 
-    env::set_var("EXONUM_CONSENSUS_PASS", "12345678");
-    env::set_var("EXONUM_SERVICE_PASS", "12345678");
+    env::set_var("EXONUM_MASTER_PASS", "12345678");
     for i in 0..env.validators_count {
         let node_config = env.output_node_config(i);
         env.command("finalize")
@@ -443,8 +434,7 @@ fn test_full_workflow() {
             .command("run")
             .with_named_arg("-c", &node_config)
             .with_named_arg("-d", env.output_dir().join("foo"))
-            .with_named_arg("--service-key-pass", "env")
-            .with_named_arg("--consensus-key-pass", "env")
+            .with_named_arg("--master-key-pass", "env")
             .run();
         assert!(feedback.is_none());
     }

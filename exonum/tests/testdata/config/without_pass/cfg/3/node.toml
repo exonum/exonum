@@ -1,41 +1,45 @@
-consensus_public_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
-consensus_secret_key = "consensus.key.toml"
-external_address = "0.0.0.0:8003"
-listen_address = "0.0.0.0:8003"
-service_public_key = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"
-service_secret_key = "service.key.toml"
+external_address = "127.0.0.4:6333"
+listen_address = "0.0.0.0:6333"
+master_key_path = "/Users/pavelmukhanov/work/rust/exonum/examples/timestamping/backend/.exonum/3/master.key.toml"
 
 [api]
 state_update_timeout = 10000
 [[connect_list.peers]]
-address = "0.0.0.0:8002"
-public_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
+address = "127.0.0.2:6333"
+identity_key = "1eadb287351a57f90e7a72c942e99895af12e65d392b28c360fce4a631b1f513"
+public_key = "1160ad405a7e63795179325db9b2ac5eee8f0e7242b5b0a932ac53ae1aa7eaf1"
 
 [[connect_list.peers]]
-address = "0.0.0.0:8000"
-public_key = "3b27439519ca4d28de698367d0a5bcc3cc33912e671c6dc952dafac2df1ffb07"
+address = "127.0.0.1:6333"
+identity_key = "18c8390fcacbd3108f67aec0be481e7463a13084fa6d91f0f0720ab00cd89a08"
+public_key = "3b6e5f864ead0e40408d6b78bdfc124f731a127f2a5d65f8b4bbdc4d8875bf1c"
 
 [[connect_list.peers]]
-address = "0.0.0.0:8001"
-public_key = "faa0b61e5ba0be4836ce8400dbfc44cfd1c3eb363ec93a7a8a89bf1d21dcef8b"
+address = "127.0.0.3:6333"
+identity_key = "70bdbf043f336edaadb0685ff782023f450f58fb50c482ca479e8cd3f03b4c03"
+public_key = "5451b096fbb4d76735559bd994b889369741b87622bdec7af868d691c2ff83ce"
 
 [database]
 create_if_missing = true
 [[genesis.validator_keys]]
-consensus_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
-service_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
+consensus_key = "1160ad405a7e63795179325db9b2ac5eee8f0e7242b5b0a932ac53ae1aa7eaf1"
+identity_key = "1eadb287351a57f90e7a72c942e99895af12e65d392b28c360fce4a631b1f513"
+service_key = "02aac0c0236b958814b3c591925fd913c7cff1548f35feb04277997dfbe82e44"
 
 [[genesis.validator_keys]]
-consensus_key = "3b27439519ca4d28de698367d0a5bcc3cc33912e671c6dc952dafac2df1ffb07"
-service_key = "e4ed73397172b26b3488494ede7e606e4967e75b0875811a49f4487ee71dc6ce"
+consensus_key = "3b6e5f864ead0e40408d6b78bdfc124f731a127f2a5d65f8b4bbdc4d8875bf1c"
+identity_key = "18c8390fcacbd3108f67aec0be481e7463a13084fa6d91f0f0720ab00cd89a08"
+service_key = "db4f7ca15b912ad1804aceb0771b1f47a498b7a54f85ff58d66c02fbd9cc0c40"
 
 [[genesis.validator_keys]]
-consensus_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
-service_key = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"
+consensus_key = "5451b096fbb4d76735559bd994b889369741b87622bdec7af868d691c2ff83ce"
+identity_key = "70bdbf043f336edaadb0685ff782023f450f58fb50c482ca479e8cd3f03b4c03"
+service_key = "32b076afd07eb72499911a8dd832d8c9156986d26a50a38443f76a32549b4c95"
 
 [[genesis.validator_keys]]
-consensus_key = "faa0b61e5ba0be4836ce8400dbfc44cfd1c3eb363ec93a7a8a89bf1d21dcef8b"
-service_key = "f4fc481e910d79027fbadb200a1e79435319d2c781d114a0b9687b3babaa2ccf"
+consensus_key = "f9e14a9e10698b0c7dfed1eddbe3dbdb58bcbe5049246ceb8f36cff827baf1e6"
+identity_key = "2f6be62dc94262bb57371e35e01e0c4abc5a75ac07059be38ec5e7964b104108"
+service_key = "e496f163978b12670bf8b4a95a15827f17a6988cd8b31bddee60618e9bc5417f"
 
 [genesis.consensus]
 first_round_timeout = 3000
@@ -46,6 +50,14 @@ peers_timeout = 10000
 propose_timeout_threshold = 500
 status_timeout = 5000
 txs_block_limit = 1000
+
+[keys]
+consensus_pk = "f9e14a9e10698b0c7dfed1eddbe3dbdb58bcbe5049246ceb8f36cff827baf1e6"
+consensus_sk = "d24fee4a8b90054395ed759d72ea4cae540ce12315985ea858c3646a0565ce14f9e14a9e10698b0c7dfed1eddbe3dbdb58bcbe5049246ceb8f36cff827baf1e6"
+identity_pk = "2f6be62dc94262bb57371e35e01e0c4abc5a75ac07059be38ec5e7964b104108"
+identity_sk = "755c097b44fd1bcfb0bc86464e81077be23a8cb4b110d44135717145cd699006"
+service_pk = "e496f163978b12670bf8b4a95a15827f17a6988cd8b31bddee60618e9bc5417f"
+service_sk = "7435b9e8138a4062ca680bc96ef89d904200e11f653d28c311cdf4c381702e0ee496f163978b12670bf8b4a95a15827f17a6988cd8b31bddee60618e9bc5417f"
 [mempool.events_pool_capacity]
 api_requests_capacity = 1024
 internal_events_capacity = 128
@@ -58,5 +70,4 @@ max_outgoing_connections = 128
 tcp_connect_max_retries = 10
 tcp_connect_retry_timeout = 15000
 tcp_nodelay = true
-
-[services_configs]
+[services_configs.configuration_service]
