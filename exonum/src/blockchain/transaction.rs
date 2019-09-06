@@ -402,7 +402,7 @@ impl ProtobufConvert for TransactionResult {
         };
 
         Ok(TransactionResult(match status_code {
-            value @ 0...MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
+            value @ 0..=MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
             TRANSACTION_STATUS_OK => Ok(()),
             TRANSACTION_STATUS_PANIC => Err(TransactionError::panic(description)),
             value => bail!("Invalid TransactionResult value: {}", value),

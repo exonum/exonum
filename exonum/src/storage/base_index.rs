@@ -308,7 +308,7 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
 /// and underscores.
 fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref().as_bytes().iter().all(|c| match *c {
-        48...57 | 65...90 | 97...122 | 95 | 46 => true,
+        48..=57 | 65..=90 | 97..=122 | 95 | 46 => true,
         _ => false,
     })
 }
