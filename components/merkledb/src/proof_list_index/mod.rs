@@ -628,7 +628,26 @@ where
         self.update_range(index, index);
     }
 
-    /// TODO
+    /// Shortens the list, keeping the indicated number of first `len` elements
+    /// and dropping the rest.
+    ///
+    /// If `len` is greater than the current state of the list, this has no effect.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let name = "name";
+    /// let fork = db.fork();
+    /// let mut index = ProofListIndex::new(name, &fork);
+    ///
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    /// assert_eq!(5, index.len());
+    /// index.truncate(3);
+    /// assert!(index.iter().eq(vec![1, 2, 3]));
+    /// ```
     pub fn truncate(&mut self, new_length: u64) {
         if self.len() <= new_length {
             return;
@@ -683,7 +702,21 @@ where
         }
     }
 
-    /// TODO
+    /// Removes the last element from the list and returns it, or returns `None`
+    /// if the list is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = ProofListIndex::new("list", &fork);
+    /// assert_eq!(None, index.pop());
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.pop());
+    /// ```
     pub fn pop(&mut self) -> Option<V> {
         if self.is_empty() {
             None

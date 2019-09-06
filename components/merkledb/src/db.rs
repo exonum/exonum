@@ -649,7 +649,7 @@ impl IndexAccess for Rc<Fork> {
         &self.patch
     }
 
-   fn changes(&self, address: &IndexAddress) -> Self::Changes {
+    fn changes(&self, address: &IndexAddress) -> Self::Changes {
         let changes = self.working_patch.take_view_changes(address);
         ChangesRef {
             changes,
