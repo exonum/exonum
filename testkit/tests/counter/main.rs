@@ -737,7 +737,7 @@ fn test_explorer_single_block() {
                 .consensus_public_key_of(precommit.validator())
                 .expect("Cannot find validator id");
             validators.insert(precommit.validator());
-            assert_eq!(pk, &precommit.author())
+            assert_eq!(&pk, &precommit.author())
         }
 
         assert!(validators.len() >= testkit.majority_count());

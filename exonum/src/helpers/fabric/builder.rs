@@ -27,7 +27,7 @@ use super::{
     internal::{CollectedCommand, Command, Feedback},
     keys,
     maintenance::Maintenance,
-    password::{PassInputMethod, SecretKeyType},
+    password::PassInputMethod,
     CommandName, Context, ServiceFactory,
 };
 
@@ -161,7 +161,7 @@ impl NodeBuilder {
             let run_config = ctx.get(keys::RUN_CONFIG).unwrap();
             let consensus_passphrase = PassInputMethod::from_str(&run_config.master_pass_method)
                 .expect("Incorrect passphrase input method for master key.")
-                .get_passphrase(SecretKeyType::Consensus, true);
+                .get_passphrase(true);
 
             config.read_secret_keys(&config_file_path, consensus_passphrase.as_bytes())
         };

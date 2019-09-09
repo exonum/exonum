@@ -52,14 +52,14 @@ fn node_config() -> NodeConfig {
         database: Default::default(),
         thread_pool_size: Default::default(),
         master_key_path: Default::default(),
-        keys: Keys {
-            consensus_pk: consensus_public_key,
-            consensus_sk: consensus_secret_key,
-            service_pk: service_public_key,
-            service_sk: service_secret_key,
-            identity_pk: identity_public_key,
-            identity_sk: identity_secret_key,
-        },
+        keys: Keys::from_keys(
+            consensus_public_key,
+            consensus_secret_key,
+            service_public_key,
+            service_secret_key,
+            identity_public_key,
+            identity_secret_key,
+        ),
     }
 }
 

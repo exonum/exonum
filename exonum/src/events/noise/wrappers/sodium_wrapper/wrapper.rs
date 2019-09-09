@@ -51,7 +51,7 @@ impl NoiseWrapper {
             let state = builder
                 .build_initiator()
                 .expect("Noise session initiator failed to initialize");
-            return Self { state };
+            Self { state }
         } else {
             panic!("Remote public key is not specified")
         }

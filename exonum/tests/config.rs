@@ -19,10 +19,15 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 
-use exonum::{api::backends::actix::AllowOrigin, crypto::{kx, PublicKey, PUBLIC_KEY_LENGTH}, helpers::{
-    config::{ConfigFile, ConfigManager},
-    fabric::NodeBuilder,
-}, node::{ConnectInfo, ConnectListConfig, NodeConfig}, helpers};
+use exonum::{
+    api::backends::actix::AllowOrigin,
+    crypto::{kx, PublicKey, PUBLIC_KEY_LENGTH},
+    helpers::{
+        config::{ConfigFile, ConfigManager},
+        fabric::NodeBuilder,
+    },
+    node::{ConnectInfo, ConnectListConfig, NodeConfig},
+};
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -33,7 +38,6 @@ use std::{
     panic,
     path::{Path, PathBuf},
 };
-use std::io::Write;
 
 #[derive(Debug)]
 struct ConfigSpec {
@@ -80,14 +84,10 @@ impl ConfigSpec {
         let dest = self.output_node_config_dir(index);
         fs::create_dir_all(&dest).unwrap();
 
-        [
-            "pub.toml",
-            "sec.toml",
-            "master.key.toml",
-        ]
-        .iter()
-        .try_for_each(|file| copy_secured(src.join(file), dest.join(file)))
-        .expect("Can't copy file");
+        ["pub.toml", "sec.toml", "master.key.toml"]
+            .iter()
+            .try_for_each(|file| copy_secured(src.join(file), dest.join(file)))
+            .expect("Can't copy file");
     }
 
     fn output_dir(&self) -> PathBuf {
@@ -231,8 +231,10 @@ fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
 fn assert_node_config_files_eq(actual: impl AsRef<Path>, expected: impl AsRef<Path>) {
     let (actual, expected) = (actual.as_ref(), expected.as_ref());
 
+    let config_dir = actual.parent().unwrap();
     let actual = load_node_config(actual);
-    let expected = load_node_config(expected);
+    let mut expected = load_node_config(expected);
+    expected.master_key_path = config_dir.join(&expected.master_key_path);
 
     assert_eq!(actual, expected);
 }

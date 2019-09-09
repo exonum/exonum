@@ -43,7 +43,7 @@ use exonum_merkledb::{Database, DbOptions, Patch, RocksDB};
 
 use exonum::{
     blockchain::{Blockchain, Schema, Service, Transaction},
-    crypto::{Hash, PublicKey, SecretKey},
+    crypto::{kx, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{RawTransaction, Signed},
     node::ApiSender,
@@ -99,6 +99,7 @@ fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Bloc
     let config = GenesisConfig::new(iter::once(ValidatorKeys {
         consensus_key: consensus_keypair.0,
         service_key: service_keypair.0,
+        identity_key: kx::PublicKey::zero(),
     }));
     blockchain.initialize(config).unwrap();
 

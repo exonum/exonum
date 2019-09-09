@@ -32,36 +32,19 @@ pub enum PassInputMethod {
     CmdLineParameter(ZeroizeOnDrop<String>),
 }
 
-/// Secret key types.
-#[derive(Copy, Clone)]
-pub enum SecretKeyType {
-    Consensus,
-    Service,
-}
-
 impl PassInputMethod {
     /// Get passphrase using selected method.
     /// Details of this process differs for different secret key types and whether we run node
     /// or generate config files.
-    pub fn get_passphrase(self, key_type: SecretKeyType, node_run: bool) -> ZeroizeOnDrop<String> {
+    pub fn get_passphrase(self, node_run: bool) -> ZeroizeOnDrop<String> {
         match self {
             PassInputMethod::Terminal => {
-                let prompt = match key_type {
-                    SecretKeyType::Consensus => "Enter master key passphrase",
-                    SecretKeyType::Service => "Enter service key passphrase",
-                };
+                let prompt = "Enter master key passphrase: ";
                 prompt_passphrase(prompt, node_run).expect("Failed to read password from stdin")
             }
             PassInputMethod::EnvVariable(name) => {
-                let var = if let Some(ref name) = name {
-                    name
-                } else {
-                    match key_type {
-                        SecretKeyType::Consensus => "EXONUM_MASTER_PASS",
-                        SecretKeyType::Service => "EXONUM_SERVICE_PASS",
-                    }
-                };
-                ZeroizeOnDrop(env::var(var).unwrap_or_else(|e| {
+                let var = name.unwrap_or_else(|| "EXONUM_MASTER_PASS".to_string());
+                ZeroizeOnDrop(env::var(var.clone()).unwrap_or_else(|e| {
                     panic!("Failed to get password from env variable: {}, {}", var, e)
                 }))
             }

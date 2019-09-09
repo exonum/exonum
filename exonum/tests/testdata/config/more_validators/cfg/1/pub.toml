@@ -19,6 +19,6 @@ address = "127.0.0.2:6333"
 [node.services_public_configs]
 
 [node.validator_keys]
-consensus_key = "001716d5e2d0f100f994c8e03637e8fe10ab59c3a894fd1020ad35435880b8f1"
-identity_key = "f2e48eb9abad13ae222083df784a1d7dce5371972a238727f3248d503ba24955"
-service_key = "73ed82efed7215797a4188828c3ee8582ecddf3fe74e1172f056130b1a42aeb1"
+consensus_key = "7aaffb2a0d3343a1b1952fad076939d184788f7a98aad44ccf67b6d05a765e71"
+identity_key = "342928a8b1d381bb8218558a9c5fd279743797980fb1c10010ca4c8f10188c37"
+service_key = "ddb3c3b820a1b2319b4e2595e0b04a2b530da5efe0e3d7f23b990e598d75880d"

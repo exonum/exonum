@@ -261,6 +261,7 @@ pub struct NodeConfig {
     pub master_key_path: PathBuf,
 
     /// TODO
+    #[serde(skip)]
     pub keys: Keys,
 }
 
@@ -413,7 +414,7 @@ impl ConnectListConfig {
     pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
         let peers = list
             .iter()
-            .filter(|config| config.validator_keys.consensus_key != node.keys.consensus_pk)
+            .filter(|config| config.validator_keys.consensus_key != node.keys.consensus_pk())
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
@@ -476,7 +477,7 @@ impl NodeHandler {
         let validator_id = stored
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == config.keys.consensus_pk)
+            .position(|pk| pk.consensus_key == config.keys.consensus_pk())
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
         let connect = Message::concrete(
@@ -485,8 +486,8 @@ impl NodeHandler {
                 system_state.current_time().into(),
                 &user_agent::get(),
             ),
-            config.keys.consensus_pk,
-            &config.keys.consensus_sk,
+            config.keys.consensus_pk(),
+            &config.keys.consensus_sk(),
         );
 
         let connect_list = config.listener.connect_list;
@@ -528,7 +529,7 @@ impl NodeHandler {
     fn sign_message<T: ProtocolMessage>(&self, message: T) -> Signed<T> {
         Message::concrete(
             message,
-            *self.state.consensus_public_key(),
+            self.state.consensus_public_key(),
             self.state.consensus_secret_key(),
         )
     }
@@ -931,8 +932,8 @@ impl Node {
         let mut blockchain = Blockchain::new(
             db,
             services,
-            node_cfg.keys.service_pk,
-            node_cfg.keys.service_sk.clone(),
+            node_cfg.keys.service_pk(),
+            node_cfg.keys.service_sk().clone(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
@@ -945,8 +946,8 @@ impl Node {
                 address: node_cfg.listen_address,
             },
             service: ServiceConfig {
-                service_public_key: node_cfg.keys.service_pk,
-                service_secret_key: node_cfg.keys.service_sk.clone(),
+                service_public_key: node_cfg.keys.service_pk(),
+                service_secret_key: node_cfg.keys.service_sk().clone(),
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
@@ -1069,7 +1070,7 @@ impl Node {
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            *self.state().identity_public_key(),
+            self.state().identity_public_key(),
             self.state().identity_secret_key().clone(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),

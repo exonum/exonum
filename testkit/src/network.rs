@@ -95,17 +95,17 @@ impl TestNetwork {
     }
 
     /// Returns service public key of the validator with given id.
-    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
+    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators()
             .get(id.0 as usize)
-            .map(|x| &x.keys.service_pk)
+            .map(|x| x.keys.service_pk())
     }
 
     /// Returns consensus public key of the validator with given id.
-    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators()
             .get(id.0 as usize)
-            .map(|x| &x.keys.consensus_pk)
+            .map(|x| x.keys.consensus_pk())
     }
 }
 
@@ -124,14 +124,14 @@ impl TestNode {
         let (identity_pk, identity_sk) = crypto::kx::gen_keypair();
 
         TestNode {
-            keys: Keys {
+            keys: Keys::from_keys(
                 consensus_pk,
                 consensus_sk,
                 service_pk,
                 service_sk,
                 identity_pk,
                 identity_sk,
-            },
+            ),
             validator_id: None,
         }
     }
@@ -143,14 +143,14 @@ impl TestNode {
         let (identity_pk, identity_sk) = crypto::kx::gen_keypair();
 
         TestNode {
-            keys: Keys {
+            keys: Keys::from_keys(
                 consensus_pk,
                 consensus_sk,
                 service_pk,
                 service_sk,
                 identity_pk,
                 identity_sk,
-            },
+            ),
             validator_id: Some(validator_id),
         }
     }
@@ -163,14 +163,14 @@ impl TestNode {
     ) -> TestNode {
         let (identity_pk, identity_sk) = kx::gen_keypair();
         TestNode {
-            keys: Keys {
-                consensus_pk: consensus_keypair.0,
-                consensus_sk: consensus_keypair.1,
-                service_pk: service_keypair.0,
-                service_sk: service_keypair.1,
+            keys: Keys::from_keys(
+                consensus_keypair.0,
+                consensus_keypair.1,
+                service_keypair.0,
+                service_keypair.1,
                 identity_pk,
                 identity_sk,
-            },
+            ),
             validator_id,
         }
     }
@@ -191,8 +191,8 @@ impl TestNode {
                 last_hash,
                 tx_hashes,
             ),
-            self.keys.consensus_pk,
-            &self.keys.consensus_sk,
+            self.keys.consensus_pk(),
+            &self.keys.consensus_sk(),
         )
     }
 
@@ -214,17 +214,17 @@ impl TestNode {
                 block_hash,
                 SystemTime::now().into(),
             ),
-            self.keys.consensus_pk,
-            &self.keys.consensus_sk,
+            self.keys.consensus_pk(),
+            &self.keys.consensus_sk(),
         )
     }
 
     /// Returns public keys of the node.
     pub fn public_keys(&self) -> ValidatorKeys {
         ValidatorKeys {
-            consensus_key: self.keys.consensus_pk,
-            service_key: self.keys.service_pk,
-            identity_key: self.keys.identity_pk,
+            consensus_key: self.keys.consensus_pk(),
+            service_key: self.keys.service_pk(),
+            identity_key: self.keys.identity_pk(),
         }
     }
 
@@ -239,13 +239,13 @@ impl TestNode {
     }
 
     /// Returns the service keypair of the node.
-    pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
-        (&self.keys.service_pk, &self.keys.service_sk)
+    pub fn service_keypair(&self) -> (PublicKey, &SecretKey) {
+        (self.keys.service_pk(), &self.keys.service_sk())
     }
 
     /// Returns the consensus keypair of the node.
-    pub fn consensus_keypair(&self) -> (&PublicKey, &SecretKey) {
-        (&self.keys.consensus_pk, &self.keys.consensus_sk)
+    pub fn consensus_keypair(&self) -> (PublicKey, &SecretKey) {
+        (self.keys.consensus_pk(), &self.keys.consensus_sk())
     }
 }
 
@@ -367,7 +367,7 @@ impl TestNetworkConfiguration {
         let validator_id = self
             .validators
             .iter()
-            .position(|x| x.public_keys().service_key == self.us.keys.service_pk)
+            .position(|x| x.public_keys().service_key == self.us.keys.service_pk())
             .map(|x| ValidatorId(x as u16));
         self.us.validator_id = validator_id;
     }

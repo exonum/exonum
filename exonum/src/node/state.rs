@@ -575,7 +575,7 @@ impl State {
         let validator_id = config
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == *self.consensus_public_key())
+            .position(|pk| pk.consensus_key == self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
 
         // TODO: update connect list (ECR-1745)
@@ -637,33 +637,33 @@ impl State {
     }
 
     /// Returns the consensus public key of the current node.
-    pub fn consensus_public_key(&self) -> &PublicKey {
-        &self.keys.consensus_pk
+    pub fn consensus_public_key(&self) -> PublicKey {
+        self.keys.consensus_pk()
     }
 
     /// TODO
-    pub fn identity_public_key(&self) -> &kx::PublicKey {
-        &self.keys.identity_pk
+    pub fn identity_public_key(&self) -> kx::PublicKey {
+        self.keys.identity_pk()
     }
 
     /// TODO
     pub fn identity_secret_key(&self) -> &kx::SecretKey {
-        &self.keys.identity_sk
+        &self.keys.identity_sk()
     }
 
     /// Returns the consensus secret key of the current node.
     pub fn consensus_secret_key(&self) -> &SecretKey {
-        &self.keys.consensus_sk
+        &self.keys.consensus_sk()
     }
 
     /// Returns the service public key of the current node.
-    pub fn service_public_key(&self) -> &PublicKey {
-        &self.keys.service_pk
+    pub fn service_public_key(&self) -> PublicKey {
+        self.keys.service_pk()
     }
 
     /// Returns the service secret key of the current node.
     pub fn service_secret_key(&self) -> &SecretKey {
-        &self.keys.service_sk
+        &self.keys.service_sk()
     }
 
     /// Returns the leader id for the specified round and current height.

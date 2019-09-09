@@ -27,7 +27,7 @@ use std::{
 use super::{
     internal::{CollectedCommand, Command, Feedback},
     keys,
-    password::{PassInputMethod, SecretKeyType},
+    password::PassInputMethod,
     shared::{
         AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, NodeRunConfig,
         SharedConfig,
@@ -168,8 +168,8 @@ impl Command for Run {
         new_context.set(keys::NODE_CONFIG, config);
 
         let run_config = NodeRunConfig {
-                master_pass_method: new_context.arg(MASTER_KEY_PASS_METHOD).unwrap_or_default(),
-            };
+            master_pass_method: new_context.arg(MASTER_KEY_PASS_METHOD).unwrap_or_default(),
+        };
         new_context.set(keys::RUN_CONFIG, run_config);
 
         Feedback::RunNode(new_context)
@@ -434,15 +434,11 @@ impl GenerateNodeConfig {
         (external_address, listen_address)
     }
 
-    fn get_passphrase(
-        context: &Context,
-        method: PassInputMethod,
-        secret_key_type: SecretKeyType,
-    ) -> ZeroizeOnDrop<String> {
+    fn get_passphrase(context: &Context, method: PassInputMethod) -> ZeroizeOnDrop<String> {
         if context.get_flag_occurrences(NO_PASSWORD).is_some() {
             ZeroizeOnDrop::default()
         } else {
-            method.get_passphrase(secret_key_type, false)
+            method.get_passphrase(false)
         }
     }
 }
@@ -540,18 +536,14 @@ impl Command for GenerateNodeConfig {
         let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
         let keys = {
-            let passphrase = Self::get_passphrase(
-                &new_context,
-                consensus_key_pass_method,
-                SecretKeyType::Consensus,
-            );
+            let passphrase = Self::get_passphrase(&new_context, consensus_key_pass_method);
             create_keys_and_files(&master_key_path, passphrase.as_bytes())
         };
 
         let validator_keys = ValidatorKeys {
-            consensus_key: keys.consensus_pk,
-            service_key: keys.service_pk,
-            identity_key: keys.identity_pk,
+            consensus_key: keys.consensus_pk(),
+            service_key: keys.service_pk(),
+            identity_key: keys.identity_pk(),
         };
         let node_pub_config = NodePublicConfig {
             address: addresses.0.clone(),
@@ -627,7 +619,7 @@ impl Finalize {
         (
             common,
             map.iter().map(|(_, c)| c.clone()).collect(),
-            map.get(&our_config.keys.consensus_pk).cloned(),
+            map.get(&our_config.keys.consensus_pk()).cloned(),
         )
     }
 

@@ -145,7 +145,7 @@ impl NodeHandler {
     }
 
     fn validate_block_response(&self, msg: &Signed<BlockResponse>) -> Result<(), failure::Error> {
-        if msg.to() != self.state.consensus_public_key() {
+        if msg.to() != &self.state.consensus_public_key() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
                 msg.to().to_hex(),
@@ -582,7 +582,7 @@ impl NodeHandler {
         &mut self,
         msg: &Signed<TransactionsResponse>,
     ) -> Result<(), failure::Error> {
-        if msg.to() != self.state.consensus_public_key() {
+        if msg.to() != &self.state.consensus_public_key() {
             bail!(
                 "Received response intended for another peer, to={}, from={}",
                 msg.to().to_hex(),

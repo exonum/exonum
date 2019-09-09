@@ -887,14 +887,14 @@ impl Sandbox {
 
         let connect_list = ConnectList::from_peers(&peers);
 
-        let keys = Keys {
-            consensus_pk: *inner.handler.state.consensus_public_key(),
-            consensus_sk: inner.handler.state.consensus_secret_key().clone(),
-            service_pk: *inner.handler.state.service_public_key(),
-            service_sk: inner.handler.state.service_secret_key().clone(),
-            identity_pk: *inner.handler.state.identity_public_key(),
-            identity_sk: inner.handler.state.identity_secret_key().clone(),
-        };
+        let keys = Keys::from_keys(
+            inner.handler.state.consensus_public_key(),
+            inner.handler.state.consensus_secret_key().clone(),
+            inner.handler.state.service_public_key(),
+            inner.handler.state.service_secret_key().clone(),
+            inner.handler.state.identity_public_key(),
+            inner.handler.state.identity_secret_key().clone(),
+        );
 
         let config = Configuration {
             listener: ListenerConfig {
@@ -902,7 +902,7 @@ impl Sandbox {
                 connect_list,
             },
             service: ServiceConfig {
-                service_public_key: *inner.handler.state.service_public_key(),
+                service_public_key: inner.handler.state.service_public_key(),
                 service_secret_key: inner.handler.state.service_secret_key().clone(),
             },
             network: NetworkConfiguration::default(),
@@ -949,7 +949,7 @@ impl Sandbox {
     }
 
     fn node_public_key(&self) -> PublicKey {
-        *self.node_state().consensus_public_key()
+        self.node_state().consensus_public_key()
     }
 
     fn node_secret_key(&self) -> SecretKey {
@@ -1095,24 +1095,17 @@ fn sandbox_with_services_uninitialized(
                 kx::gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
             )
         })
-        .map(|(v, s, i)| Keys {
-            consensus_pk: v.0,
-            consensus_sk: v.1,
-            service_pk: s.0,
-            service_sk: s.1,
-            identity_pk: i.0,
-            identity_sk: i.1,
-        })
+        .map(|(v, s, i)| Keys::from_keys(v.0, v.1, s.0, s.1, i.0, i.1))
         .collect();
 
     let validators = keys
         .iter()
-        .map(|keys| (keys.consensus_pk, keys.consensus_sk.clone()))
+        .map(|keys| (keys.consensus_pk(), keys.consensus_sk().clone()))
         .collect::<Vec<_>>();
 
     let service_keys = keys
         .iter()
-        .map(|keys| (keys.service_pk, keys.service_sk.clone()))
+        .map(|keys| (keys.service_pk(), keys.service_sk().clone()))
         .collect::<Vec<_>>();
 
     let addresses = (1..=validators_count)
@@ -1126,8 +1119,8 @@ fn sandbox_with_services_uninitialized(
         .zip(str_addresses.iter())
         .map(|(keys, a)| ConnectInfo {
             address: a.clone(),
-            public_key: keys.consensus_pk,
-            identity_key: keys.identity_pk,
+            public_key: keys.consensus_pk(),
+            identity_key: keys.identity_pk(),
         })
         .collect();
 
@@ -1144,9 +1137,9 @@ fn sandbox_with_services_uninitialized(
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
         keys.iter().map(|keys| ValidatorKeys {
-            consensus_key: keys.consensus_pk,
-            service_key: keys.service_pk,
-            identity_key: keys.identity_pk,
+            consensus_key: keys.consensus_pk(),
+            service_key: keys.service_pk(),
+            identity_key: keys.identity_pk(),
         }),
     );
 

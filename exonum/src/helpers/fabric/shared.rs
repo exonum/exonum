@@ -81,6 +81,7 @@ pub struct NodePrivateConfig {
     /// TODO
     pub master_key_path: PathBuf,
     /// TODO
+    #[serde(skip)]
     pub keys: Keys,
 }
 

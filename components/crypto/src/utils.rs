@@ -14,9 +14,10 @@
 
 // spell-checker:ignore cipherparams ciphertext
 
-use super::{gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use super::{
+    gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH,
+};
 use failure::format_err;
-use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
 use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
@@ -24,7 +25,6 @@ use secret_tree::{Name, SecretTree};
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::{
-    borrow::Cow,
     fs::{File, OpenOptions},
     io::{Error, ErrorKind, Read, Write},
     path::Path,
@@ -40,15 +40,76 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
     }
 }
 
+#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct KeyPair {
+    public_key: PublicKey,
+    secret_key: SecretKey,
+}
+
+impl KeyPair {
+    fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
+        assert_eq!(
+            &public_key[..],
+            &secret_key[PUBLIC_KEY_LENGTH..],
+            "Public key does not match the secret key."
+        );
+
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+}
+
 /// Struct containing all validator key pairs.
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
-    pub consensus_pk: PublicKey,
-    pub consensus_sk: SecretKey,
-    pub service_pk: PublicKey,
-    pub service_sk: SecretKey,
-    pub identity_pk: kx::PublicKey,
-    pub identity_sk: kx::SecretKey,
+    consensus: KeyPair,
+    service: KeyPair,
+    identity: kx::KeyPair,
+}
+
+impl Keys {
+    pub fn from_keys(
+        consensus_pk: PublicKey,
+        consensus_sk: SecretKey,
+        service_pk: PublicKey,
+        service_sk: SecretKey,
+        identity_pk: kx::PublicKey,
+        identity_sk: kx::SecretKey,
+    ) -> Self {
+        Self {
+            consensus: KeyPair::from_keys(consensus_pk, consensus_sk),
+            service: KeyPair::from_keys(service_pk, service_sk),
+            identity: kx::KeyPair::from_keys(identity_pk, identity_sk),
+        }
+    }
+}
+
+impl Keys {
+    pub fn consensus_pk(&self) -> PublicKey {
+        self.consensus.public_key
+    }
+
+    pub fn consensus_sk(&self) -> &SecretKey {
+        &self.consensus.secret_key
+    }
+
+    pub fn service_pk(&self) -> PublicKey {
+        self.service.public_key
+    }
+
+    pub fn service_sk(&self) -> &SecretKey {
+        &self.service.secret_key
+    }
+
+    pub fn identity_pk(&self) -> kx::PublicKey {
+        self.identity.public_key
+    }
+
+    pub fn identity_sk(&self) -> &kx::SecretKey {
+        &self.identity.secret_key
+    }
 }
 
 pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
@@ -131,14 +192,14 @@ fn generate_keys_from_master_password(tree: SecretTree) -> Option<Keys> {
     let seed = Seed::from_slice(&buffer)?;
     let (identity_pk, identity_sk) = kx::gen_keypair_from_seed(&seed);
 
-    Some(Keys {
+    Some(Keys::from_keys(
         consensus_pk,
         consensus_sk,
         service_pk,
         service_sk,
         identity_pk,
         identity_sk,
-    })
+    ))
 }
 
 pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
@@ -158,12 +219,13 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
 
     let tree = SecretTree::from_seed(&seed).expect("Error creating secret tree from seed.");
     generate_keys_from_master_password(tree)
-        .ok_or(format_err!("Error deriving keys from master key"))
+        .ok_or_else(|| format_err!("Error deriving keys from master key"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gen_keypair;
     use tempdir::TempDir;
 
     #[test]
@@ -187,7 +249,7 @@ mod tests {
         dbg!(hex::encode(&seed));
 
         let mut file = File::create("foo.txt").unwrap();
-        file.write_all(toml::to_string(&key).unwrap().as_bytes());
+        let _ = file.write_all(toml::to_string(&key).unwrap().as_bytes());
 
         let decrypted_seed = key
             .decrypt(pass_phrase)
@@ -236,5 +298,33 @@ mod tests {
         assert!(validate_file_mode(0o_100_755).is_err());
         assert!(validate_file_mode(0o_644).is_err());
         assert!(validate_file_mode(0o_666).is_err());
+    }
+
+    #[test]
+    fn valid_keypair() {
+        let (pk, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    #[should_panic]
+    fn not_valid_keypair() {
+        let (pk, _) = gen_keypair();
+        let (_, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    fn valid_kx_keypair() {
+        let (pk, sk) = kx::gen_keypair();
+        let _ = kx::KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    #[should_panic]
+    fn not_valid_kx_keypair() {
+        let (pk, _) = kx::gen_keypair();
+        let (_, sk) = kx::gen_keypair();
+        let _ = kx::KeyPair::from_keys(pk, sk);
     }
 }

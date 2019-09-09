@@ -2,12 +2,4 @@ external_address = "127.0.0.1:6333"
 listen_address = "0.0.0.0:6333"
 master_key_path = "master.key.toml"
 
-[keys]
-consensus_pk = "3b6e5f864ead0e40408d6b78bdfc124f731a127f2a5d65f8b4bbdc4d8875bf1c"
-consensus_sk = "0701690237c0e8233f30155e1445cb9af0b0eba310f6428fb13cebc8964a4c843b6e5f864ead0e40408d6b78bdfc124f731a127f2a5d65f8b4bbdc4d8875bf1c"
-identity_pk = "18c8390fcacbd3108f67aec0be481e7463a13084fa6d91f0f0720ab00cd89a08"
-identity_sk = "f039d0ea507d9eeb21bf39f287b259210e665ae20f8d2fcf60faf363066a738b"
-service_pk = "db4f7ca15b912ad1804aceb0771b1f47a498b7a54f85ff58d66c02fbd9cc0c40"
-service_sk = "7eb79beb978451d6a6f86af76efdc920fa4733ccf8dd42c71e19534e182f1a5adb4f7ca15b912ad1804aceb0771b1f47a498b7a54f85ff58d66c02fbd9cc0c40"
-
 [services_secret_configs]

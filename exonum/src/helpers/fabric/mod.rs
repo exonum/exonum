@@ -202,7 +202,7 @@ pub mod keys {
 /// use exonum::node::NodeConfig;
 /// use exonum::helpers::fabric::{keys, Context};
 ///
-/// fn get_node_config(context: &Context) -> NodeConfig<PathBuf> {
+/// fn get_node_config(context: &Context) -> NodeConfig {
 ///     context.get(keys::NODE_CONFIG).unwrap()
 /// }
 /// ```

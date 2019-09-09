@@ -432,7 +432,7 @@ impl TestKit {
         let mut blockchain = Blockchain::new(
             db,
             services,
-            *network.us().service_keypair().0,
+            network.us().service_keypair().0,
             network.us().service_keypair().1.clone(),
             api_sender.clone(),
         );

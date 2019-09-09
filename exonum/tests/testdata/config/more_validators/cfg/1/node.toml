@@ -5,41 +5,46 @@ master_key_path = "master.key.toml"
 [api]
 state_update_timeout = 10000
 [[connect_list.peers]]
-address = "127.0.0.3:6333"
-identity_key = "3624a73e651733d52a4774bb1295eb738b3b8fe2ff9af85d7249ff2e03296063"
-public_key = "11a318bace9595a13c7d14b48cd77177a9202fe8aba8d99ce573803c16935156"
+address = "127.0.0.1:6333"
+identity_key = "2074195abf07c426027930e30dae79ceeceef06d8f71e571d3f3c78546e4ef55"
+public_key = "448e29f1e600e7b9bc7312ff213d9dd03196c656352bbf9b5acdbe929c4dc489"
 
 [[connect_list.peers]]
-address = "127.0.0.1:6333"
-identity_key = "1f47ede84c3d48b48df811a6f5cd750a423a2178f937b240581e261b952fb253"
-public_key = "dd02d70bb9cb4589b6328de1c7971ae8955a4ac8517ec43f6820df050d8b4fdb"
+address = "127.0.0.2:6333"
+identity_key = "342928a8b1d381bb8218558a9c5fd279743797980fb1c10010ca4c8f10188c37"
+public_key = "7aaffb2a0d3343a1b1952fad076939d184788f7a98aad44ccf67b6d05a765e71"
+
+[[connect_list.peers]]
+address = "127.0.0.3:6333"
+identity_key = "609e47520b04cc2d48c9e9e38eb8ad38a9c7313af66534f8e8b25f11fb764854"
+public_key = "c1a00518f1cb606c3ff3e891c6ac1c7c4e49ca1ffcac9094e71c038abf38498c"
 
 [[connect_list.peers]]
 address = "127.0.0.4:6333"
-identity_key = "fbc302d78886131a6848c0fed54fbde65eedc1a2199aef0ff68fa93999f54563"
-public_key = "f317fa672b9074e3b59d2c42b911b8178510cad3b2e9287771bf289743ad811c"
+identity_key = "ece8ce74c3d7c6d62b7dc2aacfebe0d203ee012bd265b8aeeb8659b2568a430e"
+public_key = "ce0e13cd5f8a010c115f7b894c7c24d9403ea0bb0887001670d1b836141dd01c"
 
 [database]
 create_if_missing = true
 [[genesis.validator_keys]]
-consensus_key = "001716d5e2d0f100f994c8e03637e8fe10ab59c3a894fd1020ad35435880b8f1"
-identity_key = "f2e48eb9abad13ae222083df784a1d7dce5371972a238727f3248d503ba24955"
-service_key = "73ed82efed7215797a4188828c3ee8582ecddf3fe74e1172f056130b1a42aeb1"
+consensus_key = "448e29f1e600e7b9bc7312ff213d9dd03196c656352bbf9b5acdbe929c4dc489"
+identity_key = "2074195abf07c426027930e30dae79ceeceef06d8f71e571d3f3c78546e4ef55"
+service_key = "d82dc55e8bd08707cba61d6faebaa2e86f6dbee2672b2c95ba68adca402fbe16"
 
 [[genesis.validator_keys]]
-consensus_key = "11a318bace9595a13c7d14b48cd77177a9202fe8aba8d99ce573803c16935156"
-identity_key = "3624a73e651733d52a4774bb1295eb738b3b8fe2ff9af85d7249ff2e03296063"
-service_key = "493a092187f48e56bc8181a2531d809f2877d63e31c161ff82b5c0ce43781cc1"
+consensus_key = "7aaffb2a0d3343a1b1952fad076939d184788f7a98aad44ccf67b6d05a765e71"
+identity_key = "342928a8b1d381bb8218558a9c5fd279743797980fb1c10010ca4c8f10188c37"
+service_key = "ddb3c3b820a1b2319b4e2595e0b04a2b530da5efe0e3d7f23b990e598d75880d"
 
 [[genesis.validator_keys]]
-consensus_key = "dd02d70bb9cb4589b6328de1c7971ae8955a4ac8517ec43f6820df050d8b4fdb"
-identity_key = "1f47ede84c3d48b48df811a6f5cd750a423a2178f937b240581e261b952fb253"
-service_key = "774ea7e74e4fd24e77927c542fb0fbacaa546dce25325f0b062e8ede91df9b65"
+consensus_key = "c1a00518f1cb606c3ff3e891c6ac1c7c4e49ca1ffcac9094e71c038abf38498c"
+identity_key = "609e47520b04cc2d48c9e9e38eb8ad38a9c7313af66534f8e8b25f11fb764854"
+service_key = "e597a326e7ad218140b7d5eb587a7c162a93b06fd50dd679c676518fa703360c"
 
 [[genesis.validator_keys]]
-consensus_key = "f317fa672b9074e3b59d2c42b911b8178510cad3b2e9287771bf289743ad811c"
-identity_key = "fbc302d78886131a6848c0fed54fbde65eedc1a2199aef0ff68fa93999f54563"
-service_key = "b6473769d14eade5c8b9370afbcdbbaa377139ccb799c888f36ede1a84f78da3"
+consensus_key = "ce0e13cd5f8a010c115f7b894c7c24d9403ea0bb0887001670d1b836141dd01c"
+identity_key = "ece8ce74c3d7c6d62b7dc2aacfebe0d203ee012bd265b8aeeb8659b2568a430e"
+service_key = "dc3f637623d9cc0a49248251ef4667da1f72c1e05f7375a251245598a1112ed4"
 
 [genesis.consensus]
 first_round_timeout = 3000
@@ -50,14 +55,6 @@ peers_timeout = 10000
 propose_timeout_threshold = 500
 status_timeout = 5000
 txs_block_limit = 1000
-
-[keys]
-consensus_pk = "001716d5e2d0f100f994c8e03637e8fe10ab59c3a894fd1020ad35435880b8f1"
-consensus_sk = "5fdd38886a42b1c40086a157b6d933eefe210d2d7aecbe9a7b81f1503b00eec4001716d5e2d0f100f994c8e03637e8fe10ab59c3a894fd1020ad35435880b8f1"
-identity_pk = "f2e48eb9abad13ae222083df784a1d7dce5371972a238727f3248d503ba24955"
-identity_sk = "f6f733a6ad92ae7c1f6d4c1b410d719c6c693046d9c10ab3dadbe8db3923e7f7"
-service_pk = "73ed82efed7215797a4188828c3ee8582ecddf3fe74e1172f056130b1a42aeb1"
-service_sk = "3f0d1247d8ba27e49943cce945546099aa340b360ff7996692a81f3b4cbc6a7173ed82efed7215797a4188828c3ee8582ecddf3fe74e1172f056130b1a42aeb1"
 [mempool.events_pool_capacity]
 api_requests_capacity = 1024
 internal_events_capacity = 128

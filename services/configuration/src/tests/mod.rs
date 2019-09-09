@@ -37,7 +37,7 @@ pub fn new_tx_config_propose(
 ) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
     Propose::sign(
-        keypair.0,
+        &keypair.0,
         str::from_utf8(cfg_proposal.into_bytes().as_slice()).unwrap(),
         keypair.1,
     )
@@ -45,7 +45,7 @@ pub fn new_tx_config_propose(
 
 pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
-    Vote::sign(keypair.0, &cfg_proposal_hash, keypair.1)
+    Vote::sign(&keypair.0, &cfg_proposal_hash, keypair.1)
 }
 
 pub fn new_tx_config_vote_against(
@@ -53,7 +53,7 @@ pub fn new_tx_config_vote_against(
     cfg_proposal_hash: Hash,
 ) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
-    VoteAgainst::sign(keypair.0, &cfg_proposal_hash, keypair.1)
+    VoteAgainst::sign(&keypair.0, &cfg_proposal_hash, keypair.1)
 }
 
 pub trait ConfigurationTestKit {

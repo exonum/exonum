@@ -18,7 +18,13 @@ use std::{
 };
 
 use crate::{write_short_hex, Seed};
-use exonum_sodiumoxide::crypto::kx;
+use exonum_sodiumoxide::crypto::{
+    kx,
+    scalarmult::curve25519::{
+        scalarmult_base as sodium_scalarmult_base, Scalar as Curve25519Scalar,
+    },
+};
+
 use hex::{encode as encode_hex, FromHex, FromHexError};
 
 use serde::{
@@ -36,6 +42,35 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (pk, sk) = kx::keypair_from_seed(&kx::Seed::from_slice(&seed[..]).unwrap());
 
     (PublicKey(pk), SecretKey(sk))
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct KeyPair {
+    pub(crate) public_key: PublicKey,
+    pub(crate) secret_key: SecretKey,
+}
+
+impl KeyPair {
+    pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
+        let pk = scalarmult_base(&secret_key);
+        assert_eq!(
+            &public_key, &pk,
+            "Public key does not match the secret key."
+        );
+
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+}
+
+fn scalarmult_base(n: &SecretKey) -> PublicKey {
+    let mut sk = [0u8; 32];
+    sk.copy_from_slice(n.as_ref());
+
+    let pk = sodium_scalarmult_base(&Curve25519Scalar(sk));
+    PublicKey::from_slice(&pk[..]).unwrap()
 }
 
 #[derive(Debug, Copy, Hash, Clone, PartialEq, Eq, Ord, PartialOrd)]
@@ -60,9 +95,25 @@ impl fmt::Display for PublicKey {
     }
 }
 
+impl Default for PublicKey {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
 impl SecretKey {
     pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
         kx::SecretKey::from_slice(bytes_slice).map(SecretKey)
+    }
+
+    pub fn zero() -> Self {
+        Self::from_slice(&[0u8; 32]).unwrap()
+    }
+}
+
+impl Default for SecretKey {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 
