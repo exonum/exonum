@@ -71,7 +71,7 @@ impl TestNetwork {
     /// a blockchain.
     pub fn genesis_config(&self) -> ConsensusConfig {
         ConsensusConfig {
-            validators: self.validators.iter().map(TestNode::public_keys).collect(),
+            validator_keys: self.validators.iter().map(TestNode::public_keys).collect(),
             ..ConsensusConfig::default()
         }
     }
@@ -84,7 +84,7 @@ impl TestNetwork {
             .map(|(id, mut validator)| {
                 let validator_id = ValidatorId(id as u16);
                 validator.change_role(Some(validator_id));
-                if us.public_keys().consensus == validator.public_keys().consensus {
+                if us.public_keys().consensus_key == validator.public_keys().consensus_key {
                     us.change_role(Some(validator_id));
                 }
                 validator
@@ -215,8 +215,8 @@ impl TestNode {
     /// Returns public keys of the node.
     pub fn public_keys(&self) -> ValidatorKeys {
         ValidatorKeys {
-            consensus: self.consensus_public_key,
-            service: self.service_public_key,
+            consensus_key: self.consensus_public_key,
+            service_key: self.service_public_key,
         }
     }
 
@@ -315,7 +315,7 @@ impl TestNetworkConfiguration {
                 node
             })
             .collect();
-        self.consensus_config.validators = self
+        self.consensus_config.validator_keys = self
             .validators
             .iter()
             .cloned()
@@ -344,7 +344,7 @@ impl TestNetworkConfiguration {
         let validator_id = self
             .validators
             .iter()
-            .position(|x| x.public_keys().service == self.us.service_public_key)
+            .position(|x| x.public_keys().service_key == self.us.service_public_key)
             .map(|x| ValidatorId(x as u16));
         self.us.validator_id = validator_id;
     }

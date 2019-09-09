@@ -31,23 +31,23 @@ use crate::{
 };
 
 /// Public keys of a validator. Each validator has two public keys: the
-/// `consensus` is used for internal operations in the consensus process,
-/// while the `service` is used in services.
+/// `consensus_key` is used for internal operations in the consensus process,
+/// while the `service_key` is used in services.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, ProtobufConvert)]
 #[exonum(crate = "crate", pb = "blockchain::ValidatorKeys")]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
-    pub consensus: PublicKey,
+    pub consensus_key: PublicKey,
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
-    pub service: PublicKey,
+    pub service_key: PublicKey,
 }
 
 impl ValidateInput for ValidatorKeys {
     type Error = failure::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
-        if self.consensus == self.service {
+        if self.consensus_key == self.service_key {
             bail!("Consensus and service keys must be different.");
         }
         Ok(())
@@ -72,7 +72,7 @@ impl ValidateInput for ValidatorKeys {
 pub struct ConsensusConfig {
     /// List of validators public keys.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub validators: Vec<ValidatorKeys>,
+    pub validator_keys: Vec<ValidatorKeys>,
     /// Interval between first two rounds. This interval defines the time that passes
     /// between the moment a new block is committed to the blockchain and the
     /// time when second round starts, regardless of whether a new block has
@@ -114,7 +114,7 @@ pub struct ConsensusConfig {
 impl Default for ConsensusConfig {
     fn default() -> Self {
         Self {
-            validators: Vec::default(),
+            validator_keys: Vec::default(),
             first_round_timeout: 3000,
             status_timeout: 5000,
             peers_timeout: 10_000,
@@ -137,19 +137,21 @@ impl ConsensusConfig {
     /// a single validator key. And each key should meet only once.
     fn validate_keys(&self) -> Result<(), failure::Error> {
         ensure!(
-            !self.validators.is_empty(),
+            !self.validator_keys.is_empty(),
             "Consensus configuration must have at least one validator."
         );
 
-        let mut exist_keys = HashSet::with_capacity(self.validators.len() * 2);
-        for keys in &self.validators {
-            keys.validate()?;
-            if exist_keys.contains(&keys.consensus) || exist_keys.contains(&keys.service) {
+        let mut exist_keys = HashSet::with_capacity(self.validator_keys.len() * 2);
+        for validator_keys in &self.validator_keys {
+            validator_keys.validate()?;
+            if exist_keys.contains(&validator_keys.consensus_key)
+                || exist_keys.contains(&validator_keys.service_key)
+            {
                 bail!("Duplicated keys are found: each consensus and service key must be unique");
             }
 
-            exist_keys.insert(keys.consensus);
-            exist_keys.insert(keys.service);
+            exist_keys.insert(validator_keys.consensus_key);
+            exist_keys.insert(validator_keys.service_key);
         }
 
         Ok(())
@@ -168,20 +170,20 @@ impl ConsensusConfig {
     ///
     /// fn main() {
     ///     let config = ConsensusConfig {
-    ///         validators: (0..4)
+    ///         validator_keys: (0..4)
     ///             .map(|_| ValidatorKeys {
-    ///                 consensus: crypto::gen_keypair().0,
-    ///                 service: crypto::gen_keypair().0,
+    ///                 consensus_key: crypto::gen_keypair().0,
+    ///                 service_key: crypto::gen_keypair().0,
     ///             })
     ///             .collect(),
     ///         ..ConsensusConfig::default()
     ///     };
     ///
-    ///     let some_validator_consensus_key = config.validators[2].consensus;
+    ///     let some_validator_consensus_key = config.validator_keys[2].consensus_key;
     ///     // Try to find validator ID for this key.
     ///     assert_eq!(
     ///         config.find_validator(|validator_keys| {
-    ///             validator_keys.consensus == some_validator_consensus_key
+    ///             validator_keys.consensus_key == some_validator_consensus_key
     ///         }),
     ///         Some(ValidatorId(2)),
     ///     );
@@ -191,7 +193,7 @@ impl ConsensusConfig {
         &self,
         predicate: impl Fn(&ValidatorKeys) -> bool,
     ) -> Option<ValidatorId> {
-        self.validators
+        self.validator_keys
             .iter()
             .position(predicate)
             .map(|id| ValidatorId(id as u16))
@@ -300,8 +302,8 @@ mod tests {
 
     fn gen_validator_keys(i: u8) -> ValidatorKeys {
         ValidatorKeys {
-            consensus: gen_keypair_from_seed(&Seed::new([i + 1; SEED_LENGTH])).0,
-            service: gen_keypair_from_seed(&Seed::new([(i + 1) * 10; SEED_LENGTH])).0,
+            consensus_key: gen_keypair_from_seed(&Seed::new([i + 1; SEED_LENGTH])).0,
+            service_key: gen_keypair_from_seed(&Seed::new([(i + 1) * 10; SEED_LENGTH])).0,
         }
     }
 
@@ -313,7 +315,7 @@ mod tests {
 
     fn gen_consensus_config() -> ConsensusConfig {
         ConsensusConfig {
-            validators: (0..4).map(gen_validator_keys).collect(),
+            validator_keys: (0..4).map(gen_validator_keys).collect(),
             ..ConsensusConfig::default()
         }
     }
@@ -323,8 +325,8 @@ mod tests {
         let pk = crypto::gen_keypair().0;
 
         let keys = ValidatorKeys {
-            consensus: pk,
-            service: pk,
+            consensus_key: pk,
+            service_key: pk,
         };
         let e = keys.validate().unwrap_err();
         assert_err(e, "Consensus and service keys must be different");
@@ -333,7 +335,7 @@ mod tests {
     #[test]
     fn consensus_config_validate_ok() {
         let cfg = ConsensusConfig {
-            validators: (0..4).map(gen_validator_keys).collect(),
+            validator_keys: (0..4).map(gen_validator_keys).collect(),
             ..ConsensusConfig::default()
         };
 
@@ -345,14 +347,14 @@ mod tests {
         let keys = gen_keys_pool(4);
 
         let cfg = ConsensusConfig {
-            validators: vec![
+            validator_keys: vec![
                 ValidatorKeys {
-                    consensus: keys[0],
-                    service: keys[1],
+                    consensus_key: keys[0],
+                    service_key: keys[1],
                 },
                 ValidatorKeys {
-                    consensus: keys[0],
-                    service: keys[2],
+                    consensus_key: keys[0],
+                    service_key: keys[2],
                 },
             ],
             ..ConsensusConfig::default()
@@ -374,14 +376,14 @@ mod tests {
         let keys = gen_keys_pool(4);
 
         let cfg = ConsensusConfig {
-            validators: vec![
+            validator_keys: vec![
                 ValidatorKeys {
-                    consensus: keys[0],
-                    service: keys[1],
+                    consensus_key: keys[0],
+                    service_key: keys[1],
                 },
                 ValidatorKeys {
-                    consensus: keys[2],
-                    service: keys[1],
+                    consensus_key: keys[2],
+                    service_key: keys[1],
                 },
             ],
             ..ConsensusConfig::default()
@@ -395,14 +397,14 @@ mod tests {
         let keys = gen_keys_pool(4);
 
         let cfg = ConsensusConfig {
-            validators: vec![
+            validator_keys: vec![
                 ValidatorKeys {
-                    consensus: keys[0],
-                    service: keys[1],
+                    consensus_key: keys[0],
+                    service_key: keys[1],
                 },
                 ValidatorKeys {
-                    consensus: keys[1],
-                    service: keys[2],
+                    consensus_key: keys[1],
+                    service_key: keys[2],
                 },
             ],
             ..ConsensusConfig::default()

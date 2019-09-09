@@ -162,8 +162,8 @@ impl ExonumCommand for GenerateConfig {
         };
 
         let validator_keys = ValidatorKeys {
-            consensus: consensus_public_key,
-            service: service_public_key,
+            consensus_key: consensus_public_key,
+            service_key: service_public_key,
         };
         let node_pub_config = NodePublicConfig {
             address: self.peer_address.to_string(),

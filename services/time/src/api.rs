@@ -79,7 +79,7 @@ impl PrivateApi {
         state: &api::ServiceApiState,
     ) -> api::Result<Vec<ValidatorTime>> {
         let view = state.snapshot();
-        let validator_keys = Schema::new(view).consensus_config().validators;
+        let validator_keys = Schema::new(view).consensus_config().validator_keys;
         let schema = TimeSchema::new(state.instance.name, view);
         let idx = schema.validators_times();
 
@@ -88,8 +88,8 @@ impl PrivateApi {
         let validators_times = validator_keys
             .iter()
             .map(|validator| ValidatorTime {
-                public_key: validator.service,
-                time: idx.get(&validator.service),
+                public_key: validator.service_key,
+                time: idx.get(&validator.service_key),
             })
             .collect::<Vec<_>>();
         Ok(validators_times)

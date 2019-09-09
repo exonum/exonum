@@ -493,7 +493,7 @@ fn test_update_config() {
 #[test]
 fn test_clear_cache() {
     let env = ConfigSpec::new_without_pass();
-    let db_path = env.expected_dir().join("db0");
+    let db_path = env.output_dir().join("db0");
 
     env.command("maintenance")
         .with_named_arg("--node-config", &env.expected_node_config_file(0))

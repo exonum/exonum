@@ -33,7 +33,7 @@ fn test_exclude_validator_from_consensus() {
 
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.validators.swap_remove(0);
+        consensus_cfg.validator_keys.swap_remove(0);
 
         TxConfig::create_signed(
             sandbox.public_key(ValidatorId(0)),

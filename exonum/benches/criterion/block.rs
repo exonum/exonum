@@ -79,9 +79,9 @@ fn create_blockchain(
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
     let genesis_config = ConsensusConfig {
-        validators: vec![ValidatorKeys {
-            consensus: consensus_keypair.0,
-            service: service_keypair.0,
+        validator_keys: vec![ValidatorKeys {
+            consensus_key: consensus_keypair.0,
+            service_key: service_keypair.0,
         }],
         ..ConsensusConfig::default()
     };

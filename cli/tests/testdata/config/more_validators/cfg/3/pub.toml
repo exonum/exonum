@@ -17,5 +17,5 @@ validators_count = 3
 address = "0.0.0.0:8003"
 
 [node.validator_keys]
-consensus = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
-service = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"
+consensus_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
+service_key = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"

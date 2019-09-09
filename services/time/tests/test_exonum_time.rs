@@ -63,7 +63,7 @@ fn assert_storage_times_eq<T: IndexAccess>(
 
     let validators_times = schema.validators_times();
     for (i, validator) in validators.iter().enumerate() {
-        let public_key = &validator.public_keys().service;
+        let public_key = &validator.public_keys().service_key;
 
         assert_eq!(
             validators_times.get(&public_key),

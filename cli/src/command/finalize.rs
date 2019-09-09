@@ -75,14 +75,14 @@ impl Finalize {
             .next()
             .ok_or_else(|| format_err!("Expected at least one config in PUBLIC_CONFIGS"))?;
         let common = first.common;
-        map.insert(first.node.validator_keys.consensus, first.node);
+        map.insert(first.node.validator_keys.consensus_key, first.node);
 
         for config in config_iter {
             if common != config.common {
                 bail!("Found config with different common part.");
             };
             if map
-                .insert(config.node.validator_keys.consensus, config.node)
+                .insert(config.node.validator_keys.consensus_key, config.node)
                 .is_some()
             {
                 bail!("Found duplicate consensus keys in PUBLIC_CONFIGS");
@@ -100,9 +100,11 @@ impl Finalize {
     ) -> ConnectListConfig {
         let peers = public_configs
             .iter()
-            .filter(|config| config.validator_keys.consensus != secret_config.consensus_public_key)
+            .filter(|config| {
+                config.validator_keys.consensus_key != secret_config.consensus_public_key
+            })
             .map(|config| ConnectInfo {
-                public_key: config.validator_keys.consensus,
+                public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
             })
             .collect();
@@ -142,7 +144,7 @@ impl ExonumCommand for Finalize {
         }
 
         let genesis = ConsensusConfig {
-            validators: public_configs.iter().map(|c| c.validator_keys).collect(),
+            validator_keys: public_configs.iter().map(|c| c.validator_keys).collect(),
             ..common.consensus.clone()
         };
 

@@ -149,7 +149,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         self.caller().author().and_then(|author| {
             CoreSchema::new(self.fork())
                 .consensus_config()
-                .find_validator(|validator_keys| author == validator_keys.service)
+                .find_validator(|validator_keys| author == validator_keys.service_key)
         })
     }
 
@@ -240,7 +240,7 @@ impl<'a> AfterCommitContext<'a> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot)
             .consensus_config()
-            .find_validator(|validator_keys| self.service_keypair.0 == validator_keys.service)
+            .find_validator(|validator_keys| self.service_keypair.0 == validator_keys.service_key)
     }
 
     /// Return a current blockchain height. This height is "height of the last committed block".

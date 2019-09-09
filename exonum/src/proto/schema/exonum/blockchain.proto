@@ -42,16 +42,16 @@ message TxLocation {
 // Public keys of a validator.
 message ValidatorKeys {
   // Consensus key is used for messages related to the consensus algorithm.
-  exonum.PublicKey consensus = 1;
+  exonum.PublicKey consensus_key = 1;
   // Service key is used for services, for example, the configuration
   // updater service, the anchoring service, etc.
-  exonum.PublicKey service = 2;
+  exonum.PublicKey service_key = 2;
 }
 
 // Consensus algorithm parameters.
 message Config {
   // List of validators public keys.
-  repeated ValidatorKeys validators = 1;
+  repeated ValidatorKeys validator_keys = 1;
   // Interval between first two rounds.
   uint64 first_round_timeout = 2;
   // Period of sending a Status message.

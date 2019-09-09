@@ -438,7 +438,7 @@ impl ConnectListConfig {
             .zip(validators_keys.iter())
             .map(|(a, v)| ConnectInfo {
                 address: a.clone(),
-                public_key: v.consensus,
+                public_key: v.consensus_key,
             })
             .collect();
 
@@ -480,9 +480,9 @@ impl NodeHandler {
         info!("Creating a node with config: {:#?}", consensus_config);
 
         let validator_id = consensus_config
-            .validators
+            .validator_keys
             .iter()
-            .position(|pk| pk.consensus == config.listener.consensus_public_key)
+            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
         let connect = Verified::from_value(

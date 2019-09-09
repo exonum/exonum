@@ -48,8 +48,8 @@ impl TxTime {
         snapshot: impl IndexAccess,
         author: &PublicKey,
     ) -> Result<(), Error> {
-        let keys = Schema::new(snapshot).consensus_config().validators;
-        let signed = keys.iter().any(|k| k.service == *author);
+        let keys = Schema::new(snapshot).consensus_config().validator_keys;
+        let signed = keys.iter().any(|k| k.service_key == *author);
         if !signed {
             Err(Error::UnknownSender)?
         } else {
@@ -77,7 +77,9 @@ impl TxTime {
     }
 
     pub(crate) fn update_consolidated_time(service_name: &str, access: impl IndexAccess) {
-        let keys = Schema::new(access.clone()).consensus_config().validators;
+        let keys = Schema::new(access.clone())
+            .consensus_config()
+            .validator_keys;
         let schema = TimeSchema::new(service_name, access);
 
         // Find all known times for the validators.
@@ -87,7 +89,7 @@ impl TxTime {
                 .iter()
                 .filter_map(|(public_key, time)| {
                     keys.iter()
-                        .find(|validator| validator.service == public_key)
+                        .find(|validator| validator.service_key == public_key)
                         .map(|_| time)
                 })
                 .collect::<Vec<_>>();
