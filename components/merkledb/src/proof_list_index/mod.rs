@@ -228,21 +228,33 @@ where
         let items = (from..to).zip(self.iter_from(from).take((to - from) as usize));
         let mut proof = ListProof::new(items);
 
+        // `left` and `right` track the indices of elements for which we build the proof,
+        // on the particular `height` of the tree. Both these values are inclusive; i.e., the range
+        // is `[left, right]`.
         let (mut left, mut right) = (from, to - 1);
         for height in 1..self.height() {
+            // On each `height`, we may include into the proof the hash
+            // to the left of the range, provided that this hash is necessary to restore
+            // the root hash of the list. It is easy to see that necessity depends on the
+            // oddity of `left`. Indeed, during root hash computation, we zip a hash
+            // with an *even* index with the following hash having an *odd* index;
+            // thus, iff `left` is odd, we need a hash with index `left - 1` to restore the
+            // root hash.
             if left % 2 == 1 {
                 let hash = self.get_branch_unchecked(ProofListKey::new(height, left - 1));
                 proof.push_hash(height, left - 1, hash);
             }
 
+            // Similarly, we may need a hash to the right of the end of the range, provided
+            // that the end has an even index and the hash to the right exists.
             if right % 2 == 0 {
                 if let Some(hash) = self.get_branch(ProofListKey::new(height, right + 1)) {
                     proof.push_hash(height, right + 1, hash);
                 }
             }
 
-            left >>= 1;
-            right >>= 1;
+            left /= 2;
+            right /= 2;
         }
 
         proof

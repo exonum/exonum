@@ -571,6 +571,13 @@ fn proofs_with_unexpected_branches() {
         proof.validate(HashTag::empty_list_hash(), 3).unwrap_err(),
         ListProofError::UnexpectedBranch
     );
+
+    let mut proof = ListProof::new(vec![(1, "foo".to_owned()), (2, "bar".to_owned())]);
+    proof.push_hash(1, 6, Hash::zero());
+    assert_eq!(
+        proof.validate(HashTag::empty_list_hash(), 5).unwrap_err(),
+        ListProofError::UnexpectedBranch
+    );
 }
 
 #[test]
