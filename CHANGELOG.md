@@ -5,8 +5,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
-- `create_checkpoint` method is implemented for the `RocksDB` struct. This method uses
-  [RocksDb checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints) functionality under the hood.
+- `create_checkpoint` method has been implemented for the `RocksDB` struct.
+  This method uses
+  [RocksDB checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints)
+  functionality under the hood.
 
 - `Database` trait object can now be casted to a concrete implementation.
 
