@@ -28,6 +28,7 @@ use crate::{
     blockchain::{FatalError, IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::ValidateInput,
+    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
     node::ApiSender,
     proto::Any,
@@ -36,6 +37,10 @@ use crate::{
 use super::{
     api::ApiContext,
     error::{catch_panic, ExecutionError},
+    rust::{
+        interfaces::{Initialize, INITIALIZE_METHOD_ID},
+        Interface,
+    },
     ApiChange, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext,
     InstanceDescriptor, InstanceId, InstanceSpec, Runtime,
 };
@@ -253,29 +258,40 @@ impl Dispatcher {
         if self.runtime_lookup.contains_key(&spec.id) {
             return Err(Error::ServiceIdExists.into());
         }
-        // Try to start and configure the service instance.
+        // Try to start and initialize the service instance.
         self.runtimes
             .get_mut(&spec.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)
             .map_err(ExecutionError::from)
-            .and_then(|runtime| {
-                runtime.start_service(&spec)?;
-                // Try to configure the started instance of the service, otherwise stop.
-                Self::configure_service(runtime.as_ref(), fork, spec.as_descriptor(), constructor)
-                    .map_err(|e| {
-                        error!(
-                            "An error occurred while configuring the service {}: {}",
-                            spec.name, e
-                        );
-                        if let Err(e) = runtime.stop_service(spec.as_descriptor()) {
-                            // TODO Find the way to avoid panic from the untrusted code. [ECR-3222]
-                            panic!(FatalError::new(e.to_string()))
-                        }
-                        e
-                    })
-            })?;
-        self.register_running_service(&spec);
+            .and_then(|runtime| runtime.start_service(&spec))?;
+        // Try to initialize the started instance of the service, otherwise stop.
+        self.initialize_service(
+            self.runtimes[&spec.artifact.runtime_id].as_ref(),
+            fork,
+            spec.as_descriptor(),
+            constructor,
+        )
+        .map_err(|e| {
+            error!(
+                "An error occurred while configuring the service {}: {}",
+                spec.name, e
+            );
+            // TODO Find the way to avoid panic from the untrusted code. [ECR-3222]
+            let runtime = self
+                .runtimes
+                .get_mut(&spec.artifact.runtime_id)
+                .unwrap_or_else(|| {
+                    panic!(FatalError::new(
+                        "Unable to find runtime to rollback a broken service instance."
+                    ))
+                });
+            if let Err(e) = runtime.stop_service(spec.as_descriptor()) {
+                panic!(FatalError::new(e.to_string()))
+            }
+            e
+        })?;
         // Add service instance to the dispatcher schema.
+        self.register_running_service(&spec);
         Schema::new(fork).add_service_instance(spec)?;
         Ok(())
     }
@@ -355,13 +371,39 @@ impl Dispatcher {
     }
 
     // Try to configure the started instance of the service and catch panic if it occurs.
-    pub(crate) fn configure_service(
-        runtime: &(dyn Runtime + 'static),
+    pub(crate) fn initialize_service(
+        &self,
+        runtime: &dyn Runtime,
         fork: &Fork,
         descriptor: InstanceDescriptor,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
-        catch_panic(|| runtime.configure_service(fork, descriptor, constructor))
+        let constructor_is_empty = constructor.is_empty();
+
+        let context = ExecutionContext {
+            interface_name: Initialize::NAME,
+            ..ExecutionContext::new(self, fork, Caller::Blockchain {})
+        };
+        let call_info = CallInfo {
+            instance_id: descriptor.id,
+            method_id: INITIALIZE_METHOD_ID,
+        };
+        let args = constructor.into_bytes();
+
+        trace!("Initialize service instance {}", descriptor);
+        catch_panic(|| {
+            runtime
+                .execute(&context, &call_info, args.as_ref())
+                .or_else(|err| {
+                    // Default behavior for case if service does not implement `Initialize`
+                    // interface and constructor is null.
+                    if constructor_is_empty && err.kind == Error::NoSuchInterface.into() {
+                        Ok(())
+                    } else {
+                        Err(err)
+                    }
+                })
+        })
     }
 
     /// Return additional information about the artifact if it is deployed.

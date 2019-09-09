@@ -1,0 +1,84 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Important interservice communication interfaces.
+
+use crate::{
+    merkledb::BinaryValue,
+    proto::Any,
+    runtime::{dispatcher::Error as DispatcherError, MethodId},
+};
+
+use super::{Error as RuntimeError, ExecutionError, Interface, TransactionContext};
+
+pub const INITIALIZE_METHOD_ID: MethodId = 0;
+
+/// This trait describes a service interface to pass initial configuration parameters into
+/// the started service instance.
+pub trait Initialize {
+    /// Initialize a service instance with the given parameters.
+    ///
+    /// The configuration parameters passed to the method are discarded immediately.
+    /// So the service instance should save them by itself if it is important for
+    /// the service business logic.
+    ///
+    /// This method is called after creating a new service instance by the [`start_service`]
+    /// invocation. In this case if an error during this action occurs, the dispatcher will
+    /// invoke [`stop_service`].
+    ///
+    ///
+    ///
+    /// ['start_service`]: ../../trait.Runtime.html#start_service
+    /// ['stop_service`]: ../../trait.Runtime.html#stop_service
+    fn initialize(&self, context: TransactionContext, params: Any) -> Result<(), ExecutionError>;
+}
+
+impl Interface for dyn Initialize {
+    const NAME: &'static str = "Initialize";
+
+    fn dispatch(
+        &self,
+        context: TransactionContext,
+        method: MethodId,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError> {
+        if context.caller().as_transaction().is_some() {
+            // TODO implement error handling.
+            return Err(RuntimeError::UnspecifiedError).map_err(From::from);
+        }
+
+        match method {
+            0 => {
+                let config = Any::from_bytes(payload.into()).map_err(|error_msg| {
+                    (
+                        RuntimeError::ArgumentsParseError,
+                        format!(
+                            "Unable to parse argument for the `Initialize#initialize` method. {}",
+                            error_msg
+                        ),
+                    )
+                })?;
+                self.initialize(context, config)
+            }
+            other => {
+                let kind = DispatcherError::NoSuchMethod;
+                let message = format!(
+                    "Method with ID {} is absent in the 'Initialize' interface of the instance `{}`",
+                    other, context.instance.name,
+                );
+                Err((kind, message)).map_err(From::from)
+            }
+        }
+    }
+}

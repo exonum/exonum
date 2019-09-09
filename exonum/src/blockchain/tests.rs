@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex, ObjectHash, TemporaryDB,
+    Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash, TemporaryDB,
 };
 use futures::{sync::mpsc, Future};
 
@@ -31,8 +31,12 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
-        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
+        rust::{
+            interfaces::{Initialize, INITIALIZE_METHOD_ID},
+            BeforeCommitContext, Interface, Service, ServiceFactory, Transaction,
+            TransactionContext,
+        },
+        AnyTx, ArtifactId, ExecutionError, InstanceId,
     },
 };
 
@@ -57,6 +61,12 @@ struct TestStart {
     value: u64,
 }
 
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[exonum(pb = "TestServiceTx", crate = "crate")]
+struct TestCallInitialize {
+    value: u64,
+}
+
 #[exonum_service(crate = "crate")]
 trait TestDispatcherInterface {
     fn test_execute(
@@ -71,6 +81,11 @@ trait TestDispatcherInterface {
     ) -> Result<(), ExecutionError>;
     fn test_start(&self, context: TransactionContext, arg: TestStart)
         -> Result<(), ExecutionError>;
+    fn test_call_initialize(
+        &self,
+        context: TransactionContext,
+        arg: TestCallInitialize,
+    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -78,17 +93,19 @@ trait TestDispatcherInterface {
     crate = "crate",
     artifact_name = "test_dispatcher",
     proto_sources = "crate::proto::schema",
-    implements("TestDispatcherInterface")
+    implements("TestDispatcherInterface", "Initialize")
 )]
 struct TestDispatcherService;
 
-impl Service for TestDispatcherService {
-    fn configure(
-        &self,
-        _descriptor: InstanceDescriptor,
-        _fork: &Fork,
-        params: Any,
-    ) -> Result<(), ExecutionError> {
+impl Service for TestDispatcherService {}
+
+impl Initialize for TestDispatcherService {
+    fn initialize(&self, context: TransactionContext, params: Any) -> Result<(), ExecutionError> {
+        context
+            .caller()
+            .as_blockchain()
+            .expect("Expected `Blockchain` caller");
+
         if params.clone().try_into::<()>().is_err() {
             let v: TestExecute = params.try_into().expect("Expected `TestExecute`");
             if v.value == 42 {
@@ -173,6 +190,18 @@ impl TestDispatcherInterface for TestDispatcherService {
         let mut index = ListIndex::new(context.instance.name, context.fork());
         index.push(arg.value);
         index.push(42 / arg.value);
+        Ok(())
+    }
+
+    fn test_call_initialize(
+        &self,
+        context: TransactionContext,
+        arg: TestCallInitialize,
+    ) -> Result<(), ExecutionError> {
+        context
+            .call_context(context.instance.id)
+            .call(Initialize::NAME, INITIALIZE_METHOD_ID, Any::from(arg.value))
+            .expect_err("Initialize should be callable only from `Blockchain`");
         Ok(())
     }
 }
@@ -723,4 +752,21 @@ fn test_dispatcher_start_service_rollback() {
         Entry::<_, u64>::new(IDX_NAME, snapshot.as_ref()).get(),
         None
     );
+}
+
+#[test]
+fn test_dispatcher_err_wrong_initialize_caller() {
+    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
+        .with_instance(TEST_SERVICE_ID, IDX_NAME, Any::default())]);
+
+    let keypair = crypto::gen_keypair();
+    let status = execute_transaction(
+        &mut blockchain,
+        TestCallInitialize { value: 11 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    assert!(status
+        .0
+        .unwrap_err()
+        .description
+        .contains("Expected `Blockchain` caller"));
 }

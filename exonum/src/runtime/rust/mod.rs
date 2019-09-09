@@ -21,6 +21,7 @@ pub use self::{
 };
 
 pub mod error;
+pub mod interfaces;
 
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
@@ -219,7 +220,7 @@ impl Runtime for RustRuntime {
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        if !spec.is_null() && spec != ().into() {
+        if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             return Box::new(future::err(Error::IncorrectArtifactId.into()));
         }
@@ -268,15 +269,7 @@ impl Runtime for RustRuntime {
         descriptor: InstanceDescriptor,
         parameters: Any,
     ) -> Result<(), ExecutionError> {
-        trace!("Configure service instance {}", descriptor);
-
-        let instance = self
-            .started_services
-            .get(&descriptor.id)
-            .ok_or(dispatcher::Error::ServiceNotStarted)?;
-        instance
-            .as_ref()
-            .configure(instance.descriptor(), fork, parameters)
+        unimplemented!();
     }
 
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {

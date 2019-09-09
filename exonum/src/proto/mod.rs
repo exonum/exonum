@@ -405,6 +405,11 @@ impl Any {
         self.0.type_url.is_empty() && self.0.value.is_empty()
     }
 
+    // TODO Write specification for the empty values interpretation. [ECR-3222]
+    pub fn is_empty(&self) -> bool {
+        self.is_null() || self == &Any::from(())
+    }
+
     pub fn try_into<T>(self) -> Result<T, failure::Error>
     where
         T: BinaryValue + ProtobufConvert,

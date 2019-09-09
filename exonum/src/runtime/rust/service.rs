@@ -45,15 +45,6 @@ pub trait ServiceDispatcher: Send {
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    fn configure(
-        &self,
-        _instance: InstanceDescriptor,
-        _fork: &Fork,
-        _params: Any,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
@@ -303,7 +294,7 @@ pub trait Interface {
     /// Invoke the specified method handler of the service instance.
     fn dispatch(
         &self,
-        ctx: TransactionContext,
+        context: TransactionContext,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;

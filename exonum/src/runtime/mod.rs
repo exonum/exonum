@@ -338,6 +338,9 @@ pub enum Caller {
         /// Identifier of the service instance which invoked this transaction.
         instance_id: InstanceId,
     },
+    // This transaction is invoked on behalf of the blockchain itself,
+    // for example [`initialize`](trait.Initialize#initialize) event.
+    Blockchain,
 }
 
 impl Caller {
@@ -364,6 +367,15 @@ impl Caller {
     pub fn as_service(&self) -> Option<InstanceId> {
         if let Caller::Service { instance_id } = self {
             Some(*instance_id)
+        } else {
+            None
+        }
+    }
+
+    /// Try to reinterpret caller as blockchain.
+    pub fn as_blockchain(&self) -> Option<()> {
+        if let Caller::Blockchain = self {
+            Some(())
         } else {
             None
         }

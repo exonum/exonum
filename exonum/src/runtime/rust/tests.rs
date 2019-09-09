@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_derive::exonum_service;
-use exonum_merkledb::{BinaryValue, Database, Entry, Fork, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Database, Entry, TemporaryDB};
 
 use std::convert::TryFrom;
 
@@ -23,8 +23,8 @@ use crate::{
         Any,
     },
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, CallContext, CallInfo, Caller,
-        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
+        dispatcher::Dispatcher, error::ExecutionError, rust::interfaces::Initialize, CallContext,
+        CallInfo, Caller, ExecutionContext, InstanceId, InstanceSpec,
     },
 };
 
@@ -66,7 +66,7 @@ trait TestService {
     artifact_name = "test_service",
     artifact_version = "0.1.0",
     proto_sources = "crate::proto::schema",
-    implements("TestService")
+    implements("TestService", "Initialize")
 )]
 pub struct TestServiceImpl;
 
@@ -109,20 +109,22 @@ impl TestService for TestServiceImpl {
     }
 }
 
-impl Service for TestServiceImpl {
-    fn configure(
-        &self,
-        _descriptor: InstanceDescriptor,
-        fork: &Fork,
-        arg: Any,
-    ) -> Result<(), ExecutionError> {
+impl Initialize for TestServiceImpl {
+    fn initialize(&self, context: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+        context
+            .caller()
+            .as_blockchain()
+            .expect("Wrong interface caller");
+
         let arg = Init::try_from(arg).map_err(|e| (Error::ConfigParseError, e))?;
 
-        let mut entry = Entry::new("constructor_entry", fork);
+        let mut entry = Entry::new("constructor_entry", context.fork());
         entry.set(arg.msg);
         Ok(())
     }
 }
+
+impl Service for TestServiceImpl {}
 
 #[test]
 fn test_basic_rust_runtime() {
