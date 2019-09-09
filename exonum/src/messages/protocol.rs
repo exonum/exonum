@@ -33,7 +33,9 @@ use std::{borrow::Cow, fmt::Debug, mem};
 
 use super::{RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use crate::blockchain;
-use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use crate::crypto::{
+    kx, CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
+};
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::proto;
 use exonum_merkledb::{BinaryValue, HashTag};
@@ -73,15 +75,23 @@ pub struct Connect {
     time: DateTime<Utc>,
     /// String containing information about this node including Exonum, Rust and OS versions.
     user_agent: String,
+    /// Peer identity key,
+    pub identity_key: kx::PublicKey,
 }
 
 impl Connect {
     /// Create new `Connect` message.
-    pub fn new(addr: &str, time: DateTime<Utc>, user_agent: &str) -> Self {
+    pub fn new(
+        addr: &str,
+        time: DateTime<Utc>,
+        user_agent: &str,
+        identity_key: kx::PublicKey,
+    ) -> Self {
         Connect {
             pub_addr: addr.to_owned(),
             time,
             user_agent: user_agent.to_owned(),
+            identity_key,
         }
     }
 

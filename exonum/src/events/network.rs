@@ -311,7 +311,7 @@ impl NetworkHandler {
                 let connect_list = self.connect_list.clone();
                 let listener = handshake
                     .listen(incoming_connection)
-                    .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
+                    .and_then(move |(socket, raw, key)| (Ok(socket), Self::parse_connect_msg(Some(raw), key)))
                     .and_then(move |(socket, message)| {
                         if pool.contains(&message.author()) {
                             Box::new(future::ok(()))
@@ -389,7 +389,9 @@ impl NetworkHandler {
                             &handshake_params,
                         )
                     })
-                    .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
+                    .and_then(move |(socket, raw, key)| {
+                        (Ok(socket), Self::parse_connect_msg(Some(raw), key))
+                    })
                     .and_then(move |(socket, message)| {
                         let connection_limit_reached = pool.count_outgoing() >= max_connections;
                         if pool.contains(&message.author()) || connection_limit_reached {
@@ -513,16 +515,23 @@ impl NetworkHandler {
         )
     }
 
-    fn parse_connect_msg(raw: Option<Vec<u8>>) -> Result<Signed<Connect>, failure::Error> {
+    fn parse_connect_msg(
+        raw: Option<Vec<u8>>,
+        identity_key: kx::PublicKey,
+    ) -> Result<Signed<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Message::from_raw_buffer(raw)?;
-        match message {
-            Message::Service(Service::Connect(connect)) => Ok(connect),
+        let connect: Signed<Connect> = match message {
+            Message::Service(Service::Connect(connect)) => connect,
             other => bail!(
                 "First message from a remote peer is not Connect, got={:?}",
                 other
             ),
-        }
+        };
+
+        ensure!(connect.identity_key == identity_key, "oi!");
+
+        Ok(connect)
     }
 
     pub fn request_handler(
@@ -622,8 +631,10 @@ impl NetworkHandler {
         stream: TcpStream,
         key: kx::PublicKey,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error>
-    {
+    ) -> impl Future<
+        Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>, kx::PublicKey),
+        Error = failure::Error,
+    > {
         let mut handshake_params = handshake_params.clone();
         handshake_params.set_remote_key(key);
         NoiseHandshake::initiator(&handshake_params, &stream.peer_addr().unwrap()).send(stream)

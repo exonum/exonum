@@ -421,6 +421,8 @@ fn should_restore_peers_after_restart() {
     let public_key1 = sandbox.public_key(v1);
     let secret_key1 = sandbox.secret_key(v1).clone();
     let address1 = sandbox.address(v1);
+    let identity0 = sandbox.identity_key(v0);
+    let identity1 = sandbox.identity_key(v1);
 
     dbg!(public_key0);
     dbg!(public_key1);
@@ -432,6 +434,7 @@ fn should_restore_peers_after_restart() {
         time.into(),
         &user_agent::get(),
         &secret_key0,
+        identity0,
     );
     let connect_from_1 = sandbox.create_connect(
         &public_key1,
@@ -439,6 +442,7 @@ fn should_restore_peers_after_restart() {
         time.into(),
         &user_agent::get(),
         &secret_key1,
+        identity1,
     );
     let peers_request = sandbox.create_peers_request(&public_key1, &public_key0, &secret_key1);
 

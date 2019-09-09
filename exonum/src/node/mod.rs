@@ -485,6 +485,7 @@ impl NodeHandler {
                 external_address,
                 system_state.current_time().into(),
                 &user_agent::get(),
+                config.keys.identity_pk(),
             ),
             config.keys.consensus_pk(),
             &config.keys.consensus_sk(),

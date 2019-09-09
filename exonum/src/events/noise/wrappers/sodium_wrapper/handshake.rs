@@ -122,7 +122,7 @@ impl NoiseHandshake {
         self,
         stream: S,
         message: Vec<u8>,
-    ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>), failure::Error> {
+    ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>, kx::PublicKey), failure::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -140,7 +140,7 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_wrapper()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
-        Ok((framed, message))
+        Ok((framed, message, remote_static_key))
     }
 
     fn is_peer_allowed(&self, remote_static_key: &kx::PublicKey) -> bool {

@@ -165,6 +165,7 @@ impl SandboxInner {
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
     pub services_map: HashMap<PublicKey, SecretKey>,
+    pub identity_map: HashMap<kx::PublicKey, kx::SecretKey>,
     inner: RefCell<SandboxInner>,
     addresses: Vec<ConnectInfo>,
     /// Connect message used during initialization.
@@ -184,6 +185,7 @@ impl Sandbox {
             connect_message_time.into(),
             &user_agent::get(),
             self.secret_key(ValidatorId(0)),
+            self.identity_key(ValidatorId(0)),
         );
 
         for validator in start_index..end_index {
@@ -194,6 +196,7 @@ impl Sandbox {
                 self.time().into(),
                 &user_agent::get(),
                 self.secret_key(validator),
+                self.identity_key(validator),
             ));
             self.send(self.public_key(validator), &connect);
         }
@@ -215,6 +218,15 @@ impl Sandbox {
     pub fn secret_key(&self, id: ValidatorId) -> &SecretKey {
         let p = self.public_key(id);
         &self.validators_map[&p]
+    }
+
+    pub fn identity_key(&self, id: ValidatorId) -> kx::PublicKey {
+        self.cfg()
+            .validator_keys
+            .iter()
+            .nth(id.0 as usize)
+            .map(|keys| keys.identity_key)
+            .unwrap()
     }
 
     pub fn address(&self, id: ValidatorId) -> String {
@@ -279,9 +291,11 @@ impl Sandbox {
         time: chrono::DateTime<::chrono::Utc>,
         user_agent: &str,
         secret_key: &SecretKey,
+        identity_key: kx::PublicKey,
     ) -> Signed<Connect> {
+        //TODO: change send real identity key
         Message::concrete(
-            Connect::new(&addr, time, user_agent),
+            Connect::new(&addr, time, user_agent, identity_key),
             *public_key,
             secret_key,
         )
@@ -837,6 +851,7 @@ impl Sandbox {
                 time.into(),
                 c.user_agent(),
                 self.secret_key(ValidatorId(0)),
+                self.identity_key(ValidatorId(0)),
             )
         });
         let sandbox = self.restart_uninitialized_with_time(time);
@@ -941,6 +956,7 @@ impl Sandbox {
             inner: RefCell::new(inner),
             validators_map: self.validators_map.clone(),
             services_map: self.services_map.clone(),
+            identity_map: self.identity_map.clone(),
             addresses: self.addresses.clone(),
             connect: None,
         };
@@ -1108,6 +1124,11 @@ fn sandbox_with_services_uninitialized(
         .map(|keys| (keys.service_pk(), keys.service_sk().clone()))
         .collect::<Vec<_>>();
 
+    let identity_keys = keys
+        .iter()
+        .map(|keys| (keys.identity_pk(), keys.identity_sk().clone()))
+        .collect::<Vec<_>>();
+
     let addresses = (1..=validators_count)
         .map(gen_primitive_socket_addr)
         .collect::<Vec<_>>();
@@ -1204,6 +1225,7 @@ fn sandbox_with_services_uninitialized(
         inner: RefCell::new(inner),
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
+        identity_map: HashMap::from_iter(identity_keys),
         addresses: connect_infos,
         connect: None,
     };
@@ -1325,6 +1347,7 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
+            identity,
         ));
         s.send(
             public,
@@ -1334,6 +1357,7 @@ mod tests {
                 s.time().into(),
                 &user_agent::get(),
                 s.secret_key(ValidatorId(0)),
+                s.identity_key(ValidatorId(0)),
             ),
         );
     }
@@ -1360,6 +1384,7 @@ mod tests {
                 s.time().into(),
                 &user_agent::get(),
                 s.secret_key(ValidatorId(0)),
+                s.identity_key(ValidatorId(0)),
             ),
         );
     }
@@ -1384,6 +1409,7 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
+            identity,
         ));
         s.send(
             s.public_key(ValidatorId(1)),
@@ -1393,6 +1419,7 @@ mod tests {
                 s.time().into(),
                 &user_agent::get(),
                 s.secret_key(ValidatorId(0)),
+                s.identity_key(ValidatorId(0)),
             ),
         );
     }
@@ -1417,6 +1444,7 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
+            identity,
         ));
     }
 
@@ -1440,6 +1468,7 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
+            identity,
         ));
         s.recv(&s.create_connect(
             &public,
@@ -1447,6 +1476,7 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
+            identity,
         ));
         panic!("Oops! We don't catch unexpected message");
     }
@@ -1471,6 +1501,7 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
+            identity,
         ));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");

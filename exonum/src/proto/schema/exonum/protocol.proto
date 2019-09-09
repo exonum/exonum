@@ -24,6 +24,7 @@ message Connect {
   string pub_addr = 1;
   google.protobuf.Timestamp time = 2;
   string user_agent = 3;
+  exonum.PublicKey identity_key = 4;
 }
 
 message Status {

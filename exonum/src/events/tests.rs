@@ -197,10 +197,16 @@ pub fn connect_message(
     addr: SocketAddr,
     public_key: &PublicKey,
     secret_key: &SecretKey,
+    identity_key: kx::PublicKey,
 ) -> Signed<Connect> {
     let time = time::UNIX_EPOCH;
     Message::concrete(
-        Connect::new(&addr.to_string(), time.into(), &user_agent::get()),
+        Connect::new(
+            &addr.to_string(),
+            time.into(),
+            &user_agent::get(),
+            identity_key,
+        ),
         *public_key,
         secret_key,
     )
@@ -231,7 +237,12 @@ impl HandshakeParams {
         let address = "127.0.0.1:8000";
 
         let connect = Message::concrete(
-            Connect::new(address, SystemTime::now().into(), &user_agent::get()),
+            Connect::new(
+                address,
+                SystemTime::now().into(),
+                &user_agent::get(),
+                identity_pk,
+            ),
             public_key,
             &secret_key,
         );
@@ -253,7 +264,7 @@ impl ConnectionParams {
     pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
         let (identity_pk, identity_sk) = kx::gen_keypair();
-        let connect = connect_message(address, &public_key, &secret_key);
+        let connect = connect_message(address, &public_key, &secret_key, identity_pk);
         let handshake_params = HandshakeParams::new(
             identity_pk,
             identity_sk.clone(),
