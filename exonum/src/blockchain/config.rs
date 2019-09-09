@@ -289,7 +289,7 @@ mod tests {
     use super::*;
     use crate::crypto::{self, gen_keypair_from_seed, Seed, SEED_LENGTH};
 
-    fn assert_err(actual: impl Display, expected: impl AsRef<str>) {
+    fn assert_err_contains(actual: impl Display, expected: impl AsRef<str>) {
         let actual = actual.to_string();
         let expected = expected.as_ref();
         assert!(
@@ -302,8 +302,8 @@ mod tests {
 
     fn gen_validator_keys(i: u8) -> ValidatorKeys {
         ValidatorKeys {
-            consensus_key: gen_keypair_from_seed(&Seed::new([i + 1; SEED_LENGTH])).0,
-            service_key: gen_keypair_from_seed(&Seed::new([(i + 1) * 10; SEED_LENGTH])).0,
+            consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
+            service_key: gen_keypair_from_seed(&Seed::new([u8::max_value() - i; SEED_LENGTH])).0,
         }
     }
 
@@ -321,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn consensus_validate_validator_keys_err_same() {
+    fn validate_validator_keys_err_same() {
         let pk = crypto::gen_keypair().0;
 
         let keys = ValidatorKeys {
@@ -329,7 +329,7 @@ mod tests {
             service_key: pk,
         };
         let e = keys.validate().unwrap_err();
-        assert_err(e, "Consensus and service keys must be different");
+        assert_err_contains(e, "Consensus and service keys must be different");
     }
 
     #[test]
@@ -343,123 +343,90 @@ mod tests {
     }
 
     #[test]
-    fn consensus_config_validate_err_duplicate_keys_consensus() {
-        let keys = gen_keys_pool(4);
+    fn consensus_config_validate_err_round_trip() {
+        let keys = gen_keys_pool(3);
 
-        let cfg = ConsensusConfig {
-            validator_keys: vec![
-                ValidatorKeys {
-                    consensus_key: keys[0],
-                    service_key: keys[1],
+        let cases = [
+            (
+                ConsensusConfig::default(),
+                "Consensus configuration must have at least one validator",
+            ),
+            (
+                ConsensusConfig {
+                    validator_keys: vec![ValidatorKeys {
+                        consensus_key: keys[0],
+                        service_key: keys[0],
+                    }],
+                    ..ConsensusConfig::default()
                 },
-                ValidatorKeys {
-                    consensus_key: keys[0],
-                    service_key: keys[2],
+                "Consensus and service keys must be different",
+            ),
+            (
+                ConsensusConfig {
+                    validator_keys: vec![
+                        ValidatorKeys {
+                            consensus_key: keys[0],
+                            service_key: keys[1],
+                        },
+                        ValidatorKeys {
+                            consensus_key: keys[0],
+                            service_key: keys[2],
+                        },
+                    ],
+                    ..ConsensusConfig::default()
                 },
-            ],
-            ..ConsensusConfig::default()
-        };
-
-        assert_err(cfg.validate().unwrap_err(), "Duplicated keys are found");
-    }
-
-    #[test]
-    fn consensus_config_validate_err_empty_validators() {
-        assert_err(
-            ConsensusConfig::default().validate().unwrap_err(),
-            "Consensus configuration must have at least one validator",
-        );
-    }
-
-    #[test]
-    fn consensus_config_validate_err_duplicate_keys_service() {
-        let keys = gen_keys_pool(4);
-
-        let cfg = ConsensusConfig {
-            validator_keys: vec![
-                ValidatorKeys {
-                    consensus_key: keys[0],
-                    service_key: keys[1],
+                "Duplicated keys are found",
+            ),
+            (
+                ConsensusConfig {
+                    validator_keys: vec![
+                        ValidatorKeys {
+                            consensus_key: keys[0],
+                            service_key: keys[1],
+                        },
+                        ValidatorKeys {
+                            consensus_key: keys[2],
+                            service_key: keys[1],
+                        },
+                    ],
+                    ..ConsensusConfig::default()
                 },
-                ValidatorKeys {
-                    consensus_key: keys[2],
-                    service_key: keys[1],
+                "Duplicated keys are found",
+            ),
+            (
+                ConsensusConfig {
+                    min_propose_timeout: 10,
+                    max_propose_timeout: 5,
+                    ..gen_consensus_config()
                 },
-            ],
-            ..ConsensusConfig::default()
-        };
-
-        assert_err(cfg.validate().unwrap_err(), "Duplicated keys are found");
-    }
-
-    #[test]
-    fn consensus_config_validate_err_duplicate_keys_different() {
-        let keys = gen_keys_pool(4);
-
-        let cfg = ConsensusConfig {
-            validator_keys: vec![
-                ValidatorKeys {
-                    consensus_key: keys[0],
-                    service_key: keys[1],
+                "min_propose_timeout should be less or",
+            ),
+            (
+                ConsensusConfig {
+                    first_round_timeout: 10,
+                    max_propose_timeout: 15,
+                    ..gen_consensus_config()
                 },
-                ValidatorKeys {
-                    consensus_key: keys[1],
-                    service_key: keys[2],
+                "first_round_timeout(10) must be strictly larger than max_propose_timeout(15)",
+            ),
+            (
+                ConsensusConfig {
+                    txs_block_limit: 0,
+                    ..gen_consensus_config()
                 },
-            ],
-            ..ConsensusConfig::default()
-        };
+                "txs_block_limit should not be equal to zero",
+            ),
+            (
+                ConsensusConfig {
+                    max_message_len: 0,
+                    ..gen_consensus_config()
+                },
+                "max_message_len (0) must be at least",
+            ),
+        ];
 
-        assert_err(cfg.validate().unwrap_err(), "Duplicated keys are found");
-    }
-
-    #[test]
-    fn consensus_config_validate_err_min_propose_timeout() {
-        let cfg = ConsensusConfig {
-            min_propose_timeout: 10,
-            max_propose_timeout: 5,
-            ..gen_consensus_config()
-        };
-        assert_err(
-            cfg.validate().unwrap_err(),
-            "min_propose_timeout should be less or",
-        );
-    }
-
-    #[test]
-    fn consensus_config_validate_err_first_round_timeout() {
-        let cfg = ConsensusConfig {
-            first_round_timeout: 10,
-            max_propose_timeout: 15,
-            ..gen_consensus_config()
-        };
-        assert_err(
-            cfg.validate().unwrap_err(),
-            "first_round_timeout(10) must be strictly larger than max_propose_timeout(15)",
-        );
-    }
-
-    #[test]
-    fn consensus_config_validate_err_txs_block_limit() {
-        let cfg = ConsensusConfig {
-            txs_block_limit: 0,
-            ..gen_consensus_config()
-        };
-        assert_err(
-            cfg.validate().unwrap_err(),
-            "txs_block_limit should not be equal to zero",
-        );
-    }
-
-    #[test]
-    fn consensus_config_validate_err_max_message_len() {
-        let cfg = ConsensusConfig {
-            max_message_len: 0,
-            ..gen_consensus_config()
-        };
-        assert_err(
-            cfg.validate().unwrap_err(),
-            "max_message_len (0) must be at least",
-        );
+        for (cfg, expected_msg) in &cases {
+            assert_err_contains(cfg.validate().unwrap_err(), expected_msg);
+        }
     }
 }
