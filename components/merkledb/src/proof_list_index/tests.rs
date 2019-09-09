@@ -942,7 +942,7 @@ mod root_hash {
 
     #[test]
     fn object_hash_with_bytes() {
-        let bytes: Vec<_> = [b"foo" as &[_], b"bar", b"bazz", b"lorem", b"ipsum"]
+        let bytes: Vec<_> = [b"foo" as &[_], b"bar", b"bark", b"lorem", b"ipsum"]
             .iter()
             .map(|slice| slice.to_vec())
             .collect();
