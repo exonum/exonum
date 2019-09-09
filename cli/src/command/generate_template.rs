@@ -28,7 +28,6 @@ use crate::{
 
 /// Generate common part of the nodes configuration.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
-#[structopt(rename_all = "kebab-case")]
 pub struct GenerateTemplate {
     /// Path to a node configuration template file.
     pub common_config: PathBuf,

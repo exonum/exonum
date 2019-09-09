@@ -32,7 +32,6 @@ use crate::{
 
 /// Perform different maintenance actions.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
-#[structopt(rename_all = "kebab-case")]
 pub struct Maintenance {
     /// Path to a node configuration file.
     #[structopt(long, short = "c")]

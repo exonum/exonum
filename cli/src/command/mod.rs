@@ -44,6 +44,7 @@ pub trait ExonumCommand {
 
 /// Standard Exonum Core configuration command.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[structopt(author, about)]
 pub enum Command {
     /// Generate common part of the nodes configuration.
     #[structopt(name = "generate-template")]

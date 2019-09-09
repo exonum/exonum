@@ -13,7 +13,7 @@ description = "Helper crate for secure and convenient configuration of the Exonu
 
 [dependencies]
 exonum = { version = "0.12.0", path = "../exonum" }
-structopt = "0.2.18"
+structopt = "0.3.1"
 serde = { version = "1.0", features = ["derive"] }
 failure = "0.1"
 zeroize = "0.9"

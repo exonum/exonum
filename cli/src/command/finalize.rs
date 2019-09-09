@@ -34,7 +34,6 @@ use crate::{
 /// Generate final node configuration using public configs
 /// of other nodes in the network.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
-#[structopt(rename_all = "kebab-case")]
 pub struct Finalize {
     /// Path to a secret part of a node configuration.
     pub secret_config_path: PathBuf,

@@ -50,7 +50,6 @@ pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 
 /// Generate public and private configs of the node.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
-#[structopt(rename_all = "kebab-case")]
 pub struct GenerateConfig {
     /// Path to node configuration template file.
     pub common_config: PathBuf,
@@ -63,7 +62,7 @@ pub struct GenerateConfig {
     #[structopt(
         long,
         short = "a",
-        parse(try_from_str = "GenerateConfig::parse_external_address")
+        parse(try_from_str = GenerateConfig::parse_external_address)
     )]
     pub peer_address: SocketAddr,
     /// Listen IP address of the node used for communications between nodes.

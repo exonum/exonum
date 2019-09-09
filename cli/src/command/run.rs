@@ -40,7 +40,6 @@ pub struct NodeRunConfig {
 
 /// Run the node with provided node config.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
-#[structopt(rename_all = "kebab-case")]
 pub struct Run {
     /// Path to a node configuration file.
     #[structopt(long, short = "c")]
