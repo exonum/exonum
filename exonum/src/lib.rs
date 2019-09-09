@@ -41,8 +41,6 @@
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-#[macro_use(crate_version, crate_authors)]
-extern crate clap;
 #[macro_use]
 extern crate exonum_derive;
 pub extern crate exonum_merkledb;

@@ -71,6 +71,7 @@ impl ValidateInput for ValidatorKeys {
 #[exonum(crate = "crate", pb = "blockchain::Config")]
 pub struct ConsensusConfig {
     /// List of validators public keys.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub validators: Vec<ValidatorKeys>,
     /// Interval between first two rounds. This interval defines the time that passes
     /// between the moment a new block is committed to the blockchain and the

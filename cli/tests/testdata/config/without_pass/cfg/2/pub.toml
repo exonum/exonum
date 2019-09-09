@@ -1,0 +1,21 @@
+[common.consensus]
+first_round_timeout = 3000
+max_message_len = 1048576
+max_propose_timeout = 200
+min_propose_timeout = 10
+peers_timeout = 10000
+propose_timeout_threshold = 500
+status_timeout = 5000
+txs_block_limit = 1000
+
+[common.general]
+validators_count = 4
+
+[common.services_config]
+
+[node]
+address = "0.0.0.0:8002"
+
+[node.validator_keys]
+consensus = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
+service = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
