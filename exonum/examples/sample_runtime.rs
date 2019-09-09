@@ -23,7 +23,7 @@ use exonum::{
     node::{ApiSender, Node, NodeApiConfig, NodeChannel, NodeConfig},
     proto::Any,
     runtime::{
-        dispatcher::{self, DispatcherSender, Error as DispatcherError},
+        dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
         supervisor::{DeployRequest, StartService, Supervisor},
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
@@ -147,8 +147,8 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _context: &mut ExecutionContext,
-        call_info: CallInfo,
+        _context: &ExecutionContext,
+        call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let service = self
@@ -199,7 +199,7 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _context: &mut ExecutionContext) {}
+    fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
 
     fn after_commit(
         &self,

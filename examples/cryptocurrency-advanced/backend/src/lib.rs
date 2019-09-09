@@ -39,7 +39,7 @@ pub const INITIAL_BALANCE: u64 = 100;
 
 /// Cryptocurrency service implementation.
 #[derive(Debug, ServiceFactory)]
-#[exonum(proto_sources = "proto", service_interface = "CryptocurrencyInterface")]
+#[exonum(proto_sources = "proto", implements("CryptocurrencyInterface"))]
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {

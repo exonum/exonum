@@ -34,4 +34,10 @@ pub enum Error {
     ServiceNotStarted = 6,
     /// Suitable runtime for the given service instance ID is not found.
     IncorrectInstanceId = 7,
+    /// The interface is absent in the service.
+    NoSuchInterface = 8,
+    /// The method is absent in the service interface.
+    NoSuchMethod = 9,
+    /// Maximum depth of the call stack has been reached.
+    StackOverflow = 10,
 }

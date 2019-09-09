@@ -1200,7 +1200,7 @@ mod tests {
         artifact_name = "test-service",
         artifact_version = "0.1.0",
         proto_sources = "crate::proto::schema",
-        service_interface = "TestInterface"
+        implements("TestInterface")
     )]
     struct TestService;
 

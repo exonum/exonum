@@ -25,7 +25,7 @@ use crate::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, Service, Transaction, TransactionContext},
+        rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
         InstanceDescriptor, InstanceId,
     },
 };
@@ -42,7 +42,7 @@ mod transactions;
     crate = "crate",
     proto_sources = "proto::schema",
     artifact_name = "exonum-supervisor",
-    service_interface = "transactions::Transactions"
+    implements("transactions::Transactions")
 )]
 pub struct Supervisor;
 
@@ -55,9 +55,9 @@ impl Service for Supervisor {
         api::wire(builder)
     }
 
-    fn before_commit(&self, context: TransactionContext) {
-        let schema = Schema::new(context.instance.name, context.fork());
-        let height = blockchain::Schema::new(context.fork()).height();
+    fn before_commit(&self, context: BeforeCommitContext) {
+        let schema = Schema::new(context.instance.name, context.fork);
+        let height = blockchain::Schema::new(context.fork).height();
 
         // Removes pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema
