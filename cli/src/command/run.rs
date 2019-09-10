@@ -25,7 +25,7 @@ use std::{net::SocketAddr, path::PathBuf};
 use crate::{
     command::{ExonumCommand, StandardResult},
     io::load_config_file,
-    password::{PassInputMethod, PassphraseUsage, SecretKeyType},
+    password::{PassInputMethod, PassphraseUsage},
 };
 
 /// Container for node configuration parameters produced by `Run` command.
@@ -57,22 +57,14 @@ pub struct Run {
     /// Private API is used by node administrators for node monitoring and control.
     #[structopt(long)]
     pub private_api_address: Option<SocketAddr>,
-    /// Passphrase entry method for consensus key.
+    /// Passphrase entry method for master key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
-    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_MASTER_PASS` is used
     /// by default.
     #[structopt(long)]
-    pub consensus_key_pass: Option<PassInputMethod>,
-    /// Passphrase entry method for service key.
-    ///
-    /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
-    /// Default Value is `stdin`.
-    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
-    /// by default.
-    #[structopt(long)]
-    pub service_key_pass: Option<PassInputMethod>,
+    pub master_key_pass: Option<PassInputMethod>,
 }
 
 impl ExonumCommand for Run {
@@ -92,19 +84,12 @@ impl ExonumCommand for Run {
             config.api.private_api_address = Some(private_api_address);
         }
 
-        let consensus_passphrase = self
-            .consensus_key_pass
+        let master_passphrase = self
+            .master_key_pass
             .unwrap_or_default()
             .get_passphrase(PassphraseUsage::Using)?;
-        let service_passphrase = self
-            .service_key_pass
-            .unwrap_or_default()
-            .get_passphrase( PassphraseUsage::Using)?;
 
-        let config = config.read_secret_keys(
-            &config_path,
-            consensus_passphrase.as_bytes(),
-        );
+        let config = config.read_secret_keys(&config_path, master_passphrase.as_bytes());
 
         let run_config = NodeRunConfig {
             node_config: config,

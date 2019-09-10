@@ -29,19 +29,21 @@ use std::{
 };
 
 use crate::{
-    keys::Keys,
     api::node::SharedNodeState,
     blockchain::{
         contains_transaction, Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig,
         IndexCoordinates, IndexOwner, InstanceCollection, Schema, StoredConfiguration,
         ValidatorKeys,
     },
-    crypto::{gen_keypair, gen_keypair_from_seed, kx, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    crypto::{
+        gen_keypair, gen_keypair_from_seed, kx, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH,
+    },
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
+    keys::Keys,
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -851,7 +853,7 @@ impl Sandbox {
                 time.into(),
                 c.payload().user_agent(),
                 self.secret_key(ValidatorId(0)),
-                self.identity_key(ValidatorId(0))
+                self.identity_key(ValidatorId(0)),
             )
         });
         let sandbox = self.restart_uninitialized_with_time(time);

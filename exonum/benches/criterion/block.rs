@@ -40,7 +40,7 @@
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{Blockchain, GenesisConfig, InstanceCollection, Schema, ValidatorKeys},
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, kx, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
@@ -81,6 +81,7 @@ fn create_blockchain(
     let config = GenesisConfig::new(iter::once(ValidatorKeys {
         consensus_key: consensus_keypair.0,
         service_key: service_keypair.0,
+        identity_key: kx::PublicKey::zero(),
     }));
 
     Blockchain::new(
@@ -690,7 +691,7 @@ fn execute_block_rocksdb(
             TXS_IN_BLOCK,
         )
         .sample_size(100)
-        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
+        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u64)),
     );
 }
 

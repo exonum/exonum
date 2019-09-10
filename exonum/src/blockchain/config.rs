@@ -28,7 +28,7 @@ use serde_json::Error as JsonError;
 use std::collections::HashSet;
 
 use crate::{
-    crypto::{Hash, kx, PublicKey},
+    crypto::{kx, Hash, PublicKey},
     helpers::{Height, Milliseconds},
     messages::SIGNED_MESSAGE_MIN_SIZE,
 };

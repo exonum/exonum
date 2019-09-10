@@ -21,6 +21,7 @@ use criterion::{
 };
 use exonum::crypto::{gen_keypair, hash, sign, verify};
 use num::pow::pow;
+use std::convert::TryInto;
 
 fn bench_sign(b: &mut Bencher, &count: &usize) {
     let (_, secret_key) = gen_keypair();

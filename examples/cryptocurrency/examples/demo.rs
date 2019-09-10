@@ -13,8 +13,9 @@
 // limitations under the License.
 use exonum_merkledb::TemporaryDB;
 
-use exonum::{keys::Keys,
+use exonum::{
     blockchain::{GenesisConfig, InstanceCollection, ValidatorKeys},
+    keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;

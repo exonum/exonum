@@ -16,7 +16,7 @@
 // to `ParameterizedBenchmark::new()`.
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
-const MESSAGES_COUNT: usize = 1_000;
+const MESSAGES_COUNT: u64 = 1_000;
 const SAMPLE_SIZE: usize = 20;
 
 use criterion::{

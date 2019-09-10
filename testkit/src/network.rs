@@ -15,10 +15,10 @@
 use serde::{Deserialize, Serialize};
 
 use exonum::{
-    keys::Keys,
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, kx, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
+    keys::Keys,
     messages::{Precommit, Propose, Verified},
 };
 use exonum_merkledb::ObjectHash;
@@ -248,7 +248,6 @@ impl TestNode {
     pub fn service_keypair_cloned(&self) -> (PublicKey, SecretKey) {
         (self.keys.service_pk(), self.keys.service_sk().clone())
     }
-
 
     /// Returns the consensus keypair of the node.
     pub fn consensus_keypair(&self) -> (PublicKey, &SecretKey) {

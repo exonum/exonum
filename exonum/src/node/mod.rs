@@ -25,13 +25,13 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
+use crate::keys::{read_keys_from_file, Keys};
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
-use crate::keys::{read_keys_from_file, Keys};
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -420,19 +420,19 @@ pub struct ConnectListConfig {
 
 impl ConnectListConfig {
     /// Creates `ConnectListConfig` from validators public configs.
-//    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
-//        let peers = list
-//            .iter()
-//            .filter(|config| config.validator_keys.consensus_key != node.keys.consensus_pk())
-//            .map(|config| ConnectInfo {
-//                public_key: config.validator_keys.consensus_key,
-//                address: config.address.clone(),
-//                identity_key: config.validator_keys.identity_key,
-//            })
-//            .collect();
-//
-//        ConnectListConfig { peers }
-//    }
+    //    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
+    //        let peers = list
+    //            .iter()
+    //            .filter(|config| config.validator_keys.consensus_key != node.keys.consensus_pk())
+    //            .map(|config| ConnectInfo {
+    //                public_key: config.validator_keys.consensus_key,
+    //                address: config.address.clone(),
+    //                identity_key: config.validator_keys.identity_key,
+    //            })
+    //            .collect();
+    //
+    //        ConnectListConfig { peers }
+    //    }
 
     /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {

@@ -117,13 +117,6 @@ impl Finalize {
 impl ExonumCommand for Finalize {
     fn execute(self) -> Result<StandardResult, Error> {
         let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
-        let secret_config_dir = {
-            let directory = self
-                .secret_config_path
-                .parent()
-                .ok_or_else(|| format_err!("Cannot get the directory of the secret config path"))?;
-            std::env::current_dir()?.join(directory)
-        };
         let public_configs: Vec<SharedConfig> = self
             .public_configs
             .into_iter()

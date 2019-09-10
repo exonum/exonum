@@ -27,7 +27,7 @@ use log::SetLoggerError;
 use std::path::{Component, Path, PathBuf};
 
 use crate::blockchain::{GenesisConfig, Schema, ValidatorKeys};
-use crate::crypto::{kx, gen_keypair};
+use crate::crypto::{gen_keypair, kx};
 use crate::exonum_merkledb::Fork;
 use crate::keys::Keys;
 use crate::node::{ConnectListConfig, NodeConfig};

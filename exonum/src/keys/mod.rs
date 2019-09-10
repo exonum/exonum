@@ -110,7 +110,7 @@ fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
     #[cfg(unix)]
-        open_options.mode(0o_600);
+    open_options.mode(0o_600);
     let mut file = open_options.open(path.as_ref())?;
     file.write_all(file_content.as_bytes())?;
 
@@ -197,7 +197,7 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     let mut key_file = File::open(path)?;
 
     #[cfg(unix)]
-        validate_file_mode(key_file.metadata()?.mode())?;
+    validate_file_mode(key_file.metadata()?.mode())?;
 
     let mut file_content = vec![];
     key_file.read_to_end(&mut file_content)?;

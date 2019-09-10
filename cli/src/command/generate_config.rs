@@ -15,11 +15,11 @@
 //! Standard Exonum CLI command used to generate public and secret config files
 //! of the node using provided common configuration file.
 
-use exonum::{keys::{Keys, generate_keys, read_keys_from_file},
+use exonum::{
     blockchain::ValidatorKeys,
-    crypto::{PublicKey},
+    keys::{generate_keys, Keys},
 };
-use failure::{bail, Error};
+use failure::Error;
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -33,7 +33,7 @@ use crate::{
     command::{ExonumCommand, StandardResult},
     config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig},
     io::{load_config_file, save_config_file},
-    password::{PassInputMethod, Passphrase, PassphraseUsage, SecretKeyType},
+    password::{PassInputMethod, Passphrase, PassphraseUsage},
 };
 
 /// Name for a file containing consensus secret key.
@@ -81,26 +81,15 @@ pub struct GenerateConfig {
     /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
     /// by default.
     #[structopt(long)]
-    pub consensus_key_pass: Option<PassInputMethod>,
-    /// Passphrase entry method for service key.
-    ///
-    /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
-    /// Default Value is `stdin`.
-    /// If `ENV_VAR_NAME` is not specified `$EXONUM_SERVICE_PASS` is used
-    /// by default.
-    #[structopt(long)]
-    pub service_key_pass: Option<PassInputMethod>,
+    pub master_key_pass: Option<PassInputMethod>,
 }
 
 impl GenerateConfig {
-    fn get_passphrase(
-        no_password: bool,
-        method: PassInputMethod,
-    ) -> Result<Passphrase, Error> {
+    fn get_passphrase(no_password: bool, method: PassInputMethod) -> Result<Passphrase, Error> {
         if no_password {
             Ok(Passphrase::default())
         } else {
-            method.get_passphrase( PassphraseUsage::SettingUp)
+            method.get_passphrase(PassphraseUsage::SettingUp)
         }
     }
 
@@ -144,7 +133,8 @@ impl ExonumCommand for GenerateConfig {
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
         let keys = {
-            let passphrase = Self::get_passphrase(self.no_password, self.consensus_key_pass.unwrap_or_default());
+            let passphrase =
+                Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default());
             create_keys_and_files(&master_key_path, passphrase.unwrap().as_bytes())
         };
 

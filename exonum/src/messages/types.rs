@@ -22,7 +22,7 @@ use std::convert::TryFrom;
 
 use crate::{
     blockchain::Block,
-    crypto::{Hash, kx, PublicKey, Signature},
+    crypto::{kx, Hash, PublicKey, Signature},
     helpers::{Height, Round, ValidatorId},
     proto::schema::consensus,
 };

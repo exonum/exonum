@@ -14,10 +14,11 @@ validators_count = 3
 [common.services_config]
 
 [node]
-address = "0.0.0.0:8002"
+address = "127.0.0.3:6333"
 
 [node.services_public_configs]
 
 [node.validator_keys]
-consensus_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
-service_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
+consensus_key = "c1a00518f1cb606c3ff3e891c6ac1c7c4e49ca1ffcac9094e71c038abf38498c"
+identity_key = "609e47520b04cc2d48c9e9e38eb8ad38a9c7313af66534f8e8b25f11fb764854"
+service_key = "e597a326e7ad218140b7d5eb587a7c162a93b06fd50dd679c676518fa703360c"

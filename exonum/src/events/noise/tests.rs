@@ -29,7 +29,7 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use std::{net::SocketAddr, thread, time::Duration};
 
 use crate::{
-    crypto::{gen_keypair_from_seed, kx, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
+    crypto::{kx, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
     events::{
         error::into_failure,
         noise::{

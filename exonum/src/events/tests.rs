@@ -25,7 +25,7 @@ use std::{
 use crate::{
     blockchain::ConsensusConfig,
     crypto::{
-        gen_keypair, kx, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH,
+        gen_keypair, gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH,
         SEED_LENGTH, SIGNATURE_LENGTH,
     },
     events::{
@@ -204,7 +204,12 @@ pub fn connect_message(
 ) -> Verified<Connect> {
     let time = time::UNIX_EPOCH;
     Verified::from_value(
-        Connect::new(&addr.to_string(), time.into(), &user_agent::get(), identity_key),
+        Connect::new(
+            &addr.to_string(),
+            time.into(),
+            &user_agent::get(),
+            identity_key,
+        ),
         public_key,
         secret_key,
     )
@@ -236,7 +241,12 @@ impl HandshakeParams {
         let address = "127.0.0.1:8000";
 
         let connect = Verified::from_value(
-            Connect::new(address, SystemTime::now().into(), &user_agent::get(), identity_pk),
+            Connect::new(
+                address,
+                SystemTime::now().into(),
+                &user_agent::get(),
+                identity_pk,
+            ),
             public_key,
             &secret_key,
         );

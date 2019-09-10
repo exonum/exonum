@@ -11,13 +11,10 @@ txs_block_limit = 1000
 [common.general_config]
 validators_count = 4
 
-[common.services_config]
-
 [node]
-address = "0.0.0.0:8000"
-
-[node.services_public_configs]
+address = "127.0.0.1:8001"
 
 [node.validator_keys]
-consensus_key = "3b27439519ca4d28de698367d0a5bcc3cc33912e671c6dc952dafac2df1ffb07"
-service_key = "e4ed73397172b26b3488494ede7e606e4967e75b0875811a49f4487ee71dc6ce"
+consensus_key = "3bf31fa68763991db9fdbe285b644f3186a5b4957d2b5776ba0fee36629016eb"
+identity_key = "4b1b19078f63addd621f9ec584ac30be1587b93c20395a0c59b9bdd0fa11886b"
+service_key = "00d07854fa870ac99b2ed27ae5d2348c3542dfd3696ba69e75b9e9ec9070ff85"

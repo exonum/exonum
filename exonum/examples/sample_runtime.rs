@@ -34,6 +34,7 @@ use exonum_derive::IntoExecutionError;
 use exonum_merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB};
 use futures::{Future, IntoFuture};
 
+use exonum::keys::Keys;
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
@@ -41,7 +42,6 @@ use std::{
     thread,
     time::Duration,
 };
-use exonum::keys::Keys;
 
 /// Service instance with a counter.
 #[derive(Debug, Default)]
@@ -230,8 +230,14 @@ fn node_config() -> NodeConfig {
     };
     let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
 
-    let keys = Keys::from_keys(consensus_public_key, consensus_secret_key, service_public_key, service_secret_key,
-    identity_public_key, identity_secret_key);
+    let keys = Keys::from_keys(
+        consensus_public_key,
+        consensus_secret_key,
+        service_public_key,
+        service_secret_key,
+        identity_public_key,
+        identity_secret_key,
+    );
 
     let api_address = "0.0.0.0:8000".parse().unwrap();
     let api_cfg = NodeApiConfig {

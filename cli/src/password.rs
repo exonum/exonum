@@ -123,13 +123,10 @@ impl PassInputMethod {
     /// Get passphrase using selected method.
     /// Details of this process differs for different secret key types and whether we run node
     /// or generate config files.
-    pub fn get_passphrase(
-        self,
-        usage: PassphraseUsage,
-    ) -> Result<Passphrase, Error> {
+    pub fn get_passphrase(self, usage: PassphraseUsage) -> Result<Passphrase, Error> {
         match self {
             PassInputMethod::Terminal => {
-                let prompt =  "Enter master key passphrase";
+                let prompt = "Enter master key passphrase";
                 match usage {
                     PassphraseUsage::SettingUp => prompt_passphrase(prompt),
                     PassphraseUsage::Using => Passphrase::read_from_tty(prompt),

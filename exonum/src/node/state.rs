@@ -24,11 +24,11 @@ use std::{
 };
 
 use crate::{
-    keys::Keys,
     blockchain::{contains_transaction, ConsensusConfig, StoredConfiguration, ValidatorKeys},
     crypto::{kx, Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
+    keys::Keys,
     messages::{
         AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
         Verified,
