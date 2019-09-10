@@ -23,7 +23,7 @@ fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
 
-    let genesis = ConsensusConfig {
+    let consensus = ConsensusConfig {
         validator_keys: vec![ValidatorKeys {
             consensus_key: consensus_public_key,
             service_key: service_public_key,
@@ -45,7 +45,7 @@ fn node_config() -> NodeConfig {
         service_secret_key,
         consensus_public_key,
         consensus_secret_key,
-        genesis,
+        consensus,
         external_address: peer_address.to_owned(),
         network: Default::default(),
         connect_list: Default::default(),

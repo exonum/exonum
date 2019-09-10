@@ -238,8 +238,8 @@ impl Default for MemoryPoolConfig {
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeConfig<T = SecretKey> {
-    /// Initial config that will be written in the first block.
-    pub genesis: ConsensusConfig,
+    /// Initial consensus configuration that will be written in the genesis block.
+    pub consensus: ConsensusConfig,
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
@@ -306,7 +306,7 @@ impl NodeConfig<PathBuf> {
         NodeConfig {
             consensus_secret_key,
             service_secret_key,
-            genesis: self.genesis,
+            consensus: self.consensus,
             listen_address: self.listen_address,
             external_address: self.external_address,
             network: self.network,
@@ -352,7 +352,7 @@ impl<T> ValidateInput for NodeConfig<T> {
             capacity.network_requests_capacity,
             sanity_max,
         );
-        self.genesis.validate()
+        self.consensus.validate()
     }
 }
 
@@ -941,7 +941,7 @@ impl Node {
         let blockchain = Blockchain::new(
             database,
             services,
-            node_cfg.genesis.clone(),
+            node_cfg.consensus.clone(),
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
             channel.internal_requests.0.clone(),
@@ -1029,7 +1029,7 @@ impl Node {
             handler,
             channel,
             network_config,
-            max_message_len: node_cfg.genesis.max_message_len,
+            max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
             api_runtime_config,
         }

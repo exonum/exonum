@@ -143,7 +143,7 @@ impl ExonumCommand for Finalize {
             bail!("The number of validators does not match the number of validators keys.");
         }
 
-        let genesis = ConsensusConfig {
+        let consensus = ConsensusConfig {
             validator_keys: public_configs.iter().map(|c| c.validator_keys).collect(),
             ..common.consensus.clone()
         };
@@ -159,7 +159,7 @@ impl ExonumCommand for Finalize {
                 consensus_secret_key: secret_config_dir.join(&secret_config.consensus_secret_key),
                 service_public_key: secret_config.service_public_key,
                 service_secret_key: secret_config_dir.join(&secret_config.service_secret_key),
-                genesis,
+                consensus,
                 api: NodeApiConfig {
                     public_api_address: self.public_api_address,
                     private_api_address: self.private_api_address,

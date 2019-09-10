@@ -119,7 +119,7 @@ pub fn create_blockchain() -> Blockchain {
     Blockchain::new(
         TemporaryDB::new(),
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
-        config.genesis,
+        config.consensus,
         service_keypair,
         ApiSender(mpsc::channel(0).0),
         mpsc::channel(0).0,

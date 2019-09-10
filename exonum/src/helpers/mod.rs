@@ -45,7 +45,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
-    let genesis = ConsensusConfig {
+    let consensus = ConsensusConfig {
         validator_keys: validators
             .iter()
             .zip(services.iter())
@@ -72,8 +72,8 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             consensus_secret_key: validator.1,
             service_public_key: service.0,
             service_secret_key: service.1,
-            genesis: genesis.clone(),
-            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
+            consensus: consensus.clone(),
+            connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
             services_configs: Default::default(),
