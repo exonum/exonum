@@ -382,6 +382,7 @@ impl<V: BinaryValue> ListProof<V> {
             Err(ListProofError::UnmatchedRootHash)
         }
     }
+}
 
 /// An error that is returned when the list proof is invalid.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Fail)]
