@@ -14,7 +14,7 @@
 
 //! An implementation of a Merkelized version of an array list (Merkle tree).
 
-pub use self::proof::{ListProof, ListProofError};
+pub use self::proof::{CheckedListProof, ListProof, ListProofError, ValidationError};
 
 use std::{
     marker::PhantomData,

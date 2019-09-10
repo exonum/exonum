@@ -280,10 +280,11 @@ fn proof_list_index_build_proofs(b: &mut Bencher, len: usize) {
         proofs.extend((0..len).map(|i| table.get_proof(i as u64)));
     });
 
-    let table_root_hash = table.object_hash();
+    let table_hash = table.object_hash();
     for proof in proofs {
-        let items = proof.validate(table_root_hash).unwrap();
-        assert_eq!(items.len(), 1);
+        let checked_proof = proof.check().unwrap();
+        assert_eq!(checked_proof.object_hash(), table_hash);
+        assert_eq!(checked_proof.entries().len(), 1);
     }
 }
 
@@ -301,8 +302,8 @@ fn proof_list_index_verify_proofs(b: &mut Bencher, len: usize) {
 
     b.iter(|| {
         for proof in &proofs {
-            let items = proof.validate(table_root_hash).unwrap();
-            assert_eq!(items.len(), 1);
+            let items = proof.check_against_hash(table_root_hash).unwrap();
+            assert_eq!(items.entries().len(), 1);
         }
     });
 }

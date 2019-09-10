@@ -120,7 +120,9 @@ fn simple_proof() {
     assert_eq!(index.object_hash(), HashTag::hash_list_node(1, h0));
     let proof = index.get_proof(0);
     assert_eq!(proof, ListProof::new(vec![(0, 2_u64)], index.len()));
-    assert_eq!(*proof.validate(index.object_hash()).unwrap(), [(0, 2)]);
+    let proof = proof.check().unwrap();
+    assert_eq!(proof.object_hash(), index.object_hash());
+    assert_eq!(*proof.entries(), [(0, 2)]);
 
     index.push(4_u64);
     assert_eq!(index.object_hash(), HashTag::hash_list_node(2, h01));
@@ -131,7 +133,9 @@ fn simple_proof() {
         proof.push_hash(1, 1, h1);
         proof
     });
-    assert_eq!(*proof.validate(index.object_hash()).unwrap(), [(0, 2)]);
+    let proof = proof.check().unwrap();
+    assert_eq!(proof.object_hash(), index.object_hash());
+    assert_eq!(*proof.entries(), [(0, 2)]);
 
     let proof = index.get_proof(1);
     assert_eq!(proof, {
@@ -139,7 +143,9 @@ fn simple_proof() {
         proof.push_hash(1, 0, h0);
         proof
     });
-    assert_eq!(*proof.validate(index.object_hash()).unwrap(), [(1, 4)]);
+    let proof = proof.check().unwrap();
+    assert_eq!(proof.object_hash(), index.object_hash());
+    assert_eq!(*proof.entries(), [(1, 4)]);
 
     let proof = index.get_range_proof(0..2);
     assert_eq!(
@@ -147,7 +153,10 @@ fn simple_proof() {
         ListProof::new(vec![(0, 2_u64), (1, 4_u64)], index.len())
     );
     assert_eq!(
-        *proof.validate(index.object_hash()).unwrap(),
+        *proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries(),
         [(0, 2), (1, 4)]
     );
 
@@ -161,7 +170,13 @@ fn simple_proof() {
         proof.push_hash(2, 1, h22);
         proof
     });
-    assert_eq!(*proof.validate(index.object_hash()).unwrap(), [(0, 2)]);
+    assert_eq!(
+        *proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries(),
+        [(0, 2)]
+    );
 
     let proof = index.get_range_proof(1..3);
     assert_eq!(proof, {
@@ -170,7 +185,10 @@ fn simple_proof() {
         proof
     });
     assert_eq!(
-        *proof.validate(index.object_hash()).unwrap(),
+        *proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries(),
         [(1, 4_u64), (2, 6_u64)]
     );
 
@@ -181,7 +199,10 @@ fn simple_proof() {
         proof
     });
     assert_eq!(
-        *proof.validate(index.object_hash()).unwrap(),
+        *proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries(),
         [(0, 2_u64), (1, 4_u64)]
     );
 }
@@ -209,16 +230,13 @@ fn random_proofs() {
         let end = cmp::min(end, start + MAX_RANGE_SIZE);
 
         let range_proof = index.get_range_proof(start..end);
-        let (indices, actual_values): (Vec<_>, Vec<_>) = range_proof
-            .validate(index_hash)
-            .unwrap()
-            .to_vec()
-            .into_iter()
-            .unzip();
-        assert_eq!(indices, (start..end).collect::<Vec<_>>());
-
-        let expected_values = &values[start as usize..end as usize];
-        assert_eq!(expected_values, actual_values.as_slice());
+        let checked_proof = range_proof.check_against_hash(index_hash).unwrap();
+        let expected_entries = (start..end).zip(&values[start as usize..end as usize]);
+        assert!(checked_proof
+            .entries()
+            .iter()
+            .map(|(i, value)| (*i, value))
+            .eq(expected_entries));
     }
 }
 
@@ -277,14 +295,25 @@ fn index_and_proof_roots() {
         assert_eq!(index.object_hash(), exp_root);
 
         let range_proof = index.get_range_proof(proof_ind..=proof_ind);
-        assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 1);
+        assert_eq!(
+            range_proof
+                .check_against_hash(index.object_hash())
+                .unwrap()
+                .entries()
+                .len(),
+            1
+        );
         let js = serde_json::to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = serde_json::from_str(&js).unwrap();
         assert_eq!(deserialized_proof, range_proof);
 
         let range_proof = index.get_range_proof(..=proof_ind);
         assert_eq!(
-            range_proof.validate(index.object_hash()).unwrap().len(),
+            range_proof
+                .check_against_hash(index.object_hash())
+                .unwrap()
+                .entries()
+                .len(),
             (proof_ind + 1) as usize
         );
         let js = serde_json::to_string(&range_proof).unwrap();
@@ -292,21 +321,25 @@ fn index_and_proof_roots() {
         assert_eq!(deserialized_proof, range_proof);
 
         let range_proof = index.get_range_proof(0..1);
-        assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 1);
+        assert_eq!(
+            range_proof
+                .check_against_hash(index.object_hash())
+                .unwrap()
+                .entries()
+                .len(),
+            1
+        );
         let js = serde_json::to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = serde_json::from_str(&js).unwrap();
         assert_eq!(deserialized_proof, range_proof);
     }
 
     let range_proof = index.get_range_proof(..);
-    let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
-        .validate(index.object_hash())
+    let entries = range_proof
+        .check_against_hash(index.object_hash())
         .unwrap()
-        .iter()
-        .cloned()
-        .unzip();
-    assert_eq!(indices, (0..8).collect::<Vec<_>>());
-    let expected_values = vec![
+        .entries();
+    let expected_entries = (0..8).zip(vec![
         vec![1, 2],
         vec![2, 3],
         vec![3, 4],
@@ -315,15 +348,30 @@ fn index_and_proof_roots() {
         vec![6, 7],
         vec![7, 8],
         vec![8, 9],
-    ];
-    for (expected, actual) in expected_values.into_iter().zip(val_refs) {
-        assert_eq!(expected[..], actual[..]);
-    }
+    ]);
+    assert!(entries
+        .iter()
+        .zip(expected_entries)
+        .all(|(actual, expected)| *actual == expected));
 
     let mut range_proof = index.get_range_proof(3..5);
-    assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 2);
+    assert_eq!(
+        range_proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries()
+            .len(),
+        2
+    );
     range_proof = index.get_range_proof(2..6);
-    assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 4);
+    assert_eq!(
+        range_proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries()
+            .len(),
+        4
+    );
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
@@ -350,7 +398,11 @@ fn proof_with_range_end_exceeding_list_size() {
 
     let proof = index.get_range_proof(2..10);
     assert_eq!(
-        proof.validate(index.object_hash()).unwrap().len(),
+        proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries()
+            .len(),
         2 // elements 2 and 3
     );
 }
@@ -365,10 +417,18 @@ fn proof_with_range_start_exceeding_list_size() {
     }
 
     let proof = index.get_range_proof(8..10_000_000);
-    assert!(proof.validate(index.object_hash()).unwrap().is_empty());
+    assert!(proof
+        .check_against_hash(index.object_hash())
+        .unwrap()
+        .entries()
+        .is_empty());
 
     let proof = index.get_range_proof(8..);
-    assert!(proof.validate(index.object_hash()).unwrap().is_empty());
+    assert!(proof
+        .check_against_hash(index.object_hash())
+        .unwrap()
+        .entries()
+        .is_empty());
 }
 
 #[test]
@@ -433,10 +493,7 @@ fn unordered_proofs() {
         "length": 3,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::Unordered
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::Unordered);
 
     let json = json!({
         "entries": [(2, "foo")],
@@ -447,10 +504,7 @@ fn unordered_proofs() {
         "length": 5,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::Unordered
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::Unordered);
 
     let json = json!({
         "entries": [(2, "foo")],
@@ -462,10 +516,7 @@ fn unordered_proofs() {
         "length": 100,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::Unordered
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::Unordered);
 }
 
 #[test]
@@ -476,10 +527,7 @@ fn non_empty_proof_for_empty_tree() {
         "length": 0,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::NonEmptyProof
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::NonEmptyProof);
 
     let json = json!({
         "entries": [],
@@ -487,10 +535,7 @@ fn non_empty_proof_for_empty_tree() {
         "length": 0,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::NonEmptyProof
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::NonEmptyProof);
 }
 
 #[test]
@@ -503,10 +548,7 @@ fn proofs_with_unexpected_branches() {
         "length": 10,
     }))
     .unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::UnexpectedBranch
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::UnexpectedBranch);
 
     let proof: ListProof<u64> = serde_json::from_value(json!({
         "entries": [(2, 2)],
@@ -516,31 +558,19 @@ fn proofs_with_unexpected_branches() {
         "length": 10,
     }))
     .unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::UnexpectedBranch
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::UnexpectedBranch);
 
     let mut proof = ListProof::new(vec![(1, "foo".to_owned()), (2, "bar".to_owned())], 3);
     proof.push_hash(2, 2, Hash::zero());
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::UnexpectedBranch
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::UnexpectedBranch);
 
     let mut proof = ListProof::new(vec![(1, "foo".to_owned()), (2, "bar".to_owned())], 3);
     proof.push_hash(1, 4, Hash::zero());
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::UnexpectedBranch
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::UnexpectedBranch);
 
     let mut proof = ListProof::new(vec![(1, "foo".to_owned()), (2, "bar".to_owned())], 5);
     proof.push_hash(1, 6, Hash::zero());
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::UnexpectedBranch
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::UnexpectedBranch);
 }
 
 #[test]
@@ -554,46 +584,31 @@ fn proofs_with_unexpected_leaf() {
         "length": 5,
     }))
     .unwrap();
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::UnexpectedLeaf
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::UnexpectedLeaf);
 }
 
 #[test]
 fn proofs_with_missing_entry() {
     let proof = ListProof::new(vec![(1, 1_u64), (2, 2)], 3);
     // (1, 0) is missing
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::MissingHash
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::MissingHash);
 
     let mut proof = ListProof::new(vec![(1, 1_u64)], 7);
     proof.push_hash(1, 0, Hash::zero());
     // (2, 1) is missing
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::MissingHash
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::MissingHash);
 
     let mut proof = ListProof::new(vec![(1, 1_u64), (2, 2)], 9);
     proof.push_hash(1, 0, Hash::zero());
     proof.push_hash(1, 3, Hash::zero());
     // (3, 1) is missing
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::MissingHash
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::MissingHash);
 
     let mut proof = ListProof::new(vec![(1, 1_u64), (2, 2), (4, 4)], 8);
     proof.push_hash(1, 0, Hash::zero());
     proof.push_hash(1, 3, Hash::zero());
     proof.push_hash(2, 3, Hash::zero());
-    assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
-        ListProofError::MissingHash
-    );
+    assert_eq!(proof.check().unwrap_err(), ListProofError::MissingHash);
 }
 
 #[test]
@@ -605,7 +620,7 @@ fn invalid_proofs_with_no_values() {
     }))
     .unwrap();
     assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
+        proof.check().unwrap_err(),
         ListProofError::MissingHash // we expected 1 hash
     );
 
@@ -619,7 +634,7 @@ fn invalid_proofs_with_no_values() {
     }))
     .unwrap();
     assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
+        proof.check().unwrap_err(),
         ListProofError::UnexpectedBranch // we expected 1 hash, got 2
     );
 
@@ -632,7 +647,7 @@ fn invalid_proofs_with_no_values() {
     }))
     .unwrap();
     assert_eq!(
-        proof.validate(HashTag::empty_list_hash()).unwrap_err(),
+        proof.check().unwrap_err(),
         ListProofError::UnexpectedBranch // the hash is at an incorrect position
     );
 }

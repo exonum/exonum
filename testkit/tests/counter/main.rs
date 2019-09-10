@@ -828,7 +828,7 @@ fn test_explorer_transaction_info() {
     let block = explorer.block(Height(1)).unwrap();
     assert!(committed
         .location_proof()
-        .validate(*block.header().tx_hash())
+        .check_against_hash(*block.header().tx_hash())
         .is_ok());
 }
 

@@ -18,7 +18,7 @@ use serde_derive::*;
 use std::cmp::Ordering;
 
 use super::{key::ProofListKey, tree_height_by_length};
-use crate::{BinaryValue, HashTag};
+use crate::{BinaryValue, HashTag, ObjectHash};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 struct HashedEntry {
@@ -49,7 +49,8 @@ impl HashedEntry {
 /// # use exonum_merkledb::{
 /// #     Database, TemporaryDB, BinaryValue, ListProof, ProofListIndex, ObjectHash,
 /// # };
-/// # use exonum_crypto::hash;
+/// # use failure::Error;
+/// # fn main() -> Result<(), Error> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut list = ProofListIndex::new("index", &fork);
 /// list.extend(vec![100_u32, 200_u32, 300_u32]);
@@ -57,9 +58,17 @@ impl HashedEntry {
 /// // Get the proof from the index
 /// let proof = list.get_range_proof(1..);
 ///
-/// // Check the proof consistency
-/// let elements = proof.validate(list.object_hash()).unwrap();
-/// assert_eq!(*elements, [(1, 200_u32), (2, 300_u32)]);
+/// // Check the proof consistency.
+/// let checked_proof = proof.check()?;
+/// assert_eq!(checked_proof.object_hash(), list.object_hash());
+/// assert_eq!(*checked_proof.entries(), [(1, 200_u32), (2, 300_u32)]);
+///
+/// // If the trusted list hash is known, there is a convenient method
+/// // to combine integrity check and hash equality check.
+/// let checked_proof = proof.check_against_hash(list.object_hash())?;
+/// assert!(checked_proof.indexes().eq(1..=2));
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// # JSON serialization
@@ -379,13 +388,8 @@ impl<V: BinaryValue> ListProof<V> {
     }
 
     /// Returns the length of the underlying `ProofListIndex`.
-    pub fn len(&self) -> u64 {
+    pub fn list_len(&self) -> u64 {
         self.length
-    }
-
-    /// Is the underlying `ProofListIndex` empty?
-    pub fn is_empty(&self) -> bool {
-        self.length == 0
     }
 
     /// Returns indices and references to elements in the proof without verifying it.
@@ -450,17 +454,76 @@ impl<V: BinaryValue> ListProof<V> {
         Ok(hash_ops)
     }
 
+    /// Verifies the correctness of the proof.
+    ///
+    /// If the proof is valid, a checked list proof is returned, which allows to access
+    /// proven elements. Otherwise, an error is returned.
+    pub fn check(&self) -> Result<CheckedListProof<V>, ListProofError> {
+        let tree_root = self.collect()?;
+        Ok(CheckedListProof {
+            entries: &self.entries,
+            length: self.length,
+            hash: HashTag::hash_list_node(self.length, tree_root),
+        })
+    }
+
     /// Verifies the correctness of the proof according to the trusted list hash.
     ///
-    /// If the proof is valid, a vector with indices and references to elements is returned.
-    /// Otherwise, an error is returned.
-    pub fn validate(&self, expected_list_hash: Hash) -> Result<&[(u64, V)], ListProofError> {
-        let tree_root = self.collect()?;
-        if HashTag::hash_list_node(self.length, tree_root) == expected_list_hash {
-            Ok(&self.entries)
-        } else {
-            Err(ListProofError::UnmatchedRootHash)
-        }
+    /// The method is essentially a convenience wrapper around `check()`.
+    ///
+    /// # Return value
+    ///
+    /// If the proof is valid, a checked list proof is returned, which allows to access
+    /// proven elements. Otherwise, an error is returned.
+    pub fn check_against_hash(
+        &self,
+        expected_list_hash: Hash,
+    ) -> Result<CheckedListProof<V>, ValidationError> {
+        self.check()
+            .map_err(ValidationError::Malformed)
+            .and_then(|checked_proof| {
+                if checked_proof.object_hash() == expected_list_hash {
+                    Ok(checked_proof)
+                } else {
+                    Err(ValidationError::UnmatchedRootHash)
+                }
+            })
+    }
+}
+
+/// Version of `ListProof` obtained after verification.
+///
+/// See [`ListProof`] for an example of usage.
+///
+/// [`ListProof`]: struct.MapProof.html#workflow
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CheckedListProof<'a, V> {
+    entries: &'a [(u64, V)],
+    length: u64,
+    hash: Hash,
+}
+
+impl<'a, V> CheckedListProof<'a, V> {
+    /// Returns indices and references to elements in the proof.
+    pub fn entries(&self) -> &'a [(u64, V)] {
+        self.entries
+    }
+
+    /// Returns iterator over indexes of the elements in the proof without verifying
+    /// proof integrity.
+    pub fn indexes<'s>(&'s self) -> impl Iterator<Item = u64> + 's {
+        self.entries().iter().map(|(index, _)| *index)
+    }
+
+    /// Returns the length of the underlying `ProofListIndex`.
+    pub fn list_len(&self) -> u64 {
+        self.length
+    }
+}
+
+impl<V> ObjectHash for CheckedListProof<'_, V> {
+    fn object_hash(&self) -> Hash {
+        self.hash
     }
 }
 
@@ -476,10 +539,6 @@ pub enum ListProofError {
         display = "proof contains a hash in the position which is impossible according to the list length"
     )]
     UnexpectedBranch,
-
-    /// The hash of the proof is not equal to the trusted root hash.
-    #[fail(display = "hash of the proof is not equal to the trusted hash of the list")]
-    UnmatchedRootHash,
 
     /// Values or hashes in the proof are not ordered by their keys.
     #[fail(display = "values or hashes in the proof are not ordered by their keys")]
@@ -500,6 +559,18 @@ pub enum ListProofError {
     /// or hashes from.
     #[fail(display = "non-empty proof for an empty list")]
     NonEmptyProof,
+}
+
+/// Errors that can occur while validating a `ListProof` against a trusted list hash.
+#[derive(Debug, Fail)]
+pub enum ValidationError {
+    /// The hash of the proof is not equal to the trusted root hash.
+    #[fail(display = "hash of the proof is not equal to the trusted hash of the list")]
+    UnmatchedRootHash,
+
+    /// The proof is malformed.
+    #[fail(display = "Malformed proof: {}", _0)]
+    Malformed(#[fail(cause)] ListProofError),
 }
 
 #[cfg(test)]
