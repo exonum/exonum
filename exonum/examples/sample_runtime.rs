@@ -140,7 +140,7 @@ impl Runtime for SampleRuntime {
             .get(&call_info.instance_id)
             .ok_or(SampleRuntimeError::IncorrectCallInfo)?;
 
-        if context.interface_name == Initialize::NAME {}
+        if context.interface_name == Initialize::INTERFACE_NAME {}
 
         println!(
             "Executing method {}#{} of service {}",
@@ -151,7 +151,7 @@ impl Runtime for SampleRuntime {
         match (context.interface_name, call_info.method_id) {
             // `initialize` request sets the counter value of the corresponding
             // `SampleService` instance
-            (Initialize::NAME, INITIALIZE_METHOD_ID) => {
+            (Initialize::INTERFACE_NAME, INITIALIZE_METHOD_ID) => {
                 let new_value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
                 service.counter.set(new_value);

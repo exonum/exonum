@@ -156,7 +156,9 @@ impl ServiceFactory {
             };
 
             quote! {
-                #interface_trait::NAME => #interface_trait::dispatch(self, ctx, method, payload),
+                #interface_trait::INTERFACE_NAME => {
+                    #interface_trait::dispatch(self, ctx, method, payload)
+                }
             }
         });
 

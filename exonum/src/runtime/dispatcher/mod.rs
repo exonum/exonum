@@ -380,7 +380,7 @@ impl Dispatcher {
         let constructor_is_empty = constructor.is_empty();
 
         let context = ExecutionContext {
-            interface_name: Initialize::NAME,
+            interface_name: Initialize::INTERFACE_NAME,
             ..ExecutionContext::new(self, fork, Caller::Blockchain {})
         };
         let call_info = CallInfo {

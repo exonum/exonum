@@ -206,7 +206,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         arg: TestCallInitialize,
     ) -> Result<(), ExecutionError> {
         context.call_context(context.instance.id).call(
-            Initialize::NAME,
+            Initialize::INTERFACE_NAME,
             INITIALIZE_METHOD_ID,
             arg.value,
         )

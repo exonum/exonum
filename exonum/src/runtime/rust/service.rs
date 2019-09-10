@@ -287,7 +287,7 @@ pub trait Interface {
     /// Fully qualified name of this interface for the [call info].
     ///
     /// [call info]: ../struct.CallInfo.html
-    const NAME: &'static str;
+    const INTERFACE_NAME: &'static str;
     /// Invoke the specified method handler of the service instance.
     fn dispatch(
         &self,

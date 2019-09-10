@@ -435,7 +435,7 @@ mod foreign_interface_call {
     }
 
     impl Interface for dyn ForeignInterface {
-        const NAME: &'static str = "ForeignInterface";
+        const INTERFACE_NAME: &'static str = "ForeignInterface";
 
         fn dispatch(
             &self,
@@ -460,7 +460,7 @@ mod foreign_interface_call {
 
     impl<'a> ForeignInterfaceClient<'a> {
         fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
-            self.0.call(ForeignInterface::NAME, 0, arg)
+            self.0.call(ForeignInterface::INTERFACE_NAME, 0, arg)
         }
     }
 

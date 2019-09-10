@@ -47,7 +47,7 @@ pub trait Initialize {
 }
 
 impl Interface for dyn Initialize {
-    const NAME: &'static str = "Initialize";
+    const INTERFACE_NAME: &'static str = "Initialize";
 
     fn dispatch(
         &self,
