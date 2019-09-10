@@ -20,6 +20,9 @@ use std::cmp::Ordering;
 use super::{key::ProofListKey, tree_height_by_length};
 use crate::{BinaryValue, HashTag, ObjectHash};
 
+/// Validation errors associated with `ListProof`s.
+pub type ValidationError = crate::ValidationError<ListProofError>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 struct HashedEntry {
     #[serde(flatten)]
@@ -559,18 +562,6 @@ pub enum ListProofError {
     /// or hashes from.
     #[fail(display = "non-empty proof for an empty list")]
     NonEmptyProof,
-}
-
-/// Errors that can occur while validating a `ListProof` against a trusted list hash.
-#[derive(Debug, Fail)]
-pub enum ValidationError {
-    /// The hash of the proof is not equal to the trusted root hash.
-    #[fail(display = "hash of the proof is not equal to the trusted hash of the list")]
-    UnmatchedRootHash,
-
-    /// The proof is malformed.
-    #[fail(display = "Malformed proof: {}", _0)]
-    Malformed(#[fail(cause)] ListProofError),
 }
 
 #[cfg(test)]

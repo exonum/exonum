@@ -17,7 +17,7 @@
 pub use self::node::{BranchNode, Node};
 pub use self::{
     key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
-    proof::{CheckedMapProof, MapProof, MapProofError},
+    proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
 use std::{

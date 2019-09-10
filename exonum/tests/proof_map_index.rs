@@ -61,7 +61,7 @@ where
             .map(|&(ref k, ref v)| (k, v))
             .collect::<Vec<_>>()
     );
-    assert_eq!(proof.root_hash(), table.object_hash());
+    assert_eq!(proof.object_hash(), table.object_hash());
 }
 
 fn check_map_multiproof<T, K, V>(
@@ -103,7 +103,7 @@ fn check_map_multiproof<T, K, V>(
         proof.all_entries().collect::<Vec<_>>(),
         unchecked_proof.all_entries_unchecked().collect::<Vec<_>>()
     );
-    assert_eq!(proof.root_hash(), table.object_hash());
+    assert_eq!(proof.object_hash(), table.object_hash());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
         actual_keys

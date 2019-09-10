@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::Hash;
 use failure::Fail;
 use serde::{Deserializer, Serializer};
 use serde_derive::{Deserialize, Serialize};
 
-use exonum_crypto::Hash;
+use std::borrow::Cow;
 
 use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
@@ -26,6 +27,9 @@ use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
+
+/// Validation errors associated with `ListProof`s.
+pub type ValidationError = crate::ValidationError<MapProofError>;
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -149,38 +153,27 @@ impl<K, V> OptionalEntry<K, V> {
     }
 
     fn key(&self) -> &K {
-        match *self {
-            OptionalEntry::Missing { ref missing } => missing,
-            OptionalEntry::KV { ref key, .. } => key,
+        match self {
+            OptionalEntry::Missing { missing } => missing,
+            OptionalEntry::KV { key, .. } => key,
         }
     }
 
     fn as_missing(&self) -> Option<&K> {
-        match *self {
-            OptionalEntry::Missing { ref missing } => Some(missing),
+        match self {
+            OptionalEntry::Missing { missing } => Some(missing),
             _ => None,
         }
     }
 
     fn as_kv(&self) -> Option<(&K, &V)> {
-        match *self {
-            OptionalEntry::KV { ref key, ref value } => Some((key, value)),
+        match self {
+            OptionalEntry::KV { key, value } => Some((key, value)),
             _ => None,
         }
     }
-}
 
-impl<K, V> From<(K, Option<V>)> for OptionalEntry<K, V> {
-    fn from(value: (K, Option<V>)) -> Self {
-        match value {
-            (missing, None) => OptionalEntry::Missing { missing },
-            (key, Some(value)) => OptionalEntry::KV { key, value },
-        }
-    }
-}
-
-impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
-    fn into(self) -> (K, Option<V>) {
+    fn as_tuple(&self) -> (&K, Option<&V>) {
         match self {
             OptionalEntry::Missing { missing } => (missing, None),
             OptionalEntry::KV { key, value } => (key, Some(value)),
@@ -203,20 +196,28 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// ```
 /// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, ObjectHash};
 /// # use exonum_crypto::hash;
+/// # use failure::Error;
+/// # fn main() -> Result<(), Error> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &fork);
 /// let (h1, h2, h3) = (hash(&[1]), hash(&[2]), hash(&[3]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
 ///
-/// // Get the proof from the index
+/// // Get the proof from the index.
 /// let proof = map.get_multiproof(vec![h1, h3]);
 ///
-/// // Check the proof consistency
-/// let checked_proof = proof.check().unwrap();
-/// assert_eq!(checked_proof.entries().collect::<Vec<_>>(), vec![(&h1, &100u32)]);
-/// assert_eq!(checked_proof.missing_keys().collect::<Vec<_>>(), vec![&h3]);
-/// assert_eq!(checked_proof.root_hash(), map.object_hash());
+/// // Check the proof consistency.
+/// let checked_proof = proof.check()?;
+/// assert!(checked_proof.entries().eq(vec![(&h1, &100u32)]));
+/// assert!(checked_proof.missing_keys().eq(vec![&h3]));
+/// assert_eq!(checked_proof.object_hash(), map.object_hash());
+///
+/// // If the trusted list hash is known, there is a convenient method
+/// // to combine integrity check and hash equality check.
+/// let checked_proof = proof.check_against_hash(map.object_hash())?;
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// # JSON serialization
@@ -270,9 +271,9 @@ pub struct MapProof<K, V> {
 /// See [`MapProof`] for an example of usage.
 ///
 /// [`MapProof`]: struct.MapProof.html#workflow
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CheckedMapProof<K, V> {
-    entries: Vec<(K, Option<V>)>,
+#[derive(Debug, Serialize)]
+pub struct CheckedMapProof<'a, K, V> {
+    entries: &'a [OptionalEntry<K, V>],
     hash: Hash,
 }
 
@@ -288,7 +289,7 @@ pub struct CheckedMapProof<K, V> {
 /// added to it.
 ///
 /// `entries` are assumed to be sorted by the path in increasing order.
-fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
+fn collect(entries: &[Cow<MapProofEntry>]) -> Result<Hash, MapProofError> {
     fn common_prefix(x: &ProofPath, y: &ProofPath) -> ProofPath {
         x.prefix(x.common_prefix_len(y))
     }
@@ -342,8 +343,8 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
             {
                 let (first_entry, second_entry) = (&entries[0], &entries[1]);
                 last_prefix = common_prefix(&first_entry.path, &second_entry.path);
-                contour.push(*first_entry);
-                contour.push(*second_entry);
+                contour.push(**first_entry);
+                contour.push(**second_entry);
             }
 
             for entry in entries.iter().skip(2) {
@@ -356,7 +357,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
                     }
                 }
 
-                contour.push(*entry);
+                contour.push(**entry);
                 last_prefix = new_prefix;
             }
 
@@ -533,9 +534,7 @@ where
         Ok(())
     }
 
-    /// Consumes this proof producing a `CheckedMapProof` structure.
-    ///
-    /// Fails if the proof is malformed.
+    /// Checks this proof. Fails if the proof is malformed.
     ///
     /// # Examples
     ///
@@ -551,20 +550,22 @@ where
     /// let proof = map.get_proof(h2);
     /// let checked_proof = proof.check().unwrap();
     /// assert_eq!(checked_proof.entries().collect::<Vec<_>>(), vec![(&h2, &200u32)]);
-    /// assert_eq!(checked_proof.root_hash(), map.object_hash());
+    /// assert_eq!(checked_proof.object_hash(), map.object_hash());
     /// ```
     ///
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
-    pub fn check(self) -> Result<CheckedMapProof<K, V>, MapProofError> {
+    pub fn check(&self) -> Result<CheckedMapProof<K, V>, MapProofError> {
         self.precheck()?;
-        let (mut proof, entries) = (self.proof, self.entries);
-
-        proof.extend(entries.iter().filter_map(|e| {
-            e.as_kv().map(|(k, v)| MapProofEntry {
-                path: ProofPath::new(k),
-                hash: HashTag::hash_leaf(&v.to_bytes()),
+        let mut proof: Vec<_> = self.proof.iter().map(Cow::Borrowed).collect();
+        proof.extend(self.entries.iter().filter_map(|e| {
+            e.as_kv().map(|(k, v)| {
+                Cow::Owned(MapProofEntry {
+                    path: ProofPath::new(k),
+                    hash: HashTag::hash_leaf(&v.to_bytes()),
+                })
             })
         }));
+
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),
         // the sort is performed very quickly.
@@ -584,38 +585,50 @@ where
             }
         }
 
-        collect(&proof).map(|h| CheckedMapProof {
-            entries: entries.into_iter().map(OptionalEntry::into).collect(),
-            hash: HashTag::hash_map_node(h),
+        collect(&proof).map(|root_hash| CheckedMapProof {
+            entries: &self.entries,
+            hash: HashTag::hash_map_node(root_hash),
         })
+    }
+
+    /// Checks this proof against a trusted map hash. Fails if the proof is malformed or the
+    /// hash does not match the one computed from the proof.
+    pub fn check_against_hash(
+        &self,
+        expected_map_hash: Hash,
+    ) -> Result<CheckedMapProof<K, V>, ValidationError> {
+        self.check()
+            .map_err(ValidationError::Malformed)
+            .and_then(|checked| {
+                if checked.object_hash() == expected_map_hash {
+                    Ok(checked)
+                } else {
+                    Err(ValidationError::UnmatchedRootHash)
+                }
+            })
     }
 }
 
-impl<K, V> CheckedMapProof<K, V> {
+impl<'a, K, V> CheckedMapProof<'a, K, V> {
     /// Retrieves references to keys that the proof shows as missing from the map.
-    pub fn missing_keys(&self) -> impl Iterator<Item = &K> {
-        self.entries.iter().filter_map(|kv| match *kv {
-            (ref key, None) => Some(key),
-            _ => None,
-        })
+    pub fn missing_keys(&self) -> impl Iterator<Item = &'a K> {
+        self.entries.iter().filter_map(OptionalEntry::as_missing)
     }
 
     /// Retrieves references to key-value pairs that the proof shows as present in the map.
-    pub fn entries(&self) -> impl Iterator<Item = (&K, &V)> {
-        self.entries.iter().filter_map(|kv| match *kv {
-            (ref key, Some(ref value)) => Some((key, value)),
-            _ => None,
-        })
+    pub fn entries(&self) -> impl Iterator<Item = (&'a K, &'a V)> {
+        self.entries.iter().filter_map(OptionalEntry::as_kv)
     }
 
     /// Retrieves references to existing and non-existing entries in the proof.
     /// Existing entries have `Some` value, non-existing have `None`.
-    pub fn all_entries(&self) -> impl Iterator<Item = (&K, Option<&V>)> {
-        self.entries.iter().map(|&(ref k, ref v)| (k, v.as_ref()))
+    pub fn all_entries(&self) -> impl Iterator<Item = (&'a K, Option<&'a V>)> {
+        self.entries.iter().map(OptionalEntry::as_tuple)
     }
+}
 
-    /// Returns a hash of the map that this proof is constructed for.
-    pub fn root_hash(&self) -> Hash {
+impl<K, V> ObjectHash for CheckedMapProof<'_, K, V> {
+    fn object_hash(&self) -> Hash {
         self.hash
     }
 }
@@ -685,7 +698,6 @@ where
                     }
                 } else {
                     // Both children of `branch` do not fit.
-
                     let next_hash = branch.child_hash(next_bit);
                     match next_bit {
                         ChildKind::Left => left_hashes.push((node_path, next_hash)),

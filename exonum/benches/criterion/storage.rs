@@ -136,7 +136,7 @@ fn proof_map_index_build_proofs(b: &mut Bencher, db: &dyn Database, len: usize) 
     for (i, proof) in proofs.into_iter().enumerate() {
         let checked_proof = proof.check().unwrap();
         assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
-        assert_eq!(checked_proof.root_hash(), table_merkle_root);
+        assert_eq!(checked_proof.object_hash(), table_merkle_root);
     }
 }
 
@@ -153,9 +153,9 @@ fn proof_map_index_verify_proofs(b: &mut Bencher, db: &dyn Database, len: usize)
 
     b.iter(|| {
         for (i, proof) in proofs.iter().enumerate() {
-            let checked_proof = proof.clone().check().unwrap();
+            let checked_proof = proof.check().unwrap();
             assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
-            assert_eq!(checked_proof.root_hash(), table_merkle_root);
+            assert_eq!(checked_proof.object_hash(), table_merkle_root);
         }
     });
 }
