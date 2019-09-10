@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex, ObjectHash, TemporaryDB,
+    Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex, ObjectHash, Snapshot,
+    TemporaryDB,
 };
 use futures::{sync::mpsc, Future};
 
@@ -23,7 +24,7 @@ use crate::{
     blockchain::{
         Blockchain, ExecutionErrorKind, ExecutionStatus, FatalError, InstanceCollection, Schema,
     },
-    crypto,
+    crypto::{self, Hash},
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
@@ -101,6 +102,10 @@ impl Service for TestDispatcherService {
             }
         }
         Ok(())
+    }
+
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -197,6 +202,10 @@ impl Service for ServiceGoodImpl {
         let mut index = ListIndex::new(IDX_NAME, context.fork);
         index.push(1);
     }
+
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
 }
 
 #[exonum_service(crate = "crate")]
@@ -218,6 +227,10 @@ impl Service for ServicePanicImpl {
     fn before_commit(&self, _context: BeforeCommitContext) {
         panic!("42");
     }
+
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
 }
 
 #[exonum_service(crate = "crate")]
@@ -238,6 +251,10 @@ impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 impl Service for ServicePanicStorageErrorImpl {
     fn before_commit(&self, _context: BeforeCommitContext) {
         panic!(StorageError::new("42"));
+    }
+
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -276,7 +293,11 @@ impl TxResultCheckInterface for TxResultCheckService {
     }
 }
 
-impl Service for TxResultCheckService {}
+impl Service for TxResultCheckService {
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 fn create_entry<T: IndexAccess>(fork: T) -> Entry<T, u64> {
     Entry::new("transaction_status_test", fork)

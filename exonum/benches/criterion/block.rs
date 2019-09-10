@@ -112,10 +112,10 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{Service, Transaction, TransactionContext},
-            AnyTx, InstanceId,
+            AnyTx, InstanceDescriptor, InstanceId,
         },
     };
-    use exonum_merkledb::ObjectHash;
+    use exonum_merkledb::{ObjectHash, Snapshot};
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -156,7 +156,15 @@ mod timestamping {
         }
     }
 
-    impl Service for Timestamping {}
+    impl Service for Timestamping {
+        fn state_hash(
+            &self,
+            _descriptor: InstanceDescriptor,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
+            vec![]
+        }
+    }
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
@@ -200,14 +208,14 @@ mod timestamping {
 mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
-        crypto::PublicKey,
+        crypto::{Hash, PublicKey},
         messages::Verified,
         runtime::{
             rust::{Service, Transaction, TransactionContext},
-            AnyTx, ErrorKind, InstanceId,
+            AnyTx, ErrorKind, InstanceDescriptor, InstanceId,
         },
     };
-    use exonum_merkledb::{MapIndex, ProofMapIndex};
+    use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
     use rand::{rngs::StdRng, seq::SliceRandom};
 
     use super::gen_keypair_from_rng;
@@ -301,7 +309,15 @@ mod cryptocurrency {
         }
     }
 
-    impl Service for Cryptocurrency {}
+    impl Service for Cryptocurrency {
+        fn state_hash(
+            &self,
+            _descriptor: InstanceDescriptor,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
+            vec![]
+        }
+    }
 
     impl From<Cryptocurrency> for InstanceCollection {
         fn from(t: Cryptocurrency) -> Self {
@@ -389,9 +405,10 @@ mod foreign_interface_call {
         runtime::{
             self, dispatcher,
             rust::{Interface, Service, Transaction, TransactionContext},
-            AnyTx, CallContext, InstanceId, MethodId,
+            AnyTx, CallContext, InstanceDescriptor, InstanceId, MethodId,
         },
     };
+    use exonum_merkledb::Snapshot;
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -528,7 +545,15 @@ mod foreign_interface_call {
 
     impl ERC30Tokens for Timestamping {}
 
-    impl Service for Timestamping {}
+    impl Service for Timestamping {
+        fn state_hash(
+            &self,
+            _descriptor: InstanceDescriptor,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
+            vec![]
+        }
+    }
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {

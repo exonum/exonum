@@ -18,13 +18,14 @@ use exonum_merkledb::BinaryValue;
 
 use crate::{
     blockchain::{ConsensusConfig, ExecutionError, Schema},
-    crypto::{PublicKey, SecretKey},
+    crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
+    merkledb::Snapshot,
     messages::{AnyTx, Verified},
     proto::ProtobufConvert,
     runtime::{
         rust::{Service, Transaction, TransactionContext},
-        InstanceId,
+        InstanceDescriptor, InstanceId,
     },
 };
 
@@ -60,7 +61,11 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
     }
 }
 
-impl Service for ConfigUpdaterService {}
+impl Service for ConfigUpdaterService {
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 impl ConfigUpdaterService {
     pub const ID: InstanceId = 2;
