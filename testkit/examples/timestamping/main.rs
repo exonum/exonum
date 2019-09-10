@@ -22,10 +22,13 @@ extern crate exonum_derive;
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::{ExecutionError, Schema},
-    crypto::gen_keypair,
-    runtime::rust::{Service, Transaction, TransactionContext},
+    crypto::{gen_keypair, Hash},
+    runtime::{
+        rust::{Service, Transaction, TransactionContext},
+        InstanceDescriptor,
+    },
 };
-use exonum_merkledb::ObjectHash;
+use exonum_merkledb::{ObjectHash, Snapshot};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
 
 mod proto;
@@ -74,7 +77,11 @@ impl TimestampingInterface for TimestampingService {
     }
 }
 
-impl Service for TimestampingService {}
+impl Service for TimestampingService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 fn main() {
     let instance_id = 512;

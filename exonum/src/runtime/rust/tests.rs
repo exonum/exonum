@@ -13,13 +13,14 @@
 // limitations under the License.
 
 use exonum_derive::exonum_service;
-use exonum_merkledb::{BinaryValue, Database, Entry, TemporaryDB};
 
 use crate::{
+    crypto::Hash,
+    merkledb::{BinaryValue, Database, Entry, Snapshot, TemporaryDB},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, rust::interfaces::Initialize, CallContext,
-        CallInfo, Caller, ExecutionContext, InstanceId, InstanceSpec,
+        CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -114,7 +115,11 @@ impl Initialize for TestServiceImpl {
     }
 }
 
-impl Service for TestServiceImpl {}
+impl Service for TestServiceImpl {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 #[test]
 fn test_basic_rust_runtime() {

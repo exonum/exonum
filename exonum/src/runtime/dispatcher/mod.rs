@@ -677,7 +677,7 @@ mod tests {
             }
         }
 
-        fn stop_service(&mut self, _descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
+        fn stop_service(&mut self, _instance: InstanceDescriptor) -> Result<(), ExecutionError> {
             Ok(())
         }
 

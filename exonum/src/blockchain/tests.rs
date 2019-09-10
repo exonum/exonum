@@ -20,11 +20,11 @@ use crate::{
     blockchain::{
         Blockchain, ExecutionErrorKind, ExecutionStatus, FatalError, InstanceCollection, Schema,
     },
-    crypto,
+    crypto::{self, Hash},
     helpers::{generate_testnet_config, Height, ValidatorId},
     merkledb::{
         BinaryValue, Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash,
-        TemporaryDB,
+        Snapshot, TemporaryDB,
     },
     messages::Verified,
     node::ApiSender,
@@ -37,7 +37,7 @@ use crate::{
             BeforeCommitContext, Interface, Service, ServiceFactory, Transaction,
             TransactionContext,
         },
-        AnyTx, ArtifactId, ExecutionError, InstanceId,
+        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 
@@ -101,7 +101,11 @@ trait TestDispatcherInterface {
 )]
 struct TestDispatcherService;
 
-impl Service for TestDispatcherService {}
+impl Service for TestDispatcherService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 impl Initialize for TestDispatcherService {
     fn initialize(
@@ -225,6 +229,10 @@ struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+
     fn before_commit(&self, context: BeforeCommitContext) {
         let mut index = ListIndex::new(IDX_NAME, context.fork);
         index.push(1);
@@ -250,6 +258,10 @@ impl Service for ServicePanicImpl {
     fn before_commit(&self, _context: BeforeCommitContext) {
         panic!("42");
     }
+
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
 }
 
 #[exonum_service(crate = "crate")]
@@ -270,6 +282,10 @@ impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 impl Service for ServicePanicStorageErrorImpl {
     fn before_commit(&self, _context: BeforeCommitContext) {
         panic!(StorageError::new("42"));
+    }
+
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -308,7 +324,11 @@ impl TxResultCheckInterface for TxResultCheckService {
     }
 }
 
-impl Service for TxResultCheckService {}
+impl Service for TxResultCheckService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 fn create_entry<T: IndexAccess>(fork: T) -> Entry<T, u64> {
     Entry::new("transaction_status_test", fork)

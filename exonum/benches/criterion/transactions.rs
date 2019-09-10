@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Used in bench functions for convenience: we want to be able to pass these functions
+// to `ParameterizedBenchmark::new()`.
+#![allow(clippy::trivially_copy_pass_by_ref)]
+
 const MESSAGES_COUNT: usize = 1_000;
 const SAMPLE_SIZE: usize = 20;
 
@@ -201,7 +205,6 @@ impl MessageVerifier {
     }
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
     b.iter_with_setup(
@@ -214,7 +217,6 @@ fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     )
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
 

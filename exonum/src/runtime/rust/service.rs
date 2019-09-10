@@ -44,9 +44,7 @@ pub trait ServiceDispatcher: Send {
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
+    fn state_hash(&self, instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     fn before_commit(&self, _context: BeforeCommitContext) {}
 

@@ -18,14 +18,15 @@ use crate::proto;
 
 use exonum::{
     blockchain::ExecutionError,
+    crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{Service, TransactionContext},
-        InstanceId,
+        InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
-use exonum_merkledb::{Entry, IndexAccess};
+use exonum_merkledb::{Entry, IndexAccess, Snapshot};
 
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
@@ -114,5 +115,9 @@ impl PublicApi {
 impl Service for IncService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         PublicApi::wire(builder);
+    }
+
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }

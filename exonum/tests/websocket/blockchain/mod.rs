@@ -16,15 +16,15 @@
 
 use exonum::{
     blockchain::InstanceCollection,
-    crypto::PublicKey,
+    crypto::{Hash, PublicKey},
     helpers,
     node::{ApiSender, Node},
     runtime::{
         rust::{Service, TransactionContext},
-        InstanceId,
+        InstanceDescriptor, InstanceId,
     },
 };
-use exonum_merkledb::TemporaryDB;
+use exonum_merkledb::{Snapshot, TemporaryDB};
 
 use std::{
     net::SocketAddr,
@@ -98,7 +98,11 @@ impl MyServiceInterface for MyService {
     }
 }
 
-impl Service for MyService {}
+impl Service for MyService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 pub struct RunHandle {
     pub node_thread: JoinHandle<()>,

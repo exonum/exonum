@@ -17,13 +17,14 @@
 pub use crate::interface::Issue;
 
 use exonum::{
-    crypto::PublicKey,
+    crypto::{Hash, PublicKey},
     runtime::{
         rust::{Service, TransactionContext},
-        CallInfo, ExecutionError, InstanceId,
+        CallInfo, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
+use exonum_merkledb::Snapshot;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::{
@@ -60,7 +61,11 @@ impl WalletService {
     pub const ID: InstanceId = 24;
 }
 
-impl Service for WalletService {}
+impl Service for WalletService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 impl WalletInterface for WalletService {
     fn create(
@@ -130,7 +135,11 @@ impl DepositService {
     pub const ID: InstanceId = 25;
 }
 
-impl Service for DepositService {}
+impl Service for DepositService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 impl DepositInterface for DepositService {
     fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError> {
@@ -208,4 +217,8 @@ impl AnyCall for AnyCallService {
     }
 }
 
-impl Service for AnyCallService {}
+impl Service for AnyCallService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}

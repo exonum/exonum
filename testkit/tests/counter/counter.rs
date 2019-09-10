@@ -25,7 +25,7 @@ use exonum::{
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
         rust::{Service, TransactionContext},
-        InstanceId,
+        InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
@@ -229,5 +229,9 @@ pub struct CounterService;
 impl Service for CounterService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CounterApi::wire(builder)
+    }
+
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }

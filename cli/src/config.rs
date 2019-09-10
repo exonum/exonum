@@ -12,15 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module is used to collect structures that is shared into `CommandExtension` from `Command`.
+//! Contains various config structures used during configuration process.
 
-use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
+use exonum::{
+    blockchain::{ConsensusConfig, ValidatorKeys},
+    crypto::PublicKey,
+};
+use serde::{Deserialize, Serialize};
 
-use crate::blockchain::config::{ConsensusConfig, ValidatorKeys};
-use crate::crypto::PublicKey;
+use std::{net::SocketAddr, path::PathBuf};
 
-/// Abstract configuration.
-pub type AbstractConfig = BTreeMap<String, toml::Value>;
+/// Base config.
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
+pub struct CommonConfigTemplate {
+    /// Consensus configuration.
+    pub consensus_config: ConsensusConfig,
+    /// General configuration.
+    pub general_config: GeneralConfig,
+}
+
+/// Part of the template configuration.
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
+pub struct GeneralConfig {
+    /// Count of the validator nodes in the network.
+    pub validators_count: u32,
+}
 
 /// Node public configurations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,9 +45,6 @@ pub struct NodePublicConfig {
     pub address: String,
     /// Public keys of a validator.
     pub validator_keys: ValidatorKeys,
-    /// Services configurations.
-    #[serde(default)]
-    pub services_public_configs: AbstractConfig,
 }
 
 /// `SharedConfig` contain all public information that should be shared in the handshake process.
@@ -41,30 +54,6 @@ pub struct SharedConfig {
     pub common: CommonConfigTemplate,
     /// Public node
     pub node: NodePublicConfig,
-}
-
-impl NodePublicConfig {
-    /// Returns address.
-    pub fn address(&self) -> &str {
-        &self.address
-    }
-
-    /// Returns services configurations.
-    pub fn services_public_configs(&self) -> &AbstractConfig {
-        &self.services_public_configs
-    }
-}
-
-/// Base config.
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
-pub struct CommonConfigTemplate {
-    /// Consensus configuration.
-    pub consensus_config: ConsensusConfig,
-    /// Services configuration.
-    #[serde(default)]
-    pub services_config: AbstractConfig,
-    /// General configuration.
-    pub general_config: AbstractConfig,
 }
 
 /// `NodePrivateConfig` collects all public and secret keys.
@@ -82,14 +71,4 @@ pub struct NodePrivateConfig {
     pub service_public_key: PublicKey,
     /// Path to the service secret key file.
     pub service_secret_key: PathBuf,
-    /// Additional service secret config.
-    #[serde(default)]
-    pub services_secret_configs: AbstractConfig,
-}
-
-/// Used for passing configuration for starting node from the command line that is not in the `NodeConfig`.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NodeRunConfig {
-    pub consensus_pass_method: String,
-    pub service_pass_method: String,
 }

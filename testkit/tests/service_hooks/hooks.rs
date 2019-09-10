@@ -16,13 +16,15 @@
 use super::proto;
 use exonum::{
     blockchain::ExecutionError,
+    crypto::Hash,
     helpers::Height,
     runtime::{
         rust::{AfterCommitContext, Service, TransactionContext},
-        InstanceId,
+        InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
+use exonum_merkledb::Snapshot;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -94,5 +96,9 @@ impl Service for AfterCommitService {
         self.counter.fetch_add(1, Ordering::SeqCst);
         let tx = TxAfterCommit::new(context.height());
         context.broadcast_transaction(tx);
+    }
+
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }

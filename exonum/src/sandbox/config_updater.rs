@@ -14,17 +14,17 @@
 
 pub use crate::proto::schema::tests::TxConfig;
 
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{BinaryValue, Snapshot};
 
 use crate::{
     blockchain::{ExecutionError, Schema, StoredConfiguration},
-    crypto::{PublicKey, SecretKey},
+    crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, Verified},
     proto::ProtobufConvert,
     runtime::{
         rust::{Service, Transaction, TransactionContext},
-        InstanceId,
+        InstanceDescriptor, InstanceId,
     },
 };
 
@@ -60,7 +60,11 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
     }
 }
 
-impl Service for ConfigUpdaterService {}
+impl Service for ConfigUpdaterService {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
 
 impl ConfigUpdaterService {
     pub const ID: InstanceId = 2;
