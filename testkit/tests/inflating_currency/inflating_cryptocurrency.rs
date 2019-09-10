@@ -14,16 +14,16 @@
 
 use exonum::{
     blockchain::Schema as CoreSchema,
-    crypto::PublicKey,
+    crypto::{Hash, PublicKey},
     helpers::Height,
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{Service, TransactionContext},
-        InstanceId,
+        InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
-use exonum_merkledb::{IndexAccess, MapIndex};
+use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
 use serde_derive::{Deserialize, Serialize};
 
 use super::proto;
@@ -214,5 +214,9 @@ pub struct CurrencyService;
 impl Service for CurrencyService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
+    }
+
+    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }

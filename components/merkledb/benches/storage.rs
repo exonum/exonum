@@ -414,7 +414,9 @@ pub fn bench_storage(c: &mut Criterion) {
     );
     // ProofListIndex
     bench_fn(c, "storage/proof_list/append", proof_list_append);
+
     bench_fn(c, "storage/proof_list/extend", proof_list_extend);
+
     bench_fn(
         c,
         "storage/proof_list/proofs/build",

@@ -16,18 +16,16 @@
 
 #[macro_use]
 extern crate pretty_assertions;
-#[macro_use]
-extern crate serde_derive;
 
 use exonum::{
     api::backends::actix::AllowOrigin,
     crypto::{PublicKey, PUBLIC_KEY_LENGTH},
-    helpers::{
-        config::{ConfigFile, ConfigManager},
-        fabric::NodeBuilder,
-    },
+    helpers::config::{ConfigFile, ConfigManager},
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
+use exonum_cli::command::{Command, ExonumCommand, StandardResult};
+use serde::{Deserialize, Serialize};
+use structopt::StructOpt;
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -176,20 +174,17 @@ impl ArgsBuilder {
         self
     }
 
-    fn run(self) -> Option<()> {
-        log::trace!(
-            "-> {}",
-            self.args
-                .iter()
-                .map(|s| s.to_str().unwrap())
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-        if NodeBuilder::new().parse_cmd_string(self.args) {
-            None
-        } else {
-            Some(())
-        }
+    fn run(self) -> Result<StandardResult, failure::Error> {
+        let command = <Command as StructOpt>::from_iter_safe(self.args).unwrap();
+        command.execute()
+    }
+}
+
+fn is_run_node_config(result: StandardResult) -> bool {
+    if let StandardResult::Run(_) = result {
+        true
+    } else {
+        false
     }
 }
 
@@ -306,7 +301,7 @@ fn test_generate_config_ipv4() {
         .with_named_arg("-a", "127.0.0.1")
         .with_arg("--no-password")
         .run()
-        .unwrap()
+        .unwrap();
 }
 
 #[test]
@@ -318,7 +313,7 @@ fn test_generate_config_ipv6() {
         .with_named_arg("-a", "::1")
         .with_arg("--no-password")
         .run()
-        .unwrap()
+        .unwrap();
 }
 
 #[test]
@@ -343,7 +338,7 @@ fn test_finalize_run_without_pass() {
             .with_named_arg("--service-key-pass", "pass:")
             .with_named_arg("--consensus-key-pass", "pass:")
             .run();
-        assert!(feedback.is_none());
+        assert!(is_run_node_config(feedback.unwrap()));
     }
 }
 
@@ -371,13 +366,11 @@ fn test_finalize_run_with_pass() {
         .with_named_arg("--service-key-pass", "env")
         .with_named_arg("--consensus-key-pass", "env")
         .run();
-    assert!(feedback.is_none());
+    assert!(is_run_node_config(feedback.unwrap()));
 }
 
 #[test]
-#[should_panic(
-    expected = "The number of validators configs does not match the number of validators keys."
-)]
+#[should_panic(expected = "The number of validators does not match the number of validators keys.")]
 fn test_less_validators_count() {
     let env = ConfigSpec::new_more_validators();
 
@@ -393,9 +386,7 @@ fn test_less_validators_count() {
 }
 
 #[test]
-#[should_panic(
-    expected = "The number of validators configs does not match the number of validators keys."
-)]
+#[should_panic(expected = "The number of validators does not match the number of validators keys.")]
 fn test_more_validators_count() {
     let env = ConfigSpec::new_more_validators();
 
@@ -451,7 +442,7 @@ fn test_full_workflow() {
             .with_named_arg("--service-key-pass", "env")
             .with_named_arg("--consensus-key-pass", "env")
             .run();
-        assert!(feedback.is_none());
+        assert!(is_run_node_config(feedback.unwrap()));
     }
 }
 
@@ -471,7 +462,7 @@ fn test_run_dev() {
         .with_arg("-a")
         .with_arg(&artifacts_dir)
         .run();
-    assert!(feedback.is_none());
+    assert!(is_run_node_config(feedback.unwrap()));
     // Tests cleaning up.
     assert!(!old_db_file.exists());
 }
@@ -497,4 +488,17 @@ fn test_update_config() {
 
     let new_connect_list = config.connect_list;
     assert_eq!(new_connect_list.peers, connect_list.peers);
+}
+
+#[test]
+fn test_clear_cache() {
+    let env = ConfigSpec::new_without_pass();
+    let db_path = env.expected_dir().join("db0");
+
+    env.command("maintenance")
+        .with_named_arg("--node-config", &env.expected_node_config_file(0))
+        .with_named_arg("--db-path", &db_path)
+        .with_arg("clear-cache")
+        .run()
+        .unwrap();
 }

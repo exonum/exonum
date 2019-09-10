@@ -63,9 +63,7 @@ use crate::{
         TimeoutRequest,
     },
     helpers::{
-        config::ConfigManager,
-        fabric::{NodePrivateConfig, NodePublicConfig},
-        user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
+        config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
@@ -435,20 +433,6 @@ pub struct ConnectListConfig {
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectListConfig` from validators public configs.
-    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
-        let peers = list
-            .iter()
-            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
-            .map(|config| ConnectInfo {
-                public_key: config.validator_keys.consensus_key,
-                address: config.address.clone(),
-            })
-            .collect();
-
-        ConnectListConfig { peers }
-    }
-
     /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
         let peers = peers
@@ -1184,18 +1168,18 @@ impl Node {
 // TODO implement transaction verification logic [ECR-3253]
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::{BinaryValue, TemporaryDB};
+    use exonum_merkledb::{BinaryValue, Snapshot, TemporaryDB};
 
     use crate::{
         blockchain::Schema,
-        crypto::gen_keypair,
+        crypto::{gen_keypair, Hash},
         events::EventHandler,
         helpers,
         messages::AnyTx,
         proto::{schema::tests::TxSimple, ProtobufConvert},
         runtime::{
             rust::{Service, Transaction, TransactionContext},
-            ExecutionError, InstanceId,
+            ExecutionError, InstanceDescriptor, InstanceId,
         },
     };
 
@@ -1230,7 +1214,15 @@ mod tests {
         }
     }
 
-    impl Service for TestService {}
+    impl Service for TestService {
+        fn state_hash(
+            &self,
+            _descriptor: InstanceDescriptor,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
+            vec![]
+        }
+    }
 
     fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
         let mut msg = TxSimple::new();

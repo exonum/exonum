@@ -241,7 +241,6 @@ where
                     proof.push_hash(height, right + 1, hash);
                 }
             }
-
             left >>= 1;
             right >>= 1;
         }
