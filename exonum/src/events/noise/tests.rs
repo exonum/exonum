@@ -72,7 +72,7 @@ fn noise_converted_keys_handshake() {
     use crate::crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     const MSG_SIZE: usize = 4096;
-    static PATTERN: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
+    const PATTERN: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
     // Handshake initiator keypair.
     let (public_key_i, secret_key_i) = gen_keypair();
