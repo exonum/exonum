@@ -498,7 +498,7 @@ impl<V: BinaryValue> ListProof<V> {
 ///
 /// See [`ListProof`] for an example of usage.
 ///
-/// [`ListProof`]: struct.MapProof.html#workflow
+/// [`ListProof`]: struct.ListProof.html#workflow
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CheckedListProof<'a, V> {
     entries: &'a [(u64, V)],
