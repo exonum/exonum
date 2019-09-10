@@ -13,7 +13,7 @@
 // limitations under the License.
 use exonum_merkledb::TemporaryDB;
 
-use exonum::{
+use exonum::{keys::Keys,
     blockchain::{GenesisConfig, InstanceCollection, ValidatorKeys},
     node::{Node, NodeApiConfig, NodeConfig},
 };
@@ -22,10 +22,12 @@ use exonum_cryptocurrency::contracts::CryptocurrencyService;
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
+    let (identity_public_key, identity_secret_key) = exonum::crypto::kx::gen_keypair();
 
     let validator_keys = ValidatorKeys {
         consensus_key: consensus_public_key,
         service_key: service_public_key,
+        identity_key: identity_public_key,
     };
     let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
 
@@ -39,10 +41,6 @@ fn node_config() -> NodeConfig {
 
     NodeConfig {
         listen_address: peer_address.parse().unwrap(),
-        service_public_key,
-        service_secret_key,
-        consensus_public_key,
-        consensus_secret_key,
         genesis,
         external_address: peer_address.to_owned(),
         network: Default::default(),
@@ -52,6 +50,15 @@ fn node_config() -> NodeConfig {
         services_configs: Default::default(),
         database: Default::default(),
         thread_pool_size: Default::default(),
+        master_key_path: Default::default(),
+        keys: Keys::from_keys(
+            consensus_public_key,
+            consensus_secret_key,
+            service_public_key,
+            service_secret_key,
+            identity_public_key,
+            identity_secret_key,
+        ),
     }
 }
 

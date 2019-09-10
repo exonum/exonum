@@ -21,6 +21,7 @@ use exonum::{
 use serde::{Deserialize, Serialize};
 
 use std::{net::SocketAddr, path::PathBuf};
+use exonum::keys::Keys;
 
 /// Base config.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
@@ -63,12 +64,9 @@ pub struct NodePrivateConfig {
     pub listen_address: SocketAddr,
     /// External address.
     pub external_address: String,
-    /// Consensus public key.
-    pub consensus_public_key: PublicKey,
-    /// Path to the consensus secret key file.
-    pub consensus_secret_key: PathBuf,
-    /// Service public key.
-    pub service_public_key: PublicKey,
-    /// Path to the service secret key file.
-    pub service_secret_key: PathBuf,
+    /// TODO
+    pub master_key_path: PathBuf,
+    /// TODO
+    #[serde(skip)]
+    pub keys: Keys,
 }

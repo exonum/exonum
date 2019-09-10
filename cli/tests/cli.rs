@@ -19,7 +19,7 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::backends::actix::AllowOrigin,
-    crypto::{PublicKey, PUBLIC_KEY_LENGTH},
+    crypto::{kx, PublicKey, PUBLIC_KEY_LENGTH},
     helpers::config::{ConfigFile, ConfigManager},
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
@@ -211,7 +211,7 @@ fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<(), fail
     Ok(())
 }
 
-fn load_node_config(path: impl AsRef<Path>) -> NodeConfig<PathBuf> {
+fn load_node_config(path: impl AsRef<Path>) -> NodeConfig {
     ConfigFile::load(path).expect("Can't load node config file")
 }
 
@@ -234,8 +234,7 @@ fn assert_node_config_files_eq(actual: impl AsRef<Path>, expected: impl AsRef<Pa
     let config_dir = actual.parent().unwrap();
     let actual = load_node_config(actual);
     let mut expected = load_node_config(expected);
-    expected.service_secret_key = config_dir.join(&expected.service_secret_key);
-    expected.consensus_secret_key = config_dir.join(&expected.consensus_secret_key);
+    expected.master_key_path = config_dir.join(&expected.master_key_path);
 
     assert_eq!(actual, expected);
 }
@@ -478,6 +477,7 @@ fn test_update_config() {
     let peer = ConnectInfo {
         address: "0.0.0.1:8080".to_owned(),
         public_key: PublicKey::new([1; PUBLIC_KEY_LENGTH]),
+        identity_key: kx::PublicKey::zero(),
     };
 
     let connect_list = ConnectListConfig { peers: vec![peer] };

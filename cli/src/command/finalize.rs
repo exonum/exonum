@@ -101,11 +101,12 @@ impl Finalize {
         let peers = public_configs
             .iter()
             .filter(|config| {
-                config.validator_keys.consensus_key != secret_config.consensus_public_key
+                config.validator_keys.consensus_key != secret_config.keys.consensus_pk()
             })
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
+                identity_key: config.validator_keys.identity_key,
             })
             .collect();
 
@@ -155,10 +156,6 @@ impl ExonumCommand for Finalize {
                 listen_address: secret_config.listen_address,
                 external_address: secret_config.external_address,
                 network: Default::default(),
-                consensus_public_key: secret_config.consensus_public_key,
-                consensus_secret_key: secret_config_dir.join(&secret_config.consensus_secret_key),
-                service_public_key: secret_config.service_public_key,
-                service_secret_key: secret_config_dir.join(&secret_config.service_secret_key),
                 genesis,
                 api: NodeApiConfig {
                     public_api_address: self.public_api_address,
@@ -172,6 +169,8 @@ impl ExonumCommand for Finalize {
                 database: Default::default(),
                 connect_list,
                 thread_pool_size: Default::default(),
+                master_key_path: secret_config.master_key_path,
+                keys: secret_config.keys,
             }
         };
 

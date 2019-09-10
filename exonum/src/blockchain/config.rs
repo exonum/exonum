@@ -28,7 +28,7 @@ use serde_json::Error as JsonError;
 use std::collections::HashSet;
 
 use crate::{
-    crypto::{Hash, PublicKey},
+    crypto::{Hash, kx, PublicKey},
     helpers::{Height, Milliseconds},
     messages::SIGNED_MESSAGE_MIN_SIZE,
 };
@@ -43,6 +43,8 @@ pub struct ValidatorKeys {
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
+    ///TODO
+    pub identity_key: kx::PublicKey,
 }
 
 /// Exonum blockchain global configuration.
@@ -281,14 +283,17 @@ mod tests {
             [[validator_keys]]
             consensus_key = "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
             service_key = "43a72e714401762df66b68c26dfbdf2682aaec9f2474eca4613e424a0fbafd3c"
+            identity_key = "ab2fca32898322c208fb2dab5048bd43c355c6430f588897cb574961cfa9806f"
 
             [[validator_keys]]
             consensus_key = "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
             service_key = "20828bf5c5bdcacb684863336c202fb5599da48be5596615742170705beca9f7"
+            identity_key = "fc3b339367a5225d53a92d380323afd035d7817b6d1be47d946f6b09a9cbdc06"
 
             [[validator_keys]]
             consensus_key = "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
             service_key = "acdb0e29743f0ccb8686d0a104cb96e05abefec1538765e7595869f7dc8c49aa"
+            identity_key = "85788f6e8c1818fd4314b841a87ffb91af60d95aa98338496cd17ba1cbf1532b"
 
             [consensus]
             first_round_timeout = 3000
@@ -319,6 +324,7 @@ mod tests {
         configuration.validator_keys.push(ValidatorKeys {
             consensus_key: PublicKey::zero(),
             service_key: PublicKey::zero(),
+            identity_key: kx::PublicKey::zero(),
         });
         serialize_deserialize(&configuration);
     }
@@ -364,6 +370,7 @@ mod tests {
             .map(|i| ValidatorKeys {
                 consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
                 service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
+                identity_key: kx::gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
             })
             .collect();
 

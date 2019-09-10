@@ -54,8 +54,13 @@ pub use self::ed25519::State as SignState;
 /// for sodiumoxide-based implementation.
 pub use self::sha256::State as HashState;
 
+pub use self::kx::{
+    gen_keypair as gen_keypair_kx, gen_keypair_from_seed as gen_keypair_from_seed_kx,
+};
+
 use self::sodiumoxide::crypto::{hash::sha256, sign::ed25519};
 
+pub mod kx;
 pub mod x25519;
 
 /// Number of bytes in a `Hash`.

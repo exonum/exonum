@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use futures::future::{done, Future};
-use tokio_codec::{Decoder, Framed};
+use tokio_codec::Decoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::net::SocketAddr;
@@ -22,13 +22,10 @@ use exonum_merkledb::BinaryValue;
 
 use super::wrapper::NoiseWrapper;
 use crate::{
-    crypto::{
-        x25519::{self, into_x25519_keypair, into_x25519_public_key},
-        PublicKey, SecretKey,
-    },
+    crypto::kx,
     events::{
         codec::MessagesCodec,
-        noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+        noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
     },
     messages::{Connect, Verified},
     node::state::SharedConnectList,
@@ -37,9 +34,9 @@ use crate::{
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
-    pub public_key: x25519::PublicKey,
-    pub secret_key: x25519::SecretKey,
-    pub remote_key: Option<x25519::PublicKey>,
+    pub public_key: kx::PublicKey,
+    pub secret_key: kx::SecretKey,
+    pub remote_key: Option<kx::PublicKey>,
     pub connect_list: SharedConnectList,
     pub connect: Verified<Connect>,
     max_message_len: u32,
@@ -47,14 +44,12 @@ pub struct HandshakeParams {
 
 impl HandshakeParams {
     pub fn new(
-        public_key: PublicKey,
-        secret_key: SecretKey,
+        public_key: kx::PublicKey,
+        secret_key: kx::SecretKey,
         connect_list: SharedConnectList,
         connect: Verified<Connect>,
         max_message_len: u32,
     ) -> Self {
-        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
-
         HandshakeParams {
             public_key,
             secret_key,
@@ -65,8 +60,8 @@ impl HandshakeParams {
         }
     }
 
-    pub fn set_remote_key(&mut self, remote_key: PublicKey) {
-        self.remote_key = Some(into_x25519_public_key(remote_key));
+    pub fn set_remote_key(&mut self, remote_key: kx::PublicKey) {
+        self.remote_key = Some(remote_key);
     }
 }
 
@@ -127,7 +122,7 @@ impl NoiseHandshake {
         self,
         stream: S,
         message: Vec<u8>,
-    ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>), failure::Error> {
+    ) -> Result<HandshakeData<S>, failure::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -136,7 +131,7 @@ impl NoiseHandshake {
                 .state
                 .get_remote_static()
                 .expect("Remote static key is not present!");
-            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
+            kx::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
 
         if !self.is_peer_allowed(&remote_static_key) {
@@ -145,14 +140,14 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_wrapper()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
-        Ok((framed, message))
+        Ok((framed, message, remote_static_key))
     }
 
-    fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
+    fn is_peer_allowed(&self, remote_static_key: &kx::PublicKey) -> bool {
         self.connect_list
             .peers()
             .iter()
-            .map(|info| into_x25519_public_key(info.public_key))
+            .map(|info| info.identity_key)
             .any(|key| remote_static_key == &key)
     }
 }

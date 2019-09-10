@@ -29,7 +29,7 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use std::{net::SocketAddr, thread, time::Duration};
 
 use crate::{
-    crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
+    crypto::{gen_keypair_from_seed, kx, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
     events::{
         error::into_failure,
         noise::{
@@ -75,7 +75,7 @@ fn noise_converted_keys_handshake() {
     use crate::crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     const MSG_SIZE: usize = 4096;
-    static PATTERN: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
+    const PATTERN: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
     // Handshake initiator keypair.
     let (public_key_i, secret_key_i) = gen_keypair();
@@ -326,7 +326,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
     let mut params = HandshakeParams::with_default_params();
-    let (remote_key, _) = gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
+    let (remote_key, _) = kx::gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
     params.set_remote_key(remote_key);
 
     let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);

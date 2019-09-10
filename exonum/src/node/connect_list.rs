@@ -16,7 +16,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::crypto::PublicKey;
+use crate::crypto::{kx, PublicKey};
 use crate::node::{ConnectInfo, ConnectListConfig};
 
 /// Network address of the peer.
@@ -39,18 +39,24 @@ pub struct ConnectList {
     /// Peers to which we can connect.
     #[serde(default)]
     pub peers: BTreeMap<PublicKey, PeerAddress>,
+    ///TODO: workaround to use identity keys only for handshake
+    pub identity: BTreeMap<PublicKey, kx::PublicKey>,
 }
 
 impl ConnectList {
     /// Creates `ConnectList` from config.
     pub fn from_config(config: ConnectListConfig) -> Self {
+        let mut identity = BTreeMap::new();
         let peers: BTreeMap<PublicKey, PeerAddress> = config
             .peers
             .into_iter()
-            .map(|peer| (peer.public_key, PeerAddress::new(peer.address)))
+            .map(|peer| {
+                identity.insert(peer.public_key, peer.identity_key);
+                (peer.public_key, PeerAddress::new(peer.address))
+            })
             .collect();
 
-        ConnectList { peers }
+        ConnectList { peers, identity }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
@@ -72,6 +78,8 @@ impl ConnectList {
     pub fn add(&mut self, peer: ConnectInfo) {
         self.peers
             .insert(peer.public_key, PeerAddress::new(peer.address));
+
+        self.identity.insert(peer.public_key, peer.identity_key);
     }
 
     /// Update peer address.
@@ -127,11 +135,13 @@ mod test {
         connect_list.add(ConnectInfo {
             public_key: regular[0],
             address: address.clone(),
+            identity_key: kx::PublicKey::zero(),
         });
         check_in_connect_list(&connect_list, &regular, &[0], &[1, 2, 3]);
         connect_list.add(ConnectInfo {
             public_key: regular[2],
             address: address.clone(),
+            identity_key: kx::PublicKey::zero(),
         });
         check_in_connect_list(&connect_list, &regular, &[0, 2], &[1, 3]);
 
@@ -159,6 +169,7 @@ mod test {
             connect_list.add(ConnectInfo {
                 public_key: *peer,
                 address: address.clone(),
+                identity_key: kx::PublicKey::zero(),
             })
         }
     }
@@ -182,6 +193,7 @@ mod test {
     #[test]
     fn test_address_allowed() {
         let (public_key, _) = gen_keypair();
+        let (identity, _) = kx::gen_keypair();
         let address = "127.0.0.1:80".to_owned();
 
         let mut connect_list = ConnectList::default();
@@ -190,6 +202,7 @@ mod test {
         connect_list.add(ConnectInfo {
             public_key,
             address: address.clone(),
+            identity_key: identity,
         });
         assert!(connect_list.is_address_allowed(&address));
     }

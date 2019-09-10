@@ -258,7 +258,7 @@ impl TestKit {
             db,
             service_factories,
             genesis,
-            network.us().service_keypair(),
+            network.us().service_keypair_cloned(),
             api_sender.clone(),
             mpsc::channel(0).0,
         );

@@ -108,13 +108,13 @@ exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8203 --priv
 Run nodes:
 
 ```sh
-exonum-cryptocurrency-advanced run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --consensus-key-pass pass --service-key-pass pass
+exonum-cryptocurrency-advanced run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --master-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --consensus-key-pass pass --service-key-pass pass
+exonum-cryptocurrency-advanced run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --master-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --consensus-key-pass pass --service-key-pass pass
+exonum-cryptocurrency-advanced run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --master-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --consensus-key-pass pass --service-key-pass pass
+exonum-cryptocurrency-advanced run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass --service-key-pass pass
 ```
 
 <!-- markdownlint-enable MD013 -->

@@ -87,7 +87,7 @@ use protobuf::{well_known_types, Message};
 use std::collections::HashMap;
 
 use crate::{
-    crypto,
+    crypto::{self, kx},
     helpers::{Height, Round, ValidatorId},
 };
 
@@ -136,6 +136,26 @@ impl ProtobufConvert for crypto::PublicKey {
             "Wrong PublicKey size"
         );
         crypto::PublicKey::from_slice(data)
+            .ok_or_else(|| format_err!("Cannot convert PublicKey from bytes"))
+    }
+}
+
+impl ProtobufConvert for kx::PublicKey {
+    type ProtoStruct = PublicKey;
+
+    fn to_pb(&self) -> PublicKey {
+        let mut key = PublicKey::new();
+        key.set_data(self.as_ref().to_vec());
+        key
+    }
+
+    fn from_pb(pb: PublicKey) -> Result<Self, Error> {
+        let data = pb.get_data();
+        ensure!(
+            data.len() == crypto::PUBLIC_KEY_LENGTH,
+            "Wrong PublicKey size"
+        );
+        kx::PublicKey::from_slice(data)
             .ok_or_else(|| format_err!("Cannot convert PublicKey from bytes"))
     }
 }

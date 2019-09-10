@@ -125,19 +125,18 @@ impl PassInputMethod {
     /// or generate config files.
     pub fn get_passphrase(
         self,
-        key_type: SecretKeyType,
         usage: PassphraseUsage,
     ) -> Result<Passphrase, Error> {
         match self {
             PassInputMethod::Terminal => {
-                let prompt = key_type.prompt_message();
+                let prompt =  "Enter master key passphrase";
                 match usage {
                     PassphraseUsage::SettingUp => prompt_passphrase(prompt),
                     PassphraseUsage::Using => Passphrase::read_from_tty(prompt),
                 }
             }
             PassInputMethod::EnvVariable(name) => {
-                let variable_name = name.unwrap_or_else(|| key_type.default_env_var().to_owned());
+                let variable_name = name.unwrap_or_else(|| "EXONUM_MASTER_PASS".to_string());
                 let passphrase = env::var(&variable_name).with_context(|e| {
                     format!(
                         "Failed to get password from env variable {}: {}",

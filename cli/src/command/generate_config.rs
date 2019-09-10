@@ -15,9 +15,9 @@
 //! Standard Exonum CLI command used to generate public and secret config files
 //! of the node using provided common configuration file.
 
-use exonum::{
+use exonum::{keys::{Keys, generate_keys, read_keys_from_file},
     blockchain::ValidatorKeys,
-    crypto::{generate_keys_file, PublicKey},
+    crypto::{PublicKey},
 };
 use failure::{bail, Error};
 use serde::{Deserialize, Serialize};
@@ -96,12 +96,11 @@ impl GenerateConfig {
     fn get_passphrase(
         no_password: bool,
         method: PassInputMethod,
-        secret_key_type: SecretKeyType,
     ) -> Result<Passphrase, Error> {
         if no_password {
             Ok(Passphrase::default())
         } else {
-            method.get_passphrase(secret_key_type, PassphraseUsage::SettingUp)
+            method.get_passphrase( PassphraseUsage::SettingUp)
         }
     }
 
@@ -139,31 +138,20 @@ impl ExonumCommand for GenerateConfig {
 
         let pub_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
         let private_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
-        let consensus_secret_key_path = self.output_dir.join(CONSENSUS_SECRET_KEY_NAME);
-        let service_secret_key_path = self.output_dir.join(SERVICE_SECRET_KEY_NAME);
+        let master_key_file_name = "master.key.toml";
+        let master_key_path = self.output_dir.join(master_key_file_name);
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
-        let consensus_public_key = {
-            let passphrase = Self::get_passphrase(
-                self.no_password,
-                self.consensus_key_pass.unwrap_or_default(),
-                SecretKeyType::Consensus,
-            )?;
-            create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())?
-        };
-        let service_public_key = {
-            let passphrase = Self::get_passphrase(
-                self.no_password,
-                self.service_key_pass.unwrap_or_default(),
-                SecretKeyType::Service,
-            )?;
-            create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())?
+        let keys = {
+            let passphrase = Self::get_passphrase(self.no_password, self.consensus_key_pass.unwrap_or_default());
+            create_keys_and_files(&master_key_path, passphrase.unwrap().as_bytes())
         };
 
         let validator_keys = ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
+            consensus_key: keys.consensus_pk(),
+            service_key: keys.service_pk(),
+            identity_key: keys.identity_pk(),
         };
         let node_pub_config = NodePublicConfig {
             address: self.peer_address.to_string(),
@@ -179,10 +167,8 @@ impl ExonumCommand for GenerateConfig {
         let private_config = NodePrivateConfig {
             listen_address,
             external_address: self.peer_address.to_string(),
-            consensus_public_key,
-            consensus_secret_key: CONSENSUS_SECRET_KEY_NAME.into(),
-            service_public_key,
-            service_secret_key: SERVICE_SECRET_KEY_NAME.into(),
+            master_key_path: master_key_file_name.into(),
+            keys,
         };
 
         save_config_file(&private_config, &private_config_path)?;
@@ -194,20 +180,17 @@ impl ExonumCommand for GenerateConfig {
     }
 }
 
-fn create_secret_key_file(
-    secret_key_path: impl AsRef<Path>,
-    passphrase: impl AsRef<[u8]>,
-) -> Result<PublicKey, Error> {
+fn create_keys_and_files(secret_key_path: impl AsRef<Path>, passphrase: impl AsRef<[u8]>) -> Keys {
     let secret_key_path = secret_key_path.as_ref();
     if secret_key_path.exists() {
-        bail!(
+        panic!(
             "Failed to create secret key file. File exists: {}",
             secret_key_path.to_string_lossy(),
-        );
+        )
     } else {
         if let Some(dir) = secret_key_path.parent() {
-            fs::create_dir_all(dir)?;
+            fs::create_dir_all(dir).unwrap();
         }
-        generate_keys_file(&secret_key_path, &passphrase).map_err(Into::into)
+        generate_keys(&secret_key_path, passphrase.as_ref())
     }
 }

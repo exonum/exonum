@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore cipherparams ciphertext
-
-use super::{
-    gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH,
-};
+use crate::crypto::{gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
 use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
 
+use exonum_crypto::KeyPair;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::{
@@ -40,27 +37,6 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct KeyPair {
-    public_key: PublicKey,
-    secret_key: SecretKey,
-}
-
-impl KeyPair {
-    fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
-        assert_eq!(
-            &public_key[..],
-            &secret_key[PUBLIC_KEY_LENGTH..],
-            "Public key does not match the secret key."
-        );
-
-        Self {
-            public_key,
-            secret_key,
-        }
-    }
-}
-
 /// Struct containing all validator key pairs.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
@@ -70,6 +46,11 @@ pub struct Keys {
 }
 
 impl Keys {
+    /// Create validator keys from provided keypairs.
+    ///
+    /// # Panics
+    ///
+    /// If public key in any keypair doesn't match with corresponding private key.
     pub fn from_keys(
         consensus_pk: PublicKey,
         consensus_sk: SecretKey,
@@ -79,40 +60,46 @@ impl Keys {
         identity_sk: kx::SecretKey,
     ) -> Self {
         Self {
-            consensus: KeyPair::from_keys(consensus_pk, consensus_sk),
-            service: KeyPair::from_keys(service_pk, service_sk),
-            identity: kx::KeyPair::from_keys(identity_pk, identity_sk),
+            consensus: (consensus_pk, consensus_sk).into(),
+            service: (service_pk, service_sk).into(),
+            identity: (identity_pk, identity_sk).into(),
         }
     }
 }
 
 impl Keys {
+    /// Consensus public key.
     pub fn consensus_pk(&self) -> PublicKey {
-        self.consensus.public_key
+        self.consensus.public_key()
     }
 
+    /// Consensus private key.
     pub fn consensus_sk(&self) -> &SecretKey {
-        &self.consensus.secret_key
+        &self.consensus.secret_key()
     }
 
+    /// Service public key.
     pub fn service_pk(&self) -> PublicKey {
-        self.service.public_key
+        self.service.public_key()
     }
 
+    /// Service secret key.
     pub fn service_sk(&self) -> &SecretKey {
-        &self.service.secret_key
+        &self.service.secret_key()
     }
 
+    /// Identity public key.
     pub fn identity_pk(&self) -> kx::PublicKey {
-        self.identity.public_key
+        self.identity.public_key()
     }
 
+    /// Identity secret key.
     pub fn identity_sk(&self) -> &kx::SecretKey {
-        &self.identity.secret_key
+        &self.identity.secret_key()
     }
 }
 
-pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
+fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
     path: P,
     pass_phrase: W,
     key: &secret_tree::Seed,
@@ -123,7 +110,7 @@ pub fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
     #[cfg(unix)]
-    open_options.mode(0o_600);
+        open_options.mode(0o_600);
     let mut file = open_options.open(path.as_ref())?;
     file.write_all(file_content.as_bytes())?;
 
@@ -202,6 +189,7 @@ fn generate_keys_from_master_password(tree: SecretTree) -> Option<Keys> {
     ))
 }
 
+/// Reads encrypted master key from file and generate validator keys from it.
 pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     path: P,
     pass_phrase: W,
@@ -209,7 +197,7 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     let mut key_file = File::open(path)?;
 
     #[cfg(unix)]
-    validate_file_mode(key_file.metadata()?.mode())?;
+        validate_file_mode(key_file.metadata()?.mode())?;
 
     let mut file_content = vec![];
     key_file.read_to_end(&mut file_content)?;
@@ -225,7 +213,6 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gen_keypair;
     use tempdir::TempDir;
 
     #[test]
@@ -298,33 +285,5 @@ mod tests {
         assert!(validate_file_mode(0o_100_755).is_err());
         assert!(validate_file_mode(0o_644).is_err());
         assert!(validate_file_mode(0o_666).is_err());
-    }
-
-    #[test]
-    fn valid_keypair() {
-        let (pk, sk) = gen_keypair();
-        let _ = KeyPair::from_keys(pk, sk);
-    }
-
-    #[test]
-    #[should_panic]
-    fn not_valid_keypair() {
-        let (pk, _) = gen_keypair();
-        let (_, sk) = gen_keypair();
-        let _ = KeyPair::from_keys(pk, sk);
-    }
-
-    #[test]
-    fn valid_kx_keypair() {
-        let (pk, sk) = kx::gen_keypair();
-        let _ = kx::KeyPair::from_keys(pk, sk);
-    }
-
-    #[test]
-    #[should_panic]
-    fn not_valid_kx_keypair() {
-        let (pk, _) = kx::gen_keypair();
-        let (_, sk) = kx::gen_keypair();
-        let _ = kx::KeyPair::from_keys(pk, sk);
     }
 }

@@ -79,7 +79,7 @@ impl ExonumCommand for Run {
     fn execute(self) -> Result<StandardResult, Error> {
         let config_path = self.node_config.clone();
 
-        let mut config: NodeConfig<PathBuf> = load_config_file(&config_path)?;
+        let mut config: NodeConfig = load_config_file(&config_path)?;
         let public_addr = self.public_api_address;
         let private_addr = self.private_api_address;
 
@@ -95,16 +95,15 @@ impl ExonumCommand for Run {
         let consensus_passphrase = self
             .consensus_key_pass
             .unwrap_or_default()
-            .get_passphrase(SecretKeyType::Consensus, PassphraseUsage::Using)?;
+            .get_passphrase(PassphraseUsage::Using)?;
         let service_passphrase = self
             .service_key_pass
             .unwrap_or_default()
-            .get_passphrase(SecretKeyType::Service, PassphraseUsage::Using)?;
+            .get_passphrase( PassphraseUsage::Using)?;
 
         let config = config.read_secret_keys(
             &config_path,
             consensus_passphrase.as_bytes(),
-            service_passphrase.as_bytes(),
         );
 
         let run_config = NodeRunConfig {

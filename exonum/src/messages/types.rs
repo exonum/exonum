@@ -22,7 +22,7 @@ use std::convert::TryFrom;
 
 use crate::{
     blockchain::Block,
-    crypto::{Hash, PublicKey, Signature},
+    crypto::{Hash, kx, PublicKey, Signature},
     helpers::{Height, Round, ValidatorId},
     proto::schema::consensus,
 };
@@ -63,6 +63,9 @@ pub struct Connect {
     pub time: DateTime<Utc>,
     /// String containing information about this node including Exonum, Rust and OS versions.
     pub user_agent: String,
+
+    /// Peer identity key,
+    pub identity_key: kx::PublicKey,
 }
 
 impl Connect {
@@ -71,11 +74,13 @@ impl Connect {
         host: impl Into<String>,
         time: DateTime<Utc>,
         user_agent: impl Into<String>,
+        identity_key: kx::PublicKey,
     ) -> Self {
         Self {
             host: host.into(),
             time,
             user_agent: user_agent.into(),
+            identity_key,
         }
     }
 

@@ -71,6 +71,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   An additional field in the response of the endpoint was added. The field
   corresponds to the total number of transactions in the blockchain. (#1289)
 
+- Added new pair of keys to validator keys. This identity keys are now used
+  in noise handshake instead of converted consensus keys. (#1448)
+
+- All validator keys are now derived from single master key. Master key is
+  stored in encrypted file. (#1448)
+
 #### exonum-merkledb
 
 - Added restrictions to index names. Allowable characters in index name: ASCII

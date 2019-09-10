@@ -50,19 +50,19 @@ pub fn bench_crypto(c: &mut Criterion) {
     c.bench(
         "hash",
         ParameterizedBenchmark::new("hash", bench_hash, (6..16).map(|i| pow(2, i)))
-            .throughput(|s| Throughput::Bytes(*s as u32))
+            .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );
     c.bench(
         "sign",
         ParameterizedBenchmark::new("sign", bench_sign, (6..16).map(|i| pow(2, i)))
-            .throughput(|s| Throughput::Bytes(*s as u32))
+            .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );
     c.bench(
         "verify",
         ParameterizedBenchmark::new("verify", bench_verify, (6..16).map(|i| pow(2, i)))
-            .throughput(|s| Throughput::Bytes(*s as u32))
+            .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );
 }

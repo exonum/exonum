@@ -23,7 +23,7 @@ use exonum_merkledb::{
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use tempdir::TempDir;
 
-use std::collections::HashSet;
+use std::{collections::HashSet, convert::TryInto};
 
 const NAME: &str = "name";
 const SAMPLE_SIZE: usize = 20;
@@ -177,7 +177,7 @@ where
             },
             item_counts,
         )
-        .throughput(|s| Throughput::Elements(*s as u32))
+        .throughput(|s| Throughput::Elements((*s).try_into().unwrap()))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
         .sample_size(SAMPLE_SIZE),
     );
