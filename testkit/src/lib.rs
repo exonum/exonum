@@ -174,12 +174,11 @@ use exonum::{
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
+    merkledb::{BinaryValue, Database, ObjectHash, Patch, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
-    proto::Any,
     runtime::{rust::ServiceFactory, InstanceId},
 };
-use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -231,7 +230,7 @@ impl TestKit {
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
         id: InstanceId,
-        constructor: impl Into<Any>,
+        constructor: impl BinaryValue,
     ) -> Self {
         TestKitBuilder::validator()
             .with_service(InstanceCollection::new(service_factory).with_instance(

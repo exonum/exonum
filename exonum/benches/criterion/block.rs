@@ -382,7 +382,6 @@ mod foreign_interface_call {
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
-        proto::Any,
         runtime::{
             self, dispatcher,
             rust::{Interface, Service, Transaction, TransactionContext},
@@ -530,11 +529,11 @@ mod foreign_interface_call {
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
             Self::new(t)
-                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", Any::default())
+                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", Vec::default())
                 .with_instance(
                     FOREIGN_INTERFACE_SERVICE_ID,
                     "timestamping-foreign",
-                    Any::default(),
+                    Vec::default(),
                 )
         }
     }

@@ -14,6 +14,10 @@
 
 //! The set of specific for the Rust runtime implementation errors.
 
+use std::fmt::Display;
+
+use crate::runtime::ExecutionError;
+
 /// List of possible Rust runtime errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 #[exonum(crate = "crate", kind = "runtime")]
@@ -28,4 +32,16 @@ pub enum Error {
     UnspecifiedError = 3,
     /// Unable to parse the method arguments of the service interface.
     ArgumentsParseError = 4,
+}
+
+impl Error {
+    /// Create a `ConfigParseError` error with the specified error message.
+    pub fn config_parse_error(msg: impl Display) -> ExecutionError {
+        (Error::ConfigParseError, msg).into()
+    }
+
+    /// Create a `ArgumentsParseError` error with the specified error message.
+    pub fn arguments_parse_error(msg: impl Display) -> ExecutionError {
+        (Error::ArgumentsParseError, msg).into()
+    }
 }

@@ -15,13 +15,8 @@
 use exonum_derive::exonum_service;
 use exonum_merkledb::{BinaryValue, Database, Entry, TemporaryDB};
 
-use std::convert::TryFrom;
-
 use crate::{
-    proto::{
-        schema::tests::{TestServiceInit, TestServiceTx},
-        Any,
-    },
+    proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, rust::interfaces::Initialize, CallContext,
         CallInfo, Caller, ExecutionContext, InstanceId, InstanceSpec,
@@ -110,8 +105,8 @@ impl TestService for TestServiceImpl {
 }
 
 impl Initialize for TestServiceImpl {
-    fn initialize(&self, context: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
-        let arg = Init::try_from(arg).map_err(|e| (Error::ConfigParseError, e))?;
+    fn initialize(&self, context: TransactionContext, arg: &[u8]) -> Result<(), ExecutionError> {
+        let arg = Init::from_bytes(arg.into()).map_err(Error::config_parse_error)?;
 
         let mut entry = Entry::new("constructor_entry", context.fork());
         entry.set(arg.msg);
@@ -138,7 +133,7 @@ fn test_basic_rust_runtime() {
     // Deploy service.
     let fork = db.fork();
     dispatcher
-        .deploy_and_register_artifact(&fork, &artifact, Any::default())
+        .deploy_and_register_artifact(&fork, &artifact, Vec::default())
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 
@@ -152,8 +147,7 @@ fn test_basic_rust_runtime() {
 
         let constructor = Init {
             msg: "constructor_message".to_owned(),
-        }
-        .into();
+        };
 
         let fork = db.fork();
 

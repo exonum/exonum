@@ -19,9 +19,9 @@ use exonum::{
     blockchain::{BlockchainBuilder, GenesisConfig, ValidatorKeys},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
+    merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
     messages::Verified,
     node::{ApiSender, Node, NodeApiConfig, NodeChannel, NodeConfig},
-    proto::Any,
     runtime::{
         dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
         rust::{
@@ -34,13 +34,11 @@ use exonum::{
     },
 };
 use exonum_derive::IntoExecutionError;
-use exonum_merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB};
 use futures::{Future, IntoFuture};
 
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
-    convert::TryFrom,
     thread,
     time::Duration,
 };
@@ -154,13 +152,8 @@ impl Runtime for SampleRuntime {
             // `initialize` request sets the counter value of the corresponding
             // `SampleService` instance
             (Initialize::NAME, INITIALIZE_METHOD_ID) => {
-                // In accordance with `Initialize` interface, configuration parameters pass
-                // via Protobuf `Any` message.
-                let any = Any::from_bytes(payload.into())
+                let new_value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
-
-                let new_value =
-                    u64::try_from(any).map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
                 service.counter.set(new_value);
                 println!(
                     "Configuring service {} with value {}",
@@ -317,7 +310,7 @@ fn main() {
                 StartService {
                     artifact: "255:sample_artifact".parse().unwrap(),
                     name: instance_name.clone(),
-                    config: Any::from(10_u64),
+                    config: 10_u64.into_bytes(),
                     deadline_height,
                 }
                 .sign(

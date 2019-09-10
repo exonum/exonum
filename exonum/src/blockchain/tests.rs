@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{
-    Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash, TemporaryDB,
-};
 use futures::{sync::mpsc, Future};
 
 use std::{collections::BTreeMap, panic, sync::Mutex};
@@ -25,9 +22,13 @@ use crate::{
     },
     crypto,
     helpers::{generate_testnet_config, Height, ValidatorId},
+    merkledb::{
+        BinaryValue, Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash,
+        TemporaryDB,
+    },
     messages::Verified,
     node::ApiSender,
-    proto::{schema::tests::*, Any},
+    proto::schema::tests::*,
     runtime::{
         dispatcher,
         error::ErrorKind,
@@ -103,9 +104,13 @@ struct TestDispatcherService;
 impl Service for TestDispatcherService {}
 
 impl Initialize for TestDispatcherService {
-    fn initialize(&self, _context: TransactionContext, params: Any) -> Result<(), ExecutionError> {
-        if params.is::<TestExecute>() {
-            let v: TestExecute = params.try_into().unwrap();
+    fn initialize(
+        &self,
+        _context: TransactionContext,
+        params: &[u8],
+    ) -> Result<(), ExecutionError> {
+        if !params.is_empty() {
+            let v = TestExecute::from_bytes(params.into()).unwrap();
             if v.value == 42 {
                 panic!("42!");
             } else {
@@ -157,9 +162,9 @@ impl TestDispatcherInterface for TestDispatcherService {
         drop(index);
 
         let config = match arg.value {
-            42 => TestExecute { value: 42 }.into(),
-            18 => TestExecute { value: 18 }.into(),
-            _ => ().into(),
+            42 => TestExecute { value: 42 }.into_bytes(),
+            18 => TestExecute { value: 18 }.into_bytes(),
+            _ => Vec::new(),
         };
 
         let artifact = if arg.value == 24 {
@@ -199,7 +204,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         context.call_context(context.instance.id).call(
             Initialize::NAME,
             INITIALIZE_METHOD_ID,
-            Any::from(arg.value),
+            arg.value,
         )
     }
 }
@@ -755,7 +760,7 @@ fn test_dispatcher_start_service_rollback() {
 #[test]
 fn test_dispatcher_err_wrong_initialize_caller() {
     let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-        .with_instance(TEST_SERVICE_ID, IDX_NAME, Any::default())]);
+        .with_instance(TEST_SERVICE_ID, IDX_NAME, Vec::default())]);
 
     let keypair = crypto::gen_keypair();
     let status = execute_transaction(

@@ -48,7 +48,7 @@ message StartService {
     // Instance name.
     string name = 2;
     // Instance configuration.
-    google.protobuf.Any config = 3;
+    bytes config = 3;
     // The height until which the start service procedure should be completed.
     uint64 deadline_height = 4;
 }

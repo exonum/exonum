@@ -21,7 +21,6 @@ use exonum::{
     crypto,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    proto::Any,
     runtime::{
         rust::{ServiceFactory, Transaction},
         supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor},
@@ -156,7 +155,7 @@ fn start_service_request(
     StartService {
         artifact,
         name: name.into(),
-        config: Any::default(),
+        config: Vec::default(),
         deadline_height,
     }
 }
@@ -338,7 +337,7 @@ fn test_try_run_unregistered_service_instance() {
     let request = StartService {
         artifact: artifact_default(),
         name: instance_name.into(),
-        config: Any::default(),
+        config: Vec::default(),
         deadline_height: Height(1000),
     };
     let hash = start_service(&api, request);

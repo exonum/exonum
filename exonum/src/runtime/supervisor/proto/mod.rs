@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::Height, impl_serde_hex_for_binary_value, proto::Any, runtime::ArtifactId};
+use crate::{helpers::Height, impl_serde_hex_for_binary_value, runtime::ArtifactId};
 
 pub mod schema;
 
@@ -49,7 +49,7 @@ pub struct StartService {
     /// Instance name.
     pub name: String,
     /// Instance configuration.
-    pub config: Any,
+    pub config: Vec<u8>,
     /// The height until which the start service procedure should be completed.
     pub deadline_height: Height,
 }

@@ -70,8 +70,6 @@ pub use self::schema::{
     runtime::{AnyTx, CallInfo},
 };
 
-use std::{borrow::Cow, convert::TryFrom};
-
 pub mod schema;
 
 #[macro_use]
@@ -80,9 +78,8 @@ mod macros;
 mod tests;
 
 use chrono::{DateTime, TimeZone, Utc};
-use exonum_merkledb::BinaryValue;
 use failure::Error;
-use protobuf::{well_known_types, Message};
+use protobuf::well_known_types;
 
 use std::collections::HashMap;
 
@@ -197,9 +194,11 @@ impl ProtobufConvert for DateTime<Utc> {
 
 impl ProtobufConvert for String {
     type ProtoStruct = Self;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         self.clone()
     }
+
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(pb)
     }
@@ -207,9 +206,11 @@ impl ProtobufConvert for String {
 
 impl ProtobufConvert for Height {
     type ProtoStruct = u64;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         self.0
     }
+
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(Height(pb))
     }
@@ -217,9 +218,11 @@ impl ProtobufConvert for Height {
 
 impl ProtobufConvert for Round {
     type ProtoStruct = u32;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         self.0
     }
+
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(Round(pb))
     }
@@ -227,9 +230,11 @@ impl ProtobufConvert for Round {
 
 impl ProtobufConvert for ValidatorId {
     type ProtoStruct = u32;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         u32::from(self.0)
     }
+
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         ensure!(
             pb <= u32::from(u16::max_value()),
@@ -241,9 +246,11 @@ impl ProtobufConvert for ValidatorId {
 
 impl ProtobufConvert for u16 {
     type ProtoStruct = u32;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         u32::from(*self)
     }
+
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         ensure!(
             pb <= u32::from(u16::max_value()),
@@ -255,6 +262,7 @@ impl ProtobufConvert for u16 {
 
 impl ProtobufConvert for i16 {
     type ProtoStruct = i32;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         i32::from(*self)
     }
@@ -273,6 +281,7 @@ where
     T: ProtobufConvert,
 {
     type ProtoStruct = Vec<T::ProtoStruct>;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         self.iter().map(ProtobufConvert::to_pb).collect()
     }
@@ -298,6 +307,7 @@ impl ProtobufConvert for () {
 /// Special case for protobuf bytes.
 impl ProtobufConvert for Vec<u8> {
     type ProtoStruct = Vec<u8>;
+
     fn to_pb(&self) -> Self::ProtoStruct {
         self.clone()
     }
@@ -383,153 +393,6 @@ impl_protobuf_convert_fixed_byte_array! {
     8, 16, 24, 32, 40, 48, 56, 64,
     72, 80, 88, 96, 104, 112, 120, 128,
     160, 256, 512, 1024, 2048
-}
-
-// TODO Implement proper serialize deserialize [ECR-3222]
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct Any(well_known_types::Any);
-
-impl Any {
-    const TYPE_URL: &'static str = "type.googleapis.com/";
-
-    pub fn new<T>(value: T) -> Self
-    where
-        T: ProtobufConvert,
-        <T as ProtobufConvert>::ProtoStruct: Message,
-    {
-        Self::from_pb_message(value.to_pb())
-    }
-
-    // TODO Write specification for the empty values interpretation. [ECR-3222]
-    pub fn is_empty(&self) -> bool {
-        self.is_null() || self.is::<()>()
-    }
-
-    pub fn is<T>(&self) -> bool
-    where
-        T: BinaryValue + ProtobufConvert,
-        <T as ProtobufConvert>::ProtoStruct: Message,
-    {
-        self.0.type_url == Self::type_url::<<T as ProtobufConvert>::ProtoStruct>()
-    }
-
-    pub fn try_into<T>(self) -> Result<T, failure::Error>
-    where
-        T: BinaryValue + ProtobufConvert,
-        <T as ProtobufConvert>::ProtoStruct: Message,
-    {
-        let type_url = Self::type_url::<<T as ProtobufConvert>::ProtoStruct>();
-        ensure!(
-            self.0.type_url == type_url,
-            "Type url mismatch, actual `{}`, expected `{}`",
-            self.0.type_url,
-            type_url
-        );
-        T::from_bytes(self.0.value.into())
-    }
-
-    fn type_url<V: Message>() -> String {
-        [
-            Self::TYPE_URL,
-            protobuf::reflect::MessageDescriptor::for_type::<V>().full_name(),
-        ]
-        .concat()
-    }
-
-    /// Return true if this instance does not contain any type of data.
-    fn is_null(&self) -> bool {
-        self.0.type_url.is_empty() && self.0.value.is_empty()
-    }
-
-    fn from_pb_message(pb: impl Message) -> Self {
-        // See protobuf documentation for clarification.
-        // https://developers.google.com/protocol-buffers/docs/proto3#any
-        let type_url = [Self::TYPE_URL, pb.descriptor().full_name()].concat();
-        let value = pb
-            .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for `Any`");
-
-        Self(well_known_types::Any {
-            type_url,
-            value,
-            ..Default::default()
-        })
-    }
-}
-
-impl ProtobufConvert for Any {
-    type ProtoStruct = well_known_types::Any;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        self.0.clone()
-    }
-
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        Ok(Self(pb))
-    }
-}
-
-impl BinaryValue for Any {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.0
-            .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for `Any`")
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
-        inner.merge_from_bytes(bytes.as_ref())?;
-        ProtobufConvert::from_pb(inner)
-    }
-}
-
-impl From<well_known_types::Any> for Any {
-    fn from(v: well_known_types::Any) -> Self {
-        Self(v)
-    }
-}
-
-// TODO implement conversions for the other well-known types [ECR-3222]
-
-impl From<()> for Any {
-    fn from(_: ()) -> Self {
-        let v = well_known_types::Empty::new();
-        Self::from_pb_message(v)
-    }
-}
-
-impl From<String> for Any {
-    fn from(s: String) -> Self {
-        let mut v = well_known_types::StringValue::new();
-        v.set_value(s);
-        Self::from_pb_message(v)
-    }
-}
-
-impl From<Vec<u8>> for Any {
-    fn from(s: Vec<u8>) -> Self {
-        let mut v = well_known_types::BytesValue::new();
-        v.set_value(s);
-        Self::from_pb_message(v)
-    }
-}
-
-impl From<u64> for Any {
-    fn from(s: u64) -> Self {
-        let mut v = well_known_types::UInt64Value::new();
-        v.set_value(s);
-        Self::from_pb_message(v)
-    }
-}
-
-impl TryFrom<Any> for u64 {
-    type Error = failure::Error;
-
-    fn try_from(value: Any) -> Result<Self, Self::Error> {
-        let mut v = well_known_types::UInt64Value::new();
-        v.merge_from_bytes(&value.0.value)?;
-        Ok(v.value)
-    }
 }
 
 // Think about bincode instead of protobuf. [ECR-3222]

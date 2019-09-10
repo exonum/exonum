@@ -14,13 +14,9 @@
 
 //! Important interservice communication interfaces.
 
-use crate::{
-    merkledb::BinaryValue,
-    proto::Any,
-    runtime::{dispatcher::Error as DispatcherError, MethodId},
-};
+use crate::runtime::{dispatcher::Error as DispatcherError, MethodId};
 
-use super::{Error as RuntimeError, ExecutionError, Interface, TransactionContext};
+use super::{ExecutionError, Interface, TransactionContext};
 
 pub const INITIALIZE_METHOD_ID: MethodId = 0;
 
@@ -41,7 +37,7 @@ pub trait Initialize {
     ///
     /// ['start_service`]: ../../trait.Runtime.html#start_service
     /// ['stop_service`]: ../../trait.Runtime.html#stop_service
-    fn initialize(&self, context: TransactionContext, params: Any) -> Result<(), ExecutionError>;
+    fn initialize(&self, context: TransactionContext, params: &[u8]) -> Result<(), ExecutionError>;
 }
 
 impl Interface for dyn Initialize {
@@ -59,18 +55,7 @@ impl Interface for dyn Initialize {
         }
 
         match method {
-            INITIALIZE_METHOD_ID => {
-                let config = Any::from_bytes(payload.into()).map_err(|error_msg| {
-                    (
-                        RuntimeError::ArgumentsParseError,
-                        format!(
-                            "Unable to parse argument for the `Initialize#initialize` method. {}",
-                            error_msg
-                        ),
-                    )
-                })?;
-                self.initialize(context, config)
-            }
+            INITIALIZE_METHOD_ID => self.initialize(context, payload),
             other => {
                 let kind = DispatcherError::NoSuchMethod;
                 let message = format!(

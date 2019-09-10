@@ -31,7 +31,6 @@ use crate::{
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
     node::ApiSender,
-    proto::Any,
 };
 
 use super::{
@@ -111,7 +110,7 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
-        constructor: Any,
+        constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         assert!(
             spec.id < MAX_BUILTIN_INSTANCE_ID,
@@ -119,7 +118,7 @@ impl Dispatcher {
             MAX_BUILTIN_INSTANCE_ID
         );
         // Built-in services should not have an additional specification.
-        let artifact_spec = Any::default();
+        let artifact_spec = Vec::default();
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
@@ -232,9 +231,9 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         artifact: &ArtifactId,
-        spec: impl Into<Any>,
+        spec: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
-        let spec = spec.into();
+        let spec = spec.into_bytes();
         self.deploy_artifact(artifact.clone(), spec.clone())
             .wait()?;
         self.register_artifact(fork, &artifact, spec)
@@ -250,7 +249,7 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
-        constructor: Any,
+        constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
 
@@ -269,7 +268,7 @@ impl Dispatcher {
             self.runtimes[&spec.artifact.runtime_id].as_ref(),
             fork,
             spec.as_descriptor(),
-            constructor,
+            constructor.into_bytes(),
         )
         .map_err(|e| {
             error!(
@@ -376,7 +375,7 @@ impl Dispatcher {
         runtime: &dyn Runtime,
         fork: &Fork,
         descriptor: InstanceDescriptor,
-        constructor: Any,
+        constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let constructor_is_empty = constructor.is_empty();
 
@@ -471,7 +470,7 @@ pub(crate) enum Action {
     StartService {
         artifact: ArtifactId,
         instance_name: String,
-        config: Any,
+        config: Vec<u8>,
     },
 }
 
@@ -787,10 +786,10 @@ mod tests {
         // Check if the services are ready for deploy.
         let fork = db.fork();
         dispatcher
-            .deploy_and_register_artifact(&fork, &sample_rust_spec, Any::default())
+            .deploy_and_register_artifact(&fork, &sample_rust_spec, Vec::default())
             .unwrap();
         dispatcher
-            .deploy_and_register_artifact(&fork, &sample_java_spec, Any::default())
+            .deploy_and_register_artifact(&fork, &sample_java_spec, Vec::default())
             .unwrap();
 
         // Check if the services are ready for initiation.
@@ -802,7 +801,7 @@ mod tests {
                     id: RUST_SERVICE_ID,
                     name: RUST_SERVICE_NAME.into(),
                 },
-                Any::default(),
+                Vec::default(),
             )
             .expect("start_service failed for rust");
         dispatcher
@@ -813,7 +812,7 @@ mod tests {
                     id: JAVA_SERVICE_ID,
                     name: JAVA_SERVICE_NAME.into(),
                 },
-                Any::default(),
+                Vec::default(),
             )
             .expect("start_service failed for java");
 
@@ -909,7 +908,7 @@ mod tests {
         // Check deploy.
         assert_eq!(
             dispatcher
-                .deploy_artifact(sample_rust_spec.clone(), Any::default())
+                .deploy_artifact(sample_rust_spec.clone(), Vec::default())
                 .wait()
                 .expect_err("deploy artifact succeed"),
             RustRuntimeError::UnableToDeploy.into()
@@ -927,7 +926,7 @@ mod tests {
                         id: RUST_SERVICE_ID,
                         name: RUST_SERVICE_NAME.into()
                     },
-                    Any::default()
+                    Vec::default()
                 )
                 .expect_err("start service succeed"),
             Error::ArtifactNotDeployed.into()
