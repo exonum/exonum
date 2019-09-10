@@ -14,7 +14,7 @@
 
 //! An implementation of a Merkelized version of an array list (Merkle tree).
 
-pub use self::proof::{ListProof, ListProofError, ProofOfAbsence};
+pub use self::proof::{ListProof, ListProofError};
 
 use std::{
     marker::PhantomData,
@@ -37,6 +37,14 @@ mod proof;
 mod tests;
 
 // TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
+
+fn tree_height_by_length(len: u64) -> u8 {
+    if len == 0 {
+        0
+    } else {
+        len.next_power_of_two().trailing_zeros() as u8 + 1
+    }
+}
 
 /// A Merkelized version of an array list that provides proofs of existence for the list items.
 ///
@@ -191,8 +199,6 @@ where
     }
 
     fn has_branch(&self, key: ProofListKey) -> bool {
-        debug_assert!(key.height() > 0);
-
         key.first_left_leaf_index() < self.len()
     }
 
@@ -206,7 +212,6 @@ where
 
     fn get_branch_unchecked(&self, key: ProofListKey) -> Hash {
         debug_assert!(self.has_branch(key));
-
         self.base.get(&key).unwrap()
     }
 
@@ -214,27 +219,45 @@ where
         ProofListKey::new(self.height(), 0)
     }
 
-    fn construct_proof(&self, key: ProofListKey, from: u64, to: u64) -> ListProof<V> {
-        if key.height() == 1 {
-            return ListProof::Leaf(self.get(key.index()).unwrap());
+    /// The caller must ensure that `to > from`.
+    fn construct_proof(&self, from: u64, to: u64) -> ListProof<V> {
+        if from >= self.len() {
+            return ListProof::empty(self.merkle_root(), self.len());
         }
-        let middle = key.first_right_leaf_index();
-        if to <= middle {
-            ListProof::Left(
-                Box::new(self.construct_proof(key.left(), from, to)),
-                self.get_branch(key.right()),
-            )
-        } else if middle <= from {
-            ListProof::Right(
-                self.get_branch_unchecked(key.left()),
-                Box::new(self.construct_proof(key.right(), from, to)),
-            )
-        } else {
-            ListProof::Full(
-                Box::new(self.construct_proof(key.left(), from, middle)),
-                Box::new(self.construct_proof(key.right(), middle, to)),
-            )
+
+        let items = (from..to).zip(self.iter_from(from).take((to - from) as usize));
+        let mut proof = ListProof::new(items, self.len());
+
+        // `left` and `right` track the indices of elements for which we build the proof,
+        // on the particular `height` of the tree. Both these values are inclusive; i.e., the range
+        // is `[left, right]`.
+        let (mut left, mut right) = (from, to - 1);
+        for height in 1..self.height() {
+            // On each `height`, we may include into the proof the hash
+            // to the left of the range, provided that this hash is necessary to restore
+            // the root hash of the list. It is easy to see that necessity depends on the
+            // oddity of `left`. Indeed, during root hash computation, we zip a hash
+            // with an *even* index with the following hash having an *odd* index;
+            // thus, iff `left` is odd, we need a hash with index `left - 1` to restore the
+            // root hash.
+            if left % 2 == 1 {
+                let hash = self.get_branch_unchecked(ProofListKey::new(height, left - 1));
+                proof.push_hash(height, left - 1, hash);
+            }
+
+            // Similarly, we may need a hash to the right of the end of the range, provided
+            // that the end has an even index and the hash to the right exists.
+            if right % 2 == 0 {
+                if let Some(hash) = self.get_branch(ProofListKey::new(height, right + 1)) {
+                    proof.push_hash(height, right + 1, hash);
+                }
+            }
+
+            left /= 2;
+            right /= 2;
         }
+
+        proof
     }
 
     fn merkle_root(&self) -> Hash {
@@ -247,7 +270,6 @@ where
 
     fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
         debug_assert!(key.height() > 0);
-
         self.base.put(&key, hash)
     }
 
@@ -335,7 +357,10 @@ where
         self.state.get()
     }
 
-    /// Returns the height of the proof list.
+    /// Returns the height of the Merkle tree built based on the list.
+    ///
+    /// The height of the empty list is 0; otherwise, the height is computed as `ceil(log2(l)) + 1`,
+    /// where `l` is the list length.
     ///
     /// # Examples
     ///
@@ -346,16 +371,14 @@ where
     /// let name = "name";
     /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &fork);
+    /// assert_eq!(0, index.height());
+    /// index.push(1);
     /// assert_eq!(1, index.height());
-    ///
     /// index.push(1);
-    /// assert_eq!(1, index.len());
-    ///
-    /// index.push(1);
-    /// assert_eq!(2, index.len());
+    /// assert_eq!(2, index.height());
     /// ```
     pub fn height(&self) -> u8 {
-        self.len().next_power_of_two().trailing_zeros() as u8 + 1
+        tree_height_by_length(self.len())
     }
 
     /// Returns a proof of existence for the list element at the specified position.
@@ -373,17 +396,11 @@ where
     /// let mut index = ProofListIndex::new(name, &fork);
     ///
     /// index.push(1);
-    ///
     /// let proof = index.get_proof(0);
-    ///
     /// let proof_of_absence = index.get_proof(1);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
-        if index >= self.len() {
-            return ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()));
-        }
-
-        self.construct_proof(self.root_key(), index, index + 1)
+        self.construct_proof(index, index + 1)
     }
 
     /// Returns the proof of existence for the list elements in the specified range.
@@ -404,38 +421,43 @@ where
     /// let name = "name";
     /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &fork);
+    /// index.extend(vec![1, 2, 3, 4, 5]);
     ///
-    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
-    ///
-    /// let list_proof = index.get_range_proof(1..3);
-    ///
-    /// // Range (1..10) doesn't exist in index.
-    /// let list_proof_of_absence = index.get_range_proof(1..10);
-    ///
+    /// let range_proof = index.get_range_proof(1..3);
+    /// assert!(range_proof.indexes_unchecked().eq(vec![1, 2]));
+    /// // This proof will contain only 4 elements with indexes 1..5.
+    /// let intersection_proof = index.get_range_proof(1..10);
+    /// assert!(intersection_proof.indexes_unchecked().eq(1..5));
+    /// // This proof does not contain any elements at all.
+    /// let empty_proof = index.get_range_proof(100..10000);
+    /// assert!(empty_proof.entries_unchecked().is_empty());
     /// ```
     pub fn get_range_proof<R: RangeBounds<u64>>(&self, range: R) -> ListProof<V> {
+        // Inclusive lower boundary of the proof range.
         let from = match range.start_bound() {
             Bound::Unbounded => 0_u64,
-            Bound::Included(from) | Bound::Excluded(from) => *from,
+            Bound::Included(from) => *from,
+            Bound::Excluded(from) => *from + 1,
         };
+        if from >= self.len() && range.end_bound() == Bound::Unbounded {
+            // We assume this is a "legal" case of the caller not knowing the list length,
+            // so we don't want to panic in the `to > from` assertion below.
+            return ListProof::empty(self.merkle_root(), self.len());
+        }
 
+        // Exclusive upper boundary of the proof range.
         let to = match range.end_bound() {
             Bound::Unbounded => self.len(),
-            Bound::Included(to) | Bound::Excluded(to) => *to,
+            Bound::Included(to) => *to + 1,
+            Bound::Excluded(to) => *to,
         };
-
-        if to <= from {
-            panic!(
-                "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
-                from, to
-            )
-        }
-
-        if to > self.len() {
-            ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()))
-        } else {
-            self.construct_proof(self.root_key(), from, to)
-        }
+        assert!(
+            to > from,
+            "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
+            from,
+            to
+        );
+        self.construct_proof(from, to)
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
@@ -608,10 +630,8 @@ where
     /// let name = "name";
     /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &fork);
-    ///
     /// index.push(1);
     /// assert!(!index.is_empty());
-    ///
     /// index.clear();
     /// assert!(index.is_empty());
     /// ```
@@ -624,19 +644,21 @@ where
 impl<T, V> ObjectHash for ProofListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Returns a list hash of the proof list or a hash value of the empty list.
     ///
     /// List hash is calculated as follows:
+    ///
     /// ```text
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )
     /// ```
+    ///
     /// Empty list hash:
+    ///
     /// ```text
     /// h = sha-256( HashTag::List || 0 || Hash::default() )
     /// ```
-    ///
     ///
     /// # Examples
     ///
@@ -651,7 +673,6 @@ where
     ///
     /// let default_hash = index.object_hash();
     /// assert_eq!(HashTag::empty_list_hash(), default_hash);
-    ///
     /// index.push(1);
     /// let hash = index.object_hash();
     /// assert_ne!(hash, default_hash);
@@ -664,7 +685,7 @@ where
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     type Item = V;
     type IntoIter = ProofListIndexIter<'a, V>;
@@ -676,7 +697,7 @@ where
 
 impl<'a, V> Iterator for ProofListIndexIter<'a, V>
 where
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     type Item = V;
 
