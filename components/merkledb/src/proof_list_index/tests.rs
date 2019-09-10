@@ -358,7 +358,10 @@ fn index_and_proof_roots() {
 
         let range_proof = index.get_range_proof(..=proof_ind);
         assert_eq!(
-            range_proof.validate(index.object_hash()).unwrap().len(),
+            range_proof
+                .validate(index.object_hash(), index.len())
+                .unwrap()
+                .len(),
             (proof_ind + 1) as usize
         );
         let js = serde_json::to_string(&range_proof).unwrap();
@@ -380,7 +383,7 @@ fn index_and_proof_roots() {
 
     let range_proof = index.get_range_proof(..);
     let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
-        .validate(index.object_hash())
+        .validate(index.object_hash(), index.len())
         .unwrap()
         .iter()
         .cloned()
@@ -401,9 +404,21 @@ fn index_and_proof_roots() {
     }
 
     let mut range_proof = index.get_range_proof(3..5);
-    assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 2);
+    assert_eq!(
+        range_proof
+            .validate(index.object_hash(), index.len())
+            .unwrap()
+            .len(),
+        2
+    );
     range_proof = index.get_range_proof(2..6);
-    assert_eq!(range_proof.validate(index.object_hash()).unwrap().len(), 4);
+    assert_eq!(
+        range_proof
+            .validate(index.object_hash(), index.len())
+            .unwrap()
+            .len(),
+        4
+    );
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
