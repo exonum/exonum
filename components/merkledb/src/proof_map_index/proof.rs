@@ -336,16 +336,10 @@ fn collect(entries: &[Cow<MapProofEntry>]) -> Result<Hash, MapProofError> {
         }
 
         _ => {
-            let mut contour: Vec<MapProofEntry> = Vec::with_capacity(8);
+            let (first_entry, second_entry) = (&entries[0], &entries[1]);
+            let mut contour: Vec<MapProofEntry> = vec![**first_entry, **second_entry];
             // invariant: equal to the common prefix of the 2 last nodes in the contour
-            let mut last_prefix;
-
-            {
-                let (first_entry, second_entry) = (&entries[0], &entries[1]);
-                last_prefix = common_prefix(&first_entry.path, &second_entry.path);
-                contour.push(**first_entry);
-                contour.push(**second_entry);
-            }
+            let mut last_prefix = common_prefix(&first_entry.path, &second_entry.path);
 
             for entry in entries.iter().skip(2) {
                 let new_prefix = common_prefix(&contour.last().unwrap().path, &entry.path);
@@ -556,6 +550,7 @@ where
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
     pub fn check(&self) -> Result<CheckedMapProof<K, V>, MapProofError> {
         self.precheck()?;
+
         let mut proof: Vec<_> = self.proof.iter().map(Cow::Borrowed).collect();
         proof.extend(self.entries.iter().filter_map(|e| {
             e.as_kv().map(|(k, v)| {
