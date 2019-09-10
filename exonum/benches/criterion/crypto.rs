@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Used in bench functions for convenience: we want to be able to pass these functions
+// to `ParameterizedBenchmark::new()`.
+#![allow(clippy::trivially_copy_pass_by_ref)]
+
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
 use exonum::crypto::{gen_keypair, hash, sign, verify};
 use num::pow::pow;
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 fn bench_sign(b: &mut Bencher, &count: &usize) {
     let (_, secret_key) = gen_keypair();
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
     b.iter(|| sign(&data, &secret_key))
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 fn bench_verify(b: &mut Bencher, &count: &usize) {
     let (public_key, secret_key) = gen_keypair();
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
@@ -33,7 +35,6 @@ fn bench_verify(b: &mut Bencher, &count: &usize) {
     b.iter(|| verify(&signature, &data, &public_key))
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 fn bench_hash(b: &mut Bencher, &count: &usize) {
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
     b.iter(|| hash(&data))

@@ -189,7 +189,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 }
 
 /// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
-/// which jointly allow restoring the `merkle_root()` of the index. Apart from the
+/// which jointly allow restoring the `object_hash()` of the index. Apart from the
 /// existing elements, `MapProof` can assert absence of certain keys from the underlying
 /// index.
 ///
@@ -223,11 +223,11 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///
 /// `MapProof` is serialized to JSON as an object with 2 array fields:
 ///
-/// - `proof` is an array of `{ "path": ProofPath, "hash": Hash }` objects. The entries are sorted
+/// - `proof` is an array of `{ path: ProofPath, hash: Hash }` objects. The entries are sorted
 ///   by increasing [`ProofPath`], but client implementors should not rely on this if security
 ///   is a concern.
-/// - `entries` is an array with 2 kinds of objects: `{ "missing": K }` for keys missing from
-///   the underlying index, and `{ "key": K, "value": V }` for key-value pairs, existence of
+/// - `entries` is an array with 2 kinds of objects: `{ missing: K }` for keys missing from
+///   the underlying index, and `{ key: K, value: V }` for key-value pairs, existence of
 ///   which is asserted by the proof.
 ///
 /// ```
