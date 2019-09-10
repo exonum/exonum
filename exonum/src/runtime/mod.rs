@@ -99,7 +99,6 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     merkledb::{BinaryValue, Fork, Snapshot},
     node::ApiSender,
-    proto::Any,
 };
 
 use self::{
@@ -162,7 +161,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        deploy_spec: Any,
+        deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
     /// Return true if the specified artifact is deployed in this runtime.

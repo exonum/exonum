@@ -439,7 +439,7 @@ impl Any {
     /// Return true if this instance does not contain any type of data.
     fn is_null(&self) -> bool {
         self.0.type_url.is_empty() && self.0.value.is_empty()
-    }    
+    }
 
     fn from_pb_message(pb: impl Message) -> Self {
         // See protobuf documentation for clarification.

@@ -55,7 +55,7 @@ struct SampleService {
 /// Sample runtime.
 #[derive(Debug, Default)]
 struct SampleRuntime {
-    deployed_artifacts: BTreeMap<ArtifactId, Any>,
+    deployed_artifacts: BTreeMap<ArtifactId, Vec<u8>>,
     started_services: BTreeMap<InstanceId, SampleService>,
 }
 
@@ -81,7 +81,7 @@ impl Runtime for SampleRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: Any,
+        spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         Box::new(
             match self.deployed_artifacts.entry(artifact) {
@@ -298,7 +298,7 @@ fn main() {
                 DeployRequest {
                     artifact: "255:sample_artifact".parse().unwrap(),
                     deadline_height,
-                    spec: Any::default(),
+                    spec: Vec::default(),
                 }
                 .sign(
                     Supervisor::BUILTIN_ID,

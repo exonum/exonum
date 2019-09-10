@@ -179,12 +179,12 @@ impl Dispatcher {
     pub(crate) fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: impl Into<Any>,
+        spec: impl BinaryValue,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            runtime.deploy_artifact(artifact, spec.into())
+            runtime.deploy_artifact(artifact, spec.into_bytes())
         } else {
             Box::new(future::err(Error::IncorrectRuntime.into()))
         }
@@ -201,12 +201,12 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         artifact: &ArtifactId,
-        spec: impl Into<Any>,
+        spec: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
 
         // If for some reasons the artifact is not deployed, deploy it again.
-        let spec = spec.into();
+        let spec = spec.into_bytes();
         if !self.is_artifact_deployed(&artifact) {
             self.deploy_artifact(artifact.clone(), spec.clone())
                 .wait()
@@ -465,7 +465,7 @@ impl Dispatcher {
 pub(crate) enum Action {
     /// This action registers the deployed artifact in the dispatcher.
     /// Make sure that you successfully complete the deploy artifact procedure.
-    RegisterArtifact { artifact: ArtifactId, spec: Any },
+    RegisterArtifact { artifact: ArtifactId, spec: Vec<u8> },
     /// This action starts the service instance with the specified params.
     /// Make sure that the artifact is deployed.
     StartService {
@@ -503,7 +503,7 @@ impl Action {
 
 struct DeployArtifactRequest {
     artifact: ArtifactId,
-    spec: Any,
+    spec: Vec<u8>,
     /// The operation to be performed if this request was successfully processed.
     and_then: Box<dyn FnOnce() + 'static>,
 }
@@ -541,8 +541,12 @@ impl DispatcherSender {
 
     /// Request an artifact deployment and invoke the callback if the deployment
     /// was successfully completed.
-    pub(super) fn request_deploy_artifact<F>(&self, artifact: ArtifactId, spec: Any, and_then: F)
-    where
+    pub(super) fn request_deploy_artifact<F>(
+        &self,
+        artifact: ArtifactId,
+        spec: Vec<u8>,
+        and_then: F,
+    ) where
         F: FnOnce() + 'static,
     {
         self.deploy_request
@@ -574,10 +578,10 @@ mod tests {
         crypto::{self, PublicKey},
         node::ApiSender,
         runtime::{
+            dispatcher::Error as DispatcherError,
             rust::{Error as RustRuntimeError, RustRuntime},
             ApiChange, ArtifactProtobufSpec, InstanceId, MethodId, RuntimeIdentifier,
             StateHashAggregator,
-            dispatcher::Error as DispatcherError,
         },
     };
 
@@ -650,7 +654,7 @@ mod tests {
         fn deploy_artifact(
             &mut self,
             artifact: ArtifactId,
-            _spec: Any,
+            _spec: Vec<u8>,
         ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
             Box::new(
                 if artifact.runtime_id == self.runtime_type {
@@ -687,10 +691,8 @@ mod tests {
             if !context.interface_name.is_empty() {
                 return Err(DispatcherError::NoSuchInterface.into());
             }
-            
-            if call_info.instance_id == self.instance_id
-                && call_info.method_id == self.method_id
-            {
+
+            if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
                 Ok(())
             } else {
                 Err(SampleError::Foo.into())

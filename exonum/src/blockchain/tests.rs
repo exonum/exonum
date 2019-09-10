@@ -137,7 +137,7 @@ impl TestDispatcherInterface for TestDispatcherService {
 
         context.dispatch_action(dispatcher::Action::RegisterArtifact {
             artifact,
-            spec: ().into(),
+            spec: Vec::new(),
         });
 
         if arg.value == 42 {

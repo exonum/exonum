@@ -37,7 +37,6 @@ use std::{
 use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     node::ApiSender,
-    proto::Any,
 };
 
 use super::{
@@ -219,7 +218,7 @@ impl Runtime for RustRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: Any,
+        spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.

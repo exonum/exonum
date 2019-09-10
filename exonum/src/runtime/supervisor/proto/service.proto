@@ -17,7 +17,7 @@ syntax = "proto3";
 package exonum.service.supervisor;
 
 import "runtime.proto";
-import "google/protobuf/any.proto";
+import "google/protobuf/any.proto"; 
 
 // Transactions
 
@@ -26,7 +26,7 @@ message DeployRequest {
     // Artifact identifier.
     exonum.runtime.ArtifactId artifact = 1;
     // Additional information for Runtime to deploy.
-    google.protobuf.Any spec = 2;
+    bytes spec = 2;
     // The height until which the deployment procedure should be completed.
     uint64 deadline_height = 3;
 }
@@ -36,7 +36,7 @@ message DeployConfirmation {
     // Artifact identifier.
     exonum.runtime.ArtifactId artifact = 1;
     // Additional information for Runtime to deploy.
-    google.protobuf.Any spec = 2;
+    bytes spec = 2;
     // The height until which the deployment procedure should be completed.
     uint64 deadline_height = 3;
 }
