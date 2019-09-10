@@ -31,6 +31,8 @@ cryptocurrency
 cryptographically
 ctrlc
 cyclomatic
+ciphertext
+cipherparams
 datetime
 deadlinks
 decodable
