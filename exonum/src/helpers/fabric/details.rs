@@ -37,8 +37,8 @@ use super::{
 use crate::api::backends::actix::AllowOrigin;
 use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
+use crate::keys::{generate_keys, Keys};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
-use exonum_crypto::{generate_keys, Keys};
 use exonum_merkledb::{Database, DbOptions, RocksDB};
 
 const MASTER_KEY_PASS_METHOD: &str = "MASTER_KEY_PASS_METHOD";

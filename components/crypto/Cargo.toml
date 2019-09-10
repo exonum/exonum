@@ -24,9 +24,7 @@ serde_json = "1.0.19"
 failure = "0.1.5"
 toml = "0.5.0"
 uuid = "0.7.1"
-pwbox = "0.2.1"
-exonum_sodiumoxide = {version = "0.0.23", optional = true}
-secret-tree = { git = "https://github.com/slowli/secret-tree", branch = "master" }
+exonum_sodiumoxide = { version = "0.0.23", optional = true}
 
 [dev-dependencies]
 tempdir = "0.3.7"

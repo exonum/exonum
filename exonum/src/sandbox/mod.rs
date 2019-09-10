@@ -28,6 +28,7 @@ use std::{
 use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
 
 use crate::blockchain::check_tx;
+use crate::keys::Keys;
 use crate::messages::PoolTransactionsRequest;
 use crate::{
     blockchain::{
@@ -57,7 +58,6 @@ use crate::{
         timestamping::TimestampingService,
     },
 };
-use exonum_crypto::Keys;
 
 mod config_updater;
 mod consensus;
@@ -223,8 +223,7 @@ impl Sandbox {
     pub fn identity_key(&self, id: ValidatorId) -> kx::PublicKey {
         self.cfg()
             .validator_keys
-            .iter()
-            .nth(id.0 as usize)
+            .get(id.0 as usize)
             .map(|keys| keys.identity_key)
             .unwrap()
     }

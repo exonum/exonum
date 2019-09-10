@@ -84,6 +84,8 @@ pub mod api;
 #[doc(hidden)]
 pub mod events;
 pub mod explorer;
+#[doc(hidden)]
+pub mod keys;
 pub mod node;
 
 //TODO: revert sandbox

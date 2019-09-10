@@ -28,6 +28,7 @@ use crate::blockchain::{check_tx, ConsensusConfig, StoredConfiguration, Validato
 use crate::crypto::{kx, Hash, PublicKey, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
+use crate::keys::Keys;
 use crate::messages::{
     BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
     RawTransaction, Signed,
@@ -36,7 +37,6 @@ use crate::node::{
     connect_list::{ConnectList, PeerAddress},
     ConnectInfo,
 };
-use exonum_crypto::Keys;
 use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, Patch};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)

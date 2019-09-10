@@ -60,9 +60,9 @@ use crate::helpers::{
     fabric::{NodePrivateConfig, NodePublicConfig},
     user_agent, Height, Milliseconds, Round, ValidatorId,
 };
+use crate::keys::{read_keys_from_file, Keys};
 use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
-use exonum_crypto::{read_keys_from_file, Keys};
 use exonum_merkledb::{Database, DbOptions};
 
 mod basic;

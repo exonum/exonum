@@ -17,7 +17,7 @@
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 
 use crate::blockchain::config::{ConsensusConfig, ValidatorKeys};
-use exonum_crypto::Keys;
+use crate::keys::Keys;
 
 /// Abstract configuration.
 pub type AbstractConfig = BTreeMap<String, toml::Value>;

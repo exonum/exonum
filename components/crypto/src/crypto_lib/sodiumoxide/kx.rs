@@ -46,8 +46,8 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct KeyPair {
-    pub(crate) public_key: PublicKey,
-    pub(crate) secret_key: SecretKey,
+    public_key: PublicKey,
+    secret_key: SecretKey,
 }
 
 impl KeyPair {
@@ -62,6 +62,20 @@ impl KeyPair {
             public_key,
             secret_key,
         }
+    }
+
+    pub fn public_key(&self) -> PublicKey {
+        self.public_key
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
+    }
+}
+
+impl From<(PublicKey, SecretKey)> for KeyPair {
+    fn from(keys: (PublicKey, SecretKey)) -> Self {
+        Self::from_keys(keys.0, keys.1)
     }
 }
 
@@ -133,3 +147,22 @@ implement_serde! { PublicKey }
 implement_serde! { SecretKey }
 implement_index_traits! { PublicKey }
 implement_index_traits! { SecretKey }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_kx_keypair() {
+        let (pk, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    #[should_panic]
+    fn not_valid_kx_keypair() {
+        let (pk, _) = gen_keypair();
+        let (_, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+}

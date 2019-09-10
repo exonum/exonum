@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use futures::future::{done, Future};
-use tokio_codec::{Decoder, Framed};
+use tokio_codec::Decoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::net::SocketAddr;
@@ -25,7 +25,7 @@ use crate::{
     crypto::kx,
     events::{
         codec::MessagesCodec,
-        noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+        noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
     },
     messages::{Connect, Signed},
     node::state::SharedConnectList,
@@ -122,7 +122,7 @@ impl NoiseHandshake {
         self,
         stream: S,
         message: Vec<u8>,
-    ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>, kx::PublicKey), failure::Error> {
+    ) -> Result<HandshakeData<S>, failure::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.

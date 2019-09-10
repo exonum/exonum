@@ -29,8 +29,9 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::blockchain::{GenesisConfig, ValidatorKeys};
 use crate::crypto::gen_keypair;
+use crate::keys::Keys;
 use crate::node::{ConnectListConfig, NodeConfig};
-use exonum_crypto::{kx, Keys};
+use exonum_crypto::kx;
 
 mod types;
 

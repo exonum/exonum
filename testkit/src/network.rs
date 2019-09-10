@@ -16,8 +16,9 @@ use serde::{Deserialize, Serialize};
 
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
-    crypto::{self, kx, CryptoHash, Keys, PublicKey, SecretKey},
+    crypto::{self, kx, CryptoHash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
+    keys::Keys,
     messages::{Message, Precommit, Propose, Signed},
 };
 

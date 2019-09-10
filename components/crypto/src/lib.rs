@@ -29,7 +29,6 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-pub use self::utils::{generate_keys, read_keys_from_file, Keys};
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
@@ -57,7 +56,6 @@ use self::crypto_lib::sodiumoxide as crypto_impl;
 mod macros;
 
 pub(crate) mod crypto_lib;
-pub(crate) mod utils;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
@@ -499,6 +497,41 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
+#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct KeyPair {
+    public_key: PublicKey,
+    secret_key: SecretKey,
+}
+
+impl KeyPair {
+    pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
+        assert_eq!(
+            &public_key[..],
+            &secret_key[PUBLIC_KEY_LENGTH..],
+            "Public key does not match the secret key."
+        );
+
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
+    pub fn public_key(&self) -> PublicKey {
+        self.public_key
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
+    }
+}
+
+impl From<(PublicKey, SecretKey)> for KeyPair {
+    fn from(keys: (PublicKey, SecretKey)) -> Self {
+        Self::from_keys(keys.0, keys.1)
+    }
+}
+
 impl CryptoHash for Hash {
     fn hash(&self) -> Hash {
         *self
@@ -816,4 +849,19 @@ mod tests {
         let deserialized_value: T = serde_json::from_str(&json).unwrap();
         assert_eq!(*original_value, deserialized_value);
     }
+
+    #[test]
+    fn valid_keypair() {
+        let (pk, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    #[should_panic]
+    fn not_valid_keypair() {
+        let (pk, _) = gen_keypair();
+        let (_, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
 }

@@ -529,7 +529,10 @@ impl NetworkHandler {
             ),
         };
 
-        ensure!(connect.identity_key == identity_key, "oi!");
+        ensure!(
+            connect.identity_key == identity_key,
+            "Identity key in connect message doesn't match with the peer key"
+        );
 
         Ok(connect)
     }
