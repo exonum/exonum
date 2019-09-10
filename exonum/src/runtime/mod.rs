@@ -295,7 +295,7 @@ pub struct StateHashAggregator {
     pub instances: Vec<(InstanceId, Vec<Hash>)>,
 }
 
-/// The initiator of the transaction execution.
+/// The initiator of the method execution.
 #[derive(Debug, PartialEq)]
 pub enum Caller {
     /// A usual transaction from the Exonum client, authorized by its key pair.
@@ -305,13 +305,14 @@ pub enum Caller {
         /// Public key of the user who signed this transaction.
         author: PublicKey,
     },
-    // This transaction is invoked during the transaction execution of a different service.
+    /// Method is invoked during the method execution of a different service.
     Service {
-        /// Identifier of the service instance which invoked this transaction.
+        /// Identifier of the service instance which invoked this method.
         instance_id: InstanceId,
     },
-    // This transaction is invoked on behalf of the blockchain itself,
-    // for example [`initialize`](trait.Initialize#initialize) event.
+    /// Method is invoked on behalf of the blockchain itself, for example see an
+    /// [`initialize`](rust/interfaces/trait.Initialize.html#tymethod.initialize)
+    /// method.
     Blockchain,
 }
 

@@ -21,7 +21,7 @@ use exonum::{
     helpers::Height,
     merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
     messages::Verified,
-    node::{ApiSender, Node, NodeApiConfig, NodeChannel, NodeConfig},
+    node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
         rust::{
@@ -360,6 +360,9 @@ fn main() {
             ))
             .unwrap();
         thread::sleep(Duration::from_secs(2));
+        api_sender
+            .send_external_message(ExternalMessage::Shutdown)
+            .unwrap();
     });
 
     node.run().unwrap();

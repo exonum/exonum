@@ -18,6 +18,9 @@ use crate::runtime::{dispatcher::Error as DispatcherError, MethodId};
 
 use super::{ExecutionError, Interface, TransactionContext};
 
+/// Identifier of the [`Initialize::initialize`] method.
+///
+/// [`Initialize::initialize`]: trait.Initialize.html#tymethod.initialize
 pub const INITIALIZE_METHOD_ID: MethodId = 0;
 
 /// This trait describes a service interface to pass initial configuration parameters into
@@ -33,10 +36,13 @@ pub trait Initialize {
     /// invocation. In this case if an error during this action occurs, the dispatcher will
     /// invoke [`stop_service`].
     ///
+    /// # Execution policy
     ///
+    /// This method can only be called on behalf of the [`Blockchain`].
     ///
-    /// ['start_service`]: ../../trait.Runtime.html#start_service
-    /// ['stop_service`]: ../../trait.Runtime.html#stop_service
+    /// [`start_service`]: ../../trait.Runtime.html#tymethod.start_service
+    /// [`stop_service`]: ../../trait.Runtime.html#tymethod.stop_service
+    /// [`Blockchain`]: ../../enum.Caller.html#variant.Blockchain
     fn initialize(&self, context: TransactionContext, params: &[u8]) -> Result<(), ExecutionError>;
 }
 
