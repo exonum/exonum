@@ -74,13 +74,16 @@ trait TestDispatcherInterface {
         context: TransactionContext,
         arg: TestExecute,
     ) -> Result<(), ExecutionError>;
+
     fn test_deploy(
         &self,
         context: TransactionContext,
         arg: TestDeploy,
     ) -> Result<(), ExecutionError>;
+
     fn test_start(&self, context: TransactionContext, arg: TestStart)
         -> Result<(), ExecutionError>;
+
     fn test_call_initialize(
         &self,
         context: TransactionContext,
@@ -100,14 +103,9 @@ struct TestDispatcherService;
 impl Service for TestDispatcherService {}
 
 impl Initialize for TestDispatcherService {
-    fn initialize(&self, context: TransactionContext, params: Any) -> Result<(), ExecutionError> {
-        context
-            .caller()
-            .as_blockchain()
-            .expect("Expected `Blockchain` caller");
-
-        if params.clone().try_into::<()>().is_err() {
-            let v: TestExecute = params.try_into().expect("Expected `TestExecute`");
+    fn initialize(&self, _context: TransactionContext, params: Any) -> Result<(), ExecutionError> {
+        if params.is::<TestExecute>() {
+            let v: TestExecute = params.try_into().unwrap();
             if v.value == 42 {
                 panic!("42!");
             } else {
@@ -198,11 +196,11 @@ impl TestDispatcherInterface for TestDispatcherService {
         context: TransactionContext,
         arg: TestCallInitialize,
     ) -> Result<(), ExecutionError> {
-        context
-            .call_context(context.instance.id)
-            .call(Initialize::NAME, INITIALIZE_METHOD_ID, Any::from(arg.value))
-            .expect_err("Initialize should be callable only from `Blockchain`");
-        Ok(())
+        context.call_context(context.instance.id).call(
+            Initialize::NAME,
+            INITIALIZE_METHOD_ID,
+            Any::from(arg.value),
+        )
     }
 }
 
@@ -768,5 +766,5 @@ fn test_dispatcher_err_wrong_initialize_caller() {
         .0
         .unwrap_err()
         .description
-        .contains("Expected `Blockchain` caller"));
+        .contains("Methods from the `Initialize` interface"));
 }

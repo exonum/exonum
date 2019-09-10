@@ -390,13 +390,12 @@ impl Dispatcher {
         };
         let args = constructor.into_bytes();
 
-        trace!("Initialize service instance {}", descriptor);
         catch_panic(|| {
             runtime
                 .execute(&context, &call_info, args.as_ref())
                 .or_else(|err| {
-                    // Default behavior for case if service does not implement `Initialize`
-                    // interface and constructor is null.
+                    // Default behavior for case if the service does not implement an `Initialize`
+                    // interface and constructor is empty.
                     if constructor_is_empty && err.kind == Error::NoSuchInterface.into() {
                         Ok(())
                     } else {
@@ -578,6 +577,7 @@ mod tests {
             rust::{Error as RustRuntimeError, RustRuntime},
             ApiChange, ArtifactProtobufSpec, InstanceId, MethodId, RuntimeIdentifier,
             StateHashAggregator,
+            dispatcher::Error as DispatcherError,
         },
     };
 
@@ -678,22 +678,19 @@ mod tests {
             Ok(())
         }
 
-        fn configure_service(
-            &self,
-            _fork: &Fork,
-            _descriptor: InstanceDescriptor,
-            _parameters: Any,
-        ) -> Result<(), ExecutionError> {
-            Ok(())
-        }
-
         fn execute(
             &self,
-            _: &ExecutionContext,
+            context: &ExecutionContext,
             call_info: &CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
-            if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
+            if !context.interface_name.is_empty() {
+                return Err(DispatcherError::NoSuchInterface.into());
+            }
+            
+            if call_info.instance_id == self.instance_id
+                && call_info.method_id == self.method_id
+            {
                 Ok(())
             } else {
                 Err(SampleError::Foo.into())

@@ -39,9 +39,14 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
     proto::Any,
-    runtime::{api::ServiceApiBuilder, dispatcher, rust::Service, InstanceDescriptor},
+    runtime::{
+        api::ServiceApiBuilder,
+        dispatcher,
+        rust::{Initialize, Service, TransactionContext},
+        InstanceDescriptor,
+    },
 };
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::Snapshot;
 
 use std::convert::TryFrom;
 
@@ -52,28 +57,31 @@ use crate::{
 };
 
 #[derive(Debug, ServiceFactory)]
-#[exonum(proto_sources = "proto", implements("TimestampingInterface"))]
+#[exonum(
+    proto_sources = "proto",
+    implements("TimestampingInterface", "Initialize")
+)]
 pub struct TimestampingService;
 
-impl Service for TimestampingService {
-    fn configure(
-        &self,
-        descriptor: InstanceDescriptor,
-        fork: &Fork,
-        params: Any,
-    ) -> Result<(), ExecutionError> {
+impl Initialize for TimestampingService {
+    fn initialize(&self, context: TransactionContext, params: Any) -> Result<(), ExecutionError> {
         let config = Config::try_from(params).map_err(|e| (Error::ConfigParseError, e))?;
-        if !dispatcher::Schema::new(fork)
+
+        if !dispatcher::Schema::new(context.fork())
             .service_instances()
             .contains(&config.time_service_name)
         {
             return Err(Error::TimeServiceNotFound.into());
         }
 
-        Schema::new(descriptor.name, fork).config().set(config);
+        Schema::new(context.instance.name, context.fork())
+            .config()
+            .set(config);
         Ok(())
     }
+}
 
+impl Service for TimestampingService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         TimestampingApi.wire(builder);
     }

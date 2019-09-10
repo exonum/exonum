@@ -185,33 +185,6 @@ pub trait Runtime: Send + Debug + 'static {
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
-    /// Configure a service instance with the given parameters.
-    ///
-    /// The configuration parameters passed to the method are discarded immediately.
-    /// So the service instance should save them by itself if it is important for
-    /// the service business logic.
-    ///
-    /// This method is called in two cases:
-    ///
-    /// * After creating a new service instance by the [`start_service`] invocation. In this case,
-    /// if an error during this action occurs, the dispatcher will invoke [`stop_service`].
-    /// Make sure that this invocation will not fail.
-    /// * During the configuration change procedure. [ECR-3306]
-    ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
-    ///
-    /// ['start_service`]: #start_service
-    /// ['stop_service`]: #stop_service
-    fn configure_service(
-        &self,
-        fork: &Fork,
-        descriptor: InstanceDescriptor,
-        parameters: Any,
-    ) -> Result<(), ExecutionError>;
-
     /// Stop existing service instance with the given specification.
     ///
     /// # Policy on Panics

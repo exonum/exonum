@@ -14,6 +14,7 @@
 
 pub use self::{
     error::Error,
+    interfaces::Initialize,
     service::{
         AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
         ServiceFactory, Transaction, TransactionContext,
@@ -261,15 +262,6 @@ impl Runtime for RustRuntime {
         let service = self.available_artifacts[&artifact].create_instance();
         self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
         Ok(())
-    }
-
-    fn configure_service(
-        &self,
-        fork: &Fork,
-        descriptor: InstanceDescriptor,
-        parameters: Any,
-    ) -> Result<(), ExecutionError> {
-        unimplemented!();
     }
 
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {

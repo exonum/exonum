@@ -24,7 +24,10 @@ use exonum::{
     proto::Any,
     runtime::{
         dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
-        rust::Transaction,
+        rust::{
+            interfaces::{Initialize, INITIALIZE_METHOD_ID},
+            Interface, Transaction,
+        },
         supervisor::{DeployRequest, StartService, Supervisor},
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
@@ -46,6 +49,7 @@ use std::{
 #[derive(Debug, Default)]
 struct SampleService {
     counter: Cell<u64>,
+    name: String,
 }
 
 /// Sample runtime.
@@ -106,32 +110,14 @@ impl Runtime for SampleRuntime {
             return Err(DispatcherError::ServiceIdExists.into());
         }
 
-        self.started_services
-            .insert(spec.id, SampleService::default());
-        println!("Starting service: {:?}", spec);
-        Ok(())
-    }
-
-    /// `configure_service` request sets the counter value of the corresponding
-    /// `SampleService` instance
-    fn configure_service(
-        &self,
-        _context: &Fork,
-        descriptor: InstanceDescriptor,
-        parameters: Any,
-    ) -> Result<(), ExecutionError> {
-        let service_instance = self
-            .started_services
-            .get(&descriptor.id)
-            .ok_or(DispatcherError::ServiceNotStarted)?;
-
-        let new_value =
-            u64::try_from(parameters).map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
-        service_instance.counter.set(new_value);
-        println!(
-            "Configuring service {} with value {}",
-            descriptor.name, new_value
+        self.started_services.insert(
+            spec.id,
+            SampleService {
+                name: spec.name.clone(),
+                ..SampleService::default()
+            },
         );
+        println!("Starting service: {:?}", spec);
         Ok(())
     }
 
@@ -147,7 +133,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _context: &ExecutionContext,
+        context: &ExecutionContext,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -156,15 +142,35 @@ impl Runtime for SampleRuntime {
             .get(&call_info.instance_id)
             .ok_or(SampleRuntimeError::IncorrectCallInfo)?;
 
+        if context.interface_name == Initialize::NAME {}
+
         println!(
-            "Executing method {} of service {}",
-            call_info.method_id, call_info.instance_id
+            "Executing method {}#{} of service {}",
+            context.interface_name, call_info.method_id, call_info.instance_id
         );
 
-        // Simple transaction executor.
-        match call_info.method_id {
+        const SERVICE_INTERFACE: &str = "";
+        match (context.interface_name, call_info.method_id) {
+            // `initialize` request sets the counter value of the corresponding
+            // `SampleService` instance
+            (Initialize::NAME, INITIALIZE_METHOD_ID) => {
+                // In accordance with `Initialize` interface, configuration parameters pass
+                // via Protobuf `Any` message.
+                let any = Any::from_bytes(payload.into())
+                    .map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
+
+                let new_value =
+                    u64::try_from(any).map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
+                service.counter.set(new_value);
+                println!(
+                    "Configuring service {} with value {}",
+                    service.name, new_value
+                );
+                Ok(())
+            }
+
             // Increment counter.
-            0 => {
+            (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
                 let counter = service.counter.get();
@@ -174,7 +180,7 @@ impl Runtime for SampleRuntime {
             }
 
             // Reset counter.
-            1 => {
+            (SERVICE_INTERFACE, 1) => {
                 if !payload.is_empty() {
                     Err(SampleRuntimeError::IncorrectPayload.into())
                 } else {
@@ -185,7 +191,14 @@ impl Runtime for SampleRuntime {
             }
 
             // Unknown transaction.
-            _ => Err(SampleRuntimeError::IncorrectCallInfo.into()),
+            (interface, method) => Err((
+                SampleRuntimeError::IncorrectCallInfo,
+                format!(
+                    "Incorrect information to call transaction. {}#{}",
+                    interface, method
+                ),
+            )
+                .into()),
         }
     }
 

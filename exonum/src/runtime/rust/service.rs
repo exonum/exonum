@@ -22,7 +22,6 @@ use crate::{
     helpers::{Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
-    proto::Any,
     runtime::{
         api::ServiceApiBuilder,
         dispatcher::{self, Dispatcher, DispatcherSender},

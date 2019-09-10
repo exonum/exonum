@@ -400,14 +400,17 @@ impl Any {
         Self::from_pb_message(value.to_pb())
     }
 
-    /// Returns true if this instance does not contain any type of data.
-    pub fn is_null(&self) -> bool {
-        self.0.type_url.is_empty() && self.0.value.is_empty()
-    }
-
     // TODO Write specification for the empty values interpretation. [ECR-3222]
     pub fn is_empty(&self) -> bool {
-        self.is_null() || self == &Any::from(())
+        self.is_null() || self.is::<()>()
+    }
+
+    pub fn is<T>(&self) -> bool
+    where
+        T: BinaryValue + ProtobufConvert,
+        <T as ProtobufConvert>::ProtoStruct: Message,
+    {
+        self.0.type_url == Self::type_url::<<T as ProtobufConvert>::ProtoStruct>()
     }
 
     pub fn try_into<T>(self) -> Result<T, failure::Error>
@@ -415,20 +418,28 @@ impl Any {
         T: BinaryValue + ProtobufConvert,
         <T as ProtobufConvert>::ProtoStruct: Message,
     {
-        let type_url = [
-            Self::TYPE_URL,
-            protobuf::reflect::MessageDescriptor::for_type::<<T as ProtobufConvert>::ProtoStruct>()
-                .full_name(),
-        ]
-        .concat();
+        let type_url = Self::type_url::<<T as ProtobufConvert>::ProtoStruct>();
         ensure!(
             self.0.type_url == type_url,
-            "Type url mismatch, actual {}, expected {}",
+            "Type url mismatch, actual `{}`, expected `{}`",
             self.0.type_url,
             type_url
         );
         T::from_bytes(self.0.value.into())
     }
+
+    fn type_url<V: Message>() -> String {
+        [
+            Self::TYPE_URL,
+            protobuf::reflect::MessageDescriptor::for_type::<V>().full_name(),
+        ]
+        .concat()
+    }
+
+    /// Return true if this instance does not contain any type of data.
+    fn is_null(&self) -> bool {
+        self.0.type_url.is_empty() && self.0.value.is_empty()
+    }    
 
     fn from_pb_message(pb: impl Message) -> Self {
         // See protobuf documentation for clarification.

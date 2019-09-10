@@ -53,13 +53,13 @@ impl Interface for dyn Initialize {
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        if context.caller().as_transaction().is_some() {
-            // TODO implement error handling.
-            return Err(RuntimeError::UnspecifiedError).map_err(From::from);
+        if context.caller().as_blockchain().is_none() {
+            let msg = "Methods from the `Initialize` interface should only be called on behalf of the `Blockchain`.";
+            return Err(DispatcherError::unauthorized_caller(msg));
         }
 
         match method {
-            0 => {
+            INITIALIZE_METHOD_ID => {
                 let config = Any::from_bytes(payload.into()).map_err(|error_msg| {
                     (
                         RuntimeError::ArgumentsParseError,

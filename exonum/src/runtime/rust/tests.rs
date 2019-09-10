@@ -111,11 +111,6 @@ impl TestService for TestServiceImpl {
 
 impl Initialize for TestServiceImpl {
     fn initialize(&self, context: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
-        context
-            .caller()
-            .as_blockchain()
-            .expect("Wrong interface caller");
-
         let arg = Init::try_from(arg).map_err(|e| (Error::ConfigParseError, e))?;
 
         let mut entry = Entry::new("constructor_entry", context.fork());
