@@ -26,7 +26,14 @@ use exonum_merkledb::{
     proof_map_index::ProofPath, BinaryKey, Database, IndexAccess, MapProof, ProofMapIndex,
     TemporaryDB,
 };
-use proptest::{prelude::*, test_runner::Config};
+use proptest::{
+    prelude::prop::{
+        array,
+        collection::{btree_map, vec},
+    },
+    prelude::*,
+    test_runner::Config,
+};
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -34,38 +41,26 @@ use std::{
     ops::Range,
 };
 
-use crate::prop::{
-    array,
-    collection::{btree_map, vec},
-};
 use exonum_merkledb::{BinaryValue, ObjectHash};
 
 const INDEX_NAME: &str = "index";
 
-fn check_map_proof<T, K, V>(proof: MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<T, K, V>)
+fn check_map_proof<T, K, V>(proof: &MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<T, K, V>)
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + ObjectHash + PartialEq + Debug,
 {
-    let entries = key.map(|key| {
+    let entry = key.map(|key| {
         let value = table.get(&key).unwrap();
         (key, value)
     });
-
-    let proof = proof.check().unwrap();
-    assert_eq!(
-        proof.entries().collect::<Vec<_>>(),
-        entries
-            .iter()
-            .map(|&(ref k, ref v)| (k, v))
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(proof.object_hash(), table.object_hash());
+    let proof = proof.check_against_hash(table.object_hash()).unwrap();
+    assert!(proof.entries().eq(entry.as_ref().map(|(k, v)| (k, v))));
 }
 
 fn check_map_multiproof<T, K, V>(
-    proof: MapProof<K, V>,
+    proof: &MapProof<K, V>,
     keys: BTreeSet<K>,
     table: &ProofMapIndex<T, K, V>,
 ) where
@@ -73,56 +68,43 @@ fn check_map_multiproof<T, K, V>(
     K: BinaryKey + ObjectHash + Clone + PartialEq + Debug,
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug,
 {
-    let (entries, missing_keys) = {
-        let mut entries: Vec<(K, V)> = Vec::new();
-        let mut missing_keys: Vec<K> = Vec::new();
+    let mut entries: Vec<(K, V)> = Vec::new();
+    let mut missing_keys: Vec<K> = Vec::new();
 
-        for key in keys {
-            if table.contains(&key) {
-                let value = table.get(&key).unwrap();
-                entries.push((key, value));
-            } else {
-                missing_keys.push(key);
-            }
+    for key in keys {
+        if table.contains(&key) {
+            let value = table.get(&key).unwrap();
+            entries.push((key, value));
+        } else {
+            missing_keys.push(key);
         }
+    }
 
-        // Sort entries and missing keys by the order imposed by the `ProofPath`
-        // serialization of the keys
-        entries.sort_unstable_by(|&(ref x, _), &(ref y, _)| {
-            ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
-        });
-        missing_keys
-            .sort_unstable_by(|x, y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
-
-        (entries, missing_keys)
-    };
-
-    let unchecked_proof = proof.clone();
-    let proof = proof.check().unwrap();
-    assert_eq!(
-        proof.all_entries().collect::<Vec<_>>(),
-        unchecked_proof.all_entries_unchecked().collect::<Vec<_>>()
-    );
-    assert_eq!(proof.object_hash(), table.object_hash());
-    assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
-        let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
-        actual_keys
-            .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
-        actual_keys
+    // Sort entries and missing keys by the order imposed by the `ProofPath`
+    // serialization of the keys
+    entries.sort_unstable_by(|(x, _), (y, _)| {
+        ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
     });
-    assert_eq!(
-        entries
-            .iter()
-            .map(|&(ref k, ref v)| (k, v))
-            .collect::<Vec<_>>(),
-        {
-            let mut actual_entries = proof.entries().collect::<Vec<_>>();
-            actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
-                ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
-            });
-            actual_entries
-        }
-    );
+    missing_keys
+        .sort_unstable_by(|x, y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+
+    let unchecked_proof = proof;
+    let proof = proof.check().unwrap();
+    assert!(proof
+        .all_entries()
+        .eq(unchecked_proof.all_entries_unchecked()));
+    assert_eq!(proof.object_hash(), table.object_hash());
+
+    let mut actual_keys: Vec<_> = proof.missing_keys().collect();
+    actual_keys
+        .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+    assert!(missing_keys.iter().eq(actual_keys));
+
+    let mut actual_entries: Vec<_> = proof.entries().collect();
+    actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
+        ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
+    });
+    assert!(entries.iter().map(|(k, v)| (k, v)).eq(actual_entries));
 }
 
 // Creates data a random-filled `ProofMapIndex<_, [u8; 32], u64>`.
@@ -164,7 +146,7 @@ macro_rules! proof_map_tests {
                 let table: ProofMapIndex<_, [u8; 32], u64> =
                     ProofMapIndex::new(INDEX_NAME, &snapshot);
                 let proof = table.get_proof(key);
-                check_map_proof(proof, Some(key), &table);
+                check_map_proof(&proof, Some(key), &table);
             }
 
 
@@ -179,7 +161,7 @@ macro_rules! proof_map_tests {
                 prop_assume!(!table.contains(&key));
 
                 let proof = table.get_proof(key);
-                check_map_proof(proof, None, &table);
+                check_map_proof(&proof, None, &table);
             }
 
             #[test]
@@ -203,7 +185,7 @@ macro_rules! proof_map_tests {
                 let proof = table.get_multiproof(keys.clone());
 
                 let unique_keys: BTreeSet<_> = keys.iter().cloned().collect();
-                check_map_multiproof(proof, unique_keys, &table);
+                check_map_multiproof(&proof, unique_keys, &table);
             }
 
             #[test]
@@ -218,7 +200,7 @@ macro_rules! proof_map_tests {
 
                 let proof = table.get_multiproof(keys.clone());
                 let unique_keys: BTreeSet<_> = keys.iter().cloned().collect();
-                check_map_multiproof(proof, unique_keys, &table);
+                check_map_multiproof(&proof, unique_keys, &table);
             }
 
             #[test]
@@ -246,7 +228,7 @@ macro_rules! proof_map_tests {
                 let proof = table.get_multiproof(all_keys.clone());
 
                 let unique_keys: BTreeSet<_> = all_keys.into_iter().collect();
-                check_map_multiproof(proof, unique_keys, &table);
+                check_map_multiproof(&proof, unique_keys, &table);
             }
         }
     };
