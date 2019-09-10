@@ -411,8 +411,8 @@ fn proof_json_serialization() {
     assert_eq!(
         json,
         json!({
-            "values": [(1, "foo"), (2, "bar")],
-            "hashes": [
+            "entries": [(1, "foo"), (2, "bar")],
+            "proof": [
                 { "height": 1, "index": 0, "hash": HashTag::hash_leaf(&[4]) },
                 { "height": 2, "index": 1, "hash": HashTag::hash_leaf(&[2]) },
                 { "height": 3, "index": 1, "hash": HashTag::hash_leaf(&[1]) },
@@ -428,8 +428,8 @@ fn proof_json_serialization() {
 #[test]
 fn unordered_proofs() {
     let json = json!({
-        "values": [(2, "foo"), (1, "bar")],
-        "hashes": [],
+        "entries": [(2, "foo"), (1, "bar")],
+        "proof": [],
         "length": 3,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
@@ -439,8 +439,8 @@ fn unordered_proofs() {
     );
 
     let json = json!({
-        "values": [(2, "foo")],
-        "hashes": [
+        "entries": [(2, "foo")],
+        "proof": [
             { "height": 1, "index": 3, "hash": Hash::zero() },
             { "height": 1, "index": 1, "hash": Hash::zero() },
         ],
@@ -453,8 +453,8 @@ fn unordered_proofs() {
     );
 
     let json = json!({
-        "values": [(2, "foo")],
-        "hashes": [
+        "entries": [(2, "foo")],
+        "proof": [
             { "height": 2, "index": 1, "hash": Hash::zero() },
             { "height": 2, "index": 3, "hash": Hash::zero() },
             { "height": 1, "index": 2, "hash": Hash::zero() },
@@ -471,8 +471,8 @@ fn unordered_proofs() {
 #[test]
 fn non_empty_proof_for_empty_tree() {
     let json = json!({
-        "values": [(1, "bar")],
-        "hashes": [],
+        "entries": [(1, "bar")],
+        "proof": [],
         "length": 0,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
@@ -482,8 +482,8 @@ fn non_empty_proof_for_empty_tree() {
     );
 
     let json = json!({
-        "values": [],
-        "hashes": [{ "height": 1, "index": 1, "hash": Hash::zero() }],
+        "entries": [],
+        "proof": [{ "height": 1, "index": 1, "hash": Hash::zero() }],
         "length": 0,
     });
     let proof: ListProof<String> = serde_json::from_value(json).unwrap();
@@ -496,8 +496,8 @@ fn non_empty_proof_for_empty_tree() {
 #[test]
 fn proofs_with_unexpected_branches() {
     let proof: ListProof<u64> = serde_json::from_value(json!({
-        "values": [(2, 2)],
-        "hashes": [
+        "entries": [(2, 2)],
+        "proof": [
             { "height": 10, "index": 2, "hash": Hash::zero() },
         ],
         "length": 10,
@@ -509,8 +509,8 @@ fn proofs_with_unexpected_branches() {
     );
 
     let proof: ListProof<u64> = serde_json::from_value(json!({
-        "values": [(2, 2)],
-        "hashes": [
+        "entries": [(2, 2)],
+        "proof": [
             { "height": 5, "index": 0, "hash": Hash::zero() },
         ],
         "length": 10,
@@ -546,8 +546,8 @@ fn proofs_with_unexpected_branches() {
 #[test]
 fn proofs_with_unexpected_leaf() {
     let proof: ListProof<u64> = serde_json::from_value(json!({
-        "values": [(2, 2)],
-        "hashes": [
+        "entries": [(2, 2)],
+        "proof": [
             { "height": 0, "index": 1, "hash": Hash::zero() },
             { "height": 1, "index": 1, "hash": Hash::zero() },
         ],
@@ -599,8 +599,8 @@ fn proofs_with_missing_entry() {
 #[test]
 fn invalid_proofs_with_no_values() {
     let proof: ListProof<u64> = serde_json::from_value(json!({
-        "values": [],
-        "hashes": [],
+        "entries": [],
+        "proof": [],
         "length": 1,
     }))
     .unwrap();
@@ -610,8 +610,8 @@ fn invalid_proofs_with_no_values() {
     );
 
     let proof: ListProof<u64> = serde_json::from_value(json!({
-        "values": [],
-        "hashes": [
+        "entries": [],
+        "proof": [
             { "height": 0, "index": 1, "hash": Hash::zero() },
             { "height": 1, "index": 1, "hash": Hash::zero() },
         ],
@@ -624,8 +624,8 @@ fn invalid_proofs_with_no_values() {
     );
 
     let proof: ListProof<u64> = serde_json::from_value(json!({
-        "values": [],
-        "hashes": [
+        "entries": [],
+        "proof": [
             { "height": 0, "index": 1, "hash": Hash::zero() },
         ],
         "length": 5,

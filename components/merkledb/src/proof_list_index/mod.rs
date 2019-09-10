@@ -430,7 +430,7 @@ where
     /// assert!(intersection_proof.indexes_unchecked().eq(1..5));
     /// // This proof does not contain any elements at all.
     /// let empty_proof = index.get_range_proof(100..10000);
-    /// assert!(empty_proof.values_unchecked().is_empty());
+    /// assert!(empty_proof.entries_unchecked().is_empty());
     /// ```
     pub fn get_range_proof<R: RangeBounds<u64>>(&self, range: R) -> ListProof<V> {
         // Inclusive lower boundary of the proof range.

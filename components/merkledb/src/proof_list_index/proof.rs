@@ -66,8 +66,8 @@ impl HashedEntry {
 ///
 /// `ListProof` is serialized to JSON as an object with 2 array fields:
 ///
-/// - `hashes` is an array of `{ height: number, index: number, hash: Hash }` objects.
-/// - `values` is an array with list elements and their indexes, that is,
+/// - `proof` is an array of `{ height: number, index: number, hash: Hash }` objects.
+/// - `entries` is an array with list elements and their indexes, that is,
 ///   tuples `[number, V]`.
 /// - `length` is the length of the underlying `ProofListIndex`.
 ///
@@ -86,11 +86,11 @@ impl HashedEntry {
 /// assert_eq!(
 ///     serde_json::to_value(&proof).unwrap(),
 ///     json!({
-///         "hashes": [
+///         "proof": [
 ///             { "index": 0, "height": 1, "hash": h1 },
 ///             { "index": 1, "height": 2, "hash": h33 },
 ///         ],
-///         "values": [ [1, 2] ],
+///         "entries": [[1, 2]],
 ///         "length": 3,
 ///     })
 /// );
@@ -102,8 +102,8 @@ impl HashedEntry {
 /// [`validate()`]: #method.validate
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ListProof<V> {
-    hashes: Vec<HashedEntry>,
-    values: Vec<(u64, V)>,
+    proof: Vec<HashedEntry>,
+    entries: Vec<(u64, V)>,
     length: u64,
 }
 
@@ -230,8 +230,8 @@ impl<V: BinaryValue> ListProof<V> {
         I: IntoIterator<Item = (u64, V)>,
     {
         Self {
-            values: values.into_iter().collect(),
-            hashes: vec![],
+            entries: values.into_iter().collect(),
+            proof: vec![],
             length,
         }
     }
@@ -239,8 +239,8 @@ impl<V: BinaryValue> ListProof<V> {
     pub(super) fn empty(merkle_root: Hash, length: u64) -> Self {
         let height = tree_height_by_length(length);
         Self {
-            values: vec![],
-            hashes: vec![HashedEntry {
+            entries: vec![],
+            proof: vec![HashedEntry {
                 key: ProofListKey::new(height, 0),
                 hash: merkle_root,
             }],
@@ -253,14 +253,14 @@ impl<V: BinaryValue> ListProof<V> {
 
         let key = ProofListKey::new(height, index);
         debug_assert!(
-            if let Some(&HashedEntry { key: last_key, .. }) = self.hashes.last() {
+            if let Some(&HashedEntry { key: last_key, .. }) = self.proof.last() {
                 key > last_key
             } else {
                 true
             }
         );
 
-        self.hashes.push(HashedEntry::new(key, hash));
+        self.proof.push(HashedEntry::new(key, hash));
         self
     }
 
@@ -277,14 +277,14 @@ impl<V: BinaryValue> ListProof<V> {
         let tree_height = tree_height_by_length(self.length);
 
         // First, check an edge case when the list contains no elements.
-        if tree_height == 0 && (!self.hashes.is_empty() || !self.values.is_empty()) {
+        if tree_height == 0 && (!self.proof.is_empty() || !self.entries.is_empty()) {
             return Err(ListProofError::NonEmptyProof);
         }
 
         // Fast path in case there are no values: in this case, the proof can contain
         // only a single root hash.
-        if self.values.is_empty() {
-            return match self.hashes[..] {
+        if self.entries.is_empty() {
+            return match self.proof[..] {
                 [] => Err(ListProofError::MissingHash),
                 [HashedEntry { key, hash }] if key == ProofListKey::new(tree_height, 0) => Ok(hash),
                 _ => Err(ListProofError::UnexpectedBranch),
@@ -294,7 +294,7 @@ impl<V: BinaryValue> ListProof<V> {
         // Check ordering of `self.values` and `self.hashes`, which is relied upon
         // in the following steps.
         let values_ordered = self
-            .values
+            .entries
             .windows(2)
             .all(|window| window[0].0 < window[1].0);
         if !values_ordered {
@@ -302,7 +302,7 @@ impl<V: BinaryValue> ListProof<V> {
         }
 
         let hashes_ordered = self
-            .hashes
+            .proof
             .windows(2)
             .all(|window| window[0].key < window[1].key);
         if !hashes_ordered {
@@ -310,7 +310,7 @@ impl<V: BinaryValue> ListProof<V> {
         }
 
         // Check that hashes on each height have indices in the allowed range.
-        for &HashedEntry { key, .. } in &self.hashes {
+        for &HashedEntry { key, .. } in &self.proof {
             let height = key.height();
             if height == 0 {
                 return Err(ListProofError::UnexpectedLeaf);
@@ -324,7 +324,7 @@ impl<V: BinaryValue> ListProof<V> {
         }
 
         let mut layer: Vec<_> = self
-            .values
+            .entries
             .iter()
             .map(|(i, value)| {
                 HashedEntry::new(
@@ -334,7 +334,7 @@ impl<V: BinaryValue> ListProof<V> {
             })
             .collect();
 
-        let mut hashes = self.hashes.clone();
+        let mut hashes = self.proof.clone();
         // We track `last_index` instead of layer length in order to be able to more efficiently
         // update it when transitioning to the next height. It suffices to divide `last_index` by 2,
         // while if we used length, it would need to be modified as `l = (l + 1) / 2`.
@@ -344,8 +344,9 @@ impl<V: BinaryValue> ListProof<V> {
         for height in 1..tree_height {
             // We split `hashes` into those at `height` and those having greater height
             // (by construction, there may be no hashes with the lesser height).
+            let split_key = ProofListKey::new(height + 1, 0);
             let split_index = hashes
-                .binary_search_by(|entry| entry.key.cmp(&ProofListKey::new(height + 1, 0)))
+                .binary_search_by(|entry| entry.key.cmp(&split_key))
                 .unwrap_or_else(|i| i);
             let remaining_hashes = hashes.split_off(split_index);
             debug_assert!(
@@ -388,14 +389,14 @@ impl<V: BinaryValue> ListProof<V> {
     }
 
     /// Returns indices and references to elements in the proof without verifying it.
-    pub fn values_unchecked(&self) -> &[(u64, V)] {
-        &self.values
+    pub fn entries_unchecked(&self) -> &[(u64, V)] {
+        &self.entries
     }
 
     /// Returns iterator over indexes of the elements in the proof without verifying
     /// proof integrity.
     pub fn indexes_unchecked<'s>(&'s self) -> impl Iterator<Item = u64> + 's {
-        self.values_unchecked().iter().map(|(index, _)| *index)
+        self.entries_unchecked().iter().map(|(index, _)| *index)
     }
 
     /// Estimates the number of hash operations necessary to validate the proof.
@@ -405,7 +406,7 @@ impl<V: BinaryValue> ListProof<V> {
     /// of the checks for speed.
     pub fn hash_ops(&self) -> Result<usize, ListProofError> {
         // First, we need to hash all values in the proof.
-        let mut hash_ops = self.values.len();
+        let mut hash_ops = self.entries.len();
 
         // Observe that the number of hashes known at each height of the Merkle tree
         // determines the number of hash operations necessary to produce hashes on the next height.
@@ -413,7 +414,7 @@ impl<V: BinaryValue> ListProof<V> {
         let mut hashes_on_this_height = hash_ops;
         let mut height = 1;
 
-        for HashedEntry { key, .. } in &self.hashes {
+        for HashedEntry { key, .. } in &self.proof {
             // If `key.height()`s are not ordered, we know for sure that the proof is malformed.
             if key.height() < height {
                 return Err(if height == 0 {
@@ -456,7 +457,7 @@ impl<V: BinaryValue> ListProof<V> {
     pub fn validate(&self, expected_list_hash: Hash) -> Result<&[(u64, V)], ListProofError> {
         let tree_root = self.collect()?;
         if HashTag::hash_list_node(self.length, tree_root) == expected_list_hash {
-            Ok(&self.values)
+            Ok(&self.entries)
         } else {
             Err(ListProofError::UnmatchedRootHash)
         }
@@ -683,7 +684,7 @@ mod tests {
                 let proof = list.get_range_proof(i..(i + len));
                 assert_eq!(
                     proof.hash_ops().unwrap(),
-                    2 * proof.values.len() + proof.hashes.len() - 1,
+                    2 * proof.entries.len() + proof.proof.len() - 1,
                     "{:?}",
                     proof
                 );
