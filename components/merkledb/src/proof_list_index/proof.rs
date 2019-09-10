@@ -58,7 +58,7 @@ impl HashedEntry {
 /// let proof = list.get_range_proof(1..);
 ///
 /// // Check the proof consistency
-/// let elements = proof.validate(list.object_hash(), list.len()).unwrap();
+/// let elements = proof.validate(list.object_hash()).unwrap();
 /// assert_eq!(*elements, [(1, 200_u32), (2, 300_u32)]);
 /// ```
 ///
@@ -69,6 +69,7 @@ impl HashedEntry {
 /// - `hashes` is an array of `{ height: number, index: number, hash: Hash }` objects.
 /// - `values` is an array with list elements and their indexes, that is,
 ///   tuples `[number, V]`.
+/// - `length` is the length of the underlying `ProofListIndex`.
 ///
 /// ```
 /// # use serde_json::{self, json};
@@ -90,6 +91,7 @@ impl HashedEntry {
 ///             { "index": 1, "height": 2, "hash": h33 },
 ///         ],
 ///         "values": [ [1, 2] ],
+///         "length": 3,
 ///     })
 /// );
 /// # }
@@ -102,6 +104,7 @@ impl HashedEntry {
 pub struct ListProof<V> {
     hashes: Vec<HashedEntry>,
     values: Vec<(u64, V)>,
+    length: u64,
 }
 
 /// Merges two iterators with `HashedEntry`s so that the elements in the resulting iterator
@@ -200,26 +203,20 @@ fn hash_layer(layer: &mut Vec<HashedEntry>, last_index: u64) -> Result<(), ListP
     let new_len = (layer.len() + 1) / 2;
     for i in 0..new_len {
         let x = &layer[2 * i];
-        let y = layer.get(2 * i + 1);
-        layer[i] = match y {
+        layer[i] = if let Some(y) = layer.get(2 * i + 1) {
             // To be able to zip two hashes on the layer, they need to be adjacent to each other,
             // and the first of them needs to have an even index.
-            Some(y) => {
-                if !x.key.is_left() || y.key.index() != x.key.index() + 1 {
-                    return Err(ListProofError::MissingHash);
-                }
-
-                HashedEntry::new(x.key.parent(), HashTag::hash_node(&x.hash, &y.hash))
+            if !x.key.is_left() || y.key.index() != x.key.index() + 1 {
+                return Err(ListProofError::MissingHash);
             }
-
+            HashedEntry::new(x.key.parent(), HashTag::hash_node(&x.hash, &y.hash))
+        } else {
             // If there is an odd number of hashes on the layer, the solitary hash must have
             // the greatest possible index.
-            None => {
-                if last_index % 2 == 1 || x.key.index() != last_index {
-                    return Err(ListProofError::MissingHash);
-                }
-                HashedEntry::new(x.key.parent(), HashTag::hash_single_node(&x.hash))
+            if last_index % 2 == 1 || x.key.index() != last_index {
+                return Err(ListProofError::MissingHash);
             }
+            HashedEntry::new(x.key.parent(), HashTag::hash_single_node(&x.hash))
         };
     }
 
@@ -228,23 +225,26 @@ fn hash_layer(layer: &mut Vec<HashedEntry>, last_index: u64) -> Result<(), ListP
 }
 
 impl<V: BinaryValue> ListProof<V> {
-    pub(super) fn new<I>(values: I) -> Self
+    pub(super) fn new<I>(values: I, length: u64) -> Self
     where
         I: IntoIterator<Item = (u64, V)>,
     {
         Self {
             values: values.into_iter().collect(),
             hashes: vec![],
+            length,
         }
     }
 
-    pub(super) fn empty(height: u8, merkle_root: Hash) -> Self {
+    pub(super) fn empty(merkle_root: Hash, length: u64) -> Self {
+        let height = tree_height_by_length(length);
         Self {
             values: vec![],
             hashes: vec![HashedEntry {
                 key: ProofListKey::new(height, 0),
                 hash: merkle_root,
             }],
+            length,
         }
     }
 
@@ -273,8 +273,8 @@ impl<V: BinaryValue> ListProof<V> {
     ///
     /// For proofs of a single element or a contiguous range of elements,
     /// the total number of restored hashes is `O(log_2(N))`, where `N` is the list length.
-    fn collect(&self, list_len: u64) -> Result<Hash, ListProofError> {
-        let tree_height = tree_height_by_length(list_len);
+    fn collect(&self) -> Result<Hash, ListProofError> {
+        let tree_height = tree_height_by_length(self.length);
 
         // First, check an edge case when the list contains no elements.
         if tree_height == 0 && (!self.hashes.is_empty() || !self.values.is_empty()) {
@@ -316,9 +316,9 @@ impl<V: BinaryValue> ListProof<V> {
                 return Err(ListProofError::UnexpectedLeaf);
             }
 
-            // `list_len - 1` is the index of the last element at `height = 1`. This index
+            // `self.length - 1` is the index of the last element at `height = 1`. This index
             // is divided by 2 with each new height.
-            if height >= tree_height || key.index() > (list_len - 1) >> u64::from(height - 1) {
+            if height >= tree_height || key.index() > (self.length - 1) >> u64::from(height - 1) {
                 return Err(ListProofError::UnexpectedBranch);
             }
         }
@@ -338,8 +338,8 @@ impl<V: BinaryValue> ListProof<V> {
         // We track `last_index` instead of layer length in order to be able to more efficiently
         // update it when transitioning to the next height. It suffices to divide `last_index` by 2,
         // while if we used length, it would need to be modified as `l = (l + 1) / 2`.
-        let mut last_index = list_len - 1;
-        // We have covered `list_len == 0` case before, so the subtraction above is safe.
+        let mut last_index = self.length - 1;
+        // We have covered `self.length == 0` case before, so the subtraction above is safe.
 
         for height in 1..tree_height {
             // We split `hashes` into those at `height` and those having greater height
@@ -375,6 +375,16 @@ impl<V: BinaryValue> ListProof<V> {
         debug_assert_eq!(layer.len(), 1);
         debug_assert_eq!(layer[0].key, ProofListKey::new(tree_height, 0));
         Ok(layer[0].hash)
+    }
+
+    /// Returns the length of the underlying `ProofListIndex`.
+    pub fn len(&self) -> u64 {
+        self.length
+    }
+
+    /// Is the underlying `ProofListIndex` empty?
+    pub fn is_empty(&self) -> bool {
+        self.length == 0
     }
 
     /// Returns indices and references to elements in the proof without verifying it.
@@ -439,18 +449,13 @@ impl<V: BinaryValue> ListProof<V> {
         Ok(hash_ops)
     }
 
-    /// Verifies the correctness of the proof by the trusted Merkle root hash and the number of
-    /// elements in the tree.
+    /// Verifies the correctness of the proof according to the trusted list hash.
     ///
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, an error is returned.
-    pub fn validate(
-        &self,
-        expected_list_hash: Hash,
-        len: u64,
-    ) -> Result<&[(u64, V)], ListProofError> {
-        let tree_root = self.collect(len)?;
-        if HashTag::hash_list_node(len, tree_root) == expected_list_hash {
+    pub fn validate(&self, expected_list_hash: Hash) -> Result<&[(u64, V)], ListProofError> {
+        let tree_root = self.collect()?;
+        if HashTag::hash_list_node(self.length, tree_root) == expected_list_hash {
             Ok(&self.values)
         } else {
             Err(ListProofError::UnmatchedRootHash)
@@ -586,15 +591,15 @@ mod tests {
     #[test]
     fn hash_ops_examples() {
         // Empty proof.
-        let proof = ListProof::<u32>::empty(5, Hash::zero());
+        let proof = ListProof::<u32>::empty(Hash::zero(), 15);
         assert_eq!(proof.hash_ops().unwrap(), 0);
 
         // Proof for a single-element tree.
-        let proof = ListProof::new(vec![(0, 0_u32)]);
+        let proof = ListProof::new(vec![(0, 0_u32)], 1);
         assert_eq!(proof.hash_ops().unwrap(), 1);
 
         // Proof for index 1 in a 3-element tree.
-        let mut proof = ListProof::new(vec![(1, 1_u32)]);
+        let mut proof = ListProof::new(vec![(1, 1_u32)], 3);
         proof.push_hash(1, 0, Hash::zero());
         proof.push_hash(2, 1, Hash::zero());
         assert_eq!(proof.hash_ops().unwrap(), 3);
@@ -609,7 +614,7 @@ mod tests {
         //   x       Values
 
         // Proof for index 4 in a 5-element tree.
-        let mut proof = ListProof::new(vec![(4, 4_u32)]);
+        let mut proof = ListProof::new(vec![(4, 4_u32)], 5);
         proof.push_hash(3, 0, Hash::zero());
         assert_eq!(proof.hash_ops().unwrap(), 4);
         // 1 ops to hash values + 1 op per heights 1..=3:
@@ -625,7 +630,7 @@ mod tests {
         //       x   Values
 
         // Proof for indices 1..=2 in a 3-element tree.
-        let mut proof = ListProof::new(vec![(1, 1_u32), (2, 2)]);
+        let mut proof = ListProof::new(vec![(1, 1_u32), (2, 2)], 3);
         proof.push_hash(1, 0, Hash::zero());
         assert_eq!(proof.hash_ops().unwrap(), 5);
         // 2 ops to hash values + 2 ops on height 1 + 1 op on height 2:

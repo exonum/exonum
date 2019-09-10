@@ -222,11 +222,11 @@ where
     /// The caller must ensure that `to > from`.
     fn construct_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if from >= self.len() {
-            return ListProof::empty(self.height(), self.merkle_root());
+            return ListProof::empty(self.merkle_root(), self.len());
         }
 
         let items = (from..to).zip(self.iter_from(from).take((to - from) as usize));
-        let mut proof = ListProof::new(items);
+        let mut proof = ListProof::new(items, self.len());
 
         // `left` and `right` track the indices of elements for which we build the proof,
         // on the particular `height` of the tree. Both these values are inclusive; i.e., the range
@@ -442,7 +442,7 @@ where
         if from >= self.len() && range.end_bound() == Bound::Unbounded {
             // We assume this is a "legal" case of the caller not knowing the list length,
             // so we don't want to panic in the `to > from` assertion below.
-            return ListProof::empty(self.height(), self.merkle_root());
+            return ListProof::empty(self.merkle_root(), self.len());
         }
 
         // Exclusive upper boundary of the proof range.

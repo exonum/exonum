@@ -282,7 +282,7 @@ fn proof_list_index_build_proofs(b: &mut Bencher, len: usize) {
 
     let table_root_hash = table.object_hash();
     for proof in proofs {
-        let items = proof.validate(table_root_hash, table.len()).unwrap();
+        let items = proof.validate(table_root_hash).unwrap();
         assert_eq!(items.len(), 1);
     }
 }
@@ -301,7 +301,7 @@ fn proof_list_index_verify_proofs(b: &mut Bencher, len: usize) {
 
     b.iter(|| {
         for proof in &proofs {
-            let items = proof.validate(table_root_hash, table.len()).unwrap();
+            let items = proof.validate(table_root_hash).unwrap();
             assert_eq!(items.len(), 1);
         }
     });
