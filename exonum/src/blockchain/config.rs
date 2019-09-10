@@ -43,7 +43,7 @@ pub struct ValidatorKeys {
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
-    ///TODO
+    /// Peer identity key is used to secure communications between peers.
     pub identity_key: kx::PublicKey,
 }
 

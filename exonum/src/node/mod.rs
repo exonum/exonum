@@ -259,11 +259,9 @@ pub struct NodeConfig {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
-
-    /// TODO
+    /// Path to the master key file.
     pub master_key_path: PathBuf,
-
-    /// TODO
+    /// Validator keys.
     #[serde(skip)]
     pub keys: Keys,
 }
@@ -354,8 +352,7 @@ pub struct Configuration {
     pub peer_discovery: Vec<String>,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
-
-    /// TODO
+    /// Validator keys.
     pub keys: Keys,
 }
 
@@ -419,21 +416,6 @@ pub struct ConnectListConfig {
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectListConfig` from validators public configs.
-    //    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
-    //        let peers = list
-    //            .iter()
-    //            .filter(|config| config.validator_keys.consensus_key != node.keys.consensus_pk())
-    //            .map(|config| ConnectInfo {
-    //                public_key: config.validator_keys.consensus_key,
-    //                address: config.address.clone(),
-    //                identity_key: config.validator_keys.identity_key,
-    //            })
-    //            .collect();
-    //
-    //        ConnectListConfig { peers }
-    //    }
-
     /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
         let peers = peers
@@ -946,7 +928,7 @@ impl Node {
             database,
             services,
             node_cfg.genesis.clone(),
-            node_cfg.service_keypair(), //TODO: change to Keypair
+            node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
             channel.internal_requests.0.clone(),
         );

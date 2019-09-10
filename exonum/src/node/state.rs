@@ -92,7 +92,6 @@ pub struct State {
 
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
-
     keys: Keys,
 }
 
@@ -436,7 +435,7 @@ impl SharedConnectList {
         connect_list.find_address_by_pubkey(public_key).cloned()
     }
 
-    /// TODO
+    /// Get peer identity key using public key.
     pub fn identity_key(&self, public_key: &PublicKey) -> kx::PublicKey {
         let connect_list = self.inner.read().expect("ConnectList read lock");
         *connect_list.identity.get(public_key).unwrap()
@@ -636,12 +635,12 @@ impl State {
         self.keys.consensus_pk()
     }
 
-    /// TODO
+    /// Returns the identity public key of the current node.
     pub fn identity_public_key(&self) -> kx::PublicKey {
         self.keys.identity_pk()
     }
 
-    /// TODO
+    /// Returns the identity secret key of the current node.
     pub fn identity_secret_key(&self) -> &kx::SecretKey {
         &self.keys.identity_sk()
     }

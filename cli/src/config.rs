@@ -61,9 +61,9 @@ pub struct NodePrivateConfig {
     pub listen_address: SocketAddr,
     /// External address.
     pub external_address: String,
-    /// TODO
+    /// Path to the master key file.
     pub master_key_path: PathBuf,
-    /// TODO
+    /// Validator keys.
     #[serde(skip)]
     pub keys: Keys,
 }

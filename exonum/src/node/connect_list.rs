@@ -39,7 +39,7 @@ pub struct ConnectList {
     /// Peers to which we can connect.
     #[serde(default)]
     pub peers: BTreeMap<PublicKey, PeerAddress>,
-    ///TODO: workaround to use identity keys only for handshake
+    /// Mapping between consensus and identity keys.
     pub identity: BTreeMap<PublicKey, kx::PublicKey>,
 }
 
