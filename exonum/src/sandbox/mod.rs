@@ -1227,15 +1227,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::BinaryValue;
+    use exonum_merkledb::{BinaryValue, Snapshot};
 
     use crate::{
         blockchain::ExecutionError,
-        crypto::{gen_keypair_from_seed, Seed},
+        crypto::{gen_keypair_from_seed, Hash, Seed},
         proto::schema::tests::TxAfterCommit,
         runtime::{
             rust::{AfterCommitContext, Service, Transaction, TransactionContext},
-            AnyTx, InstanceId,
+            AnyTx, InstanceDescriptor, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1275,6 +1275,14 @@ mod tests {
         fn after_commit(&self, context: AfterCommitContext) {
             let tx = TxAfterCommit::new_with_height(context.height());
             context.broadcast_signed_transaction(tx);
+        }
+
+        fn state_hash(
+            &self,
+            _descriptor: InstanceDescriptor,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
+            vec![]
         }
     }
 

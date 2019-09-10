@@ -156,9 +156,12 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::rust::{Service, Transaction, TransactionContext},
+        runtime::{
+            rust::{Service, Transaction, TransactionContext},
+            InstanceDescriptor,
+        },
     };
-    use exonum_merkledb::ObjectHash;
+    use exonum_merkledb::{ObjectHash, Snapshot};
 
     use crate::{InstanceCollection, TestKitApi, TestKitBuilder};
 
@@ -212,7 +215,15 @@ mod tests {
         }
     }
 
-    impl Service for SampleService {}
+    impl Service for SampleService {
+        fn state_hash(
+            &self,
+            _descriptor: InstanceDescriptor,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
+            vec![]
+        }
+    }
 
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
