@@ -185,7 +185,7 @@ impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -889,7 +889,7 @@ impl<T, K, V> ObjectHash for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
     /// For hash of the empty map see [`HashTag::empty_map_hash`].
@@ -924,7 +924,7 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     type Item = (K::Owned, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
@@ -970,15 +970,14 @@ where
     }
 }
 
-#[allow(clippy::use_self)]
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash + fmt::Debug,
+    V: BinaryValue + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct Entry<'a, T: 'a + IndexAccess, K: 'a, V: 'a + BinaryValue> {
+        struct Entry<'a, T: IndexAccess, K, V: BinaryValue> {
             index: &'a ProofMapIndex<T, K, V>,
             path: ProofPath,
             hash: Hash,
@@ -989,10 +988,10 @@ where
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
-            V: BinaryValue + ObjectHash,
+            V: BinaryValue,
         {
             fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
-                Entry {
+                Self {
                     index,
                     path,
                     hash,
@@ -1009,11 +1008,11 @@ where
             }
         }
 
-        impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
+        impl<T, K, V> fmt::Debug for Entry<'_, T, K, V>
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
-            V: BinaryValue + ObjectHash + fmt::Debug,
+            V: BinaryValue + fmt::Debug,
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self.node {

@@ -49,7 +49,7 @@ fn check_map_proof<T, K, V>(proof: &MapProof<K, V>, key: Option<K>, table: &Proo
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
-    V: BinaryValue + ObjectHash + PartialEq + Debug,
+    V: BinaryValue + PartialEq + Debug,
 {
     let entry = key.map(|key| {
         let value = table.get(&key).unwrap();
@@ -65,8 +65,8 @@ fn check_map_multiproof<T, K, V>(
     table: &ProofMapIndex<T, K, V>,
 ) where
     T: IndexAccess,
-    K: BinaryKey + ObjectHash + Clone + PartialEq + Debug,
-    V: BinaryValue + ObjectHash + Clone + PartialEq + Debug,
+    K: BinaryKey + ObjectHash + PartialEq + Debug,
+    V: BinaryValue + PartialEq + Debug,
 {
     let mut entries: Vec<(K, V)> = Vec::new();
     let mut missing_keys: Vec<K> = Vec::new();

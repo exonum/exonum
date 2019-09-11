@@ -475,8 +475,8 @@ impl<K, V> MapProof<K, V> {
 
 impl<K, V> MapProof<K, V>
 where
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    K: ObjectHash,
+    V: BinaryValue,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use self::MapProofError::*;
@@ -646,18 +646,12 @@ impl<K, V> ObjectHash for CheckedMapProof<'_, K, V> {
 }
 
 /// Creates a proof for a single key.
-pub fn create_proof<K, V, F, M>(
+pub fn create_proof<K: ObjectHash, V>(
     key: K,
     root_node: Option<(ProofPath, Node)>,
-    lookup: F,
-    get_value: M,
-) -> MapProof<K, V>
-where
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
-    F: Fn(&ProofPath) -> Node,
-    M: Fn(&K) -> V,
-{
+    lookup: impl Fn(&ProofPath) -> Node,
+    get_value: impl Fn(&K) -> V,
+) -> MapProof<K, V> {
     fn combine(
         mut left_hashes: Vec<(ProofPath, Hash)>,
         right_hashes: Vec<(ProofPath, Hash)>,
@@ -784,19 +778,14 @@ impl ContourNode {
 }
 
 /// Processes a single key in a map with multiple entries.
-fn process_key<K, V, F, M>(
+fn process_key<K, V>(
     contour: &mut Vec<ContourNode>,
     mut builder: MapProofBuilder<K, V>,
     proof_path: &ProofPath,
     key: K,
-    lookup: &F,
-    get_value: &M,
-) -> MapProofBuilder<K, V>
-where
-    V: BinaryValue + ObjectHash,
-    F: Fn(&ProofPath) -> Node,
-    M: Fn(&K) -> V,
-{
+    lookup: impl Fn(&ProofPath) -> Node,
+    get_value: impl Fn(&K) -> V,
+) -> MapProofBuilder<K, V> {
     // `unwrap()` is safe: there is at least 1 element in the contour by design
     let common_prefix = proof_path.common_prefix_len(&contour.last().unwrap().key);
 
@@ -846,7 +835,7 @@ where
             Node::Branch(branch) => {
                 contour.push(ContourNode::new(node_path, branch));
             }
-            Node::Leaf(_hash) => {
+            Node::Leaf(_) => {
                 // We have reached the leaf node and haven't diverged!
                 let value = get_value(&key);
                 builder = builder.add_entry(key, value);
@@ -858,19 +847,12 @@ where
     builder
 }
 
-pub fn create_multiproof<K, V, KI, F, M>(
-    keys: KI,
+pub fn create_multiproof<K: ObjectHash, V>(
+    keys: impl IntoIterator<Item = K>,
     root_node: Option<(ProofPath, Node)>,
-    lookup: F,
-    get_value: M,
-) -> MapProof<K, V>
-where
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
-    KI: IntoIterator<Item = K>,
-    F: Fn(&ProofPath) -> Node,
-    M: Fn(&K) -> V,
-{
+    lookup: impl Fn(&ProofPath) -> Node,
+    get_value: impl Fn(&K) -> V,
+) -> MapProof<K, V> {
     match root_node {
         Some((root_path, Node::Branch(root_branch))) => {
             let mut builder = MapProofBuilder::new();
