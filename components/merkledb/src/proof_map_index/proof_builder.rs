@@ -18,7 +18,7 @@ impl<K, V> MapProof<K, V> {
     /// keys is requested.
     fn process_key(
         mut self,
-        tree: &impl MerklePatricia<K, V>,
+        tree: &impl MerklePatriciaTree<K, V>,
         contour: &mut Vec<ContourNode>,
         proof_path: &ProofPath,
         key: K,
@@ -78,7 +78,7 @@ impl<K, V> MapProof<K, V> {
 
 /// Encapsulation of a Merkle Patricia tree allowing to access its terminal and intermediate
 /// nodes.
-pub trait MerklePatricia<K, V> {
+pub trait MerklePatriciaTree<K, V> {
     /// Gets the root node of the tree.
     fn root_node(&self) -> Option<(ProofPath, Node)>;
 
@@ -167,7 +167,7 @@ pub trait BuildProof<K, V> {
 impl<K, V, T> BuildProof<K, V> for T
 where
     K: ObjectHash,
-    T: MerklePatricia<K, V>,
+    T: MerklePatriciaTree<K, V>,
 {
     fn create_proof(&self, key: K) -> MapProof<K, V> {
         let searched_path = ProofPath::new(&key);

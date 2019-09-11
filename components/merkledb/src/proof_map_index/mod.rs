@@ -30,7 +30,7 @@ use exonum_crypto::Hash;
 
 use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
-    proof_builder::{BuildProof, MerklePatricia},
+    proof_builder::{BuildProof, MerklePatriciaTree},
 };
 use crate::views::{AnyObject, IndexAddress};
 use crate::{
@@ -48,7 +48,7 @@ mod proof_builder;
 mod tests;
 
 // Necessary to allow building proofs.
-impl<T, K, V> MerklePatricia<K, V> for ProofMapIndex<T, K, V>
+impl<T, K, V> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
