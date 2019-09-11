@@ -175,6 +175,7 @@ impl ConsensusConfig {
     ///             .map(|_| ValidatorKeys {
     ///                 consensus_key: crypto::gen_keypair().0,
     ///                 service_key: crypto::gen_keypair().0,
+    ///                 identity_key: crypto::kx::gen_keypair().0,
     ///             })
     ///             .collect(),
     ///         ..ConsensusConfig::default()
