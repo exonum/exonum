@@ -51,6 +51,16 @@ pub enum Error {
 }
 
 impl Error {
+    /// Create a `NoSuchInterface` error with the specified error message.
+    pub fn no_such_interface(msg: impl Display) -> ExecutionError {
+        (Error::NoSuchInterface, msg).into()
+    }
+
+    /// Create a `NoSuchMethod` error with the specified error message.
+    pub fn no_such_method(msg: impl Display) -> ExecutionError {
+        (Error::NoSuchMethod, msg).into()
+    }
+
     /// Create an `UnauthorizedCaller` error with the specified error message.
     pub fn unauthorized_caller(msg: impl Display) -> ExecutionError {
         (Error::UnauthorizedCaller, msg).into()

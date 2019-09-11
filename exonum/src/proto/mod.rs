@@ -60,7 +60,7 @@
 //! ```
 
 pub use self::schema::{
-    blockchain::{Block, ConfigReference, TxLocation},
+    blockchain::{Block, TxLocation},
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,

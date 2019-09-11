@@ -58,36 +58,6 @@ define_names!(
     CONSENSUS_CONFIG => "consensus.config";
 );
 
-/// Configuration index.
-#[derive(Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "proto::ConfigReference", crate = "crate")]
-pub struct ConfigReference {
-    /// Height since which this configuration becomes actual.
-    actual_from: Height,
-    /// Hash of the configuration contents that serialized as raw bytes vec.
-    cfg_hash: Hash,
-}
-
-impl ConfigReference {
-    /// New ConfigReference
-    pub fn new(actual_from: Height, cfg_hash: &Hash) -> Self {
-        Self {
-            actual_from,
-            cfg_hash: *cfg_hash,
-        }
-    }
-
-    /// Height since which this configuration becomes actual.
-    pub fn actual_from(&self) -> Height {
-        self.actual_from
-    }
-
-    /// Hash of the configuration contents that serialized as raw bytes vec.
-    pub fn cfg_hash(&self) -> &Hash {
-        &self.cfg_hash
-    }
-}
-
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.

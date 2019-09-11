@@ -19,7 +19,6 @@ use exonum::{
     crypto::{self, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Propose, Verified},
-    proto::Any,
 };
 use exonum_merkledb::ObjectHash;
 
@@ -333,10 +332,7 @@ impl TestNetworkConfiguration {
     }
 
     /// Modifies the configuration of the service with the given identifier.
-    pub fn set_service_config<D>(&mut self, _id: &str, _config: D)
-    where
-        D: Into<Any>,
-    {
+    pub fn set_service_config<D>(&mut self, _id: &str, _config: D) {
         unimplemented!();
     }
 
