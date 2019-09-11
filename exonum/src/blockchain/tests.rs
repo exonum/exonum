@@ -364,7 +364,7 @@ fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) ->
     Blockchain::new(
         TemporaryDB::new(),
         instances,
-        config.genesis,
+        config.consensus,
         service_keypair,
         ApiSender::new(api_channel.0),
         internal_sender,

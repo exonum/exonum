@@ -112,7 +112,7 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     /// Adds new Rust service to the list of available services.

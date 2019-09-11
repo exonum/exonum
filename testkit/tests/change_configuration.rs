@@ -12,41 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// TODO Implement new configuration change logic [ECR-3285]
+
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{
-    blockchain::Schema,
-    helpers::{Height, ValidatorId},
-};
-use exonum_merkledb::ObjectHash;
+use exonum::helpers::{Height, ValidatorId};
 use exonum_testkit::TestKitBuilder;
-
-#[test]
-#[ignore = "Implement new configuration change logic [ECR-3285]"]
-fn test_following_config() {
-    let mut testkit = TestKitBuilder::validator().create();
-    let cfg_change_height = Height(10);
-    let proposal = {
-        let mut cfg = testkit.configuration_change_proposal();
-        cfg.set_actual_from(cfg_change_height);
-        cfg.set_service_config("service", "config");
-        cfg
-    };
-    let stored = proposal.stored_configuration().clone();
-    testkit.commit_configuration_change(proposal);
-    // Check that the following configuration is none.
-    assert_eq!(
-        Schema::new(&testkit.snapshot()).following_configuration(),
-        None
-    );
-    testkit.create_block();
-    // Check that the following configuration has appeared.
-    assert_eq!(
-        Schema::new(&testkit.snapshot()).following_configuration(),
-        Some(stored)
-    );
-}
 
 #[test]
 #[ignore = "Implement new configuration change logic [ECR-3285]"]
@@ -61,26 +33,26 @@ fn test_configuration_and_rollbacks() {
         cfg.set_service_config("service", "config");
         cfg
     };
-    let old_config = testkit.actual_configuration();
-    let new_config = proposal.stored_configuration().clone();
+    let old_config = testkit.consensus_config();
+    let new_config = proposal.consensus_config().clone();
 
     testkit.checkpoint();
 
     testkit.commit_configuration_change(proposal);
     testkit.create_blocks_until(Height(10));
-    assert_eq!(testkit.actual_configuration(), new_config);
+    assert_eq!(testkit.consensus_config(), new_config);
 
     testkit.checkpoint();
     testkit.create_block();
     testkit.rollback();
-    assert_eq!(testkit.actual_configuration(), new_config);
+    assert_eq!(testkit.consensus_config(), new_config);
 
     testkit.rollback();
 
     // As rollback is behind the time a proposal entered the blockchain,
     // the proposal is effectively forgotten.
     testkit.create_blocks_until(Height(10));
-    assert_eq!(testkit.actual_configuration(), old_config);
+    assert_eq!(testkit.consensus_config(), old_config);
 }
 
 #[test]
@@ -96,21 +68,14 @@ fn test_add_to_validators() {
         cfg.set_validators(validators);
         cfg
     };
-    let stored = proposal.stored_configuration().clone();
+    let stored = proposal.consensus_config().clone();
     testkit.commit_configuration_change(proposal);
 
     testkit.create_blocks_until(cfg_change_height.previous());
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());
-    assert_eq!(testkit.actual_configuration(), stored);
-    assert_eq!(
-        Schema::new(&testkit.snapshot())
-            .previous_configuration()
-            .unwrap()
-            .object_hash(),
-        stored.previous_cfg_hash
-    );
+    assert_eq!(testkit.consensus_config(), stored);
 }
 
 #[test]
@@ -125,21 +90,14 @@ fn test_exclude_from_validators() {
         cfg.set_validators(vec![validator]);
         cfg
     };
-    let stored = proposal.stored_configuration().clone();
+    let stored = proposal.consensus_config().clone();
     testkit.commit_configuration_change(proposal);
 
     testkit.create_blocks_until(cfg_change_height.previous());
 
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_eq!(testkit.network().validators().len(), 1);
-    assert_eq!(testkit.actual_configuration(), stored);
-    assert_eq!(
-        Schema::new(&testkit.snapshot())
-            .previous_configuration()
-            .unwrap()
-            .object_hash(),
-        stored.previous_cfg_hash
-    );
+    assert_eq!(testkit.consensus_config(), stored);
 }
 
 #[test]

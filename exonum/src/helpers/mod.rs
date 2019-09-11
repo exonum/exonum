@@ -26,7 +26,7 @@ use log::SetLoggerError;
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::blockchain::{GenesisConfig, Schema, ValidatorKeys};
+use crate::blockchain::{ConsensusConfig, Schema, ValidatorKeys};
 use crate::crypto::gen_keypair;
 use crate::exonum_merkledb::Fork;
 use crate::node::{ConnectListConfig, NodeConfig};
@@ -45,16 +45,17 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
-    let genesis =
-        GenesisConfig::new(
-            validators
-                .iter()
-                .zip(services.iter())
-                .map(|x| ValidatorKeys {
-                    consensus_key: (x.0).0,
-                    service_key: (x.1).0,
-                }),
-        );
+    let consensus = ConsensusConfig {
+        validator_keys: validators
+            .iter()
+            .zip(services.iter())
+            .map(|x| ValidatorKeys {
+                consensus_key: (x.0).0,
+                service_key: (x.1).0,
+            })
+            .collect(),
+        ..ConsensusConfig::default()
+    };
     let peers = (0..validators.len())
         .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
         .collect::<Vec<_>>();
@@ -71,8 +72,8 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             consensus_secret_key: validator.1,
             service_public_key: service.0,
             service_secret_key: service.1,
-            genesis: genesis.clone(),
-            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
+            consensus: consensus.clone(),
+            connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
             services_configs: Default::default(),

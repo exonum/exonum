@@ -26,9 +26,9 @@ use std::{net::SocketAddr, path::PathBuf};
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct CommonConfigTemplate {
     /// Consensus configuration.
-    pub consensus_config: ConsensusConfig,
+    pub consensus: ConsensusConfig,
     /// General configuration.
-    pub general_config: GeneralConfig,
+    pub general: GeneralConfig,
 }
 
 /// Part of the template configuration.
