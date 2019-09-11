@@ -16,14 +16,14 @@
 
 pub use self::proof::{CheckedListProof, ListProof, ListProofError, ValidationError};
 
-use std::{
-    marker::PhantomData,
-    ops::{Bound, RangeBounds},
-};
+use std::{marker::PhantomData, ops::RangeBounds};
 
 use exonum_crypto::Hash;
 
-use self::key::ProofListKey;
+use self::{
+    key::ProofListKey,
+    proof_builder::{BuildProof, MerkleTree},
+};
 use crate::views::IndexAddress;
 use crate::{
     hash::HashTag,
@@ -33,6 +33,7 @@ use crate::{
 
 mod key;
 mod proof;
+mod proof_builder;
 #[cfg(test)]
 mod tests;
 
@@ -87,6 +88,24 @@ where
 
     fn metadata(&self) -> Vec<u8> {
         self.state.metadata().to_bytes()
+    }
+}
+
+impl<T, V> MerkleTree<V> for ProofListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn len(&self) -> u64 {
+        self.len()
+    }
+
+    fn node(&self, position: ProofListKey) -> Hash {
+        self.get_branch_unchecked(position)
+    }
+
+    fn values<'s>(&'s self, start_index: u64) -> Box<dyn Iterator<Item = V> + 's> {
+        Box::new(self.iter_from(start_index))
     }
 }
 
@@ -217,47 +236,6 @@ where
 
     fn root_key(&self) -> ProofListKey {
         ProofListKey::new(self.height(), 0)
-    }
-
-    /// The caller must ensure that `to > from`.
-    fn construct_proof(&self, from: u64, to: u64) -> ListProof<V> {
-        if from >= self.len() {
-            return ListProof::empty(self.merkle_root(), self.len());
-        }
-
-        let items = (from..to).zip(self.iter_from(from).take((to - from) as usize));
-        let mut proof = ListProof::new(items, self.len());
-
-        // `left` and `right` track the indices of elements for which we build the proof,
-        // on the particular `height` of the tree. Both these values are inclusive; i.e., the range
-        // is `[left, right]`.
-        let (mut left, mut right) = (from, to - 1);
-        for height in 1..self.height() {
-            // On each `height`, we may include into the proof the hash
-            // to the left of the range, provided that this hash is necessary to restore
-            // the root hash of the list. It is easy to see that necessity depends on the
-            // oddity of `left`. Indeed, during root hash computation, we zip a hash
-            // with an *even* index with the following hash having an *odd* index;
-            // thus, iff `left` is odd, we need a hash with index `left - 1` to restore the
-            // root hash.
-            if left % 2 == 1 {
-                let hash = self.get_branch_unchecked(ProofListKey::new(height, left - 1));
-                proof.push_hash(height, left - 1, hash);
-            }
-
-            // Similarly, we may need a hash to the right of the end of the range, provided
-            // that the end has an even index and the hash to the right exists.
-            if right % 2 == 0 {
-                if let Some(hash) = self.get_branch(ProofListKey::new(height, right + 1)) {
-                    proof.push_hash(height, right + 1, hash);
-                }
-            }
-
-            left /= 2;
-            right /= 2;
-        }
-
-        proof
     }
 
     fn merkle_root(&self) -> Hash {
@@ -400,7 +378,7 @@ where
     /// let proof_of_absence = index.get_proof(1);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
-        self.construct_proof(index, index + 1)
+        self.create_proof(index)
     }
 
     /// Returns the proof of existence for the list elements in the specified range.
@@ -433,31 +411,7 @@ where
     /// assert!(empty_proof.entries_unchecked().is_empty());
     /// ```
     pub fn get_range_proof<R: RangeBounds<u64>>(&self, range: R) -> ListProof<V> {
-        // Inclusive lower boundary of the proof range.
-        let from = match range.start_bound() {
-            Bound::Unbounded => 0_u64,
-            Bound::Included(from) => *from,
-            Bound::Excluded(from) => *from + 1,
-        };
-        if from >= self.len() && range.end_bound() == Bound::Unbounded {
-            // We assume this is a "legal" case of the caller not knowing the list length,
-            // so we don't want to panic in the `to > from` assertion below.
-            return ListProof::empty(self.merkle_root(), self.len());
-        }
-
-        // Exclusive upper boundary of the proof range.
-        let to = match range.end_bound() {
-            Bound::Unbounded => self.len(),
-            Bound::Included(to) => *to + 1,
-            Bound::Excluded(to) => *to,
-        };
-        assert!(
-            to > from,
-            "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
-            from,
-            to
-        );
-        self.construct_proof(from, to)
+        self.create_range_proof(range)
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
