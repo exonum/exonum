@@ -62,7 +62,7 @@ pub struct NodePrivateConfig {
     /// External address.
     pub external_address: String,
     /// Path to the master key file.
-    pub master_key_path: PathBuf,
+    pub master_key_file_name: PathBuf,
     /// Validator keys.
     #[serde(skip)]
     pub keys: Keys,

@@ -27,6 +27,7 @@ use exonum_cli::command::{Command, ExonumCommand, StandardResult};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
+use exonum_cli::password::DEFAULT_MASTER_PASS_ENV_VAR;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -336,7 +337,7 @@ fn test_finalize_run_without_pass() {
 fn test_finalize_run_with_pass() {
     let env = ConfigSpec::new_with_pass();
 
-    env::set_var("EXONUM_MASTER_PASS", "some passphrase");
+    env::set_var(DEFAULT_MASTER_PASS_ENV_VAR, "some passphrase");
     env.copy_node_config_to_output(0);
     let node_config = env.output_node_config(0);
     env.command("finalize")

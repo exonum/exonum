@@ -19,7 +19,7 @@ use exonum::{
     blockchain::ValidatorKeys,
     keys::{generate_keys, Keys},
 };
-use failure::Error;
+use failure::{bail, Error};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -36,14 +36,12 @@ use crate::{
     password::{PassInputMethod, Passphrase, PassphraseUsage},
 };
 
-/// Name for a file containing consensus secret key.
-pub const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
-/// Name for a file containing service secret key.
-pub const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
 /// Name for a file containing the public part of the node configuration.
 pub const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
 /// Name for a file containing the secret part of the node configuration.
 pub const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
+/// Name for a file containing the secret part of the node configuration.
+pub const MASTER_KEY_FILE_NAME: &str = "master.key.toml";
 
 /// Default port number used by Exonum for communication between nodes.
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
@@ -125,10 +123,9 @@ impl ExonumCommand for GenerateConfig {
     fn execute(self) -> Result<StandardResult, Error> {
         let common_config: CommonConfigTemplate = load_config_file(self.common_config.clone())?;
 
-        let pub_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
-        let private_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
-        let master_key_file_name = "master.key.toml";
-        let master_key_path = self.output_dir.join(master_key_file_name);
+        let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
+        let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
+        let master_key_path = self.output_dir.join(MASTER_KEY_FILE_NAME);
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
@@ -136,7 +133,7 @@ impl ExonumCommand for GenerateConfig {
             let passphrase =
                 Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default());
             create_keys_and_files(&master_key_path, passphrase.unwrap().as_bytes())
-        };
+        }?;
 
         let validator_keys = ValidatorKeys {
             consensus_key: keys.consensus_pk(),
@@ -152,28 +149,32 @@ impl ExonumCommand for GenerateConfig {
             common: common_config,
         };
         // Save public config separately.
-        save_config_file(&shared_config, &pub_config_path)?;
+        save_config_file(&shared_config, &public_config_path)?;
 
         let private_config = NodePrivateConfig {
             listen_address,
             external_address: self.peer_address.to_string(),
-            master_key_path: master_key_file_name.into(),
+            master_key_file_name: MASTER_KEY_FILE_NAME.into(),
             keys,
         };
 
-        save_config_file(&private_config, &private_config_path)?;
+        save_config_file(&private_config, &secret_config_path)?;
 
         Ok(StandardResult::GenerateConfig {
-            public_config_path: pub_config_path,
-            secret_config_path: private_config_path,
+            public_config_path,
+            secret_config_path,
+            master_key_path,
         })
     }
 }
 
-fn create_keys_and_files(secret_key_path: impl AsRef<Path>, passphrase: impl AsRef<[u8]>) -> Keys {
+fn create_keys_and_files(
+    secret_key_path: impl AsRef<Path>,
+    passphrase: impl AsRef<[u8]>,
+) -> Result<Keys, failure::Error> {
     let secret_key_path = secret_key_path.as_ref();
     if secret_key_path.exists() {
-        panic!(
+        bail!(
             "Failed to create secret key file. File exists: {}",
             secret_key_path.to_string_lossy(),
         )

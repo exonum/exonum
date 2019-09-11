@@ -158,10 +158,11 @@ impl EncryptedMasterKey {
 }
 
 /// Creates a TOML file that contains encrypted master and returns `Keys` derived from it.
-pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Keys {
+pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys, failure::Error> {
     let tree = SecretTree::new(&mut thread_rng());
-    save_master_key(path, passphrase, tree.seed()).expect("Error generating master key.");
-    generate_keys_from_master_password(tree).expect("Error deriving keys from master key.")
+    save_master_key(path, passphrase, tree.seed())?;
+    generate_keys_from_master_password(tree)
+        .ok_or_else(|| format_err!("Error deriving keys from master key."))
 }
 
 fn generate_keys_from_master_password(tree: SecretTree) -> Option<Keys> {
@@ -220,7 +221,7 @@ mod tests {
         let dir = TempDir::new("test_utils").expect("Couldn't create TempDir");
         let file_path = dir.path().join("private_key.toml");
         let pass_phrase = b"passphrase";
-        let pk1 = generate_keys(file_path.as_path(), pass_phrase);
+        let pk1 = generate_keys(file_path.as_path(), pass_phrase).unwrap();
         let pk2 = read_keys_from_file(file_path.as_path(), pass_phrase).unwrap();
         assert_eq!(pk1, pk2);
     }

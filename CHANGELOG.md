@@ -72,10 +72,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   corresponds to the total number of transactions in the blockchain. (#1289)
 
 - Added new pair of keys to validator keys. This identity keys are now used
-  in noise handshake instead of converted consensus keys. (#1448)
+  in noise handshake instead of converted consensus keys. (#1459)
 
 - All validator keys are now derived from single master key. Master key is
-  stored in encrypted file. (#1448)
+  stored in encrypted file. (#1459)
+
+- Command line parameters `--service-key-pass` and `--consensus-key-pass` was
+  removed in favor of `--master-key-pass` parameter. For example now you can
+  run node with the command below (#1459).
+    ```bash
+    cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
+    ```
 
 #### exonum-merkledb
 
@@ -135,6 +142,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Removed deprecated `CryptoHash` trait, use `exonum-merkledb::ObjectHash`
   instead (#1361)
+
+- Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
+  module  in `exonum`. (#1459)
 
 ### New features
 
