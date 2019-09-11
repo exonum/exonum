@@ -28,7 +28,6 @@ use exonum_crypto::{hash, Hash, HashStream};
 use super::{
     key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
     node::BranchNode,
-    proof::MapProofBuilder,
     MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
 use crate::{BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB};
@@ -549,9 +548,8 @@ fn test_invalid_map_proofs() {
 
     let h = hash(&[1]);
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h)
-        .create();
+    let proof: MapProof<[u8; 32], Vec<u8>> =
+        MapProof::new().add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h);
     match proof.check().unwrap_err() {
         NonTerminalNode(..) => {}
         e => panic!("expected non-terminal node error, got {}", e),
@@ -570,48 +568,43 @@ fn test_invalid_map_proofs() {
         e => panic!("expected invalid ordering error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(77), h)
-        .create();
+        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(77), h);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
-        .add_entry([1; 32], vec![1, 2, 3])
-        .create();
+        .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
-        .add_entry([1; 32], vec![1, 2, 3])
-        .create();
+        .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
         .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
         .add_proof_entry(ProofPath::new(&[1; 32]), h)
-        .add_entry([1; 32], vec![1, 2, 3])
-        .create();
+        .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         DuplicatePath(..) => {}
         e => panic!("expected duplicate path error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
         .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
         .add_entry([1; 32], vec![1, 2, 3])
-        .add_entry([1; 32], vec![1, 2, 3])
-        .create();
+        .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         DuplicatePath(..) => {}
         e => panic!("expected duplicate path error, got {}", e),
