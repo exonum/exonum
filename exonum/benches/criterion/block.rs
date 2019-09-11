@@ -80,10 +80,10 @@ fn create_blockchain(
     let consensus_keypair = crypto::gen_keypair();
     let genesis_config = ConsensusConfig {
         validator_keys: vec![ValidatorKeys {
-        consensus_key: consensus_keypair.0,
-        service_key: service_keypair.0,
-        identity_key: kx::PublicKey::zero(),
-    }],
+            consensus_key: consensus_keypair.0,
+            service_key: service_keypair.0,
+            identity_key: kx::PublicKey::zero(),
+        }],
         ..ConsensusConfig::default()
     };
 
@@ -694,7 +694,7 @@ fn execute_block_rocksdb(
             TXS_IN_BLOCK,
         )
         .sample_size(100)
-        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
+        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u64)),
     );
 }
 

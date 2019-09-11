@@ -1159,11 +1159,13 @@ fn sandbox_with_services_uninitialized(
         .collect();
 
     let genesis = ConsensusConfig {
-        validator_keys:  keys.iter().map(|keys| ValidatorKeys {
-            consensus_key: keys.consensus_pk(),
-            service_key: keys.service_pk(),
-            identity_key: keys.identity_pk(),
-        })
+        validator_keys: keys
+            .iter()
+            .map(|keys| ValidatorKeys {
+                consensus_key: keys.consensus_pk(),
+                service_key: keys.service_pk(),
+                identity_key: keys.identity_pk(),
+            })
             .collect(),
         ..consensus
     };

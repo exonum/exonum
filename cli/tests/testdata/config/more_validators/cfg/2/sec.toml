@@ -1,5 +1,3 @@
-external_address = "127.0.0.3:6333"
-listen_address = "0.0.0.0:6333"
+external_address = "127.0.0.1:8003"
+listen_address = "0.0.0.0:8003"
 master_key_path = "master.key.toml"
-
-[services_secret_configs]
