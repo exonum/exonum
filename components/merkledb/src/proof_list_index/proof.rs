@@ -45,7 +45,7 @@ impl HashedEntry {
 ///
 /// You can create `ListProof`s with [`get_proof()`] and [`get_range_proof()`] methods of
 /// `ProofListIndex`. Proofs can be verified on the server side with the help of
-/// [`validate()`]. Prior to the `validate` conversion, you may use `*unchecked` methods
+/// [`check()`]. Prior to the `check` conversion, you may use `*unchecked` methods
 /// to obtain information about the proof.
 ///
 /// ```
@@ -109,9 +109,16 @@ impl HashedEntry {
 /// # }
 /// ```
 ///
+/// ## Note on external implementations
+///
+/// External implementations (e.g., in light clients) must treat serialized `ListProof`s
+/// as untrusted inputs. Implementations may rely on the invariants provided by Exonum nodes
+/// (e.g., ordering of `proof` / `entries`; see [`check()`]) only if these invariants are checked
+/// during proof verification.
+///
 /// [`get_proof()`]: struct.ProofListIndex.html#method.get_proof
 /// [`get_range_proof()`]: struct.ProofListIndex.html#method.get_range_proof
-/// [`validate()`]: #method.validate
+/// [`check()`]: #method.check
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ListProof<V> {
     proof: Vec<HashedEntry>,
@@ -460,7 +467,18 @@ impl<V: BinaryValue> ListProof<V> {
     /// Verifies the correctness of the proof.
     ///
     /// If the proof is valid, a checked list proof is returned, which allows to access
-    /// proven elements. Otherwise, an error is returned.
+    /// proven elements.
+    ///
+    /// ## Errors
+    ///
+    /// An error is returned if proof is malformed. The following checks are performed:
+    ///
+    /// - `proof` field is ordered by increasing `(height, index)` tuple.
+    /// - `entries` are ordered by increasing index.
+    /// - Positions of elements in `proof` and `entries` are feasible.
+    /// - There is sufficient information in `proof` and `entries` to restore the Merkle tree root.
+    /// - There are no redundant entries in `proof` (i.e., ones that can be inferred from other
+    ///   `proof` elements / `entries`).
     pub fn check(&self) -> Result<CheckedListProof<V>, ListProofError> {
         let tree_root = self.collect()?;
         Ok(CheckedListProof {

@@ -224,9 +224,7 @@ impl<K, V> OptionalEntry<K, V> {
 ///
 /// `MapProof` is serialized to JSON as an object with 2 array fields:
 ///
-/// - `proof` is an array of `{ path: ProofPath, hash: Hash }` objects. The entries are sorted
-///   by increasing [`ProofPath`], but client implementors should not rely on this if security
-///   is a concern.
+/// - `proof` is an array of `{ path: ProofPath, hash: Hash }` objects.
 /// - `entries` is an array with 2 kinds of objects: `{ missing: K }` for keys missing from
 ///   the underlying index, and `{ key: K, value: V }` for key-value pairs, existence of
 ///   which is asserted by the proof.
@@ -242,19 +240,29 @@ impl<K, V> OptionalEntry<K, V> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &fork);
 /// let (h1, h2) = (HashTag::hash_leaf(&[1]), HashTag::hash_leaf(&[2]));
-/// map.put(&h1, 100u32);
-/// map.put(&h2, 200u32);
+/// map.put(&h1, 100_u32);
+/// map.put(&h2, 200_u32);
 ///
 /// let proof = map.get_proof(h2);
 /// assert_eq!(
 ///     serde_json::to_value(&proof).unwrap(),
 ///     json!({
-///         "proof": [ { "path": ProofPath::new(&h1), "hash": HashTag::hash_leaf(&100u32.to_bytes()) } ],
-///         "entries": [ { "key": h2, "value": 200 } ]
+///         "proof": [{
+///             "path": ProofPath::new(&h1),
+///             "hash": HashTag::hash_leaf(&100_u32.to_bytes()),
+///         }],
+///         "entries": [{ "key": h2, "value": 200 }],
 ///     })
 /// );
 /// # }
 /// ```
+///
+/// ## Note on external implementations
+///
+/// External implementations (e.g., in light clients) must treat serialized `MapProof`s
+/// as untrusted inputs. Implementations may rely on the invariants provided by Exonum nodes
+/// (e.g., ordering of `proof`; see [`check()`]) only if these invariants are checked
+/// during proof verification.
 ///
 /// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
@@ -474,7 +482,7 @@ where
         use self::MapProofError::*;
         use std::cmp::Ordering;
 
-        // Check that entries in proof are in increasing order
+        // Check that entries in `proof` are in increasing order.
         for w in self.proof.windows(2) {
             let (prev_path, path) = (&w[0].path, &w[1].path);
             match prev_path.partial_cmp(path) {
@@ -528,7 +536,16 @@ where
         Ok(())
     }
 
-    /// Checks this proof. Fails if the proof is malformed.
+    /// Checks this proof.
+    ///
+    /// ## Errors
+    ///
+    /// An error is returned if proof is malformed. The following checks are performed:
+    ///
+    /// - `proof` elements are ordered by increasing `path` field.
+    /// - No path in `proof` is a prefix of another path in `proof` or a path inferred from
+    ///   an entry.
+    /// - Paths in `proof` and ones computed from `entries` are all distinct.
     ///
     /// # Examples
     ///
