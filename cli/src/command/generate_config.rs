@@ -154,7 +154,7 @@ impl ExonumCommand for GenerateConfig {
         let private_config = NodePrivateConfig {
             listen_address,
             external_address: self.peer_address.to_string(),
-            master_key_file_name: MASTER_KEY_FILE_NAME.into(),
+            master_key_path: MASTER_KEY_FILE_NAME.into(),
             keys,
         };
 

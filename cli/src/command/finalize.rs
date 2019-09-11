@@ -162,7 +162,7 @@ impl ExonumCommand for Finalize {
                 database: Default::default(),
                 connect_list,
                 thread_pool_size: Default::default(),
-                master_key_path: secret_config.master_key_file_name,
+                master_key_path: secret_config.master_key_path,
                 keys: secret_config.keys,
             }
         };
