@@ -86,6 +86,8 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
+pub extern crate structopt;
+
 use exonum::{
     blockchain::InstanceCollection,
     exonum_merkledb::{Database, RocksDB},
