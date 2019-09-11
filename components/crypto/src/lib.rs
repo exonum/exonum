@@ -842,8 +842,8 @@ mod tests {
     }
 
     fn assert_serialize_deserialize<T>(original_value: &T)
-        where
-            T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
+    where
+        T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
     {
         let json = serde_json::to_string(original_value).unwrap();
         let deserialized_value: T = serde_json::from_str(&json).unwrap();

@@ -102,13 +102,13 @@ exonum-timestamping finalize --public-api-address 0.0.0.0:8203 --private-api-add
 Run nodes:
 
 ```sh
-exonum-timestamping run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --master-key-pass pass 
+exonum-timestamping run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --master-key-pass pass
 
-exonum-timestamping run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --master-key-pass pass 
+exonum-timestamping run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --master-key-pass pass
 
-exonum-timestamping run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --master-key-pass pass 
+exonum-timestamping run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --master-key-pass pass
 
-exonum-timestamping run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass 
+exonum-timestamping run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass
 ```
 
 <!-- markdownlint-enable MD013 -->
