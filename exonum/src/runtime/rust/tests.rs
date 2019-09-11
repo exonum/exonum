@@ -20,13 +20,14 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, rust::interfaces::Initialize, CallContext,
-        CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
+        CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor, InstanceId,
+        InstanceSpec,
     },
 };
 
 use super::{
     service::{Service, ServiceFactory},
-    ArtifactId, Error, RustRuntime, TransactionContext,
+    ArtifactId, RustRuntime, TransactionContext,
 };
 
 const SERVICE_INSTANCE_ID: InstanceId = 2;
@@ -107,7 +108,7 @@ impl TestService for TestServiceImpl {
 
 impl Initialize for TestServiceImpl {
     fn initialize(&self, context: TransactionContext, arg: &[u8]) -> Result<(), ExecutionError> {
-        let arg = Init::from_bytes(arg.into()).map_err(Error::config_parse_error)?;
+        let arg = Init::from_bytes(arg.into()).map_err(DispatcherError::parse_error)?;
 
         let mut entry = Entry::new("constructor_entry", context.fork());
         entry.set(arg.msg);

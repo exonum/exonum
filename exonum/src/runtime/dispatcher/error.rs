@@ -46,11 +46,18 @@ pub enum Error {
     StackOverflow = 10,
     /// This caller is not authorized to call this method.
     UnauthorizedCaller = 11,
+    /// Unable to parse the method arguments of a service interface.
+    ParseError = 12,
 }
 
 impl Error {
     /// Create an `UnauthorizedCaller` error with the specified error message.
     pub fn unauthorized_caller(msg: impl Display) -> ExecutionError {
         (Error::UnauthorizedCaller, msg).into()
+    }
+
+    /// Create a `ParseError` error with the specified error message.
+    pub fn parse_error(msg: impl Display) -> ExecutionError {
+        (Error::ParseError, msg).into()
     }
 }

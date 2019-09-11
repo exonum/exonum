@@ -447,7 +447,7 @@ mod foreign_interface_call {
                 0u32 => {
                     let bytes = payload.into();
                     let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(|e| (runtime::rust::Error::ArgumentsParseError, e))?;
+                        .map_err(runtime::DispatcherError::parse_error)?;
                     self.timestamp(ctx, arg)
                 }
                 _ => Err(dispatcher::Error::NoSuchMethod).map_err(From::from),

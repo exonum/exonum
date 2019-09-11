@@ -79,6 +79,7 @@
 //! [artifacts]: struct.ArtifactId.html
 
 pub use self::{
+    dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
     types::{AnyTx, ArtifactId, CallInfo, InstanceId, InstanceSpec, MethodId},
 };

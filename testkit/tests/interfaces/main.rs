@@ -299,7 +299,7 @@ fn test_any_call_err_wrong_arg() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, runtime::rust::Error::ArgumentsParseError.into());
+    assert_eq!(err.kind, runtime::DispatcherError::ParseError.into());
 }
 
 #[test]

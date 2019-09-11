@@ -177,13 +177,10 @@ impl ExonumService {
                         let bytes = payload.into();
                         let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
                             .map_err(|error_msg|
-                                (
-                                    #cr::runtime::rust::error::Error::ArgumentsParseError,
-                                    format!("Unable to parse argument for the `{}#{}` method. {}",
-                                        stringify!(#trait_name), stringify!(#name), error_msg
-                                    )
-                                )
-                            )?;
+                                format!("Unable to parse argument for the `{}#{}` method. {}",
+                                    stringify!(#trait_name), stringify!(#name), error_msg)
+                            )
+                            .map_err(#cr::runtime::DispatcherError::parse_error)?;
                         self.#name(ctx,arg).map_err(From::from)
                     }
                 }
