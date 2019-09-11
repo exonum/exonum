@@ -48,7 +48,7 @@ impl TxTime {
         snapshot: impl IndexAccess,
         author: &PublicKey,
     ) -> Result<(), Error> {
-        let keys = Schema::new(snapshot).actual_configuration().validator_keys;
+        let keys = Schema::new(snapshot).consensus_config().validator_keys;
         let signed = keys.iter().any(|k| k.service_key == *author);
         if !signed {
             Err(Error::UnknownSender)?
@@ -78,7 +78,7 @@ impl TxTime {
 
     pub(crate) fn update_consolidated_time(service_name: &str, access: impl IndexAccess) {
         let keys = Schema::new(access.clone())
-            .actual_configuration()
+            .consensus_config()
             .validator_keys;
         let schema = TimeSchema::new(service_name, access);
 

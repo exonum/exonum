@@ -52,9 +52,7 @@ use crate::{
         node::SharedNodeState,
         ApiAccess, ApiAggregator,
     },
-    blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema, ValidatorKeys,
-    },
+    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
     crypto::{self, kx, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
@@ -237,8 +235,8 @@ impl Default for MemoryPoolConfig {
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeConfig {
-    /// Initial config that will be written in the first block.
-    pub genesis: GenesisConfig,
+    /// Initial consensus configuration that will be written in the genesis block.
+    pub consensus: ConsensusConfig,
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
@@ -285,7 +283,7 @@ impl NodeConfig {
             .expect("Could not read master_key_path from file");
 
         NodeConfig {
-            genesis: self.genesis,
+            consensus: self.consensus,
             listen_address: self.listen_address,
             external_address: self.external_address,
             network: self.network,
@@ -335,7 +333,7 @@ impl ValidateInput for NodeConfig {
             capacity.network_requests_capacity,
             sanity_max,
         );
-        Ok(())
+        self.consensus.validate()
     }
 }
 
@@ -462,10 +460,10 @@ impl NodeHandler {
 
         let snapshot = blockchain.snapshot();
 
-        let stored = Schema::new(&snapshot).actual_configuration();
-        info!("Creating a node with config: {:#?}", stored);
+        let consensus_config = Schema::new(&snapshot).consensus_config();
+        info!("Creating a node with config: {:#?}", consensus_config);
 
-        let validator_id = stored
+        let validator_id = consensus_config
             .validator_keys
             .iter()
             .position(|pk| pk.consensus_key == config.keys.consensus_pk())
@@ -486,7 +484,7 @@ impl NodeHandler {
         let state = State::new(
             validator_id,
             connect_list,
-            stored,
+            consensus_config,
             connect,
             blockchain.get_saved_peers(),
             last_hash,
@@ -927,7 +925,7 @@ impl Node {
         let blockchain = Blockchain::new(
             database,
             services,
-            node_cfg.genesis.clone(),
+            node_cfg.consensus.clone(),
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
             channel.internal_requests.0.clone(),
@@ -1014,7 +1012,7 @@ impl Node {
             handler,
             channel,
             network_config,
-            max_message_len: node_cfg.genesis.consensus.max_message_len,
+            max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
             api_runtime_config,
         }

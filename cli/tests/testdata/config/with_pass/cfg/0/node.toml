@@ -1,24 +1,24 @@
-external_address = "127.0.0.1:6333"
-listen_address = "0.0.0.0:6333"
-master_key_path = "master.key.toml"
+consensus_public_key = "7297f4c5d5dfa26b2bdd788a8664883f787578fe5632efd07836d34257742ba0"
+consensus_secret_key = "consensus.key.toml"
+external_address = "0.0.0.0:8003"
+listen_address = "0.0.0.0:8003"
+service_public_key = "d327e5083de17fd70d1a830025705e91c1a1ed28e7e416d6ef01dc6ffe9dbb94"
+service_secret_key = "service.key.toml"
 
 [api]
 state_update_timeout = 10000
-[[connect_list.peers]]
-address = "127.0.0.1:6333"
-identity_key = "970c5ae82672c1250a003142cbed9e1014eb35687a5986b1fb1bdb4c003de637"
-public_key = "bdcc4ba6b695423bf829ae93a2a714bc76e4a1b0f4c52625e6733c4c396325b7"
+
+[connect_list]
+peers = []
 
 [database]
 create_if_missing = true
 compression_type = "none"
-
 [[genesis.validator_keys]]
-consensus_key = "bdcc4ba6b695423bf829ae93a2a714bc76e4a1b0f4c52625e6733c4c396325b7"
-identity_key = "970c5ae82672c1250a003142cbed9e1014eb35687a5986b1fb1bdb4c003de637"
-service_key = "9d517d2535b6eba05b2a6529c1f0724220458444e4e65e5d463a374516a3bb94"
+consensus_key = "7297f4c5d5dfa26b2bdd788a8664883f787578fe5632efd07836d34257742ba0"
+service_key = "d327e5083de17fd70d1a830025705e91c1a1ed28e7e416d6ef01dc6ffe9dbb94"
 
-[genesis.consensus]
+[consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
 max_propose_timeout = 200
@@ -39,5 +39,3 @@ max_outgoing_connections = 128
 tcp_connect_max_retries = 10
 tcp_connect_retry_timeout = 15000
 tcp_nodelay = true
-
-[services_configs]

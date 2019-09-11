@@ -510,6 +510,14 @@ impl From<String> for Any {
     }
 }
 
+impl From<&str> for Any {
+    fn from(s: &str) -> Self {
+        let mut v = well_known_types::StringValue::new();
+        v.set_value(s.to_owned());
+        Self::from_pb_message(v)
+    }
+}
+
 impl From<Vec<u8>> for Any {
     fn from(s: Vec<u8>) -> Self {
         let mut v = well_known_types::BytesValue::new();

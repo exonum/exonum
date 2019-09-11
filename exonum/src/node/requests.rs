@@ -100,7 +100,7 @@ impl NodeHandler {
         let mut txs = Vec::new();
         let mut txs_size = 0;
         let unoccupied_message_size =
-            self.state.config().consensus.max_message_len as usize - TX_RES_EMPTY_SIZE;
+            self.state.config().max_message_len as usize - TX_RES_EMPTY_SIZE;
 
         for hash in hashes {
             if let Some(tx) = get_transaction(&hash, &schema.transactions(), &self.state.tx_cache())

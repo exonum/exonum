@@ -15,11 +15,12 @@
 use serde::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{ConsensusConfig, ValidatorKeys},
     crypto::{self, kx, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     keys::Keys,
     messages::{Precommit, Propose, Verified},
+    proto::Any,
 };
 use exonum_merkledb::ObjectHash;
 
@@ -69,8 +70,11 @@ impl TestNetwork {
 
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
-    pub fn genesis_config(&self) -> GenesisConfig {
-        GenesisConfig::new(self.validators.iter().map(TestNode::public_keys))
+    pub fn genesis_config(&self) -> ConsensusConfig {
+        ConsensusConfig {
+            validator_keys: self.validators.iter().map(TestNode::public_keys).collect(),
+            ..ConsensusConfig::default()
+        }
     }
 
     /// Updates the test network by the new set of nodes.
@@ -266,21 +270,17 @@ impl From<TestNode> for ValidatorKeys {
 pub struct TestNetworkConfiguration {
     us: TestNode,
     validators: Vec<TestNode>,
-    stored_configuration: StoredConfiguration,
+    consensus_config: ConsensusConfig,
+    actual_from: Height,
 }
 
 impl TestNetworkConfiguration {
-    pub(crate) fn new(
-        network: &TestNetwork,
-        mut stored_configuration: StoredConfiguration,
-    ) -> Self {
-        let prev_hash = stored_configuration.object_hash();
-        stored_configuration.previous_cfg_hash = prev_hash;
-
+    pub(crate) fn new(network: &TestNetwork, consensus_config: ConsensusConfig) -> Self {
         TestNetworkConfiguration {
             us: network.us().clone(),
             validators: network.validators().into(),
-            stored_configuration,
+            consensus_config,
+            actual_from: Height::zero(),
         }
     }
 
@@ -301,23 +301,23 @@ impl TestNetworkConfiguration {
     }
 
     /// Returns the current consensus configuration.
-    pub fn consensus_configuration(&self) -> &ConsensusConfig {
-        &self.stored_configuration.consensus
+    pub fn consensus_config(&self) -> &ConsensusConfig {
+        &self.consensus_config
     }
 
     /// Return the height, starting from which this configuration becomes actual.
     pub fn actual_from(&self) -> Height {
-        self.stored_configuration.actual_from
+        self.actual_from
     }
 
     /// Modifies the height, starting from which this configuration becomes actual.
     pub fn set_actual_from(&mut self, actual_from: Height) {
-        self.stored_configuration.actual_from = actual_from;
+        self.actual_from = actual_from;
     }
 
     /// Modifies the current consensus configuration.
-    pub fn set_consensus_configuration(&mut self, consensus: ConsensusConfig) {
-        self.stored_configuration.consensus = consensus;
+    pub fn set_consensus_config(&mut self, consensus_config: ConsensusConfig) {
+        self.consensus_config = consensus_config;
     }
 
     /// Modifies the validators list.
@@ -333,7 +333,7 @@ impl TestNetworkConfiguration {
                 node
             })
             .collect();
-        self.stored_configuration.validator_keys = self
+        self.consensus_config.validator_keys = self
             .validators
             .iter()
             .cloned()
@@ -353,14 +353,9 @@ impl TestNetworkConfiguration {
     /// Modifies the configuration of the service with the given identifier.
     pub fn set_service_config<D>(&mut self, _id: &str, _config: D)
     where
-        D: Serialize,
+        D: Into<Any>,
     {
         unimplemented!();
-    }
-
-    /// Returns the resulting exonum blockchain configuration.
-    pub fn stored_configuration(&self) -> &StoredConfiguration {
-        &self.stored_configuration
     }
 
     fn update_our_role(&mut self) {

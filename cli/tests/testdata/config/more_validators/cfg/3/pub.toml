@@ -1,4 +1,4 @@
-[common.consensus_config]
+[common.consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
 max_propose_timeout = 200
@@ -14,11 +14,9 @@ validators_count = 3
 [common.services_config]
 
 [node]
-address = "127.0.0.4:6333"
-
-[node.services_public_configs]
+address = "0.0.0.0:8003"
 
 [node.validator_keys]
-consensus_key = "ce0e13cd5f8a010c115f7b894c7c24d9403ea0bb0887001670d1b836141dd01c"
-identity_key = "ece8ce74c3d7c6d62b7dc2aacfebe0d203ee012bd265b8aeeb8659b2568a430e"
-service_key = "dc3f637623d9cc0a49248251ef4667da1f72c1e05f7375a251245598a1112ed4"
+consensus_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
+service_key = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"
+

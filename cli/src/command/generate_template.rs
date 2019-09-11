@@ -39,8 +39,8 @@ pub struct GenerateTemplate {
 impl ExonumCommand for GenerateTemplate {
     fn execute(self) -> Result<StandardResult, Error> {
         let config_template = CommonConfigTemplate {
-            consensus_config: Default::default(),
-            general_config: GeneralConfig {
+            consensus: Default::default(),
+            general: GeneralConfig {
                 validators_count: self.validators_count,
             },
         };

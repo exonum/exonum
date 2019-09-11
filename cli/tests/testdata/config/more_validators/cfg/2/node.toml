@@ -1,54 +1,44 @@
-external_address = "127.0.0.3:6333"
-listen_address = "0.0.0.0:6333"
-master_key_path = "master.key.toml"
+consensus_public_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
+consensus_secret_key = "consensus.key.toml"
+external_address = "0.0.0.0:8002"
+listen_address = "0.0.0.0:8002"
+service_public_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
+service_secret_key = "service.key.toml"
 
 [api]
 state_update_timeout = 10000
 [[connect_list.peers]]
-address = "127.0.0.1:6333"
-identity_key = "2074195abf07c426027930e30dae79ceeceef06d8f71e571d3f3c78546e4ef55"
-public_key = "448e29f1e600e7b9bc7312ff213d9dd03196c656352bbf9b5acdbe929c4dc489"
+address = "0.0.0.0:8000"
+public_key = "3b27439519ca4d28de698367d0a5bcc3cc33912e671c6dc952dafac2df1ffb07"
 
 [[connect_list.peers]]
-address = "127.0.0.2:6333"
-identity_key = "342928a8b1d381bb8218558a9c5fd279743797980fb1c10010ca4c8f10188c37"
-public_key = "7aaffb2a0d3343a1b1952fad076939d184788f7a98aad44ccf67b6d05a765e71"
+address = "0.0.0.0:8003"
+public_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
 
 [[connect_list.peers]]
-address = "127.0.0.3:6333"
-identity_key = "609e47520b04cc2d48c9e9e38eb8ad38a9c7313af66534f8e8b25f11fb764854"
-public_key = "c1a00518f1cb606c3ff3e891c6ac1c7c4e49ca1ffcac9094e71c038abf38498c"
-
-[[connect_list.peers]]
-address = "127.0.0.4:6333"
-identity_key = "ece8ce74c3d7c6d62b7dc2aacfebe0d203ee012bd265b8aeeb8659b2568a430e"
-public_key = "ce0e13cd5f8a010c115f7b894c7c24d9403ea0bb0887001670d1b836141dd01c"
+address = "0.0.0.0:8001"
+public_key = "faa0b61e5ba0be4836ce8400dbfc44cfd1c3eb363ec93a7a8a89bf1d21dcef8b"
 
 [database]
 create_if_missing = true
 compression_type = "none"
+[[genesis.validator_keys]]
+consensus_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
+service_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
 
 [[genesis.validator_keys]]
-consensus_key = "448e29f1e600e7b9bc7312ff213d9dd03196c656352bbf9b5acdbe929c4dc489"
-identity_key = "2074195abf07c426027930e30dae79ceeceef06d8f71e571d3f3c78546e4ef55"
-service_key = "d82dc55e8bd08707cba61d6faebaa2e86f6dbee2672b2c95ba68adca402fbe16"
+consensus_key = "3b27439519ca4d28de698367d0a5bcc3cc33912e671c6dc952dafac2df1ffb07"
+service_key = "e4ed73397172b26b3488494ede7e606e4967e75b0875811a49f4487ee71dc6ce"
 
 [[genesis.validator_keys]]
-consensus_key = "7aaffb2a0d3343a1b1952fad076939d184788f7a98aad44ccf67b6d05a765e71"
-identity_key = "342928a8b1d381bb8218558a9c5fd279743797980fb1c10010ca4c8f10188c37"
-service_key = "ddb3c3b820a1b2319b4e2595e0b04a2b530da5efe0e3d7f23b990e598d75880d"
+consensus_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
+service_key = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"
 
 [[genesis.validator_keys]]
-consensus_key = "c1a00518f1cb606c3ff3e891c6ac1c7c4e49ca1ffcac9094e71c038abf38498c"
-identity_key = "609e47520b04cc2d48c9e9e38eb8ad38a9c7313af66534f8e8b25f11fb764854"
-service_key = "e597a326e7ad218140b7d5eb587a7c162a93b06fd50dd679c676518fa703360c"
+consensus_key = "faa0b61e5ba0be4836ce8400dbfc44cfd1c3eb363ec93a7a8a89bf1d21dcef8b"
+service_key = "f4fc481e910d79027fbadb200a1e79435319d2c781d114a0b9687b3babaa2ccf"
 
-[[genesis.validator_keys]]
-consensus_key = "ce0e13cd5f8a010c115f7b894c7c24d9403ea0bb0887001670d1b836141dd01c"
-identity_key = "ece8ce74c3d7c6d62b7dc2aacfebe0d203ee012bd265b8aeeb8659b2568a430e"
-service_key = "dc3f637623d9cc0a49248251ef4667da1f72c1e05f7375a251245598a1112ed4"
-
-[genesis.consensus]
+[consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
 max_propose_timeout = 200
@@ -69,4 +59,3 @@ max_outgoing_connections = 128
 tcp_connect_max_retries = 10
 tcp_connect_retry_timeout = 15000
 tcp_nodelay = true
-[services_configs.configuration_service]

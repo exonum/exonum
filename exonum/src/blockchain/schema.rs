@@ -27,7 +27,7 @@ use crate::{
     runtime::InstanceId,
 };
 
-use super::{config::StoredConfiguration, Block, BlockProof, ExecutionStatus};
+use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -51,12 +51,11 @@ define_names!(
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
     PRECOMMITS => "precommits";
-    CONFIGS => "configs";
-    CONFIGS_ACTUAL_FROM => "configs_actual_from";
     STATE_HASH_AGGREGATOR => "state_hash_aggregator";
     PEERS_CACHE => "peers_cache";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
+    CONSENSUS_CONFIG => "consensus.config";
 );
 
 /// Configuration index.
@@ -209,17 +208,9 @@ where
         ListIndex::new_in_family(PRECOMMITS, hash, self.access.clone())
     }
 
-    /// Returns a table that represents a map with a key-value pair of a
-    /// configuration hash and contents.
-    pub fn configs(&self) -> ProofMapIndex<T, Hash, StoredConfiguration> {
-        // configs patricia merkle tree <block height> json
-        ProofMapIndex::new(CONFIGS, self.access.clone())
-    }
-
-    /// Returns an auxiliary table that keeps hash references to configurations in
-    /// the increasing order of their `actual_from` height.
-    pub fn configs_actual_from(&self) -> ListIndex<T, ConfigReference> {
-        ListIndex::new(CONFIGS_ACTUAL_FROM, self.access.clone())
+    /// Returns an actual consensus configuration entry.
+    pub fn consensus_config_entry(&self) -> Entry<T, ConsensusConfig> {
+        Entry::new(CONSENSUS_CONFIG, self.access.clone())
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -305,75 +296,21 @@ where
         Height(len - 1)
     }
 
-    /// Returns the configuration for the latest height of the blockchain.
+    /// Returns an actual consensus configuration of the blockchain.
     ///
     /// # Panics
     ///
     /// Panics if the "genesis block" was not created.
-    pub fn actual_configuration(&self) -> StoredConfiguration {
-        let next_height = self.next_height();
-        let res = self.configuration_by_height(next_height);
-        trace!("Retrieved actual_config: {:?}", res);
-        res
-    }
-
-    /// Returns the nearest following configuration which will be applied after
-    /// the current one, if it exists.
-    pub fn following_configuration(&self) -> Option<StoredConfiguration> {
-        let next_height = self.next_height();
-        let idx = self.find_configurations_index_by_height(next_height);
-        match self.configs_actual_from().get(idx + 1) {
-            Some(cfg_ref) => {
-                let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| {
-                    panic!("Config with hash {:?} is absent in configs table", cfg_hash)
-                });
-                Some(cfg)
-            }
-            None => None,
-        }
-    }
-
-    /// Returns the previous configuration if it exists.
-    pub fn previous_configuration(&self) -> Option<StoredConfiguration> {
-        let next_height = self.next_height();
-        let idx = self.find_configurations_index_by_height(next_height);
-        if idx > 0 {
-            let cfg_ref = self
-                .configs_actual_from()
-                .get(idx - 1)
-                .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
-            let cfg_hash = cfg_ref.cfg_hash();
-            let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| {
-                panic!("Config with hash {:?} is absent in configs table", cfg_hash)
-            });
-            Some(cfg)
-        } else {
-            None
-        }
-    }
-
-    /// Returns the configuration that is actual for the given height.
-    pub fn configuration_by_height(&self, height: Height) -> StoredConfiguration {
-        let idx = self.find_configurations_index_by_height(height);
-        let cfg_ref = self
-            .configs_actual_from()
-            .get(idx)
-            .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
-        let cfg_hash = cfg_ref.cfg_hash();
-        self.configuration_by_hash(cfg_hash)
-            .unwrap_or_else(|| panic!("Config with hash {:?} is absent in configs table", cfg_hash))
-    }
-
-    /// Returns the configuration for the given configuration hash.
-    pub fn configuration_by_hash(&self, hash: &Hash) -> Option<StoredConfiguration> {
-        self.configs().get(hash)
+    pub fn consensus_config(&self) -> ConsensusConfig {
+        self.consensus_config_entry()
+            .get()
+            .expect("Consensus configuration is absent")
     }
 
     /// Returns the `state_hash` table for core tables.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.configs().object_hash(),
+            self.consensus_config_entry().object_hash(),
             self.transaction_results().object_hash(),
         ]
     }
@@ -382,43 +319,6 @@ where
     pub(crate) fn set_consensus_round(&mut self, round: Round) {
         let mut entry: Entry<T, _> = Entry::new(CONSENSUS_ROUND, self.access.clone());
         entry.set(round);
-    }
-
-    /// Adds a new configuration to the blockchain, which will become actual at
-    /// the `actual_from` height in `config_data`.
-    pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
-        let actual_from = config_data.actual_from;
-        if let Some(last_cfg) = self.configs_actual_from().last() {
-            if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
-                // TODO: Replace panic with errors. (ECR-123)
-                panic!(
-                    "Attempting to commit configuration with incorrect previous hash: {:?}, \
-                     expected: {:?}",
-                    config_data.previous_cfg_hash,
-                    last_cfg.cfg_hash()
-                );
-            }
-
-            if actual_from <= last_cfg.actual_from() {
-                panic!(
-                    "Attempting to commit configuration with actual_from {} less than the last \
-                     committed the last committed actual_from {}",
-                    actual_from,
-                    last_cfg.actual_from()
-                );
-            }
-        }
-
-        info!(
-            "Scheduled the following configuration for acceptance: {:?}",
-            &config_data
-        );
-
-        let cfg_hash = config_data.object_hash();
-        self.configs().put(&cfg_hash, config_data);
-
-        let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
-        self.configs_actual_from().push(cfg_ref);
     }
 
     /// Adds transaction into the persistent pool.
@@ -450,26 +350,6 @@ where
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
-    }
-
-    fn find_configurations_index_by_height(&self, height: Height) -> u64 {
-        let actual_from = self.configs_actual_from();
-        for i in (0..actual_from.len()).rev() {
-            if actual_from.get(i).unwrap().actual_from() <= height {
-                return i as u64;
-            }
-        }
-        panic!(
-            "Couldn't not find any config for height {}, \
-             that means that genesis block was created incorrectly.",
-            height
-        )
-    }
-
-    /// Returns the next height of the blockchain.
-    /// Its value is equal to "height of the latest committed block" + 1.
-    fn next_height(&self) -> Height {
-        Height(self.block_hashes_by_height().len())
     }
 }
 

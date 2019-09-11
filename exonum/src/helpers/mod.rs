@@ -26,7 +26,7 @@ use log::SetLoggerError;
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::blockchain::{GenesisConfig, Schema, ValidatorKeys};
+use crate::blockchain::{ConsensusConfig, Schema, ValidatorKeys};
 use crate::crypto::{gen_keypair, kx};
 use crate::exonum_merkledb::Fork;
 use crate::keys::Keys;
@@ -48,11 +48,17 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
         .map(|(v, s, i)| Keys::from_keys(v.0, v.1, s.0, s.1, i.0, i.1))
         .collect();
 
-    let genesis = GenesisConfig::new(keys.iter().map(|keys| ValidatorKeys {
-        consensus_key: keys.consensus_pk(),
-        service_key: keys.service_pk(),
-        identity_key: keys.identity_pk(),
-    }));
+    let consensus = ConsensusConfig {
+        validator_keys: keys
+            .iter()
+            .map(|keys| ValidatorKeys {
+                consensus_key: keys.consensus_pk(),
+                service_key: keys.service_pk(),
+                identity_key: keys.identity_pk(),
+            })
+            .collect(),
+        ..ConsensusConfig::default()
+    };
     let peers = (0..keys.len())
         .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
         .collect::<Vec<_>>();
@@ -63,8 +69,8 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             listen_address: peers[idx].parse().unwrap(),
             external_address: peers[idx].clone(),
             network: Default::default(),
-            genesis: genesis.clone(),
-            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
+            consensus: consensus.clone(),
+            connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
             services_configs: Default::default(),

@@ -86,6 +86,8 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
+pub extern crate structopt;
+
 use exonum::{
     blockchain::InstanceCollection,
     exonum_merkledb::{Database, RocksDB},
@@ -112,7 +114,7 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     /// Adds new Rust service to the list of available services.

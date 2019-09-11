@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use crate::{
     api::ApiContext,
-    blockchain::{Blockchain, GenesisConfig, Schema},
+    blockchain::{Blockchain, ConsensusConfig, Schema},
     crypto::{PublicKey, SecretKey},
     events::InternalRequest,
     node::ApiSender,
@@ -43,7 +43,7 @@ pub struct BlockchainBuilder {
     /// The database which works under the hood.
     pub database: Arc<dyn Database>,
     /// Blockchain configuration used to create the genesis block.
-    pub genesis_config: GenesisConfig,
+    pub genesis_config: ConsensusConfig,
     /// Keypair, which  is used to sign service transactions on behalf of this node.
     pub service_keypair: (PublicKey, SecretKey),
     /// List of the supported runtimes.
@@ -58,7 +58,7 @@ impl BlockchainBuilder {
     /// the service keypair without any runtimes. The user must add them by himself/herself.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        genesis_config: GenesisConfig,
+        genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
     ) -> Self {
         Self {
@@ -216,6 +216,7 @@ mod tests {
     use exonum_merkledb::TemporaryDB;
 
     use crate::{
+        crypto,
         helpers::{generate_testnet_config, Height},
         runtime::supervisor::Supervisor,
     };
@@ -230,7 +231,7 @@ mod tests {
         let blockchain = Blockchain::new(
             TemporaryDB::new(),
             Vec::new(),
-            config.genesis,
+            config.consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),
             mpsc::channel(0).0,
@@ -254,7 +255,23 @@ mod tests {
                 Supervisor::BUILTIN_NAME,
                 (),
             )],
-            config.genesis,
+            config.consensus,
+            service_keypair,
+            ApiSender::new(mpsc::channel(0).0),
+            mpsc::channel(0).0,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Consensus configuration must have at least one validator")]
+    fn finalize_invalid_consensus_config() {
+        let consensus = ConsensusConfig::default();
+        let service_keypair = crypto::gen_keypair();
+
+        Blockchain::new(
+            TemporaryDB::new(),
+            Vec::new(),
+            consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),
             mpsc::channel(0).0,
