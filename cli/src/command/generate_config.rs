@@ -80,6 +80,9 @@ pub struct GenerateConfig {
     /// by default.
     #[structopt(long)]
     pub master_key_pass: Option<PassInputMethod>,
+    /// Path to the master key file. If empty, file will be placed to <output_dir>.
+    #[structopt(long)]
+    pub master_key_path: Option<PathBuf>,
 }
 
 impl GenerateConfig {
@@ -125,13 +128,17 @@ impl ExonumCommand for GenerateConfig {
 
         let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
         let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
-        let master_key_path = self.output_dir.join(MASTER_KEY_FILE_NAME);
+        let master_key_path = self
+            .master_key_path
+            .unwrap_or_else(|| "".into())
+            .join(MASTER_KEY_FILE_NAME);
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
         let keys = {
             let passphrase =
                 Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default());
+            let master_key_path = self.output_dir.join(master_key_path.clone());
             create_keys_and_files(&master_key_path, passphrase.unwrap().as_bytes())
         }?;
 
@@ -154,7 +161,7 @@ impl ExonumCommand for GenerateConfig {
         let private_config = NodePrivateConfig {
             listen_address,
             external_address: self.peer_address.to_string(),
-            master_key_path: MASTER_KEY_FILE_NAME.into(),
+            master_key_path: master_key_path.clone(),
             keys,
         };
 

@@ -73,6 +73,7 @@ impl ExonumCommand for RunDev {
             listen_address: None,
             no_password: true,
             master_key_pass: None,
+            master_key_path: None,
         };
         generate_config.execute()?;
 

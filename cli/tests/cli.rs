@@ -272,6 +272,7 @@ fn test_generate_template() {
 #[test]
 fn test_generate_config_key_files() {
     let env = ConfigSpec::new_without_pass();
+
     env.command("generate-config")
         .with_arg(&env.expected_template_file())
         .with_arg(&env.output_node_config_dir(0))
