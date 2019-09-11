@@ -170,7 +170,7 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
-    blockchain::{Blockchain, GenesisConfig, Schema as CoreSchema, StoredConfiguration},
+    blockchain::{Blockchain, ConsensusConfig, Schema as CoreSchema},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
@@ -245,7 +245,7 @@ impl TestKit {
         database: impl Into<CheckpointDb<TemporaryDB>>,
         service_factories: impl IntoIterator<Item = InstanceCollection>,
         network: TestNetwork,
-        genesis: GenesisConfig,
+        genesis: ConsensusConfig,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
@@ -512,19 +512,18 @@ impl TestKit {
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
                 Uncommitted(cfg_proposal) => {
-                    // Commit configuration proposal
-                    let stored = cfg_proposal.stored_configuration().clone();
-
-                    let fork = self.blockchain.fork();
-                    CoreSchema::new(&fork).commit_configuration(stored);
                     self.cfg_proposal = Some(Committed(cfg_proposal));
-
-                    return Some(fork.into_patch());
                 }
                 Committed(cfg_proposal) => {
                     if cfg_proposal.actual_from() == actual_from {
+                        // Commit configuration proposal
+                        let config = cfg_proposal.consensus_config().clone();
+
+                        let fork = self.blockchain.fork();
+                        CoreSchema::new(&fork).consensus_config_entry().set(config);
                         // Modify the self configuration
                         self.network_mut().update_configuration(cfg_proposal);
+                        return Some(fork.into_patch());
                     } else {
                         self.cfg_proposal = Some(Committed(cfg_proposal));
                     }
@@ -538,7 +537,7 @@ impl TestKit {
     /// Returns a reference to the scheduled configuration proposal, or `None` if
     /// there is no such proposal.
     pub fn next_configuration(&self) -> Option<&TestNetworkConfiguration> {
-        use crate::ConfigurationProposalState::*;
+        use crate::ConfigurationProposalState::{Committed, Uncommitted};
 
         self.cfg_proposal.as_ref().map(|p| match *p {
             Committed(ref proposal) | Uncommitted(ref proposal) => proposal,
@@ -695,8 +694,8 @@ impl TestKit {
     }
 
     /// Return an actual blockchain configuration.
-    pub fn actual_configuration(&self) -> StoredConfiguration {
-        CoreSchema::new(&self.snapshot()).actual_configuration()
+    pub fn consensus_config(&self) -> ConsensusConfig {
+        CoreSchema::new(&self.snapshot()).consensus_config()
     }
 
     /// Returns reference to validator with the given identifier.
@@ -732,8 +731,8 @@ impl TestKit {
     /// The returned configuration could be modified for use with
     /// `commit_configuration_change` method.
     pub fn configuration_change_proposal(&self) -> TestNetworkConfiguration {
-        let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
-        TestNetworkConfiguration::new(self.network(), stored_configuration)
+        let consensus_config = CoreSchema::new(&self.snapshot()).consensus_config();
+        TestNetworkConfiguration::new(self.network(), consensus_config)
     }
 
     /// Adds a new configuration proposal. Remember, to add this proposal to the blockchain,
@@ -963,21 +962,12 @@ impl StoppedTestKit {
         self,
         available_services: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
     ) -> TestKit {
-        let genesis = {
-            let snapshot = self.db.snapshot();
-            let schema = CoreSchema::new(&snapshot);
-            GenesisConfig::new(
-                schema
-                    .configuration_by_height(Height(0))
-                    .validator_keys
-                    .into_iter(),
-            )
-        };
         let mut testkit = TestKit::assemble(
             self.db,
             available_services.into_iter().map(InstanceCollection::new),
             self.network,
-            genesis,
+            // TODO make consensus config optional [ECR-3222]
+            ConsensusConfig::default(),
         );
         testkit.cfg_proposal = self.cfg_proposal;
         testkit

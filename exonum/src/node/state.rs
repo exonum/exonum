@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{contains_transaction, ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{contains_transaction, ConsensusConfig, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
@@ -60,7 +60,7 @@ pub struct State {
     service_public_key: PublicKey,
     service_secret_key: SecretKey,
 
-    config: StoredConfiguration,
+    config: ConsensusConfig,
     connect_list: SharedConnectList,
 
     peers: HashMap<PublicKey, Verified<Connect>>,
@@ -446,7 +446,7 @@ impl State {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         connect_list: ConnectList,
-        stored: StoredConfiguration,
+        config: ConsensusConfig,
         connect: Verified<Connect>,
         peers: HashMap<PublicKey, Verified<Connect>>,
         last_hash: Hash,
@@ -486,7 +486,7 @@ impl State {
 
             requests: HashMap::new(),
 
-            config: stored,
+            config,
 
             incomplete_block: None,
 
@@ -539,8 +539,8 @@ impl State {
         &self.config.validator_keys
     }
 
-    /// Returns `StoredConfiguration`.
-    pub fn config(&self) -> &StoredConfiguration {
+    /// Returns `ConsensusConfig`.
+    pub fn config(&self) -> &ConsensusConfig {
         &self.config
     }
 
@@ -554,12 +554,12 @@ impl State {
 
     /// Returns `ConsensusConfig`.
     pub fn consensus_config(&self) -> &ConsensusConfig {
-        &self.config.consensus
+        &self.config
     }
 
-    /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node
+    /// Replaces `ConsensusConfig` with a new one and updates validator id of the current node
     /// if the new config is different from the previous one.
-    pub fn update_config(&mut self, config: StoredConfiguration) {
+    pub fn update_config(&mut self, config: ConsensusConfig) {
         if self.config == config {
             return;
         }
@@ -605,7 +605,7 @@ impl State {
         self.config
             .validator_keys
             .iter()
-            .any(|x| x.consensus_key == *pubkey)
+            .any(|x| &x.consensus_key == pubkey)
     }
 
     /// Checks if a peer is in this node's connection list.

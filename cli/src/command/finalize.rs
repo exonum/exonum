@@ -16,7 +16,7 @@
 //! node configuration in a single file.
 
 use exonum::{
-    blockchain::GenesisConfig,
+    blockchain::ConsensusConfig,
     node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig},
 };
 use failure::{bail, format_err, Error};
@@ -137,16 +137,16 @@ impl ExonumCommand for Finalize {
             public_configs,
         } = Self::validate_configs(public_configs)?;
 
-        let validators_count = common.general_config.validators_count as usize;
+        let validators_count = common.general.validators_count as usize;
 
         if validators_count != public_configs.len() {
             bail!("The number of validators does not match the number of validators keys.");
         }
 
-        let genesis = GenesisConfig::new_with_consensus(
-            common.clone().consensus_config,
-            public_configs.iter().map(|c| c.validator_keys),
-        );
+        let consensus = ConsensusConfig {
+            validator_keys: public_configs.iter().map(|c| c.validator_keys).collect(),
+            ..common.consensus.clone()
+        };
 
         let connect_list = Self::create_connect_list_config(&public_configs, &secret_config);
 
@@ -159,7 +159,7 @@ impl ExonumCommand for Finalize {
                 consensus_secret_key: secret_config_dir.join(&secret_config.consensus_secret_key),
                 service_public_key: secret_config.service_public_key,
                 service_secret_key: secret_config_dir.join(&secret_config.service_secret_key),
-                genesis,
+                consensus,
                 api: NodeApiConfig {
                     public_api_address: self.public_api_address,
                     private_api_address: self.private_api_address,

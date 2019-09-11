@@ -14,12 +14,13 @@
 
 pub use crate::proto::schema::tests::TxConfig;
 
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::BinaryValue;
 
 use crate::{
-    blockchain::{ExecutionError, Schema, StoredConfiguration},
+    blockchain::{ConsensusConfig, ExecutionError, Schema},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
+    merkledb::Snapshot,
     messages::{AnyTx, Verified},
     proto::ProtobufConvert,
     runtime::{
@@ -53,9 +54,9 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
         context: TransactionContext,
         arg: TxConfig,
     ) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.fork());
-        schema
-            .commit_configuration(StoredConfiguration::try_deserialize(arg.get_config()).unwrap());
+        Schema::new(context.fork())
+            .consensus_config_entry()
+            .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
     }
 }

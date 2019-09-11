@@ -14,7 +14,7 @@
 use exonum_merkledb::TemporaryDB;
 
 use exonum::{
-    blockchain::{GenesisConfig, InstanceCollection, ValidatorKeys},
+    blockchain::{ConsensusConfig, InstanceCollection, ValidatorKeys},
     node::{Node, NodeApiConfig, NodeConfig},
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
@@ -23,11 +23,13 @@ fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
 
-    let validator_keys = ValidatorKeys {
-        consensus_key: consensus_public_key,
-        service_key: service_public_key,
+    let consensus = ConsensusConfig {
+        validator_keys: vec![ValidatorKeys {
+            consensus_key: consensus_public_key,
+            service_key: service_public_key,
+        }],
+        ..ConsensusConfig::default()
     };
-    let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
 
     let api_address = "0.0.0.0:8000".parse().unwrap();
     let api_cfg = NodeApiConfig {
@@ -43,7 +45,7 @@ fn node_config() -> NodeConfig {
         service_secret_key,
         consensus_public_key,
         consensus_secret_key,
-        genesis,
+        consensus,
         external_address: peer_address.to_owned(),
         network: Default::default(),
         connect_list: Default::default(),
