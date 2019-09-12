@@ -25,12 +25,17 @@ use super::{ExecutionError, Interface, TransactionContext};
 ///
 /// [`Initialize::initialize`]: trait.Initialize.html#tymethod.initialize
 pub const INITIALIZE_METHOD_ID: MethodId = 0;
-
+/// Fully qualified name of the `Initialize` interface.
 pub const INITIALIZE_INTERFACE_NAME: &str = "Initialize";
 
 /// This trait describes a service interface to pass initial configuration parameters into
 /// the started service instance.
+/// 
+/// This interface is optional, therefore if initialize was called on a service 
+/// that does not implement this interface, and then if the configuration parameters are empty,
+/// dispatcher assumes that the initialization was successful.
 pub trait Initialize {
+    /// The specific type of parameters passed during the service instance initialization.
     type Params: BinaryValue;
 
     /// Initialize a service instance with the given parameters.
