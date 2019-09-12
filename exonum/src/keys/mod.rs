@@ -234,8 +234,6 @@ mod tests {
         let key =
             EncryptedMasterKey::encrypt(&seed, pass_phrase).expect("Couldn't encrypt master key");
 
-        dbg!(hex::encode(&seed));
-
         let mut file = File::create("foo.txt").unwrap();
         let _ = file.write_all(toml::to_string(&key).unwrap().as_bytes());
 

@@ -65,8 +65,8 @@ pub mod x25519;
 
 /// Hash of an empty slice.
 pub const EMPTY_SLICE_HASH: Hash = Hash([
-    227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228,
-    100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85,
+    0xE3, 0xB0, 0xC4, 0x42, 0x98, 0xFC, 0x1C, 0x14, 0x9A, 0xFB, 0xF4, 0xC8, 0x99, 0x6F, 0xB9, 0x24,
+    0x27, 0xAE, 0x41, 0xE4, 0x64, 0x9B, 0x93, 0x4C, 0xA4, 0x95, 0x99, 0x1B, 0x78, 0x52, 0xB8, 0x55,
 ]);
 
 /// Number of bytes in a `Hash`.
@@ -116,4 +116,10 @@ pub fn verify(sig: &Signature, data: &[u8], pub_key: &PublicKey) -> bool {
 /// Calculates hash of a bytes slice.
 pub fn hash(data: &[u8]) -> Hash {
     sha256::hash(data)
+}
+
+/// Verifies that public key matches provided secret key.
+pub(crate) fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+    let data = vec![0; 16];
+    verify(&sign(&data, secret_key), &data, public_key)
 }

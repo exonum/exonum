@@ -245,11 +245,7 @@ impl TestNode {
     }
 
     /// Returns the service keypair of the node.
-    pub fn service_keypair(&self) -> (PublicKey, &SecretKey) {
-        (self.keys.service_pk(), &self.keys.service_sk())
-    }
-
-    pub fn service_keypair_cloned(&self) -> (PublicKey, SecretKey) {
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
         (self.keys.service_pk(), self.keys.service_sk().clone())
     }
 

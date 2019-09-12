@@ -505,9 +505,8 @@ pub struct KeyPair {
 
 impl KeyPair {
     pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
-        assert_eq!(
-            &public_key[..],
-            &secret_key[PUBLIC_KEY_LENGTH..],
+        debug_assert!(
+            verify_keys_match(&public_key, &secret_key),
             "Public key does not match the secret key."
         );
 
@@ -530,6 +529,10 @@ impl From<(PublicKey, SecretKey)> for KeyPair {
     fn from(keys: (PublicKey, SecretKey)) -> Self {
         Self::from_keys(keys.0, keys.1)
     }
+}
+
+fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+    crypto_impl::verify_keys_match(&public_key.0, &secret_key.0)
 }
 
 impl CryptoHash for Hash {
@@ -863,5 +866,4 @@ mod tests {
         let (_, sk) = gen_keypair();
         let _ = KeyPair::from_keys(pk, sk);
     }
-
 }

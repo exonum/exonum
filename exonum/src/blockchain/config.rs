@@ -144,16 +144,19 @@ impl ConsensusConfig {
         );
 
         let mut exist_keys = HashSet::with_capacity(self.validator_keys.len() * 2);
+        let mut exist_identity_keys = HashSet::with_capacity(self.validator_keys.len() * 2);
         for validator_keys in &self.validator_keys {
             validator_keys.validate()?;
             if exist_keys.contains(&validator_keys.consensus_key)
                 || exist_keys.contains(&validator_keys.service_key)
+                || exist_identity_keys.contains(&validator_keys.identity_key)
             {
                 bail!("Duplicated keys are found: each consensus and service key must be unique");
             }
 
             exist_keys.insert(validator_keys.consensus_key);
             exist_keys.insert(validator_keys.service_key);
+            exist_identity_keys.insert(validator_keys.identity_key);
         }
 
         Ok(())
@@ -317,6 +320,12 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
+    fn gen_identity_keys_pool(count: usize) -> Vec<kx::PublicKey> {
+        (0..count)
+            .map(|_| crypto::kx::gen_keypair().0)
+            .collect::<Vec<_>>()
+    }
+
     fn gen_consensus_config() -> ConsensusConfig {
         ConsensusConfig {
             validator_keys: (0..4).map(gen_validator_keys).collect(),
@@ -350,7 +359,8 @@ mod tests {
 
     #[test]
     fn consensus_config_validate_err_round_trip() {
-        let keys = gen_keys_pool(3);
+        let keys = gen_keys_pool(4);
+        let identity_keys = gen_identity_keys_pool(2);
 
         let cases = [
             (
@@ -362,7 +372,7 @@ mod tests {
                     validator_keys: vec![ValidatorKeys {
                         consensus_key: keys[0],
                         service_key: keys[0],
-                        identity_key: kx::PublicKey::zero(),
+                        identity_key: identity_keys[0],
                     }],
                     ..ConsensusConfig::default()
                 },
@@ -374,12 +384,12 @@ mod tests {
                         ValidatorKeys {
                             consensus_key: keys[0],
                             service_key: keys[1],
-                            identity_key: kx::PublicKey::zero(),
+                            identity_key: identity_keys[0],
                         },
                         ValidatorKeys {
                             consensus_key: keys[0],
                             service_key: keys[2],
-                            identity_key: kx::PublicKey::zero(),
+                            identity_key: identity_keys[1],
                         },
                     ],
                     ..ConsensusConfig::default()
@@ -392,12 +402,30 @@ mod tests {
                         ValidatorKeys {
                             consensus_key: keys[0],
                             service_key: keys[1],
-                            identity_key: kx::PublicKey::zero(),
+                            identity_key: identity_keys[0],
                         },
                         ValidatorKeys {
                             consensus_key: keys[2],
                             service_key: keys[1],
-                            identity_key: kx::PublicKey::zero(),
+                            identity_key: identity_keys[1],
+                        },
+                    ],
+                    ..ConsensusConfig::default()
+                },
+                "Duplicated keys are found",
+            ),
+            (
+                ConsensusConfig {
+                    validator_keys: vec![
+                        ValidatorKeys {
+                            consensus_key: keys[1],
+                            service_key: keys[0],
+                            identity_key: identity_keys[1],
+                        },
+                        ValidatorKeys {
+                            consensus_key: keys[2],
+                            service_key: keys[3],
+                            identity_key: identity_keys[1],
                         },
                     ],
                     ..ConsensusConfig::default()

@@ -408,11 +408,10 @@ impl SharedConnectList {
 
     /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
-        let identity = self.inner.read().unwrap().identity.clone();
+        let connect_list = self.inner.read().expect("ConnectList read lock");
+        let identity = connect_list.identity.clone();
 
-        self.inner
-            .read()
-            .expect("ConnectList read lock")
+        connect_list
             .peers
             .iter()
             .map(|(pk, a)| ConnectInfo {
@@ -436,9 +435,16 @@ impl SharedConnectList {
     }
 
     /// Get peer identity key using public key.
+    ///
+    /// # Panics
+    ///
+    /// If identity key is not present in the connect list.
     pub fn identity_key(&self, public_key: &PublicKey) -> kx::PublicKey {
         let connect_list = self.inner.read().expect("ConnectList read lock");
-        *connect_list.identity.get(public_key).unwrap()
+        *connect_list
+            .identity
+            .get(public_key)
+            .expect("Identity key not found")
     }
 }
 

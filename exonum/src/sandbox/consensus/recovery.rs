@@ -427,9 +427,6 @@ fn should_restore_peers_after_restart() {
     let identity0 = sandbox.identity_key(v0);
     let identity1 = sandbox.identity_key(v1);
 
-    dbg!(public_key0);
-    dbg!(public_key1);
-
     let time = sandbox.time();
     let connect_from_0 = sandbox.create_connect(
         &public_key0,
