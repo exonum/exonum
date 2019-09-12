@@ -20,8 +20,7 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, rust::interfaces::Initialize, CallContext,
-        CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor, InstanceId,
-        InstanceSpec,
+        CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -35,7 +34,7 @@ const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
 #[derive(Debug, ProtobufConvert)]
 #[exonum(pb = "TestServiceInit", crate = "crate")]
-struct Init {
+pub struct Init {
     msg: String,
 }
 
@@ -63,7 +62,7 @@ trait TestService {
     artifact_name = "test_service",
     artifact_version = "0.1.0",
     proto_sources = "crate::proto::schema",
-    implements("TestService", "Initialize")
+    implements("TestService", "Initialize<Params = Init>")
 )]
 pub struct TestServiceImpl;
 
@@ -107,9 +106,13 @@ impl TestService for TestServiceImpl {
 }
 
 impl Initialize for TestServiceImpl {
-    fn initialize(&self, context: TransactionContext, arg: &[u8]) -> Result<(), ExecutionError> {
-        let arg = Init::from_bytes(arg.into()).map_err(DispatcherError::parse_error)?;
+    type Params = Init;
 
+    fn initialize(
+        &self,
+        context: TransactionContext,
+        arg: Self::Params,
+    ) -> Result<(), ExecutionError> {
         let mut entry = Entry::new("constructor_entry", context.fork());
         entry.set(arg.msg);
         Ok(())

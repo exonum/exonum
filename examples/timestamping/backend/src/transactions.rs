@@ -28,10 +28,8 @@ use crate::{
 pub enum Error {
     /// Content hash already exists.
     HashAlreadyExists = 0,
-    /// Unable to parse service configuration.
-    ConfigParseError = 1,
     /// Time service with the specified name doesn't exist.
-    TimeServiceNotFound = 2,
+    TimeServiceNotFound = 1,
 }
 
 /// Timestamping transaction.

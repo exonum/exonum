@@ -38,7 +38,7 @@ pub mod transactions;
 use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
-    merkledb::{BinaryValue, Snapshot},
+    merkledb::Snapshot,
     runtime::{
         api::ServiceApiBuilder,
         dispatcher,
@@ -56,14 +56,18 @@ use crate::{
 #[derive(Debug, ServiceFactory)]
 #[exonum(
     proto_sources = "proto",
-    implements("TimestampingInterface", "Initialize")
+    implements("TimestampingInterface", "Initialize<Params = Config>")
 )]
 pub struct TimestampingService;
 
 impl Initialize for TimestampingService {
-    fn initialize(&self, context: TransactionContext, params: &[u8]) -> Result<(), ExecutionError> {
-        let config = Config::from_bytes(params.into()).map_err(|e| (Error::ConfigParseError, e))?;
+    type Params = Config;
 
+    fn initialize(
+        &self,
+        context: TransactionContext,
+        config: Self::Params,
+    ) -> Result<(), ExecutionError> {
         if !dispatcher::Schema::new(context.fork())
             .service_instances()
             .contains(&config.time_service_name)

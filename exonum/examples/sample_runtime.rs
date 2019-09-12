@@ -25,8 +25,8 @@ use exonum::{
     runtime::{
         dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
         rust::{
-            interfaces::{Initialize, INITIALIZE_METHOD_ID},
-            Interface, Transaction,
+            interfaces::{INITIALIZE_INTERFACE_NAME, INITIALIZE_METHOD_ID},
+            Transaction,
         },
         supervisor::{DeployRequest, StartService, Supervisor},
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
@@ -140,8 +140,6 @@ impl Runtime for SampleRuntime {
             .get(&call_info.instance_id)
             .ok_or(SampleRuntimeError::IncorrectCallInfo)?;
 
-        if context.interface_name == Initialize::INTERFACE_NAME {}
-
         println!(
             "Executing method {}#{} of service {}",
             context.interface_name, call_info.method_id, call_info.instance_id
@@ -151,7 +149,7 @@ impl Runtime for SampleRuntime {
         match (context.interface_name, call_info.method_id) {
             // `initialize` request sets the counter value of the corresponding
             // `SampleService` instance
-            (Initialize::INTERFACE_NAME, INITIALIZE_METHOD_ID) => {
+            (INITIALIZE_INTERFACE_NAME, INITIALIZE_METHOD_ID) => {
                 let new_value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
                 service.counter.set(new_value);

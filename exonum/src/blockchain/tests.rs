@@ -33,9 +33,8 @@ use crate::{
         dispatcher,
         error::ErrorKind,
         rust::{
-            interfaces::{Initialize, INITIALIZE_METHOD_ID},
-            BeforeCommitContext, Interface, Service, ServiceFactory, Transaction,
-            TransactionContext,
+            interfaces::{Initialize, INITIALIZE_INTERFACE_NAME, INITIALIZE_METHOD_ID},
+            BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext,
         },
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
     },
@@ -97,7 +96,7 @@ trait TestDispatcherInterface {
     crate = "crate",
     artifact_name = "test_dispatcher",
     proto_sources = "crate::proto::schema",
-    implements("TestDispatcherInterface", "Initialize")
+    implements("TestDispatcherInterface", "Initialize<Params = Vec<u8>>")
 )]
 struct TestDispatcherService;
 
@@ -108,10 +107,12 @@ impl Service for TestDispatcherService {
 }
 
 impl Initialize for TestDispatcherService {
+    type Params = Vec<u8>;
+
     fn initialize(
         &self,
         _context: TransactionContext,
-        params: &[u8],
+        params: Self::Params,
     ) -> Result<(), ExecutionError> {
         if !params.is_empty() {
             let v = TestExecute::from_bytes(params.into()).unwrap();
@@ -206,7 +207,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         arg: TestCallInitialize,
     ) -> Result<(), ExecutionError> {
         context.call_context(context.instance.id).call(
-            Initialize::INTERFACE_NAME,
+            INITIALIZE_INTERFACE_NAME,
             INITIALIZE_METHOD_ID,
             arg.value,
         )

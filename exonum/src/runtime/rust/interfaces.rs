@@ -14,7 +14,10 @@
 
 //! Important interservice communication interfaces.
 
-use crate::runtime::{dispatcher::Error as DispatcherError, MethodId};
+use crate::{
+    merkledb::BinaryValue,
+    runtime::{DispatcherError, MethodId},
+};
 
 use super::{ExecutionError, Interface, TransactionContext};
 
@@ -23,9 +26,13 @@ use super::{ExecutionError, Interface, TransactionContext};
 /// [`Initialize::initialize`]: trait.Initialize.html#tymethod.initialize
 pub const INITIALIZE_METHOD_ID: MethodId = 0;
 
+pub const INITIALIZE_INTERFACE_NAME: &str = "Initialize";
+
 /// This trait describes a service interface to pass initial configuration parameters into
 /// the started service instance.
 pub trait Initialize {
+    type Params: BinaryValue;
+
     /// Initialize a service instance with the given parameters.
     ///
     /// The configuration parameters passed to the method are discarded immediately.
@@ -43,11 +50,15 @@ pub trait Initialize {
     /// [`start_service`]: ../../trait.Runtime.html#tymethod.start_service
     /// [`stop_service`]: ../../trait.Runtime.html#tymethod.stop_service
     /// [`Blockchain`]: ../../enum.Caller.html#variant.Blockchain
-    fn initialize(&self, context: TransactionContext, params: &[u8]) -> Result<(), ExecutionError>;
+    fn initialize(
+        &self,
+        context: TransactionContext,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError>;
 }
 
-impl Interface for dyn Initialize {
-    const INTERFACE_NAME: &'static str = "Initialize";
+impl<T: BinaryValue> Interface for dyn Initialize<Params = T> {
+    const INTERFACE_NAME: &'static str = INITIALIZE_INTERFACE_NAME;
 
     fn dispatch(
         &self,
@@ -61,7 +72,10 @@ impl Interface for dyn Initialize {
         }
 
         match method {
-            INITIALIZE_METHOD_ID => self.initialize(context, payload),
+            INITIALIZE_METHOD_ID => self.initialize(
+                context,
+                T::from_bytes(payload.into()).map_err(DispatcherError::parse_error)?,
+            ),
             other => {
                 let kind = DispatcherError::NoSuchMethod;
                 let message = format!(
