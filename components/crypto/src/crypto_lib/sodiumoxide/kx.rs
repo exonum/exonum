@@ -52,9 +52,9 @@ pub struct KeyPair {
 
 impl KeyPair {
     pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
-        let pk = scalarmult_base(&secret_key);
-        assert_eq!(
-            &public_key, &pk,
+        debug_assert_eq!(
+            &public_key,
+            &scalarmult_base(&secret_key),
             "Public key does not match the secret key."
         );
 
