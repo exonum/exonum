@@ -15,8 +15,6 @@
 use exonum_crypto::Hash;
 use tempfile::TempDir;
 
-use std::sync::Arc;
-
 use crate::{
     Database, DbOptions, Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex,
     ProofMapIndex, RocksDB, SparseListIndex, ValueSetIndex,
@@ -45,9 +43,7 @@ fn checkpoints() {
     let dst_path = dst_temp_dir.path().join("dst");
 
     // Convert into `dyn Database` to test downcast.
-    let db: Arc<dyn Database> = RocksDB::open(&*src_path, &DbOptions::default())
-        .unwrap()
-        .into();
+    let db = RocksDB::open(&*src_path, &DbOptions::default()).unwrap();
 
     // Write some data to the source database.
     {
@@ -58,8 +54,7 @@ fn checkpoints() {
 
     // Create checkpoint
     {
-        let rocks_db = db.downcast_ref::<RocksDB>().unwrap();
-        rocks_db.create_checkpoint(&*dst_path).unwrap();
+        db.create_checkpoint(&*dst_path).unwrap();
     }
 
     // Add more data to the source database
