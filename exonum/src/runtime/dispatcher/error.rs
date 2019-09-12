@@ -46,8 +46,8 @@ pub enum Error {
     StackOverflow = 10,
     /// This caller is not authorized to call this method.
     UnauthorizedCaller = 11,
-    /// Unable to parse the method arguments of a service interface.
-    ParseError = 12,
+    /// Malformed arguments for calling a service interface method.
+    MalformedArguments = 12,
 }
 
 impl Error {
@@ -66,8 +66,8 @@ impl Error {
         (Error::UnauthorizedCaller, msg).into()
     }
 
-    /// Create a `ParseError` error with the specified error message.
-    pub fn parse_error(msg: impl Display) -> ExecutionError {
-        (Error::ParseError, msg).into()
+    /// Create a `MalformedArguments` error with the specified error message.
+    pub fn malformed_arguments(msg: impl Display) -> ExecutionError {
+        (Error::MalformedArguments, msg).into()
     }
 }

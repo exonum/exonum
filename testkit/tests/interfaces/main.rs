@@ -299,7 +299,10 @@ fn test_any_call_err_wrong_arg() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, runtime::DispatcherError::ParseError.into());
+    assert_eq!(
+        err.kind,
+        runtime::DispatcherError::MalformedArguments.into()
+    );
 }
 
 #[test]

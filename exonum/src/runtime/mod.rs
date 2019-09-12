@@ -195,21 +195,21 @@ pub trait Runtime: Send + Debug + 'static {
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
 
     /// Execute service instance method.
-    /// 
+    ///
     /// # Important interfaces
-    /// 
-    /// In addition to its own methods, a service can implement methods of additional interfaces. 
+    ///
+    /// In addition to its own methods, a service can implement methods of additional interfaces.
     /// You should provide in your own runtime following most important service interfaces:
-    /// 
+    ///
     /// ## Initialize
-    /// 
-    /// This interface describes an initial configuration procedure of started service. See explanation in the 
+    ///
+    /// This interface describes an initial configuration procedure of started service. See explanation in the
     /// Rust runtime definition of this [interface].
     ///
     /// # Policy on Panics
     ///
     /// Do not process. Panic will be processed by the method caller.
-    /// 
+    ///
     /// [interface]: rust/interfaces/trait.Initialize.html
     fn execute(
         &self,

@@ -30,8 +30,8 @@ pub const INITIALIZE_INTERFACE_NAME: &str = "Initialize";
 
 /// This trait describes a service interface to pass initial configuration parameters into
 /// the started service instance.
-/// 
-/// This interface is optional, therefore if initialize was called on a service 
+///
+/// This interface is optional, therefore if initialize was called on a service
 /// that does not implement this interface, and then if the configuration parameters are empty,
 /// dispatcher assumes that the initialization was successful.
 pub trait Initialize {
@@ -79,7 +79,7 @@ impl<T: BinaryValue> Interface for dyn Initialize<Params = T> {
         match method {
             INITIALIZE_METHOD_ID => self.initialize(
                 context,
-                T::from_bytes(payload.into()).map_err(DispatcherError::parse_error)?,
+                T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?,
             ),
             other => {
                 let kind = DispatcherError::NoSuchMethod;

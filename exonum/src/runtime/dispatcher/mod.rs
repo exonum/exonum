@@ -369,41 +369,6 @@ impl Dispatcher {
         }
     }
 
-    // Try to configure the started instance of the service and catch panic if it occurs.
-    pub(crate) fn initialize_service(
-        &self,
-        runtime: &dyn Runtime,
-        fork: &Fork,
-        descriptor: InstanceDescriptor,
-        constructor: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        let constructor_is_empty = constructor.is_empty();
-
-        let context = ExecutionContext {
-            interface_name: <dyn Initialize<Params = ()> as Interface>::INTERFACE_NAME,
-            ..ExecutionContext::new(self, fork, Caller::Blockchain {})
-        };
-        let call_info = CallInfo {
-            instance_id: descriptor.id,
-            method_id: INITIALIZE_METHOD_ID,
-        };
-        let args = constructor.into_bytes();
-
-        catch_panic(|| {
-            runtime
-                .execute(&context, &call_info, args.as_ref())
-                .or_else(|err| {
-                    // Default behavior for case if the service does not implement an `Initialize`
-                    // interface and constructor is empty.
-                    if constructor_is_empty && err.kind == Error::NoSuchInterface.into() {
-                        Ok(())
-                    } else {
-                        Err(err)
-                    }
-                })
-        })
-    }
-
     /// Return additional information about the artifact if it is deployed.
     pub(crate) fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
         self.runtimes
@@ -457,6 +422,41 @@ impl Dispatcher {
         runtime.start_service(instance)?;
         self.register_running_service(&instance);
         Ok(())
+    }
+
+    // Try to configure the started instance of the service and catch panic if it occurs.
+    fn initialize_service(
+        &self,
+        runtime: &dyn Runtime,
+        fork: &Fork,
+        descriptor: InstanceDescriptor,
+        constructor: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let constructor_is_empty = constructor.is_empty();
+
+        let context = ExecutionContext {
+            interface_name: <dyn Initialize<Params = ()> as Interface>::INTERFACE_NAME,
+            ..ExecutionContext::new(self, fork, Caller::Blockchain {})
+        };
+        let call_info = CallInfo {
+            instance_id: descriptor.id,
+            method_id: INITIALIZE_METHOD_ID,
+        };
+        let args = constructor.into_bytes();
+
+        catch_panic(|| {
+            runtime
+                .execute(&context, &call_info, args.as_ref())
+                .or_else(|err| {
+                    // Default behavior for case if the service does not implement an `Initialize`
+                    // interface and constructor is empty.
+                    if constructor_is_empty && err.kind == Error::NoSuchInterface.into() {
+                        Ok(())
+                    } else {
+                        Err(err)
+                    }
+                })
+        })
     }
 }
 
