@@ -15,13 +15,16 @@
 //! Exonum blockchain explorer API.
 
 use actix::Arbiter;
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
+use actix_web::{
+    http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpMessage, HttpResponse, Query,
+};
 use chrono::{DateTime, Utc};
 use futures::{Future, IntoFuture};
 
 use std::ops::{Bound, Range};
 use std::sync::{Arc, Mutex};
 
+use crate::blockchain::Schema;
 use crate::{
     api::{
         backends::actix::{
@@ -32,9 +35,10 @@ use crate::{
     },
     blockchain::{Block, SharedNodeState},
     crypto::Hash,
+    events::error::into_failure,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{Message, Precommit, RawTransaction, Signed, SignedMessage},
+    messages::{Message, Precommit, ProtocolMessage, RawTransaction, Signed, SignedMessage},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -246,24 +250,51 @@ impl ExplorerApi {
                 ApiError::NotFound(description)
             })
     }
+
     /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
     pub fn add_transaction(
-        state: &ServiceApiState,
-        query: TransactionHex,
-    ) -> Result<TransactionResponse, ApiError> {
-        use crate::events::error::into_failure;
-        use crate::messages::ProtocolMessage;
+        name: &'static str,
+        backend: &mut actix_backend::ApiBuilder,
+        service_api_state: ServiceApiState,
+    ) {
+        let snapshot = service_api_state.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        let max_message_len = schema.actual_configuration().consensus.max_message_len;
 
-        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_raw_buffer(buf)?;
-        let tx_hash = signed.hash();
-        let signed = RawTransaction::try_from(Message::deserialize(signed)?)
-            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
-        let _ = state
-            .sender()
-            .broadcast_transaction(signed)
-            .map_err(ApiError::from);
-        Ok(TransactionResponse { tx_hash })
+        let handler = |state: &ServiceApiState,
+                       query: TransactionHex|
+         -> Result<TransactionResponse, ApiError> {
+            let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
+            let signed = SignedMessage::from_raw_buffer(buf)?;
+            let tx_hash = signed.hash();
+            let signed = RawTransaction::try_from(Message::deserialize(signed)?)
+                .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
+            let _ = state
+                .sender()
+                .broadcast_transaction(signed)
+                .map_err(ApiError::from);
+            Ok(TransactionResponse { tx_hash })
+        };
+
+        let index = move |request: HttpRequest| {
+            let state = request.state().clone();
+            request
+                .json()
+                .limit(max_message_len as usize)
+                .from_err()
+                .and_then(move |query: TransactionHex| {
+                    handler(&state, query)
+                        .map(|value| HttpResponse::Ok().json(value))
+                        .map_err(From::from)
+                })
+                .responder()
+        };
+
+        backend.raw_handler(RequestHandler {
+            name: name.to_owned(),
+            method: http::Method::POST,
+            inner: Arc::new(index) as Arc<RawHandler>,
+        });
     }
 
     /// Subscribes to events.
@@ -283,11 +314,12 @@ impl ExplorerApi {
             let server = server.clone();
             let service_api_state = service_api_state.clone();
             let mut address = server.lock().expect("Expected mutex lock");
+
             if address.is_none() {
                 *address = Some(Arbiter::start(|_| Server::new(service_api_state)));
-
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
+
             let address = address.to_owned().unwrap();
 
             extract_query(&request)
@@ -312,6 +344,12 @@ impl ExplorerApi {
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
     ) -> &mut ServiceApiScope {
+        Self::add_transaction(
+            "v1/transactions",
+            api_scope.web_backend(),
+            service_api_state.clone(),
+        );
+
         // Default subscription for blocks.
         Self::handle_ws(
             "v1/blocks/subscribe",
@@ -320,6 +358,7 @@ impl ExplorerApi {
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::Blocks),
         );
+
         // Default subscription for transactions.
         Self::handle_ws(
             "v1/transactions/subscribe",
@@ -340,6 +379,7 @@ impl ExplorerApi {
                     .unwrap_or(Ok(SubscriptionType::None))
             },
         );
+
         // Default websocket connection.
         Self::handle_ws(
             "v1/ws",
@@ -348,11 +388,11 @@ impl ExplorerApi {
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::None),
         );
+
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)
             .endpoint("v1/transactions", Self::transaction_info)
-            .endpoint_mut("v1/transactions", Self::add_transaction)
     }
 }
 
