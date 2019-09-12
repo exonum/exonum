@@ -32,20 +32,26 @@ use proptest::{
         collection::{btree_map, vec},
     },
     prelude::*,
-    test_runner::Config,
+    test_runner::{Config, TestCaseError, TestCaseResult},
 };
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
-    ops::Range,
+    ops::{Range, RangeInclusive},
 };
 
 use exonum_merkledb::{BinaryValue, ObjectHash};
 
 const INDEX_NAME: &str = "index";
 
-fn check_map_proof<T, K, V>(proof: &MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<T, K, V>)
+type Data = BTreeMap<[u8; 32], u64>;
+
+fn check_map_proof<T, K, V>(
+    proof: &MapProof<K, V>,
+    key: Option<K>,
+    table: &ProofMapIndex<T, K, V>,
+) -> TestCaseResult
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
@@ -55,25 +61,29 @@ where
         let value = table.get(&key).unwrap();
         (key, value)
     });
-    let proof = proof.check_against_hash(table.object_hash()).unwrap();
-    assert!(proof.entries().eq(entry.as_ref().map(|(k, v)| (k, v))));
+    let proof = proof
+        .check_against_hash(table.object_hash())
+        .map_err(|e| TestCaseError::fail(e.to_string()))?;
+    prop_assert!(proof.entries().eq(entry.as_ref().map(|(k, v)| (k, v))));
+    Ok(())
 }
 
 fn check_map_multiproof<T, K, V>(
     proof: &MapProof<K, V>,
-    keys: BTreeSet<K>,
+    keys: BTreeSet<&K>,
     table: &ProofMapIndex<T, K, V>,
-) where
+) -> TestCaseResult
+where
     T: IndexAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + PartialEq + Debug,
 {
-    let mut entries: Vec<(K, V)> = Vec::new();
-    let mut missing_keys: Vec<K> = Vec::new();
+    let mut entries: Vec<(&K, V)> = Vec::new();
+    let mut missing_keys: Vec<&K> = Vec::new();
 
     for key in keys {
-        if table.contains(&key) {
-            let value = table.get(&key).unwrap();
+        if table.contains(key) {
+            let value = table.get(key).unwrap();
             entries.push((key, value));
         } else {
             missing_keys.push(key);
@@ -83,193 +93,309 @@ fn check_map_multiproof<T, K, V>(
     // Sort entries and missing keys by the order imposed by the `ProofPath`
     // serialization of the keys
     entries.sort_unstable_by(|(x, _), (y, _)| {
-        ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
+        ProofPath::new(*x).partial_cmp(&ProofPath::new(*y)).unwrap()
     });
     missing_keys
-        .sort_unstable_by(|x, y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+        .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
 
     let unchecked_proof = proof;
-    let proof = proof.check().unwrap();
-    assert!(proof
+    let proof = proof
+        .check()
+        .map_err(|e| TestCaseError::fail(e.to_string()))?;
+    prop_assert!(proof
         .all_entries()
         .eq(unchecked_proof.all_entries_unchecked()));
-    assert_eq!(proof.object_hash(), table.object_hash());
+    prop_assert_eq!(proof.object_hash(), table.object_hash());
 
-    let mut actual_keys: Vec<_> = proof.missing_keys().collect();
+    let mut actual_keys: Vec<&K> = proof.missing_keys().collect();
     actual_keys
         .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
-    assert!(missing_keys.iter().eq(actual_keys));
+    prop_assert_eq!(missing_keys, actual_keys);
 
-    let mut actual_entries: Vec<_> = proof.entries().collect();
+    let mut actual_entries: Vec<(&K, &V)> = proof.entries().collect();
     actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
         ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
     });
-    assert!(entries.iter().map(|(k, v)| (k, v)).eq(actual_entries));
+    prop_assert!(entries.iter().map(|(k, v)| (*k, v)).eq(actual_entries));
+    Ok(())
 }
 
-// Creates data a random-filled `ProofMapIndex<_, [u8; 32], u64>`.
-fn index_data<S>(key_bytes: S, elements_len: Range<usize>) -> BoxedStrategy<BTreeMap<[u8; 32], u64>>
-where
-    S: 'static + Strategy<Value = u8>,
-{
-    btree_map(array::uniform32(key_bytes), any::<u64>(), elements_len).boxed()
-}
-
-// Converts raw data to a database.
-fn data_to_db(data: BTreeMap<[u8; 32], u64>) -> TemporaryDB {
-    let db = TemporaryDB::new();
+/// Writes raw data to a database.
+fn write_data(db: &TemporaryDB, data: Data) {
     let fork = db.fork();
     {
         let mut table = ProofMapIndex::new(INDEX_NAME, &fork);
+        table.clear();
         for (key, value) in data {
             table.put(&key, value);
         }
     }
     db.merge(fork.into_patch()).unwrap();
-    db
 }
 
-macro_rules! proof_map_tests {
-    (cases = $cases:expr,sizes = $sizes:expr,bytes = $bytes:expr) => {
-        proptest! {
-            #![proptest_config(Config::with_cases($cases))]
+/// Creates data for a random-filled `ProofMapIndex<_, [u8; 32], u64>`.
+fn index_data(
+    key_bytes: impl Strategy<Value = u8>,
+    sizes: Range<usize>,
+) -> impl Strategy<Value = Data> {
+    btree_map(array::uniform32(key_bytes), any::<u64>(), sizes)
+}
 
-            #[test]
-            fn proof_of_presence(
-                (key, ref db) in index_data($bytes, $sizes)
-                    .prop_flat_map(|data| (0..data.len(), Just(data)))
-                    .prop_map(|(index, data)| {
-                        (*data.keys().nth(index).unwrap(), data_to_db(data))
-                    })
-            ) {
-                let snapshot = db.snapshot();
-                let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, &snapshot);
-                let proof = table.get_proof(key);
-                check_map_proof(&proof, Some(key), &table);
-            }
+/// Generates data to test a proof of presence.
+fn data_for_proof_of_presence(
+    key_bytes: impl Strategy<Value = u8>,
+    sizes: Range<usize>,
+) -> impl Strategy<Value = ([u8; 32], Data)> {
+    index_data(key_bytes, sizes)
+        .prop_flat_map(|data| (0..data.len(), Just(data)))
+        .prop_map(|(index, data)| (*data.keys().nth(index).unwrap(), data))
+}
 
+fn data_for_multi_proof(
+    key_bytes: impl Strategy<Value = u8>,
+    sizes: Range<usize>,
+) -> impl Strategy<Value = (Vec<[u8; 32]>, Data)> {
+    index_data(key_bytes, sizes)
+        .prop_flat_map(|data| (vec(0..data.len(), data.len() / 5), Just(data)))
+        .prop_map(|(indexes, data)| {
+            // Note that keys may coincide; this is intentional.
+            let keys: Vec<_> = indexes
+                .into_iter()
+                .map(|i| *data.keys().nth(i).unwrap())
+                .collect();
+            (keys, data)
+        })
+}
 
-            #[test]
-            fn proof_of_absence(
-                ref db in index_data($bytes, $sizes).prop_map(data_to_db),
-                key in array::uniform32($bytes)
-            ) {
-                let snapshot = db.snapshot();
-                let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, &snapshot);
-                prop_assume!(!table.contains(&key));
-
-                let proof = table.get_proof(key);
-                check_map_proof(&proof, None, &table);
-            }
-
-            #[test]
-            fn multiproof_of_existing_elements(
-                (ref keys, ref db) in index_data($bytes, $sizes)
-                    .prop_flat_map(|data| {
-                        (vec(0..data.len(), data.len() / 5), Just(data))
-                    })
-                    .prop_map(|(indexes, data)| {
-                        // Note that keys may coincide; this is intentional.
-                        let keys: Vec<_> = indexes
-                            .into_iter()
-                            .map(|i| *data.keys().nth(i).unwrap())
-                            .collect();
-                        (keys, data_to_db(data))
-                    })
-            ) {
-                            let snapshot = db.snapshot();
-                let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, &snapshot);
-                let proof = table.get_multiproof(keys.clone());
-
-                let unique_keys: BTreeSet<_> = keys.iter().cloned().collect();
-                check_map_multiproof(&proof, unique_keys, &table);
-            }
-
-            #[test]
-            fn multiproof_of_nonexisting_elements(
-                ref db in index_data($bytes, $sizes).prop_map(data_to_db),
-                ref keys in vec(array::uniform32($bytes), 20)
-            ) {
-                                            let snapshot = db.snapshot();
-                let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, &snapshot);
-                prop_assume!(keys.iter().all(|key| !table.contains(key)));
-
-                let proof = table.get_multiproof(keys.clone());
-                let unique_keys: BTreeSet<_> = keys.iter().cloned().collect();
-                check_map_multiproof(&proof, unique_keys, &table);
-            }
-
-            #[test]
-            fn mixed_multiproof(
-                (ref keys, ref db) in index_data($bytes, $sizes)
-                    .prop_flat_map(|data| {
-                        (vec(0..data.len(), data.len() / 5), Just(data))
-                    })
-                    .prop_map(|(indexes, data)| {
-                        // Note that keys may coincide; this is intentional.
-                        let keys: Vec<_> = indexes
-                            .into_iter()
-                            .map(|i| *data.keys().nth(i).unwrap())
-                            .collect();
-                        (keys, data_to_db(data))
-                    }),
-                ref absent_keys in vec(array::uniform32($bytes), 20)
-            ) {
-                                        let snapshot = db.snapshot();
-                let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, &snapshot);
-
-                let mut all_keys = keys.clone();
-                all_keys.extend_from_slice(absent_keys);
-                let proof = table.get_multiproof(all_keys.clone());
-
-                let unique_keys: BTreeSet<_> = all_keys.into_iter().collect();
-                check_map_multiproof(&proof, unique_keys, &table);
-            }
-        }
+fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
+    let snapshot = db.snapshot();
+    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let proof = table.get_proof(key);
+    let expected_key = if table.contains(&key) {
+        Some(key)
+    } else {
+        None
     };
+    check_map_proof(&proof, expected_key, &table)
+}
+
+fn test_multi_proof(db: &TemporaryDB, keys: &[[u8; 32]]) -> TestCaseResult {
+    let snapshot = db.snapshot();
+    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let proof = table.get_multiproof(keys.to_vec());
+    let unique_keys: BTreeSet<_> = keys.iter().collect();
+    check_map_multiproof(&proof, unique_keys, &table)
+}
+
+#[derive(Debug, Clone)]
+struct TestParams {
+    key_bytes: RangeInclusive<u8>,
+    index_sizes: Range<usize>,
+    test_cases_divider: u32,
+}
+
+impl TestParams {
+    fn key_bytes(&self) -> RangeInclusive<u8> {
+        self.key_bytes.clone()
+    }
+
+    fn index_sizes(&self) -> Range<usize> {
+        self.index_sizes.clone()
+    }
+
+    fn config(&self) -> Config {
+        Config::with_cases(Config::default().cases / self.test_cases_divider)
+    }
+
+    fn proof_of_presence(&self) {
+        let db = TemporaryDB::new();
+        let strategy = data_for_proof_of_presence(self.key_bytes(), self.index_sizes());
+        proptest!(self.config(), |((key, data) in strategy)| {
+            write_data(&db, data);
+            test_proof(&db, key)?;
+        });
+    }
+
+    fn proof_of_absence(&self) {
+        let db = TemporaryDB::new();
+        let key_strategy = array::uniform32(self.key_bytes());
+        let data_strategy = index_data(self.key_bytes(), self.index_sizes());
+        proptest!(self.config(), |(key in key_strategy, data in data_strategy)| {
+            write_data(&db, data);
+            test_proof(&db, key)?;
+        });
+    }
+
+    fn multi_proof_of_existing_elements(&self) {
+        let db = TemporaryDB::new();
+        let strategy = data_for_multi_proof(self.key_bytes(), self.index_sizes());
+        proptest!(self.config(), |((keys, data) in strategy)| {
+            write_data(&db, data);
+            test_multi_proof(&db, &keys)?;
+        });
+    }
+
+    fn multi_proof_of_absent_elements(&self) {
+        let db = TemporaryDB::new();
+        let keys_strategy = vec(array::uniform32(self.key_bytes()), 20);
+        let data_strategy = index_data(self.key_bytes(), self.index_sizes());
+        proptest!(self.config(), |(keys in keys_strategy, data in data_strategy)| {
+            write_data(&db, data);
+            test_multi_proof(&db, &keys)?;
+        });
+    }
+
+    fn mixed_multi_proof(&self) {
+        let db = TemporaryDB::new();
+        let strategy = data_for_multi_proof(self.key_bytes(), self.index_sizes());
+        let absent_keys_strategy = vec(array::uniform32(self.key_bytes()), 20);
+        proptest!(
+            self.config(),
+            |((mut keys, data) in strategy, absent_keys in absent_keys_strategy)| {
+                write_data(&db, data);
+                keys.extend_from_slice(&absent_keys);
+                test_multi_proof(&db, &keys)?;
+            }
+        );
+    }
 }
 
 mod small_index {
     use super::*;
 
-    proof_map_tests!(
-        cases = Config::default().cases,
-        sizes = 10..100,
-        bytes = 0_u8..
-    );
+    const PARAMS: TestParams = TestParams {
+        key_bytes: 0..=255,
+        index_sizes: 10..100,
+        test_cases_divider: 1,
+    };
+
+    #[test]
+    fn proof_of_presence() {
+        PARAMS.proof_of_presence();
+    }
+
+    #[test]
+    fn proof_of_absence() {
+        PARAMS.proof_of_absence();
+    }
+
+    #[test]
+    fn multi_proof_of_existing_elements() {
+        PARAMS.multi_proof_of_existing_elements();
+    }
+
+    #[test]
+    fn multi_proof_of_absent_elements() {
+        PARAMS.multi_proof_of_absent_elements();
+    }
+
+    #[test]
+    fn mixed_multi_proof() {
+        PARAMS.mixed_multi_proof();
+    }
 }
 
 mod small_index_skewed {
     use super::*;
 
-    proof_map_tests!(
-        cases = Config::default().cases,
-        sizes = 10..100,
-        bytes = 0_u8..3
-    );
+    const PARAMS: TestParams = TestParams {
+        key_bytes: 0..=2,
+        index_sizes: 10..100,
+        test_cases_divider: 1,
+    };
+
+    #[test]
+    fn proof_of_presence() {
+        PARAMS.proof_of_presence();
+    }
+
+    #[test]
+    fn proof_of_absence() {
+        PARAMS.proof_of_absence();
+    }
+
+    #[test]
+    fn multi_proof_of_existing_elements() {
+        PARAMS.multi_proof_of_existing_elements();
+    }
+
+    #[test]
+    fn multi_proof_of_absent_elements() {
+        PARAMS.multi_proof_of_absent_elements();
+    }
+
+    #[test]
+    fn mixed_multi_proof() {
+        PARAMS.mixed_multi_proof();
+    }
 }
 
 mod large_index {
     use super::*;
 
-    proof_map_tests!(
-        cases = Config::default().cases >> 5,
-        sizes = 5_000..10_000,
-        bytes = 0_u8..
-    );
+    const PARAMS: TestParams = TestParams {
+        key_bytes: 0..=255,
+        index_sizes: 5_000..10_000,
+        test_cases_divider: 32,
+    };
+
+    #[test]
+    fn proof_of_presence() {
+        PARAMS.proof_of_presence();
+    }
+
+    #[test]
+    fn proof_of_absence() {
+        PARAMS.proof_of_absence();
+    }
+
+    #[test]
+    fn multi_proof_of_existing_elements() {
+        PARAMS.multi_proof_of_existing_elements();
+    }
+
+    #[test]
+    fn multi_proof_of_absent_elements() {
+        PARAMS.multi_proof_of_absent_elements();
+    }
+
+    #[test]
+    fn mixed_multi_proof() {
+        PARAMS.mixed_multi_proof();
+    }
 }
 
 mod large_index_skewed {
     use super::*;
 
-    proof_map_tests!(
-        cases = Config::default().cases >> 5,
-        sizes = 5_000..10_000,
-        bytes = 0_u8..3
-    );
+    const PARAMS: TestParams = TestParams {
+        key_bytes: 0..=2,
+        index_sizes: 5_000..10_000,
+        test_cases_divider: 32,
+    };
+
+    #[test]
+    fn proof_of_presence() {
+        PARAMS.proof_of_presence();
+    }
+
+    #[test]
+    fn proof_of_absence() {
+        PARAMS.proof_of_absence();
+    }
+
+    #[test]
+    fn multi_proof_of_existing_elements() {
+        PARAMS.multi_proof_of_existing_elements();
+    }
+
+    #[test]
+    fn multi_proof_of_absent_elements() {
+        PARAMS.multi_proof_of_absent_elements();
+    }
+
+    #[test]
+    fn mixed_multi_proof() {
+        PARAMS.mixed_multi_proof();
+    }
 }
