@@ -78,9 +78,8 @@ impl Dispatcher {
     }
 
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
-    pub(crate) fn restore_state(&mut self, context: &ApiContext) -> Result<(), ExecutionError> {
-        let snapshot = context.snapshot();
-        let schema = Schema::new(&snapshot);
+    pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
+        let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
         for (artifact, spec) in schema.artifacts_with_spec() {
             self.deploy_artifact(artifact.clone(), spec).wait()?;
@@ -89,8 +88,6 @@ impl Dispatcher {
         for instance in schema.service_instances().values() {
             self.restart_service(&instance)?;
         }
-        // Notify runtimes about API to start.
-        self.notify_api_changes(context);
         Ok(())
     }
 
@@ -842,7 +839,8 @@ mod tests {
             .with_runtime(runtime_a.runtime_type, runtime_a)
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
-        dispatcher.restore_state(&context).unwrap();
+        let snapshot = db.snapshot();
+        dispatcher.restore_state(&snapshot).unwrap();
         assert_eq!(
             expected_api_changes,
             changes_rx.iter().take(2).collect::<Vec<_>>()
