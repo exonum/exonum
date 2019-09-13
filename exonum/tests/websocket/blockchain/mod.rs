@@ -29,6 +29,7 @@ use exonum::{
     node::{ApiSender, Node},
 };
 
+use exonum::node::NodeConfig;
 use exonum_merkledb::{Snapshot, TemporaryDB};
 
 mod proto;
@@ -126,6 +127,25 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .parse::<SocketAddr>()
             .unwrap(),
     );
+    run_node_with_cfg(node_cfg)
+}
+
+pub fn run_node_with_message_len(
+    listen_port: u16,
+    pub_api_port: u16,
+    max_message_len: u32,
+) -> RunHandle {
+    let mut node_cfg = helpers::generate_testnet_config(1, listen_port).remove(0);
+    node_cfg.genesis.consensus.max_message_len = max_message_len;
+    node_cfg.api.public_api_address = Some(
+        format!("127.0.0.1:{}", pub_api_port)
+            .parse::<SocketAddr>()
+            .unwrap(),
+    );
+    run_node_with_cfg(node_cfg)
+}
+
+fn run_node_with_cfg(node_cfg: NodeConfig) -> RunHandle {
     let service = Box::new(MyService);
     let node = Node::new(TemporaryDB::new(), vec![service], node_cfg, None);
     let api_tx = node.channel();

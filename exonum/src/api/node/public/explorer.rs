@@ -253,37 +253,20 @@ impl ExplorerApi {
 
     /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
     pub fn add_transaction(
-        name: &'static str,
+        name: &str,
         backend: &mut actix_backend::ApiBuilder,
         service_api_state: ServiceApiState,
     ) {
-        let snapshot = service_api_state.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
-        let max_message_len = schema.actual_configuration().consensus.max_message_len;
-
-        let handler = |state: &ServiceApiState,
-                       query: TransactionHex|
-         -> Result<TransactionResponse, ApiError> {
-            let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-            let signed = SignedMessage::from_raw_buffer(buf)?;
-            let tx_hash = signed.hash();
-            let signed = RawTransaction::try_from(Message::deserialize(signed)?)
-                .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
-            let _ = state
-                .sender()
-                .broadcast_transaction(signed)
-                .map_err(ApiError::from);
-            Ok(TransactionResponse { tx_hash })
-        };
+        let max_message_len = calculate_message_len(&service_api_state);
 
         let index = move |request: HttpRequest| {
             let state = request.state().clone();
             request
                 .json()
-                .limit(max_message_len as usize)
+                .limit(max_message_len)
                 .from_err()
                 .and_then(move |query: TransactionHex| {
-                    handler(&state, query)
+                    Self::tx_handler(&state, query)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
                 })
@@ -297,6 +280,22 @@ impl ExplorerApi {
         });
     }
 
+    fn tx_handler(
+        state: &ServiceApiState,
+        query: TransactionHex,
+    ) -> Result<TransactionResponse, ApiError> {
+        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
+        let signed = SignedMessage::from_raw_buffer(buf)?;
+        let tx_hash = signed.hash();
+        let signed = RawTransaction::try_from(Message::deserialize(signed)?)
+            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
+        let _ = state
+            .sender()
+            .broadcast_transaction(signed)
+            .map_err(ApiError::from);
+        Ok(TransactionResponse { tx_hash })
+    }
+
     /// Subscribes to events.
     pub fn handle_ws<Q>(
         name: &'static str,
@@ -307,6 +306,7 @@ impl ExplorerApi {
     ) where
         Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
     {
+        let max_message_len = calculate_message_len(&service_api_state);
         let server = Arc::new(Mutex::new(None));
         let service_api_state = Arc::new(service_api_state);
 
@@ -326,7 +326,19 @@ impl ExplorerApi {
                 .into_future()
                 .from_err()
                 .and_then(move |query: SubscriptionType| {
-                    ws::start(&request, Session::new(address, vec![query])).into_future()
+                    ws::handshake(&request)
+                        .map(|mut response| {
+                            let stream =
+                                ws::WsStream::new(request.payload()).max_size(max_message_len);
+                            let body = ws::WebsocketContext::create(
+                                request.clone(),
+                                Session::new(address, vec![query]),
+                                stream,
+                            );
+                            response.body(body)
+                        })
+                        .map_err(From::from)
+                        .into_future()
                 })
                 .responder()
         };
@@ -418,4 +430,11 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
             time: Some(median_precommits_time(&inner.precommits())),
         }
     }
+}
+
+fn calculate_message_len(api_state: &ServiceApiState) -> usize {
+    let snapshot = api_state.blockchain().snapshot();
+    let schema = Schema::new(&snapshot);
+    let max_message_len_in_bytes = schema.actual_configuration().consensus.max_message_len;
+    max_message_len_in_bytes as usize * 2 + 2
 }

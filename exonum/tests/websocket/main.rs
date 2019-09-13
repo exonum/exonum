@@ -427,3 +427,53 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
         let _ = client.shutdown();
     }
 }
+
+#[test]
+fn test_sending_message_size() {
+    let max_message_len = 512_usize;
+    let node_handler = run_node_with_message_len(6338, 8087, max_message_len as u32);
+    let mut client =
+        create_ws_client("ws://localhost:8087/api/explorer/v1/ws").expect("Cannot connect to node");
+    client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+
+    // Send transaction.
+    let (pk, sk) = gen_keypair();
+    let name = String::from_utf8(vec![64; max_message_len / 2]).unwrap();
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, name.as_str()), SERVICE_ID, pk, &sk);
+    let tx_hash = tx.hash();
+    let tx_json =
+        serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
+            .unwrap();
+    client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
+
+    // Check response on set message when the message is smaller than 512 bytes.
+    let resp_text = recv_text_msg(&mut client).unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
+        json!({
+            "result": "success",
+            "response": { "tx_hash": tx_hash }
+        })
+    );
+
+    let (pk, sk) = gen_keypair();
+    let name = String::from_utf8(vec![64; max_message_len]).unwrap();
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, name.as_str()), SERVICE_ID, pk, &sk);
+    let tx_json =
+        serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
+            .unwrap();
+    client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
+
+    // Check response on set message when the message is bigger than 512 bytes.
+    assert!(recv_text_msg(&mut client).is_none());
+
+    // Shutdown node.
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
+}
