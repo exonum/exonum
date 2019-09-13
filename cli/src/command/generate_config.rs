@@ -133,9 +133,7 @@ impl ExonumCommand for GenerateConfig {
             .unwrap_or_default()
             .join(MASTER_KEY_FILE_NAME);
 
-        if !master_key_path.is_absolute() {
-            master_key_path = self.output_dir.join(master_key_path.clone());
-        }
+        master_key_path = self.output_dir.join(master_key_path.clone());
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
