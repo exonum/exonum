@@ -687,6 +687,7 @@ mod tests {
             call_info: &CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
+            // TODO Provide interface calls support for this runtime [ECR-3222]
             if !context.interface_name.is_empty() {
                 return Err(DispatcherError::NoSuchInterface.into());
             }
