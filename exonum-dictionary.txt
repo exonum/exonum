@@ -15,6 +15,7 @@ brainwallet
 btree
 bytearray
 byteorder
+canonicalize
 checkpointed
 chmod
 chrono
