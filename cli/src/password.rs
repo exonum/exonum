@@ -65,7 +65,7 @@ pub enum PassInputMethod {
     Terminal,
     /// Get passphrase from the environment variable with given name.
     ///
-    /// Default value `EXONUM_MASTER_PASS` for master key.
+    /// Default value is `EXONUM_MASTER_PASS`.
     /// Defaults are used if `None` is provided.
     EnvVariable(Option<String>),
     /// Passphrase is passed as a command line parameter.

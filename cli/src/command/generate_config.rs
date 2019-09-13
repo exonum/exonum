@@ -40,7 +40,7 @@ use crate::{
 pub const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
 /// Name for a file containing the secret part of the node configuration.
 pub const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
-/// Name for a file containing the secret part of the node configuration.
+/// Name for a encrypted file containing the node master key.
 pub const MASTER_KEY_FILE_NAME: &str = "master.key.toml";
 
 /// Default port number used by Exonum for communication between nodes.
@@ -72,11 +72,11 @@ pub struct GenerateConfig {
     /// Don't prompt for passwords when generating private keys.
     #[structopt(long, short = "n")]
     pub no_password: bool,
-    /// Passphrase entry method for consensus key.
+    /// Passphrase entry method for master key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
-    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_MASTER_PASS` is used
     /// by default.
     #[structopt(long)]
     pub master_key_pass: Option<PassInputMethod>,
@@ -128,18 +128,21 @@ impl ExonumCommand for GenerateConfig {
 
         let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
         let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
-        let master_key_path = self
+        let mut master_key_path = self
             .master_key_path
-            .unwrap_or_else(|| "".into())
+            .unwrap_or_default()
             .join(MASTER_KEY_FILE_NAME);
+
+        if !master_key_path.is_absolute() {
+            master_key_path = self.output_dir.join(master_key_path.clone());
+        }
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
         let keys = {
             let passphrase =
                 Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default());
-            let master_key_path = self.output_dir.join(master_key_path.clone());
-            create_keys_and_files(&master_key_path, passphrase.unwrap().as_bytes())
+            create_keys_and_files(&master_key_path, passphrase?.as_bytes())
         }?;
 
         let validator_keys = ValidatorKeys {
@@ -187,7 +190,7 @@ fn create_keys_and_files(
         )
     } else {
         if let Some(dir) = secret_key_path.parent() {
-            fs::create_dir_all(dir).unwrap();
+            fs::create_dir_all(dir)?;
         }
         generate_keys(&secret_key_path, passphrase.as_ref())
     }
