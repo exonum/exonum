@@ -49,7 +49,7 @@
 //! # Transaction Life Cycle
 //!
 //! 1. An Exonum client creates a transaction message which includes [CallInfo] information
-//! about the corresponding handler and serialized transaction parameters as a payload.
+//! about the corresponding method to call and serialized method parameters as a payload.
 //! The client then signs the message with the author's key pair.
 //!
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
@@ -68,6 +68,15 @@
 //!
 //! 6. After execution the transaction [execution status] is written into the blockchain.
 //!
+//! # Service interfaces
+//!
+//! In addition to its own methods, a service can implement methods of additional interfaces.
+//! In your own runtime implementation, you must provide support of the following interfaces:
+//!
+//! ## Initialize
+//!
+//! This interface describes an initial configuration procedure of started service. See explanation in the
+//! Rust runtime definition of this [interface].
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
@@ -77,7 +86,7 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-
+/// [interface]: rust/interfaces/trait.Initialize.html
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
@@ -194,23 +203,21 @@ pub trait Runtime: Send + Debug + 'static {
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
 
-    /// Execute service instance method.
+    /// Dispatch payload to the method of a specific service instance.
+    /// Service instance name and method ID are provided in the `call_info` argument and
+    /// interface name is provided as the corresponding field of the `context` argument.
     ///
-    /// # Important interfaces
+    /// # Notes for Runtime Developers.
     ///
-    /// In addition to its own methods, a service can implement methods of additional interfaces.
-    /// In your own runtime implementation, you must provide support of the following interfaces:
-    ///
-    /// ## Initialize
-    ///
-    /// This interface describes an initial configuration procedure of started service. See explanation in the
-    /// Rust runtime definition of this [interface].
+    /// * If service does not implement required interface, return `NoSuchInterface` error.
+    /// * If interface does not have required method, return `NoSuchMethod` error.
+    /// * For compatibility reasons, the interface name for user transactions is currently
+    /// always blank. But it may be changed in future releases.
     ///
     /// # Policy on Panics
     ///
     /// Do not process. Panic will be processed by the method caller.
     ///
-    /// [interface]: rust/interfaces/trait.Initialize.html
     fn execute(
         &self,
         context: &ExecutionContext,

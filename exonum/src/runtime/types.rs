@@ -26,12 +26,12 @@ use super::InstanceDescriptor;
 /// * This is a secondary identifier, mainly used in transaction messages.
 /// The primary one is a service instance name.
 ///
-/// * The core assigns this identifier when the service is started.
+/// * The dispatcher assigns this identifier when the service is started.
 pub type InstanceId = u32;
 /// Identifier of the method in the service interface required for the call.
 pub type MethodId = u32;
 
-/// Unique service transaction identifier.
+/// Information for calling the service method.
 #[derive(
     Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
 )]
