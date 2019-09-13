@@ -839,8 +839,13 @@ mod tests {
             .with_runtime(runtime_a.runtime_type, runtime_a)
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
-        let snapshot = db.snapshot();
-        dispatcher.restore_state(&snapshot).unwrap();
+        dispatcher.restore_state(&db.snapshot()).unwrap();
+        dispatcher.notify_api_changes(&ApiContext::new(
+            db.clone(),
+            crypto::gen_keypair(),
+            ApiSender::new(mpsc::channel(0).0),
+        ));
+
         assert_eq!(
             expected_api_changes,
             changes_rx.iter().take(2).collect::<Vec<_>>()
