@@ -45,7 +45,7 @@ pub trait Initialize {
     /// the service business logic.
     ///
     /// This method is called after creating a new service instance by the [`start_service`]
-    /// invocation. In this case if an error during this action occurs, the dispatcher will
+    /// invocation. In the case of an error occuring during this action, the dispatcher will
     /// invoke [`stop_service`].
     ///
     /// # Execution policy

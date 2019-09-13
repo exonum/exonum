@@ -199,7 +199,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// # Important interfaces
     ///
     /// In addition to its own methods, a service can implement methods of additional interfaces.
-    /// You should provide in your own runtime following most important service interfaces:
+    /// In your own runtime implementation, you must provide support of the following interfaces:
     ///
     /// ## Initialize
     ///
