@@ -19,7 +19,7 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::backends::actix::AllowOrigin,
-    crypto::{kx, PublicKey, PUBLIC_KEY_LENGTH},
+    crypto::{PublicKey, PUBLIC_KEY_LENGTH},
     helpers::config::{ConfigFile, ConfigManager},
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
@@ -496,7 +496,6 @@ fn test_update_config() {
     let peer = ConnectInfo {
         address: "0.0.0.1:8080".to_owned(),
         public_key: PublicKey::new([1; PUBLIC_KEY_LENGTH]),
-        identity_key: kx::PublicKey::zero(),
     };
 
     let connect_list = ConnectListConfig { peers: vec![peer] };

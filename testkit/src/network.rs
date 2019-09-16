@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
-    crypto::{self, kx, PublicKey, SecretKey},
+    crypto::{self, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     keys::Keys,
     messages::{Precommit, Propose, Verified},
@@ -127,17 +127,9 @@ impl TestNode {
     pub fn new_auditor() -> Self {
         let (consensus_pk, consensus_sk) = crypto::gen_keypair();
         let (service_pk, service_sk) = crypto::gen_keypair();
-        let (identity_pk, identity_sk) = crypto::kx::gen_keypair();
 
         TestNode {
-            keys: Keys::from_keys(
-                consensus_pk,
-                consensus_sk,
-                service_pk,
-                service_sk,
-                identity_pk,
-                identity_sk,
-            ),
+            keys: Keys::from_keys(consensus_pk, consensus_sk, service_pk, service_sk),
             validator_id: None,
         }
     }
@@ -146,17 +138,9 @@ impl TestNode {
     pub fn new_validator(validator_id: ValidatorId) -> Self {
         let (consensus_pk, consensus_sk) = crypto::gen_keypair();
         let (service_pk, service_sk) = crypto::gen_keypair();
-        let (identity_pk, identity_sk) = crypto::kx::gen_keypair();
 
         TestNode {
-            keys: Keys::from_keys(
-                consensus_pk,
-                consensus_sk,
-                service_pk,
-                service_sk,
-                identity_pk,
-                identity_sk,
-            ),
+            keys: Keys::from_keys(consensus_pk, consensus_sk, service_pk, service_sk),
             validator_id: Some(validator_id),
         }
     }
@@ -167,15 +151,12 @@ impl TestNode {
         service_keypair: (PublicKey, SecretKey),
         validator_id: Option<ValidatorId>,
     ) -> TestNode {
-        let (identity_pk, identity_sk) = kx::gen_keypair();
         TestNode {
             keys: Keys::from_keys(
                 consensus_keypair.0,
                 consensus_keypair.1,
                 service_keypair.0,
                 service_keypair.1,
-                identity_pk,
-                identity_sk,
             ),
             validator_id,
         }
@@ -230,7 +211,6 @@ impl TestNode {
         ValidatorKeys {
             consensus_key: self.keys.consensus_pk(),
             service_key: self.keys.service_pk(),
-            identity_key: self.keys.identity_pk(),
         }
     }
 

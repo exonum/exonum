@@ -31,7 +31,7 @@ use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Du
 
 use super::{error::log_error, to_box};
 use crate::{
-    crypto::PublicKey,
+    crypto::{x25519, PublicKey},
     events::{
         codec::MessagesCodec,
         error::into_failure,
@@ -41,7 +41,7 @@ use crate::{
     messages::{Connect, Message, Service, SignedMessage, Verified},
     node::state::SharedConnectList,
 };
-use exonum_crypto::kx;
+use exonum_crypto::x25519::into_x25519_public_key;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -361,7 +361,6 @@ impl NetworkHandler {
         let timeout = self.network_config.tcp_connect_retry_timeout;
         let max_tries = self.network_config.tcp_connect_max_retries as usize;
         let max_connections = self.network_config.max_outgoing_connections;
-        let identity_key = self.connect_list.identity_key(&key);
         let strategy = FixedInterval::from_millis(timeout)
             .map(jitter)
             .take(max_tries);
@@ -384,11 +383,7 @@ impl NetworkHandler {
                     .map_err(into_failure)
                     .and_then(move |socket| Self::configure_socket(socket, network_config))
                     .and_then(move |outgoing_connection| {
-                        Self::build_handshake_initiator(
-                            outgoing_connection,
-                            identity_key,
-                            &handshake_params,
-                        )
+                        Self::build_handshake_initiator(outgoing_connection, key, &handshake_params)
                     })
                     .and_then(move |(socket, raw, key)| {
                         (Ok(socket), Self::parse_connect_msg(Some(raw), key))
@@ -518,7 +513,7 @@ impl NetworkHandler {
 
     fn parse_connect_msg(
         raw: Option<Vec<u8>>,
-        identity_key: kx::PublicKey,
+        key: x25519::PublicKey,
     ) -> Result<Verified<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Message::from_raw_buffer(raw)?;
@@ -529,9 +524,10 @@ impl NetworkHandler {
                 other
             ),
         };
+        let author = into_x25519_public_key(connect.author());
 
         ensure!(
-            connect.as_ref().identity_key == identity_key,
+            author == key,
             "Identity key in connect message doesn't match with the peer key"
         );
 
@@ -633,10 +629,10 @@ impl NetworkHandler {
 
     fn build_handshake_initiator(
         stream: TcpStream,
-        key: kx::PublicKey,
+        key: PublicKey,
         handshake_params: &HandshakeParams,
     ) -> impl Future<
-        Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>, kx::PublicKey),
+        Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>, x25519::PublicKey),
         Error = failure::Error,
     > {
         let mut handshake_params = handshake_params.clone();

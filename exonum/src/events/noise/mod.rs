@@ -33,7 +33,7 @@ use tokio_io::{
 };
 
 use crate::events::{codec::MessagesCodec, error::into_failure};
-use exonum_crypto::kx;
+use exonum_crypto::x25519;
 
 pub mod error;
 pub mod wrappers;
@@ -45,7 +45,7 @@ pub const MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
 pub const HEADER_LENGTH: usize = 4;
 
-type HandshakeData<S> = (Framed<S, MessagesCodec>, Vec<u8>, kx::PublicKey);
+type HandshakeData<S> = (Framed<S, MessagesCodec>, Vec<u8>, x25519::PublicKey);
 type HandshakeResult<S> = Box<dyn Future<Item = HandshakeData<S>, Error = failure::Error>>;
 
 pub trait Handshake {

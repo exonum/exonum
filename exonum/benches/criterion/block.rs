@@ -40,7 +40,7 @@
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
-    crypto::{self, kx, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
@@ -82,7 +82,6 @@ fn create_blockchain(
         validator_keys: vec![ValidatorKeys {
             consensus_key: consensus_keypair.0,
             service_key: service_keypair.0,
-            identity_key: kx::PublicKey::zero(),
         }],
         ..ConsensusConfig::default()
     };

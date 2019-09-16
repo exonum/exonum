@@ -28,21 +28,19 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use crate::keys::Keys;
 use crate::{
     api::node::SharedNodeState,
     blockchain::{
         contains_transaction, Block, BlockProof, Blockchain, ConsensusConfig, IndexCoordinates,
         IndexOwner, InstanceCollection, Schema, ValidatorKeys,
     },
-    crypto::{
-        gen_keypair, gen_keypair_from_seed, kx, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH,
-    },
+    crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
-    keys::Keys,
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -168,7 +166,6 @@ impl SandboxInner {
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
     pub services_map: HashMap<PublicKey, SecretKey>,
-    pub identity_map: HashMap<kx::PublicKey, kx::SecretKey>,
     inner: RefCell<SandboxInner>,
     addresses: Vec<ConnectInfo>,
     /// Connect message used during initialization.
@@ -188,7 +185,6 @@ impl Sandbox {
             connect_message_time.into(),
             &user_agent::get(),
             self.secret_key(ValidatorId(0)),
-            self.identity_key(ValidatorId(0)),
         );
 
         for validator in start_index..end_index {
@@ -199,7 +195,6 @@ impl Sandbox {
                 self.time().into(),
                 &user_agent::get(),
                 self.secret_key(validator),
-                self.identity_key(validator),
             ));
             self.send(self.public_key(validator), &connect);
         }
@@ -221,14 +216,6 @@ impl Sandbox {
     pub fn secret_key(&self, id: ValidatorId) -> &SecretKey {
         let p = self.public_key(id);
         &self.validators_map[&p]
-    }
-
-    pub fn identity_key(&self, id: ValidatorId) -> kx::PublicKey {
-        self.cfg()
-            .validator_keys
-            .get(id.0 as usize)
-            .map(|keys| keys.identity_key)
-            .unwrap()
     }
 
     pub fn address(&self, id: ValidatorId) -> String {
@@ -293,10 +280,9 @@ impl Sandbox {
         time: chrono::DateTime<::chrono::Utc>,
         user_agent: &str,
         secret_key: &SecretKey,
-        identity_key: kx::PublicKey,
     ) -> Verified<Connect> {
         Verified::from_value(
-            Connect::new(&addr, time, user_agent, identity_key),
+            Connect::new(&addr, time, user_agent),
             *public_key,
             secret_key,
         )
@@ -850,7 +836,6 @@ impl Sandbox {
                 time.into(),
                 c.payload().user_agent(),
                 self.secret_key(ValidatorId(0)),
-                self.identity_key(ValidatorId(0)),
             )
         });
         let sandbox = self.restart_uninitialized_with_time(time);
@@ -891,23 +876,13 @@ impl Sandbox {
             api_requests: api_channel.0.clone().wait(),
         };
 
-        let peers = inner.handler.state.connect_list().peers();
-        let saved_peers = inner.handler.state.peers();
-
-        let peers: Vec<ConnectInfo> = peers
-            .into_iter()
-            .filter(|c| saved_peers.contains_key(&c.public_key))
-            .collect();
-
-        let connect_list = ConnectList::from_peers(&peers);
+        let connect_list = ConnectList::from_peers(inner.handler.state.peers());
 
         let keys = Keys::from_keys(
             inner.handler.state.consensus_public_key(),
             inner.handler.state.consensus_secret_key().clone(),
             inner.handler.state.service_public_key(),
             inner.handler.state.service_secret_key().clone(),
-            inner.handler.state.identity_public_key(),
-            inner.handler.state.identity_secret_key().clone(),
         );
 
         let config = Configuration {
@@ -955,7 +930,6 @@ impl Sandbox {
             inner: RefCell::new(inner),
             validators_map: self.validators_map.clone(),
             services_map: self.services_map.clone(),
-            identity_map: self.identity_map.clone(),
             addresses: self.addresses.clone(),
             connect: None,
         };
@@ -989,7 +963,6 @@ impl Sandbox {
             .add_peer_to_connect_list(ConnectInfo {
                 address: addr.to_string(),
                 public_key,
-                identity_key: validator_keys.identity_key,
             });
     }
 
@@ -1010,17 +983,12 @@ impl ConnectList {
     /// Helper method to populate ConnectList after sandbox node restarts and
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
-    pub fn from_peers(peers: &[ConnectInfo]) -> Self {
-        let mut identity = BTreeMap::new();
-
+    pub fn from_peers(peers: &HashMap<PublicKey, Verified<Connect>>) -> Self {
         let peers: BTreeMap<PublicKey, PeerAddress> = peers
             .iter()
-            .map(|c| {
-                identity.insert(c.public_key, c.identity_key);
-                (c.public_key, PeerAddress::new(c.address.to_owned()))
-            })
+            .map(|(p, c)| (*p, PeerAddress::new(c.payload().host.clone())))
             .collect();
-        ConnectList { peers, identity }
+        ConnectList { peers }
     }
 }
 
@@ -1121,10 +1089,9 @@ fn sandbox_with_services_uninitialized(
             (
                 gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
                 gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
-                kx::gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
             )
         })
-        .map(|(v, s, i)| Keys::from_keys(v.0, v.1, s.0, s.1, i.0, i.1))
+        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
         .collect();
 
     let validators = keys
@@ -1135,11 +1102,6 @@ fn sandbox_with_services_uninitialized(
     let service_keys = keys
         .iter()
         .map(|keys| (keys.service_pk(), keys.service_sk().clone()))
-        .collect::<Vec<_>>();
-
-    let identity_keys = keys
-        .iter()
-        .map(|keys| (keys.identity_pk(), keys.identity_sk().clone()))
         .collect::<Vec<_>>();
 
     let addresses = (1..=validators_count)
@@ -1154,7 +1116,6 @@ fn sandbox_with_services_uninitialized(
         .map(|(keys, a)| ConnectInfo {
             address: a.clone(),
             public_key: keys.consensus_pk(),
-            identity_key: keys.identity_pk(),
         })
         .collect();
 
@@ -1164,7 +1125,6 @@ fn sandbox_with_services_uninitialized(
             .map(|keys| ValidatorKeys {
                 consensus_key: keys.consensus_pk(),
                 service_key: keys.service_pk(),
-                identity_key: keys.identity_pk(),
             })
             .collect(),
         ..consensus
@@ -1239,7 +1199,6 @@ fn sandbox_with_services_uninitialized(
         inner: RefCell::new(inner),
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
-        identity_map: HashMap::from_iter(identity_keys),
         addresses: connect_infos,
         connect: None,
     };
@@ -1367,13 +1326,11 @@ mod tests {
         // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
-        let (identity, _) = kx::gen_keypair();
+        let consensus = gen_keypair();
+        let service = gen_keypair();
         let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
-            identity_key: identity,
+            consensus_key: consensus.0,
+            service_key: service.0,
         };
 
         let new_peer_addr = gen_primitive_socket_addr(2);
@@ -1382,22 +1339,20 @@ mod tests {
         s.add_peer_to_connect_list(new_peer_addr, validator_keys);
 
         s.recv(&s.create_connect(
-            &public,
+            &consensus.0,
             new_peer_addr.to_string(),
             s.time().into(),
             &user_agent::get(),
-            &secret,
-            identity,
+            &consensus.1,
         ));
         s.send(
-            public,
+            consensus.0,
             &s.create_connect(
                 &s.public_key(ValidatorId(0)),
                 s.address(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
                 s.secret_key(ValidatorId(0)),
-                s.identity_key(ValidatorId(0)),
             ),
         );
     }
@@ -1424,7 +1379,6 @@ mod tests {
                 s.time().into(),
                 &user_agent::get(),
                 s.secret_key(ValidatorId(0)),
-                s.identity_key(ValidatorId(0)),
             ),
         );
     }
@@ -1436,11 +1390,9 @@ mod tests {
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let (identity, _) = kx::gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
             service_key,
-            identity_key: identity,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1449,7 +1401,6 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
-            identity,
         ));
         s.send(
             s.public_key(ValidatorId(1)),
@@ -1459,7 +1410,6 @@ mod tests {
                 s.time().into(),
                 &user_agent::get(),
                 s.secret_key(ValidatorId(0)),
-                s.identity_key(ValidatorId(0)),
             ),
         );
     }
@@ -1471,11 +1421,9 @@ mod tests {
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let (identity, _) = kx::gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
             service_key,
-            identity_key: identity,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1484,7 +1432,6 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
-            identity,
         ));
     }
 
@@ -1495,11 +1442,9 @@ mod tests {
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let (identity, _) = kx::gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
             service_key,
-            identity_key: identity,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1508,7 +1453,6 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
-            identity,
         ));
         s.recv(&s.create_connect(
             &public,
@@ -1516,7 +1460,6 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
-            identity,
         ));
         panic!("Oops! We don't catch unexpected message");
     }
@@ -1528,11 +1471,9 @@ mod tests {
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let (identity, _) = kx::gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
             service_key,
-            identity_key: identity,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1541,7 +1482,6 @@ mod tests {
             s.time().into(),
             &user_agent::get(),
             &secret,
-            identity,
         ));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");

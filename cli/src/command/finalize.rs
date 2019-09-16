@@ -106,7 +106,6 @@ impl Finalize {
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
-                identity_key: config.validator_keys.identity_key,
             })
             .collect();
 

@@ -25,7 +25,7 @@ use std::{
 
 use crate::{
     blockchain::{contains_transaction, ConsensusConfig, ValidatorKeys},
-    crypto::{kx, Hash, PublicKey, SecretKey},
+    crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
@@ -409,7 +409,6 @@ impl SharedConnectList {
     /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
         let connect_list = self.inner.read().expect("ConnectList read lock");
-        let identity = connect_list.identity.clone();
 
         connect_list
             .peers
@@ -417,7 +416,6 @@ impl SharedConnectList {
             .map(|(pk, a)| ConnectInfo {
                 address: a.address.clone(),
                 public_key: *pk,
-                identity_key: *identity.get(&pk).unwrap(),
             })
             .collect()
     }
@@ -432,19 +430,6 @@ impl SharedConnectList {
     pub fn find_address_by_key(&self, public_key: &PublicKey) -> Option<PeerAddress> {
         let connect_list = self.inner.read().expect("ConnectList read lock");
         connect_list.find_address_by_pubkey(public_key).cloned()
-    }
-
-    /// Get peer identity key using public key.
-    ///
-    /// # Panics
-    ///
-    /// If identity key is not present in the connect list.
-    pub fn identity_key(&self, public_key: &PublicKey) -> kx::PublicKey {
-        let connect_list = self.inner.read().expect("ConnectList read lock");
-        *connect_list
-            .identity
-            .get(public_key)
-            .expect("Identity key not found")
     }
 }
 
@@ -639,16 +624,6 @@ impl State {
     /// Returns the consensus public key of the current node.
     pub fn consensus_public_key(&self) -> PublicKey {
         self.keys.consensus_pk()
-    }
-
-    /// Returns the identity public key of the current node.
-    pub fn identity_public_key(&self) -> kx::PublicKey {
-        self.keys.identity_pk()
-    }
-
-    /// Returns the identity secret key of the current node.
-    pub fn identity_secret_key(&self) -> &kx::SecretKey {
-        &self.keys.identity_sk()
     }
 
     /// Returns the consensus secret key of the current node.

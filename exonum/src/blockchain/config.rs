@@ -24,7 +24,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    crypto::{kx, PublicKey},
+    crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
     messages::SIGNED_MESSAGE_MIN_SIZE,
     proto::schema::blockchain,
@@ -41,8 +41,6 @@ pub struct ValidatorKeys {
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
-    /// Identity key is used for secure communication between peers.
-    pub identity_key: kx::PublicKey,
 }
 
 impl ValidateInput for ValidatorKeys {
@@ -144,19 +142,16 @@ impl ConsensusConfig {
         );
 
         let mut exist_keys = HashSet::with_capacity(self.validator_keys.len() * 2);
-        let mut exist_identity_keys = HashSet::with_capacity(self.validator_keys.len() * 2);
         for validator_keys in &self.validator_keys {
             validator_keys.validate()?;
             if exist_keys.contains(&validator_keys.consensus_key)
                 || exist_keys.contains(&validator_keys.service_key)
-                || exist_identity_keys.contains(&validator_keys.identity_key)
             {
                 bail!("Duplicated keys are found: each consensus and service key must be unique");
             }
 
             exist_keys.insert(validator_keys.consensus_key);
             exist_keys.insert(validator_keys.service_key);
-            exist_identity_keys.insert(validator_keys.identity_key);
         }
 
         Ok(())
@@ -310,19 +305,12 @@ mod tests {
         ValidatorKeys {
             consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
             service_key: gen_keypair_from_seed(&Seed::new([u8::max_value() - i; SEED_LENGTH])).0,
-            identity_key: kx::gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
         }
     }
 
     fn gen_keys_pool(count: usize) -> Vec<PublicKey> {
         (0..count)
             .map(|_| crypto::gen_keypair().0)
-            .collect::<Vec<_>>()
-    }
-
-    fn gen_identity_keys_pool(count: usize) -> Vec<kx::PublicKey> {
-        (0..count)
-            .map(|_| crypto::kx::gen_keypair().0)
             .collect::<Vec<_>>()
     }
 
@@ -336,12 +324,10 @@ mod tests {
     #[test]
     fn validate_validator_keys_err_same() {
         let pk = crypto::gen_keypair().0;
-        let kx_pk = crypto::kx::gen_keypair().0;
 
         let keys = ValidatorKeys {
             consensus_key: pk,
             service_key: pk,
-            identity_key: kx_pk,
         };
         let e = keys.validate().unwrap_err();
         assert_err_contains(e, "Consensus and service keys must be different");
@@ -360,7 +346,6 @@ mod tests {
     #[test]
     fn consensus_config_validate_err_round_trip() {
         let keys = gen_keys_pool(4);
-        let identity_keys = gen_identity_keys_pool(2);
 
         let cases = [
             (
@@ -372,7 +357,6 @@ mod tests {
                     validator_keys: vec![ValidatorKeys {
                         consensus_key: keys[0],
                         service_key: keys[0],
-                        identity_key: identity_keys[0],
                     }],
                     ..ConsensusConfig::default()
                 },
@@ -384,12 +368,10 @@ mod tests {
                         ValidatorKeys {
                             consensus_key: keys[0],
                             service_key: keys[1],
-                            identity_key: identity_keys[0],
                         },
                         ValidatorKeys {
                             consensus_key: keys[0],
                             service_key: keys[2],
-                            identity_key: identity_keys[1],
                         },
                     ],
                     ..ConsensusConfig::default()
@@ -402,30 +384,10 @@ mod tests {
                         ValidatorKeys {
                             consensus_key: keys[0],
                             service_key: keys[1],
-                            identity_key: identity_keys[0],
                         },
                         ValidatorKeys {
                             consensus_key: keys[2],
                             service_key: keys[1],
-                            identity_key: identity_keys[1],
-                        },
-                    ],
-                    ..ConsensusConfig::default()
-                },
-                "Duplicated keys are found",
-            ),
-            (
-                ConsensusConfig {
-                    validator_keys: vec![
-                        ValidatorKeys {
-                            consensus_key: keys[1],
-                            service_key: keys[0],
-                            identity_key: identity_keys[1],
-                        },
-                        ValidatorKeys {
-                            consensus_key: keys[2],
-                            service_key: keys[3],
-                            identity_key: identity_keys[1],
                         },
                     ],
                     ..ConsensusConfig::default()

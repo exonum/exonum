@@ -233,7 +233,6 @@ impl SharedNodeState {
                     let conn_info = ConnectInfo {
                         address: addr.to_string(),
                         public_key: *p,
-                        identity_key: state.connect_list().identity_key(p),
                     };
                     lock.incoming_connections.insert(conn_info);
                 }
@@ -241,7 +240,6 @@ impl SharedNodeState {
                     let conn_info = ConnectInfo {
                         address: addr.to_string(),
                         public_key: *p,
-                        identity_key: state.connect_list().identity_key(p),
                     };
                     lock.outgoing_connections.insert(conn_info);
                 }

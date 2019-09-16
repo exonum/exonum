@@ -22,7 +22,10 @@ use exonum_merkledb::BinaryValue;
 
 use super::wrapper::NoiseWrapper;
 use crate::{
-    crypto::kx,
+    crypto::{
+        x25519::{self, into_x25519_keypair, into_x25519_public_key},
+        PublicKey, SecretKey,
+    },
     events::{
         codec::MessagesCodec,
         noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
@@ -34,9 +37,9 @@ use crate::{
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
-    pub public_key: kx::PublicKey,
-    pub secret_key: kx::SecretKey,
-    pub remote_key: Option<kx::PublicKey>,
+    pub public_key: x25519::PublicKey,
+    pub secret_key: x25519::SecretKey,
+    pub remote_key: Option<x25519::PublicKey>,
     pub connect_list: SharedConnectList,
     pub connect: Verified<Connect>,
     max_message_len: u32,
@@ -44,12 +47,14 @@ pub struct HandshakeParams {
 
 impl HandshakeParams {
     pub fn new(
-        public_key: kx::PublicKey,
-        secret_key: kx::SecretKey,
+        public_key: PublicKey,
+        secret_key: SecretKey,
         connect_list: SharedConnectList,
         connect: Verified<Connect>,
         max_message_len: u32,
     ) -> Self {
+        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+
         HandshakeParams {
             public_key,
             secret_key,
@@ -60,8 +65,8 @@ impl HandshakeParams {
         }
     }
 
-    pub fn set_remote_key(&mut self, remote_key: kx::PublicKey) {
-        self.remote_key = Some(remote_key);
+    pub fn set_remote_key(&mut self, remote_key: PublicKey) {
+        self.remote_key = Some(into_x25519_public_key(remote_key));
     }
 }
 
@@ -131,7 +136,7 @@ impl NoiseHandshake {
                 .state
                 .get_remote_static()
                 .expect("Remote static key is not present!");
-            kx::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
+            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
 
         if !self.is_peer_allowed(&remote_static_key) {
@@ -143,11 +148,11 @@ impl NoiseHandshake {
         Ok((framed, message, remote_static_key))
     }
 
-    fn is_peer_allowed(&self, remote_static_key: &kx::PublicKey) -> bool {
+    fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
         self.connect_list
             .peers()
             .iter()
-            .map(|info| info.identity_key)
+            .map(|info| into_x25519_public_key(info.public_key))
             .any(|key| remote_static_key == &key)
     }
 }

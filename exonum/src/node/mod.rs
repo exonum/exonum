@@ -53,7 +53,7 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
-    crypto::{self, kx, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
@@ -421,7 +421,6 @@ impl ConnectListConfig {
             .map(|(a, v)| ConnectInfo {
                 address: a.clone(),
                 public_key: v.consensus_key,
-                identity_key: v.identity_key,
             })
             .collect();
 
@@ -473,7 +472,6 @@ impl NodeHandler {
                 external_address,
                 system_state.current_time().into(),
                 &user_agent::get(),
-                config.keys.identity_pk(),
             ),
             config.keys.consensus_pk(),
             &config.keys.consensus_sk(),
@@ -830,8 +828,6 @@ pub struct ConnectInfo {
     pub address: String,
     /// Peer public key.
     pub public_key: PublicKey,
-    /// Peer identity key.
-    pub identity_key: kx::PublicKey,
 }
 
 impl fmt::Display for ConnectInfo {
@@ -1063,8 +1059,8 @@ impl Node {
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            self.state().identity_public_key(),
-            self.state().identity_secret_key().clone(),
+            self.state().consensus_public_key(),
+            self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
             self.max_message_len,

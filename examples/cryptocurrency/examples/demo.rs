@@ -23,13 +23,11 @@ use exonum_cryptocurrency::contracts::CryptocurrencyService;
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
-    let (identity_public_key, identity_secret_key) = exonum::crypto::kx::gen_keypair();
 
     let consensus = ConsensusConfig {
         validator_keys: vec![ValidatorKeys {
             consensus_key: consensus_public_key,
             service_key: service_public_key,
-            identity_key: identity_public_key,
         }],
         ..ConsensusConfig::default()
     };
@@ -59,8 +57,6 @@ fn node_config() -> NodeConfig {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            identity_public_key,
-            identity_secret_key,
         ),
     }
 }

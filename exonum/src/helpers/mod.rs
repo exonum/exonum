@@ -27,7 +27,7 @@ use log::SetLoggerError;
 use std::path::{Component, Path, PathBuf};
 
 use crate::blockchain::{ConsensusConfig, Schema, ValidatorKeys};
-use crate::crypto::{gen_keypair, kx};
+use crate::crypto::gen_keypair;
 use crate::exonum_merkledb::Fork;
 use crate::keys::Keys;
 use crate::node::{ConnectListConfig, NodeConfig};
@@ -44,8 +44,8 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
     let keys: (Vec<_>) = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair(), kx::gen_keypair()))
-        .map(|(v, s, i)| Keys::from_keys(v.0, v.1, s.0, s.1, i.0, i.1))
+        .map(|_| (gen_keypair(), gen_keypair()))
+        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
         .collect();
 
     let consensus = ConsensusConfig {
@@ -54,7 +54,6 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             .map(|keys| ValidatorKeys {
                 consensus_key: keys.consensus_pk(),
                 service_key: keys.service_pk(),
-                identity_key: keys.identity_pk(),
             })
             .collect(),
         ..ConsensusConfig::default()

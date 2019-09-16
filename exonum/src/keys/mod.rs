@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::crypto::{gen_keypair_from_seed, kx, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use crate::crypto::{gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
 use rand::thread_rng;
@@ -42,7 +42,6 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
 pub struct Keys {
     consensus: KeyPair,
     service: KeyPair,
-    identity: kx::KeyPair,
 }
 
 impl Keys {
@@ -56,13 +55,10 @@ impl Keys {
         consensus_sk: SecretKey,
         service_pk: PublicKey,
         service_sk: SecretKey,
-        identity_pk: kx::PublicKey,
-        identity_sk: kx::SecretKey,
     ) -> Self {
         Self {
             consensus: (consensus_pk, consensus_sk).into(),
             service: (service_pk, service_sk).into(),
-            identity: (identity_pk, identity_sk).into(),
         }
     }
 }
@@ -86,16 +82,6 @@ impl Keys {
     /// Service secret key.
     pub fn service_sk(&self) -> &SecretKey {
         &self.service.secret_key()
-    }
-
-    /// Identity public key.
-    pub fn identity_pk(&self) -> kx::PublicKey {
-        self.identity.public_key()
-    }
-
-    /// Identity secret key.
-    pub fn identity_sk(&self) -> &kx::SecretKey {
-        &self.identity.secret_key()
     }
 }
 
@@ -176,17 +162,11 @@ fn generate_keys_from_master_password(tree: SecretTree) -> Option<Keys> {
     let seed = Seed::from_slice(&buffer)?;
     let (service_pk, service_sk) = gen_keypair_from_seed(&seed);
 
-    tree.child(Name::new("identity")).fill(&mut buffer);
-    let seed = Seed::from_slice(&buffer)?;
-    let (identity_pk, identity_sk) = kx::gen_keypair_from_seed(&seed);
-
     Some(Keys::from_keys(
         consensus_pk,
         consensus_sk,
         service_pk,
         service_sk,
-        identity_pk,
-        identity_sk,
     ))
 }
 
