@@ -6,22 +6,18 @@ master_key_path = "master.key.toml"
 state_update_timeout = 10000
 [[connect_list.peers]]
 address = "127.0.0.1:8003"
-identity_key = "cfb3f9eed7889ba9aae0337ee269f6c9491229e3aa6d8ccfaa23a4a50f945c35"
 public_key = "4c6dab7819244758e2b987d37daecc132458d03ce2364e558e3a281ed9f93aed"
 
 [[connect_list.peers]]
 address = "127.0.0.1:8004"
-identity_key = "6a4d3521e491b2314bed9a2c58eed53bda0de7e499cde629936800c27c752b1a"
 public_key = "5833f7fc72487e256240b081017638589bfb7c98d8537c5b10d6c2c32ee11730"
 
 [[connect_list.peers]]
 address = "127.0.0.1:8001"
-identity_key = "f87bf509b2d2cb68ffc6121adc2fdd1163ef39668b6d3fd2a5ca531e64c2cc28"
 public_key = "6296ccc5b48851ccc3c25628914a51428c0a7cf64e03c8477df1a2e57b4d9ebb"
 
 [[connect_list.peers]]
 address = "127.0.0.1:8002"
-identity_key = "9ae32c67665a509efe3d0afc93e19f7d55ed4489ffa76428bfbb9393cd904778"
 public_key = "8e4974569d89871f529f6319b6c6394d19e8c0581bf1ff956cee83d124321296"
 
 [consensus]
@@ -36,22 +32,18 @@ txs_block_limit = 1000
 
 [[consensus.validator_keys]]
 consensus_key = "4c6dab7819244758e2b987d37daecc132458d03ce2364e558e3a281ed9f93aed"
-identity_key = "cfb3f9eed7889ba9aae0337ee269f6c9491229e3aa6d8ccfaa23a4a50f945c35"
 service_key = "b75a0944556a6cf385e6ba6f32a349b2c6717bc207df8b19f91b459aa44ab4d4"
 
 [[consensus.validator_keys]]
 consensus_key = "5833f7fc72487e256240b081017638589bfb7c98d8537c5b10d6c2c32ee11730"
-identity_key = "6a4d3521e491b2314bed9a2c58eed53bda0de7e499cde629936800c27c752b1a"
 service_key = "f9aaf4a5b7a6f5dc2e2f3f8bc618d4645bf2638f4eecb3ee56b00e87b5d6b210"
 
 [[consensus.validator_keys]]
 consensus_key = "6296ccc5b48851ccc3c25628914a51428c0a7cf64e03c8477df1a2e57b4d9ebb"
-identity_key = "f87bf509b2d2cb68ffc6121adc2fdd1163ef39668b6d3fd2a5ca531e64c2cc28"
 service_key = "54808c7a0a1f7114bb198798ed1a5eab16f69eb8cada1ffac31f4cf1a6194e88"
 
 [[consensus.validator_keys]]
 consensus_key = "8e4974569d89871f529f6319b6c6394d19e8c0581bf1ff956cee83d124321296"
-identity_key = "9ae32c67665a509efe3d0afc93e19f7d55ed4489ffa76428bfbb9393cd904778"
 service_key = "38e803636bd685ed29a64b89a32bd84f1a37a96b05c5c50b85176ca57c993451"
 
 [database]

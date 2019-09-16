@@ -16,5 +16,4 @@ address = "127.0.0.1:8003"
 
 [node.validator_keys]
 consensus_key = "4c6dab7819244758e2b987d37daecc132458d03ce2364e558e3a281ed9f93aed"
-identity_key = "cfb3f9eed7889ba9aae0337ee269f6c9491229e3aa6d8ccfaa23a4a50f945c35"
 service_key = "b75a0944556a6cf385e6ba6f32a349b2c6717bc207df8b19f91b459aa44ab4d4"
