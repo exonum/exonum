@@ -441,8 +441,9 @@ fn test_sending_message_size() {
 
     // Send transaction.
     let (pk, sk) = gen_keypair();
-    let name = String::from_utf8(vec![64; max_message_len / 2]).unwrap();
+    let name = "a".repeat(371);
     let tx = Message::sign_transaction(CreateWallet::new(&pk, name.as_str()), SERVICE_ID, pk, &sk);
+    assert_eq!(tx.signed_message().raw().len(), max_message_len);
     let tx_hash = tx.hash();
     let tx_json =
         serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
@@ -460,17 +461,26 @@ fn test_sending_message_size() {
     );
 
     let (pk, sk) = gen_keypair();
-    let name = String::from_utf8(vec![64; max_message_len]).unwrap();
+    let name = "a".repeat(372);
     let tx = Message::sign_transaction(CreateWallet::new(&pk, name.as_str()), SERVICE_ID, pk, &sk);
+    assert_eq!(tx.signed_message().raw().len(), max_message_len + 1);
     let tx_json =
         serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
             .unwrap();
     client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
 
     // Check response on set message when the message is bigger than 512 bytes.
-    assert!(recv_text_msg(&mut client).is_none());
+    let resp_text = recv_text_msg(&mut client).unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
+        json!({
+            "result": "error",
+            "description": "Payload too large: Allowed message length is: 512, but try to send: 513"
+        })
+    );
 
     // Shutdown node.
+    client.shutdown().unwrap();
     node_handler
         .api_tx
         .send_external_message(ExternalMessage::Shutdown)

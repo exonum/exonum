@@ -16,7 +16,8 @@
 
 use actix::Arbiter;
 use actix_web::{
-    http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpMessage, HttpResponse, Query,
+    http, http::header::CONTENT_LENGTH, ws, AsyncResponder, Error as ActixError, FromRequest,
+    HttpMessage, HttpResponse, Query,
 };
 use chrono::{DateTime, Utc};
 use futures::{Future, IntoFuture};
@@ -30,6 +31,7 @@ use crate::{
         backends::actix::{
             self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
         },
+        error::convert_error,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
     },
@@ -257,16 +259,23 @@ impl ExplorerApi {
         backend: &mut actix_backend::ApiBuilder,
         service_api_state: ServiceApiState,
     ) {
-        let max_message_len = calculate_message_len(&service_api_state);
-
+        let (max_message_len, max_payload_len) = get_message_limits(&service_api_state);
         let index = move |request: HttpRequest| {
             let state = request.state().clone();
+            let content_length = request
+                .headers()
+                .get(CONTENT_LENGTH)
+                .unwrap()
+                .to_str()
+                .unwrap_or_default()
+                .to_owned();
             request
                 .json()
-                .limit(max_message_len)
+                .limit(max_payload_len)
+                .map_err(move |e| convert_error(e, max_payload_len, content_length))
                 .from_err()
                 .and_then(move |query: TransactionHex| {
-                    Self::tx_handler(&state, query)
+                    Self::tx_handler(&state, query, max_message_len)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
                 })
@@ -280,25 +289,33 @@ impl ExplorerApi {
         });
     }
 
-    fn tx_handler(
+    pub(crate) fn tx_handler(
         state: &ServiceApiState,
         query: TransactionHex,
+        max_message_len: usize,
     ) -> Result<TransactionResponse, ApiError> {
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
+        if buf.len() > max_message_len {
+            return Err(ApiError::PayloadTooLarge(format!(
+                "Allowed message length is: {}, but try to send: {}",
+                max_message_len,
+                buf.len()
+            )));
+        }
         let signed = SignedMessage::from_raw_buffer(buf)?;
         let tx_hash = signed.hash();
         let signed = RawTransaction::try_from(Message::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
-        let _ = state
+        state
             .sender()
             .broadcast_transaction(signed)
-            .map_err(ApiError::from);
+            .map_err(ApiError::from)?;
         Ok(TransactionResponse { tx_hash })
     }
 
     /// Subscribes to events.
     pub fn handle_ws<Q>(
-        name: &'static str,
+        name: &str,
         backend: &mut actix_backend::ApiBuilder,
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
@@ -306,7 +323,7 @@ impl ExplorerApi {
     ) where
         Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
     {
-        let max_message_len = calculate_message_len(&service_api_state);
+        let (max_message_len, max_payload_len) = get_message_limits(&service_api_state);
         let server = Arc::new(Mutex::new(None));
         let service_api_state = Arc::new(service_api_state);
 
@@ -316,7 +333,9 @@ impl ExplorerApi {
             let mut address = server.lock().expect("Expected mutex lock");
 
             if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::new(service_api_state)));
+                *address = Some(Arbiter::start(move |_| {
+                    Server::new(service_api_state, max_message_len)
+                }));
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
 
@@ -329,7 +348,7 @@ impl ExplorerApi {
                     ws::handshake(&request)
                         .map(|mut response| {
                             let stream =
-                                ws::WsStream::new(request.payload()).max_size(max_message_len);
+                                ws::WsStream::new(request.payload()).max_size(max_payload_len);
                             let body = ws::WebsocketContext::create(
                                 request.clone(),
                                 Session::new(address, vec![query]),
@@ -432,9 +451,16 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
     }
 }
 
-fn calculate_message_len(api_state: &ServiceApiState) -> usize {
+fn get_message_limits(api_state: &ServiceApiState) -> (usize, usize) {
     let snapshot = api_state.blockchain().snapshot();
     let schema = Schema::new(&snapshot);
     let max_message_len_in_bytes = schema.actual_configuration().consensus.max_message_len;
-    max_message_len_in_bytes as usize * 2 + 2
+    let max_payload_len_in_bytes = max_message_len_in_bytes * 2 + 64;
+    // This formula applies because the length of JSON produced by a transaction with
+    // 'n' bytes is at least 2*n (one byte represented as 2 hex digits) + 64 bytes for additional
+    // fields in JSON
+    (
+        max_message_len_in_bytes as usize,
+        max_payload_len_in_bytes as usize,
+    )
 }

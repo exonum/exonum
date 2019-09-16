@@ -133,6 +133,7 @@ impl ResponseError for ApiError {
             ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
             ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
             ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
+            ApiError::PayloadTooLarge(err) => HttpResponse::PayloadTooLarge().body(err.to_string()),
         }
     }
 }

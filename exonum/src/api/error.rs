@@ -18,6 +18,8 @@
 
 //! The set of errors for the Exonum API module.
 
+use actix_web::error::JsonPayloadError;
+use failure::Fail;
 use std::io;
 
 /// List of possible API errors.
@@ -50,6 +52,10 @@ pub enum Error {
     /// authentication credentials.
     #[fail(display = "Unauthorized")]
     Unauthorized,
+
+    /// Message length is exceeded.
+    #[fail(display = "Payload too large: {}", _0)]
+    PayloadTooLarge(String),
 }
 
 impl From<io::Error> for Error {
@@ -61,5 +67,25 @@ impl From<io::Error> for Error {
 impl From<failure::Error> for Error {
     fn from(e: failure::Error) -> Self {
         Error::InternalError(e)
+    }
+}
+
+pub(crate) fn convert_error(
+    error: JsonPayloadError,
+    max_payload_len: usize,
+    content_len: String,
+) -> Error {
+    match error {
+        JsonPayloadError::Overflow => Error::PayloadTooLarge(format!(
+            "Allowed payload length is: {}, but try to send: {}",
+            max_payload_len, content_len
+        )),
+        JsonPayloadError::ContentType => Error::BadRequest("Wrong content type".to_owned()),
+        JsonPayloadError::Deserialize(err) => {
+            Error::BadRequest(format!("Json deserialize error: {}", err))
+        }
+        JsonPayloadError::Payload(err) => {
+            Error::BadRequest(format!("Error that occur during reading payload: {}", err))
+        }
     }
 }
