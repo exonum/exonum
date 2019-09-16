@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::Height, impl_serde_hex_for_binary_value, runtime::ArtifactId};
+use crate::{
+    blockchain::ConsensusConfig,
+    helpers::Height,
+    impl_serde_hex_for_binary_value,
+    runtime::{ArtifactId, InstanceId},
+};
 
 pub mod schema;
 
@@ -70,4 +75,18 @@ impl From<DeployRequest> for DeployConfirmation {
             spec: v.spec,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::ServiceConfig", crate = "crate")]
+pub struct ServiceConfig {
+    pub instance_id: InstanceId,
+    pub params: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::ConfigChange", crate = "crate")]
+pub enum ConfigChange {
+    Consensus(ConsensusConfig),
+    Service(ServiceConfig),
 }

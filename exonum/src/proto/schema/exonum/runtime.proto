@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package exonum.runtime;
 
+import "blockchain.proto";
 import "google/protobuf/empty.proto";
 
 // Unique service transaction identifier.

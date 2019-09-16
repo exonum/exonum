@@ -162,6 +162,14 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
         CallContext::new(self.inner, self.instance.id, called)
     }
+
+    pub fn check_caller<F, T, E>(&self, check: F) -> Result<(T, &Fork), E>
+    where
+        E: Into<ExecutionError>,
+        F: Fn(&Caller, &dyn Snapshot) -> Result<T, E>,
+    {
+        check(&self.inner.caller, self.inner.fork.as_ref()).map(|result| (result, self.inner.fork))
+    }
 }
 
 /// Provide context for the `before_commit` handler.

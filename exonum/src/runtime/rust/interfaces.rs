@@ -16,7 +16,7 @@
 
 use crate::{
     merkledb::BinaryValue,
-    runtime::{DispatcherError, MethodId},
+    runtime::{CallContext, DispatcherError, MethodId},
 };
 
 use super::{ExecutionError, Interface, TransactionContext};
@@ -93,5 +93,78 @@ impl<T: BinaryValue> Interface for dyn Initialize<Params = T> {
                 Err((kind, message)).map_err(From::from)
             }
         }
+    }
+}
+
+pub const CONFIGURE_INTERFACE_NAME: &str = "Configure";
+pub const VERIFY_CONFIG_METHOD_ID: MethodId = 0;
+pub const APPLY_CONFIG_METHOD_ID: MethodId = 1;
+
+pub trait Configure {
+    type Params: BinaryValue;
+
+    fn verify_config(
+        &self,
+        context: TransactionContext,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError>;
+
+    fn apply_config(
+        &self,
+        context: TransactionContext,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError>;
+}
+
+impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
+    const INTERFACE_NAME: &'static str = CONFIGURE_INTERFACE_NAME;
+
+    fn dispatch(
+        &self,
+        context: TransactionContext,
+        method: MethodId,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError> {
+        match method {
+            VERIFY_CONFIG_METHOD_ID => self.verify_config(
+                context,
+                T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?,
+            ),
+
+            APPLY_CONFIG_METHOD_ID => self.apply_config(
+                context,
+                T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?,
+            ),
+
+            other => {
+                let kind = DispatcherError::NoSuchMethod;
+                let message = format!(
+                    "Method with ID {} is absent in the 'Configure' interface of the instance `{}`",
+                    other, context.instance.name,
+                );
+                Err((kind, message)).map_err(From::from)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ConfigureCall<'a>(CallContext<'a>);
+
+impl<'a> From<CallContext<'a>> for ConfigureCall<'a> {
+    fn from(context: CallContext<'a>) -> Self {
+        Self(context)
+    }
+}
+
+impl<'a> ConfigureCall<'a> {
+    pub fn verify_config(&self, params: impl BinaryValue) -> Result<(), ExecutionError> {
+        self.0
+            .call(CONFIGURE_INTERFACE_NAME, VERIFY_CONFIG_METHOD_ID, params)
+    }
+
+    pub fn apply_config(&self, params: impl BinaryValue) -> Result<(), ExecutionError> {
+        self.0
+            .call(CONFIGURE_INTERFACE_NAME, APPLY_CONFIG_METHOD_ID, params)
     }
 }

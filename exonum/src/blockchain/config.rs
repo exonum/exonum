@@ -33,7 +33,7 @@ use crate::{
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
 /// while the `service_key` is used in services.
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, ProtobufConvert)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(crate = "crate", pb = "blockchain::ValidatorKeys")]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
@@ -67,7 +67,7 @@ impl ValidateInput for ValidatorKeys {
 ///
 /// For additional information on the Exonum consensus algorithm, refer to
 /// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(crate = "crate", pb = "blockchain::Config")]
 pub struct ConsensusConfig {
     /// List of validators public keys.
