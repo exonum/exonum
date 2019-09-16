@@ -97,14 +97,13 @@ impl Blockchain {
     pub(crate) fn with_dispatcher(
         db: Arc<dyn Database>,
         dispatcher: Dispatcher,
-        service_public_key: PublicKey,
-        service_secret_key: SecretKey,
+        service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
         internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
             db,
-            service_keypair: (service_public_key, service_secret_key),
+            service_keypair,
             api_sender,
             dispatcher: Arc::new(Mutex::new(dispatcher)),
             internal_requests,
@@ -177,6 +176,9 @@ impl Blockchain {
             .1
         };
         self.merge(patch)?;
+
+        info!("GENESIS_BLOCK ====== hash={}", self.last_hash());
+
         Ok(())
     }
 
@@ -379,11 +381,10 @@ impl Blockchain {
         };
         self.merge(patch)?;
         // Invokes `after_commit` for each service in order of their identifiers
-        let mut dispatcher = self.dispatcher();
-        dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
+        self.dispatcher()
+            .after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
         // Send `RestartApi` request if the dispatcher state has been modified.
-        let context = ApiContext::with_blockchain(self);
-        if dispatcher.notify_api_changes(&context) {
+        if self.notify_api_changes() {
             self.internal_requests
                 .clone()
                 .send(InternalRequest::RestartApi)
@@ -392,6 +393,12 @@ impl Blockchain {
                 .ok();
         }
         Ok(())
+    }
+
+    /// Notify runtimes about changes in API.
+    pub(crate) fn notify_api_changes(&self) -> bool {
+        self.dispatcher()
+            .notify_api_changes(&ApiContext::with_blockchain(self))
     }
 
     /// Returns the transactions pool size.
