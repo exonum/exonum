@@ -30,20 +30,15 @@ pub use self::crypto_impl::{
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
 
-use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Duration, Utc};
-use rust_decimal::Decimal;
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     Serialize, Serializer,
 };
-use uuid::Uuid;
 
 use std::{
     default::Default,
     fmt,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
@@ -622,13 +617,6 @@ mod tests {
     }
 
     #[test]
-    fn range_sodium() {
-        let h = hash(&[]);
-        let sub_range = &h[10..20];
-        assert_eq!(&crypto_impl::EMPTY_SLICE_HASH[10..20], sub_range);
-    }
-
-    #[test]
     fn hash_streaming_zero() {
         let h1 = hash(&[]);
         let state = HashStream::new();
@@ -662,11 +650,6 @@ mod tests {
         let sig = creation_stream.sign(&sk);
         let mut verified_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
         assert!(verified_stream.verify(&sig, &pk));
-    }
-
-    #[test]
-    fn empty_slice_hash() {
-        assert_eq!(Hash(super::crypto_impl::EMPTY_SLICE_HASH), hash(&[]));
     }
 
     fn assert_serialize_deserialize<T>(original_value: &T)

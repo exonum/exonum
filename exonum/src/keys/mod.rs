@@ -30,6 +30,7 @@ use std::{
 #[cfg(unix)]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::verbose_bit_mask))]
 fn validate_file_mode(mode: u32) -> Result<(), Error> {
+    // Check that group and other bits are not set.
     if (mode & 0o_077) == 0 {
         Ok(())
     } else {
@@ -95,6 +96,7 @@ fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
         toml::to_string_pretty(&encrypted_key).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
+    // By agreement we use the same permissions as for SSH private keys.
     #[cfg(unix)]
     open_options.mode(0o_600);
     let mut file = open_options.open(path.as_ref())?;
