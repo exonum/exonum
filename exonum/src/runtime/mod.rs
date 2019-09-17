@@ -72,7 +72,7 @@
 //!
 //! In addition to its own methods, a service can implement methods of additional interfaces.
 //! In your own runtime implementation, you must provide support of the following interfaces:
-//! 
+//!
 //! TODO: Think about runtime agnostic interfaces description. [ECR-3531]
 //!
 //! ## Initialize

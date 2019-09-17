@@ -28,6 +28,9 @@ pub const INITIALIZE_METHOD_ID: MethodId = 0;
 /// Fully qualified name of the `Initialize` interface.
 pub const INITIALIZE_INTERFACE_NAME: &str = "Initialize";
 
+// TODO This interface looks a little bit more specific than the other interfaces like
+// Configure and it is possible redundant. [ECR-3222]
+
 /// This trait describes a service interface to pass initial configuration parameters into
 /// the started service instance.
 ///
