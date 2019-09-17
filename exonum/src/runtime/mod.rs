@@ -40,9 +40,9 @@
 //! confirmations is equal to the total number of validators, each validator calls the dispatcher
 //! to start a new service instance.
 //!
-//! 4. // TODO modify instance configuration procedure.
+//! 4. Modify instance configuration procedure. TODO [ECR-3306]
 //!
-//! 5. // TODO stop instance procedure.
+//! 5. Stop instance procedure. TODO
 //!
 //! Each Exonum transaction is an [`AnyTx`] message with a correct signature.
 //!
@@ -72,6 +72,8 @@
 //!
 //! In addition to its own methods, a service can implement methods of additional interfaces.
 //! In your own runtime implementation, you must provide support of the following interfaces:
+//! 
+//! TODO: Think about runtime agnostic interfaces description. [ECR-3531]
 //!
 //! ## Initialize
 //!
@@ -86,7 +88,7 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-/// [interface]: rust/interfaces/trait.Initialize.html
+//! [interface]: rust/interfaces/trait.Initialize.html
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},

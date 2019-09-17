@@ -278,9 +278,7 @@ impl<'a> Debug for AfterCommitContext<'a> {
 
 /// A service interface specification.
 pub trait Interface {
-    /// Fully qualified name of this interface for the [call info].
-    ///
-    /// [call info]: ../struct.CallInfo.html
+    /// Fully qualified name of this interface.
     const INTERFACE_NAME: &'static str;
     /// Invoke the specified method handler of the service instance.
     fn dispatch(
