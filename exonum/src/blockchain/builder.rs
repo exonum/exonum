@@ -19,7 +19,6 @@ use futures::sync::mpsc;
 use std::sync::Arc;
 
 use crate::{
-    api::ApiContext,
     blockchain::{Blockchain, ConsensusConfig, Schema},
     crypto::{PublicKey, SecretKey},
     events::InternalRequest,
@@ -133,18 +132,13 @@ impl BlockchainBuilder {
                 .is_empty()
         };
 
-        Ok(if has_genesis_block {
-            let context = ApiContext::new(
-                self.database.clone(),
-                self.service_keypair.clone(),
-                api_sender.clone(),
-            );
-            dispatcher.restore_state(&context)?;
+        let blockchain = if has_genesis_block {
+            let snapshot = self.database.snapshot();
+            dispatcher.restore_state(&snapshot)?;
             Blockchain::with_dispatcher(
                 self.database,
                 dispatcher,
-                self.service_keypair.0,
-                self.service_keypair.1,
+                self.service_keypair,
                 api_sender,
                 internal_requests,
             )
@@ -153,8 +147,7 @@ impl BlockchainBuilder {
             let mut blockchain = Blockchain::with_dispatcher(
                 self.database,
                 dispatcher,
-                self.service_keypair.0,
-                self.service_keypair.1,
+                self.service_keypair,
                 api_sender,
                 internal_requests,
             );
@@ -170,7 +163,10 @@ impl BlockchainBuilder {
             // Commits genesis block.
             blockchain.create_genesis_block(self.genesis_config)?;
             blockchain
-        })
+        };
+        // Starts built-in APIs.
+        blockchain.notify_api_changes();
+        Ok(blockchain)
     }
 }
 
