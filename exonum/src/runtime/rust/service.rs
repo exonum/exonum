@@ -24,7 +24,7 @@ use crate::{
     node::ApiSender,
     runtime::{
         api::ServiceApiBuilder,
-        dispatcher::{self, Dispatcher, DispatcherSender},
+        dispatcher::{self, DispatcherRef, DispatcherSender},
         error::ExecutionError,
         AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ExecutionContext,
         InstanceDescriptor, InstanceId, MethodId,
@@ -143,7 +143,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     /// Enqueue dispatcher action.
     pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
-        self.inner.dispatch_action(action)
+        self.inner.dispatcher.dispatch_action(action)
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
@@ -181,7 +181,7 @@ pub struct BeforeCommitContext<'a> {
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a Dispatcher,
+    dispatcher: DispatcherRef<'a>,
 }
 
 impl<'a> BeforeCommitContext<'a> {
@@ -189,7 +189,7 @@ impl<'a> BeforeCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
-        dispatcher: &'a Dispatcher,
+        dispatcher: DispatcherRef<'a>,
     ) -> Self {
         Self {
             instance,
@@ -212,7 +212,7 @@ impl<'a> BeforeCommitContext<'a> {
     #[doc(hidden)]
     /// Create a context to call interfaces of the specified service instance.
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
-        CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
+        CallContext::new(self.fork, self.dispatcher.clone(), self.instance.id, called)
     }
 }
 

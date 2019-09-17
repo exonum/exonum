@@ -14,7 +14,7 @@
 
 pub use self::{
     error::Error,
-    interfaces::{Initialize, Configure},
+    interfaces::{Configure, Initialize},
     service::{
         AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
         ServiceFactory, Transaction, TransactionContext,
@@ -41,7 +41,7 @@ use crate::{
 
 use super::{
     api::{ApiContext, ServiceApiBuilder},
-    dispatcher::{self, Dispatcher, DispatcherSender},
+    dispatcher::{self, DispatcherRef, DispatcherSender},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
@@ -303,13 +303,14 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork) {
+    fn before_commit(&self, dispatcher: DispatcherRef, fork: &mut Fork) {
         for instance in self.started_services.values() {
+            let dispatcher = dispatcher.clone();
             let result = catch_panic(|| {
                 instance.as_ref().before_commit(BeforeCommitContext::new(
                     instance.descriptor(),
                     fork,
-                    dispatcher,
+                    dispatcher.clone(),
                 ));
                 Ok(())
             });

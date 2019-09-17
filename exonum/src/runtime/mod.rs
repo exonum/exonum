@@ -107,7 +107,7 @@ pub mod supervisor;
 
 use futures::Future;
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::fmt::Debug;
 
 use crate::{
     api::ApiContext,
@@ -118,7 +118,7 @@ use crate::{
 
 use self::{
     api::ServiceApiBuilder,
-    dispatcher::{Dispatcher, DispatcherSender},
+    dispatcher::{DispatcherRef, DispatcherSender},
 };
 
 mod types;
@@ -245,7 +245,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
+    fn before_commit(&self, dispatcher: DispatcherRef, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -394,10 +394,8 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field can only contains a core interfaces like `Configure` and
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
-    /// List of dispatcher actions that will be performed after execution finishes.
-    actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a Dispatcher,
+    dispatcher: DispatcherRef<'a>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -406,23 +404,14 @@ impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
-    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: DispatcherRef<'a>, fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,
-            actions: Rc::default(),
             dispatcher,
             interface_name: "",
             call_stack_depth: 0,
         }
-    }
-
-    pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
-        self.actions.borrow_mut().push(action);
-    }
-
-    pub(crate) fn take_actions(&self) -> Vec<dispatcher::Action> {
-        self.actions.borrow_mut().drain(..).collect()
     }
 }
 
@@ -468,10 +457,8 @@ pub struct CallContext<'a> {
     called: InstanceId,
     /// The current state of the blockchain.
     fork: &'a Fork,
-    /// List of dispatcher actions that will be performed after execution finishes.
-    actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a Dispatcher,
+    dispatcher: DispatcherRef<'a>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -480,7 +467,7 @@ impl<'a> CallContext<'a> {
     /// Create a new call context.
     pub fn new(
         fork: &'a Fork,
-        dispatcher: &'a Dispatcher,
+        dispatcher: DispatcherRef<'a>,
         caller: InstanceId,
         called: InstanceId,
     ) -> Self {
@@ -489,7 +476,6 @@ impl<'a> CallContext<'a> {
             called,
             fork,
             dispatcher,
-            actions: Rc::default(),
             call_stack_depth: 0,
         }
     }
@@ -504,8 +490,7 @@ impl<'a> CallContext<'a> {
             caller,
             called,
             fork: inner.fork,
-            actions: inner.actions.clone(),
-            dispatcher: inner.dispatcher,
+            dispatcher: inner.dispatcher.clone(),
             call_stack_depth: inner.call_stack_depth,
         }
     }
@@ -520,8 +505,7 @@ impl<'a> CallContext<'a> {
     ) -> Result<(), ExecutionError> {
         let context = ExecutionContext {
             fork: self.fork,
-            dispatcher: self.dispatcher,
-            actions: self.actions.clone(),
+            dispatcher: self.dispatcher.clone(),
             caller: Caller::Service {
                 instance_id: self.caller,
             },

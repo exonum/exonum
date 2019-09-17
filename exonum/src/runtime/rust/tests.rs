@@ -19,8 +19,11 @@ use crate::{
     merkledb::{BinaryValue, Database, Entry, Snapshot, TemporaryDB},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, rust::interfaces::Initialize, CallContext,
-        CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
+        dispatcher::{Dispatcher, DispatcherRef},
+        error::ExecutionError,
+        rust::interfaces::Initialize,
+        CallContext, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
+        InstanceSpec,
     },
 };
 
@@ -179,7 +182,7 @@ fn test_basic_rust_runtime() {
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let fork = db.fork();
         let context = ExecutionContext::new(
-            &dispatcher,
+            DispatcherRef::new(&dispatcher),
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
@@ -208,7 +211,7 @@ fn test_basic_rust_runtime() {
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let fork = db.fork();
         let context = ExecutionContext::new(
-            &dispatcher,
+            DispatcherRef::new(&dispatcher),
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,

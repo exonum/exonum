@@ -21,6 +21,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
     panic,
+    rc::Rc,
 };
 
 use crate::{
@@ -300,7 +301,7 @@ impl Dispatcher {
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let context = ExecutionContext::new(
-            self,
+            DispatcherRef::new(self),
             fork,
             Caller::Transaction {
                 author: tx.author(),
@@ -309,7 +310,7 @@ impl Dispatcher {
         );
         self.call(&context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
         // Execute pending dispatcher actions.
-        for action in context.take_actions() {
+        for action in context.dispatcher.take_actions() {
             action.execute(self, fork)?;
         }
         Ok(())
@@ -336,8 +337,9 @@ impl Dispatcher {
     }
 
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
+        let dispatcher_ref = DispatcherRef::new(self);
         for runtime in self.runtimes.values() {
-            runtime.before_commit(self, fork);
+            runtime.before_commit(dispatcher_ref.clone(), fork);
         }
     }
 
@@ -433,7 +435,7 @@ impl Dispatcher {
 
         let context = ExecutionContext {
             interface_name: <dyn Initialize<Params = ()> as Interface>::INTERFACE_NAME,
-            ..ExecutionContext::new(self, fork, Caller::Blockchain {})
+            ..ExecutionContext::new(DispatcherRef::new(self), fork, Caller::Blockchain {})
         };
         let call_info = CallInfo {
             instance_id: descriptor.id,
@@ -516,6 +518,43 @@ impl std::fmt::Debug for DeployArtifactRequest {
         f.debug_tuple("DeployArtifactRequest")
             .field(&self.artifact)
             .finish()
+    }
+}
+
+/// Reference to the underlying runtime dispatcher.
+#[derive(Debug, Clone)]
+pub struct DispatcherRef<'a> {
+    /// List of dispatcher actions that will be performed after execution finishes.
+    actions: Rc<RefCell<Vec<Action>>>,
+    /// Reference to the underlying runtime dispatcher.
+    inner: &'a Dispatcher,
+}
+
+impl<'a> DispatcherRef<'a> {
+    /// Create a new instance.
+    pub(crate) fn new(dispatcher: &'a Dispatcher) -> Self {
+        Self {
+            inner: dispatcher,
+            actions: Rc::default(),
+        }
+    }
+
+    /// Call the corresponding runtime method.
+    pub(crate) fn call(
+        &self,
+        context: &ExecutionContext,
+        call_info: &CallInfo,
+        arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        self.inner.call(context, call_info, arguments)
+    }
+
+    pub(crate) fn dispatch_action(&self, action: Action) {
+        self.actions.borrow_mut().push(action);
+    }
+
+    pub(crate) fn take_actions(&self) -> Vec<Action> {
+        self.actions.borrow_mut().drain(..).collect()
     }
 }
 
@@ -700,7 +739,7 @@ mod tests {
             StateHashAggregator::default()
         }
 
-        fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
+        fn before_commit(&self, _dispatcher: DispatcherRef, _fork: &mut Fork) {}
 
         fn after_commit(
             &self,
@@ -817,7 +856,11 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let context = ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 1 });
+        let context = ExecutionContext::new(
+            DispatcherRef::new(&dispatcher),
+            &fork,
+            Caller::Service { instance_id: 1 },
+        );
         dispatcher
             .call(
                 &context,
@@ -939,8 +982,11 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let context =
-            ExecutionContext::new(&dispatcher, &fork, Caller::Service { instance_id: 15 });
+        let context = ExecutionContext::new(
+            DispatcherRef::new(&dispatcher),
+            &fork,
+            Caller::Service { instance_id: 15 },
+        );
         dispatcher
             .call(
                 &context,

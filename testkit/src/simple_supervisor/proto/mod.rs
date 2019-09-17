@@ -16,11 +16,11 @@ pub mod schema;
 
 use exonum::{
     blockchain::ConsensusConfig,
+    crypto,
     helpers::Height,
     merkledb::BinaryValue,
-    runtime::{ConfigChange, InstanceId, ServiceConfig,rust::Transaction},
-    messages::{Verified, AnyTx},
-    crypto,
+    messages::{AnyTx, Verified},
+    runtime::{rust::Transaction, ConfigChange, InstanceId, ServiceConfig},
 };
 use exonum_derive::ProtobufConvert;
 

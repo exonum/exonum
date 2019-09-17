@@ -23,7 +23,7 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
+        dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
         rust::{
             interfaces::{INITIALIZE_INTERFACE_NAME, INITIALIZE_METHOD_ID},
             Transaction,
@@ -203,7 +203,7 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
+    fn before_commit(&self, _dispatcher: DispatcherRef, _fork: &mut Fork) {}
 
     fn after_commit(
         &self,
