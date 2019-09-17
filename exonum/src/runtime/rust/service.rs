@@ -181,7 +181,7 @@ pub struct BeforeCommitContext<'a> {
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: DispatcherRef<'a>,
+    dispatcher: &'a DispatcherRef<'a>,
 }
 
 impl<'a> BeforeCommitContext<'a> {
@@ -189,7 +189,7 @@ impl<'a> BeforeCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
-        dispatcher: DispatcherRef<'a>,
+        dispatcher: &'a DispatcherRef<'a>,
     ) -> Self {
         Self {
             instance,
@@ -212,7 +212,7 @@ impl<'a> BeforeCommitContext<'a> {
     #[doc(hidden)]
     /// Create a context to call interfaces of the specified service instance.
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
-        CallContext::new(self.fork, self.dispatcher.clone(), self.instance.id, called)
+        CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
     }
 }
 

@@ -303,14 +303,13 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, dispatcher: DispatcherRef, fork: &mut Fork) {
+    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork) {
         for instance in self.started_services.values() {
-            let dispatcher = dispatcher.clone();
             let result = catch_panic(|| {
                 instance.as_ref().before_commit(BeforeCommitContext::new(
                     instance.descriptor(),
                     fork,
-                    dispatcher.clone(),
+                    dispatcher,
                 ));
                 Ok(())
             });

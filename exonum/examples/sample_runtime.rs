@@ -203,7 +203,7 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
 
     fn after_commit(
         &self,

@@ -181,8 +181,9 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let fork = db.fork();
+        let dispatcher_ref = DispatcherRef::new(&dispatcher);
         let context = ExecutionContext::new(
-            DispatcherRef::new(&dispatcher),
+            &dispatcher_ref,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
@@ -210,8 +211,9 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let fork = db.fork();
+        let dispatcher_ref = DispatcherRef::new(&dispatcher);
         let context = ExecutionContext::new(
-            DispatcherRef::new(&dispatcher),
+            &dispatcher_ref,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,

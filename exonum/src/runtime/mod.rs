@@ -245,7 +245,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, dispatcher: DispatcherRef, fork: &mut Fork);
+    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -395,7 +395,7 @@ pub struct ExecutionContext<'a> {
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: DispatcherRef<'a>,
+    dispatcher: &'a DispatcherRef<'a>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -404,7 +404,7 @@ impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
-    pub(crate) fn new(dispatcher: DispatcherRef<'a>, fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: &'a DispatcherRef<'a>, fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,
@@ -458,7 +458,7 @@ pub struct CallContext<'a> {
     /// The current state of the blockchain.
     fork: &'a Fork,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: DispatcherRef<'a>,
+    dispatcher: &'a DispatcherRef<'a>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -467,7 +467,7 @@ impl<'a> CallContext<'a> {
     /// Create a new call context.
     pub fn new(
         fork: &'a Fork,
-        dispatcher: DispatcherRef<'a>,
+        dispatcher: &'a DispatcherRef<'a>,
         caller: InstanceId,
         called: InstanceId,
     ) -> Self {
@@ -490,7 +490,7 @@ impl<'a> CallContext<'a> {
             caller,
             called,
             fork: inner.fork,
-            dispatcher: inner.dispatcher.clone(),
+            dispatcher: inner.dispatcher,
             call_stack_depth: inner.call_stack_depth,
         }
     }
@@ -505,7 +505,7 @@ impl<'a> CallContext<'a> {
     ) -> Result<(), ExecutionError> {
         let context = ExecutionContext {
             fork: self.fork,
-            dispatcher: self.dispatcher.clone(),
+            dispatcher: self.dispatcher,
             caller: Caller::Service {
                 instance_id: self.caller,
             },

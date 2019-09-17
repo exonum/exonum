@@ -21,7 +21,6 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
     panic,
-    rc::Rc,
 };
 
 use crate::{
@@ -300,8 +299,9 @@ impl Dispatcher {
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
+        let dispatcher_ref = DispatcherRef::new(self);
         let context = ExecutionContext::new(
-            DispatcherRef::new(self),
+            &dispatcher_ref,
             fork,
             Caller::Transaction {
                 author: tx.author(),
@@ -339,7 +339,7 @@ impl Dispatcher {
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         let dispatcher_ref = DispatcherRef::new(self);
         for runtime in self.runtimes.values() {
-            runtime.before_commit(dispatcher_ref.clone(), fork);
+            runtime.before_commit(&dispatcher_ref, fork);
         }
     }
 
@@ -433,9 +433,10 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let constructor_is_empty = constructor.is_empty();
 
+        let dispatcher_ref = DispatcherRef::new(self);
         let context = ExecutionContext {
             interface_name: <dyn Initialize<Params = ()> as Interface>::INTERFACE_NAME,
-            ..ExecutionContext::new(DispatcherRef::new(self), fork, Caller::Blockchain {})
+            ..ExecutionContext::new(&dispatcher_ref, fork, Caller::Blockchain {})
         };
         let call_info = CallInfo {
             instance_id: descriptor.id,
@@ -522,10 +523,10 @@ impl std::fmt::Debug for DeployArtifactRequest {
 }
 
 /// Reference to the underlying runtime dispatcher.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DispatcherRef<'a> {
     /// List of dispatcher actions that will be performed after execution finishes.
-    actions: Rc<RefCell<Vec<Action>>>,
+    actions: RefCell<Vec<Action>>,
     /// Reference to the underlying runtime dispatcher.
     inner: &'a Dispatcher,
 }
@@ -535,7 +536,7 @@ impl<'a> DispatcherRef<'a> {
     pub(crate) fn new(dispatcher: &'a Dispatcher) -> Self {
         Self {
             inner: dispatcher,
-            actions: Rc::default(),
+            actions: RefCell::default(),
         }
     }
 
@@ -739,7 +740,7 @@ mod tests {
             StateHashAggregator::default()
         }
 
-        fn before_commit(&self, _dispatcher: DispatcherRef, _fork: &mut Fork) {}
+        fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
 
         fn after_commit(
             &self,
@@ -856,11 +857,9 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let context = ExecutionContext::new(
-            DispatcherRef::new(&dispatcher),
-            &fork,
-            Caller::Service { instance_id: 1 },
-        );
+        let dispatcher_ref = DispatcherRef::new(&dispatcher);
+        let context =
+            ExecutionContext::new(&dispatcher_ref, &fork, Caller::Service { instance_id: 1 });
         dispatcher
             .call(
                 &context,
@@ -982,11 +981,9 @@ mod tests {
         // Check if transactions are ready for execution.
         let tx_payload = [0x00_u8; 1];
 
-        let context = ExecutionContext::new(
-            DispatcherRef::new(&dispatcher),
-            &fork,
-            Caller::Service { instance_id: 15 },
-        );
+        let dispatcher_ref = DispatcherRef::new(&dispatcher);
+        let context =
+            ExecutionContext::new(&dispatcher_ref, &fork, Caller::Service { instance_id: 15 });
         dispatcher
             .call(
                 &context,
