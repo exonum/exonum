@@ -62,3 +62,15 @@ message ExecutionStatus {
     ExecutionError error = 2;
   }
 }
+
+message ServiceConfig {
+  uint32 instance_id = 1;
+  bytes params = 2;
+}
+
+message ConfigChange {
+  oneof message {
+    exonum.Config consensus = 1;
+    ServiceConfig service = 2;
+  }
+}

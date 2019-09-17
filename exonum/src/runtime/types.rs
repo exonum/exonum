@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{is_allowed_latin1_char, is_valid_index_name, BinaryValue};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
-use crate::{helpers::ValidateInput, proto::schema};
+use crate::{
+    blockchain::ConsensusConfig,
+    helpers::ValidateInput,
+    merkledb::{is_allowed_latin1_char, is_valid_index_name, BinaryValue},
+    proto::schema,
+};
 
 use super::InstanceDescriptor;
 
@@ -278,6 +282,20 @@ impl ValidateInput for InstanceSpec {
         self.artifact.validate()?;
         Self::is_valid_name(&self.name)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::runtime::ServiceConfig", crate = "crate")]
+pub struct ServiceConfig {
+    pub instance_id: InstanceId,
+    pub params: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::runtime::ConfigChange", crate = "crate")]
+pub enum ConfigChange {
+    Consensus(ConsensusConfig),
+    Service(ServiceConfig),
 }
 
 #[test]

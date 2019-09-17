@@ -160,7 +160,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     #[doc(hidden)]
     /// Create a context to call interfaces of the specified service instance.
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
-        CallContext::new(self.inner, self.instance.id, called)
+        CallContext::from_execution_context(self.inner, self.instance.id, called)
     }
 
     pub fn check_caller<F, T, E>(&self, check: F) -> Result<(T, &Fork), E>
@@ -196,6 +196,23 @@ impl<'a> BeforeCommitContext<'a> {
             fork,
             dispatcher,
         }
+    }
+
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a client to call interface methods of the specified service instance.
+    pub fn interface<T>(&self, called: InstanceId) -> T
+    where
+        T: From<CallContext<'a>>,
+    {
+        self.call_context(called).into()
+    }
+
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a context to call interfaces of the specified service instance.
+    pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
+        CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
     }
 }
 

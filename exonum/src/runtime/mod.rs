@@ -92,7 +92,10 @@
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
-    types::{AnyTx, ArtifactId, CallInfo, InstanceId, InstanceSpec, MethodId},
+    types::{
+        AnyTx, ArtifactId, CallInfo, ConfigChange, InstanceId, InstanceSpec, MethodId,
+        ServiceConfig,
+    },
 };
 
 #[macro_use]
@@ -318,7 +321,7 @@ pub struct StateHashAggregator {
 }
 
 /// The initiator of the method execution.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Caller {
     /// A usual transaction from the Exonum client, authorized by its key pair.
     Transaction {
@@ -459,21 +462,51 @@ pub enum ApiChange {
 /// Provide a low level context for the call of methods of a different service instance.
 #[derive(Debug)]
 pub struct CallContext<'a> {
-    /// Underlying execution context.
-    inner: &'a ExecutionContext<'a>,
     /// Identifier of the caller service instance.
     caller: InstanceId,
     /// Identifier of the called service instance.
     called: InstanceId,
+    /// The current state of the blockchain.
+    fork: &'a Fork,
+    /// List of dispatcher actions that will be performed after execution finishes.
+    actions: Rc<RefCell<Vec<dispatcher::Action>>>,
+    /// Reference to the underlying runtime dispatcher.
+    dispatcher: &'a Dispatcher,
+    /// Depth of call stack.
+    call_stack_depth: usize,
 }
 
 impl<'a> CallContext<'a> {
-    /// Create a new call context for the given execution context.
-    pub fn new(inner: &'a ExecutionContext<'a>, caller: InstanceId, called: InstanceId) -> Self {
+    /// Create a new call context.
+    pub fn new(
+        fork: &'a Fork,
+        dispatcher: &'a Dispatcher,
+        caller: InstanceId,
+        called: InstanceId,
+    ) -> Self {
         Self {
-            inner,
             caller,
             called,
+            fork,
+            dispatcher,
+            actions: Rc::default(),
+            call_stack_depth: 0,
+        }
+    }
+
+    /// Create a new call context for the given execution context.
+    pub fn from_execution_context(
+        inner: &'a ExecutionContext<'a>,
+        caller: InstanceId,
+        called: InstanceId,
+    ) -> Self {
+        Self {
+            caller,
+            called,
+            fork: inner.fork,
+            actions: inner.actions.clone(),
+            dispatcher: inner.dispatcher,
+            call_stack_depth: inner.call_stack_depth,
         }
     }
 
@@ -486,14 +519,14 @@ impl<'a> CallContext<'a> {
         // TODO ExecutionError here mislead about the true cause of an occurred error. [ECR-3222]
     ) -> Result<(), ExecutionError> {
         let context = ExecutionContext {
-            fork: self.inner.fork,
-            dispatcher: self.inner.dispatcher,
-            actions: self.inner.actions.clone(),
+            fork: self.fork,
+            dispatcher: self.dispatcher,
+            actions: self.actions.clone(),
             caller: Caller::Service {
                 instance_id: self.caller,
             },
             interface_name: interface_name.as_ref(),
-            call_stack_depth: self.inner.call_stack_depth + 1,
+            call_stack_depth: self.call_stack_depth + 1,
         };
         let call_info = CallInfo {
             method_id,
@@ -509,8 +542,7 @@ impl<'a> CallContext<'a> {
             return Err((kind, msg).into());
         }
 
-        self.inner
-            .dispatcher
+        self.dispatcher
             .call(&context, &call_info, arguments.into_bytes().as_ref())
     }
 }

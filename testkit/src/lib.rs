@@ -164,6 +164,7 @@ pub use crate::{
 };
 pub mod compare;
 pub mod proto;
+pub mod simple_supervisor;
 
 use exonum::{
     api::{
@@ -454,6 +455,7 @@ impl TestKit {
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
+        let saved_consensus_config = self.consensus_config();
 
         let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
@@ -496,6 +498,13 @@ impl TestKit {
             .unwrap();
         drop(guard);
 
+        // Modify the self configuration
+        let actual_consensus_config = self.consensus_config();
+        if actual_consensus_config != saved_consensus_config {
+            self.network_mut()
+                .update_consensus_config(actual_consensus_config);
+        }
+
         self.poll_events();
 
         let snapshot = self.snapshot();
@@ -530,7 +539,6 @@ impl TestKit {
                 }
             }
         }
-
         None
     }
 
@@ -703,8 +711,8 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if validator with the given id is absent in test network.
-    pub fn validator(&self, id: ValidatorId) -> &TestNode {
-        &self.network.validators()[id.0 as usize]
+    pub fn validator(&self, id: ValidatorId) -> TestNode {
+        self.network.validators()[id.0 as usize].clone()
     }
 
     /// Returns sufficient number of validators for the Byzantine Fault Tolerance consensus.
@@ -713,8 +721,8 @@ impl TestKit {
     }
 
     /// Returns the leader on the current height. At the moment first validator.
-    pub fn leader(&self) -> &TestNode {
-        &self.network().validators()[0]
+    pub fn leader(&self) -> TestNode {
+        self.network().validators()[0].clone()
     }
 
     /// Returns the reference to test network.
@@ -840,8 +848,8 @@ impl TestKit {
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
-    pub fn us(&self) -> &TestNode {
-        self.network().us()
+    pub fn us(&self) -> TestNode {
+        self.network().us().clone()
     }
 
     /// Emulates stopping the node. The stopped node can then be `restart()`ed.
@@ -1004,7 +1012,7 @@ fn test_number_of_validators_in_builder() {
     let testkit = TestKitBuilder::auditor().with_validators(3).create();
     assert_eq!(testkit.network().validators().len(), 3);
     let us = testkit.us();
-    assert!(!testkit.network().validators().iter().any(|v| v == us));
+    assert!(!testkit.network().validators().into_iter().any(|v| v == us));
 
     let testkit = TestKitBuilder::validator().with_validators(5).create();
     assert_eq!(testkit.network().validators().len(), 5);

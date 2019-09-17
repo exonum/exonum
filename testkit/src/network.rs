@@ -26,7 +26,7 @@ use exonum_merkledb::ObjectHash;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TestNetwork {
     us: TestNode,
-    validators: Vec<TestNode>,
+    nodes: Vec<TestNode>,
 }
 
 impl TestNetwork {
@@ -43,17 +43,26 @@ impl TestNetwork {
             "At least one validator should be present in the network."
         );
 
-        let validators = (0..validator_count)
+        let mut nodes = (0..validator_count)
             .map(ValidatorId)
             .map(TestNode::new_validator)
             .collect::<Vec<_>>();
 
         let us = if let Some(ValidatorId(id)) = us {
-            validators[id as usize].clone()
+            nodes[id as usize].clone()
         } else {
-            TestNode::new_auditor()
+            let us = TestNode::new_auditor();
+            nodes.push(us.clone());
+            us
         };
-        TestNetwork { validators, us }
+
+        TestNetwork { nodes, us }
+    }
+
+    /// Adds a new auditor node to this network.
+    pub fn add_node(&mut self) -> &TestNode {
+        self.nodes.push(TestNode::new_auditor());
+        self.nodes.last().unwrap()
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
@@ -62,15 +71,26 @@ impl TestNetwork {
     }
 
     /// Returns a slice of all validators in the network.
-    pub fn validators(&self) -> &[TestNode] {
-        &self.validators
+    pub fn validators(&self) -> Vec<TestNode> {
+        let mut validators = self
+            .nodes
+            .iter()
+            .filter(|x| x.validator_id.is_some())
+            .cloned()
+            .collect::<Vec<_>>();
+        validators.sort_by(|a, b| a.validator_id.cmp(&b.validator_id));
+        validators
     }
 
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
     pub fn genesis_config(&self) -> ConsensusConfig {
         ConsensusConfig {
-            validator_keys: self.validators.iter().map(TestNode::public_keys).collect(),
+            validator_keys: self
+                .validators()
+                .iter()
+                .map(TestNode::public_keys)
+                .collect(),
             ..ConsensusConfig::default()
         }
     }
@@ -89,8 +109,28 @@ impl TestNetwork {
                 validator
             })
             .collect::<Vec<_>>();
-        self.validators = validators;
+        self.nodes = validators;
         self.us.clone_from(&us);
+    }
+
+    /// Updates the test network with a new consensus configuration.
+    // TODO Optimize O(n^2) [ECR-3222]
+    pub fn update_consensus_config(&mut self, config: ConsensusConfig) {
+        // Assign new node roles.
+        for node in &mut self.nodes {
+            node.validator_id =
+                config.find_validator(|keys| keys.consensus_key == node.consensus_public_key);
+        }
+        // Verify that all validator keys have been assigned.
+        let validators_count = self
+            .nodes
+            .iter()
+            .filter(|x| x.validator_id.is_some())
+            .count();
+        assert_eq!(validators_count, config.validator_keys.len());
+        // Modify us.
+        self.us.validator_id =
+            config.find_validator(|keys| keys.consensus_key == self.us.consensus_public_key);
     }
 
     /// Updates the test network with a new configuration.
@@ -99,22 +139,22 @@ impl TestNetwork {
     }
 
     /// Returns service public key of the validator with given id.
-    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
+    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators()
             .get(id.0 as usize)
-            .map(|x| &x.service_public_key)
+            .map(|x| x.service_public_key)
     }
 
     /// Returns consensus public key of the validator with given id.
-    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators()
             .get(id.0 as usize)
-            .map(|x| &x.consensus_public_key)
+            .map(|x| x.consensus_public_key)
     }
 }
 
 /// An emulated node in the test network.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TestNode {
     consensus_secret_key: SecretKey,
     consensus_public_key: PublicKey,
@@ -259,7 +299,7 @@ impl TestNetworkConfiguration {
     pub(crate) fn new(network: &TestNetwork, consensus_config: ConsensusConfig) -> Self {
         TestNetworkConfiguration {
             us: network.us().clone(),
-            validators: network.validators().into(),
+            validators: network.validators(),
             consensus_config,
             actual_from: Height::zero(),
         }

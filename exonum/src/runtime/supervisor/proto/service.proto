@@ -14,25 +14,11 @@
 
 syntax = "proto3";
 
-package exonum.service.supervisor;
+package exonum.supervisor;
 
+import "helpers.proto";
 import "runtime.proto";
 import "blockchain.proto";
-import "google/protobuf/any.proto";
-
-// Types
-
-message ServiceConfig {
-  uint32 instance_id = 1;
-  bytes params = 2;
-}
-
-message ConfigChange {
-  oneof message {
-    exonum.Config consensus = 1;
-    ServiceConfig service = 2;
-  }
-}
 
 // Transactions
 
@@ -71,7 +57,7 @@ message StartService {
 // Request for the configuration change
 message ConfigPropose {
     uint64 actual_from = 1;
-    repeated ConfigChange changes = 2;
+    repeated exonum.runtime.ConfigChange changes = 2;
 }
 
 message ConfigVote {
