@@ -128,19 +128,20 @@ impl ExonumCommand for GenerateConfig {
 
         let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
         let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
-        let mut master_key_path = self
+        let master_key_path = self
             .master_key_path
             .unwrap_or_default()
             .join(MASTER_KEY_FILE_NAME);
-
-        master_key_path = self.output_dir.join(master_key_path.clone());
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
         let keys = {
             let passphrase =
                 Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default());
-            create_keys_and_files(&master_key_path, passphrase?.as_bytes())
+            create_keys_and_files(
+                &self.output_dir.join(master_key_path.clone()),
+                passphrase?.as_bytes(),
+            )
         }?;
 
         let validator_keys = ValidatorKeys {

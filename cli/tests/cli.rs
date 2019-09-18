@@ -282,38 +282,7 @@ fn test_generate_config_key_files() {
         .unwrap();
 
     let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
-    let master_key_path = env.output_node_config_dir(0).join("master.key.toml");
-    let master_key_path = master_key_path.to_str().unwrap().into();
-    assert_eq!(sec_cfg["master_key_path"], master_key_path);
-}
-
-#[test]
-fn test_relative_master_key_path() {
-    let env = ConfigSpec::new_without_pass();
-
-    env.command("generate-config")
-        .with_arg(&env.expected_template_file())
-        .with_arg(&env.output_node_config_dir(0))
-        .with_named_arg("-a", "0.0.0.0:8000")
-        .with_arg("--no-password")
-        .with_named_arg("--master-key-path", "../")
-        .run()
-        .unwrap();
-
-    let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
-    let master_key_path = env
-        .output_node_config_dir(0)
-        .parent()
-        .unwrap()
-        .to_path_buf();
-
-    let actual = master_key_path.join("master.key.toml");
-    let expected = PathBuf::from(sec_cfg["master_key_path"].as_str().unwrap());
-
-    assert_eq!(
-        expected.canonicalize().unwrap(),
-        actual.canonicalize().unwrap()
-    );
+    assert_eq!(sec_cfg["master_key_path"], "master.key.toml".into());
 }
 
 #[test]

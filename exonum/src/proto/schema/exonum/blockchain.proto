@@ -46,8 +46,6 @@ message ValidatorKeys {
   // Service key is used for services, for example, the configuration
   // updater service, the anchoring service, etc.
   exonum.PublicKey service_key = 2;
-  /// Identity key is used for secure communication between peers.
-  exonum.PublicKey identity_key = 3;
 }
 
 // Consensus algorithm parameters.

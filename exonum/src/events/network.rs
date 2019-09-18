@@ -528,7 +528,7 @@ impl NetworkHandler {
 
         ensure!(
             author == key,
-            "Identity key in connect message doesn't match with the peer key"
+            "Connect message public key doesn't match with the received peer key"
         );
 
         Ok(connect)
