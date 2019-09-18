@@ -25,13 +25,14 @@ use futures::{Future, IntoFuture};
 use std::ops::{Bound, Range};
 use std::sync::{Arc, Mutex};
 
+use crate::api::error::LengthLimit;
 use crate::blockchain::Schema;
 use crate::{
     api::{
         backends::actix::{
             self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
         },
-        error::convert_error,
+        error::into_api_error,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
     },
@@ -262,17 +263,20 @@ impl ExplorerApi {
         let (max_message_len, max_payload_len) = get_message_limits(&service_api_state);
         let index = move |request: HttpRequest| {
             let state = request.state().clone();
-            let content_length = request
-                .headers()
-                .get(CONTENT_LENGTH)
-                .unwrap()
-                .to_str()
-                .unwrap_or_default()
-                .to_owned();
+            let content_length = match request.headers().get(CONTENT_LENGTH) {
+                Some(length) => length.to_str().unwrap_or_default().to_owned(),
+                None => {
+                    return Err(ApiError::BadRequest("No content-length".to_string()).into())
+                        .into_future()
+                        .responder();
+                }
+            };
             request
                 .json()
                 .limit(max_payload_len)
-                .map_err(move |e| convert_error(e, max_payload_len, content_length))
+                .map_err(move |e| {
+                    into_api_error(e, LengthLimit::Json(max_payload_len), content_length)
+                })
                 .from_err()
                 .and_then(move |query: TransactionHex| {
                     Self::tx_handler(&state, query, max_message_len)
@@ -294,14 +298,14 @@ impl ExplorerApi {
         query: TransactionHex,
         max_message_len: usize,
     ) -> Result<TransactionResponse, ApiError> {
-        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        if buf.len() > max_message_len {
-            return Err(ApiError::PayloadTooLarge(format!(
-                "Allowed message length is: {}, but try to send: {}",
-                max_message_len,
-                buf.len()
-            )));
+        let message_len_in_bytes = query.tx_body.len() / 2; // one byte == 2 digits in hex
+        if message_len_in_bytes > max_message_len {
+            return Err(ApiError::PayloadTooLarge {
+                length_limit: LengthLimit::Message(max_message_len),
+                content_length: message_len_in_bytes,
+            });
         }
+        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::from_raw_buffer(buf)?;
         let tx_hash = signed.hash();
         let signed = RawTransaction::try_from(Message::deserialize(signed)?)

@@ -12,33 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for the blockchain explorer functionality.
-
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
+//! Tests for the websocket functionality.
 
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
     OwnedMessage, WebSocketResult,
 };
 
+use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
 use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
 
-use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
-
-mod blockchain;
-
-use blockchain::*;
+use crate::blockchain::{run_node, run_node_with_message_len, CreateWallet, Transfer, SERVICE_ID};
 
 fn create_ws_client(addr: &str) -> WebSocketResult<Client<TcpStream>> {
     let mut last_err = None;
@@ -441,7 +428,7 @@ fn test_sending_message_size() {
 
     // Send transaction.
     let (pk, sk) = gen_keypair();
-    let name = "a".repeat(371);
+    let name = "a".repeat(371); // With name length 371 chars we'll get tx size: 512 bytes.
     let tx = Message::sign_transaction(CreateWallet::new(&pk, name.as_str()), SERVICE_ID, pk, &sk);
     assert_eq!(tx.signed_message().raw().len(), max_message_len);
     let tx_hash = tx.hash();
@@ -475,7 +462,7 @@ fn test_sending_message_size() {
         serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
         json!({
             "result": "error",
-            "description": "Payload too large: Allowed message length is: 512, but try to send: 513"
+            "description": "Payload too large: Allowed message length is: 512, but got to send: 513"
         })
     );
 

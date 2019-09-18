@@ -16,7 +16,11 @@
 
 use futures::sync::mpsc;
 
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    net::SocketAddr,
+    thread::{self, JoinHandle},
+};
 
 use exonum::{
     blockchain::{
@@ -24,8 +28,9 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
+    helpers::generate_testnet_config,
     messages::{Message, RawTransaction, Signed},
-    node::ApiSender,
+    node::{ApiSender, Node, NodeConfig},
 };
 
 use exonum_merkledb::{Snapshot, TemporaryDB};
@@ -201,4 +206,46 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
             &mut BTreeMap::new(),
         )
         .unwrap();
+}
+
+pub struct RunHandle {
+    pub node_thread: JoinHandle<()>,
+    pub api_tx: ApiSender,
+}
+
+pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
+    let mut node_cfg = generate_testnet_config(1, listen_port).remove(0);
+    node_cfg.api.public_api_address = Some(
+        format!("127.0.0.1:{}", pub_api_port)
+            .parse::<SocketAddr>()
+            .unwrap(),
+    );
+    run_node_with_cfg(node_cfg)
+}
+
+pub fn run_node_with_message_len(
+    listen_port: u16,
+    pub_api_port: u16,
+    max_message_len: u32,
+) -> RunHandle {
+    let mut node_cfg = generate_testnet_config(1, listen_port).remove(0);
+    node_cfg.genesis.consensus.max_message_len = max_message_len;
+    node_cfg.api.public_api_address = Some(
+        format!("127.0.0.1:{}", pub_api_port)
+            .parse::<SocketAddr>()
+            .unwrap(),
+    );
+    run_node_with_cfg(node_cfg)
+}
+
+fn run_node_with_cfg(node_cfg: NodeConfig) -> RunHandle {
+    let service = Box::new(MyService);
+    let node = Node::new(TemporaryDB::new(), vec![service], node_cfg, None);
+    let api_tx = node.channel();
+    RunHandle {
+        node_thread: thread::spawn(move || {
+            node.run().unwrap();
+        }),
+        api_tx,
+    }
 }

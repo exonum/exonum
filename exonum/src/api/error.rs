@@ -20,7 +20,7 @@
 
 use actix_web::error::JsonPayloadError;
 use failure::Fail;
-use std::io;
+use std::{fmt, io};
 
 /// List of possible API errors.
 #[derive(Fail, Debug)]
@@ -54,8 +54,13 @@ pub enum Error {
     Unauthorized,
 
     /// Message length is exceeded.
-    #[fail(display = "Payload too large: {}", _0)]
-    PayloadTooLarge(String),
+    #[fail(display = "Payload too large: Allowed {}, but got to send: {}", _0, _1)]
+    PayloadTooLarge {
+        /// Variant of a limit for incoming requests.
+        length_limit: LengthLimit,
+        /// A length of content length.
+        content_length: usize,
+    },
 }
 
 impl From<io::Error> for Error {
@@ -70,22 +75,40 @@ impl From<failure::Error> for Error {
     }
 }
 
-pub(crate) fn convert_error(
+/// Length limit for incoming requests.
+#[derive(Debug, Clone, Copy)]
+pub enum LengthLimit {
+    /// Limit for a message in bytes.
+    Message(usize),
+    /// Limit for Json body in bytes.
+    Json(usize),
+}
+
+impl fmt::Display for LengthLimit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            LengthLimit::Message(len) => write!(f, "message length is: {}", len),
+            LengthLimit::Json(len) => write!(f, "json length is: {}", len),
+        }
+    }
+}
+
+pub(crate) fn into_api_error(
     error: JsonPayloadError,
-    max_payload_len: usize,
-    content_len: String,
+    length_limit: LengthLimit,
+    content_length: String,
 ) -> Error {
     match error {
-        JsonPayloadError::Overflow => Error::PayloadTooLarge(format!(
-            "Allowed payload length is: {}, but try to send: {}",
-            max_payload_len, content_len
-        )),
+        JsonPayloadError::Overflow => Error::PayloadTooLarge {
+            length_limit,
+            content_length: content_length.parse().unwrap(),
+        },
         JsonPayloadError::ContentType => Error::BadRequest("Wrong content type".to_owned()),
         JsonPayloadError::Deserialize(err) => {
             Error::BadRequest(format!("Json deserialize error: {}", err))
         }
         JsonPayloadError::Payload(err) => {
-            Error::BadRequest(format!("Error that occur during reading payload: {}", err))
+            Error::BadRequest(format!("Error while reading payload: {}", err))
         }
     }
 }
