@@ -96,19 +96,59 @@ impl<T: BinaryValue> Interface for dyn Initialize<Params = T> {
     }
 }
 
+/// Fully qualified name of the ['Configure`] interface.
+///
+/// ['Configure`]: trait.Configure.html
 pub const CONFIGURE_INTERFACE_NAME: &str = "Configure";
+/// Identifier of the [`Configure::verify_config`] method.
+///
+/// [`Configure::verify_config`]: trait.Configure.html#tymethod.verify_config
 pub const VERIFY_CONFIG_METHOD_ID: MethodId = 0;
+/// Identifier of the [`Configure::apply_config`] method.
+///
+/// [`Configure::apply_config`]: trait.Configure.html#tymethod.apply_config
 pub const APPLY_CONFIG_METHOD_ID: MethodId = 1;
 
 pub trait Configure {
+    /// The specific type of parameters passed during the service instance configuration.    
     type Params: BinaryValue;
-
+    /// Verify a new configuration parameters before before their actual application.
+    ///
+    /// This method is called by the new configuration change proposal. If the proposed
+    /// parameters do not fit for this service instance, it should return a corresponding
+    /// error to discard this proposal. Thus only a configuration change proposal in which all
+    /// changes are correct can be applied later.
+    ///
+    /// The proposal approval process details, and even the configuration proposal format, depends
+    /// on the particular implementation.
+    ///
+    /// # Execution policy
+    ///
+    /// This method can only be called on behalf of the supervisor service instance.
+    /// In other words, only a method with the specified [identifier] can call this method.
+    ///
+    /// [identifier]: ../../constant.SUPERVISOR_SERVICE_ID.html
     fn verify_config(
         &self,
         context: TransactionContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
-
+    /// Update service configuration with the given parameters.
+    ///
+    /// The configuration parameters passed to the method are discarded immediately.
+    /// So the service instance should save them by itself if it is important for
+    /// the service business logic.
+    ///
+    /// This method is called then some external conditions occur and thus this happens
+    /// outside of the transaction execution, which means that errors that occur during the
+    /// execution of this method may be ignored.
+    ///
+    /// # Execution policy
+    ///
+    /// This method can only be called on behalf of the supervisor service instance.
+    /// In other words, only a method with the specified [identifier] can call this method.
+    ///
+    /// [identifier]: ../../constant.SUPERVISOR_SERVICE_ID.html
     fn apply_config(
         &self,
         context: TransactionContext,
