@@ -14,7 +14,7 @@
 
 pub use self::{
     error::Error,
-    interfaces::{Configure, Initialize},
+    interfaces::{caller_is_supervisor, Configure, Initialize},
     service::{
         AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
         ServiceFactory, Transaction, TransactionContext,

@@ -487,7 +487,7 @@ impl Dispatcher {
 
             ConfigChange::Service(config) => {
                 trace!(
-                    "Updating service instance {} configuration",
+                    "Updating service instance configuration, instance ID is {}",
                     config.instance_id
                 );
 

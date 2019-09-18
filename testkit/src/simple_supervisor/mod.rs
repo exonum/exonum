@@ -73,7 +73,7 @@ impl Transactions for SimpleSupervisor {
             .check_caller(|caller, _| caller.author().ok_or(DispatcherError::UnauthorizedCaller))?;
 
         // Check that the `actual_from` height is in the future.
-        if blockchain::Schema::new(fork).height() > arg.actual_from {
+        if blockchain::Schema::new(fork).height() >= arg.actual_from {
             return Err(Error::ActualFromIsPast).map_err(From::from);
         }
 
