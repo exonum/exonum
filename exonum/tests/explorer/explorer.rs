@@ -20,14 +20,14 @@ use exonum::{
     explorer::*,
     helpers::Height,
     messages::{self, Message, RawTransaction, Signed},
+    node::ExternalMessage,
 };
 use reqwest::Client;
 
 use crate::blockchain::{
-    create_block, create_blockchain, run_node_with_message_len, CreateWallet, ExplorerTransactions,
-    Transfer, SERVICE_ID,
+    create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
 };
-use exonum::node::ExternalMessage;
+use crate::node::run_node_with_message_len;
 
 #[test]
 #[allow(clippy::cognitive_complexity)]

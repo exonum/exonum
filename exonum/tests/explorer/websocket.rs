@@ -25,7 +25,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::blockchain::{run_node, run_node_with_message_len, CreateWallet, Transfer, SERVICE_ID};
+use crate::blockchain::{CreateWallet, Transfer, SERVICE_ID};
+use crate::node::{run_node, run_node_with_message_len};
 
 fn create_ws_client(addr: &str) -> WebSocketResult<Client<TcpStream>> {
     let mut last_err = None;

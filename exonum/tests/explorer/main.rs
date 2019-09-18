@@ -26,4 +26,5 @@ extern crate pretty_assertions;
 
 mod blockchain;
 mod explorer;
+mod node;
 mod websocket;
