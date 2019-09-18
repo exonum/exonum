@@ -123,6 +123,11 @@ use self::{
 
 mod types;
 
+/// Persistent identifier of supervisor service instance.
+///
+/// Only a service with this ID can perform actions with the dispatcher.
+pub const SUPERVISOR_SERVICE_ID: InstanceId = 0;
+
 /// List of predefined runtimes.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]

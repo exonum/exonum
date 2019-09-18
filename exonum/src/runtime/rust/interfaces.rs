@@ -15,8 +15,8 @@
 //! Important interservice communication interfaces.
 
 use crate::{
-    merkledb::BinaryValue,
-    runtime::{CallContext, DispatcherError, MethodId},
+    merkledb::{BinaryValue, Snapshot},
+    runtime::{CallContext, Caller, DispatcherError, MethodId, SUPERVISOR_SERVICE_ID},
 };
 
 use super::{ExecutionError, Interface, TransactionContext};
@@ -167,4 +167,21 @@ impl<'a> ConfigureCall<'a> {
         self.0
             .call(CONFIGURE_INTERFACE_NAME, APPLY_CONFIG_METHOD_ID, params)
     }
+}
+
+pub fn caller_is_supervisor(caller: &Caller, _: &dyn Snapshot) -> Result<(), ExecutionError> {
+    caller
+        .as_service()
+        .and_then(|instance_id| {
+            if instance_id == SUPERVISOR_SERVICE_ID {
+                Some(())
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            DispatcherError::unauthorized_caller(
+                "Only the supervisor service is allowed to call this method.",
+            )
+        })
 }

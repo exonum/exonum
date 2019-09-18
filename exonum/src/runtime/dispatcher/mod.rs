@@ -25,7 +25,7 @@ use std::{
 
 use crate::{
     api::ApiBuilder,
-    blockchain::{FatalError, IndexCoordinates, IndexOwner},
+    blockchain::{self, FatalError, IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::ValidateInput,
     merkledb::BinaryValue,
@@ -37,11 +37,11 @@ use super::{
     api::ApiContext,
     error::{catch_panic, ExecutionError},
     rust::{
-        interfaces::{Initialize, INITIALIZE_METHOD_ID},
+        interfaces::{ConfigureCall, Initialize, INITIALIZE_METHOD_ID},
         Interface,
     },
-    ApiChange, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext,
-    InstanceDescriptor, InstanceId, InstanceSpec, Runtime,
+    ApiChange, ArtifactId, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange,
+    ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -336,10 +336,19 @@ impl Dispatcher {
         runtime.execute(context, call_info, arguments)
     }
 
-    pub(crate) fn before_commit(&self, fork: &mut Fork) {
+    pub(crate) fn before_commit(&mut self, fork: &mut Fork) {
         let dispatcher_ref = DispatcherRef::new(self);
         for runtime in self.runtimes.values() {
             runtime.before_commit(&dispatcher_ref, fork);
+        }
+        // Execute pending dispatcher actions.
+        for action in dispatcher_ref.take_actions() {
+            let _ = action.execute(self, fork).map_err(|e| {
+                error!(
+                    "An error occurred while performing the dispatcher action. {}",
+                    e
+                )
+            });
         }
     }
 
@@ -458,25 +467,68 @@ impl Dispatcher {
                 })
         })
     }
+
+    /// Perform a configuration update with the specified changes.
+    fn update_config(
+        &self,
+        fork: &Fork,
+        caller_instance_id: InstanceId,
+        changes: Vec<ConfigChange>,
+    ) -> Result<(), ExecutionError> {
+        changes.into_iter().try_for_each(|change| match change {
+            ConfigChange::Consensus(config) => {
+                trace!("Updating consensus configuration {:?}", config);
+
+                blockchain::Schema::new(fork)
+                    .consensus_config_entry()
+                    .set(config);
+                Ok(())
+            }
+
+            ConfigChange::Service(config) => {
+                trace!(
+                    "Updating service instance {} configuration",
+                    config.instance_id
+                );
+
+                let dispatcher_ref = DispatcherRef::new(self);
+
+                let context = CallContext::new(
+                    fork,
+                    &dispatcher_ref,
+                    caller_instance_id,
+                    config.instance_id,
+                );
+                ConfigureCall::from(context).apply_config(config.params)
+            }
+        })
+    }
 }
 
 #[derive(Debug)]
 pub(crate) enum Action {
-    /// This action registers the deployed artifact in the dispatcher.
+    /// Register the deployed artifact in the dispatcher.
     /// Make sure that you successfully complete the deploy artifact procedure.
     RegisterArtifact { artifact: ArtifactId, spec: Vec<u8> },
-    /// This action starts the service instance with the specified params.
+    /// Start the service instance with the specified params.
     /// Make sure that the artifact is deployed.
     StartService {
         artifact: ArtifactId,
         instance_name: String,
         config: Vec<u8>,
     },
+    /// Perform a configuration update with the specified changes.
+    /// Make sure that no errors occur when applying these changes.
+    UpdateConfig {
+        caller_instance_id: InstanceId,
+        changes: Vec<ConfigChange>,
+    },
 }
 
 impl Action {
     fn execute(self, dispatcher: &mut Dispatcher, fork: &Fork) -> Result<(), ExecutionError> {
-        match self {
+        // TODO Take care about the graceful panics handling during the actions execution. [ECR-3222]
+        catch_panic(|| match self {
             Action::RegisterArtifact { artifact, spec } => dispatcher
                 .register_artifact(fork, &artifact, spec)
                 .map_err(From::from),
@@ -496,7 +548,12 @@ impl Action {
                     config,
                 )
                 .map_err(From::from),
-        }
+
+            Action::UpdateConfig {
+                caller_instance_id,
+                changes,
+            } => dispatcher.update_config(fork, caller_instance_id, changes),
+        })
     }
 }
 

@@ -115,29 +115,15 @@ impl Service for SimpleSupervisor {
             .config_propose_entry()
             .get()
             .filter(|proposal| {
-                proposal.actual_from == blockchain::Schema::new(context.fork).height()
+                proposal.actual_from == blockchain::Schema::new(context.fork).height().next()
             }) {
             proposal
         } else {
             return;
         };
-        // Perform the application of configs.
-        for change in proposal.changes {
-            match change {
-                ConfigChange::Consensus(config) => {
-                    blockchain::Schema::new(context.fork)
-                        .consensus_config_entry()
-                        .set(config);
-                }
 
-                ConfigChange::Service(config) => {
-                    context
-                        .interface::<ConfigureCall>(config.instance_id)
-                        .apply_config(config.params.clone())
-                        .expect("Configuration should be valid in this context");
-                }
-            }
-        }
+        // Perform the application of configs.
+        context.update_config(proposal.changes);
     }
 }
 

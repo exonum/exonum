@@ -26,7 +26,7 @@ use crate::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
-        InstanceDescriptor, InstanceId,
+        InstanceDescriptor, InstanceId, SUPERVISOR_SERVICE_ID,
     },
 };
 
@@ -124,6 +124,6 @@ impl Service for Supervisor {
 }
 
 impl Supervisor {
-    pub const BUILTIN_ID: InstanceId = 0;
+    pub const BUILTIN_ID: InstanceId = SUPERVISOR_SERVICE_ID;
     pub const BUILTIN_NAME: &'static str = "supervisor";
 }

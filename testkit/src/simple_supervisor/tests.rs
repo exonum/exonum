@@ -43,7 +43,9 @@ fn add_nodes_to_validators() {
             .consensus_config(new_consensus_config.clone())
             .into_tx(),
     );
-    testkit.create_blocks_until(cfg_change_height.next());
+    testkit.create_blocks_until(cfg_change_height.previous());
+    assert_eq!(testkit.network().us().validator_id(), None);
+    testkit.create_block();
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());
@@ -71,7 +73,7 @@ fn exclude_us_from_validators() {
             .consensus_config(new_consensus_config.clone())
             .into_tx(),
     );
-    testkit.create_blocks_until(cfg_change_height.next());
+    testkit.create_blocks_until(cfg_change_height);
 
     assert_eq!(testkit.consensus_config(), new_consensus_config);
     assert_eq!(testkit.network().us().validator_id(), None);
@@ -98,7 +100,7 @@ fn exclude_other_from_validators() {
             .consensus_config(new_consensus_config.clone())
             .into_tx(),
     );
-    testkit.create_blocks_until(cfg_change_height.next());
+    testkit.create_blocks_until(cfg_change_height);
 
     assert_eq!(testkit.consensus_config(), new_consensus_config);
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(0)));
@@ -125,7 +127,7 @@ fn change_us_validator_id() {
             .consensus_config(new_consensus_config.clone())
             .into_tx(),
     );
-    testkit.create_blocks_until(cfg_change_height.next());
+    testkit.create_blocks_until(cfg_change_height);
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());

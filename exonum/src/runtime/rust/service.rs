@@ -26,7 +26,7 @@ use crate::{
         api::ServiceApiBuilder,
         dispatcher::{self, DispatcherRef, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ExecutionContext,
+        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange, ExecutionContext,
         InstanceDescriptor, InstanceId, MethodId,
     },
 };
@@ -213,6 +213,19 @@ impl<'a> BeforeCommitContext<'a> {
     /// Create a context to call interfaces of the specified service instance.
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
         CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
+    }
+
+    /// Add a configuration update to pending actions. These changes will be applied immediately
+    /// before the block commit.
+    ///
+    /// Only the supervisor service is allowed to perform this action.
+    #[doc(hidden)]
+    pub fn update_config(&self, changes: Vec<ConfigChange>) {
+        self.dispatcher
+            .dispatch_action(dispatcher::Action::UpdateConfig {
+                caller_instance_id: self.instance.id,
+                changes,
+            })
     }
 }
 
