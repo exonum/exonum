@@ -39,7 +39,7 @@ use crate::{TestKit, TestNetwork};
 /// Outputs the status of the testkit, which includes:
 ///
 /// - Current blockchain height
-/// - Current [test network configuration][cfg]
+/// - Current test network configuration
 /// - Next network configuration if it is scheduled with [`commit_configuration_change`].
 ///
 /// ## Create block
@@ -66,7 +66,6 @@ use crate::{TestKit, TestNetwork};
 /// Returns the latest block from the blockchain on success.
 ///
 /// [`serve`]: #method.serve
-/// [cfg]: struct.TestNetworkConfiguration.html
 /// [`create_block`]: struct.TestKit.html#method.create_block
 /// [`create_block_with_tx_hashes`]: struct.TestKit.html#method.create_block_with_tx_hashes
 /// [`commit_configuration_change`]: struct.TestKit.html#method.commit_configuration_change
