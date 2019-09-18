@@ -159,7 +159,7 @@ pub use crate::{
     api::{ApiKind, TestKitApi},
     builder::{InstanceCollection, TestKitBuilder},
     compare::ComparableSnapshot,
-    network::{TestNetwork, TestNetworkConfiguration, TestNode},
+    network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
 pub mod compare;
@@ -175,7 +175,7 @@ use exonum::{
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
-    merkledb::{BinaryValue, Database, ObjectHash, Patch, Snapshot, TemporaryDB},
+    merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
     runtime::{rust::ServiceFactory, InstanceId},
@@ -212,7 +212,6 @@ pub struct TestKit {
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
-    cfg_proposal: Option<ConfigurationProposalState>,
 }
 
 impl fmt::Debug for TestKit {
@@ -220,7 +219,6 @@ impl fmt::Debug for TestKit {
         f.debug_struct("TestKit")
             .field("blockchain", &self.blockchain)
             .field("network", &self.network)
-            .field("cfg_change_proposal", &self.cfg_proposal)
             .finish()
     }
 }
@@ -292,7 +290,6 @@ impl TestKit {
             events_stream,
             processing_lock,
             network,
-            cfg_proposal: None,
         }
     }
 
@@ -453,7 +450,6 @@ impl TestKit {
         let last_hash = self.last_block_hash();
         let saved_consensus_config = self.consensus_config();
 
-        let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
             self.blockchain.create_patch(
@@ -462,15 +458,6 @@ impl TestKit {
                 tx_hashes,
                 &mut BTreeMap::new(),
             )
-        };
-
-        let patch = if let Some(config_patch) = config_patch {
-            let mut fork = self.blockchain.fork();
-            fork.merge(config_patch);
-            fork.merge(patch);
-            fork.into_patch()
-        } else {
-            patch
         };
 
         let propose =
@@ -507,45 +494,6 @@ impl TestKit {
         BlockchainExplorer::new(snapshot.as_ref())
             .block_with_txs(self.height())
             .unwrap()
-    }
-
-    /// Update test network configuration if such an update has been scheduled
-    /// with `commit_configuration_change`.
-    fn update_configuration(&mut self, new_block_height: Height) -> Option<Patch> {
-        use crate::ConfigurationProposalState::*;
-        let actual_from = new_block_height.next();
-        if let Some(cfg_proposal) = self.cfg_proposal.take() {
-            match cfg_proposal {
-                Uncommitted(cfg_proposal) => {
-                    self.cfg_proposal = Some(Committed(cfg_proposal));
-                }
-                Committed(cfg_proposal) => {
-                    if cfg_proposal.actual_from() == actual_from {
-                        // Commit configuration proposal
-                        let config = cfg_proposal.consensus_config().clone();
-
-                        let fork = self.blockchain.fork();
-                        CoreSchema::new(&fork).consensus_config_entry().set(config);
-                        // Modify the self configuration
-                        self.network_mut().update_configuration(cfg_proposal);
-                        return Some(fork.into_patch());
-                    } else {
-                        self.cfg_proposal = Some(Committed(cfg_proposal));
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    /// Returns a reference to the scheduled configuration proposal, or `None` if
-    /// there is no such proposal.
-    pub fn next_configuration(&self) -> Option<&TestNetworkConfiguration> {
-        use crate::ConfigurationProposalState::{Committed, Uncommitted};
-
-        self.cfg_proposal.as_ref().map(|p| match *p {
-            Committed(ref proposal) | Uncommitted(ref proposal) => proposal,
-        })
     }
 
     /// Creates a block with the given transactions.
@@ -731,84 +679,6 @@ impl TestKit {
         &mut self.network
     }
 
-    /// Returns a copy of the actual configuration of the testkit.
-    /// The returned configuration could be modified for use with
-    /// `commit_configuration_change` method.
-    pub fn configuration_change_proposal(&self) -> TestNetworkConfiguration {
-        let consensus_config = CoreSchema::new(&self.snapshot()).consensus_config();
-        TestNetworkConfiguration::new(self.network(), consensus_config)
-    }
-
-    /// Adds a new configuration proposal. Remember, to add this proposal to the blockchain,
-    /// you should create at least one block.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if `actual_from` is less than current height or equals.
-    /// - Panics if configuration change has been already proposed but not executed.
-    ///
-    /// # Example
-    ///
-    /// ```ignore Implement configuration change logic [ECR-3306]
-    /// extern crate exonum;
-    /// extern crate exonum_testkit;
-    /// extern crate serde;
-    /// extern crate serde_json;
-    ///
-    /// use exonum::blockchain::Schema;
-    /// use exonum::crypto::CryptoHash;
-    /// use exonum::helpers::{Height, ValidatorId};
-    /// use exonum_testkit::TestKitBuilder;
-    ///
-    /// fn main() {
-    ///    let mut testkit = TestKitBuilder::auditor().with_validators(3).create();
-    ///
-    ///    let cfg_change_height = Height(5);
-    ///    let proposal = {
-    ///         let mut cfg = testkit.configuration_change_proposal();
-    ///         // Add us to validators.
-    ///         let mut validators = cfg.validators().to_vec();
-    ///         validators.push(testkit.network().us().clone());
-    ///         cfg.set_validators(validators);
-    ///         // Change configuration of our service.
-    ///         cfg.set_service_config("my_service", "My config");
-    ///         // Set the height with which the configuration takes effect.
-    ///         cfg.set_actual_from(cfg_change_height);
-    ///         cfg
-    ///     };
-    ///     // Save proposed configuration.
-    ///     let stored = proposal.stored_configuration().clone();
-    ///     // Commit configuration change proposal to the testkit.
-    ///     testkit.commit_configuration_change(proposal);
-    ///     // Create blocks up to the height preceding the `actual_from` height.
-    ///     testkit.create_blocks_until(cfg_change_height.previous());
-    ///     // Check that the proposal has become actual.
-    ///     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(3)));
-    ///     assert_eq!(testkit.validator(ValidatorId(3)), testkit.network().us());
-    ///     assert_eq!(testkit.actual_configuration(), stored);
-    ///     assert_eq!(
-    ///         Schema::new(&testkit.snapshot())
-    ///             .previous_configuration()
-    ///             .unwrap()
-    ///             .hash(),
-    ///         stored.previous_cfg_hash
-    ///     );
-    /// }
-    /// ```
-    pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
-        use self::ConfigurationProposalState::*;
-
-        assert!(
-            self.height() < proposal.actual_from(),
-            "The `actual_from` height should be greater than the current."
-        );
-        assert!(
-            self.cfg_proposal.is_none(),
-            "There is an active configuration change proposal."
-        );
-        self.cfg_proposal = Some(Uncommitted(proposal));
-    }
-
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let events_stream = self.remove_events_stream();
         // Creates complete actix web server with the testkit extensions.
@@ -855,18 +725,13 @@ impl TestKit {
     /// [`StoppedTestKit`]: struct.StoppedTestKit.html
     pub fn stop(self) -> StoppedTestKit {
         let Self {
-            cfg_proposal,
             db_handler,
             network,
             ..
         } = self;
 
         let db = db_handler.into_inner();
-        StoppedTestKit {
-            network,
-            cfg_proposal,
-            db,
-        }
+        StoppedTestKit { network, db }
     }
 }
 
@@ -938,7 +803,6 @@ impl TestKit {
 pub struct StoppedTestKit {
     db: CheckpointDb<TemporaryDB>,
     network: TestNetwork,
-    cfg_proposal: Option<ConfigurationProposalState>,
 }
 
 impl StoppedTestKit {
@@ -966,23 +830,14 @@ impl StoppedTestKit {
         self,
         available_services: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
     ) -> TestKit {
-        let mut testkit = TestKit::assemble(
+        TestKit::assemble(
             self.db,
             available_services.into_iter().map(InstanceCollection::new),
             self.network,
             // TODO make consensus config optional [ECR-3222]
             ConsensusConfig::default(),
-        );
-        testkit.cfg_proposal = self.cfg_proposal;
-        testkit
+        )
     }
-}
-
-// A new configuration proposal state.
-#[derive(Debug)]
-enum ConfigurationProposalState {
-    Uncommitted(TestNetworkConfiguration),
-    Committed(TestNetworkConfiguration),
 }
 
 #[test]

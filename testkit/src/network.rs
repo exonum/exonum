@@ -133,11 +133,6 @@ impl TestNetwork {
             config.find_validator(|keys| keys.consensus_key == self.us.consensus_public_key);
     }
 
-    /// Updates the test network with a new configuration.
-    pub fn update_configuration(&mut self, config: TestNetworkConfiguration) {
-        self.update(config.us, config.validators);
-    }
-
     /// Returns service public key of the validator with given id.
     pub fn service_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators()
@@ -283,105 +278,5 @@ impl TestNode {
 impl From<TestNode> for ValidatorKeys {
     fn from(node: TestNode) -> Self {
         node.public_keys()
-    }
-}
-
-/// A configuration of the test network.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TestNetworkConfiguration {
-    us: TestNode,
-    validators: Vec<TestNode>,
-    consensus_config: ConsensusConfig,
-    actual_from: Height,
-}
-
-impl TestNetworkConfiguration {
-    pub(crate) fn new(network: &TestNetwork, consensus_config: ConsensusConfig) -> Self {
-        TestNetworkConfiguration {
-            us: network.us().clone(),
-            validators: network.validators(),
-            consensus_config,
-            actual_from: Height::zero(),
-        }
-    }
-
-    /// Returns the node from whose perspective the testkit operates.
-    pub fn us(&self) -> &TestNode {
-        &self.us
-    }
-
-    /// Modifies the node from whose perspective the testkit operates.
-    pub fn set_us(&mut self, us: TestNode) {
-        self.us = us;
-        self.update_our_role();
-    }
-
-    /// Returns the test network validators.
-    pub fn validators(&self) -> &[TestNode] {
-        self.validators.as_ref()
-    }
-
-    /// Returns the current consensus configuration.
-    pub fn consensus_config(&self) -> &ConsensusConfig {
-        &self.consensus_config
-    }
-
-    /// Return the height, starting from which this configuration becomes actual.
-    pub fn actual_from(&self) -> Height {
-        self.actual_from
-    }
-
-    /// Modifies the height, starting from which this configuration becomes actual.
-    pub fn set_actual_from(&mut self, actual_from: Height) {
-        self.actual_from = actual_from;
-    }
-
-    /// Modifies the current consensus configuration.
-    pub fn set_consensus_config(&mut self, consensus_config: ConsensusConfig) {
-        self.consensus_config = consensus_config;
-    }
-
-    /// Modifies the validators list.
-    pub fn set_validators<I>(&mut self, validators: I)
-    where
-        I: IntoIterator<Item = TestNode>,
-    {
-        self.validators = validators
-            .into_iter()
-            .enumerate()
-            .map(|(idx, mut node)| {
-                node.change_role(Some(ValidatorId(idx as u16)));
-                node
-            })
-            .collect();
-        self.consensus_config.validator_keys = self
-            .validators
-            .iter()
-            .cloned()
-            .map(ValidatorKeys::from)
-            .collect();
-        self.update_our_role();
-    }
-
-    /// Returns the configuration for service with the given identifier.
-    pub fn service_config<D>(&self, _id: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        unimplemented!();
-    }
-
-    /// Modifies the configuration of the service with the given identifier.
-    pub fn set_service_config<D>(&mut self, _id: &str, _config: D) {
-        unimplemented!();
-    }
-
-    fn update_our_role(&mut self) {
-        let validator_id = self
-            .validators
-            .iter()
-            .position(|x| x.public_keys().service_key == self.us.service_public_key)
-            .map(|x| ValidatorId(x as u16));
-        self.us.validator_id = validator_id;
     }
 }

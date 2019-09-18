@@ -135,16 +135,20 @@ fn exclude_us_from_validators() {
         cfg
     };
 
+    let old_validators = testkit.network().validators();
+
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
             .into_tx(),
     );
-
     testkit.create_blocks_until(cfg_change_height);
+
+    let new_validators = testkit.network().validators();
 
     assert_eq!(testkit.consensus_config(), new_consensus_config);
     assert_eq!(testkit.network().us().validator_id(), None);
+    assert_ne!(old_validators, new_validators);
 }
 
 #[test]
