@@ -21,7 +21,7 @@ pub use self::{
 use exonum_merkledb::Snapshot;
 
 use crate::{
-    blockchain,
+    blockchain::{self, InstanceCollection},
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
@@ -126,4 +126,14 @@ impl Service for Supervisor {
 impl Supervisor {
     pub const BUILTIN_ID: InstanceId = SUPERVISOR_SERVICE_ID;
     pub const BUILTIN_NAME: &'static str = "supervisor";
+}
+
+impl From<Supervisor> for InstanceCollection {
+    fn from(service: Supervisor) -> Self {
+        InstanceCollection::new(service).with_instance(
+            Supervisor::BUILTIN_ID,
+            Supervisor::BUILTIN_NAME,
+            Vec::default(),
+        )
+    }
 }

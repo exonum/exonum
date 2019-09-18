@@ -171,7 +171,7 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
-    blockchain::{Blockchain, ConsensusConfig, Schema as CoreSchema},
+    blockchain::{Blockchain, BlockchainBuilder, ConsensusConfig, Schema as CoreSchema},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
@@ -254,14 +254,10 @@ impl TestKit {
         let db = database.into();
 
         let db_handler = db.handler();
-        let blockchain = Blockchain::new(
-            db,
-            service_factories,
-            genesis,
-            network.us().service_keypair(),
-            api_sender.clone(),
-            mpsc::channel(0).0,
-        );
+        let blockchain = BlockchainBuilder::new(db, genesis, network.us().service_keypair())
+            .with_rust_runtime(service_factories)
+            .finalize(api_sender.clone(), mpsc::channel(0).0)
+            .expect("Unable to create blockchain instance");
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);

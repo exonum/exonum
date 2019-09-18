@@ -110,6 +110,7 @@ fn add_nodes_to_validators() {
             .consensus_config(new_consensus_config.clone())
             .into_tx(),
     );
+
     testkit.create_blocks_until(cfg_change_height.previous());
     assert_eq!(testkit.network().us().validator_id(), None);
     testkit.create_block();
@@ -139,6 +140,7 @@ fn exclude_us_from_validators() {
             .consensus_config(new_consensus_config.clone())
             .into_tx(),
     );
+
     testkit.create_blocks_until(cfg_change_height);
 
     assert_eq!(testkit.consensus_config(), new_consensus_config);
@@ -337,7 +339,7 @@ fn another_configuration_change_proposal() {
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
             .into_tx(),
     );
-    // Try to commit second config change propose
+    // Try to commit second config change propose.
     testkit
         .create_block_with_transaction(
             ConfigPropose::actual_from(cfg_change_height)

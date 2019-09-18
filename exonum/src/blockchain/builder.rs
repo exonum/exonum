@@ -82,11 +82,7 @@ impl BlockchainBuilder {
     ) -> Self {
         // Add the built-in `Supervisor` service.
         let mut services = services.into_iter().collect::<Vec<_>>();
-        services.push(InstanceCollection::new(Supervisor).with_instance(
-            Supervisor::BUILTIN_ID,
-            Supervisor::BUILTIN_NAME,
-            (),
-        ));
+        services.push(Supervisor.into());
         self.with_rust_runtime(services)
     }
 

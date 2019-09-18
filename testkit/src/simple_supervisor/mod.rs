@@ -128,7 +128,7 @@ impl Service for SimpleSupervisor {
 }
 
 impl SimpleSupervisor {
-    pub const BUILTIN_ID: InstanceId = 2;
+    pub const BUILTIN_ID: InstanceId = 0;
     pub const BUILTIN_NAME: &'static str = "supervisor-sample";
 }
 

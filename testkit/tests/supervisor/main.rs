@@ -204,6 +204,7 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .create()
 }
@@ -211,6 +212,7 @@ fn testkit_with_inc_service() -> TestKit {
 fn testkit_with_inc_service_and_two_validators() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .with_validators(2)
         .create()
@@ -219,6 +221,7 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .with_validators(1)
         .create()
@@ -229,8 +232,16 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
     let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(collection)
         .create()
+}
+
+fn with_available_services() -> Vec<Box<dyn ServiceFactory>> {
+    vec![
+        Box::new(IncService) as Box<dyn ServiceFactory>,
+        Box::new(Supervisor) as Box<dyn ServiceFactory>,
+    ]
 }
 
 /// Just test that the Inc service works as intended.
@@ -499,6 +510,7 @@ fn test_start_service_instance_twice() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .create();
 
@@ -508,7 +520,7 @@ fn test_restart_node_and_start_service_instance() {
     let testkit_stopped = testkit.stop();
 
     // And start it again with the same service factory.
-    let mut testkit = testkit_stopped.resume(vec![IncService]);
+    let mut testkit = testkit_stopped.resume(with_available_services());
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
@@ -536,7 +548,7 @@ fn test_restart_node_and_start_service_instance() {
 
     // Restart the node again.
     let testkit_stopped = testkit.stop();
-    let mut testkit = testkit_stopped.resume(vec![IncService]);
+    let mut testkit = testkit_stopped.resume(with_available_services());
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
@@ -583,7 +595,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     testkit.create_block();
 
     // Restart the node again after the first block was created.
-    let mut testkit = testkit.stop().resume(vec![IncService]);
+    let mut testkit = testkit.stop().resume(with_available_services());
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
