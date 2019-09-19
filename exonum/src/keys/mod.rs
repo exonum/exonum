@@ -14,7 +14,7 @@
 
 use crate::crypto::{gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
-use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
+use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite, SensitiveData};
 use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
 
@@ -128,20 +128,17 @@ impl EncryptedMasterKey {
         Ok(EncryptedMasterKey { key: encrypted_key })
     }
 
-    fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<secret_tree::Seed, Error> {
+    fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<SensitiveData, Error> {
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
         let restored = eraser
             .restore(&self.key)
             .map_err(|_| Error::new(ErrorKind::Other, "Couldn't restore a secret key"))?;
         assert_eq!(restored.len(), SEED_LENGTH);
-        let seed_bytes = restored
-            .open(pass_phrase)
-            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))?;
 
-        let mut seed: [u8; 32] = [0; 32];
-        seed.copy_from_slice(&seed_bytes[..]);
-        Ok(seed)
+        restored
+            .open(pass_phrase)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))
     }
 }
 
@@ -222,7 +219,7 @@ mod tests {
         let decrypted_seed = key
             .decrypt(pass_phrase)
             .expect("Couldn't decrypt master key ");
-        assert_eq!(seed, &decrypted_seed);
+        assert_eq!(&seed[..], &decrypted_seed[..]);
     }
 
     #[test]
@@ -249,7 +246,7 @@ mod tests {
         let seed = keys.decrypt(pass_phrase).expect("Couldn't decrypt key");
 
         assert_eq!(
-            hex::encode(&seed),
+            hex::encode(&*seed),
             "a05a82575d5f9d1f9469df31896f5b3c14ec4d18b3948cd7c8b09a7eed48b4e0"
         );
     }
