@@ -34,6 +34,7 @@ pub const VERIFY_CONFIG_METHOD_ID: MethodId = 0;
 /// [`Configure::apply_config`]: trait.Configure.html#tymethod.apply_config
 pub const APPLY_CONFIG_METHOD_ID: MethodId = 1;
 
+/// Describes a procedure for updating the configuration of a service instance.
 pub trait Configure {
     /// The specific type of parameters passed during the service instance configuration.    
     type Params: BinaryValue;
@@ -49,7 +50,7 @@ pub trait Configure {
     ///
     /// # Execution policy
     ///
-    /// This method can only be called on behalf of the supervisor service instance.
+    /// At the moment, this method can only be called on behalf of the supervisor service instance.
     /// In other words, only a method with the specified [identifier] can call this method.
     ///
     /// [identifier]: ../../constant.SUPERVISOR_SERVICE_ID.html
@@ -70,7 +71,7 @@ pub trait Configure {
     ///
     /// # Execution policy
     ///
-    /// This method can only be called on behalf of the supervisor service instance.
+    /// At the moment, this method can only be called on behalf of the supervisor service instance.
     /// In other words, only a method with the specified [identifier] can call this method.
     ///
     /// [identifier]: ../../constant.SUPERVISOR_SERVICE_ID.html
@@ -113,6 +114,9 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
     }
 }
 
+/// A helper struct for invoking the [`Configure`] interface methods on the specified service instance.
+///
+/// [`Configure`]: trait.Configure.html
 #[derive(Debug)]
 pub struct ConfigureCall<'a>(CallContext<'a>);
 
@@ -123,17 +127,22 @@ impl<'a> From<CallContext<'a>> for ConfigureCall<'a> {
 }
 
 impl<'a> ConfigureCall<'a> {
+    /// Invoke the corresponding [method](trait.Configure.html#tymethod.verify_config)
+    /// of the interface.
     pub fn verify_config(&self, params: impl BinaryValue) -> Result<(), ExecutionError> {
         self.0
             .call(CONFIGURE_INTERFACE_NAME, VERIFY_CONFIG_METHOD_ID, params)
     }
 
+    /// Invoke the corresponding [method](trait.Configure.html#tymethod.apply_config)
+    /// of the interface.
     pub fn apply_config(&self, params: impl BinaryValue) -> Result<(), ExecutionError> {
         self.0
             .call(CONFIGURE_INTERFACE_NAME, APPLY_CONFIG_METHOD_ID, params)
     }
 }
 
+/// Verify that the caller of this method is supervisor service.
 pub fn caller_is_supervisor(caller: &Caller, _: &dyn Snapshot) -> Result<(), ExecutionError> {
     caller
         .as_service()

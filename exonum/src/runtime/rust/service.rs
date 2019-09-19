@@ -172,6 +172,11 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         CallContext::from_execution_context(self.inner, self.instance.id, called)
     }
 
+    /// Check the caller of this method with the specified closure.
+    ///
+    /// If the closure returns `Ok(value)`, then the method returns `Ok((value, fork))` thus you
+    /// get a write access to the blockchain state. Otherwise this method returns
+    /// an occurred error.
     pub fn check_caller<F, T, E>(&self, check: F) -> Result<(T, &Fork), E>
     where
         E: Into<ExecutionError>,

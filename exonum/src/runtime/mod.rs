@@ -77,7 +77,9 @@
 //!
 //! ## Configure
 //!
-//! TODO:
+//! Describes a procedure for updating the configuration of a service instance.
+//!
+//! See explanation in the Rust runtime definition of the [`Configure`] interface.
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
@@ -87,7 +89,7 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-//! [configure]: rust/interfaces/trait.Configure.html
+//! [`Configure`]: rust/interfaces/trait.Configure.html
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
