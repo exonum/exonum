@@ -24,10 +24,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
-        rust::{
-            interfaces::{INITIALIZE_INTERFACE_NAME, INITIALIZE_METHOD_ID},
-            Transaction,
-        },
+        rust::Transaction,
         supervisor::{DeployRequest, StartService, Supervisor},
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
@@ -61,8 +58,6 @@ struct SampleRuntime {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 #[exonum(kind = "runtime")]
 enum SampleRuntimeError {
-    /// Unable to parse service configuration.
-    ConfigParseError = 0,
     /// Incorrect information to call transaction.
     IncorrectCallInfo = 1,
     /// Incorrect transaction payload.
@@ -119,6 +114,29 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
+    /// `initialize_service` request sets the counter value of the corresponding
+    /// `SampleService` instance
+    fn initialize_service(
+        &self,
+        _context: &Fork,
+        descriptor: InstanceDescriptor,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let service_instance = self
+            .started_services
+            .get(&descriptor.id)
+            .ok_or(DispatcherError::ServiceNotStarted)?;
+
+        let new_value =
+            u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        service_instance.counter.set(new_value);
+        println!(
+            "Initializing service {} with value {}",
+            descriptor.name, new_value
+        );
+        Ok(())
+    }
+
     /// `stop_service` removes the service with the specified ID from the list of the started services.
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
         println!("Stopping service: {}", descriptor);
@@ -147,19 +165,6 @@ impl Runtime for SampleRuntime {
 
         const SERVICE_INTERFACE: &str = "";
         match (context.interface_name, call_info.method_id) {
-            // `initialize` request sets the counter value of the corresponding
-            // `SampleService` instance
-            (INITIALIZE_INTERFACE_NAME, INITIALIZE_METHOD_ID) => {
-                let new_value = u64::from_bytes(payload.into())
-                    .map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
-                service.counter.set(new_value);
-                println!(
-                    "Configuring service {} with value {}",
-                    service.name, new_value
-                );
-                Ok(())
-            }
-
             // Increment counter.
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())

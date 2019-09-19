@@ -38,12 +38,9 @@ pub mod transactions;
 use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
-    merkledb::Snapshot,
+    merkledb::{BinaryValue, Fork, Snapshot},
     runtime::{
-        api::ServiceApiBuilder,
-        dispatcher,
-        rust::{Initialize, Service, TransactionContext},
-        InstanceDescriptor,
+        api::ServiceApiBuilder, dispatcher, rust::Service, DispatcherError, InstanceDescriptor,
     },
 };
 
@@ -54,33 +51,8 @@ use crate::{
 };
 
 #[derive(Debug, ServiceFactory)]
-#[exonum(
-    proto_sources = "proto",
-    implements("TimestampingInterface", "Initialize<Params = Config>")
-)]
+#[exonum(proto_sources = "proto", implements("TimestampingInterface"))]
 pub struct TimestampingService;
-
-impl Initialize for TimestampingService {
-    type Params = Config;
-
-    fn initialize(
-        &self,
-        context: TransactionContext,
-        config: Self::Params,
-    ) -> Result<(), ExecutionError> {
-        if !dispatcher::Schema::new(context.fork())
-            .service_instances()
-            .contains(&config.time_service_name)
-        {
-            return Err(Error::TimeServiceNotFound.into());
-        }
-
-        Schema::new(context.instance.name, context.fork())
-            .config()
-            .set(config);
-        Ok(())
-    }
-}
 
 impl Service for TimestampingService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
@@ -90,5 +62,25 @@ impl Service for TimestampingService {
     fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(descriptor.name, snapshot);
         schema.state_hash()
+    }
+
+    fn initialize(
+        &self,
+        instance: InstanceDescriptor,
+        fork: &Fork,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let config =
+            Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+
+        if !dispatcher::Schema::new(fork)
+            .service_instances()
+            .contains(&config.time_service_name)
+        {
+            return Err(Error::TimeServiceNotFound.into());
+        }
+
+        Schema::new(instance.name, fork).config().set(config);
+        Ok(())
     }
 }

@@ -75,10 +75,9 @@
 //!
 //! TODO: Think about runtime agnostic interfaces description. [ECR-3531]
 //!
-//! ## Initialize
+//! ## Configure
 //!
-//! This interface describes an initial configuration procedure of started service. See explanation in the
-//! Rust runtime definition of this [interface].
+//! TODO:
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
@@ -88,7 +87,7 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-//! [interface]: rust/interfaces/trait.Initialize.html
+//! [configure]: rust/interfaces/trait.Configure.html
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
@@ -203,6 +202,30 @@ pub trait Runtime: Send + Debug + 'static {
     /// them into `ExecutionError`.
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
+
+    /// Initialize a service instance with the given parameters.
+    ///
+    /// The configuration parameters passed to the method are discarded immediately.
+    /// So the service instance should save them by itself if it is important for
+    /// the service business logic.
+    ///
+    /// This method is called after creating a new service instance by the [`start_service`].
+    /// In this case, if an error during this action occurs, the dispatcher will invoke
+    /// [`stop_service`]. Make sure that this invocation will not fail.
+    ///
+    /// # Policy on Panics
+    ///
+    /// * Catch each kind of panics except for `FatalError` and convert
+    /// them into `ExecutionError`.
+    ///
+    /// ['start_service`]: #start_service
+    /// ['stop_service`]: #stop_service
+    fn initialize_service(
+        &self,
+        fork: &Fork,
+        instance: InstanceDescriptor,
+        parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError>;
 
     /// Stop existing service instance with the given specification.
     ///
@@ -340,10 +363,6 @@ pub enum Caller {
         /// Identifier of the service instance which invoked this method.
         instance_id: InstanceId,
     },
-    /// Method is invoked on behalf of the blockchain itself, for example see an
-    /// [`initialize`](rust/interfaces/trait.Initialize.html#tymethod.initialize)
-    /// method.
-    Blockchain,
 }
 
 impl Caller {
@@ -370,15 +389,6 @@ impl Caller {
     pub fn as_service(&self) -> Option<InstanceId> {
         if let Caller::Service { instance_id } = self {
             Some(*instance_id)
-        } else {
-            None
-        }
-    }
-
-    /// Try to reinterpret caller as blockchain.
-    pub fn as_blockchain(&self) -> Option<()> {
-        if let Caller::Blockchain = self {
-            Some(())
         } else {
             None
         }

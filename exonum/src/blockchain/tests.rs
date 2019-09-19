@@ -23,8 +23,8 @@ use crate::{
     crypto::{self, Hash},
     helpers::{generate_testnet_config, Height, ValidatorId},
     merkledb::{
-        BinaryValue, Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash,
-        Snapshot, TemporaryDB,
+        BinaryValue, Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex,
+        ObjectHash, Snapshot, TemporaryDB,
     },
     messages::Verified,
     node::ApiSender,
@@ -32,10 +32,7 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{
-            interfaces::{Initialize, INITIALIZE_INTERFACE_NAME, INITIALIZE_METHOD_ID},
-            BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext,
-        },
+        rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
@@ -83,12 +80,6 @@ trait TestDispatcherInterface {
 
     fn test_start(&self, context: TransactionContext, arg: TestStart)
         -> Result<(), ExecutionError>;
-
-    fn test_call_initialize(
-        &self,
-        context: TransactionContext,
-        arg: TestCallInitialize,
-    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -96,23 +87,16 @@ trait TestDispatcherInterface {
     crate = "crate",
     artifact_name = "test_dispatcher",
     proto_sources = "crate::proto::schema",
-    implements("TestDispatcherInterface", "Initialize<Params = Vec<u8>>")
+    implements("TestDispatcherInterface")
 )]
 struct TestDispatcherService;
 
 impl Service for TestDispatcherService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
-}
-
-impl Initialize for TestDispatcherService {
-    type Params = Vec<u8>;
-
     fn initialize(
         &self,
-        _context: TransactionContext,
-        params: Self::Params,
+        _instance: InstanceDescriptor,
+        _fork: &Fork,
+        params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         if !params.is_empty() {
             let v = TestExecute::from_bytes(params.into()).unwrap();
@@ -126,6 +110,10 @@ impl Initialize for TestDispatcherService {
             }
         }
         Ok(())
+    }
+
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -199,18 +187,6 @@ impl TestDispatcherInterface for TestDispatcherService {
         index.push(arg.value);
         index.push(42 / arg.value);
         Ok(())
-    }
-
-    fn test_call_initialize(
-        &self,
-        context: TransactionContext,
-        arg: TestCallInitialize,
-    ) -> Result<(), ExecutionError> {
-        context.call_context(context.instance.id).call(
-            INITIALIZE_INTERFACE_NAME,
-            INITIALIZE_METHOD_ID,
-            arg.value,
-        )
     }
 }
 
@@ -776,21 +752,4 @@ fn test_dispatcher_start_service_rollback() {
         Entry::<_, u64>::new(IDX_NAME, snapshot.as_ref()).get(),
         None
     );
-}
-
-#[test]
-fn test_dispatcher_err_wrong_initialize_caller() {
-    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-        .with_instance(TEST_SERVICE_ID, IDX_NAME, Vec::default())]);
-
-    let keypair = crypto::gen_keypair();
-    let status = execute_transaction(
-        &mut blockchain,
-        TestCallInitialize { value: 11 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
-    );
-    assert!(status
-        .0
-        .unwrap_err()
-        .description
-        .contains("Methods from the `Initialize` interface"));
 }

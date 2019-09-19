@@ -36,12 +36,9 @@ use crate::{
 use super::{
     api::ApiContext,
     error::{catch_panic, ExecutionError},
-    rust::{
-        interfaces::{ConfigureCall, Initialize, INITIALIZE_METHOD_ID},
-        Interface,
-    },
+    rust::interfaces::ConfigureCall,
     ApiChange, ArtifactId, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange,
-    ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Runtime,
+    ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -261,31 +258,28 @@ impl Dispatcher {
             .map_err(ExecutionError::from)
             .and_then(|runtime| runtime.start_service(&spec))?;
         // Try to initialize the started instance of the service, otherwise stop.
-        self.initialize_service(
-            self.runtimes[&spec.artifact.runtime_id].as_ref(),
-            fork,
-            spec.as_descriptor(),
-            constructor.into_bytes(),
-        )
-        .map_err(|e| {
-            error!(
-                "An error occurred while configuring the service {}: {}",
-                spec.name, e
-            );
-            // TODO Find the way to avoid panic from the untrusted code. [ECR-3222]
-            let runtime = self
-                .runtimes
-                .get_mut(&spec.artifact.runtime_id)
-                .unwrap_or_else(|| {
-                    panic!(FatalError::new(
-                        "Unable to find runtime to rollback a broken service instance."
-                    ))
-                });
-            if let Err(e) = runtime.stop_service(spec.as_descriptor()) {
-                panic!(FatalError::new(e.to_string()))
-            }
-            e
-        })?;
+        self.runtimes[&spec.artifact.runtime_id]
+            .as_ref()
+            .initialize_service(fork, spec.as_descriptor(), constructor.into_bytes())
+            .map_err(|e| {
+                error!(
+                    "An error occurred while configuring the service {}: {}",
+                    spec.name, e
+                );
+                // TODO Find the way to avoid panic from the untrusted code. [ECR-3222]
+                let runtime = self
+                    .runtimes
+                    .get_mut(&spec.artifact.runtime_id)
+                    .unwrap_or_else(|| {
+                        panic!(FatalError::new(
+                            "Unable to find runtime to rollback a broken service instance."
+                        ))
+                    });
+                if let Err(e) = runtime.stop_service(spec.as_descriptor()) {
+                    panic!(FatalError::new(e.to_string()))
+                }
+                e
+            })?;
         // Add service instance to the dispatcher schema.
         self.register_running_service(&spec);
         Schema::new(fork).add_service_instance(spec)?;
@@ -430,42 +424,6 @@ impl Dispatcher {
         runtime.start_service(instance)?;
         self.register_running_service(&instance);
         Ok(())
-    }
-
-    // Try to configure the started instance of the service and catch panic if it occurs.
-    fn initialize_service(
-        &self,
-        runtime: &dyn Runtime,
-        fork: &Fork,
-        descriptor: InstanceDescriptor,
-        constructor: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        let constructor_is_empty = constructor.is_empty();
-
-        let dispatcher_ref = DispatcherRef::new(self);
-        let context = ExecutionContext {
-            interface_name: <dyn Initialize<Params = ()> as Interface>::INTERFACE_NAME,
-            ..ExecutionContext::new(&dispatcher_ref, fork, Caller::Blockchain {})
-        };
-        let call_info = CallInfo {
-            instance_id: descriptor.id,
-            method_id: INITIALIZE_METHOD_ID,
-        };
-        let args = constructor.into_bytes();
-
-        catch_panic(|| {
-            runtime
-                .execute(&context, &call_info, args.as_ref())
-                .or_else(|err| {
-                    // Default behavior for case if the service does not implement an `Initialize`
-                    // interface and constructor is empty.
-                    if constructor_is_empty && err.kind == Error::NoSuchInterface.into() {
-                        Ok(())
-                    } else {
-                        Err(err)
-                    }
-                })
-        })
     }
 
     /// Perform a configuration update with the specified changes.
@@ -671,10 +629,9 @@ mod tests {
         crypto::{self, PublicKey},
         node::ApiSender,
         runtime::{
-            dispatcher::Error as DispatcherError,
             rust::{Error as RustRuntimeError, RustRuntime},
-            ApiChange, ArtifactProtobufSpec, InstanceId, MethodId, RuntimeIdentifier,
-            StateHashAggregator,
+            ApiChange, ArtifactProtobufSpec, InstanceDescriptor, InstanceId, MethodId,
+            RuntimeIdentifier, StateHashAggregator,
         },
     };
 
@@ -771,21 +728,25 @@ mod tests {
             }
         }
 
+        fn initialize_service(
+            &self,
+            _fork: &Fork,
+            _instance: InstanceDescriptor,
+            _parameters: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+
         fn stop_service(&mut self, _instance: InstanceDescriptor) -> Result<(), ExecutionError> {
             Ok(())
         }
 
         fn execute(
             &self,
-            context: &ExecutionContext,
+            _: &ExecutionContext,
             call_info: &CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
-            // TODO Provide interface calls support for this runtime [ECR-3222]
-            if !context.interface_name.is_empty() {
-                return Err(DispatcherError::NoSuchInterface.into());
-            }
-
             if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
                 Ok(())
             } else {

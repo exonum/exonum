@@ -18,7 +18,9 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::{Entry, Snapshot},
     runtime::{
-        rust::{caller_is_supervisor, Configure, Service, Transaction, TransactionContext},
+        rust::{
+            interfaces::caller_is_supervisor, Configure, Service, Transaction, TransactionContext,
+        },
         DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };

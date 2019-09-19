@@ -14,7 +14,7 @@
 
 pub use self::{
     error::Error,
-    interfaces::{caller_is_supervisor, Configure, Initialize},
+    interfaces::Configure,
     service::{
         AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
         ServiceFactory, Transaction, TransactionContext,
@@ -261,6 +261,24 @@ impl Runtime for RustRuntime {
         let service = self.available_artifacts[&artifact].create_instance();
         self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
         Ok(())
+    }
+
+    fn initialize_service(
+        &self,
+        fork: &Fork,
+        descriptor: InstanceDescriptor,
+        parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let instance = self
+            .started_services
+            .get(&descriptor.id)
+            .ok_or(dispatcher::Error::ServiceNotStarted)?;
+
+        trace!("Initialize service instance {}", descriptor);
+
+        instance
+            .as_ref()
+            .initialize(instance.descriptor(), fork, parameters)
     }
 
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {

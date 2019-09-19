@@ -16,14 +16,13 @@ use exonum_derive::exonum_service;
 
 use crate::{
     crypto::Hash,
-    merkledb::{BinaryValue, Database, Entry, Snapshot, TemporaryDB},
+    merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         dispatcher::{Dispatcher, DispatcherRef},
         error::ExecutionError,
-        rust::interfaces::Initialize,
-        CallContext, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
-        InstanceSpec,
+        CallContext, CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor,
+        InstanceId, InstanceSpec,
     },
 };
 
@@ -65,7 +64,7 @@ trait TestService {
     artifact_name = "test_service",
     artifact_version = "0.1.0",
     proto_sources = "crate::proto::schema",
-    implements("TestService", "Initialize<Params = Init>")
+    implements("TestService")
 )]
 pub struct TestServiceImpl;
 
@@ -108,21 +107,20 @@ impl TestService for TestServiceImpl {
     }
 }
 
-impl Initialize for TestServiceImpl {
-    type Params = Init;
-
+impl Service for TestServiceImpl {
     fn initialize(
         &self,
-        context: TransactionContext,
-        arg: Self::Params,
+        _instance: InstanceDescriptor,
+        fork: &Fork,
+        params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let mut entry = Entry::new("constructor_entry", context.fork());
-        entry.set(arg.msg);
+        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+
+        let mut entry = Entry::new("constructor_entry", fork);
+        entry.set(init.msg);
         Ok(())
     }
-}
 
-impl Service for TestServiceImpl {
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
