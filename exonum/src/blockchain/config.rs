@@ -243,7 +243,7 @@ impl StoredConfiguration {
         }
 
         // Check maximum message length for too big messages.
-        if config.consensus.max_message_len > MAXIMUM_MESSAGE_LENGTH {
+        if config.consensus.max_message_len >= MAXIMUM_MESSAGE_LENGTH {
             return Err(JsonError::custom(format!(
                 "max_message_len ({}) must be less then {}",
                 config.consensus.max_message_len, MAXIMUM_MESSAGE_LENGTH
