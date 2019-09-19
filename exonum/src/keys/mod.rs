@@ -14,7 +14,7 @@
 
 use crate::crypto::{gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
-use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite, SensitiveData};
+use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
 
