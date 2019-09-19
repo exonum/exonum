@@ -529,7 +529,7 @@ fn test_sending_message_size() {
         .unwrap();
     assert_eq!(
         result.text().unwrap(),
-        "Payload too large: Allowed message length is: 512, but got to send: 513"
+        "Payload too large: the allowed message limit is 512 bytes, while received 513 bytes"
     );
 
     // Case when message len >= max_payload_len
@@ -544,7 +544,7 @@ fn test_sending_message_size() {
         .unwrap();
     assert_eq!(
         result.text().unwrap(),
-        "Payload too large: Allowed json length is: 1088, but got to send: 1168"
+        "Payload too large: the allowed json limit is 1088 bytes, while received 1168 bytes"
     );
 
     node_handler

@@ -463,7 +463,7 @@ fn test_sending_message_size() {
         serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
         json!({
             "result": "error",
-            "description": "Payload too large: Allowed message length is: 512, but got to send: 513"
+            "description": "Payload too large: the allowed message limit is 512 bytes, while received 513 bytes"
         })
     );
 

@@ -55,7 +55,7 @@ pub enum Error {
 
     /// Message length is exceeded.
     #[fail(
-        display = "Payload too large: received {}, while the allowed limit is {} bytes",
+        display = "Payload too large: the allowed {}, while received {} bytes",
         _0, _1
     )]
     PayloadTooLarge {
@@ -90,8 +90,8 @@ pub enum LengthLimit {
 impl fmt::Display for LengthLimit {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
-            LengthLimit::Message(len) => write!(f, "{}-byte message", len),
-            LengthLimit::Json(len) => write!(f, "{}-byte json", len),
+            LengthLimit::Message(len) => write!(f, "message limit is {} bytes", len),
+            LengthLimit::Json(len) => write!(f, "json limit is {} bytes", len),
         }
     }
 }

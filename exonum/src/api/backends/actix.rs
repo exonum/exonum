@@ -137,7 +137,7 @@ impl ResponseError for ApiError {
                 length_limit,
                 content_length,
             } => HttpResponse::PayloadTooLarge().body(format!(
-                "Payload too large: received {}, while the allowed limit is {} bytes",
+                "Payload too large: the allowed {}, while received {} bytes",
                 length_limit, content_length
             )),
         }
