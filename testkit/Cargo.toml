@@ -21,7 +21,7 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix-web = { version = "0.7.18", default-features = false }
-exonum = { version = "0.12.0", path = "../exonum" }
+exonum = { version = "0.12.1", path = "../exonum" }
 failure = "0.1.5"
 futures = "0.1.25"
 reqwest = "0.9.8"

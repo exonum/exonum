@@ -9,7 +9,7 @@ documentation = "https://docs.rs/exonum-merkledb"
 readme = "README.md"
 license = "Apache-2.0"
 
-keywords = ["exonum", "cryptography", "library", "database", "merkelize", "patricia"]
+keywords = ["exonum", "cryptography", "database", "merkelize", "patricia"]
 categories = ["cryptography", "database", "data-structures"]
 description = "Persistent storage implementation based on RocksDB which provides APIs to work with Merkelized data structures."
 

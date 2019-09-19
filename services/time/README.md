@@ -1,7 +1,6 @@
 # exonum-time
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
-![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum.svg?label=MacOS%20Build)
 [![Docs.rs](https://docs.rs/exonum-time/badge.svg)](https://docs.rs/exonum-time)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
 ![rust 1.33.0+ required](https://img.shields.io/badge/rust-1.33.0+-blue.svg?label=Required%20Rust)
@@ -17,7 +16,7 @@ Include `exonum-time` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.12.0"
+exonum = "0.12.1"
 exonum-time = "0.12.0"
 ```
 

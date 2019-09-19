@@ -20,7 +20,6 @@ quote = "1.0"
 proc-macro2 = "1.0"
 
 [dev-dependencies]
-exonum = { version = "0.12.0", path = "../../exonum" }
 exonum-merkledb = { version = "0.12.0", path = "../merkledb" }
 failure = "0.1.5"
 protobuf = "2.8.0"
