@@ -27,14 +27,12 @@ use std::{
 };
 
 use crate::api::{
-    node::public::explorer::{TransactionHex, TransactionResponse},
+    node::public::explorer::{ExplorerApi, TransactionHex, TransactionResponse},
     ServiceApiState,
 };
 use crate::blockchain::{Block, Schema, TransactionResult, TxLocation};
 use crate::crypto::Hash;
-use crate::events::error::into_failure;
 use crate::explorer::{median_precommits_time, TxStatus};
-use crate::messages::{Message as ExonumMessage, ProtocolMessage, RawTransaction, SignedMessage};
 
 use exonum_merkledb::{IndexAccess, ListProof, Snapshot};
 
@@ -186,14 +184,16 @@ pub(crate) struct Server {
     pub subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
     service_api_state: Arc<ServiceApiState>,
     rng: RefCell<ThreadRng>,
+    max_message_len: usize,
 }
 
 impl Server {
-    pub fn new(service_api_state: Arc<ServiceApiState>) -> Self {
+    pub fn new(service_api_state: Arc<ServiceApiState>, max_message_len: usize) -> Self {
         Self {
             subscribers: BTreeMap::new(),
             service_api_state,
             rng: RefCell::new(rand::thread_rng()),
+            max_message_len,
         }
     }
 
@@ -348,16 +348,8 @@ impl Handler<Transaction> for Server {
         Transaction { tx }: Transaction,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let buf: Vec<u8> = hex::decode(tx.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_raw_buffer(buf)?;
-        let tx_hash = signed.hash();
-        let signed = RawTransaction::try_from(ExonumMessage::deserialize(signed)?)
-            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
-        let _ = self
-            .service_api_state
-            .sender()
-            .broadcast_transaction(signed);
-        Ok(TransactionResponse { tx_hash })
+        ExplorerApi::tx_handler(&self.service_api_state, tx, self.max_message_len)
+            .map_err(Into::into)
     }
 }
 

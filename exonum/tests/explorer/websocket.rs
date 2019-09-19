@@ -12,33 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for the blockchain explorer functionality.
-
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
+//! Tests for the websocket functionality.
 
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
     OwnedMessage, WebSocketResult,
 };
 
+use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
 use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
 
-use exonum::{api::websocket::*, crypto::gen_keypair, messages::Message, node::ExternalMessage};
-
-mod blockchain;
-
-use blockchain::*;
+use crate::blockchain::{CreateWallet, Transfer, SERVICE_ID};
+use crate::node::{run_node, run_node_with_message_len};
 
 fn create_ws_client(addr: &str) -> WebSocketResult<Client<TcpStream>> {
     let mut last_err = None;
@@ -426,4 +414,64 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
         // Behavior of TcpStream::shutdown on disconnected stream is platform-specific.
         let _ = client.shutdown();
     }
+}
+
+#[test]
+fn test_sending_message_size() {
+    let max_message_len = 512_usize;
+    let node_handler = run_node_with_message_len(6338, 8087, max_message_len as u32);
+    let mut client =
+        create_ws_client("ws://localhost:8087/api/explorer/v1/ws").expect("Cannot connect to node");
+    client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+
+    // Send transaction.
+    let (pk, sk) = gen_keypair();
+    let name = "a".repeat(371); // With name length 371 chars we'll get tx size: 512 bytes.
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, name.as_str()), SERVICE_ID, pk, &sk);
+    assert_eq!(tx.signed_message().raw().len(), max_message_len);
+    let tx_hash = tx.hash();
+    let tx_json =
+        serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
+            .unwrap();
+    client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
+
+    // Check response on set message when the message is smaller than 512 bytes.
+    let resp_text = recv_text_msg(&mut client).unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
+        json!({
+            "result": "success",
+            "response": { "tx_hash": tx_hash }
+        })
+    );
+
+    let (pk, sk) = gen_keypair();
+    let name = "a".repeat(372);
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, name.as_str()), SERVICE_ID, pk, &sk);
+    assert_eq!(tx.signed_message().raw().len(), max_message_len + 1);
+    let tx_json =
+        serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
+            .unwrap();
+    client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
+
+    // Check response on set message when the message is bigger than 512 bytes.
+    let resp_text = recv_text_msg(&mut client).unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
+        json!({
+            "result": "error",
+            "description": "Payload too large: the allowed message limit is 512 bytes, while received 513 bytes"
+        })
+    );
+
+    // Shutdown node.
+    client.shutdown().unwrap();
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
 }

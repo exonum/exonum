@@ -15,26 +15,33 @@
 //! Exonum blockchain explorer API.
 
 use actix::Arbiter;
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
+use actix_web::{
+    http, http::header::CONTENT_LENGTH, ws, AsyncResponder, Error as ActixError, FromRequest,
+    HttpMessage, HttpResponse, Query,
+};
 use chrono::{DateTime, Utc};
 use futures::{Future, IntoFuture};
 
 use std::ops::{Bound, Range};
 use std::sync::{Arc, Mutex};
 
+use crate::api::error::LengthLimit;
+use crate::blockchain::Schema;
 use crate::{
     api::{
         backends::actix::{
             self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
         },
+        error::into_api_error,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
     },
     blockchain::{Block, SharedNodeState},
     crypto::Hash,
+    events::error::into_failure,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{Message, Precommit, RawTransaction, Signed, SignedMessage},
+    messages::{Message, Precommit, ProtocolMessage, RawTransaction, Signed, SignedMessage},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -246,29 +253,73 @@ impl ExplorerApi {
                 ApiError::NotFound(description)
             })
     }
+
     /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
     pub fn add_transaction(
+        name: &str,
+        backend: &mut actix_backend::ApiBuilder,
+        service_api_state: ServiceApiState,
+    ) {
+        let (max_message_len, max_payload_len) = get_message_limits(&service_api_state);
+        let index = move |request: HttpRequest| {
+            let state = request.state().clone();
+            let content_length = match request.headers().get(CONTENT_LENGTH) {
+                Some(length) => length.to_str().unwrap_or_default().to_owned(),
+                None => {
+                    return Err(ApiError::BadRequest("No content-length".to_string()).into())
+                        .into_future()
+                        .responder();
+                }
+            };
+            request
+                .json()
+                .limit(max_payload_len)
+                .map_err(move |e| {
+                    into_api_error(e, LengthLimit::Json(max_payload_len), content_length)
+                })
+                .from_err()
+                .and_then(move |query: TransactionHex| {
+                    Self::tx_handler(&state, query, max_message_len)
+                        .map(|value| HttpResponse::Ok().json(value))
+                        .map_err(From::from)
+                })
+                .responder()
+        };
+
+        backend.raw_handler(RequestHandler {
+            name: name.to_owned(),
+            method: http::Method::POST,
+            inner: Arc::new(index) as Arc<RawHandler>,
+        });
+    }
+
+    pub(crate) fn tx_handler(
         state: &ServiceApiState,
         query: TransactionHex,
+        max_message_len: usize,
     ) -> Result<TransactionResponse, ApiError> {
-        use crate::events::error::into_failure;
-        use crate::messages::ProtocolMessage;
-
+        let message_len_in_bytes = query.tx_body.len() / 2; // one byte == 2 digits in hex
+        if message_len_in_bytes > max_message_len {
+            return Err(ApiError::PayloadTooLarge {
+                length_limit: LengthLimit::Message(max_message_len),
+                content_length: message_len_in_bytes,
+            });
+        }
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::from_raw_buffer(buf)?;
         let tx_hash = signed.hash();
         let signed = RawTransaction::try_from(Message::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
-        let _ = state
+        state
             .sender()
             .broadcast_transaction(signed)
-            .map_err(ApiError::from);
+            .map_err(ApiError::from)?;
         Ok(TransactionResponse { tx_hash })
     }
 
     /// Subscribes to events.
     pub fn handle_ws<Q>(
-        name: &'static str,
+        name: &str,
         backend: &mut actix_backend::ApiBuilder,
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
@@ -276,6 +327,7 @@ impl ExplorerApi {
     ) where
         Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
     {
+        let (max_message_len, max_payload_len) = get_message_limits(&service_api_state);
         let server = Arc::new(Mutex::new(None));
         let service_api_state = Arc::new(service_api_state);
 
@@ -283,18 +335,33 @@ impl ExplorerApi {
             let server = server.clone();
             let service_api_state = service_api_state.clone();
             let mut address = server.lock().expect("Expected mutex lock");
-            if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::new(service_api_state)));
 
+            if address.is_none() {
+                *address = Some(Arbiter::start(move |_| {
+                    Server::new(service_api_state, max_message_len)
+                }));
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
+
             let address = address.to_owned().unwrap();
 
             extract_query(&request)
                 .into_future()
                 .from_err()
                 .and_then(move |query: SubscriptionType| {
-                    ws::start(&request, Session::new(address, vec![query])).into_future()
+                    ws::handshake(&request)
+                        .map(|mut response| {
+                            let stream =
+                                ws::WsStream::new(request.payload()).max_size(max_payload_len);
+                            let body = ws::WebsocketContext::create(
+                                request.clone(),
+                                Session::new(address, vec![query]),
+                                stream,
+                            );
+                            response.body(body)
+                        })
+                        .map_err(From::from)
+                        .into_future()
                 })
                 .responder()
         };
@@ -312,6 +379,12 @@ impl ExplorerApi {
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
     ) -> &mut ServiceApiScope {
+        Self::add_transaction(
+            "v1/transactions",
+            api_scope.web_backend(),
+            service_api_state.clone(),
+        );
+
         // Default subscription for blocks.
         Self::handle_ws(
             "v1/blocks/subscribe",
@@ -320,6 +393,7 @@ impl ExplorerApi {
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::Blocks),
         );
+
         // Default subscription for transactions.
         Self::handle_ws(
             "v1/transactions/subscribe",
@@ -340,6 +414,7 @@ impl ExplorerApi {
                     .unwrap_or(Ok(SubscriptionType::None))
             },
         );
+
         // Default websocket connection.
         Self::handle_ws(
             "v1/ws",
@@ -348,11 +423,11 @@ impl ExplorerApi {
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::None),
         );
+
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)
             .endpoint("v1/transactions", Self::transaction_info)
-            .endpoint_mut("v1/transactions", Self::add_transaction)
     }
 }
 
@@ -378,4 +453,18 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
             time: Some(median_precommits_time(&inner.precommits())),
         }
     }
+}
+
+fn get_message_limits(api_state: &ServiceApiState) -> (usize, usize) {
+    let snapshot = api_state.blockchain().snapshot();
+    let schema = Schema::new(&snapshot);
+    let max_message_len_in_bytes = schema.actual_configuration().consensus.max_message_len;
+    let max_payload_len_in_bytes = max_message_len_in_bytes * 2 + 64;
+    // This formula applies because the length of JSON produced by a transaction with
+    // 'n' bytes is at least 2*n (one byte represented as 2 hex digits) + 64 bytes for additional
+    // fields in JSON
+    (
+        max_message_len_in_bytes as usize,
+        max_payload_len_in_bytes as usize,
+    )
 }
