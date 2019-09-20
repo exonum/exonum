@@ -46,7 +46,7 @@ pub trait Configure {
     /// changes are correct can be applied later.
     ///
     /// The proposal approval process details, and even the configuration proposal format, depends
-    /// on the particular implementation.
+    /// on the particular runtime implementation.
     ///
     /// # Execution policy
     ///

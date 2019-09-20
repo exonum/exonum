@@ -215,7 +215,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// the service business logic.
     ///
     /// This method is called after creating a new service instance by the [`start_service`].
-    /// In this case, if an error during this action occurs, the dispatcher will invoke
+    /// If an error occurs during invocation of this method, the dispatcher invokes
     /// [`stop_service`]. Make sure that this invocation will not fail.
     ///
     /// # Policy on Panics
