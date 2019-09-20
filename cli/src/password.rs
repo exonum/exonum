@@ -21,10 +21,8 @@ use zeroize::Zeroize;
 
 use std::{env, str::FromStr};
 
-/// Default name of the environment variable with a consensus key passphrase.
-pub const DEFAULT_CONSENSUS_PASS_ENV_VAR: &str = "EXONUM_CONSENSUS_PASS";
-/// Default name of the environment variable with a service key passphrase.
-pub const DEFAULT_SERVICE_PASS_ENV_VAR: &str = "EXONUM_SERVICE_PASS";
+/// Default name of the environment variable with a master key passphrase.
+pub const DEFAULT_MASTER_PASS_ENV_VAR: &str = "EXONUM_MASTER_PASS";
 
 /// A wrapper around `String` which securely erases itself on drop.
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -67,8 +65,7 @@ pub enum PassInputMethod {
     Terminal,
     /// Get passphrase from the environment variable with given name.
     ///
-    /// Default values are `EXONUM_CONSENSUS_PASS` and `EXONUM_SERVICE_PASS` for
-    /// consensus and service secret keys correspondingly.
+    /// Default value is `EXONUM_MASTER_PASS`.
     /// Defaults are used if `None` is provided.
     EnvVariable(Option<String>),
     /// Passphrase is passed as a command line parameter.
@@ -78,33 +75,6 @@ pub enum PassInputMethod {
 impl Default for PassInputMethod {
     fn default() -> Self {
         PassInputMethod::Terminal
-    }
-}
-
-/// Secret key types.
-#[derive(Copy, Clone)]
-pub enum SecretKeyType {
-    /// Consensus key. Used in communication between nodes during consensus.
-    Consensus,
-    /// Service key. Used to sign transactions produced by the node.
-    Service,
-}
-
-impl SecretKeyType {
-    /// Returns default environment variable names for the corresponding `SecretKeyType`.
-    pub fn default_env_var(self) -> &'static str {
-        match self {
-            SecretKeyType::Consensus => DEFAULT_CONSENSUS_PASS_ENV_VAR,
-            SecretKeyType::Service => DEFAULT_SERVICE_PASS_ENV_VAR,
-        }
-    }
-
-    /// Returns prompt messages for the corresponding `SecretKeyType`.
-    pub fn prompt_message(self) -> &'static str {
-        match self {
-            SecretKeyType::Consensus => "Enter consensus key passphrase",
-            SecretKeyType::Service => "Enter service key passphrase",
-        }
     }
 }
 
@@ -123,21 +93,17 @@ impl PassInputMethod {
     /// Get passphrase using selected method.
     /// Details of this process differs for different secret key types and whether we run node
     /// or generate config files.
-    pub fn get_passphrase(
-        self,
-        key_type: SecretKeyType,
-        usage: PassphraseUsage,
-    ) -> Result<Passphrase, Error> {
+    pub fn get_passphrase(self, usage: PassphraseUsage) -> Result<Passphrase, Error> {
         match self {
             PassInputMethod::Terminal => {
-                let prompt = key_type.prompt_message();
+                let prompt = "Enter master key passphrase: ";
                 match usage {
                     PassphraseUsage::SettingUp => prompt_passphrase(prompt),
                     PassphraseUsage::Using => Passphrase::read_from_tty(prompt),
                 }
             }
             PassInputMethod::EnvVariable(name) => {
-                let variable_name = name.unwrap_or_else(|| key_type.default_env_var().to_owned());
+                let variable_name = name.unwrap_or_else(|| DEFAULT_MASTER_PASS_ENV_VAR.to_string());
                 let passphrase = env::var(&variable_name).with_context(|e| {
                     format!(
                         "Failed to get password from env variable {}: {}",

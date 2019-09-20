@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashSet;
-
 use criterion::{
     black_box, AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+use std::{collections::HashSet, convert::TryInto};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
 use exonum_merkledb::{Database, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB};
@@ -364,7 +363,7 @@ where
             move |b: &mut Bencher, &len: &usize| benchmark(b, len),
             item_counts,
         )
-        .throughput(|s| Throughput::Elements(*s as u32))
+        .throughput(|s| Throughput::Elements((*s).try_into().unwrap()))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
         .sample_size(SAMPLE_SIZE),
     );

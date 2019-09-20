@@ -14,12 +14,10 @@
 
 //! Contains various config structures used during configuration process.
 
-use exonum::{
-    blockchain::{ConsensusConfig, ValidatorKeys},
-    crypto::PublicKey,
-};
+use exonum::blockchain::{ConsensusConfig, ValidatorKeys};
 use serde::{Deserialize, Serialize};
 
+use exonum::keys::Keys;
 use std::{net::SocketAddr, path::PathBuf};
 
 /// Base config.
@@ -63,12 +61,9 @@ pub struct NodePrivateConfig {
     pub listen_address: SocketAddr,
     /// External address.
     pub external_address: String,
-    /// Consensus public key.
-    pub consensus_public_key: PublicKey,
-    /// Path to the consensus secret key file.
-    pub consensus_secret_key: PathBuf,
-    /// Service public key.
-    pub service_public_key: PublicKey,
-    /// Path to the service secret key file.
-    pub service_secret_key: PathBuf,
+    /// Path to the master key file.
+    pub master_key_path: PathBuf,
+    /// Validator keys.
+    #[serde(skip)]
+    pub keys: Keys,
 }

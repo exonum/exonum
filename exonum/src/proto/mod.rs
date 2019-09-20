@@ -87,7 +87,7 @@ use protobuf::{well_known_types, Message};
 use std::collections::HashMap;
 
 use crate::{
-    crypto,
+    crypto::{self},
     helpers::{Height, Round, ValidatorId},
 };
 

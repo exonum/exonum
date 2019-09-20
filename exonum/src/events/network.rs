@@ -31,7 +31,7 @@ use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Du
 
 use super::{error::log_error, to_box};
 use crate::{
-    crypto::PublicKey,
+    crypto::{x25519, PublicKey},
     events::{
         codec::MessagesCodec,
         error::into_failure,
@@ -41,6 +41,7 @@ use crate::{
     messages::{Connect, Message, Service, SignedMessage, Verified},
     node::state::SharedConnectList,
 };
+use exonum_crypto::x25519::into_x25519_public_key;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -311,7 +312,7 @@ impl NetworkHandler {
                 let connect_list = self.connect_list.clone();
                 let listener = handshake
                     .listen(incoming_connection)
-                    .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
+                    .and_then(move |(socket, raw, key)| (Ok(socket), Self::parse_connect_msg(Some(raw), key)))
                     .and_then(move |(socket, message)| {
                         if pool.contains(&message.author()) {
                             Box::new(future::ok(()))
@@ -384,7 +385,9 @@ impl NetworkHandler {
                     .and_then(move |outgoing_connection| {
                         Self::build_handshake_initiator(outgoing_connection, key, &handshake_params)
                     })
-                    .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
+                    .and_then(move |(socket, raw, key)| {
+                        (Ok(socket), Self::parse_connect_msg(Some(raw), key))
+                    })
                     .and_then(move |(socket, message)| {
                         let connection_limit_reached = pool.count_outgoing() >= max_connections;
                         if pool.contains(&message.author()) || connection_limit_reached {
@@ -508,16 +511,27 @@ impl NetworkHandler {
         )
     }
 
-    fn parse_connect_msg(raw: Option<Vec<u8>>) -> Result<Verified<Connect>, failure::Error> {
+    fn parse_connect_msg(
+        raw: Option<Vec<u8>>,
+        key: x25519::PublicKey,
+    ) -> Result<Verified<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Message::from_raw_buffer(raw)?;
-        match message {
-            Message::Service(Service::Connect(connect)) => Ok(connect),
+        let connect: Verified<Connect> = match message {
+            Message::Service(Service::Connect(connect)) => connect,
             other => bail!(
                 "First message from a remote peer is not Connect, got={:?}",
                 other
             ),
-        }
+        };
+        let author = into_x25519_public_key(connect.author());
+
+        ensure!(
+            author == key,
+            "Connect message public key doesn't match with the received peer key"
+        );
+
+        Ok(connect)
     }
 
     pub fn request_handler(
@@ -617,8 +631,10 @@ impl NetworkHandler {
         stream: TcpStream,
         key: PublicKey,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error>
-    {
+    ) -> impl Future<
+        Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>, x25519::PublicKey),
+        Error = failure::Error,
+    > {
         let mut handshake_params = handshake_params.clone();
         handshake_params.set_remote_key(key);
         NoiseHandshake::initiator(&handshake_params, &stream.peer_addr().unwrap()).send(stream)

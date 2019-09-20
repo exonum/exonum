@@ -28,6 +28,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, Round, ValidatorId},
+    keys::Keys,
     messages::{
         AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
         Verified,
@@ -54,11 +55,6 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Verified<Connect>,
-
-    consensus_public_key: PublicKey,
-    consensus_secret_key: SecretKey,
-    service_public_key: PublicKey,
-    service_secret_key: SecretKey,
 
     config: ConsensusConfig,
     connect_list: SharedConnectList,
@@ -96,6 +92,7 @@ pub struct State {
 
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
+    keys: Keys,
 }
 
 /// State of a validator-node.
@@ -411,9 +408,9 @@ impl SharedConnectList {
 
     /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
-        self.inner
-            .read()
-            .expect("ConnectList read lock")
+        let connect_list = self.inner.read().expect("ConnectList read lock");
+
+        connect_list
             .peers
             .iter()
             .map(|(pk, a)| ConnectInfo {
@@ -441,10 +438,6 @@ impl State {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
         validator_id: Option<ValidatorId>,
-        consensus_public_key: PublicKey,
-        consensus_secret_key: SecretKey,
-        service_public_key: PublicKey,
-        service_secret_key: SecretKey,
         connect_list: ConnectList,
         config: ConsensusConfig,
         connect: Verified<Connect>,
@@ -452,13 +445,10 @@ impl State {
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
+        keys: Keys,
     ) -> Self {
         Self {
             validator_state: validator_id.map(ValidatorState::new),
-            consensus_public_key,
-            consensus_secret_key,
-            service_public_key,
-            service_secret_key,
             connect_list: SharedConnectList::from_connect_list(connect_list),
             peers,
             connections: HashMap::new(),
@@ -491,6 +481,8 @@ impl State {
             incomplete_block: None,
 
             tx_cache: BTreeMap::new(),
+
+            keys,
         }
     }
 
@@ -631,22 +623,22 @@ impl State {
 
     /// Returns the consensus public key of the current node.
     pub fn consensus_public_key(&self) -> PublicKey {
-        self.consensus_public_key
+        self.keys.consensus_pk()
     }
 
     /// Returns the consensus secret key of the current node.
     pub fn consensus_secret_key(&self) -> &SecretKey {
-        &self.consensus_secret_key
+        &self.keys.consensus_sk()
     }
 
     /// Returns the service public key of the current node.
     pub fn service_public_key(&self) -> PublicKey {
-        self.service_public_key
+        self.keys.service_pk()
     }
 
     /// Returns the service secret key of the current node.
     pub fn service_secret_key(&self) -> &SecretKey {
-        &self.service_secret_key
+        &self.keys.service_sk()
     }
 
     /// Returns the leader id for the specified round and current height.

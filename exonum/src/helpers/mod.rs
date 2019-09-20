@@ -29,6 +29,7 @@ use std::path::{Component, Path, PathBuf};
 use crate::blockchain::{ConsensusConfig, Schema, ValidatorKeys};
 use crate::crypto::gen_keypair;
 use crate::exonum_merkledb::Fork;
+use crate::keys::Keys;
 use crate::node::{ConnectListConfig, NodeConfig};
 
 mod types;
@@ -42,36 +43,31 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
-    let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
+    let keys: (Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
-        .unzip();
+        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
+        .collect();
+
     let consensus = ConsensusConfig {
-        validator_keys: validators
+        validator_keys: keys
             .iter()
-            .zip(services.iter())
-            .map(|x| ValidatorKeys {
-                consensus_key: (x.0).0,
-                service_key: (x.1).0,
+            .map(|keys| ValidatorKeys {
+                consensus_key: keys.consensus_pk(),
+                service_key: keys.service_pk(),
             })
             .collect(),
         ..ConsensusConfig::default()
     };
-    let peers = (0..validators.len())
+    let peers = (0..keys.len())
         .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
         .collect::<Vec<_>>();
 
-    validators
-        .into_iter()
-        .zip(services.into_iter())
+    keys.into_iter()
         .enumerate()
-        .map(|(idx, (validator, service))| NodeConfig {
+        .map(|(idx, keys)| NodeConfig {
             listen_address: peers[idx].parse().unwrap(),
             external_address: peers[idx].clone(),
             network: Default::default(),
-            consensus_public_key: validator.0,
-            consensus_secret_key: validator.1,
-            service_public_key: service.0,
-            service_secret_key: service.1,
             consensus: consensus.clone(),
             connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
             api: Default::default(),
@@ -79,6 +75,8 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             services_configs: Default::default(),
             database: Default::default(),
             thread_pool_size: Default::default(),
+            master_key_path: "master.key.toml".into(),
+            keys,
         })
         .collect::<Vec<_>>()
 }

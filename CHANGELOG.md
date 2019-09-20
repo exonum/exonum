@@ -7,9 +7,27 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### exonum
+
 - `system/v1/rebroadcast` endpoint has been removed. (#1445)
 
 - Added a possibility to specify compression algorithm for the database. (#1447)
+
+- Validator keys are now derived from single master key. Master key is
+  stored in encrypted file. (#1459)
+
+- Command line parameters `--service-key-pass` and `--consensus-key-pass` was
+  removed in favor of `--master-key-pass` parameter. For example now you can
+  run node with the command below (#1459).
+
+    ```bash
+    cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
+    ```
+
+#### exonum-crypto
+
+- Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
+  module in the `exonum`. (#1459)
 
 ## 0.12.0 - 2019-08-14
 

@@ -29,9 +29,7 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-pub use self::utils::{generate_keys_file, read_keys_from_file};
 
-use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     Serialize, Serializer,
@@ -43,6 +41,8 @@ use std::{
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
+use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
+
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
 use self::crypto_lib::sodiumoxide as crypto_impl;
@@ -51,7 +51,6 @@ use self::crypto_lib::sodiumoxide as crypto_impl;
 mod macros;
 
 pub(crate) mod crypto_lib;
-pub(crate) mod utils;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
@@ -483,11 +482,42 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
-/// Returns a hash consisting of zeros.
-impl Default for Hash {
-    fn default() -> Self {
-        Self::zero()
+#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct KeyPair {
+    public_key: PublicKey,
+    secret_key: SecretKey,
+}
+
+impl KeyPair {
+    pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
+        debug_assert!(
+            verify_keys_match(&public_key, &secret_key),
+            "Public key does not match the secret key."
+        );
+
+        Self {
+            public_key,
+            secret_key,
+        }
     }
+
+    pub fn public_key(&self) -> PublicKey {
+        self.public_key
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
+    }
+}
+
+impl From<(PublicKey, SecretKey)> for KeyPair {
+    fn from(keys: (PublicKey, SecretKey)) -> Self {
+        Self::from_keys(keys.0, keys.1)
+    }
+}
+
+fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+    crypto_impl::verify_keys_match(&public_key.0, &secret_key.0)
 }
 
 #[cfg(test)]
@@ -497,12 +527,6 @@ mod tests {
     use serde::de::DeserializeOwned;
 
     use hex::FromHex;
-
-    /// Hash of an empty slice.
-    const EMPTY_SLICE_HASH: crate::crypto_impl::Hash = crate::crypto_impl::Hash([
-        227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65,
-        228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85,
-    ]);
 
     #[test]
     fn to_from_hex_hash() {
@@ -593,13 +617,6 @@ mod tests {
     }
 
     #[test]
-    fn range_sodium() {
-        let h = hash(&[]);
-        let sub_range = &h[10..20];
-        assert_eq!(&EMPTY_SLICE_HASH[10..20], sub_range);
-    }
-
-    #[test]
     fn hash_streaming_zero() {
         let h1 = hash(&[]);
         let state = HashStream::new();
@@ -635,11 +652,6 @@ mod tests {
         assert!(verified_stream.verify(&sig, &pk));
     }
 
-    #[test]
-    fn empty_slice_hash() {
-        assert_eq!(Hash(EMPTY_SLICE_HASH), hash(&[]));
-    }
-
     fn assert_serialize_deserialize<T>(original_value: &T)
     where
         T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
@@ -647,5 +659,19 @@ mod tests {
         let json = serde_json::to_string(original_value).unwrap();
         let deserialized_value: T = serde_json::from_str(&json).unwrap();
         assert_eq!(*original_value, deserialized_value);
+    }
+
+    #[test]
+    fn valid_keypair() {
+        let (pk, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    #[should_panic]
+    fn not_valid_keypair() {
+        let (pk, _) = gen_keypair();
+        let (_, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
     }
 }
