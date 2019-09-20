@@ -17,6 +17,7 @@
 pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
 
 pub mod config;
+pub mod multisig;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
@@ -26,11 +27,13 @@ use log::SetLoggerError;
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::blockchain::{ConsensusConfig, Schema, ValidatorKeys};
-use crate::crypto::gen_keypair;
-use crate::exonum_merkledb::Fork;
-use crate::keys::Keys;
-use crate::node::{ConnectListConfig, NodeConfig};
+use crate::{
+    blockchain::{ConsensusConfig, Schema, ValidatorKeys},
+    crypto::gen_keypair,
+    exonum_merkledb::Fork,
+    keys::Keys,
+    node::{ConnectListConfig, NodeConfig},
+};
 
 mod types;
 
