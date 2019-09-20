@@ -192,7 +192,7 @@ impl Display for ExecutionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "An execution error occurred `{}` with description: {}",
+            "An execution error `{}` occurred with description: {}",
             self.kind, self.description
         )
     }
