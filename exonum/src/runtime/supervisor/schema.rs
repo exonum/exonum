@@ -15,7 +15,7 @@
 use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
 
 use super::{DeployConfirmation, DeployRequest, StartService};
-use crate::{crypto::Hash, runtime::ArtifactId, helpers::multisig::ValidatorMultisig};
+use crate::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
 
 /// Service information schema.
 #[derive(Debug)]

@@ -23,6 +23,8 @@ use exonum::{
 };
 use exonum_merkledb::ObjectHash;
 
+// TODO Refactor TestNetwork and TestkitBuilder [ECR-3222]
+
 /// Emulated test network.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TestNetwork {
@@ -39,15 +41,36 @@ impl TestNetwork {
     /// Creates a new emulated network with a specific role of the node
     /// the network will be viewed from.
     pub fn with_our_role(us: Option<ValidatorId>, validator_count: u16) -> Self {
+        let keys = (0..validator_count).map(|_| {
+            let consensus_keypair = crypto::gen_keypair();
+            let service_keypair = crypto::gen_keypair();
+            Keys::from_keys(
+                consensus_keypair.0,
+                consensus_keypair.1,
+                service_keypair.0,
+                service_keypair.1,
+            )
+        });
+        Self::with_our_role_from_keys(us, keys)
+    }
+
+    pub(crate) fn with_our_role_from_keys(
+        us: Option<ValidatorId>,
+        keys: impl IntoIterator<Item = Keys>,
+    ) -> Self {
+        let mut nodes = keys
+            .into_iter()
+            .enumerate()
+            .map(|(n, keys)| TestNode {
+                keys,
+                validator_id: Some(ValidatorId(n as u16)),
+            })
+            .collect::<Vec<_>>();
+
         assert!(
-            validator_count > 0,
+            !nodes.is_empty(),
             "At least one validator should be present in the network."
         );
-
-        let mut nodes = (0..validator_count)
-            .map(ValidatorId)
-            .map(TestNode::new_validator)
-            .collect::<Vec<_>>();
 
         let us = if let Some(ValidatorId(id)) = us {
             nodes[id as usize].clone()
@@ -57,7 +80,7 @@ impl TestNetwork {
             us
         };
 
-        TestNetwork { nodes, us }
+        Self { nodes, us }
     }
 
     /// Adds a new auditor node to this network.
