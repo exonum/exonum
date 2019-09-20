@@ -7,9 +7,22 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### exonum
+
 - `system/v1/rebroadcast` endpoint has been removed. (#1445)
 
 - Added a possibility to specify compression algorithm for the database. (#1447)
+
+- Updated `hex` dependency with changes in the methods signatures of the `ToHex`
+  trait. (#1468)
+
+## 0.12.1 - 2019-09-19
+
+### Bug Fixes
+
+#### exonum
+
+- A message length checking has been fixed (#1463)
 
 ## 0.12.0 - 2019-08-14
 

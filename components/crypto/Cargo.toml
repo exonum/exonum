@@ -14,7 +14,7 @@ description = "Cryptography related types, constants, traits and functions."
 [dependencies]
 byteorder = { version = "1.2.7", features = [ "i128" ] }
 chrono = "0.4.6"
-hex = "0.3.2"
+hex = "0.4"
 hex-buffer-serde = "0.2.0"
 pwbox = "0.2.0"
 rand = "0.7"

@@ -24,16 +24,16 @@
 macro_rules! impl_serde_hex_for_binary_value {
     ($name:ident) => {
         impl hex::ToHex for $name {
-            fn write_hex<W: std::fmt::Write>(&self, w: &mut W) -> std::fmt::Result {
+            fn encode_hex<T: ::std::iter::FromIterator<char>>(&self) -> T {
                 use exonum_merkledb::BinaryValue;
 
-                self.to_bytes().write_hex(w)
+                self.to_bytes().encode_hex()
             }
 
-            fn write_hex_upper<W: std::fmt::Write>(&self, w: &mut W) -> std::fmt::Result {
+            fn encode_hex_upper<T: ::std::iter::FromIterator<char>>(&self) -> T {
                 use exonum_merkledb::BinaryValue;
 
-                self.to_bytes().write_hex_upper(w)
+                self.to_bytes().encode_hex_upper()
             }
         }
 
@@ -52,7 +52,7 @@ macro_rules! impl_serde_hex_for_binary_value {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 use hex::ToHex;
 
-                self.write_hex(f)
+                write!(f, "{}", self.encode_hex::<String>())
             }
         }
 

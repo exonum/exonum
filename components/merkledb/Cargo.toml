@@ -20,7 +20,7 @@ chrono = "0.4.6"
 enum-primitive-derive = "0.1"
 exonum-crypto = { path="../crypto", version="0.12.0"}
 failure = "0.1"
-hex = "0.3.2"
+hex = "0.4"
 leb128 = "0.2"
 num-traits = "0.2"
 rocksdb = { version = "0.12.3", default-features = false }
