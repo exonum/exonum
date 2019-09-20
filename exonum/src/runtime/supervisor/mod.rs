@@ -26,7 +26,7 @@ use crate::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
-        InstanceDescriptor, InstanceId, SUPERVISOR_SERVICE_ID,
+        InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
 
@@ -123,16 +123,11 @@ impl Service for Supervisor {
     }
 }
 
-impl Supervisor {
-    pub const BUILTIN_ID: InstanceId = SUPERVISOR_SERVICE_ID;
-    pub const BUILTIN_NAME: &'static str = "supervisor";
-}
-
 impl From<Supervisor> for InstanceCollection {
     fn from(service: Supervisor) -> Self {
         InstanceCollection::new(service).with_instance(
-            Supervisor::BUILTIN_ID,
-            Supervisor::BUILTIN_NAME,
+            SUPERVISOR_INSTANCE_ID,
+            SUPERVISOR_INSTANCE_NAME,
             Vec::default(),
         )
     }

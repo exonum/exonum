@@ -63,14 +63,20 @@ message ExecutionStatus {
   }
 }
 
+// Configuration parameters of the certain service instance.
 message ServiceConfig {
+  // Corresponding service instance ID.
   uint32 instance_id = 1;
+  // Raw bytes representation of service configuration parameters.
   bytes params = 2;
 }
 
+// This message contains one atomic configuration change.
 message ConfigChange {
   oneof message {
+    // New consensus config.
     exonum.Config consensus = 1;
+    // New service instance config.
     ServiceConfig service = 2;
   }
 }

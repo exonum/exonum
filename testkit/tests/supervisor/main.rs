@@ -24,7 +24,7 @@ use exonum::{
     runtime::{
         rust::{ServiceFactory, Transaction},
         supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor},
-        ArtifactId, InstanceId, RuntimeIdentifier,
+        ArtifactId, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -87,7 +87,7 @@ fn deploy_artifact_manually(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> crypto::Hash {
-    let service_id = Supervisor::BUILTIN_ID;
+    let service_id = SUPERVISOR_INSTANCE_ID;
     let keys = &testkit.validator(validator_id).service_keypair();
     let signed_request = request.clone().sign(service_id, keys.0, &keys.1);
     testkit.add_tx(signed_request.clone());
@@ -108,7 +108,7 @@ fn start_service_manually(
     request: &StartService,
     validator_id: ValidatorId,
 ) -> crypto::Hash {
-    let service_id = Supervisor::BUILTIN_ID;
+    let service_id = SUPERVISOR_INSTANCE_ID;
     let keys = &testkit.validator(validator_id).service_keypair();
     let signed_request = request.clone().sign(service_id, keys.0, &keys.1);
     testkit.add_tx(signed_request.clone());
@@ -120,7 +120,7 @@ fn deploy_confirmation(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let service_id = Supervisor::BUILTIN_ID;
+    let service_id = SUPERVISOR_INSTANCE_ID;
     let confirmation: DeployConfirmation = request.clone().into();
     let keys = &testkit.validator(validator_id).service_keypair();
     confirmation.sign(service_id, keys.0, &keys.1)
@@ -746,7 +746,7 @@ fn test_auditor_cant_send_requests() {
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
         // Manually signing the tx with auditor's keypair.
-        let service_id = Supervisor::BUILTIN_ID;
+        let service_id = SUPERVISOR_INSTANCE_ID;
         let confirmation: DeployConfirmation = request_deploy.clone().into();
         let keys = &testkit.us().service_keypair();
         confirmation.sign(service_id, keys.0, &keys.1)

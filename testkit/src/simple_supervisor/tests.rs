@@ -19,7 +19,8 @@ use exonum::{
     merkledb::{Entry, Snapshot},
     runtime::{
         rust::{
-            interfaces::caller_is_supervisor, Configure, Service, Transaction, TransactionContext,
+            interfaces::verify_caller_is_supervisor, Configure, Service, Transaction,
+            TransactionContext,
         },
         DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
@@ -68,7 +69,7 @@ impl Configure for ConfigChangeService {
         context: TransactionContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        context.check_caller(caller_is_supervisor)?;
+        context.check_caller(verify_caller_is_supervisor)?;
 
         match params.as_ref() {
             "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
@@ -82,7 +83,7 @@ impl Configure for ConfigChangeService {
         context: TransactionContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        context.check_caller(caller_is_supervisor)?;
+        context.check_caller(verify_caller_is_supervisor)?;
 
         Entry::new(format!("{}.params", context.instance.name), context.fork()).set(params);
         Ok(())

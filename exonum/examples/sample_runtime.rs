@@ -16,7 +16,7 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{BlockchainBuilder, ConsensusConfig, ValidatorKeys},
+    blockchain::{BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
@@ -28,6 +28,7 @@ use exonum::{
         supervisor::{DeployRequest, StartService, Supervisor},
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -279,7 +280,7 @@ fn main() {
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain = BlockchainBuilder::new(db, genesis, service_keypair.clone())
-        .with_default_runtime(vec![])
+        .with_rust_runtime(vec![InstanceCollection::from(Supervisor)])
         .with_additional_runtime(SampleRuntime::default())
         .finalize(api_sender.clone(), channel.internal_requests.0.clone())
         .unwrap();
@@ -299,7 +300,7 @@ fn main() {
                     spec: Vec::default(),
                 }
                 .sign(
-                    Supervisor::BUILTIN_ID,
+                    SUPERVISOR_INSTANCE_ID,
                     service_keypair.0,
                     &service_keypair.1,
                 ),
@@ -319,7 +320,7 @@ fn main() {
                     deadline_height,
                 }
                 .sign(
-                    Supervisor::BUILTIN_ID,
+                    SUPERVISOR_INSTANCE_ID,
                     service_keypair.0,
                     &service_keypair.1,
                 ),

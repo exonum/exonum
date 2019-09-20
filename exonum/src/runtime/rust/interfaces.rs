@@ -16,7 +16,7 @@
 
 use crate::{
     merkledb::{BinaryValue, Snapshot},
-    runtime::{CallContext, Caller, DispatcherError, MethodId, SUPERVISOR_SERVICE_ID},
+    runtime::{CallContext, Caller, DispatcherError, MethodId, SUPERVISOR_INSTANCE_ID},
 };
 
 use super::{ExecutionError, Interface, TransactionContext};
@@ -53,7 +53,7 @@ pub trait Configure {
     /// At the moment, this method can only be called on behalf of the supervisor service instance.
     /// In other words, only a method with the specified [identifier] can call this method.
     ///
-    /// [identifier]: ../../constant.SUPERVISOR_SERVICE_ID.html
+    /// [identifier]: ../../constant.SUPERVISOR_INSTANCE_ID.html
     fn verify_config(
         &self,
         context: TransactionContext,
@@ -74,7 +74,7 @@ pub trait Configure {
     /// At the moment, this method can only be called on behalf of the supervisor service instance.
     /// In other words, only a method with the specified [identifier] can call this method.
     ///
-    /// [identifier]: ../../constant.SUPERVISOR_SERVICE_ID.html
+    /// [identifier]: ../../constant.SUPERVISOR_INSTANCE_ID.html
     fn apply_config(
         &self,
         context: TransactionContext,
@@ -143,11 +143,14 @@ impl<'a> ConfigureCall<'a> {
 }
 
 /// Verify that the caller of this method is supervisor service.
-pub fn caller_is_supervisor(caller: &Caller, _: &dyn Snapshot) -> Result<(), ExecutionError> {
+pub fn verify_caller_is_supervisor(
+    caller: &Caller,
+    _: &dyn Snapshot,
+) -> Result<(), ExecutionError> {
     caller
         .as_service()
         .and_then(|instance_id| {
-            if instance_id == SUPERVISOR_SERVICE_ID {
+            if instance_id == SUPERVISOR_INSTANCE_ID {
                 Some(())
             } else {
                 None

@@ -241,11 +241,7 @@ mod tests {
 
         Blockchain::new(
             TemporaryDB::new(),
-            vec![InstanceCollection::new(Supervisor).with_instance(
-                Supervisor::BUILTIN_ID,
-                Supervisor::BUILTIN_NAME,
-                (),
-            )],
+            vec![InstanceCollection::from(Supervisor)],
             config.consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),

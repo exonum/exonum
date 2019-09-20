@@ -90,6 +90,7 @@
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
 //! [`Configure`]: rust/interfaces/trait.Configure.html
+
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
@@ -127,7 +128,9 @@ mod types;
 /// Persistent identifier of supervisor service instance.
 ///
 /// Only a service with this ID can perform actions with the dispatcher.
-pub const SUPERVISOR_SERVICE_ID: InstanceId = 0;
+pub const SUPERVISOR_INSTANCE_ID: InstanceId = 0;
+/// Persistent name of supervisor service instance.
+pub const SUPERVISOR_INSTANCE_NAME: &str = "supervisor";
 
 /// List of predefined runtimes.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
