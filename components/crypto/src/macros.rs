@@ -109,11 +109,11 @@ macro_rules! implement_private_crypto_wrapper {
     }
 
     impl ToHex for $name {
-        fn encode_hex<T: ::std::iter::FromIterator<char>>(&self) -> T {
+        fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
             (self.0).0.as_ref().encode_hex()
         }
 
-        fn encode_hex_upper<T: ::std::iter::FromIterator<char>>(&self) -> T {
+        fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
             (self.0).0.as_ref().encode_hex_upper()
         }
     }

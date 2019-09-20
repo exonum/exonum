@@ -17,7 +17,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::sync::{Arc, RwLock};
 
 /// A helper trait that provides the node with a current time.
-pub trait TimeProvider: Send + Sync + ::std::fmt::Debug {
+pub trait TimeProvider: Send + Sync + std::fmt::Debug {
     /// Returns the current time.
     fn current_time(&self) -> DateTime<Utc>;
 }

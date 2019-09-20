@@ -966,7 +966,7 @@ impl Sandbox {
 
 impl Drop for Sandbox {
     fn drop(&mut self) {
-        if !::std::thread::panicking() {
+        if !std::thread::panicking() {
             self.check_unexpected_message();
         }
     }

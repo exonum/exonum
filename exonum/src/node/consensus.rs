@@ -255,7 +255,7 @@ impl NodeHandler {
 
         // Lock to propose
         // TODO: avoid loop here (ECR-171).
-        let start_round = ::std::cmp::max(self.state.locked_round().next(), propose_round);
+        let start_round = std::cmp::max(self.state.locked_round().next(), propose_round);
         for round in start_round.iter_to(self.state.round().next()) {
             if self.state.has_majority_prevotes(round, hash) {
                 self.handle_majority_prevotes(round, hash);
@@ -744,7 +744,7 @@ impl NodeHandler {
         info!("LEADER: pool = {}, cache = {}", pool_len, txs_cache_len);
 
         let remaining_tx_count = tx_block_limit.saturating_sub(txs_cache_len as u32);
-        let cache_max_count = ::std::cmp::min(u64::from(tx_block_limit), txs_cache_len);
+        let cache_max_count = std::cmp::min(u64::from(tx_block_limit), txs_cache_len);
 
         let mut cache_txs: Vec<Hash> = self
             .state

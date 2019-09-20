@@ -24,13 +24,13 @@
 macro_rules! impl_serde_hex_for_binary_value {
     ($name:ident) => {
         impl hex::ToHex for $name {
-            fn encode_hex<T: ::std::iter::FromIterator<char>>(&self) -> T {
+            fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
                 use exonum_merkledb::BinaryValue;
 
                 self.to_bytes().encode_hex()
             }
 
-            fn encode_hex_upper<T: ::std::iter::FromIterator<char>>(&self) -> T {
+            fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
                 use exonum_merkledb::BinaryValue;
 
                 self.to_bytes().encode_hex_upper()
