@@ -1,5 +1,5 @@
 use hex::{FromHex, ToHex};
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use std::fmt::Display;
 
@@ -15,10 +15,7 @@ impl HexStringRepresentation {
         S: Serializer,
         T: ToHex,
     {
-        let mut hex_string = String::new();
-        message
-            .write_hex(&mut hex_string)
-            .map_err(ser::Error::custom)?;
+        let hex_string = message.encode_hex::<String>();
         <String as Serialize>::serialize(&hex_string, serializer)
     }
 
@@ -35,7 +32,6 @@ impl HexStringRepresentation {
 
 /// Returns hexadecimal string representation of `message`.
 pub fn to_hex_string<T>(message: &Signed<T>) -> String {
-    let mut hex_string = String::new();
-    message.write_hex(&mut hex_string).unwrap();
+    let hex_string = message.encode_hex::<String>();
     hex_string
 }

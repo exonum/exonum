@@ -37,7 +37,7 @@ use hex::{FromHex, ToHex};
 use serde::de::{self, Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
+use std::{borrow::Cow, cmp::PartialEq, fmt, iter::FromIterator, mem, ops::Deref};
 
 use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
 
@@ -223,13 +223,13 @@ impl fmt::Debug for ServiceTransaction {
     }
 }
 
-impl<T> ToHex for Signed<T> {
-    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.raw().write_hex(w)
+impl<M> ToHex for Signed<M> {
+    fn encode_hex<T: FromIterator<char>>(&self) -> T {
+        self.message.raw().encode_hex()
     }
 
-    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.raw().write_hex_upper(w)
+    fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
+        self.message.raw().encode_hex_upper()
     }
 }
 

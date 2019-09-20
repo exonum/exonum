@@ -56,11 +56,7 @@ pub struct TransactionMessage {
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
-        let mut signed_message_debug = String::new();
-        self.message
-            .signed_message()
-            .write_hex(&mut signed_message_debug)?;
-
+        let signed_message_debug = self.message.signed_message().encode_hex::<String>();
         let mut debug = fmt.debug_struct("TransactionMessage");
         debug.field("service_id", &self.service_id);
         debug.field("message", &signed_message_debug);

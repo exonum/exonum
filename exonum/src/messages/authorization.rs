@@ -1,12 +1,11 @@
 use failure::Error;
 use hex::{FromHex, ToHex};
 
-use std::fmt;
-
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 use crate::crypto::{
     self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
+use failure::_core::iter::FromIterator;
 
 /// `SignedMessage` can be constructed from a raw byte buffer which must have the following
 /// data layout:
@@ -152,12 +151,12 @@ impl SignedMessage {
 }
 
 impl ToHex for SignedMessage {
-    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.raw.write_hex(w)
+    fn encode_hex<T: FromIterator<char>>(&self) -> T {
+        self.raw.encode_hex()
     }
 
-    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.raw.write_hex_upper(w)
+    fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
+        self.raw.encode_hex_upper()
     }
 }
 

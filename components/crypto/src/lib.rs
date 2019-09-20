@@ -43,6 +43,7 @@ use uuid::Uuid;
 use std::{
     default::Default,
     fmt,
+    iter::FromIterator,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
     time::{SystemTime, UNIX_EPOCH},
 };
