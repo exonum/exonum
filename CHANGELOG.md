@@ -5,6 +5,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+- `create_checkpoint` method has been implemented for the `RocksDB` struct.
+  This method uses
+  [RocksDB checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints)
+  functionality under the hood.
+
 ## 0.12.0 - 2019-08-14
 
 ### Breaking changes
