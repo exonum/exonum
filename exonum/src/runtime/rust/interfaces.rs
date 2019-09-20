@@ -65,9 +65,8 @@ pub trait Configure {
     /// So the service instance should save them by itself if it is important for
     /// the service business logic.
     ///
-    /// This method is called then some external conditions occur and thus this happens
-    /// outside of the transaction execution, which means that errors that occur during the
-    /// execution of this method may be ignored.
+    /// This method can be triggered at any time and does not follow the general transaction
+    /// execution workflow, so the errors returned might be ignored.
     ///
     /// # Execution policy
     ///
