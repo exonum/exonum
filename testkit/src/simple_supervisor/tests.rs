@@ -89,8 +89,15 @@ impl Configure for ConfigChangeService {
             .verify_caller(verify_caller_is_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance.name), fork).set(params);
-        Ok(())
+        Entry::new(format!("{}.params", context.instance.name), fork).set(params.clone());
+
+        match params.as_ref() {
+            "apply_error" => {
+                Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
+            }
+            "apply_panic" => panic!("Aaaa!"),
+            _ => Ok(()),
+        }
     }
 }
 
@@ -448,4 +455,88 @@ fn test_configuration_and_rollbacks() {
     // the proposal is effectively forgotten.
     testkit.create_blocks_until(Height(10));
     assert_eq!(testkit.consensus_config(), old_config);
+}
+
+#[test]
+fn service_config_rollback_apply_error() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_service(SimpleSupervisor)
+        .with_service(ConfigChangeService)
+        .create();
+
+    let cfg_change_height = Height(5);
+    let params = "apply_error".to_owned();
+
+    testkit.create_block_with_transaction(
+        ConfigPropose::actual_from(cfg_change_height)
+            .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
+            .into_tx(),
+    );
+    testkit.create_blocks_until(cfg_change_height);
+
+    let actual_params: Option<String> = Entry::new(
+        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
+        &testkit.snapshot(),
+    )
+    .get();
+
+    assert!(actual_params.is_none());
+}
+
+#[test]
+fn service_config_rollback_apply_panic() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_service(SimpleSupervisor)
+        .with_service(ConfigChangeService)
+        .create();
+
+    let cfg_change_height = Height(5);
+    let params = "apply_panic".to_owned();
+
+    testkit.create_block_with_transaction(
+        ConfigPropose::actual_from(cfg_change_height)
+            .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
+            .into_tx(),
+    );
+    testkit.create_blocks_until(cfg_change_height);
+
+    let actual_params: Option<String> = Entry::new(
+        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
+        &testkit.snapshot(),
+    )
+    .get();
+
+    assert!(actual_params.is_none());
+}
+
+#[test]
+fn service_config_apply_several_configs() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_service(SimpleSupervisor)
+        .with_service(ConfigChangeService)
+        .create();
+
+    let cfg_change_height = Height(5);
+    let params = "I am a new parameter".to_owned();
+
+    testkit.create_block_with_transaction(
+        ConfigPropose::actual_from(cfg_change_height)
+            .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
+            .service_config(ConfigChangeService::INSTANCE_ID, "apply_panic".to_owned())
+            .service_config(ConfigChangeService::INSTANCE_ID, "apply_error".to_owned())
+            .into_tx(),
+    );
+    testkit.create_blocks_until(cfg_change_height);
+
+    let actual_params: String = Entry::new(
+        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
+        &testkit.snapshot(),
+    )
+    .get()
+    .unwrap();
+
+    assert_eq!(actual_params, params);
 }

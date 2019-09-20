@@ -443,18 +443,19 @@ impl Dispatcher {
     /// Perform a configuration update with the specified changes.
     fn update_config(
         &self,
-        fork: &Fork,
+        fork: &mut Fork,
         caller_instance_id: InstanceId,
         changes: Vec<ConfigChange>,
-    ) -> Result<(), ExecutionError> {
-        changes.into_iter().try_for_each(|change| match change {
+    ) {
+        // An error while configuring one of the service instances should not affect others.
+        changes.into_iter().for_each(|change| match change {
             ConfigChange::Consensus(config) => {
                 trace!("Updating consensus configuration {:?}", config);
 
-                blockchain::Schema::new(fork)
+                blockchain::Schema::new(fork as &Fork)
                     .consensus_config_entry()
                     .set(config);
-                Ok(())
+                fork.flush();
             }
 
             ConfigChange::Service(config) => {
@@ -463,15 +464,24 @@ impl Dispatcher {
                     config.instance_id
                 );
 
-                let dispatcher_ref = DispatcherRef::new(self);
+                let configure_result = catch_panic(|| {
+                    let dispatcher_ref = DispatcherRef::new(self);
+                    let context = CallContext::new(
+                        fork,
+                        &dispatcher_ref,
+                        caller_instance_id,
+                        config.instance_id,
+                    );
+                    ConfigureCall::from(context).apply_config(config.params)
+                });
 
-                let context = CallContext::new(
-                    fork,
-                    &dispatcher_ref,
-                    caller_instance_id,
-                    config.instance_id,
-                );
-                ConfigureCall::from(context).apply_config(config.params)
+                match configure_result {
+                    Ok(_) => fork.flush(),
+                    Err(e) => {
+                        fork.rollback();
+                        error!("An error occurred while performing the service configuration apply. {}", e);
+                    }
+                }
             }
         })
     }
@@ -498,7 +508,7 @@ pub(crate) enum Action {
 }
 
 impl Action {
-    fn execute(self, dispatcher: &mut Dispatcher, fork: &Fork) -> Result<(), ExecutionError> {
+    fn execute(self, dispatcher: &mut Dispatcher, fork: &mut Fork) -> Result<(), ExecutionError> {
         // TODO Take care about the graceful panics handling during the actions execution. [ECR-3559]
         catch_panic(|| match self {
             Action::RegisterArtifact { artifact, spec } => dispatcher
@@ -515,7 +525,7 @@ impl Action {
                     InstanceSpec {
                         artifact,
                         name: instance_name,
-                        id: Schema::new(fork).assign_instance_id(),
+                        id: Schema::new(fork as &Fork).assign_instance_id(),
                     },
                     config,
                 )
@@ -524,7 +534,10 @@ impl Action {
             Action::UpdateConfig {
                 caller_instance_id,
                 changes,
-            } => dispatcher.update_config(fork, caller_instance_id, changes),
+            } => {
+                dispatcher.update_config(fork, caller_instance_id, changes);
+                Ok(())
+            }
         })
     }
 }
