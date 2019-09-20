@@ -106,3 +106,9 @@ pub fn verify(sig: &Signature, data: &[u8], pub_key: &PublicKey) -> bool {
 pub fn hash(data: &[u8]) -> Hash {
     sha256::hash(data)
 }
+
+/// Verifies that public key matches provided secret key.
+pub(crate) fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+    let data = vec![0; 16];
+    verify(&sign(&data, secret_key), &data, public_key)
+}

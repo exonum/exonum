@@ -77,6 +77,8 @@ pub mod api;
 #[doc(hidden)]
 pub mod events;
 pub mod explorer;
+#[doc(hidden)]
+pub mod keys;
 pub mod node;
 #[macro_use]
 pub mod runtime;

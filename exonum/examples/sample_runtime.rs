@@ -34,6 +34,7 @@ use exonum::{
 use exonum_derive::IntoExecutionError;
 use futures::{Future, IntoFuture};
 
+use exonum::keys::Keys;
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
@@ -239,6 +240,13 @@ fn node_config() -> NodeConfig {
         ..ConsensusConfig::default()
     };
 
+    let keys = Keys::from_keys(
+        consensus_public_key,
+        consensus_secret_key,
+        service_public_key,
+        service_secret_key,
+    );
+
     let api_address = "0.0.0.0:8000".parse().unwrap();
     let api_cfg = NodeApiConfig {
         public_api_address: Some(api_address),
@@ -249,10 +257,6 @@ fn node_config() -> NodeConfig {
 
     NodeConfig {
         listen_address: peer_address.parse().unwrap(),
-        service_public_key,
-        service_secret_key,
-        consensus_public_key,
-        consensus_secret_key,
         consensus,
         external_address: peer_address.to_owned(),
         network: Default::default(),
@@ -262,6 +266,8 @@ fn node_config() -> NodeConfig {
         services_configs: Default::default(),
         database: Default::default(),
         thread_pool_size: Default::default(),
+        master_key_path: Default::default(),
+        keys,
     }
 }
 

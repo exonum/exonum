@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn consensus_config_validate_err_round_trip() {
-        let keys = gen_keys_pool(3);
+        let keys = gen_keys_pool(4);
 
         let cases = [
             (

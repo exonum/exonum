@@ -51,6 +51,12 @@ macro_rules! implement_public_crypto_wrapper {
         }
     }
 
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
+        }
+    }
+
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
@@ -105,6 +111,12 @@ macro_rules! implement_private_crypto_wrapper {
             write!(f, "(")?;
             write_short_hex(f, &self[..])?;
             write!(f, ")")
+        }
+    }
+
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
         }
     }
 
