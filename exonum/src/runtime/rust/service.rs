@@ -181,6 +181,8 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     where
         F: Fn(&Caller) -> Option<T>,
     {
+        // TODO Think about returning structure with the named fields instead of unnamed tuple
+        // to make code more clear. [ECR-3222]
         predicate(&self.inner.caller).map(|result| (result, self.inner.fork))
     }
 }
