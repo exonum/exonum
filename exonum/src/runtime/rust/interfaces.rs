@@ -15,7 +15,7 @@
 //! Important interservice communication interfaces.
 
 use crate::{
-    merkledb::{BinaryValue, Snapshot},
+    merkledb::BinaryValue,
     runtime::{CallContext, Caller, DispatcherError, MethodId, SUPERVISOR_INSTANCE_ID},
 };
 
@@ -25,6 +25,7 @@ use super::{ExecutionError, Interface, TransactionContext};
 ///
 /// ['Configure`]: trait.Configure.html
 pub const CONFIGURE_INTERFACE_NAME: &str = "Configure";
+
 /// Identifier of the [`Configure::verify_config`] method.
 ///
 /// [`Configure::verify_config`]: trait.Configure.html#tymethod.verify_config
@@ -142,22 +143,12 @@ impl<'a> ConfigureCall<'a> {
 }
 
 /// Verify that the caller of this method is supervisor service.
-pub fn verify_caller_is_supervisor(
-    caller: &Caller,
-    _: &dyn Snapshot,
-) -> Result<(), ExecutionError> {
-    caller
-        .as_service()
-        .and_then(|instance_id| {
-            if instance_id == SUPERVISOR_INSTANCE_ID {
-                Some(())
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| {
-            DispatcherError::unauthorized_caller(
-                "Only the supervisor service is allowed to call this method.",
-            )
-        })
+pub fn verify_caller_is_supervisor(caller: &Caller) -> Option<()> {
+    caller.as_service().and_then(|instance_id| {
+        if instance_id == SUPERVISOR_INSTANCE_ID {
+            Some(())
+        } else {
+            None
+        }
+    })
 }

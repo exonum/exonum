@@ -216,8 +216,8 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// This method is called after creating a new service instance by the [`start_service`].
     /// If an error occurs during invocation of this method, the dispatcher invokes
-    /// [`stop_service`]. Therefore, it is recommended that you ensure that initialization
-    /// does not fail.
+    /// [`stop_service`].
+    /// Therefore, it is recommended to avoid errors returned from the method.
     ///
     /// # Policy on Panics
     ///
@@ -374,18 +374,18 @@ pub enum Caller {
 impl Caller {
     /// Return the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
-        self.as_transaction().map(|(_hash, author)| *author)
+        self.as_transaction().map(|(_hash, author)| author)
     }
 
     /// Return the transaction hash, if it exists.
     pub fn transaction_hash(&self) -> Option<Hash> {
-        self.as_transaction().map(|(hash, _)| *hash)
+        self.as_transaction().map(|(hash, _)| hash)
     }
 
     /// Try to reinterpret caller as an authorized transaction.
-    pub fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
+    pub fn as_transaction(&self) -> Option<(Hash, PublicKey)> {
         if let Caller::Transaction { hash, author } = self {
-            Some((hash, author))
+            Some((*hash, *author))
         } else {
             None
         }

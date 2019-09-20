@@ -174,15 +174,14 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     /// Check the caller of this method with the specified closure.
     ///
-    /// If the closure returns `Ok(value)`, then the method returns `Ok((value, fork))` thus you
+    /// If the closure returns `Some(value)`, then the method returns `Some((value, fork))` thus you
     /// get a write access to the blockchain state. Otherwise this method returns
     /// an occurred error.
-    pub fn check_caller<F, T, E>(&self, check: F) -> Result<(T, &Fork), E>
+    pub fn verify_caller<F, T>(&self, predicate: F) -> Option<(T, &Fork)>
     where
-        E: Into<ExecutionError>,
-        F: Fn(&Caller, &dyn Snapshot) -> Result<T, E>,
+        F: Fn(&Caller) -> Option<T>,
     {
-        check(&self.inner.caller, self.inner.fork.as_ref()).map(|result| (result, self.inner.fork))
+        predicate(&self.inner.caller).map(|result| (result, self.inner.fork))
     }
 }
 

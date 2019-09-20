@@ -24,7 +24,7 @@ use exonum::{
     merkledb::Snapshot,
     runtime::{
         rust::{interfaces::ConfigureCall, BeforeCommitContext, Service, TransactionContext},
-        ConfigChange, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
+        Caller, ConfigChange, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
@@ -70,7 +70,8 @@ impl Transactions for SimpleSupervisor {
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context
-            .check_caller(|caller, _| caller.author().ok_or(DispatcherError::UnauthorizedCaller))?;
+            .verify_caller(Caller::as_transaction)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Check that the `actual_from` height is in the future.
         if blockchain::Schema::new(fork).height() >= arg.actual_from {

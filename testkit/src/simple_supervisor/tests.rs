@@ -69,7 +69,9 @@ impl Configure for ConfigChangeService {
         context: TransactionContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        context.check_caller(verify_caller_is_supervisor)?;
+        context
+            .verify_caller(verify_caller_is_supervisor)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {
             "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
@@ -83,9 +85,11 @@ impl Configure for ConfigChangeService {
         context: TransactionContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        context.check_caller(verify_caller_is_supervisor)?;
+        let (_, fork) = context
+            .verify_caller(verify_caller_is_supervisor)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance.name), context.fork()).set(params);
+        Entry::new(format!("{}.params", context.instance.name), fork).set(params);
         Ok(())
     }
 }
