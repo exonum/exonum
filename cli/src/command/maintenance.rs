@@ -54,7 +54,7 @@ pub enum Action {
 
 impl Action {
     fn clear_cache(node_config: PathBuf, db_path: PathBuf) -> Result<(), Error> {
-        let node_config: NodeConfig<PathBuf> = load_config_file(node_config)?;
+        let node_config: NodeConfig = load_config_file(node_config)?;
         let db: Box<dyn Database> = Box::new(RocksDB::open(db_path, &node_config.database)?);
         let fork = db.fork();
         clear_consensus_messages_cache(&fork);

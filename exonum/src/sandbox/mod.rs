@@ -28,6 +28,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use crate::keys::Keys;
 use crate::{
     api::node::SharedNodeState,
     blockchain::{
@@ -877,11 +878,16 @@ impl Sandbox {
 
         let connect_list = ConnectList::from_peers(inner.handler.state.peers());
 
+        let keys = Keys::from_keys(
+            inner.handler.state.consensus_public_key(),
+            inner.handler.state.consensus_secret_key().clone(),
+            inner.handler.state.service_public_key(),
+            inner.handler.state.service_secret_key().clone(),
+        );
+
         let config = Configuration {
             listener: ListenerConfig {
                 address,
-                consensus_public_key: inner.handler.state.consensus_public_key(),
-                consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
                 connect_list,
             },
             service: ServiceConfig {
@@ -891,6 +897,7 @@ impl Sandbox {
             network: NetworkConfiguration::default(),
             peer_discovery: Vec::new(),
             mempool: Default::default(),
+            keys,
         };
 
         let system_state = SandboxSystemStateProvider {
@@ -1077,12 +1084,24 @@ fn sandbox_with_services_uninitialized(
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
-    let validators = (0..validators_count)
-        .map(|i| gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])))
+    let keys: (Vec<_>) = (0..validators_count)
+        .map(|i| {
+            (
+                gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
+                gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
+            )
+        })
+        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
+        .collect();
+
+    let validators = keys
+        .iter()
+        .map(|keys| (keys.consensus_pk(), keys.consensus_sk().clone()))
         .collect::<Vec<_>>();
 
-    let service_keys = (0..validators_count)
-        .map(|i| gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])))
+    let service_keys = keys
+        .iter()
+        .map(|keys| (keys.service_pk(), keys.service_sk().clone()))
         .collect::<Vec<_>>();
 
     let addresses = (1..=validators_count)
@@ -1091,23 +1110,21 @@ fn sandbox_with_services_uninitialized(
 
     let str_addresses: Vec<String> = addresses.iter().map(ToString::to_string).collect();
 
-    let connect_infos: Vec<_> = validators
+    let connect_infos: Vec<_> = keys
         .iter()
-        .map(|(p, _)| p)
         .zip(str_addresses.iter())
-        .map(|(p, a)| ConnectInfo {
+        .map(|(keys, a)| ConnectInfo {
             address: a.clone(),
-            public_key: *p,
+            public_key: keys.consensus_pk(),
         })
         .collect();
 
     let genesis = ConsensusConfig {
-        validator_keys: validators
+        validator_keys: keys
             .iter()
-            .zip(service_keys.iter())
-            .map(|x| ValidatorKeys {
-                consensus_key: (x.0).0,
-                service_key: (x.1).0,
+            .map(|keys| ValidatorKeys {
+                consensus_key: keys.consensus_pk(),
+                service_key: keys.service_pk(),
             })
             .collect(),
         ..consensus
@@ -1129,8 +1146,6 @@ fn sandbox_with_services_uninitialized(
     let config = Configuration {
         listener: ListenerConfig {
             address: addresses[0],
-            consensus_public_key: validators[0].0,
-            consensus_secret_key: validators[0].1.clone(),
             connect_list: ConnectList::from_config(connect_list_config),
         },
         service: ServiceConfig {
@@ -1140,6 +1155,7 @@ fn sandbox_with_services_uninitialized(
         network: NetworkConfiguration::default(),
         peer_discovery: Vec::new(),
         mempool: Default::default(),
+        keys: keys[0].clone(),
     };
 
     let system_state = SandboxSystemStateProvider {

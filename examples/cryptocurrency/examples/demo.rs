@@ -15,6 +15,7 @@ use exonum_merkledb::TemporaryDB;
 
 use exonum::{
     blockchain::{ConsensusConfig, InstanceCollection, ValidatorKeys},
+    keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
@@ -41,10 +42,6 @@ fn node_config() -> NodeConfig {
 
     NodeConfig {
         listen_address: peer_address.parse().unwrap(),
-        service_public_key,
-        service_secret_key,
-        consensus_public_key,
-        consensus_secret_key,
         consensus,
         external_address: peer_address.to_owned(),
         network: Default::default(),
@@ -54,6 +51,13 @@ fn node_config() -> NodeConfig {
         services_configs: Default::default(),
         database: Default::default(),
         thread_pool_size: Default::default(),
+        master_key_path: Default::default(),
+        keys: Keys::from_keys(
+            consensus_public_key,
+            consensus_secret_key,
+            service_public_key,
+            service_secret_key,
+        ),
     }
 }
 

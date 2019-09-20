@@ -101,7 +101,7 @@ impl Finalize {
         let peers = public_configs
             .iter()
             .filter(|config| {
-                config.validator_keys.consensus_key != secret_config.consensus_public_key
+                config.validator_keys.consensus_key != secret_config.keys.consensus_pk()
             })
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
@@ -116,13 +116,6 @@ impl Finalize {
 impl ExonumCommand for Finalize {
     fn execute(self) -> Result<StandardResult, Error> {
         let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
-        let secret_config_dir = {
-            let directory = self
-                .secret_config_path
-                .parent()
-                .ok_or_else(|| format_err!("Cannot get the directory of the secret config path"))?;
-            std::env::current_dir()?.join(directory)
-        };
         let public_configs: Vec<SharedConfig> = self
             .public_configs
             .into_iter()
@@ -155,10 +148,6 @@ impl ExonumCommand for Finalize {
                 listen_address: secret_config.listen_address,
                 external_address: secret_config.external_address,
                 network: Default::default(),
-                consensus_public_key: secret_config.consensus_public_key,
-                consensus_secret_key: secret_config_dir.join(&secret_config.consensus_secret_key),
-                service_public_key: secret_config.service_public_key,
-                service_secret_key: secret_config_dir.join(&secret_config.service_secret_key),
                 consensus,
                 api: NodeApiConfig {
                     public_api_address: self.public_api_address,
@@ -172,6 +161,8 @@ impl ExonumCommand for Finalize {
                 database: Default::default(),
                 connect_list,
                 thread_pool_size: Default::default(),
+                master_key_path: secret_config.master_key_path,
+                keys: secret_config.keys,
             }
         };
 

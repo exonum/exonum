@@ -72,8 +72,8 @@ impl ExonumCommand for RunDev {
             peer_address: "127.0.0.1:6200".parse().unwrap(),
             listen_address: None,
             no_password: true,
-            consensus_key_pass: None,
-            service_key_pass: None,
+            master_key_pass: None,
+            master_key_path: None,
         };
         generate_config.execute()?;
 
@@ -95,8 +95,7 @@ impl ExonumCommand for RunDev {
             db_path: self.artifact_path("db"),
             public_api_address: None,
             private_api_address: None,
-            consensus_key_pass: Some(FromStr::from_str("pass:").unwrap()),
-            service_key_pass: Some(FromStr::from_str("pass:").unwrap()),
+            master_key_pass: Some(FromStr::from_str("pass:").unwrap()),
         };
         run.execute()
     }

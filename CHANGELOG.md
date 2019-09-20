@@ -16,6 +16,22 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Updated `hex` dependency with changes in the methods signatures of the `ToHex`
   trait. (#1468)
 
+- Validator keys are now derived from single master key. Master key is
+  stored in encrypted file. (#1459)
+
+- Command line parameters `--service-key-pass` and `--consensus-key-pass` was
+  removed in favor of `--master-key-pass` parameter. For example now you can
+  run node with the command below (#1459).
+
+    ```bash
+    cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
+    ```
+
+#### exonum-crypto
+
+- Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
+  module in the `exonum`. (#1459)
+
 ## 0.12.1 - 2019-09-19
 
 ### Bug Fixes

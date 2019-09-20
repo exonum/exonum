@@ -15,6 +15,7 @@ brainwallet
 btree
 bytearray
 byteorder
+canonicalize
 checkpointed
 chmod
 chrono
@@ -31,6 +32,8 @@ cryptocurrency
 cryptographically
 ctrlc
 cyclomatic
+ciphertext
+cipherparams
 datetime
 deadlinks
 decodable
