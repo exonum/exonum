@@ -49,6 +49,9 @@ impl<'a, T: IndexAccess> TimeSchema<'a, T> {
 
     /// Returns hashes for stored tables.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.validators_times().object_hash(), self.time().hash()]
+        vec![
+            self.validators_times().object_hash(),
+            self.time().object_hash(),
+        ]
     }
 }

@@ -15,10 +15,12 @@
 use serde::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{ConsensusConfig, ValidatorKeys},
     crypto::{self, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
+    keys::Keys,
     messages::{Precommit, Propose, Verified},
+    proto::Any,
 };
 use exonum_merkledb::ObjectHash;
 
@@ -68,8 +70,11 @@ impl TestNetwork {
 
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
-    pub fn genesis_config(&self) -> GenesisConfig {
-        GenesisConfig::new(self.validators.iter().map(TestNode::public_keys))
+    pub fn genesis_config(&self) -> ConsensusConfig {
+        ConsensusConfig {
+            validator_keys: self.validators.iter().map(TestNode::public_keys).collect(),
+            ..ConsensusConfig::default()
+        }
     }
 
     /// Updates the test network by the new set of nodes.
@@ -96,55 +101,46 @@ impl TestNetwork {
     }
 
     /// Returns service public key of the validator with given id.
-    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
+    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators()
             .get(id.0 as usize)
-            .map(|x| &x.service_public_key)
+            .map(|x| x.keys.service_pk())
     }
 
     /// Returns consensus public key of the validator with given id.
-    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators()
             .get(id.0 as usize)
-            .map(|x| &x.consensus_public_key)
+            .map(|x| x.keys.consensus_pk())
     }
 }
 
 /// An emulated node in the test network.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TestNode {
-    consensus_secret_key: SecretKey,
-    consensus_public_key: PublicKey,
-    service_secret_key: SecretKey,
-    service_public_key: PublicKey,
+    keys: Keys,
     validator_id: Option<ValidatorId>,
 }
 
 impl TestNode {
     /// Creates a new auditor.
     pub fn new_auditor() -> Self {
-        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = crypto::gen_keypair();
+        let (consensus_pk, consensus_sk) = crypto::gen_keypair();
+        let (service_pk, service_sk) = crypto::gen_keypair();
 
         TestNode {
-            consensus_secret_key,
-            consensus_public_key,
-            service_secret_key,
-            service_public_key,
+            keys: Keys::from_keys(consensus_pk, consensus_sk, service_pk, service_sk),
             validator_id: None,
         }
     }
 
     /// Creates a new validator with the given id.
     pub fn new_validator(validator_id: ValidatorId) -> Self {
-        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = crypto::gen_keypair();
+        let (consensus_pk, consensus_sk) = crypto::gen_keypair();
+        let (service_pk, service_sk) = crypto::gen_keypair();
 
         TestNode {
-            consensus_secret_key,
-            consensus_public_key,
-            service_secret_key,
-            service_public_key,
+            keys: Keys::from_keys(consensus_pk, consensus_sk, service_pk, service_sk),
             validator_id: Some(validator_id),
         }
     }
@@ -156,10 +152,12 @@ impl TestNode {
         validator_id: Option<ValidatorId>,
     ) -> TestNode {
         TestNode {
-            consensus_public_key: consensus_keypair.0,
-            consensus_secret_key: consensus_keypair.1,
-            service_public_key: service_keypair.0,
-            service_secret_key: service_keypair.1,
+            keys: Keys::from_keys(
+                consensus_keypair.0,
+                consensus_keypair.1,
+                service_keypair.0,
+                service_keypair.1,
+            ),
             validator_id,
         }
     }
@@ -180,8 +178,8 @@ impl TestNode {
                 last_hash,
                 tx_hashes,
             ),
-            self.consensus_public_key,
-            &self.consensus_secret_key,
+            self.keys.consensus_pk(),
+            &self.keys.consensus_sk(),
         )
     }
 
@@ -203,16 +201,16 @@ impl TestNode {
                 block_hash,
                 SystemTime::now().into(),
             ),
-            self.consensus_public_key,
-            &self.consensus_secret_key,
+            self.keys.consensus_pk(),
+            &self.keys.consensus_sk(),
         )
     }
 
     /// Returns public keys of the node.
     pub fn public_keys(&self) -> ValidatorKeys {
         ValidatorKeys {
-            consensus_key: self.consensus_public_key,
-            service_key: self.service_public_key,
+            consensus_key: self.keys.consensus_pk(),
+            service_key: self.keys.service_pk(),
         }
     }
 
@@ -228,12 +226,12 @@ impl TestNode {
 
     /// Returns the service keypair of the node.
     pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
-        (self.service_public_key, self.service_secret_key.clone())
+        (self.keys.service_pk(), self.keys.service_sk().clone())
     }
 
     /// Returns the consensus keypair of the node.
-    pub fn consensus_keypair(&self) -> (&PublicKey, &SecretKey) {
-        (&self.consensus_public_key, &self.consensus_secret_key)
+    pub fn consensus_keypair(&self) -> (PublicKey, &SecretKey) {
+        (self.keys.consensus_pk(), &self.keys.consensus_sk())
     }
 }
 
@@ -248,21 +246,17 @@ impl From<TestNode> for ValidatorKeys {
 pub struct TestNetworkConfiguration {
     us: TestNode,
     validators: Vec<TestNode>,
-    stored_configuration: StoredConfiguration,
+    consensus_config: ConsensusConfig,
+    actual_from: Height,
 }
 
 impl TestNetworkConfiguration {
-    pub(crate) fn new(
-        network: &TestNetwork,
-        mut stored_configuration: StoredConfiguration,
-    ) -> Self {
-        let prev_hash = stored_configuration.object_hash();
-        stored_configuration.previous_cfg_hash = prev_hash;
-
+    pub(crate) fn new(network: &TestNetwork, consensus_config: ConsensusConfig) -> Self {
         TestNetworkConfiguration {
             us: network.us().clone(),
             validators: network.validators().into(),
-            stored_configuration,
+            consensus_config,
+            actual_from: Height::zero(),
         }
     }
 
@@ -283,23 +277,23 @@ impl TestNetworkConfiguration {
     }
 
     /// Returns the current consensus configuration.
-    pub fn consensus_configuration(&self) -> &ConsensusConfig {
-        &self.stored_configuration.consensus
+    pub fn consensus_config(&self) -> &ConsensusConfig {
+        &self.consensus_config
     }
 
     /// Return the height, starting from which this configuration becomes actual.
     pub fn actual_from(&self) -> Height {
-        self.stored_configuration.actual_from
+        self.actual_from
     }
 
     /// Modifies the height, starting from which this configuration becomes actual.
     pub fn set_actual_from(&mut self, actual_from: Height) {
-        self.stored_configuration.actual_from = actual_from;
+        self.actual_from = actual_from;
     }
 
     /// Modifies the current consensus configuration.
-    pub fn set_consensus_configuration(&mut self, consensus: ConsensusConfig) {
-        self.stored_configuration.consensus = consensus;
+    pub fn set_consensus_config(&mut self, consensus_config: ConsensusConfig) {
+        self.consensus_config = consensus_config;
     }
 
     /// Modifies the validators list.
@@ -315,7 +309,7 @@ impl TestNetworkConfiguration {
                 node
             })
             .collect();
-        self.stored_configuration.validator_keys = self
+        self.consensus_config.validator_keys = self
             .validators
             .iter()
             .cloned()
@@ -335,21 +329,16 @@ impl TestNetworkConfiguration {
     /// Modifies the configuration of the service with the given identifier.
     pub fn set_service_config<D>(&mut self, _id: &str, _config: D)
     where
-        D: Serialize,
+        D: Into<Any>,
     {
         unimplemented!();
-    }
-
-    /// Returns the resulting exonum blockchain configuration.
-    pub fn stored_configuration(&self) -> &StoredConfiguration {
-        &self.stored_configuration
     }
 
     fn update_our_role(&mut self) {
         let validator_id = self
             .validators
             .iter()
-            .position(|x| x.public_keys().service_key == self.us.service_public_key)
+            .position(|x| x.public_keys().service_key == self.us.keys.service_pk())
             .map(|x| ValidatorId(x as u16));
         self.us.validator_id = validator_id;
     }

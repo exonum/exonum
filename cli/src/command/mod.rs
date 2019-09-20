@@ -101,6 +101,8 @@ pub enum StandardResult {
         public_config_path: PathBuf,
         /// Path to a generated private config of the node.
         secret_config_path: PathBuf,
+        /// Path to a master key of the node.
+        master_key_path: PathBuf,
     },
     /// `finalize` command output.
     Finalize {

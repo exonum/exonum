@@ -507,7 +507,7 @@ impl NodeHandler {
             };
             // Update node state.
             self.state
-                .update_config(Schema::new(&self.blockchain.snapshot()).actual_configuration());
+                .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
             // Update state to new height.
             let block_hash = self.blockchain.last_hash();
             self.state

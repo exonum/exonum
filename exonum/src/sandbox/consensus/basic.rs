@@ -47,7 +47,7 @@ fn test_check_leader() {
 
     let n_rounds_without_request_peers = {
         let mut rounds = 0;
-        let mut time_left = sandbox.cfg().consensus.peers_timeout;
+        let mut time_left = sandbox.cfg().peers_timeout;
         while time_left > 0 {
             time_left = time_left.saturating_sub(
                 sandbox.first_round_timeout() + rounds * sandbox.round_timeout_increase(),

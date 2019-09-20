@@ -24,8 +24,7 @@ pub use crate::runtime::{
 pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
-    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
-    genesis::GenesisConfig,
+    config::{ConsensusConfig, ValidatorKeys},
     schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
 };
 
@@ -46,7 +45,7 @@ use crate::{
     api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
     events::InternalRequest,
-    helpers::{Height, Round, ValidatorId},
+    helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
     runtime::{dispatcher::Dispatcher, error::catch_panic},
@@ -54,7 +53,6 @@ use crate::{
 
 mod block;
 mod builder;
-mod genesis;
 mod schema;
 #[cfg(test)]
 mod tests;
@@ -84,12 +82,12 @@ impl Blockchain {
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
         services: impl IntoIterator<Item = InstanceCollection>,
-        config: GenesisConfig,
+        genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
         internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        BlockchainBuilder::new(database, config, service_keypair)
+        BlockchainBuilder::new(database, genesis_config, service_keypair)
             .with_default_runtime(services)
             .finalize(api_sender, internal_requests)
             .expect("Unable to create blockchain instance")
@@ -99,14 +97,13 @@ impl Blockchain {
     pub(crate) fn with_dispatcher(
         db: Arc<dyn Database>,
         dispatcher: Dispatcher,
-        service_public_key: PublicKey,
-        service_secret_key: SecretKey,
+        service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
         internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
             db,
-            service_keypair: (service_public_key, service_secret_key),
+            service_keypair,
             api_sender,
             dispatcher: Arc::new(Mutex::new(dispatcher)),
             internal_requests,
@@ -162,25 +159,13 @@ impl Blockchain {
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
-    fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), failure::Error> {
-        let config_propose = StoredConfiguration {
-            previous_cfg_hash: Hash::zero(),
-            actual_from: Height::zero(),
-            validator_keys: cfg.validator_keys,
-            consensus: cfg.consensus,
-        };
+    fn create_genesis_block(&mut self, config: ConsensusConfig) -> Result<(), failure::Error> {
+        config.validate()?;
 
         let patch = {
             let fork = self.fork();
-            // Commit actual configuration
-            {
-                let mut schema = Schema::new(&fork);
-                if schema.block_hash_by_height(Height::zero()).is_some() {
-                    // TODO create genesis block for MemoryDB and compare it hash with zero block. (ECR-1630)
-                    return Ok(());
-                }
-                schema.commit_configuration(config_propose);
-            };
+            Schema::new(&fork).consensus_config_entry().set(config);
+
             self.merge(fork.into_patch())?;
             self.create_patch(
                 ValidatorId::zero(),
@@ -191,6 +176,9 @@ impl Blockchain {
             .1
         };
         self.merge(patch)?;
+
+        info!("GENESIS_BLOCK ====== hash={}", self.last_hash());
+
         Ok(())
     }
 
@@ -393,11 +381,10 @@ impl Blockchain {
         };
         self.merge(patch)?;
         // Invokes `after_commit` for each service in order of their identifiers
-        let mut dispatcher = self.dispatcher();
-        dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
+        self.dispatcher()
+            .after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
         // Send `RestartApi` request if the dispatcher state has been modified.
-        let context = ApiContext::with_blockchain(self);
-        if dispatcher.notify_api_changes(&context) {
+        if self.notify_api_changes() {
             self.internal_requests
                 .clone()
                 .send(InternalRequest::RestartApi)
@@ -406,6 +393,12 @@ impl Blockchain {
                 .ok();
         }
         Ok(())
+    }
+
+    /// Notify runtimes about changes in API.
+    pub(crate) fn notify_api_changes(&self) -> bool {
+        self.dispatcher()
+            .notify_api_changes(&ApiContext::with_blockchain(self))
     }
 
     /// Returns the transactions pool size.

@@ -1,24 +1,14 @@
-consensus_public_key = "7297f4c5d5dfa26b2bdd788a8664883f787578fe5632efd07836d34257742ba0"
-consensus_secret_key = "consensus.key.toml"
-external_address = "0.0.0.0:8003"
-listen_address = "0.0.0.0:8003"
-service_public_key = "d327e5083de17fd70d1a830025705e91c1a1ed28e7e416d6ef01dc6ffe9dbb94"
-service_secret_key = "service.key.toml"
+external_address = "127.0.0.1:8001"
+listen_address = "0.0.0.0:8001"
+master_key_path = "master.key.toml"
 
 [api]
 state_update_timeout = 10000
+[[connect_list.peers]]
+address = "127.0.0.1:8001"
+public_key = "0a4cdd514e319d8dd65e9903786f1efdff5530f0c39243c556f7b7ffdad7f37b"
 
-[connect_list]
-peers = []
-
-[database]
-create_if_missing = true
-compression_type = "none"
-[[genesis.validator_keys]]
-consensus_key = "7297f4c5d5dfa26b2bdd788a8664883f787578fe5632efd07836d34257742ba0"
-service_key = "d327e5083de17fd70d1a830025705e91c1a1ed28e7e416d6ef01dc6ffe9dbb94"
-
-[genesis.consensus]
+[consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
 max_propose_timeout = 200
@@ -27,6 +17,14 @@ peers_timeout = 10000
 propose_timeout_threshold = 500
 status_timeout = 5000
 txs_block_limit = 1000
+
+[[consensus.validator_keys]]
+consensus_key = "0a4cdd514e319d8dd65e9903786f1efdff5530f0c39243c556f7b7ffdad7f37b"
+service_key = "4192d6ccb6ef82fc40f3624bbccad675ce4ba5537e07da00f34d0b968256b04a"
+
+[database]
+compression_type = "none"
+create_if_missing = true
 [mempool.events_pool_capacity]
 api_requests_capacity = 1024
 internal_events_capacity = 128

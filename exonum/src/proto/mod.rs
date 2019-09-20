@@ -87,7 +87,7 @@ use protobuf::{well_known_types, Message};
 use std::collections::HashMap;
 
 use crate::{
-    crypto,
+    crypto::{self},
     helpers::{Height, Round, ValidatorId},
 };
 
@@ -486,6 +486,14 @@ impl From<String> for Any {
     fn from(s: String) -> Self {
         let mut v = well_known_types::StringValue::new();
         v.set_value(s);
+        Self::from_pb_message(v)
+    }
+}
+
+impl From<&str> for Any {
+    fn from(s: &str) -> Self {
+        let mut v = well_known_types::StringValue::new();
+        v.set_value(s.to_owned());
         Self::from_pb_message(v)
     }
 }

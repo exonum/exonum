@@ -629,9 +629,23 @@ impl AsRef<dyn Snapshot> for Fork {
     }
 }
 
-impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
+impl AsRef<dyn Snapshot> for dyn Snapshot {
     fn as_ref(&self) -> &dyn Snapshot {
         self
+    }
+}
+
+impl Snapshot for Box<dyn Snapshot> {
+    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        self.as_ref().get(name, key)
+    }
+
+    fn contains(&self, name: &str, key: &[u8]) -> bool {
+        self.as_ref().contains(name, key)
+    }
+
+    fn iter(&self, name: &str, from: &[u8]) -> Iter {
+        self.as_ref().iter(name, from)
     }
 }
 

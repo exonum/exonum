@@ -99,7 +99,7 @@ where
 {
     pub fn new(index_name: impl Into<String>, access: I) -> Self {
         let validator_keys = blockchain::Schema::new(access.clone())
-            .actual_configuration()
+            .consensus_config()
             .validator_keys;
         Self {
             index_name: index_name.into(),
@@ -129,7 +129,7 @@ where
     pub fn validator_id(&self, author: PublicKey) -> Option<ValidatorId> {
         self.validator_keys
             .iter()
-            .position(|validator| validator.service_key == author)
+            .position(|validator_keys| validator_keys.service_key == author)
             .map(|id| ValidatorId(id as u16))
     }
 
