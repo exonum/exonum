@@ -104,6 +104,10 @@ where
         self.get_branch_unchecked(position)
     }
 
+    fn merkle_root(&self) -> Hash {
+        self.get_branch(self.root_key()).unwrap_or_default()
+    }
+
     fn values<'s>(&'s self, start_index: u64) -> Box<dyn Iterator<Item = V> + 's> {
         Box::new(self.iter_from(start_index))
     }
@@ -236,10 +240,6 @@ where
 
     fn root_key(&self) -> ProofListKey {
         ProofListKey::new(self.height(), 0)
-    }
-
-    fn merkle_root(&self) -> Hash {
-        self.get_branch(self.root_key()).unwrap_or_default()
     }
 
     fn set_len(&mut self, len: u64) {

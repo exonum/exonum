@@ -208,6 +208,38 @@ fn simple_proof() {
 }
 
 #[test]
+fn proofs_in_empty_list() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let index: ProofListIndex<_, u32> = ProofListIndex::new(IDX_NAME, &fork);
+    let proof = index.get_range_proof(..);
+    proof.check_against_hash(index.object_hash()).unwrap();
+    assert!(proof.check_against_hash(index.object_hash()).is_ok());
+    let proof = index.get_range_proof(..0);
+    assert!(proof.check_against_hash(index.object_hash()).is_ok());
+}
+
+#[test]
+fn empty_proof_ranges() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    index.extend(vec![1_u32, 2, 3]);
+    let proof = index.get_range_proof(1..1);
+    assert!(proof
+        .check_against_hash(index.object_hash())
+        .unwrap()
+        .entries()
+        .is_empty());
+    let proof = index.get_range_proof(1..=0);
+    assert!(proof
+        .check_against_hash(index.object_hash())
+        .unwrap()
+        .entries()
+        .is_empty());
+}
+
+#[test]
 fn random_proofs() {
     const LIST_SIZE: usize = 1 << 10;
     const MAX_RANGE_SIZE: u64 = 128;
@@ -376,7 +408,7 @@ fn index_and_proof_roots() {
 }
 
 #[test]
-#[should_panic(expected = "the range start is 2, but the range end is 2")]
+#[should_panic(expected = "the range start is 2, but the range end is 1")]
 fn proof_illegal_range() {
     let db = TemporaryDB::new();
     let fork = db.fork();
@@ -384,27 +416,94 @@ fn proof_illegal_range() {
     for i in 0_u8..4 {
         index.push(vec![i]);
     }
-    index.get_range_proof(2..2);
+    index.get_range_proof(2..1);
 }
 
 #[test]
-fn proof_with_range_end_exceeding_list_size() {
+#[should_panic(expected = "the range start is 2, but the range end is 1")]
+fn proof_illegal_inclusive_range() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     for i in 0_u8..4 {
         index.push(vec![i]);
     }
+    index.get_range_proof(2..=0); // `2..=1` is a legal empty range; cf. `Vec` slicing
+}
 
-    let proof = index.get_range_proof(2..10);
-    assert_eq!(
-        proof
-            .check_against_hash(index.object_hash())
-            .unwrap()
-            .entries()
-            .len(),
-        2 // elements 2 and 3
-    );
+#[test]
+fn ranges_work_similar_to_vec_slicing() {
+    use std::{
+        fmt,
+        ops::RangeBounds,
+        panic::{self, UnwindSafe},
+        slice::SliceIndex,
+    };
+
+    #[allow(clippy::needless_pass_by_value)] // references to ranges look awkward
+    fn check_bounds(
+        v: &[u32],
+        slice_bounds: impl SliceIndex<[u32], Output = [u32]> + Clone + UnwindSafe + fmt::Debug,
+        index_bounds: impl RangeBounds<u64> + UnwindSafe,
+    ) {
+        let panic_hook = panic::take_hook();
+        panic::set_hook(Box::new(|_| {}));
+
+        let slice_bounds_ = slice_bounds.clone();
+        let slicing_res = panic::catch_unwind(|| v[slice_bounds_].to_vec());
+        let proof_res = panic::catch_unwind(|| {
+            let fork = TemporaryDB::new().fork();
+            let mut index = ProofListIndex::new(IDX_NAME, &fork);
+            index.extend(v.to_vec());
+            (index.object_hash(), index.get_range_proof(index_bounds))
+        });
+
+        panic::set_hook(panic_hook);
+
+        if let Ok((index_hash, proof)) = proof_res {
+            let checked_proof = proof.check_against_hash(index_hash).unwrap();
+
+            match slicing_res {
+                Ok(slice) => {
+                    assert_eq!(
+                        checked_proof
+                            .entries()
+                            .iter()
+                            .map(|(_, value)| *value)
+                            .collect::<Vec<_>>(),
+                        slice
+                    );
+                }
+                Err(e) => {
+                    // Slicing is more strict if the range does not completely fit
+                    // in the slice indexes.
+                    assert!(
+                        e.downcast_ref::<String>().unwrap().contains("out of range"),
+                        "{:?}",
+                        slice_bounds
+                    );
+                }
+            }
+        } else {
+            assert!(slicing_res.is_err(), "{:?}", slice_bounds);
+        }
+    }
+
+    let v = vec![1, 2, 3, 4, 5];
+    check_bounds(&v, .., ..);
+    for start in 0_usize..10 {
+        for end in 0_usize..10 {
+            check_bounds(&v, start..end, (start as u64)..(end as u64));
+            check_bounds(&v, start..=end, (start as u64)..=(end as u64));
+            if start == 0 {
+                check_bounds(&v, ..end, ..(end as u64));
+                check_bounds(&v, ..=end, ..=(end as u64));
+            }
+            if end == 0 && start <= v.len() {
+                check_bounds(&v, start.., (start as u64)..);
+            }
+        }
+    }
 }
 
 #[test]
@@ -432,6 +531,26 @@ fn proof_with_range_start_exceeding_list_size() {
 }
 
 #[test]
+fn proof_with_range_end_exceeding_list_size() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    for i in 0_u8..4 {
+        index.push(vec![i]);
+    }
+
+    let proof = index.get_range_proof(2..10);
+    assert_eq!(
+        proof
+            .check_against_hash(index.object_hash())
+            .unwrap()
+            .entries()
+            .len(),
+        2 // elements 2 and 3
+    );
+}
+
+#[test]
 fn same_merkle_root() {
     let db = TemporaryDB::new();
     let hash1 = {
@@ -446,7 +565,7 @@ fn same_merkle_root() {
         list.set(1, vec![7]);
         list.set(2, vec![5]);
         list.set(3, vec![1]);
-        list.merkle_root()
+        list.object_hash()
     };
     let hash2 = {
         let fork = db.fork();
@@ -455,7 +574,7 @@ fn same_merkle_root() {
         list.push(vec![7]);
         list.push(vec![5]);
         list.push(vec![1]);
-        list.merkle_root()
+        list.object_hash()
     };
     assert_eq!(hash1, hash2);
 }

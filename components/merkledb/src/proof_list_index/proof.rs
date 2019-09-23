@@ -256,13 +256,20 @@ impl<V: BinaryValue> ListProof<V> {
     }
 
     pub(super) fn empty(merkle_root: Hash, length: u64) -> Self {
-        let height = tree_height_by_length(length);
-        Self {
-            entries: vec![],
-            proof: vec![HashedEntry {
+        let proof = if length == 0 {
+            // The empty tree is special: it does not require the root element in the proof.
+            vec![]
+        } else {
+            let height = tree_height_by_length(length);
+            vec![HashedEntry {
                 key: ProofListKey::new(height, 0),
                 hash: merkle_root,
-            }],
+            }]
+        };
+
+        Self {
+            entries: vec![],
+            proof,
             length,
         }
     }
@@ -296,8 +303,12 @@ impl<V: BinaryValue> ListProof<V> {
         let tree_height = tree_height_by_length(self.length);
 
         // First, check an edge case when the list contains no elements.
-        if tree_height == 0 && (!self.proof.is_empty() || !self.entries.is_empty()) {
-            return Err(ListProofError::NonEmptyProof);
+        if tree_height == 0 {
+            return if self.proof.is_empty() && self.entries.is_empty() {
+                Ok(Hash::zero())
+            } else {
+                Err(ListProofError::NonEmptyProof)
+            };
         }
 
         // Fast path in case there are no values: in this case, the proof can contain

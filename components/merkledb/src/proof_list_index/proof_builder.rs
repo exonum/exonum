@@ -50,11 +50,6 @@ where
             Bound::Included(from) => *from,
             Bound::Excluded(from) => *from + 1,
         };
-        if from >= self.len() && indexes.end_bound() == Bound::Unbounded {
-            // We assume this is a "legal" case of the caller not knowing the list length,
-            // so we don't want to panic in the `to > from` assertion below.
-            return ListProof::empty(self.merkle_root(), self.len());
-        }
 
         // Exclusive upper boundary of the proof range.
         let to = match indexes.end_bound() {
@@ -62,9 +57,15 @@ where
             Bound::Included(to) => *to + 1,
             Bound::Excluded(to) => *to,
         };
+
+        if (from >= self.len() && indexes.end_bound() == Bound::Unbounded) || from == to {
+            // We assume the first condition is a "legal" case of the caller not knowing
+            // the list length, so we don't want to panic in the `to > from` assertion below.
+            return ListProof::empty(self.merkle_root(), self.len());
+        }
         assert!(
             to > from,
-            "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
+            "Illegal range boundaries: the range start is {}, but the range end is {}",
             from,
             to
         );
