@@ -94,7 +94,7 @@ impl TestNetwork {
         &self.us
     }
 
-    /// Returns a slice of all validators in the network.
+    /// Returns all validators in the network.
     pub fn validators(&self) -> Vec<TestNode> {
         let mut validators = self
             .nodes
@@ -104,6 +104,11 @@ impl TestNetwork {
             .collect::<Vec<_>>();
         validators.sort_by(|a, b| a.validator_id.cmp(&b.validator_id));
         validators
+    }
+
+    /// Returns a slice of all nodes in the network.
+    pub fn nodes(&self) -> &[TestNode] {
+        &self.nodes
     }
 
     /// Returns config encoding the network structure usable for creating the genesis block of
