@@ -208,7 +208,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// let checked_proof = proof.check()?;
 /// assert!(checked_proof.entries().eq(vec![(&h1, &100u32)]));
 /// assert!(checked_proof.missing_keys().eq(vec![&h3]));
-/// assert_eq!(checked_proof.object_hash(), map.object_hash());
+/// assert_eq!(checked_proof.index_hash(), map.object_hash());
 ///
 /// // If the trusted list hash is known, there is a convenient method
 /// // to combine integrity check and hash equality check.
