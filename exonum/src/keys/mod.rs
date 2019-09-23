@@ -41,8 +41,10 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
 /// Struct containing all validator key pairs.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
-    consensus: KeyPair,
-    service: KeyPair,
+    /// Consensus keypair.
+    pub consensus: KeyPair,
+    /// Service keypair.
+    pub service: KeyPair,
 }
 
 impl Keys {

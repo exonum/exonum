@@ -313,6 +313,21 @@ fn master_key_path_current_dir() {
 }
 
 #[test]
+#[should_panic]
+fn invalid_master_key_path() {
+    let env = ConfigSpec::new_without_pass();
+
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file())
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "0.0.0.0:8000")
+        .with_arg("--no-password")
+        .with_named_arg("--master-key-path", "./..not-valid/path/")
+        .run()
+        .unwrap();
+}
+
+#[test]
 fn test_generate_config_ipv4() {
     let env = ConfigSpec::new_without_pass();
     env.command("generate-config")
