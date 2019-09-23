@@ -174,10 +174,7 @@ impl ExonumCommand for GenerateConfig {
 }
 
 fn get_master_key_path(path: Option<PathBuf>) -> Result<PathBuf, Error> {
-    let path = path.map(|path| {
-        path.canonicalize()
-    }).unwrap_or(Ok(PathBuf::new()))?;
-
+    let path = path.map_or_else(|| Ok(PathBuf::new()), |path| path.canonicalize())?;
     Ok(path.join(MASTER_KEY_FILE_NAME))
 }
 
