@@ -115,9 +115,12 @@ impl Service for Supervisor {
                     }
                 };
                 // TODO Rewrite on async await syntax. [ECR-3222]
-                context
-                    .dispatcher_channel()
-                    .request_deploy_artifact(artifact, spec, and_then);
+                context.dispatcher_channel().request_deploy_artifact(
+                    context.instance.id,
+                    artifact,
+                    spec,
+                    and_then,
+                );
             })
     }
 }

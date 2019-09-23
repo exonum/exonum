@@ -38,7 +38,7 @@ use super::{
     error::{catch_panic, ExecutionError},
     rust::interfaces::ConfigureCall,
     ApiChange, ArtifactId, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange,
-    ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    ExecutionContext, InstanceId, InstanceSpec, Runtime, SUPERVISOR_INSTANCE_ID,
 };
 
 mod error;
@@ -592,7 +592,11 @@ impl<'a> DispatcherRef<'a> {
         self.inner.call(context, call_info, arguments)
     }
 
-    pub(crate) fn dispatch_action(&self, action: Action) {
+    pub(crate) fn dispatch_action(&self, caller: InstanceId, action: Action) {
+        assert!(
+            caller == SUPERVISOR_INSTANCE_ID,
+            "Only the supervisor service is allowed to perform dispatcher actions."
+        );
         self.actions.borrow_mut().push(action);
     }
 
@@ -621,12 +625,18 @@ impl DispatcherSender {
     /// was successfully completed.
     pub(super) fn request_deploy_artifact<F>(
         &self,
+        caller: InstanceId,
         artifact: ArtifactId,
         spec: Vec<u8>,
         and_then: F,
     ) where
         F: FnOnce() + 'static,
     {
+        assert!(
+            caller == SUPERVISOR_INSTANCE_ID,
+            "Only the supervisor service is allowed to perform dispatcher actions."
+        );
+
         self.deploy_request
             .borrow_mut()
             .push(DeployArtifactRequest {

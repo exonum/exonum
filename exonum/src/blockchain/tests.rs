@@ -18,7 +18,8 @@ use std::{collections::BTreeMap, panic, sync::Mutex};
 
 use crate::{
     blockchain::{
-        Blockchain, ExecutionErrorKind, ExecutionStatus, FatalError, InstanceCollection, Schema,
+        Blockchain, BlockchainBuilder, ExecutionErrorKind, ExecutionStatus, FatalError,
+        InstanceCollection, Schema,
     },
     crypto::{self, Hash},
     helpers::{generate_testnet_config, Height, ValidatorId},
@@ -33,12 +34,12 @@ use crate::{
         dispatcher,
         error::ErrorKind,
         rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
-        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
+        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
 const IDX_NAME: &str = "idx_name";
-const TEST_SERVICE_ID: InstanceId = 255;
+const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
@@ -369,14 +370,10 @@ fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) ->
     let api_channel = mpsc::channel(1);
     let internal_sender = mpsc::channel(1).0;
 
-    Blockchain::new(
-        TemporaryDB::new(),
-        instances,
-        config.consensus,
-        service_keypair,
-        ApiSender::new(api_channel.0),
-        internal_sender,
-    )
+    BlockchainBuilder::new(TemporaryDB::new(), config.consensus, service_keypair)
+        .with_rust_runtime(instances)
+        .finalize(ApiSender::new(api_channel.0), internal_sender)
+        .unwrap()
 }
 
 #[test]

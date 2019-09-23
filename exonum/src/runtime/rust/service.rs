@@ -152,7 +152,9 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     /// Enqueue dispatcher action.
     pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
-        self.inner.dispatcher.dispatch_action(action)
+        self.inner
+            .dispatcher
+            .dispatch_action(self.instance.id, action)
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
@@ -236,11 +238,13 @@ impl<'a> BeforeCommitContext<'a> {
     /// Only the supervisor service is allowed to perform this action.
     #[doc(hidden)]
     pub fn update_config(&self, changes: Vec<ConfigChange>) {
-        self.dispatcher
-            .dispatch_action(dispatcher::Action::UpdateConfig {
+        self.dispatcher.dispatch_action(
+            self.instance.id,
+            dispatcher::Action::UpdateConfig {
                 caller_instance_id: self.instance.id,
                 changes,
-            })
+            },
+        )
     }
 }
 
