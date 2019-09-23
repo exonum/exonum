@@ -435,7 +435,7 @@ where
     where
         KI: IntoIterator<Item = K>,
     {
-        self.create_multi_proof(keys)
+        self.create_multiproof(keys)
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element

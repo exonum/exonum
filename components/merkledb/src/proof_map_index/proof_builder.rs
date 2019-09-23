@@ -153,15 +153,17 @@ impl ContourNode {
 
 /// Builds proofs for arbitrary set of keys in a Merkelized map.
 ///
-/// This is an extension trait to `MerklePatricia`; all types that implement `MerklePatricia`
-/// (with reasonable constraints on key and value types) automatically implement
-/// `BuildProof` as well.
+/// This is an extension trait to [`MerklePatriciaTree`]; all types implementing
+/// `MerklePatriciaTree` (with reasonable constraints on key and value types) automatically
+/// implement `BuildProof` as well.
+///
+/// [`MerklePatriciaTree`]: trait.MerklePatriciaTree.html
 pub trait BuildProof<K, V> {
     /// Creates a proof of existence / absence for a single key.
     fn create_proof(&self, key: K) -> MapProof<K, V>;
 
     /// Creates a proof of existence / absence for multiple keys.
-    fn create_multi_proof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V>;
+    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V>;
 }
 
 impl<K, V, T> BuildProof<K, V> for T
@@ -240,7 +242,7 @@ where
         }
     }
 
-    fn create_multi_proof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V> {
+    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V> {
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut proof = MapProof::new();

@@ -151,7 +151,7 @@ fn data_for_proof_of_presence(
         .prop_map(|(index, data)| (*data.keys().nth(index).unwrap(), data))
 }
 
-fn data_for_multi_proof(
+fn data_for_multiproof(
     key_bytes: impl Strategy<Value = u8>,
     sizes: Range<usize>,
 ) -> impl Strategy<Value = (Vec<[u8; 32]>, Data)> {
@@ -179,7 +179,7 @@ fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
     check_map_proof(&proof, expected_key, &table)
 }
 
-fn test_multi_proof(db: &TemporaryDB, keys: &[[u8; 32]]) -> TestCaseResult {
+fn test_multiproof(db: &TemporaryDB, keys: &[[u8; 32]]) -> TestCaseResult {
     let snapshot = db.snapshot();
     let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
     let proof = table.get_multiproof(keys.to_vec());
@@ -226,35 +226,35 @@ impl TestParams {
         });
     }
 
-    fn multi_proof_of_existing_elements(&self) {
+    fn multiproof_of_existing_elements(&self) {
         let db = TemporaryDB::new();
-        let strategy = data_for_multi_proof(self.key_bytes(), self.index_sizes());
+        let strategy = data_for_multiproof(self.key_bytes(), self.index_sizes());
         proptest!(self.config(), |((keys, data) in strategy)| {
             write_data(&db, data);
-            test_multi_proof(&db, &keys)?;
+            test_multiproof(&db, &keys)?;
         });
     }
 
-    fn multi_proof_of_absent_elements(&self) {
+    fn multiproof_of_absent_elements(&self) {
         let db = TemporaryDB::new();
         let keys_strategy = vec(array::uniform32(self.key_bytes()), 20);
         let data_strategy = index_data(self.key_bytes(), self.index_sizes());
         proptest!(self.config(), |(keys in keys_strategy, data in data_strategy)| {
             write_data(&db, data);
-            test_multi_proof(&db, &keys)?;
+            test_multiproof(&db, &keys)?;
         });
     }
 
-    fn mixed_multi_proof(&self) {
+    fn mixed_multiproof(&self) {
         let db = TemporaryDB::new();
-        let strategy = data_for_multi_proof(self.key_bytes(), self.index_sizes());
+        let strategy = data_for_multiproof(self.key_bytes(), self.index_sizes());
         let absent_keys_strategy = vec(array::uniform32(self.key_bytes()), 20);
         proptest!(
             self.config(),
             |((mut keys, data) in strategy, absent_keys in absent_keys_strategy)| {
                 write_data(&db, data);
                 keys.extend_from_slice(&absent_keys);
-                test_multi_proof(&db, &keys)?;
+                test_multiproof(&db, &keys)?;
             }
         );
     }
@@ -280,18 +280,18 @@ mod small_index {
     }
 
     #[test]
-    fn multi_proof_of_existing_elements() {
-        PARAMS.multi_proof_of_existing_elements();
+    fn multiproof_of_existing_elements() {
+        PARAMS.multiproof_of_existing_elements();
     }
 
     #[test]
-    fn multi_proof_of_absent_elements() {
-        PARAMS.multi_proof_of_absent_elements();
+    fn multiproof_of_absent_elements() {
+        PARAMS.multiproof_of_absent_elements();
     }
 
     #[test]
-    fn mixed_multi_proof() {
-        PARAMS.mixed_multi_proof();
+    fn mixed_multiproof() {
+        PARAMS.mixed_multiproof();
     }
 }
 
@@ -315,18 +315,18 @@ mod small_index_skewed {
     }
 
     #[test]
-    fn multi_proof_of_existing_elements() {
-        PARAMS.multi_proof_of_existing_elements();
+    fn multiproof_of_existing_elements() {
+        PARAMS.multiproof_of_existing_elements();
     }
 
     #[test]
-    fn multi_proof_of_absent_elements() {
-        PARAMS.multi_proof_of_absent_elements();
+    fn multiproof_of_absent_elements() {
+        PARAMS.multiproof_of_absent_elements();
     }
 
     #[test]
-    fn mixed_multi_proof() {
-        PARAMS.mixed_multi_proof();
+    fn mixed_multiproof() {
+        PARAMS.mixed_multiproof();
     }
 }
 
@@ -350,18 +350,18 @@ mod large_index {
     }
 
     #[test]
-    fn multi_proof_of_existing_elements() {
-        PARAMS.multi_proof_of_existing_elements();
+    fn multiproof_of_existing_elements() {
+        PARAMS.multiproof_of_existing_elements();
     }
 
     #[test]
-    fn multi_proof_of_absent_elements() {
-        PARAMS.multi_proof_of_absent_elements();
+    fn multiproof_of_absent_elements() {
+        PARAMS.multiproof_of_absent_elements();
     }
 
     #[test]
-    fn mixed_multi_proof() {
-        PARAMS.mixed_multi_proof();
+    fn mixed_multiproof() {
+        PARAMS.mixed_multiproof();
     }
 }
 
@@ -385,17 +385,17 @@ mod large_index_skewed {
     }
 
     #[test]
-    fn multi_proof_of_existing_elements() {
-        PARAMS.multi_proof_of_existing_elements();
+    fn multiproof_of_existing_elements() {
+        PARAMS.multiproof_of_existing_elements();
     }
 
     #[test]
-    fn multi_proof_of_absent_elements() {
-        PARAMS.multi_proof_of_absent_elements();
+    fn multiproof_of_absent_elements() {
+        PARAMS.multiproof_of_absent_elements();
     }
 
     #[test]
-    fn mixed_multi_proof() {
-        PARAMS.mixed_multi_proof();
+    fn mixed_multiproof() {
+        PARAMS.mixed_multiproof();
     }
 }
