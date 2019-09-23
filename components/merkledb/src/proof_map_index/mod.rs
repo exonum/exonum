@@ -920,7 +920,7 @@ where
     }
 }
 
-impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
+impl<'a, T, K, V> std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,

@@ -152,7 +152,7 @@ impl<T> Comparison<T> {
     }
 }
 
-impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
+impl<T: PartialEq + std::fmt::Debug> Comparison<T> {
     /// Asserts that the states are equal (by the `PartialEq` definition).
     ///
     /// # Panics

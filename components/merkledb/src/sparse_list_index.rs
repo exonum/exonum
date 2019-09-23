@@ -622,7 +622,7 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
+impl<'a, T, V> std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
     T: IndexAccess,
     V: BinaryValue,

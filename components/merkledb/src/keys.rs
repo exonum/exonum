@@ -259,7 +259,7 @@ impl BinaryKey for String {
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
+        unsafe { std::str::from_utf8_unchecked(buffer).to_string() }
     }
 }
 
@@ -353,8 +353,8 @@ mod tests {
             fn $test_name() {
                 use std::iter::once;
 
-                const MIN: $type = ::std::$type::MIN;
-                const MAX: $type = ::std::$type::MAX;
+                const MIN: $type = std::$type::MIN;
+                const MAX: $type = std::$type::MAX;
 
                 // Roundtrip
                 let mut buffer = [0_u8; $size];

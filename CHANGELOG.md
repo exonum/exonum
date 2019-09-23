@@ -13,6 +13,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added a possibility to specify compression algorithm for the database. (#1447)
 
+- Updated `hex` dependency with changes in the methods signatures of the `ToHex`
+  trait. (#1468)
+
 - Validator keys are now derived from single master key. Master key is
   stored in encrypted file. (#1459)
 
@@ -28,6 +31,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
   module in the `exonum`. (#1459)
+
+## 0.12.1 - 2019-09-19
+
+### Bug Fixes
+
+#### exonum
+
+- A message length checking has been fixed (#1463)
 
 ## 0.12.0 - 2019-08-14
 

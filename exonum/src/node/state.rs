@@ -822,7 +822,7 @@ impl State {
     /// Returns a list of queued consensus messages.
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
         let mut queued = Vec::new();
-        ::std::mem::swap(&mut self.queued, &mut queued);
+        std::mem::swap(&mut self.queued, &mut queued);
         queued
     }
 

@@ -472,7 +472,7 @@ where
     }
 }
 
-impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
+impl<'a, T, K, V> std::iter::IntoIterator for &'a MapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey,

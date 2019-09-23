@@ -19,7 +19,7 @@ use std::marker::PhantomData;
 use super::error;
 
 /// Type alias for the usual synchronous result.
-pub type Result<I> = ::std::result::Result<I, error::Error>;
+pub type Result<I> = std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
 pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 

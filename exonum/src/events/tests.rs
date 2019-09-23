@@ -135,7 +135,7 @@ impl TestHandler {
 
 impl Drop for TestHandler {
     fn drop(&mut self) {
-        if !::std::thread::panicking() {
+        if !std::thread::panicking() {
             self.shutdown();
         }
     }

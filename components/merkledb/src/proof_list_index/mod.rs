@@ -682,7 +682,7 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
+impl<'a, T, V> std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
     T: IndexAccess,
     V: BinaryValue,

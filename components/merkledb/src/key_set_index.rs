@@ -313,7 +313,7 @@ where
     }
 }
 
-impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
+impl<'a, T, K> std::iter::IntoIterator for &'a KeySetIndex<T, K>
 where
     T: IndexAccess,
     K: BinaryKey,
