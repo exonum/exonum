@@ -131,6 +131,8 @@ impl ExonumCommand for GenerateConfig {
         let master_key_path = self
             .master_key_path
             .unwrap_or_default()
+            .canonicalize()
+            .unwrap_or_default()
             .join(MASTER_KEY_FILE_NAME);
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);

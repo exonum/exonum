@@ -37,6 +37,7 @@ use std::{
     panic,
     path::{Path, PathBuf},
 };
+use tempfile::TempDir;
 
 #[derive(Debug)]
 struct ConfigSpec {
@@ -283,6 +284,32 @@ fn test_generate_config_key_files() {
 
     let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
     assert_eq!(sec_cfg["master_key_path"], "master.key.toml".into());
+}
+
+#[test]
+fn master_key_path_current_dir() {
+    let env = ConfigSpec::new_without_pass();
+
+    let temp_dir = TempDir::new().unwrap().into_path();
+    env::set_current_dir(temp_dir).unwrap();
+
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file())
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "0.0.0.0:8000")
+        .with_arg("--no-password")
+        .with_named_arg("--master-key-path", ".")
+        .run()
+        .unwrap();
+
+    let current_dir = std::env::current_dir().unwrap();
+    let expected_path = current_dir.join("master.key.toml");
+
+    let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
+    assert_eq!(
+        sec_cfg["master_key_path"],
+        expected_path.to_str().unwrap().into()
+    );
 }
 
 #[test]

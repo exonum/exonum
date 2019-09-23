@@ -206,15 +206,12 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt() {
+    fn encrypt_decrypt() {
         let pass_phrase = b"passphrase";
         let tree = SecretTree::new(&mut thread_rng());
         let seed = tree.seed();
         let key =
             EncryptedMasterKey::encrypt(&seed, pass_phrase).expect("Couldn't encrypt master key");
-
-        let mut file = File::create("foo.txt").unwrap();
-        let _ = file.write_all(toml::to_string(&key).unwrap().as_bytes());
 
         let decrypted_seed = key
             .decrypt(pass_phrase)
