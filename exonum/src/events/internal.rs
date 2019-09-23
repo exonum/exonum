@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn verify_msg() {
         let (pk, sk) = gen_keypair();
-        let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
+        let tx = SignedMessage::new(0, 0, &[0; 200], pk, &sk);
 
         let expected_event =
             InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn verify_incorrect_msg() {
         let (pk, _) = gen_keypair();
-        let tx = SignedMessage::new_with_signature(0, 0, &vec![0; 200], pk, Signature::zero());
+        let tx = SignedMessage::new_with_signature(0, 0, &[0; 200], pk, Signature::zero());
 
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, None);

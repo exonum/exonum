@@ -517,7 +517,7 @@ mod tests {
         for value in &values {
             let error = TransactionError::new(value.0, value.1.map(str::to_owned));
             assert_eq!(value.0, error.error_type());
-            assert_eq!(value.1.as_ref().map(|d| d.as_ref()), error.description());
+            assert_eq!(value.1, error.description());
         }
     }
 

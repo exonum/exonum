@@ -95,7 +95,6 @@ mod test {
     fn make_keys(source: [u8; 16], count: usize) -> Vec<PublicKey> {
         let mut rng = XorShiftRng::from_seed(source);
         (0..count)
-            .into_iter()
             .map(|_| {
                 let mut key = [0; PUBLIC_KEY_LENGTH];
                 rng.fill_bytes(&mut key);

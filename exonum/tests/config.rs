@@ -299,7 +299,7 @@ fn test_generate_full_config_run() {
         for i in 0..PUB_CONFIG.len() {
             copy_file_to_temp(&format!("consensus{}.toml", i), command);
             copy_file_to_temp(&format!("service{}.toml", i), command);
-            for n in 0..PUB_CONFIG.len() + 1 {
+            for n in 0..=PUB_CONFIG.len() {
                 println!("{} {}", i, n);
                 let config = format!("config{}{}.toml", i, n);
                 let result = panic::catch_unwind(|| {

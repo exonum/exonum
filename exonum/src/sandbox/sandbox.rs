@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
-#![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
 use bit_vec::BitVec;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -299,6 +299,7 @@ impl Sandbox {
     }
 
     /// Creates a `Precommit` message signed by this validator.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_precommit(
         &self,
         validator_id: ValidatorId,
@@ -347,6 +348,7 @@ impl Sandbox {
     }
 
     /// Creates a `PrevoteRequest` message signed by this validator.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_prevote_request(
         &self,
         from: &PublicKey,

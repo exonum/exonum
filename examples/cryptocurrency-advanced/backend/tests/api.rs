@@ -230,6 +230,7 @@ impl CryptocurrencyApi {
         (tx, key)
     }
 
+    #[allow(clippy::let_and_return)]
     fn get_wallet(&self, pub_key: PublicKey) -> Option<Wallet> {
         let wallet_info = self
             .inner
@@ -269,7 +270,7 @@ impl CryptocurrencyApi {
             .unwrap();
 
         let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
-        assert!(to_wallet.missing_keys().find(|v| **v == pub_key).is_some())
+        assert!(to_wallet.missing_keys().any(|v| *v == pub_key))
     }
 
     /// Asserts that the transaction with the given hash has a specified status.

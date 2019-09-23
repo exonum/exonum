@@ -417,6 +417,7 @@ fn test_snapshot_comparison_panic() {
         });
 }
 
+#[allow(clippy::cognitive_complexity)]
 #[test]
 fn test_explorer_blocks() {
     use exonum::api::node::public::explorer::BlocksRange;

@@ -424,7 +424,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 ) -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
-    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
+    tx_pool.extend(txs.iter().map(|tx| (tx.hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
     let txs: &[Signed<RawTransaction>] = raw_txs.as_ref();
 

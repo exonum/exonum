@@ -15,7 +15,7 @@ addons:
     - sourceline: 'ppa:maarten-fonville/protobuf'
     - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
     - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/16.04/prod xenial main'
-      key_url: https://packages.microsoft.com/keys/microsoft.asc    
+      key_url: https://packages.microsoft.com/keys/microsoft.asc
     packages:
     - binutils-dev
     - build-essential
@@ -38,7 +38,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.33.0
+  - 1.37.0
 
 cache:
   directories:

@@ -291,6 +291,7 @@ mod tests {
         assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
     }
 
+    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn test_rollback() {
         let db = CheckpointDb::new(MemoryDB::new());

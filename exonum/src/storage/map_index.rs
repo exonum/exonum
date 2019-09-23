@@ -473,7 +473,7 @@ mod tests {
     use super::*;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
-    const IDX_NAME: &'static str = "idx_name";
+    const IDX_NAME: &str = "idx_name";
 
     #[test]
     fn str_key() {

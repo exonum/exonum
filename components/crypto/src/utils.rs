@@ -200,13 +200,13 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_validate_file_mode() {
-        assert!(validate_file_mode(0o100600).is_ok());
+        assert!(validate_file_mode(0o100_600).is_ok());
         assert!(validate_file_mode(0o600).is_ok());
-        assert!(validate_file_mode(0o111111).is_err());
-        assert!(validate_file_mode(0o100644).is_err());
-        assert!(validate_file_mode(0o100666).is_err());
-        assert!(validate_file_mode(0o100777).is_err());
-        assert!(validate_file_mode(0o100755).is_err());
+        assert!(validate_file_mode(0o111_111).is_err());
+        assert!(validate_file_mode(0o100_644).is_err());
+        assert!(validate_file_mode(0o100_666).is_err());
+        assert!(validate_file_mode(0o100_777).is_err());
+        assert!(validate_file_mode(0o100_755).is_err());
         assert!(validate_file_mode(0o644).is_err());
         assert!(validate_file_mode(0o666).is_err());
     }

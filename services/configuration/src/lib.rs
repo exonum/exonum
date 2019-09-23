@@ -129,7 +129,7 @@ impl blockchain::Service for Service {
         SERVICE_ID
     }
 
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         SERVICE_NAME
     }
 
@@ -162,7 +162,6 @@ impl fabric::ServiceFactory for ServiceFactory {
     }
 
     fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
-        use exonum::helpers::fabric;
         Some(match command {
             v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
             v if v == fabric::Finalize.name() => Box::new(Finalize),

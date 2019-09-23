@@ -467,8 +467,8 @@ mod tests {
     fn decimal_round_trip() {
         let values = [
             Decimal::from_str("3.14").unwrap(),
-            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
-            Decimal::new(9497628354687268, 12),
+            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
+            Decimal::new(9_497_628_354_687_268, 12),
             Decimal::from_str("0").unwrap(),
             Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];
@@ -477,7 +477,7 @@ mod tests {
     }
 
     fn assert_round_trip_eq<T: StorageValue + Clone + PartialEq + Debug>(values: &[T]) {
-        for value in values.into_iter() {
+        for value in values {
             let bytes = value.clone().into_bytes();
             assert_eq!(
                 *value,

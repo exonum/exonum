@@ -18,7 +18,7 @@ use super::{
 };
 use crate::crypto::Hash;
 
-const IDX_NAME: &'static str = "idx_name";
+const IDX_NAME: &str = "idx_name";
 
 fn fork_iter<T: Database>(db: T) {
     let mut fork = db.fork();
@@ -117,6 +117,7 @@ fn fork_iter<T: Database>(db: T) {
     assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn changelog<T: Database>(db: T) {
     let mut fork = db.fork();
 

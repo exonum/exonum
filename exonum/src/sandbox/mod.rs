@@ -16,6 +16,7 @@ mod config_updater;
 mod consensus;
 mod old;
 mod requests;
+#[allow(clippy::module_inception)]
 mod sandbox;
 mod sandbox_tests_helper;
 mod timestamping;

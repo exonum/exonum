@@ -166,7 +166,7 @@ fn test_reach_thirteen_height() {
 
     let target_height = 13;
 
-    for height in 2..target_height + 1 {
+    for height in 2..=target_height {
         add_one_height(&sandbox, &sandbox_state);
         sandbox.assert_state(Height(height), Round(1));
     }
@@ -220,7 +220,7 @@ fn test_retrieve_block_and_precommits() {
 
     let target_height = Height(6);
 
-    for _ in 2..target_height.0 + 1 {
+    for _ in 2..=target_height.0 {
         add_one_height(&sandbox, &sandbox_state)
     }
     sandbox.assert_state(target_height, Round(1));

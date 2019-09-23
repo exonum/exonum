@@ -38,6 +38,7 @@ use crate::blockchain::{
 
 mod blockchain;
 
+#[allow(clippy::cognitive_complexity)]
 #[test]
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
@@ -67,7 +68,7 @@ fn test_explorer_basics() {
 
     // Block #1: Alice's transaction.
 
-    create_block(&mut blockchain, vec![tx_alice.clone().into()]);
+    create_block(&mut blockchain, vec![tx_alice.clone()]);
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
@@ -403,6 +404,7 @@ fn test_transaction_iterator() {
     assert_eq!(create_wallet_positions, vec![0, 1]);
 }
 
+#[allow(clippy::block_in_if_condition_stmt)]
 #[test]
 fn test_block_with_transactions() {
     let mut blockchain = create_blockchain();

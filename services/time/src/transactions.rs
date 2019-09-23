@@ -134,9 +134,7 @@ impl TxTime {
 
         match schema.time().get() {
             // Selected time should be greater than the time in the storage.
-            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
-                return;
-            }
+            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {}
             _ => {
                 // Change the time in the storage.
                 schema.time_mut().set(validator_times[max_byzantine_nodes]);
