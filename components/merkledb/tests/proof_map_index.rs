@@ -105,7 +105,7 @@ where
     prop_assert!(proof
         .all_entries()
         .eq(unchecked_proof.all_entries_unchecked()));
-    prop_assert_eq!(proof.object_hash(), table.object_hash());
+    prop_assert_eq!(proof.index_hash(), table.object_hash());
 
     let mut actual_keys: Vec<&K> = proof.missing_keys().collect();
     actual_keys

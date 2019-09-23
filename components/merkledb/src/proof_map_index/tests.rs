@@ -403,14 +403,14 @@ where
             .map(|&(ref k, ref v)| (k, v))
             .collect::<Vec<_>>()
     );
-    assert_eq!(proof.object_hash(), table.object_hash());
+    assert_eq!(proof.index_hash(), table.object_hash());
 
     let deserialized_proof = deserialized_proof.check().unwrap();
     assert_eq!(
         deserialized_proof.entries().collect::<Vec<_>>(),
         proof.entries().collect::<Vec<_>>()
     );
-    assert_eq!(deserialized_proof.object_hash(), proof.object_hash());
+    assert_eq!(deserialized_proof.index_hash(), proof.index_hash());
 }
 
 fn check_map_multiproof<K, V>(
@@ -446,7 +446,7 @@ fn check_map_multiproof<K, V>(
     };
 
     let proof = proof.check().unwrap();
-    assert_eq!(proof.object_hash(), table.object_hash());
+    assert_eq!(proof.index_hash(), table.object_hash());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
         actual_keys
@@ -1454,7 +1454,7 @@ fn test_tree_with_hashed_key() {
         proof.all_entries().collect::<Vec<_>>(),
         vec![(&Point::new(1, 2), Some(&vec![1, 2, 3]))]
     );
-    assert_eq!(proof.object_hash(), table.object_hash());
+    assert_eq!(proof.index_hash(), table.object_hash());
 
     let key = Point::new(3, 4);
     let other_key = Point::new(1, 2);

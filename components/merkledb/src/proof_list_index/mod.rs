@@ -174,11 +174,11 @@ where
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofListIndex<_, u8> =
-    ///                             ProofListIndex::new_in_family(name, &index_id, &snapshot);
+    ///     ProofListIndex::new_in_family(name, &index_id, &snapshot);
     ///
     /// let fork = db.fork();
     /// let mut mut_index : ProofListIndex<_, u8> =
-    ///                                 ProofListIndex::new_in_family(name, &index_id, &fork);
+    ///     ProofListIndex::new_in_family(name, &index_id, &fork);
     /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
     where

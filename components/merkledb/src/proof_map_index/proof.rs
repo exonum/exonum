@@ -530,7 +530,7 @@ where
     /// let proof = map.get_proof(h2);
     /// let checked_proof = proof.check().unwrap();
     /// assert_eq!(checked_proof.entries().collect::<Vec<_>>(), vec![(&h2, &200u32)]);
-    /// assert_eq!(checked_proof.object_hash(), map.object_hash());
+    /// assert_eq!(checked_proof.index_hash(), map.object_hash());
     /// ```
     ///
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
@@ -581,7 +581,7 @@ where
         self.check()
             .map_err(ValidationError::Malformed)
             .and_then(|checked| {
-                if checked.object_hash() == expected_map_hash {
+                if checked.index_hash() == expected_map_hash {
                     Ok(checked)
                 } else {
                     Err(ValidationError::UnmatchedRootHash)
@@ -606,10 +606,9 @@ impl<'a, K, V> CheckedMapProof<'a, K, V> {
     pub fn all_entries(&self) -> impl Iterator<Item = (&'a K, Option<&'a V>)> {
         self.entries.iter().map(OptionalEntry::as_tuple)
     }
-}
 
-impl<K, V> ObjectHash for CheckedMapProof<'_, K, V> {
-    fn object_hash(&self) -> Hash {
+    /// Returns the `object_hash()` of the underlying `ProofMapIndex`.
+    pub fn index_hash(&self) -> Hash {
         self.hash
     }
 }

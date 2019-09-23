@@ -282,7 +282,7 @@ fn proof_list_index_build_proofs(b: &mut Bencher, len: usize) {
     let table_hash = table.object_hash();
     for proof in proofs {
         let checked_proof = proof.check().unwrap();
-        assert_eq!(checked_proof.object_hash(), table_hash);
+        assert_eq!(checked_proof.index_hash(), table_hash);
         assert_eq!(checked_proof.entries().len(), 1);
     }
 }

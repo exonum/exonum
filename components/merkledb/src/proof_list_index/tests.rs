@@ -121,7 +121,7 @@ fn simple_proof() {
     let proof = index.get_proof(0);
     assert_eq!(proof, ListProof::new(vec![(0, 2_u64)], index.len()));
     let proof = proof.check().unwrap();
-    assert_eq!(proof.object_hash(), index.object_hash());
+    assert_eq!(proof.index_hash(), index.object_hash());
     assert_eq!(*proof.entries(), [(0, 2)]);
 
     index.push(4_u64);
@@ -134,7 +134,7 @@ fn simple_proof() {
         proof
     });
     let proof = proof.check().unwrap();
-    assert_eq!(proof.object_hash(), index.object_hash());
+    assert_eq!(proof.index_hash(), index.object_hash());
     assert_eq!(*proof.entries(), [(0, 2)]);
 
     let proof = index.get_proof(1);
@@ -144,7 +144,7 @@ fn simple_proof() {
         proof
     });
     let proof = proof.check().unwrap();
-    assert_eq!(proof.object_hash(), index.object_hash());
+    assert_eq!(proof.index_hash(), index.object_hash());
     assert_eq!(*proof.entries(), [(1, 4)]);
 
     let proof = index.get_range_proof(0..2);

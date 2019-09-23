@@ -18,7 +18,7 @@ use serde_derive::*;
 use std::cmp::Ordering;
 
 use super::{key::ProofListKey, tree_height_by_length};
-use crate::{BinaryValue, HashTag, ObjectHash};
+use crate::{BinaryValue, HashTag};
 
 /// Validation errors associated with `ListProof`s.
 pub type ValidationError = crate::ValidationError<ListProofError>;
@@ -63,7 +63,7 @@ impl HashedEntry {
 ///
 /// // Check the proof consistency.
 /// let checked_proof = proof.check()?;
-/// assert_eq!(checked_proof.object_hash(), list.object_hash());
+/// assert_eq!(checked_proof.index_hash(), list.object_hash());
 /// assert_eq!(*checked_proof.entries(), [(1, 200_u32), (2, 300_u32)]);
 ///
 /// // If the trusted list hash is known, there is a convenient method
@@ -514,7 +514,7 @@ impl<V: BinaryValue> ListProof<V> {
         self.check()
             .map_err(ValidationError::Malformed)
             .and_then(|checked_proof| {
-                if checked_proof.object_hash() == expected_list_hash {
+                if checked_proof.index_hash() == expected_list_hash {
                     Ok(checked_proof)
                 } else {
                     Err(ValidationError::UnmatchedRootHash)
@@ -551,10 +551,9 @@ impl<'a, V> CheckedListProof<'a, V> {
     pub fn list_len(&self) -> u64 {
         self.length
     }
-}
 
-impl<V> ObjectHash for CheckedListProof<'_, V> {
-    fn object_hash(&self) -> Hash {
+    /// Returns the `object_hash()` of the underlying `ProofListIndex`.
+    pub fn index_hash(&self) -> Hash {
         self.hash
     }
 }
