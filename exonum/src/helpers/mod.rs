@@ -85,12 +85,16 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
 }
 
 /// Basic trait to validate user defined input.
-pub trait ValidateInput {
+pub trait ValidateInput: Sized {
     /// The type returned in the event of a validate error.
     type Error;
-    /// Performs parameters validation for this configuration and returns error if
+    /// Perform parameters validation for this configuration and return error if
     /// value is inconsistent.
     fn validate(&self) -> Result<(), Self::Error>;
+    /// The same as validate method, but returns the value itself as a successful result.
+    fn into_validated(self) -> Result<Self, Self::Error> {
+        self.validate().map(|_| self)
+    }
 }
 
 /// This routine is adapted from the *old* Path's `path_relative_from`
