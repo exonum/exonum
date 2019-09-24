@@ -15,7 +15,8 @@
 //! Exonum blockchain explorer API.
 
 use actix::Arbiter;
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
+use actix_web::{http, Error as ActixError, FromRequest, web::Query, HttpRequest};
+//use actix_web_actors::ws;
 use chrono::{DateTime, Utc};
 use futures::{Future, IntoFuture};
 
@@ -25,7 +26,7 @@ use std::sync::{Arc, Mutex};
 use crate::{
     api::{
         backends::actix::{
-            self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
+            self as actix_backend, FutureResponse, RawHandler, RequestHandler,
         },
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
@@ -265,7 +266,7 @@ impl ExplorerApi {
             .map_err(ApiError::from);
         Ok(TransactionResponse { tx_hash })
     }
-
+/*
     /// Subscribes to events.
     pub fn handle_ws<Q>(
         name: &'static str,
@@ -305,13 +306,14 @@ impl ExplorerApi {
             inner: Arc::from(index) as Arc<RawHandler>,
         });
     }
-
+*/
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire(
         api_scope: &mut ServiceApiScope,
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
     ) -> &mut ServiceApiScope {
+        /*
         // Default subscription for blocks.
         Self::handle_ws(
             "v1/blocks/subscribe",
@@ -348,6 +350,7 @@ impl ExplorerApi {
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::None),
         );
+        */
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)

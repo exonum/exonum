@@ -30,6 +30,8 @@ use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
+use actix_web::App;
+//use actix_web::dev::{Body, ServiceRequest, ServiceResponse, MessageBody};
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -42,7 +44,7 @@ use std::{
 };
 
 use crate::api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, AppConfig, Cors, SystemRuntimeConfig},
     ApiAccess, ApiAggregator,
 };
 use crate::blockchain::{
@@ -1033,13 +1035,22 @@ impl Node {
         // Runs actix-web api.
         let actix_api_runtime = SystemRuntimeConfig {
             api_runtimes: {
-                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
-                    let app_config = move |app: App| -> App {
-                        let cors = Cors::from(allow_origin.clone());
-                        app.middleware(cors)
-                    };
-                    Arc::new(app_config)
-                };
+                //fn into_app_config<T,B>(allow_origin: AllowOrigin) -> AppConfig<T,B>
+                //where
+                //B: MessageBody,
+                //T: actix_service::NewService<
+                //    Config = (),
+                //    Request = ServiceRequest,
+                //    Response = ServiceResponse<B>,
+                //    Error = Error,
+                //    InitError = (),
+                //>{
+                //    let app_config = move |app: App<T,B>| -> App<T,B> {
+                //        let cors = Cors::from(allow_origin.clone());
+                //        app.wrap(cors)
+                //    };
+                //    Arc::new(app_config)
+                //};
 
                 let public_api_handler = self
                     .api_options
@@ -1047,11 +1058,11 @@ impl Node {
                     .map(|listen_address| ApiRuntimeConfig {
                         listen_address,
                         access: ApiAccess::Public,
-                        app_config: self
-                            .api_options
-                            .public_allow_origin
-                            .clone()
-                            .map(into_app_config),
+                        //app_config: self
+                        //    .api_options
+                        //    .public_allow_origin
+                        //    .clone()
+                        //    .map(into_app_config),
                     })
                     .into_iter();
                 let private_api_handler = self
@@ -1060,11 +1071,11 @@ impl Node {
                     .map(|listen_address| ApiRuntimeConfig {
                         listen_address,
                         access: ApiAccess::Private,
-                        app_config: self
-                            .api_options
-                            .private_allow_origin
-                            .clone()
-                            .map(into_app_config),
+                        //app_config: self
+                        //    .api_options
+                        //    .private_allow_origin
+                        //    .clone()
+                        //    .map(into_app_config),
                     })
                     .into_iter();
                 // Collects API handlers.

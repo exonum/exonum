@@ -15,7 +15,7 @@
 //! WebSocket API.
 
 use actix::*;
-use actix_web::ws;
+use actix_web_actors::ws;
 use chrono::{DateTime, Utc};
 use futures::Future;
 use log::error;
@@ -438,8 +438,9 @@ impl Session {
     }
 }
 
+
 impl Actor for Session {
-    type Context = ws::WebsocketContext<Self, ServiceApiState>;
+    type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let address: Recipient<_> = ctx.address().recipient();

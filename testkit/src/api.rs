@@ -16,7 +16,8 @@
 
 pub use exonum::api::ApiAccess;
 
-use actix_web::{test::TestServer, App};
+//use actix_web::{test::TestServer, App};
+use actix_web::{test, web, App, HttpResponse, http::StatusCode};
 use reqwest::{Client, RequestBuilder as ReqwestBuilder, Response, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
 
