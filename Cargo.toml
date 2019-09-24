@@ -4,6 +4,7 @@ members = [
     "exonum",
     "examples/cryptocurrency",
     "examples/cryptocurrency-advanced/backend",
+    "examples/sample_runtime",
     "examples/timestamping/backend",
     "services/time",
     "services/supervisor",
