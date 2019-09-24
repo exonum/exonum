@@ -139,7 +139,6 @@ jobs:
 
   # Benchmarks (compilation only).
   - name: benchmarks
-    rust: nightly-2018-12-30
     script:
     - RUST_LOG=off cargo check --benches --features "long_benchmarks"
 
