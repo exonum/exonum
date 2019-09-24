@@ -133,6 +133,13 @@ impl ResponseError for ApiError {
             ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
             ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
             ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
+            ApiError::PayloadTooLarge {
+                length_limit,
+                content_length,
+            } => HttpResponse::PayloadTooLarge().body(format!(
+                "Payload too large: the allowed {}, while received {} bytes",
+                length_limit, content_length
+            )),
         }
     }
 }

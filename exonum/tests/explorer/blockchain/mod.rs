@@ -90,7 +90,7 @@ impl Transaction for Transfer {
     }
 }
 
-struct MyService;
+pub(crate) struct MyService;
 
 impl Service for MyService {
     fn service_id(&self) -> u16 {

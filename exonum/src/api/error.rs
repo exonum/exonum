@@ -18,7 +18,8 @@
 
 //! The set of errors for the Exonum API module.
 
-use std::io;
+use actix_web::error::JsonPayloadError;
+use std::{fmt, io};
 
 use crate::storage;
 
@@ -52,6 +53,18 @@ pub enum Error {
     /// authentication credentials.
     #[fail(display = "Unauthorized")]
     Unauthorized,
+
+    /// Message length is exceeded.
+    #[fail(
+        display = "Payload too large: the allowed {}, while received {} bytes",
+        _0, _1
+    )]
+    PayloadTooLarge {
+        /// Variant of a limit for incoming requests.
+        length_limit: LengthLimit,
+        /// A length of content length.
+        content_length: usize,
+    },
 }
 
 impl From<io::Error> for Error {
@@ -69,5 +82,43 @@ impl From<failure::Error> for Error {
 impl From<storage::Error> for Error {
     fn from(e: storage::Error) -> Self {
         Error::Storage(e)
+    }
+}
+
+/// Length limit for incoming requests.
+#[derive(Debug, Clone, Copy)]
+pub enum LengthLimit {
+    /// Limit for a message in bytes.
+    Message(usize),
+    /// Limit for Json body in bytes.
+    Json(usize),
+}
+
+impl fmt::Display for LengthLimit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            LengthLimit::Message(len) => write!(f, "message limit is {} bytes", len),
+            LengthLimit::Json(len) => write!(f, "json limit is {} bytes", len),
+        }
+    }
+}
+
+pub(crate) fn into_api_error(
+    error: JsonPayloadError,
+    length_limit: LengthLimit,
+    content_length: String,
+) -> Error {
+    match error {
+        JsonPayloadError::Overflow => Error::PayloadTooLarge {
+            length_limit,
+            content_length: content_length.parse().unwrap(),
+        },
+        JsonPayloadError::ContentType => Error::BadRequest("Wrong content type".to_owned()),
+        JsonPayloadError::Deserialize(err) => {
+            Error::BadRequest(format!("Json deserialize error: {}", err))
+        }
+        JsonPayloadError::Payload(err) => {
+            Error::BadRequest(format!("Error while reading payload: {}", err))
+        }
     }
 }

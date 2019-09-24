@@ -193,6 +193,7 @@ impl StoredConfiguration {
     pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
         const MINIMAL_BODY_SIZE: usize = 256;
         const MINIMAL_MESSAGE_LENGTH: u32 = (MINIMAL_BODY_SIZE + EMPTY_SIGNED_MESSAGE_SIZE) as u32;
+        const MAXIMUM_MESSAGE_LENGTH: u32 = 1024 * 1024 * 10;
 
         let config: Self = serde_json::from_slice(serialized)?;
 
@@ -238,6 +239,14 @@ impl StoredConfiguration {
             return Err(JsonError::custom(format!(
                 "max_message_len ({}) must be at least {}",
                 config.consensus.max_message_len, MINIMAL_MESSAGE_LENGTH
+            )));
+        }
+
+        // Check maximum message length for too big messages.
+        if config.consensus.max_message_len >= MAXIMUM_MESSAGE_LENGTH {
+            return Err(JsonError::custom(format!(
+                "max_message_len ({}) must be less then {}",
+                config.consensus.max_message_len, MAXIMUM_MESSAGE_LENGTH
             )));
         }
 
@@ -360,6 +369,14 @@ mod tests {
     fn too_small_max_message_len() {
         let mut configuration = create_test_configuration();
         configuration.consensus.max_message_len = 128;
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "max_message_len (10485761) must be less then")]
+    fn too_big_max_message_len() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.max_message_len = 1024 * 1024 * 10 + 1;
         serialize_deserialize(&configuration);
     }
 

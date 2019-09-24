@@ -30,13 +30,19 @@ use exonum::{
     explorer::*,
     helpers::Height,
     messages::{self, Message, RawTransaction, Signed},
+    node::ExternalMessage,
 };
+use reqwest::Client;
 
-use crate::blockchain::{
-    create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
+use crate::{
+    blockchain::{
+        create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
+    },
+    node::run_node_with_message_len,
 };
 
 mod blockchain;
+mod node;
 
 #[allow(clippy::cognitive_complexity)]
 #[test]
@@ -490,4 +496,64 @@ fn test_block_with_transactions_roundtrip() {
         block_copy[0].content().message(),
         block[0].content().message()
     );
+}
+
+#[test]
+fn test_sending_message_size() {
+    let max_message_len = 512_usize;
+    let node_handler = run_node_with_message_len(6339, 8088, max_message_len as u32);
+    let client = Client::new();
+    let (pk, sk) = crypto::gen_keypair();
+
+    // Case when message len <= max_message_len
+    let name = "a".repeat(371); // With name length 371 chars we'll get tx size: 512 bytes.
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, &name), SERVICE_ID, pk, &sk);
+    assert_eq!(tx.signed_message().raw().len(), max_message_len);
+    let tx_hash = tx.hash();
+    let tx_json = json!({ "tx_body": tx });
+    let mut result = client
+        .post("http://localhost:8088/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&result.text().unwrap()).unwrap(),
+        json!({ "tx_hash": tx_hash })
+    );
+
+    // Case when max_message_len < message len < max_payload_len
+    let name = "a".repeat(372);
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, &name), SERVICE_ID, pk, &sk);
+    assert_eq!(tx.signed_message().raw().len(), max_message_len + 1);
+    let tx_json = json!({ "tx_body": tx });
+    let mut result = client
+        .post("http://localhost:8088/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+    assert_eq!(
+        result.text().unwrap(),
+        "Payload too large: the allowed message limit is 512 bytes, while received 513 bytes"
+    );
+
+    // Case when message len >= max_payload_len
+    let name = "a".repeat(436);
+    let tx = Message::sign_transaction(CreateWallet::new(&pk, &name), SERVICE_ID, pk, &sk);
+    assert_eq!(tx.signed_message().raw().len(), max_message_len + 65);
+    let tx_json = json!({ "tx_body": tx });
+    let mut result = client
+        .post("http://localhost:8088/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+    assert_eq!(
+        result.text().unwrap(),
+        "Payload too large: the allowed json limit is 1088 bytes, while received 1168 bytes"
+    );
+
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
 }

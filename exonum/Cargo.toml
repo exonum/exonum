@@ -70,6 +70,7 @@ proptest = "0.9.1"
 modifier = "0.1.0"
 criterion = "0.2.8"
 num = "0.2.0"
+reqwest = "0.9"
 
 [[bench]]
 name = "criterion"
