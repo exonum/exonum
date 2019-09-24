@@ -41,8 +41,10 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
 /// Struct containing all validator key pairs.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
-    consensus: KeyPair,
-    service: KeyPair,
+    /// Consensus keypair.
+    pub consensus: KeyPair,
+    /// Service keypair.
+    pub service: KeyPair,
 }
 
 impl Keys {
@@ -206,15 +208,12 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt() {
+    fn encrypt_decrypt() {
         let pass_phrase = b"passphrase";
         let tree = SecretTree::new(&mut thread_rng());
         let seed = tree.seed();
         let key =
             EncryptedMasterKey::encrypt(&seed, pass_phrase).expect("Couldn't encrypt master key");
-
-        let mut file = File::create("foo.txt").unwrap();
-        let _ = file.write_all(toml::to_string(&key).unwrap().as_bytes());
 
         let decrypted_seed = key
             .decrypt(pass_phrase)
