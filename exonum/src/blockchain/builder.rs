@@ -28,7 +28,6 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        supervisor::Supervisor,
         InstanceId, InstanceSpec, Runtime,
     },
 };
@@ -70,24 +69,11 @@ impl BlockchainBuilder {
     }
 
     /// Add the built-in Rust runtime with the default built-in services.
-    ///
-    /// # List of the built-in services to be added:
-    ///
-    /// * The [`Supervisor`] service, which is responsible for adding, modifying and removing user
-    /// services during the operation of the blockchain.
-    ///
-    /// [`Supervisor`]: ../runtime/supervisor/index.html
     pub fn with_default_runtime(
         self,
         services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {
-        // Add the built-in `Supervisor` service.
-        let mut services = services.into_iter().collect::<Vec<_>>();
-        services.push(InstanceCollection::new(Supervisor).with_instance(
-            Supervisor::BUILTIN_ID,
-            Supervisor::BUILTIN_NAME,
-            (),
-        ));
+        let services = services.into_iter().collect::<Vec<_>>();
         self.with_rust_runtime(services)
     }
 

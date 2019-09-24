@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::Height, impl_serde_hex_for_binary_value, proto::Any, runtime::ArtifactId};
+use exonum::{helpers::Height, impl_serde_hex_for_binary_value, proto::Any, runtime::ArtifactId};
 
-pub mod schema;
+use super::proto;
 
 // Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::DeployRequest", crate = "crate")]
+#[exonum(pb = "proto::DeployRequest")]
 pub struct DeployRequest {
     // Artifact identifier.
     pub artifact: ArtifactId,
@@ -30,7 +30,7 @@ pub struct DeployRequest {
 
 // Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::DeployConfirmation", crate = "crate")]
+#[exonum(pb = "proto::DeployConfirmation")]
 pub struct DeployConfirmation {
     // Artifact identifier.
     pub artifact: ArtifactId,
@@ -42,7 +42,7 @@ pub struct DeployConfirmation {
 
 // Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::StartService", crate = "crate")]
+#[exonum(pb = "proto::StartService")]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,

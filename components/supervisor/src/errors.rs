@@ -14,7 +14,7 @@
 
 /// Common errors emitted by transactions during execution.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(crate = "crate")]
+#[exonum()]
 pub enum Error {
     /// Artifact has been already deployed.
     AlreadyDeployed = 0,

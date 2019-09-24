@@ -418,7 +418,7 @@ impl Dispatcher {
 }
 
 #[derive(Debug)]
-pub(crate) enum Action {
+pub enum Action {
     /// This action registers the deployed artifact in the dispatcher.
     /// Make sure that you successfully complete the deploy artifact procedure.
     RegisterArtifact { artifact: ArtifactId, spec: Any },
@@ -497,7 +497,7 @@ impl DispatcherSender {
 
     /// Request an artifact deployment and invoke the callback if the deployment
     /// was successfully completed.
-    pub(super) fn request_deploy_artifact<F>(&self, artifact: ArtifactId, spec: Any, and_then: F)
+    pub fn request_deploy_artifact<F>(&self, artifact: ArtifactId, spec: Any, and_then: F)
     where
         F: FnOnce() + 'static,
     {

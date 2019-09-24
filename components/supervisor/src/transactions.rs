@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
+use exonum::{
     blockchain,
     helpers::ValidateInput,
     runtime::{
@@ -25,7 +25,7 @@ use crate::{
 use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor};
 
 /// Supervisor service transactions.
-#[exonum_service(crate = "crate")]
+#[exonum_service()]
 pub trait Transactions {
     /// Requests artifact deploy.
     ///

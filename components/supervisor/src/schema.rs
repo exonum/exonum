@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::{crypto::Hash, runtime::ArtifactId};
 use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
 
 use super::{multisig::ValidatorMultisig, DeployConfirmation, DeployRequest, StartService};
-use crate::{crypto::Hash, runtime::ArtifactId};
 
 /// Service information schema.
 #[derive(Debug)]

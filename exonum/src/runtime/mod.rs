@@ -88,7 +88,6 @@ pub mod rust;
 pub mod api;
 pub mod dispatcher;
 pub mod error;
-pub mod supervisor;
 
 use futures::Future;
 

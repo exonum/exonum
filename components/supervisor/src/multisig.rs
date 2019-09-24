@@ -25,7 +25,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{
+use exonum::{
     blockchain::{self, ValidatorKeys},
     crypto::{self, Hash, PublicKey},
     helpers::ValidatorId,
