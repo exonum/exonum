@@ -78,28 +78,42 @@ use crate::{TestKit, TestNetwork};
 ///
 /// # Example
 ///
-/// ```ignore [ECR-3275]
-/// # extern crate exonum;
-/// # extern crate exonum_testkit;
-/// # extern crate failure;
-/// # use exonum::blockchain::{Service, Transaction};
-/// # use exonum::messages::AnyTx;
+/// ```
+/// # use exonum_derive::{exonum_service, ServiceFactory};
+/// # use exonum_merkledb::Snapshot;
 /// # use exonum_testkit::TestKitBuilder;
+/// # use exonum::{
+/// #     blockchain::InstanceCollection,
+/// #     crypto::Hash,
+/// #     runtime::{InstanceDescriptor, rust::Service},
+/// # };
+/// #
+/// # const SERVICE_ID: u32 = 1;
+/// #
+/// # #[derive(Clone, Default, Debug, ServiceFactory)]
+/// # #[exonum(
+/// #     artifact_name = "documentation",
+/// #     artifact_version = "1.0.0",
+/// #     proto_sources = "exonum_testkit::proto",
+/// #     implements("MyInterface")
+/// # )]
 /// # pub struct MyService;
+/// #
 /// # impl Service for MyService {
-/// #    fn service_name(&self) -> &str {
-/// #        "documentation"
-/// #    }
-/// #    fn state_hash(&self, _: &exonum_merkledb::Snapshot) -> Vec<exonum::crypto::Hash> {
-/// #        Vec::new()
-/// #    }
-/// #    fn service_id(&self) -> u16 {
-/// #        0
-/// #    }
-/// #    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
-/// #        unimplemented!();
-/// #    }
+/// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
 /// # }
+/// #
+/// # #[exonum_service]
+/// # pub trait MyInterface {}
+/// #
+/// # impl MyInterface for MyService {}
+/// #
+/// # impl From<MyService> for InstanceCollection {
+/// #     fn from(t: MyService) -> Self {
+/// #         Self::new(t).with_instance(SERVICE_ID, "my", ())
+/// #     }
+/// # }
+/// #
 /// # fn main() {
 /// let mut testkit = TestKitBuilder::validator()
 ///     .with_rust_service(MyService)
