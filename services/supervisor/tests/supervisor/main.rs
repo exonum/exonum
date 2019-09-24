@@ -24,10 +24,10 @@ use exonum::{
     proto::Any,
     runtime::{
         rust::{ServiceFactory, Transaction},
-        supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor},
         ArtifactId, InstanceId, RuntimeIdentifier,
     },
 };
+use exonum_supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor};
 
 use crate::inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME};
 

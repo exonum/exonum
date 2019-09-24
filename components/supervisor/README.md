@@ -1,3 +1,0 @@
-# Exonum-supervisor
-
-## TBD

@@ -367,3 +367,5 @@
 //     node.run().unwrap();
 //     handle.join().unwrap();
 // }
+
+fn main() {}

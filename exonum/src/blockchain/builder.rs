@@ -200,8 +200,10 @@ mod tests {
     use crate::{
         crypto,
         helpers::{generate_testnet_config, Height},
-        runtime::supervisor::Supervisor,
     };
+
+    // Import service from tests, so we won't have implement other one.
+    use crate::blockchain::tests::ServiceGoodImpl as SampleService;
 
     use super::*;
 
@@ -232,11 +234,10 @@ mod tests {
 
         Blockchain::new(
             TemporaryDB::new(),
-            vec![InstanceCollection::new(Supervisor).with_instance(
-                Supervisor::BUILTIN_ID,
-                Supervisor::BUILTIN_NAME,
-                (),
-            )],
+            vec![
+                InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+                InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+            ],
             config.consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),
