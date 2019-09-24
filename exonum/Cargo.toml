@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.11.0"
+version = "0.11.1"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
