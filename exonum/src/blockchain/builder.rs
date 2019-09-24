@@ -110,6 +110,15 @@ impl BlockchainBuilder {
         self
     }
 
+    /// Add instance specifications of builtin services.
+    pub fn with_builtin_instances(
+        mut self,
+        instances: impl IntoIterator<Item = (InstanceSpec, Any)>,
+    ) -> Self {
+        self.builtin_instances.extend(instances);
+        self
+    }
+
     /// Returns blockchain instance, creates and commits the genesis block with the specified
     /// genesis configuration if the blockchain has not been initialized.
     /// Otherwise restores dispatcher state from database.

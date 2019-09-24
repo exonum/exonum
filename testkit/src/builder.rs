@@ -16,12 +16,12 @@
 
 pub use exonum::blockchain::InstanceCollection;
 
-use exonum::{crypto, helpers::ValidatorId};
+use exonum::{crypto, helpers::ValidatorId, proto::Any, runtime::InstanceSpec};
 use exonum_merkledb::TemporaryDB;
 
 use std::net::SocketAddr;
 
-use crate::{TestKit, TestNetwork};
+use crate::{runtime::RuntimeFactory, TestKit, TestNetwork};
 
 /// Builder for `TestKit`.
 ///
@@ -111,6 +111,8 @@ pub struct TestKitBuilder {
     validator_count: Option<u16>,
     service_instances: Vec<InstanceCollection>,
     logger: bool,
+    runtime_factories: Vec<Box<dyn RuntimeFactory>>,
+    instances: Vec<(InstanceSpec, Any)>,
 }
 
 impl TestKitBuilder {
@@ -121,6 +123,8 @@ impl TestKitBuilder {
             our_validator_id: Some(ValidatorId(0)),
             service_instances: Vec::new(),
             logger: false,
+            runtime_factories: vec![],
+            instances: vec![],
         }
     }
 
@@ -131,6 +135,8 @@ impl TestKitBuilder {
             our_validator_id: None,
             service_instances: Vec::new(),
             logger: false,
+            runtime_factories: vec![],
+            instances: vec![],
         }
     }
 
@@ -166,7 +172,14 @@ impl TestKitBuilder {
         let network =
             TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1));
         let genesis = network.genesis_config();
-        TestKit::assemble(TemporaryDB::new(), self.service_instances, network, genesis)
+        TestKit::assemble(
+            TemporaryDB::new(),
+            self.service_instances,
+            network,
+            genesis,
+            self.runtime_factories,
+            self.instances,
+        )
     }
 
     /// Starts a testkit web server, which listens to public and private APIs exposed by

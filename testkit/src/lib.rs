@@ -164,20 +164,21 @@ pub use crate::{
 };
 pub mod compare;
 pub mod proto;
+pub mod runtime;
 
 use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
-    blockchain::{Blockchain, ConsensusConfig, Schema as CoreSchema},
+    blockchain::{Blockchain, BlockchainBuilder, ConsensusConfig, Schema as CoreSchema},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
     proto::Any,
-    runtime::{rust::ServiceFactory, InstanceId},
+    runtime::{rust::ServiceFactory, InstanceId, InstanceSpec},
 };
 use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
@@ -192,6 +193,7 @@ use std::{
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::poll_events,
+    runtime::RuntimeFactory,
 };
 
 #[macro_use]
@@ -213,6 +215,7 @@ pub struct TestKit {
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
+    runtime_factories: Vec<Box<dyn RuntimeFactory>>,
 }
 
 impl fmt::Debug for TestKit {
@@ -247,6 +250,8 @@ impl TestKit {
         service_factories: impl IntoIterator<Item = InstanceCollection>,
         network: TestNetwork,
         genesis: ConsensusConfig,
+        runtime_factories: Vec<Box<dyn RuntimeFactory>>,
+        instances: impl IntoIterator<Item = (InstanceSpec, Any)>,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
@@ -254,14 +259,19 @@ impl TestKit {
         let db = database.into();
 
         let db_handler = db.handler();
-        let blockchain = Blockchain::new(
-            db,
-            service_factories,
-            genesis,
-            network.us().service_keypair(),
-            api_sender.clone(),
-            mpsc::channel(0).0,
-        );
+
+        let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair())
+            // We always create Rust runtime
+            .with_default_runtime(service_factories);
+
+        for runtime_factory in runtime_factories.iter() {
+            builder = builder.with_additional_runtime(runtime_factory.create_runtime());
+        }
+
+        let blockchain = builder
+            .with_builtin_instances(instances)
+            .finalize(api_sender.clone(), mpsc::channel(0).0)
+            .expect("Unable to create blockchain instance");
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -297,6 +307,7 @@ impl TestKit {
             processing_lock,
             network,
             cfg_proposal: None,
+            runtime_factories,
         }
     }
 
@@ -855,6 +866,7 @@ impl TestKit {
             cfg_proposal,
             db_handler,
             network,
+            runtime_factories,
             ..
         } = self;
 
@@ -863,6 +875,7 @@ impl TestKit {
             network,
             cfg_proposal,
             db,
+            runtime_factories,
         }
     }
 }
@@ -936,6 +949,7 @@ pub struct StoppedTestKit {
     db: CheckpointDb<TemporaryDB>,
     network: TestNetwork,
     cfg_proposal: Option<ConfigurationProposalState>,
+    runtime_factories: Vec<Box<dyn RuntimeFactory>>,
 }
 
 impl StoppedTestKit {
@@ -969,6 +983,8 @@ impl StoppedTestKit {
             self.network,
             // TODO make consensus config optional [ECR-3222]
             ConsensusConfig::default(),
+            self.runtime_factories,
+            vec![],
         );
         testkit.cfg_proposal = self.cfg_proposal;
         testkit
