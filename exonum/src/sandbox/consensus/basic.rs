@@ -47,7 +47,7 @@ fn test_check_leader() {
 
     let n_rounds_without_request_peers = {
         let mut rounds = 0;
-        let mut time_left = sandbox.cfg().consensus.peers_timeout;
+        let mut time_left = sandbox.cfg().peers_timeout;
         while time_left > 0 {
             time_left = time_left.saturating_sub(
                 sandbox.first_round_timeout() + rounds * sandbox.round_timeout_increase(),
@@ -192,8 +192,7 @@ fn test_query_state_hash() {
             IndexCoordinates::new(IndexOwner::Service(TimestampingService::ID), 1);
 
         let proof_configs = sandbox.get_proof_to_index(IndexOwner::Core, 0);
-        let proof = proof_configs.check().unwrap();
-        assert_eq!(proof.root_hash(), state_hash);
+        let proof = proof_configs.check_against_hash(state_hash).unwrap();
         assert_ne!(configs_rh, Hash::zero());
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),
@@ -202,8 +201,7 @@ fn test_query_state_hash() {
 
         let proof_configs =
             sandbox.get_proof_to_index(IndexOwner::Service(TimestampingService::ID), 0);
-        let proof = proof_configs.check().unwrap();
-        assert_eq!(proof.root_hash(), state_hash);
+        let proof = proof_configs.check_against_hash(state_hash).unwrap();
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),
             vec![(&timestamp_t1_key, &Hash::new([127; HASH_SIZE]))]
@@ -211,8 +209,7 @@ fn test_query_state_hash() {
 
         let proof_configs =
             sandbox.get_proof_to_index(IndexOwner::Service(TimestampingService::ID), 1);
-        let proof = proof_configs.check().unwrap();
-        assert_eq!(proof.root_hash(), state_hash);
+        let proof = proof_configs.check_against_hash(state_hash).unwrap();
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),
             vec![(&timestamp_t2_key, &Hash::new([128; HASH_SIZE]))]

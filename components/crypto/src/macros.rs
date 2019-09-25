@@ -51,6 +51,12 @@ macro_rules! implement_public_crypto_wrapper {
         }
     }
 
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
+        }
+    }
+
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
@@ -108,13 +114,19 @@ macro_rules! implement_private_crypto_wrapper {
         }
     }
 
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
+        }
+    }
+
     impl ToHex for $name {
-        fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-            (self.0).0.as_ref().write_hex(w)
+        fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
+            (self.0).0.as_ref().encode_hex()
         }
 
-        fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-            (self.0).0.as_ref().write_hex_upper(w)
+        fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
+            (self.0).0.as_ref().encode_hex_upper()
         }
     }
     )

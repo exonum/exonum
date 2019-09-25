@@ -760,7 +760,7 @@ fn test_explorer_single_block() {
                 .consensus_public_key_of(precommit.payload().validator)
                 .expect("Cannot find validator id");
             validators.insert(precommit.payload().validator);
-            assert_eq!(pk, &precommit.author())
+            assert_eq!(pk, precommit.author())
         }
 
         assert!(validators.len() >= testkit.majority_count());
@@ -828,7 +828,7 @@ fn test_explorer_transaction_info() {
     let block = explorer.block(Height(1)).unwrap();
     assert!(committed
         .location_proof()
-        .validate(*block.header().tx_hash(), 1)
+        .check_against_hash(*block.header().tx_hash())
         .is_ok());
 }
 

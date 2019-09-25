@@ -193,7 +193,7 @@ fn check_list_proofs(list: &ProofListIndex<Rc<Fork>, i32>, ref_list: &Vec<i32>) 
     prop_assert_eq!(list.object_hash(), expected_hash);
     for i in 0..list.len() {
         let proof = list.get_proof(i);
-        prop_assert!(proof.validate(list.object_hash(), list.len()).is_ok());
+        prop_assert!(proof.check_against_hash(list.object_hash()).is_ok());
     }
     Ok(())
 }

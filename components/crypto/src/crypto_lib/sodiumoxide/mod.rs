@@ -54,7 +54,10 @@ pub use self::ed25519::State as SignState;
 /// for sodiumoxide-based implementation.
 pub use self::sha256::State as HashState;
 
-use self::sodiumoxide::crypto::{hash::sha256, sign::ed25519};
+use self::sodiumoxide::crypto::{
+    hash::sha256,
+    sign::{convert_sk_to_pk, ed25519},
+};
 
 pub mod x25519;
 
@@ -105,4 +108,9 @@ pub fn verify(sig: &Signature, data: &[u8], pub_key: &PublicKey) -> bool {
 /// Calculates hash of a bytes slice.
 pub fn hash(data: &[u8]) -> Hash {
     sha256::hash(data)
+}
+
+/// Verifies that public key matches provided secret key.
+pub(crate) fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+    convert_sk_to_pk(&secret_key) == *public_key
 }

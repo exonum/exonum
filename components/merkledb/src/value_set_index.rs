@@ -416,7 +416,7 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
+impl<'a, T, V> std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
     T: IndexAccess,
     V: BinaryValue + ObjectHash,

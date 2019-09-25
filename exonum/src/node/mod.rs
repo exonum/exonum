@@ -25,6 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
+use crate::keys::{read_keys_from_file, Keys};
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
@@ -51,10 +52,8 @@ use crate::{
         node::SharedNodeState,
         ApiAccess, ApiAggregator,
     },
-    blockchain::{
-        Blockchain, ConsensusConfig, GenesisConfig, InstanceCollection, Schema, ValidatorKeys,
-    },
-    crypto::{self, read_keys_from_file, Hash, PublicKey, SecretKey},
+    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
+    crypto::{self, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
@@ -107,7 +106,7 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: ::std::fmt::Debug + Send + 'static {
+pub trait SystemStateProvider: std::fmt::Debug + Send + 'static {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -154,10 +153,6 @@ pub struct ServiceConfig {
 /// Listener config.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
-    /// Public key.
-    pub consensus_public_key: PublicKey,
-    /// Secret key.
-    pub consensus_secret_key: SecretKey,
     /// ConnectList.
     pub connect_list: ConnectList,
     /// Socket address.
@@ -239,23 +234,15 @@ impl Default for MemoryPoolConfig {
 
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct NodeConfig<T = SecretKey> {
-    /// Initial config that will be written in the first block.
-    pub genesis: GenesisConfig,
+pub struct NodeConfig {
+    /// Initial consensus configuration that will be written in the genesis block.
+    pub consensus: ConsensusConfig,
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
     pub external_address: String,
     /// Network configuration.
     pub network: NetworkConfiguration,
-    /// Consensus public key.
-    pub consensus_public_key: PublicKey,
-    /// Consensus secret key.
-    pub consensus_secret_key: T,
-    /// Service public key.
-    pub service_public_key: PublicKey,
-    /// Service secret key.
-    pub service_secret_key: T,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -270,61 +257,52 @@ pub struct NodeConfig<T = SecretKey> {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
+    /// Path to the master key file.
+    pub master_key_path: PathBuf,
+    /// Validator keys.
+    #[serde(skip)]
+    pub keys: Keys,
 }
 
-impl NodeConfig<SecretKey> {
-    /// Returns service keypair.
-    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
-        (self.service_public_key, self.service_secret_key.clone())
-    }
-}
-
-impl NodeConfig<PathBuf> {
+impl NodeConfig {
     /// Converts `NodeConfig<PathBuf>` to `NodeConfig<SecretKey>` reading the key files.
     pub fn read_secret_keys(
         self,
         config_file_path: impl AsRef<Path>,
-        consensus_passphrase: &[u8],
-        service_passphrase: &[u8],
+        master_key_passphrase: &[u8],
     ) -> NodeConfig {
         let config_folder = config_file_path.as_ref().parent().unwrap();
-        let consensus_key_path = if self.consensus_secret_key.is_absolute() {
-            self.consensus_secret_key
+        let master_key_path = if self.master_key_path.is_absolute() {
+            self.master_key_path.clone()
         } else {
-            config_folder.join(&self.consensus_secret_key)
-        };
-        let service_key_path = if self.service_secret_key.is_absolute() {
-            self.service_secret_key
-        } else {
-            config_folder.join(&self.service_secret_key)
+            config_folder.join(&self.master_key_path)
         };
 
-        let consensus_secret_key = read_keys_from_file(&consensus_key_path, consensus_passphrase)
-            .expect("Could not read consensus_secret_key from file")
-            .1;
-        let service_secret_key = read_keys_from_file(&service_key_path, service_passphrase)
-            .expect("Could not read service_secret_key from file")
-            .1;
+        let keys = read_keys_from_file(&master_key_path, master_key_passphrase)
+            .expect("Could not read master_key_path from file");
+
         NodeConfig {
-            consensus_secret_key,
-            service_secret_key,
-            genesis: self.genesis,
+            consensus: self.consensus,
             listen_address: self.listen_address,
             external_address: self.external_address,
             network: self.network,
-            consensus_public_key: self.consensus_public_key,
-            service_public_key: self.service_public_key,
             api: self.api,
             mempool: self.mempool,
             services_configs: self.services_configs,
             database: self.database,
             connect_list: self.connect_list,
             thread_pool_size: self.thread_pool_size,
+            master_key_path: self.master_key_path,
+            keys,
         }
+    }
+
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
+        (self.keys.service_pk(), self.keys.service_sk().clone())
     }
 }
 
-impl<T> ValidateInput for NodeConfig<T> {
+impl ValidateInput for NodeConfig {
     type Error = failure::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -354,7 +332,7 @@ impl<T> ValidateInput for NodeConfig<T> {
             capacity.network_requests_capacity,
             sanity_max,
         );
-        Ok(())
+        self.consensus.validate()
     }
 }
 
@@ -371,6 +349,8 @@ pub struct Configuration {
     pub peer_discovery: Vec<String>,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
+    /// Validator keys.
+    pub keys: Keys,
 }
 
 /// Channel for messages, timeouts and api requests.
@@ -478,13 +458,13 @@ impl NodeHandler {
 
         let snapshot = blockchain.snapshot();
 
-        let stored = Schema::new(&snapshot).actual_configuration();
-        info!("Creating a node with config: {:#?}", stored);
+        let consensus_config = Schema::new(&snapshot).consensus_config();
+        info!("Creating a node with config: {:#?}", consensus_config);
 
-        let validator_id = stored
+        let validator_id = consensus_config
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
+            .position(|pk| pk.consensus_key == config.keys.consensus_pk())
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
         let connect = Verified::from_value(
@@ -493,24 +473,21 @@ impl NodeHandler {
                 system_state.current_time().into(),
                 &user_agent::get(),
             ),
-            config.listener.consensus_public_key,
-            &config.listener.consensus_secret_key,
+            config.keys.consensus_pk(),
+            &config.keys.consensus_sk(),
         );
 
         let connect_list = config.listener.connect_list;
         let state = State::new(
             validator_id,
-            config.listener.consensus_public_key,
-            config.listener.consensus_secret_key,
-            config.service.service_public_key,
-            config.service.service_secret_key,
             connect_list,
-            stored,
+            consensus_config,
             connect,
             blockchain.get_saved_peers(),
             last_hash,
             last_height,
             system_state.current_time(),
+            config.keys,
         );
 
         let node_role = NodeRole::new(validator_id);
@@ -943,7 +920,7 @@ impl Node {
         let blockchain = Blockchain::new(
             database,
             services,
-            node_cfg.genesis.clone(),
+            node_cfg.consensus.clone(),
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
             channel.internal_requests.0.clone(),
@@ -963,18 +940,17 @@ impl Node {
 
         let config = Configuration {
             listener: ListenerConfig {
-                consensus_public_key: node_cfg.consensus_public_key,
-                consensus_secret_key: node_cfg.consensus_secret_key,
                 connect_list: ConnectList::from_config(node_cfg.connect_list),
                 address: node_cfg.listen_address,
             },
             service: ServiceConfig {
-                service_public_key: node_cfg.service_public_key,
-                service_secret_key: node_cfg.service_secret_key,
+                service_public_key: node_cfg.keys.service_pk(),
+                service_secret_key: node_cfg.keys.service_sk().clone(),
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
             peer_discovery: peers,
+            keys: node_cfg.keys,
         };
 
         let api_state = SharedNodeState::new(&blockchain, node_cfg.api.state_update_timeout as u64);
@@ -1031,7 +1007,7 @@ impl Node {
             handler,
             channel,
             network_config,
-            max_message_len: node_cfg.genesis.consensus.max_message_len,
+            max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
             api_runtime_config,
         }

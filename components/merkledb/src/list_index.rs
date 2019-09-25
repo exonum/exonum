@@ -483,7 +483,7 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
+impl<'a, T, V> std::iter::IntoIterator for &'a ListIndex<T, V>
 where
     T: IndexAccess,
     V: BinaryValue,

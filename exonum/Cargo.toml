@@ -23,7 +23,7 @@ actix-net = "0.2.6"
 actix-web = { version = "0.7.18", default-features = false }
 log = "0.4.6"
 byteorder = { version = "1.2.7", features = [ "i128" ] }
-hex = "0.3.2"
+hex = "0.4"
 bit-vec = "0.6.0"
 rand = "0.7"
 serde = "1.0.10"
@@ -55,14 +55,16 @@ ctrlc = "3.1.1"
 rpassword = "4.0.1"
 zeroize = "0.9.1"
 semver = "0.9.0"
+pwbox = "0.2.1"
+secret-tree = "0.2.0"
 
-exonum_sodiumoxide = { version = "0.0.22", optional = true }
+exonum_sodiumoxide = { version = "0.0.23", optional = true }
 exonum-crypto = { version = "0.12.0", path = "../components/crypto" }
 exonum-derive = { version = "0.12.0", path = "../components/derive" }
 exonum-merkledb = { version = "0.12.0", path = "../components/merkledb" }
 
 [dev-dependencies]
-criterion = "0.2.8"
+criterion = "0.3.0"
 lazy_static = "1.0.1"
 modifier = "0.1.0"
 num = "0.2.0"

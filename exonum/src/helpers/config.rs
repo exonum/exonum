@@ -21,7 +21,7 @@ use std::{
     fs::{self, File},
     io::{Read, Write},
     mem::drop,
-    path::{Path, PathBuf},
+    path::Path,
     sync::mpsc,
     thread,
 };
@@ -135,7 +135,7 @@ impl ConfigManager {
     where
         P: AsRef<Path>,
     {
-        let mut current_config: NodeConfig<PathBuf> = ConfigFile::load(path)?;
+        let mut current_config: NodeConfig = ConfigFile::load(path)?;
         current_config.connect_list = connect_list;
         ConfigFile::save(&current_config, path)?;
 

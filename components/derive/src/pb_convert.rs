@@ -17,7 +17,7 @@ use heck::SnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
-use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Path};
+use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Fields, Path, Type, Variant};
 
 use std::convert::TryFrom;
 
@@ -161,9 +161,44 @@ impl ToTokens for ProtobufConvertStruct {
 }
 
 #[derive(Debug)]
+struct ParsedVariant {
+    name: Ident,
+    field_name: Path,
+}
+
+impl TryFrom<&Variant> for ParsedVariant {
+    type Error = darling::Error;
+
+    fn try_from(value: &Variant) -> Result<Self, Self::Error> {
+        let name = value.ident.clone();
+        let field_name = match &value.fields {
+            Fields::Unnamed(fields) => {
+                if fields.unnamed.len() != 1 {
+                    return Err(darling::Error::unsupported_shape(
+                        "Too many fields in the enum variant",
+                    ));
+                }
+
+                match &fields.unnamed.first().unwrap().ty {
+                    Type::Path(type_path) => Ok(type_path.path.clone()),
+                    _ => Err(darling::Error::unsupported_shape(
+                        "Only variants in form Foo(Bar) are supported.",
+                    )),
+                }
+            }
+            _ => Err(darling::Error::unsupported_shape(
+                "Only variants in form Foo(Bar) are supported.",
+            )),
+        }?;
+
+        Ok(Self { name, field_name })
+    }
+}
+
+#[derive(Debug)]
 struct ProtobufConvertEnum {
     name: Ident,
-    variants: Vec<Ident>,
+    variants: Vec<ParsedVariant>,
     attrs: ProtobufConvertEnumAttrs,
 }
 
@@ -174,7 +209,11 @@ impl ProtobufConvertEnum {
         attrs: &[Attribute],
     ) -> Result<Self, darling::Error> {
         let attrs = ProtobufConvertEnumAttrs::try_from(attrs)?;
-        let variants = data.variants.iter().map(|v| v.ident.clone()).collect();
+        let variants = data
+            .variants
+            .iter()
+            .map(ParsedVariant::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
             name,
@@ -200,12 +239,15 @@ impl ProtobufConvertEnum {
         let from_pb_impl = {
             let match_arms = self.variants.iter().map(|variant| {
                 let pb_variant = Ident::new(
-                    variant.to_string().to_snake_case().as_ref(),
+                    variant.name.to_string().to_snake_case().as_ref(),
                     Span::call_site(),
                 );
+                let variant_name = &variant.name;
+                let field_name = &variant.field_name;
+
                 quote! {
                     Some(#pb_oneof_enum::#pb_variant(pb)) => {
-                        #variant::from_pb(pb).map(#name::#variant)
+                        #field_name::from_pb(pb).map(#name::#variant_name)
                     }
                 }
             });
@@ -219,10 +261,12 @@ impl ProtobufConvertEnum {
         };
         let to_pb_impl = {
             let match_arms = self.variants.iter().map(|variant| {
-                let pb_variant = variant.to_string().to_snake_case();
+                let pb_variant = variant.name.to_string().to_snake_case();
+                let variant_name = &variant.name;
+
                 let setter = Ident::new(&format!("set_{}", pb_variant), Span::call_site());
                 quote! {
-                    #name::#variant(msg) => inner.#setter(msg.to_pb()),
+                    #name::#variant_name(msg) => inner.#setter(msg.to_pb()),
                 }
             });
 
@@ -253,22 +297,25 @@ impl ProtobufConvertEnum {
     fn impl_enum_conversions(&self) -> impl ToTokens {
         let name = &self.name;
         let conversions = self.variants.iter().map(|variant| {
+            let variant_name = &variant.name;
+            let field_name = &variant.field_name;
+
             quote! {
-                impl From<#variant> for #name {
-                    fn from(variant: #variant) -> Self {
-                        #name::#variant(variant)
+                impl From<#field_name> for #name {
+                    fn from(variant: #field_name) -> Self {
+                        #name::#variant_name(variant)
                     }
                 }
 
-                impl std::convert::TryFrom<#name> for #variant {
+                impl std::convert::TryFrom<#name> for #field_name {
                     type Error = failure::Error;
 
                     fn try_from(msg: #name) -> Result<Self, Self::Error> {
-                        if let #name::#variant(inner) = msg {
+                        if let #name::#variant_name(inner) = msg {
                             Ok(inner)
                         } else {
                             Err(failure::format_err!(
-                                "Expected #variant variant, but got {:?}",
+                                "Expected #variant_name variant, but got {:?}",
                                 msg
                             ))
                         }

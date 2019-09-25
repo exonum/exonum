@@ -16,7 +16,7 @@
 // to `ParameterizedBenchmark::new()`.
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
-const MESSAGES_COUNT: usize = 1_000;
+const MESSAGES_COUNT: u64 = 1_000;
 const SAMPLE_SIZE: usize = 20;
 
 use criterion::{
@@ -81,7 +81,7 @@ impl EventHandler for MessagesHandler {
     }
 }
 
-fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
+fn gen_messages(count: u64, tx_size: usize) -> Vec<Vec<u8>> {
     use exonum_merkledb::BinaryValue;
     let (p, s) = crypto::gen_keypair();
     (0..count)
@@ -240,14 +240,14 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
     c.bench(
         "transactions/simple",
         ParameterizedBenchmark::new("size", bench_verify_messages_simple, parameters.clone())
-            .throughput(|_| Throughput::Elements(MESSAGES_COUNT as u32))
+            .throughput(|_| Throughput::Elements(MESSAGES_COUNT))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
             .sample_size(SAMPLE_SIZE),
     );
     c.bench(
         "transactions/event_loop",
         ParameterizedBenchmark::new("size", bench_verify_messages_event_loop, parameters.clone())
-            .throughput(|_| Throughput::Elements(MESSAGES_COUNT as u32))
+            .throughput(|_| Throughput::Elements(MESSAGES_COUNT))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
             .sample_size(SAMPLE_SIZE),
     );

@@ -17,7 +17,7 @@
 
 use exonum::{
     blockchain::ValidatorKeys,
-    crypto::{generate_keys_file, PublicKey},
+    keys::{generate_keys, Keys},
 };
 use failure::{bail, Error};
 use serde::{Deserialize, Serialize};
@@ -33,17 +33,15 @@ use crate::{
     command::{ExonumCommand, StandardResult},
     config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig},
     io::{load_config_file, save_config_file},
-    password::{PassInputMethod, Passphrase, PassphraseUsage, SecretKeyType},
+    password::{PassInputMethod, Passphrase, PassphraseUsage},
 };
 
-/// Name for a file containing consensus secret key.
-pub const CONSENSUS_SECRET_KEY_NAME: &str = "consensus.key.toml";
-/// Name for a file containing service secret key.
-pub const SERVICE_SECRET_KEY_NAME: &str = "service.key.toml";
 /// Name for a file containing the public part of the node configuration.
 pub const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
 /// Name for a file containing the secret part of the node configuration.
 pub const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
+/// Name for a encrypted file containing the node master key.
+pub const MASTER_KEY_FILE_NAME: &str = "master.key.toml";
 
 /// Default port number used by Exonum for communication between nodes.
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
@@ -74,34 +72,25 @@ pub struct GenerateConfig {
     /// Don't prompt for passwords when generating private keys.
     #[structopt(long, short = "n")]
     pub no_password: bool,
-    /// Passphrase entry method for consensus key.
+    /// Passphrase entry method for master key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
     /// Default Value is `stdin`.
-    /// If `ENV_VAR_NAME` is not specified `$EXONUM_CONSENSUS_PASS` is used
+    /// If `ENV_VAR_NAME` is not specified `$EXONUM_MASTER_PASS` is used
     /// by default.
     #[structopt(long)]
-    pub consensus_key_pass: Option<PassInputMethod>,
-    /// Passphrase entry method for service key.
-    ///
-    /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
-    /// Default Value is `stdin`.
-    /// If `ENV_VAR_NAME` is not specified `$EXONUM_SERVICE_PASS` is used
-    /// by default.
+    pub master_key_pass: Option<PassInputMethod>,
+    /// Path to the master key file. If empty, file will be placed to <output_dir>.
     #[structopt(long)]
-    pub service_key_pass: Option<PassInputMethod>,
+    pub master_key_path: Option<PathBuf>,
 }
 
 impl GenerateConfig {
-    fn get_passphrase(
-        no_password: bool,
-        method: PassInputMethod,
-        secret_key_type: SecretKeyType,
-    ) -> Result<Passphrase, Error> {
+    fn get_passphrase(no_password: bool, method: PassInputMethod) -> Result<Passphrase, Error> {
         if no_password {
             Ok(Passphrase::default())
         } else {
-            method.get_passphrase(secret_key_type, PassphraseUsage::SettingUp)
+            method.get_passphrase(PassphraseUsage::SettingUp)
         }
     }
 
@@ -137,33 +126,24 @@ impl ExonumCommand for GenerateConfig {
     fn execute(self) -> Result<StandardResult, Error> {
         let common_config: CommonConfigTemplate = load_config_file(self.common_config.clone())?;
 
-        let pub_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
-        let private_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
-        let consensus_secret_key_path = self.output_dir.join(CONSENSUS_SECRET_KEY_NAME);
-        let service_secret_key_path = self.output_dir.join(SERVICE_SECRET_KEY_NAME);
+        let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
+        let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
+        let master_key_path = get_master_key_path(self.master_key_path.clone())?;
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
-        let consensus_public_key = {
-            let passphrase = Self::get_passphrase(
-                self.no_password,
-                self.consensus_key_pass.unwrap_or_default(),
-                SecretKeyType::Consensus,
-            )?;
-            create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())?
-        };
-        let service_public_key = {
-            let passphrase = Self::get_passphrase(
-                self.no_password,
-                self.service_key_pass.unwrap_or_default(),
-                SecretKeyType::Service,
-            )?;
-            create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())?
-        };
+        let keys = {
+            let passphrase =
+                Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default());
+            create_keys_and_files(
+                &self.output_dir.join(master_key_path.clone()),
+                passphrase?.as_bytes(),
+            )
+        }?;
 
         let validator_keys = ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
+            consensus_key: keys.consensus_pk(),
+            service_key: keys.service_pk(),
         };
         let node_pub_config = NodePublicConfig {
             address: self.peer_address.to_string(),
@@ -174,40 +154,44 @@ impl ExonumCommand for GenerateConfig {
             common: common_config,
         };
         // Save public config separately.
-        save_config_file(&shared_config, &pub_config_path)?;
+        save_config_file(&shared_config, &public_config_path)?;
 
         let private_config = NodePrivateConfig {
             listen_address,
             external_address: self.peer_address.to_string(),
-            consensus_public_key,
-            consensus_secret_key: CONSENSUS_SECRET_KEY_NAME.into(),
-            service_public_key,
-            service_secret_key: SERVICE_SECRET_KEY_NAME.into(),
+            master_key_path: master_key_path.clone(),
+            keys,
         };
 
-        save_config_file(&private_config, &private_config_path)?;
+        save_config_file(&private_config, &secret_config_path)?;
 
         Ok(StandardResult::GenerateConfig {
-            public_config_path: pub_config_path,
-            secret_config_path: private_config_path,
+            public_config_path,
+            secret_config_path,
+            master_key_path,
         })
     }
 }
 
-fn create_secret_key_file(
+fn get_master_key_path(path: Option<PathBuf>) -> Result<PathBuf, Error> {
+    let path = path.map_or_else(|| Ok(PathBuf::new()), |path| path.canonicalize())?;
+    Ok(path.join(MASTER_KEY_FILE_NAME))
+}
+
+fn create_keys_and_files(
     secret_key_path: impl AsRef<Path>,
     passphrase: impl AsRef<[u8]>,
-) -> Result<PublicKey, Error> {
+) -> Result<Keys, failure::Error> {
     let secret_key_path = secret_key_path.as_ref();
     if secret_key_path.exists() {
         bail!(
             "Failed to create secret key file. File exists: {}",
             secret_key_path.to_string_lossy(),
-        );
+        )
     } else {
         if let Some(dir) = secret_key_path.parent() {
             fs::create_dir_all(dir)?;
         }
-        generate_keys_file(&secret_key_path, &passphrase).map_err(Into::into)
+        generate_keys(&secret_key_path, passphrase.as_ref())
     }
 }

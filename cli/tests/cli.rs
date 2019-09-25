@@ -27,6 +27,7 @@ use exonum_cli::command::{Command, ExonumCommand, StandardResult};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
+use exonum_cli::password::DEFAULT_MASTER_PASS_ENV_VAR;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -36,6 +37,7 @@ use std::{
     panic,
     path::{Path, PathBuf},
 };
+use tempfile::TempDir;
 
 #[derive(Debug)]
 struct ConfigSpec {
@@ -82,15 +84,10 @@ impl ConfigSpec {
         let dest = self.output_node_config_dir(index);
         fs::create_dir_all(&dest).unwrap();
 
-        [
-            "pub.toml",
-            "sec.toml",
-            "service.key.toml",
-            "consensus.key.toml",
-        ]
-        .iter()
-        .try_for_each(|file| copy_secured(src.join(file), dest.join(file)))
-        .expect("Can't copy file");
+        ["pub.toml", "sec.toml", "master.key.toml"]
+            .iter()
+            .try_for_each(|file| copy_secured(src.join(file), dest.join(file)))
+            .expect("Can't copy file");
     }
 
     fn output_dir(&self) -> PathBuf {
@@ -211,7 +208,7 @@ fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<(), fail
     Ok(())
 }
 
-fn load_node_config(path: impl AsRef<Path>) -> NodeConfig<PathBuf> {
+fn load_node_config(path: impl AsRef<Path>) -> NodeConfig {
     ConfigFile::load(path).expect("Can't load node config file")
 }
 
@@ -231,11 +228,8 @@ fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
 fn assert_node_config_files_eq(actual: impl AsRef<Path>, expected: impl AsRef<Path>) {
     let (actual, expected) = (actual.as_ref(), expected.as_ref());
 
-    let config_dir = actual.parent().unwrap();
     let actual = load_node_config(actual);
-    let mut expected = load_node_config(expected);
-    expected.service_secret_key = config_dir.join(&expected.service_secret_key);
-    expected.consensus_secret_key = config_dir.join(&expected.consensus_secret_key);
+    let expected = load_node_config(expected);
 
     assert_eq!(actual, expected);
 }
@@ -279,6 +273,7 @@ fn test_generate_template() {
 #[test]
 fn test_generate_config_key_files() {
     let env = ConfigSpec::new_without_pass();
+
     env.command("generate-config")
         .with_arg(&env.expected_template_file())
         .with_arg(&env.output_node_config_dir(0))
@@ -288,8 +283,48 @@ fn test_generate_config_key_files() {
         .unwrap();
 
     let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
-    assert_eq!(sec_cfg["consensus_secret_key"], "consensus.key.toml".into());
-    assert_eq!(sec_cfg["service_secret_key"], "service.key.toml".into());
+    assert_eq!(sec_cfg["master_key_path"], "master.key.toml".into());
+}
+
+#[test]
+fn master_key_path_current_dir() {
+    let env = ConfigSpec::new_without_pass();
+
+    let temp_dir = TempDir::new().unwrap().into_path();
+    env::set_current_dir(temp_dir).unwrap();
+
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file())
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "0.0.0.0:8000")
+        .with_arg("--no-password")
+        .with_named_arg("--master-key-path", ".")
+        .run()
+        .unwrap();
+
+    let current_dir = std::env::current_dir().unwrap();
+    let expected_path = current_dir.join("master.key.toml");
+
+    let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
+    assert_eq!(
+        sec_cfg["master_key_path"],
+        expected_path.to_str().unwrap().into()
+    );
+}
+
+#[test]
+#[should_panic]
+fn invalid_master_key_path() {
+    let env = ConfigSpec::new_without_pass();
+
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file())
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "0.0.0.0:8000")
+        .with_arg("--no-password")
+        .with_named_arg("--master-key-path", "./..not-valid/path/")
+        .run()
+        .unwrap();
 }
 
 #[test]
@@ -335,8 +370,7 @@ fn test_finalize_run_without_pass() {
             .command("run")
             .with_named_arg("-c", &node_config)
             .with_named_arg("-d", env.output_dir().join("foo"))
-            .with_named_arg("--service-key-pass", "pass:")
-            .with_named_arg("--consensus-key-pass", "pass:")
+            .with_named_arg("--master-key-pass", "pass:")
             .run();
         assert!(is_run_node_config(feedback.unwrap()));
     }
@@ -346,8 +380,7 @@ fn test_finalize_run_without_pass() {
 fn test_finalize_run_with_pass() {
     let env = ConfigSpec::new_with_pass();
 
-    env::set_var("EXONUM_CONSENSUS_PASS", "some passphrase");
-    env::set_var("EXONUM_SERVICE_PASS", "another passphrase");
+    env::set_var(DEFAULT_MASTER_PASS_ENV_VAR, "some passphrase");
     env.copy_node_config_to_output(0);
     let node_config = env.output_node_config(0);
     env.command("finalize")
@@ -363,8 +396,7 @@ fn test_finalize_run_with_pass() {
         .command("run")
         .with_named_arg("-c", &node_config)
         .with_named_arg("-d", env.output_dir().join("foo"))
-        .with_named_arg("--service-key-pass", "env")
-        .with_named_arg("--consensus-key-pass", "env")
+        .with_named_arg("--master-key-pass", "env")
         .run();
     assert!(is_run_node_config(feedback.unwrap()));
 }
@@ -417,14 +449,12 @@ fn test_full_workflow() {
             .with_arg(&output_template_file)
             .with_arg(&env.output_node_config_dir(i))
             .with_named_arg("-a", format!("0.0.0.0:{}", 8000 + i))
-            .with_named_arg("--service-key-pass", "pass:12345678")
-            .with_named_arg("--consensus-key-pass", "pass:12345678")
+            .with_named_arg("--master-key-pass", "pass:12345678")
             .run()
             .unwrap();
     }
 
-    env::set_var("EXONUM_CONSENSUS_PASS", "12345678");
-    env::set_var("EXONUM_SERVICE_PASS", "12345678");
+    env::set_var("EXONUM_MASTER_PASS", "12345678");
     for i in 0..env.validators_count {
         let node_config = env.output_node_config(i);
         env.command("finalize")
@@ -439,8 +469,7 @@ fn test_full_workflow() {
             .command("run")
             .with_named_arg("-c", &node_config)
             .with_named_arg("-d", env.output_dir().join("foo"))
-            .with_named_arg("--service-key-pass", "env")
-            .with_named_arg("--consensus-key-pass", "env")
+            .with_named_arg("--master-key-pass", "env")
             .run();
         assert!(is_run_node_config(feedback.unwrap()));
     }
@@ -493,7 +522,7 @@ fn test_update_config() {
 #[test]
 fn test_clear_cache() {
     let env = ConfigSpec::new_without_pass();
-    let db_path = env.expected_dir().join("db0");
+    let db_path = env.output_dir().join("db0");
 
     env.command("maintenance")
         .with_named_arg("--node-config", &env.expected_node_config_file(0))
