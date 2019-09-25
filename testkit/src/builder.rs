@@ -14,9 +14,9 @@
 
 //! Testkit builder.
 
-pub use exonum::blockchain::InstanceCollection;
+pub use exonum::blockchain::{InstanceCollection, InstanceConfig};
 
-use exonum::{crypto, helpers::ValidatorId, proto::Any, runtime::InstanceSpec};
+use exonum::{crypto, helpers::ValidatorId};
 use exonum_merkledb::TemporaryDB;
 
 use std::net::SocketAddr;
@@ -112,7 +112,7 @@ pub struct TestKitBuilder {
     service_instances: Vec<InstanceCollection>,
     logger: bool,
     runtime_factories: Vec<Box<dyn RuntimeFactory>>,
-    instances: Vec<(InstanceSpec, Any)>,
+    instances: Vec<InstanceConfig>,
 }
 
 impl TestKitBuilder {

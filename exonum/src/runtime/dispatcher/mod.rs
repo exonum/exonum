@@ -103,6 +103,7 @@ impl Dispatcher {
         &mut self,
         fork: &Fork,
         spec: InstanceSpec,
+        artifact_spec: Any,
         constructor: Any,
     ) -> Result<(), ExecutionError> {
         assert!(
@@ -110,8 +111,6 @@ impl Dispatcher {
             "Instance identifier for builtin service should be lesser than {}",
             MAX_BUILTIN_INSTANCE_ID
         );
-        // Built-in services should not have an additional specification.
-        let artifact_spec = Any::default();
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {

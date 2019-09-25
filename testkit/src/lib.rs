@@ -171,14 +171,16 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
-    blockchain::{Blockchain, BlockchainBuilder, ConsensusConfig, Schema as CoreSchema},
+    blockchain::{
+        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
+    },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
     proto::Any,
-    runtime::{rust::ServiceFactory, InstanceId, InstanceSpec},
+    runtime::{rust::ServiceFactory, InstanceId},
 };
 use exonum_merkledb::{Database, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
@@ -251,7 +253,7 @@ impl TestKit {
         network: TestNetwork,
         genesis: ConsensusConfig,
         runtime_factories: Vec<Box<dyn RuntimeFactory>>,
-        instances: impl IntoIterator<Item = (InstanceSpec, Any)>,
+        instances: impl IntoIterator<Item = InstanceConfig>,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
