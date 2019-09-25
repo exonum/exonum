@@ -134,7 +134,7 @@ pub use self::{
     },
     entry::Entry,
     error::Error,
-    hash::{root_hash, HashTag, ObjectHash},
+    hash::{root_hash, HashTag, ObjectHash, ValidationError},
     key_set_index::KeySetIndex,
     keys::BinaryKey,
     list_index::ListIndex,
