@@ -231,7 +231,7 @@ impl fmt::Debug for TestKit {
 }
 
 impl TestKit {
-    /// Creates a new `TestKit` with a single validator with the given service.
+    /// Creates a new `TestKit` with a single validator with the given Rust service.
     pub fn for_service(
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
@@ -973,8 +973,8 @@ impl StoppedTestKit {
 
     /// Resumes the operation of the testkit.
     ///
-    /// Note that `available_services` may differ from the vector of services initially passed to
-    /// the `TestKit` (which is also what may happen with real Exonum apps).
+    /// Note that `available_services` may differ from the vector of Rust services initially passed
+    /// to the `TestKit` (which is also what may happen with real Exonum apps).
     pub fn resume(
         self,
         available_services: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
