@@ -162,6 +162,17 @@ impl TestKitBuilder {
         self
     }
 
+    /// Adds a runtime factory to the testkit.
+    pub fn with_runtime_factory(
+        mut self,
+        runtime_factory: Box<dyn RuntimeFactory>,
+        instances: impl IntoIterator<Item = InstanceConfig>,
+    ) -> Self {
+        self.runtime_factories.push(runtime_factory);
+        self.instances.extend(instances);
+        self
+    }
+
     /// Creates the testkit.
     pub fn create(self) -> TestKit {
         if self.logger {
