@@ -149,9 +149,9 @@ fn merge(
     }
 
     impl<T, U> Merge<T, U>
-        where
-            T: Iterator<Item = HashedEntry>,
-            U: Iterator<Item = HashedEntry>,
+    where
+        T: Iterator<Item = HashedEntry>,
+        U: Iterator<Item = HashedEntry>,
     {
         fn new(mut first: T, mut second: U) -> Self {
             let (first_item, second_item) = (first.next(), second.next());
@@ -165,9 +165,9 @@ fn merge(
     }
 
     impl<T, U> Iterator for Merge<T, U>
-        where
-            T: Iterator<Item = HashedEntry>,
-            U: Iterator<Item = HashedEntry>,
+    where
+        T: Iterator<Item = HashedEntry>,
+        U: Iterator<Item = HashedEntry>,
     {
         type Item = Result<HashedEntry, ()>;
 
@@ -245,8 +245,8 @@ fn hash_layer(layer: &mut Vec<HashedEntry>, last_index: u64) -> Result<(), ListP
 
 impl<V: BinaryValue> ListProof<V> {
     pub(super) fn new<I>(values: I, length: u64) -> Self
-        where
-            I: IntoIterator<Item = (u64, V)>,
+    where
+        I: IntoIterator<Item = (u64, V)>,
     {
         Self {
             entries: values.into_iter().collect(),
@@ -567,7 +567,7 @@ pub enum ListProofError {
 
     /// Proof contains a hash in the position which is impossible according to the list length.
     #[fail(
-    display = "proof contains a hash in the position which is impossible according to the list length"
+        display = "proof contains a hash in the position which is impossible according to the list length"
     )]
     UnexpectedBranch,
 
@@ -614,7 +614,7 @@ mod tests {
             entry(3, 0),
             entry(4, 1),
         ]
-            .into_iter();
+        .into_iter();
         let merged = merge(first, second).collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(
