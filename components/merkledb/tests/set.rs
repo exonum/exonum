@@ -24,7 +24,7 @@ use proptest::{
 
 use std::{collections::HashSet, hash::Hash, rc::Rc};
 
-use exonum_merkledb::{Fork, KeySetIndex, ValueSetIndex};
+use exonum_merkledb::{Fork, KeySetIndex, TemporaryDB, ValueSetIndex};
 
 mod common;
 use crate::common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
@@ -113,11 +113,19 @@ impl FromFork for KeySetIndex<Rc<Fork>, u8> {
     fn from_fork(fork: Rc<Fork>) -> Self {
         Self::new("test", fork)
     }
+
+    fn clear(&mut self) {
+        self.clear();
+    }
 }
 
 impl FromFork for ValueSetIndex<Rc<Fork>, u8> {
     fn from_fork(fork: Rc<Fork>) -> Self {
         Self::new("test", fork)
+    }
+
+    fn clear(&mut self) {
+        self.clear();
     }
 }
 
@@ -143,14 +151,16 @@ fn compare_value_set(set: &ValueSetIndex<Rc<Fork>, u8>, ref_set: &HashSet<u8>) -
 
 #[test]
 fn compare_key_set_to_hash_set() {
+    let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(actions, compare_key_set)?;
+        compare_collections(&db, actions, compare_key_set)?;
     });
 }
 
 #[test]
 fn compare_value_set_to_hash_set() {
+    let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(actions, compare_value_set)?;
+        compare_collections(&db, actions, compare_value_set)?;
     });
 }

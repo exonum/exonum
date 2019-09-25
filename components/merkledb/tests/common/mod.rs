@@ -26,11 +26,13 @@ pub const ACTIONS_MAX_LEN: usize = 100;
 
 pub trait FromFork {
     fn from_fork(fork: Rc<Fork>) -> Self;
+    fn clear(&mut self);
 }
 
 pub struct MergeFork;
 
 pub fn compare_collections<A, R, T>(
+    db: &TemporaryDB,
     actions: &[A],
     compare: impl Fn(&T, &R) -> TestCaseResult,
 ) -> TestCaseResult
@@ -39,8 +41,11 @@ where
     R: Default,
     T: FromFork,
 {
-    let db = TemporaryDB::new();
     let mut fork = Rc::new(db.fork());
+    {
+        let mut collection = T::from_fork(fork.clone());
+        collection.clear();
+    }
     let mut reference = R::default();
 
     for action in actions {

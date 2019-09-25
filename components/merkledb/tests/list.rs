@@ -26,7 +26,9 @@ use proptest::{
 
 use std::rc::Rc;
 
-use exonum_merkledb::{BinaryValue, Fork, HashTag, ListIndex, ObjectHash, ProofListIndex};
+use exonum_merkledb::{
+    BinaryValue, Fork, HashTag, ListIndex, ObjectHash, ProofListIndex, TemporaryDB,
+};
 
 mod common;
 use crate::common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
@@ -156,11 +158,19 @@ impl<V: BinaryValue> FromFork for ListIndex<Rc<Fork>, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
         Self::new("test", fork)
     }
+
+    fn clear(&mut self) {
+        self.clear();
+    }
 }
 
 impl<V: BinaryValue> FromFork for ProofListIndex<Rc<Fork>, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
         Self::new("test", fork)
+    }
+
+    fn clear(&mut self) {
+        self.clear();
     }
 }
 
@@ -200,21 +210,24 @@ fn check_list_proofs(list: &ProofListIndex<Rc<Fork>, i32>, ref_list: &Vec<i32>) 
 
 #[test]
 fn compare_list_to_vec() {
+    let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(actions, compare_list)?;
+        compare_collections(&db, actions, compare_list)?;
     });
 }
 
 #[test]
 fn compare_proof_list_to_vec() {
+    let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(actions, compare_proof_list)?;
+        compare_collections(&db, actions, compare_proof_list)?;
     });
 }
 
 #[test]
 fn check_proofs_for_proof_list() {
+    let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(actions, check_list_proofs)?;
+        compare_collections(&db, actions, check_list_proofs)?;
     });
 }

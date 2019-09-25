@@ -24,7 +24,9 @@ use proptest::{
 
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
-use exonum_merkledb::{BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{
+    BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+};
 
 mod common;
 use crate::common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
@@ -113,11 +115,19 @@ impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
         Self::new("test", fork)
     }
+
+    fn clear(&mut self) {
+        self.clear();
+    }
 }
 
 impl<V: BinaryValue + ObjectHash> FromFork for ProofMapIndex<Rc<Fork>, [u8; 32], V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
         Self::new("test", fork)
+    }
+
+    fn clear(&mut self) {
+        self.clear();
     }
 }
 
@@ -164,14 +174,16 @@ fn generate_proof_action() -> impl Strategy<Value = MapAction<[u8; 32], i32>> {
 
 #[test]
 fn compare_map_to_hash_map() {
+    let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(actions, compare_map)?;
+        compare_collections(&db, actions, compare_map)?;
     });
 }
 
 #[test]
 fn compare_proof_list_to_vec() {
+    let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_proof_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(actions, compare_proof_map)?;
+        compare_collections(&db, actions, compare_proof_map)?;
     });
 }
