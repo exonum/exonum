@@ -26,7 +26,7 @@ use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supe
 
 /// Supervisor service transactions.
 #[exonum_service()]
-pub trait Transactions {
+pub trait SupervisorInterface {
     /// Requests artifact deploy.
     ///
     /// This request should be sent by the each of validators.
@@ -88,7 +88,7 @@ impl ValidateInput for StartService {
     }
 }
 
-impl Transactions for Supervisor {
+impl SupervisorInterface for Supervisor {
     fn request_artifact_deploy(
         &self,
         context: TransactionContext,

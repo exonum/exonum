@@ -50,7 +50,7 @@ mod transactions;
 #[exonum(
     proto_sources = "proto",
     artifact_name = "exonum-supervisor",
-    implements("transactions::Transactions")
+    implements("transactions::SupervisorInterface")
 )]
 pub struct Supervisor;
 
