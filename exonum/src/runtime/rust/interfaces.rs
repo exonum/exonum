@@ -39,7 +39,7 @@ pub const APPLY_CONFIG_METHOD_ID: MethodId = 1;
 pub trait Configure {
     /// The specific type of parameters passed during the service instance configuration.    
     type Params: BinaryValue;
-    /// Verify a new configuration parameters before before their actual application.
+    /// Verify a new configuration parameters before their actual application.
     ///
     /// This method is called by the new configuration change proposal. If the proposed
     /// parameters do not fit for this service instance, it should return a corresponding
