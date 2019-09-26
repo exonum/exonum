@@ -14,7 +14,9 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
-use exonum_merkledb::{BinaryKey, BinaryValue, Database, ObjectHash, ProofMapIndex, TemporaryDB};
+use exonum_merkledb::{
+    BinaryKey, BinaryValue, Database, MapProof, ObjectHash, ProofMapIndex, TemporaryDB,
+};
 
 use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt};
 
@@ -328,7 +330,7 @@ fn test_convert_any_message() {
 }
 
 #[test]
-fn serialize_proof() {
+fn serialize_map_proof() {
     let db = TemporaryDB::default();
     let storage = db.fork();
 
@@ -348,15 +350,14 @@ fn serialize_proof() {
     assert_deserialized_proof(proof);
 }
 
-fn assert_deserialized_proof<K, V>(proof: exonum_merkledb::MapProof<K, V>)
+fn assert_deserialized_proof<K, V>(proof: MapProof<K, V>)
 where
     K: BinaryKey + ObjectHash + fmt::Debug,
     V: BinaryValue + ObjectHash + fmt::Debug,
-    exonum_merkledb::MapProof<K, V>: ProtobufConvert + PartialEq,
+    MapProof<K, V>: ProtobufConvert + PartialEq,
 {
     let pb = proof.to_pb();
-    let deserialized: exonum_merkledb::MapProof<K, V> =
-        exonum_merkledb::MapProof::from_pb(pb).unwrap();
+    let deserialized: MapProof<K, V> = MapProof::from_pb(pb).unwrap();
     assert_eq!(proof, deserialized);
     deserialized.check().expect("proof is not valid");
 }

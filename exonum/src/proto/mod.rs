@@ -355,7 +355,7 @@ where
                 let mut entry = OptionalEntry::new();
                 let mut buf = vec![0u8; key.size()];
                 key.write(&mut buf);
-                entry.set_key(buf.to_vec());
+                entry.set_key(buf.to_vec()); //TODO: maybe we should use separate field for missing keys.
 
                 if let Some(value) = value {
                     entry.set_value(value.to_bytes());
