@@ -279,10 +279,11 @@ fn proof_list_index_build_proofs(b: &mut Bencher, len: usize) {
         proofs.extend((0..len).map(|i| table.get_proof(i as u64)));
     });
 
-    let table_root_hash = table.object_hash();
+    let table_hash = table.object_hash();
     for proof in proofs {
-        let items = proof.validate(table_root_hash).unwrap();
-        assert_eq!(items.len(), 1);
+        let checked_proof = proof.check().unwrap();
+        assert_eq!(checked_proof.index_hash(), table_hash);
+        assert_eq!(checked_proof.entries().len(), 1);
     }
 }
 
@@ -300,8 +301,8 @@ fn proof_list_index_verify_proofs(b: &mut Bencher, len: usize) {
 
     b.iter(|| {
         for proof in &proofs {
-            let items = proof.validate(table_root_hash).unwrap();
-            assert_eq!(items.len(), 1);
+            let items = proof.check_against_hash(table_root_hash).unwrap();
+            assert_eq!(items.entries().len(), 1);
         }
     });
 }
@@ -315,7 +316,7 @@ fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
-    let table_root_hash = table.object_hash();
+    let table_hash = table.object_hash();
     let mut proofs = Vec::with_capacity(data.len());
 
     b.iter(|| {
@@ -324,9 +325,8 @@ fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
     });
 
     for (i, proof) in proofs.into_iter().enumerate() {
-        let checked_proof = proof.check().unwrap();
+        let checked_proof = proof.check_against_hash(table_hash).unwrap();
         assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
-        assert_eq!(checked_proof.root_hash(), table_root_hash);
     }
 }
 
@@ -339,14 +339,13 @@ fn proof_map_index_verify_proofs(b: &mut Bencher, len: usize) {
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
-    let table_root_hash = table.object_hash();
+    let table_hash = table.object_hash();
     let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
 
     b.iter(|| {
         for (i, proof) in proofs.iter().enumerate() {
-            let checked_proof = proof.clone().check().unwrap();
+            let checked_proof = proof.check_against_hash(table_hash).unwrap();
             assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
-            assert_eq!(checked_proof.root_hash(), table_root_hash);
         }
     });
 }

@@ -17,7 +17,7 @@
 pub use self::node::{BranchNode, Node};
 pub use self::{
     key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
-    proof::{CheckedMapProof, MapProof, MapProofError},
+    proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
 use std::{
@@ -30,7 +30,7 @@ use exonum_crypto::Hash;
 
 use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
-    proof::{create_multiproof, create_proof},
+    proof_builder::{BuildProof, MerklePatriciaTree},
 };
 use crate::views::{AnyObject, IndexAddress};
 use crate::{
@@ -43,8 +43,29 @@ use crate::{
 mod key;
 mod node;
 mod proof;
+mod proof_builder;
 #[cfg(test)]
 mod tests;
+
+// Necessary to allow building proofs.
+impl<T, K, V> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V>
+where
+    T: IndexAccess,
+    K: BinaryKey + ObjectHash,
+    V: BinaryValue,
+{
+    fn root_node(&self) -> Option<(ProofPath, Node)> {
+        self.get_root_node()
+    }
+
+    fn node(&self, path: &ProofPath) -> Node {
+        self.get_node_unchecked(path)
+    }
+
+    fn value(&self, key: &K) -> V {
+        self.get_value_unchecked(key)
+    }
+}
 
 /// A Merkelized version of a map that provides proofs of existence or non-existence for the map
 /// keys.
@@ -185,7 +206,7 @@ impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -394,12 +415,7 @@ where
     /// let proof = index.get_proof(Hash::default());
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
-        create_proof(
-            key,
-            self.get_root_node(),
-            |path| self.get_node_unchecked(path),
-            |key| self.get_value_unchecked(key),
-        )
+        self.create_proof(key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -419,12 +435,7 @@ where
     where
         KI: IntoIterator<Item = K>,
     {
-        create_multiproof(
-            keys,
-            self.get_root_node(),
-            |path| self.get_node_unchecked(path),
-            |key| self.get_value_unchecked(key),
-        )
+        self.create_multiproof(keys)
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
@@ -889,7 +900,7 @@ impl<T, K, V> ObjectHash for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
     /// For hash of the empty map see [`HashTag::empty_map_hash`].
@@ -924,7 +935,7 @@ impl<'a, T, K, V> std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     type Item = (K::Owned, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
@@ -970,15 +981,14 @@ where
     }
 }
 
-#[allow(clippy::use_self)]
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash + fmt::Debug,
+    V: BinaryValue + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct Entry<'a, T: 'a + IndexAccess, K: 'a, V: 'a + BinaryValue> {
+        struct Entry<'a, T: IndexAccess, K, V: BinaryValue> {
             index: &'a ProofMapIndex<T, K, V>,
             path: ProofPath,
             hash: Hash,
@@ -989,10 +999,10 @@ where
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
-            V: BinaryValue + ObjectHash,
+            V: BinaryValue,
         {
             fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
-                Entry {
+                Self {
                     index,
                     path,
                     hash,
@@ -1009,11 +1019,11 @@ where
             }
         }
 
-        impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
+        impl<T, K, V> fmt::Debug for Entry<'_, T, K, V>
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
-            V: BinaryValue + ObjectHash + fmt::Debug,
+            V: BinaryValue + fmt::Debug,
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self.node {
