@@ -440,21 +440,11 @@ impl<K, V> MapProof<K, V> {
         debug_assert!(self.proof.windows(2).all(|w| w[0].path < w[1].path));
         self
     }
-
-    /// Creates a [`MapProof`] from the builder.
-    ///
-    /// [`MapProof`]: struct.MapProof.html
-    pub fn create(self) -> MapProof<K, V> {
-        MapProof {
-            entries: self.entries,
-            proof: self.proof,
-        }
-    }
 }
 
 impl<K, V> MapProof<K, V> {
     /// Creates MapProof from provided `proof` and `entries` vectors. Used to construct proof
- /// after deserialization.
+    /// after deserialization.
     pub fn from_parts(proof: &[(ProofPath, Hash)], entries: Vec<(K, Option<V>)>) -> Self {
         Self {
             proof: proof
