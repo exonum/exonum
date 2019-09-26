@@ -14,9 +14,9 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{BinaryKey, BinaryValue, Database, ObjectHash, ProofMapIndex, TemporaryDB};
 
-use std::{borrow::Cow, collections::HashMap, convert::TryFrom};
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt};
 
 use super::{schema, ProtobufConvert};
 use crate::crypto::{self, Hash, PublicKey, Signature};
@@ -325,4 +325,38 @@ fn test_convert_any_message() {
     let artifact_id = crate::runtime::ArtifactId::try_from(any).unwrap();
     assert_eq!(artifact_id.runtime_id, 0);
     assert_eq!(artifact_id.name, "exonum-cryptocurrency-advanced/0.11.0");
+}
+
+#[test]
+fn serialize_proof() {
+    let db = TemporaryDB::default();
+    let storage = db.fork();
+
+    let mut table = ProofMapIndex::new("index", &storage);
+
+    let proof = table.get_proof(0);
+    assert_deserialized_proof(proof);
+
+    for i in 0..10 {
+        table.put(&i, i);
+    }
+
+    let proof = table.get_proof(5);
+    assert_deserialized_proof(proof);
+
+    let proof = table.get_multiproof(5..15);
+    assert_deserialized_proof(proof);
+}
+
+fn assert_deserialized_proof<K, V>(proof: exonum_merkledb::MapProof<K, V>)
+where
+    K: BinaryKey + ObjectHash + fmt::Debug,
+    V: BinaryValue + ObjectHash + fmt::Debug,
+    exonum_merkledb::MapProof<K, V>: ProtobufConvert + PartialEq,
+{
+    let pb = proof.to_pb();
+    let deserialized: exonum_merkledb::MapProof<K, V> =
+        exonum_merkledb::MapProof::from_pb(pb).unwrap();
+    assert_eq!(proof, deserialized);
+    deserialized.check().expect("proof is not valid");
 }

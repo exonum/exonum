@@ -259,7 +259,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
@@ -443,6 +443,27 @@ impl<K, V> MapProofBuilder<K, V> {
 }
 
 impl<K, V> MapProof<K, V> {
+    /// Creates MapProof from provided `proof` and `entries` vectors. Used to construct proof
+    /// after deserialization.
+    pub fn from_parts(proof: &[(ProofPath, Hash)], entries: Vec<(K, Option<V>)>) -> Self {
+        Self {
+            proof: proof
+                .iter()
+                .map(|(path, hash)| MapProofEntry {
+                    path: *path,
+                    hash: *hash,
+                })
+                .collect(),
+            entries: entries
+                .into_iter()
+                .map(|(key, value)| match value {
+                    Some(value) => OptionalEntry::KV { key, value },
+                    None => OptionalEntry::Missing { missing: key },
+                })
+                .collect(),
+        }
+    }
+
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof
