@@ -15,6 +15,7 @@
 use exonum::{
     blockchain::InstanceConfig,
     crypto::{PublicKey, SecretKey},
+    exonum_merkledb::{Fork, Snapshot},
     node::ApiSender,
     proto::Any,
     runtime::dispatcher::{Dispatcher, DispatcherSender},
@@ -23,12 +24,11 @@ use exonum::{
         InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
-use exonum_merkledb::{Fork, Snapshot};
 use exonum_testkit::{runtime::RuntimeFactory, TestKitBuilder};
 use futures::{Future, IntoFuture};
 use std::{cell::RefCell, sync::Arc};
 
-// Tracks parts of runtime's state that we're interested in.
+// Tracks parts of state of runtime that we're interested in.
 #[derive(Debug)]
 struct RuntimeState {
     deployed_artifact: ArtifactId,
