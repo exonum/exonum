@@ -36,7 +36,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `ProtobufConvert` is now implemented for `exonum_merkledb::MapProof`. (#)
+- `ProtobufConvert` is now implemented for `exonum_merkledb::MapProof`. (#1477)
 
 ## 0.12.1 - 2019-09-19
 

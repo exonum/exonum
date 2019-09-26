@@ -440,11 +440,10 @@ impl<K, V> MapProof<K, V> {
         debug_assert!(self.proof.windows(2).all(|w| w[0].path < w[1].path));
         self
     }
-}
 
-impl<K, V> MapProof<K, V> {
     /// Creates MapProof from provided `proof` and `entries` vectors. Used to construct proof
     /// after deserialization.
+    /// TODO: maybe it's better to use builder methods(but I don't think they should be exposed to public).
     pub fn from_parts(proof: &[(ProofPath, Hash)], entries: Vec<(K, Option<V>)>) -> Self {
         Self {
             proof: proof
@@ -462,32 +461,6 @@ impl<K, V> MapProof<K, V> {
                 })
                 .collect(),
         }
-    }
-
-    /// Provides access to the proof part of the view. Useful mainly for debug purposes.
-    pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
-        self.proof
-            .iter()
-            .cloned()
-            .map(|e| (e.path, e.hash))
-            .collect()
-    }
-
-    /// Retrieves references to keys that the proof shows as missing from the map.
-    /// This method does not perform any integrity checks of the proof.
-    pub fn missing_keys_unchecked(&self) -> impl Iterator<Item = &K> {
-        self.entries.iter().filter_map(OptionalEntry::as_missing)
-    }
-
-    /// Retrieves references to existing and non-existing entries in the proof.
-    ///
-    /// Existing entries have `Some` value, non-existing have `None`.
-    /// This method does not perform any integrity checks of the proof.
-    pub fn all_entries_unchecked(&self) -> impl Iterator<Item = (&K, Option<&V>)> {
-        self.entries.iter().map(|e| match e {
-            OptionalEntry::Missing { ref missing } => (missing, None),
-            OptionalEntry::KV { ref key, ref value } => (key, Some(value)),
-        })
     }
 }
 
