@@ -443,8 +443,7 @@ impl<K, V> MapProof<K, V> {
 
     /// Creates MapProof from provided `proof` and `entries` vectors. Used to construct proof
     /// after deserialization.
-    /// TODO: maybe it's better to use builder methods(but I don't think they should be exposed to public).
-    pub fn from_parts(proof: &[(ProofPath, Hash)], entries: Vec<(K, Option<V>)>) -> Self {
+    pub fn from_raw_parts(proof: &[(ProofPath, Hash)], entries: Vec<(K, Option<V>)>) -> Self {
         Self {
             proof: proof
                 .iter()

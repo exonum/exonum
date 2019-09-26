@@ -337,20 +337,20 @@ fn serialize_map_proof() {
     let mut table = ProofMapIndex::new("index", &storage);
 
     let proof = table.get_proof(0);
-    assert_deserialized_proof(proof);
+    assert_proof_roundtrip(proof);
 
     for i in 0..10 {
         table.put(&i, i);
     }
 
     let proof = table.get_proof(5);
-    assert_deserialized_proof(proof);
+    assert_proof_roundtrip(proof);
 
     let proof = table.get_multiproof(5..15);
-    assert_deserialized_proof(proof);
+    assert_proof_roundtrip(proof);
 }
 
-fn assert_deserialized_proof<K, V>(proof: MapProof<K, V>)
+fn assert_proof_roundtrip<K, V>(proof: MapProof<K, V>)
 where
     K: BinaryKey + ObjectHash + fmt::Debug,
     V: BinaryValue + ObjectHash + fmt::Debug,
@@ -358,6 +358,13 @@ where
 {
     let pb = proof.to_pb();
     let deserialized: MapProof<K, V> = MapProof::from_pb(pb).unwrap();
+    let checked_proof = deserialized
+        .check()
+        .expect("deserialized proof is not valid");
+
     assert_eq!(proof, deserialized);
-    deserialized.check().expect("proof is not valid");
+    assert_eq!(
+        checked_proof.index_hash(),
+        proof.check().unwrap().index_hash()
+    );
 }
