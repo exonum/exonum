@@ -13,11 +13,11 @@
 // limitations under the License.
 
 //! Sample counter service.
-use actix_web::{http::Method, HttpResponse};
+use actix_web::{http::Method, HttpResponse, HttpRequest};
 use exonum::{
     api::{
         self,
-        backends::actix::{HttpRequest, RawHandler, RequestHandler},
+        backends::actix::{RawHandler, RequestHandler},
         ApiBackend,
     },
     crypto::Hash,
@@ -195,7 +195,7 @@ impl CounterApi {
             let snapshot = context.snapshot();
             Self::count(snapshot.as_ref())
         };
-        let handler: Arc<RawHandler> = Arc::new(move |request| {
+        let handler: Arc<RawHandler> = Arc::new(move |request, _payload| {
             Box::new(
                 handler(request)
                     .into_future()

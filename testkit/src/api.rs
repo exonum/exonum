@@ -16,7 +16,9 @@
 
 pub use exonum::api::ApiAccess;
 
-use actix_web::{test::TestServer, App};
+use actix_http::HttpService;
+use actix_http_test::{TestServer, TestServerRuntime};
+use actix_web::App;
 use reqwest::{Client, RequestBuilder as ReqwestBuilder, Response, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -67,7 +69,7 @@ impl fmt::Display for ApiKind {
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct TestKitApi {
-    test_server: TestServer,
+    pub test_server: TestServerRuntime,
     test_client: Client,
     api_sender: ApiSender,
 }
@@ -317,18 +319,18 @@ where
     }
 }
 
-/// Create a test server.
-fn create_test_server(aggregator: ApiAggregator) -> TestServer {
-    let server = TestServer::with_factory(move || {
-        App::new()
-            .scope("public/api", |scope| {
-                trace!("Create public/api");
-                aggregator.extend_backend(ApiAccess::Public, scope)
-            })
-            .scope("private/api", |scope| {
-                trace!("Create private/api");
-                aggregator.extend_backend(ApiAccess::Private, scope)
-            })
+/// Creates a test server.
+fn create_test_server(aggregator: ApiAggregator) -> TestServerRuntime {
+    let server = TestServer::new(move || {
+        HttpService::new(
+            App::new()
+                .service({
+                    aggregator.extend_backend(ApiAccess::Public, actix_web::web::scope("public/api"))
+                })
+                .service({
+                    aggregator.extend_backend(ApiAccess::Private, actix_web::web::scope("private/api"))
+                })
+        )
     });
 
     info!("Test server created on {}", server.addr());

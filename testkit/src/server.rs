@@ -341,6 +341,7 @@ mod tests {
         let body = CreateBlockQuery {
             tx_hashes: Some(vec![Hash::zero()]),
         };
+
         let err = api
             .private("api/testkit")
             .query(&body)

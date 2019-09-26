@@ -108,7 +108,7 @@ impl ApiBackend for ApiBuilder {
                         .route(actix_web::web::post().to(move |r, p| inner(r, p))),
                 ),
                 _ => {
-                    // TODO: log error. unrichable ?
+                    // TODO: log error. unreachable ?
                     output
                 }
             };
