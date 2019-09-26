@@ -192,7 +192,7 @@ where
     };
 
     let mut index_address = metadata.index_address();
-    // Set index adress name, since metadata itself doesn't know it.
+    // Set index address name, since metadata itself doesn't know it.
     index_address.name = index_name;
 
     let index_state = IndexState::new(index_access, index_full_name, metadata, is_new);
