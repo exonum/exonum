@@ -98,7 +98,7 @@ impl ServiceApiScope {
         let context = self.context.clone();
         let descriptor = self.descriptor.clone();
 
-        let endp_handl = move |query: Q| -> crate::api::FutureResult<I> {
+        self.inner.endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
             let state = ServiceApiState::from_api_context(
                 &context,
                 InstanceDescriptor {
@@ -107,9 +107,7 @@ impl ServiceApiScope {
                 },
             );
             Box::new(handler(&state, query).into_future())
-        };
-
-        self.inner.endpoint(name, endp_handl);
+        });
         self
     }
 

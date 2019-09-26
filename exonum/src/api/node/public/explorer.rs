@@ -31,7 +31,7 @@ use crate::{
     api::{
         backends::actix::{self as actix_backend, FutureResponse, RawHandler, RequestHandler},
         node::SharedNodeState,
-        websocket::{Server, Session, SubscriptionType, TransactionFilter},
+        websocket::{Server, Session, SubscriptionType},
         ApiBackend, ApiContext, ApiScope, Error as ApiError,
     },
     blockchain::Block,
