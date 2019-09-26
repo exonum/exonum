@@ -14,8 +14,9 @@
 
 //! Exonum blockchain explorer API.
 
-use actix::Arbiter;
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
+use actix::Actor;
+use actix_web::{http, web::Payload, web::Query, Error as ActixError, FromRequest, HttpRequest};
+use actix_web_actors::ws;
 use chrono::{DateTime, Utc};
 use exonum_merkledb::{ObjectHash, Snapshot};
 use futures::{Future, IntoFuture};
@@ -28,9 +29,7 @@ use std::{
 
 use crate::{
     api::{
-        backends::actix::{
-            self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
-        },
+        backends::actix::{self as actix_backend, FutureResponse, RawHandler, RequestHandler},
         node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         ApiBackend, ApiContext, ApiScope, Error as ApiError,
@@ -301,24 +300,22 @@ impl ExplorerApi {
     {
         let server = Arc::new(Mutex::new(None));
 
-        let index = move |request: HttpRequest| -> FutureResponse {
+        let index = move |request: HttpRequest, payload: Payload| -> FutureResponse {
             let server = server.clone();
             let context = context.clone();
             let mut address = server.lock().expect("Expected mutex lock");
             if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::new(context)));
+                *address = Some(Server::new(context).start());
 
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
             let address = address.to_owned().unwrap();
 
-            extract_query(&request)
-                .into_future()
-                .from_err()
-                .and_then(move |query: SubscriptionType| {
-                    ws::start(&request, Session::new(address, vec![query])).into_future()
-                })
-                .responder()
+            Box::new(extract_query(&request).into_future().from_err().and_then(
+                move |query: SubscriptionType| {
+                    ws::start(Session::new(address, vec![query]), &request, payload).into_future()
+                },
+            ))
         };
 
         backend.raw_handler(RequestHandler {
@@ -349,17 +346,21 @@ impl ExplorerApi {
             self.context.clone(),
             shared_node_state.clone(),
             |request| {
-                if request.query().is_empty() {
+                if request.query_string().is_empty() {
                     return Ok(SubscriptionType::Transactions { filter: None });
                 }
-
-                Query::from_request(request, &Default::default())
-                    .map(|query: Query<TransactionFilter>| {
+                let mut dummy_payload = actix_web::dev::Payload::None;
+                Query::from_request(request, &mut dummy_payload)
+                    .map(Query::into_inner)
+                    .and_then(|query| {
                         Ok(SubscriptionType::Transactions {
-                            filter: Some(query.into_inner()),
+                            filter: Some(query),
                         })
                     })
-                    .unwrap_or(Ok(SubscriptionType::None))
+                    .or_else(|err| {
+                        warn!("Failed to handle ws: {}", err);
+                        Ok(SubscriptionType::None)
+                    })
             },
         );
         // Default websocket connection.

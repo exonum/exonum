@@ -17,13 +17,16 @@
 //! [Actix-web](https://github.com/actix/actix-web) is an asynchronous backend
 //! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
-pub use actix_web::middleware::cors::Cors;
-
-use actix::{Actor, Addr, System};
+use actix::Actor;
+use actix::{Addr, System};
+pub use actix_cors::Cors;
 use actix_web::{
-    error::ResponseError, AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
+    dev::{Body, ServiceRequest, ServiceResponse},
+    error::ResponseError,
+    web::{scope, Payload, Query},
+    App, Error, FromRequest, HttpRequest, HttpResponse, Scope,
 };
-use futures::{Future, IntoFuture};
+use futures::{Future, IntoFuture, Stream};
 use serde::{
     de::{self, DeserializeOwned},
     ser, Serialize,
@@ -46,15 +49,9 @@ use crate::api::{
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
-pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
-/// Type alias for the concrete `actix-web` HTTP request.
-pub type HttpRequest = actix_web::HttpRequest<()>;
+pub type FutureResponse = Box<dyn Future<Item = HttpResponse, Error = Error>>;
 /// Type alias for the inner `actix-web` HTTP requests handler.
-pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
-/// Type alias for the `actix-web::App`.
-pub type App = actix_web::App<()>;
-/// Type alias for the `actix-web::App` configuration.
-pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
+pub type RawHandler = dyn Fn(HttpRequest, Payload) -> FutureResponse + 'static + Send + Sync;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
@@ -91,7 +88,7 @@ impl ApiBuilder {
 
 impl ApiBackend for ApiBuilder {
     type Handler = RequestHandler;
-    type Backend = actix_web::Scope<()>;
+    type Backend = Scope;
 
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
         self.handlers.push(handler);
@@ -101,21 +98,32 @@ impl ApiBackend for ApiBuilder {
     fn wire(&self, mut output: Self::Backend) -> Self::Backend {
         for handler in self.handlers.clone() {
             let inner = handler.inner;
-            output = output.route(&handler.name, handler.method.clone(), move |request| {
-                inner(request)
-            });
+            output = match handler.method {
+                actix_web::http::Method::GET => output.service(
+                    actix_web::web::resource(&handler.name)
+                        .route(actix_web::web::get().to(move |r, p| inner(r, p))),
+                ),
+                actix_web::http::Method::POST => output.service(
+                    actix_web::web::resource(&handler.name)
+                        .route(actix_web::web::post().to(move |r, p| inner(r, p))),
+                ),
+                _ => {
+                    // TODO: log error. unrichable ?
+                    output
+                }
+            };
         }
         output
     }
 }
 
-impl ExtendApiBackend for actix_web::Scope<()> {
+impl ExtendApiBackend for Scope {
     fn extend<'a, I>(mut self, items: I) -> Self
     where
         I: IntoIterator<Item = (&'a str, &'a ApiScope)>,
     {
         for item in items {
-            self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
+            self = self.service(item.1.actix_backend.wire(scope(&item.0)));
         }
         self
     }
@@ -144,8 +152,9 @@ where
 {
     fn from(f: NamedWith<Q, I, Result<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let future = Query::from_request(&request, &Default::default())
+        let index = move |request: HttpRequest, mut _payload: Payload| -> FutureResponse {
+            let mut dummy_payload = actix_web::dev::Payload::None;
+            let future = Query::from_request(&request, &mut dummy_payload)
                 .map(Query::into_inner)
                 .and_then(|query| handler(query).map_err(From::from))
                 .and_then(|value| Ok(HttpResponse::Ok().json(value)))
@@ -169,17 +178,19 @@ where
 {
     fn from(f: NamedWith<Q, I, Result<I>, F, Mutable>) -> Self {
         let handler = f.inner.handler;
-        let index = move |request: HttpRequest| -> FutureResponse {
+        let index = move |_request: HttpRequest, payload: Payload| -> FutureResponse {
             let handler = handler.clone();
-            request
-                .json()
-                .from_err()
-                .and_then(move |query: Q| {
-                    handler(query)
-                        .map(|value| HttpResponse::Ok().json(value))
-                        .map_err(From::from)
-                })
-                .responder()
+            Box::new(
+                payload
+                    .concat2()
+                    .from_err()
+                    .and_then(move |body| {
+                        handler(serde_json::from_slice::<Q>(&body)?)
+                            .map(|value| HttpResponse::Ok().json(value))
+                            .map_err(From::from)
+                    })
+                    .into_future(),
+            )
         };
 
         Self {
@@ -198,14 +209,16 @@ where
 {
     fn from(f: NamedWith<Q, I, FutureResult<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
-        let index = move |request: HttpRequest| -> FutureResponse {
+        let index = move |request: HttpRequest, mut _payload: Payload| -> FutureResponse {
             let handler = handler.clone();
-            Query::from_request(&request, &Default::default())
-                .map(Query::into_inner)
-                .into_future()
-                .and_then(move |query| handler(query).map_err(From::from))
-                .map(|value| HttpResponse::Ok().json(value))
-                .responder()
+            let mut dummy_payload = actix_web::dev::Payload::None;
+            Box::new(
+                Query::from_request(&request, &mut dummy_payload)
+                    .map(Query::into_inner)
+                    .into_future()
+                    .and_then(move |query| handler(query).map_err(From::from))
+                    .map(|value| HttpResponse::Ok().json(value)),
+            )
         };
 
         Self {
@@ -224,17 +237,20 @@ where
 {
     fn from(f: NamedWith<Q, I, FutureResult<I>, F, Mutable>) -> Self {
         let handler = f.inner.handler;
-        let index = move |request: HttpRequest| -> FutureResponse {
+        let index = move |_request: HttpRequest, payload: Payload| -> FutureResponse {
             let handler = handler.clone();
-            request
-                .json()
-                .from_err()
-                .and_then(move |query: Q| {
-                    handler(query)
-                        .map(|value| HttpResponse::Ok().json(value))
-                        .map_err(From::from)
-                })
-                .responder()
+
+            Box::new(
+                payload
+                    .concat2()
+                    .from_err()
+                    .and_then(move |body| {
+                        handler(serde_json::from_slice::<Q>(&body).unwrap()) // TODO rid off unwrap
+                            .map(|value| HttpResponse::Ok().json(value))
+                            .map_err(From::from)
+                    })
+                    .into_future(),
+            )
         };
 
         Self {
@@ -246,15 +262,28 @@ where
 }
 
 /// Creates `actix_web::App` for the given aggregator and runtime configuration.
-pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeConfig) -> App {
-    let app_config = runtime_config.app_config;
+pub(crate) fn create_app(
+    aggregator: &ApiAggregator,
+    runtime_config: ApiRuntimeConfig,
+) -> App<
+    impl actix_service::NewService<
+        Config = (),
+        Request = ServiceRequest,
+        Response = ServiceResponse<Body>,
+        Error = Error,
+        InitError = (),
+    >,
+    Body,
+> {
     let access = runtime_config.access;
-    let mut app = App::new();
-    app = app.scope("api", |scope| aggregator.extend_backend(access, scope));
-    if let Some(app_config) = app_config {
-        app = app_config(app);
-    }
-    app
+    let cors = match runtime_config.allow_origin {
+        Some(origin) => Cors::from(origin.clone()),
+        None => Cors::new(),
+    };
+
+    App::new()
+        .wrap(cors)
+        .service(aggregator.extend_backend(access, actix_web::web::scope("api")))
 }
 
 /// Configuration parameters for the `App` runtime.
@@ -264,8 +293,8 @@ pub struct ApiRuntimeConfig {
     pub listen_address: SocketAddr,
     /// API access level.
     pub access: ApiAccess,
-    /// Optional App configuration.
-    pub app_config: Option<AppConfig>,
+    /// Optional allow origin configuration
+    pub allow_origin: Option<AllowOrigin>,
 }
 
 impl ApiRuntimeConfig {
@@ -274,7 +303,7 @@ impl ApiRuntimeConfig {
         Self {
             listen_address,
             access,
-            app_config: Default::default(),
+            allow_origin: Default::default(),
         }
     }
 }
@@ -284,7 +313,7 @@ impl fmt::Debug for ApiRuntimeConfig {
         f.debug_struct("ApiRuntimeConfig")
             .field("listen_address", &self.listen_address)
             .field("access", &self.access)
-            .field("app_config", &self.app_config.as_ref().map(drop))
+            .field("allow_origin", &self.allow_origin)
             .finish()
     }
 }
@@ -326,14 +355,12 @@ impl SystemRuntime {
             system_tx.send(System::current())?;
             api_runtime_tx.send(api_manager)?;
             // Starts actix-web runtime.
-            let code = system.run();
+            let result = system.run();
 
-            trace!("Actix runtime finished with code {}", code);
-            ensure!(
-                code == 0,
-                "Actix runtime finished with the non zero error code: {}",
-                code
-            );
+            trace!("Actix runtime finished with result {:?}", result);
+            if let Err(err) = result {
+                error!("Actix runtime finished with error: {}", err)
+            };
             Ok(())
         });
         // Receives addresses of runtime items.
@@ -464,13 +491,13 @@ impl FromStr for AllowOrigin {
 impl<'a> From<&'a AllowOrigin> for Cors {
     fn from(origin: &'a AllowOrigin) -> Self {
         match *origin {
-            AllowOrigin::Any => Self::build().finish(),
+            AllowOrigin::Any => Self::new(),
             AllowOrigin::Whitelist(ref hosts) => {
-                let mut builder = Self::build();
+                let mut builder = Self::new();
                 for host in hosts {
-                    builder.allowed_origin(host);
+                    builder = builder.allowed_origin(host);
                 }
-                builder.finish()
+                builder
             }
         }
     }

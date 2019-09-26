@@ -97,18 +97,19 @@ impl ServiceApiScope {
     {
         let context = self.context.clone();
         let descriptor = self.descriptor.clone();
-        self.inner
-            .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let state = ServiceApiState::from_api_context(
-                    &context,
-                    InstanceDescriptor {
-                        id: descriptor.0,
-                        name: descriptor.1.as_ref(),
-                    },
-                );
-                let result = handler(&state, query);
-                Box::new(result.into_future())
-            });
+
+        let endp_handl = move |query: Q| -> crate::api::FutureResult<I> {
+            let state = ServiceApiState::from_api_context(
+                &context,
+                InstanceDescriptor {
+                    id: descriptor.0,
+                    name: descriptor.1.as_ref(),
+                },
+            );
+            Box::new(handler(&state, query).into_future())
+        };
+
+        self.inner.endpoint(name, endp_handl);
         self
     }
 

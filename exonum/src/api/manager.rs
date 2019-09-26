@@ -16,19 +16,18 @@
 
 use crate::api::backends::actix::{create_app, ApiRuntimeConfig};
 use actix::prelude::*;
-use actix_net::server::Server;
-use actix_web::server::{HttpServer, StopServer};
+use actix_server::Server;
+use actix_web::HttpServer;
+use futures::Future;
 use std::{fmt, io};
 
 use crate::api::backends::actix::SystemRuntimeConfig;
 use crate::api::ApiAggregator;
-use futures::Future;
-use std::collections::HashMap;
 
 /// Actor responsible for API management.
 pub struct ApiManager {
     runtime_config: SystemRuntimeConfig,
-    api_runtime_addresses: HashMap<Addr<Server>, ApiRuntimeConfig>,
+    api_runtime_addresses: Vec<(Server, ApiRuntimeConfig)>,
 }
 
 impl fmt::Debug for ApiManager {
@@ -52,7 +51,7 @@ impl ApiManager {
     pub fn new(runtime_config: SystemRuntimeConfig) -> Self {
         Self {
             runtime_config,
-            api_runtime_addresses: HashMap::new(),
+            api_runtime_addresses: Vec::new(),
         }
     }
 
@@ -74,7 +73,7 @@ impl ApiManager {
     fn start_server(
         runtime_config: ApiRuntimeConfig,
         aggregator: ApiAggregator,
-    ) -> io::Result<Addr<Server>> {
+    ) -> io::Result<Server> {
         let access = runtime_config.access;
         let listen_address = runtime_config.listen_address;
         info!("Starting {} web api on {}", access, listen_address);
@@ -86,10 +85,10 @@ impl ApiManager {
 
     fn initiate_restart(&mut self, manager: Addr<Self>) {
         info!("Restarting servers.");
-        for (addr, config) in self.api_runtime_addresses.drain() {
+        for (addr, config) in self.api_runtime_addresses.drain(..) {
             let manager = manager.clone();
             Arbiter::spawn(
-                addr.send(StopServer { graceful: true })
+                addr.stop(true)
                     .then(move |_| manager.send(StartServer { config }))
                     .map_err(|e| error!("Error while restarting API server: {}", e)),
             );
@@ -129,6 +128,6 @@ impl Handler<StartServer> for ApiManager {
         let aggregator = self.runtime_config.api_aggregator.clone();
         aggregator.refresh();
         let addr = Self::start_server(msg.config.clone(), aggregator).unwrap();
-        self.api_runtime_addresses.insert(addr, msg.config);
+        self.api_runtime_addresses.push((addr, msg.config));
     }
 }

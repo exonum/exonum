@@ -17,7 +17,7 @@
 // TODO Move module to the backends/actix directory. [ECR-3222]
 
 use actix::*;
-use actix_web::ws;
+use actix_web_actors::ws;
 use chrono::{DateTime, Utc};
 use exonum_merkledb::{IndexAccess, ListProof, ObjectHash, Snapshot};
 use futures::Future;
@@ -444,7 +444,7 @@ impl Session {
 }
 
 impl Actor for Session {
-    type Context = ws::WebsocketContext<Self, ()>;
+    type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let address: Recipient<_> = ctx.address().recipient();

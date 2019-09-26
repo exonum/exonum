@@ -46,9 +46,7 @@ use std::{
 
 use crate::{
     api::{
-        backends::actix::{
-            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntime, SystemRuntimeConfig,
-        },
+        backends::actix::{AllowOrigin, ApiRuntimeConfig, SystemRuntime, SystemRuntimeConfig},
         node::SharedNodeState,
         ApiAccess, ApiAggregator,
     },
@@ -960,20 +958,12 @@ impl Node {
         let api_cfg = node_cfg.api.clone();
         let api_runtime_config = SystemRuntimeConfig {
             api_runtimes: {
-                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
-                    let app_config = move |app: App| -> App {
-                        let cors = Cors::from(allow_origin.clone());
-                        app.middleware(cors)
-                    };
-                    Arc::new(app_config)
-                };
-
                 let public_api_handler = api_cfg
                     .public_api_address
                     .map(|listen_address| ApiRuntimeConfig {
                         listen_address,
                         access: ApiAccess::Public,
-                        app_config: api_cfg.public_allow_origin.clone().map(into_app_config),
+                        allow_origin: api_cfg.public_allow_origin.clone(),
                     })
                     .into_iter();
                 let private_api_handler = api_cfg
@@ -981,7 +971,7 @@ impl Node {
                     .map(|listen_address| ApiRuntimeConfig {
                         listen_address,
                         access: ApiAccess::Private,
-                        app_config: api_cfg.private_allow_origin.clone().map(into_app_config),
+                        allow_origin: api_cfg.private_allow_origin.clone(),
                     })
                     .into_iter();
                 // Collects API handlers.
