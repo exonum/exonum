@@ -112,19 +112,19 @@ impl Service for SimpleSupervisor {
     }
 
     fn before_commit(&self, context: BeforeCommitContext) {
-        let proposal = if let Some(proposal) = Schema::new(context.fork)
-            .config_propose_entry()
-            .get()
-            .filter(|proposal| {
+        let schema = Schema::new(context.fork);
+        let proposal = if let Some(proposal) =
+            schema.config_propose_entry().get().filter(|proposal| {
                 proposal.actual_from == blockchain::Schema::new(context.fork).height().next()
             }) {
             proposal
         } else {
             return;
         };
-
         // Perform the application of configs.
         context.update_config(proposal.changes);
+        // Remove config from proposals.
+        schema.config_propose_entry().remove();
     }
 }
 

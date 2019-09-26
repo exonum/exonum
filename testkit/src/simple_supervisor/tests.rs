@@ -28,8 +28,8 @@ use exonum::{
 use exonum_derive::ServiceFactory;
 
 use crate::{
-    simple_supervisor::{ConfigPropose, SimpleSupervisor},
-    TestKitBuilder,
+    simple_supervisor::{ConfigPropose, Schema, SimpleSupervisor},
+    TestKit, TestKitBuilder,
 };
 
 #[derive(Debug, ServiceFactory)]
@@ -101,6 +101,11 @@ impl Configure for ConfigChangeService {
     }
 }
 
+fn assert_config_change_is_applied(testkit: &TestKit) {
+    let snapshot = testkit.snapshot();
+    assert!(!Schema::new(&snapshot).config_propose_entry().exists());
+}
+
 #[test]
 fn add_nodes_to_validators() {
     let mut testkit = TestKitBuilder::auditor()
@@ -129,6 +134,7 @@ fn add_nodes_to_validators() {
     assert_eq!(testkit.network().us().validator_id(), None);
     testkit.create_block();
 
+    assert_config_change_is_applied(&testkit);
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());
     assert_eq!(testkit.consensus_config(), new_consensus_config);
@@ -271,6 +277,7 @@ fn discard_errored_service_config_change() {
             .into_tx(),
     );
     testkit.create_blocks_until(cfg_change_height);
+    assert_config_change_is_applied(&testkit);
 
     let actual_params: Option<String> = Entry::new(
         format!("{}.params", ConfigChangeService::INSTANCE_NAME),
@@ -307,6 +314,7 @@ fn discard_panicked_service_config_change() {
             .into_tx(),
     );
     testkit.create_blocks_until(cfg_change_height);
+    assert_config_change_is_applied(&testkit);
 
     let actual_params: Option<String> = Entry::new(
         format!("{}.params", ConfigChangeService::INSTANCE_NAME),
@@ -371,6 +379,7 @@ fn another_configuration_change_proposal() {
         .status()
         .unwrap_err();
     testkit.create_blocks_until(cfg_change_height);
+    assert_config_change_is_applied(&testkit);
 
     let actual_params: String = Entry::new(
         format!("{}.params", ConfigChangeService::INSTANCE_NAME),
@@ -442,12 +451,14 @@ fn test_configuration_and_rollbacks() {
     );
 
     testkit.create_blocks_until(cfg_change_height);
+    assert_config_change_is_applied(&testkit);
     assert_eq!(testkit.consensus_config(), new_config);
 
     testkit.checkpoint();
     testkit.create_block();
     testkit.rollback();
     assert_eq!(testkit.consensus_config(), new_config);
+    assert_config_change_is_applied(&testkit);
 
     testkit.rollback();
 
@@ -455,6 +466,7 @@ fn test_configuration_and_rollbacks() {
     // the proposal is effectively forgotten.
     testkit.create_blocks_until(Height(10));
     assert_eq!(testkit.consensus_config(), old_config);
+    assert_config_change_is_applied(&testkit);
 }
 
 #[test]
@@ -474,6 +486,7 @@ fn service_config_rollback_apply_error() {
             .into_tx(),
     );
     testkit.create_blocks_until(cfg_change_height);
+    assert_config_change_is_applied(&testkit);
 
     let actual_params: Option<String> = Entry::new(
         format!("{}.params", ConfigChangeService::INSTANCE_NAME),
@@ -501,6 +514,7 @@ fn service_config_rollback_apply_panic() {
             .into_tx(),
     );
     testkit.create_blocks_until(cfg_change_height);
+    assert_config_change_is_applied(&testkit);
 
     let actual_params: Option<String> = Entry::new(
         format!("{}.params", ConfigChangeService::INSTANCE_NAME),
@@ -512,7 +526,7 @@ fn service_config_rollback_apply_panic() {
 }
 
 #[test]
-fn service_config_apply_several_configs() {
+fn service_config_apply_multiple_configs() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
         .with_service(SimpleSupervisor)
@@ -539,4 +553,38 @@ fn service_config_apply_several_configs() {
     .unwrap();
 
     assert_eq!(actual_params, params);
+}
+
+#[test]
+fn several_service_config_changes() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_service(SimpleSupervisor)
+        .with_service(ConfigChangeService)
+        .create();
+
+    for i in 1..5 {
+        let cfg_change_height = Height(5 * i);
+        let params = format!("Change {}", i);
+
+        testkit.create_block_with_transaction(
+            ConfigPropose::actual_from(cfg_change_height)
+                .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
+                .into_tx(),
+        )[0]
+        .status()
+        .unwrap();
+
+        testkit.create_blocks_until(cfg_change_height);
+        assert_config_change_is_applied(&testkit);
+    }
+
+    let actual_params: String = Entry::new(
+        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
+        &testkit.snapshot(),
+    )
+    .get()
+    .unwrap();
+
+    assert_eq!(actual_params, "Change 4");
 }
