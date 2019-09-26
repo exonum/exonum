@@ -1002,7 +1002,6 @@ fn fork_from_patch() {
         .expect("Fork created from patch should be merged successfully");
 }
 
-//#[should_panic(expected = "Index name must not be empty")]
 #[test]
 fn test_index_builder_index_address() {
     let db = TemporaryDB::new();
