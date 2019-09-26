@@ -708,11 +708,15 @@ fn views_based_on_rc_fork() {
     drop(view2);
 
     {
+        // Check that changes introduced by the both views are reflected in the fork.
         let mut view1 = View::new(&*fork, IDX_1);
         assert_eq!(view1.get_bytes(&[0]), Some(vec![3]));
         view1.remove(&vec![0]);
+        let view2 = View::new(fork.clone(), IDX_2);
+        assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
     }
 
+    // ...and that these changes propagate to patch.
     let patch = Rc::try_unwrap(fork).unwrap().into_patch();
     db.merge_sync(patch).unwrap();
     let snapshot = db.snapshot();

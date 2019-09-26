@@ -462,15 +462,36 @@ where
     /// - `self.len()` / `self.height()` is assumed to be correctly set.
     /// - Value hashes (i.e., tree branches on level 1) are assumed to be updated.
     fn update_range(&mut self, mut first_index: u64, mut last_index: u64) {
-        let mut last_level_index = self.len() - 1;
+        // Index of the last element on the current `height` of the tree.
+        let mut last_index_on_height = self.len() - 1;
+
         for height in 1..self.height() {
             // Check consistency of the index range.
             debug_assert!(first_index <= last_index);
             // Check consistency with the level length.
-            debug_assert!(last_index <= last_level_index);
+            debug_assert!(last_index <= last_index_on_height);
 
-            let mut index = first_index & !1; // make the starting index even
-            let stop_index = cmp::min(last_index | 1, last_level_index);
+            // Calculate the start and stop indexes to process at the current `height`.
+
+            // The start index is always even, since during hashing we hash together
+            // an element with an even index and the following element (if it exists). Thus, we may
+            // need to decrease `first_index` by 1 to get the actual starting index if
+            // `first_index` is odd. The code below does just that; it is equivalent to
+            //
+            //    let mut index = first_index - (first_index % 2);
+            //
+            // ...just a bit faster.
+            let mut index = first_index & !1;
+
+            // To get the stop index, we may need to increase `last_index` to get an odd value,
+            // but we need to keep in mind the resulting index may be not in the tree.
+            // `last_index | 1` is equivalent to
+            //
+            //    last_index + (1 - last_index % 2)
+            //
+            // ...just a bit faster.
+            let stop_index = cmp::min(last_index | 1, last_index_on_height);
+
             while index < stop_index {
                 let key = ProofListKey::new(height, index);
                 let branch_hash = HashTag::hash_node(
@@ -487,14 +508,66 @@ where
                 self.base.put(&key.parent(), branch_hash);
             }
 
-            first_index >>= 1;
-            last_index >>= 1;
-            last_level_index >>= 1;
+            first_index /= 2;
+            last_index /= 2;
+            last_index_on_height /= 2;
         }
 
         debug_assert_eq!(first_index, 0);
         debug_assert_eq!(last_index, 0);
-        debug_assert_eq!(last_level_index, 0);
+        debug_assert_eq!(last_index_on_height, 0);
+    }
+
+    /// Removes the extra elements in the tree on heights `1..` and updates elements
+    /// where it is necessary.
+    ///
+    /// # Invariants
+    ///
+    /// - List length is assumed to be updated.
+    fn remove_range(&mut self, mut old_last_index: u64, old_height: u8) {
+        let new_length = self.len();
+        // New last index of the element on a certain height. The height of the tree
+        // may decrease after removing elements; we encode this case as `last_index == None`.
+        let mut last_index = Some(new_length - 1);
+
+        // Have we started updating hashes in the tree? Up to a certain height, we may just
+        // remove hashes from the tree. However, once the last element on the tree level is even
+        // and has its right neighbor removed, the hashes of the rightmost elements on each
+        // following height must be updated.
+        let mut started_updating_hashes = false;
+
+        for height in 1..old_height {
+            // Remove excessive branches on the level.
+            for index in last_index.map_or(0, |i| i + 1)..=old_last_index {
+                self.base.remove(&ProofListKey::new(height, index));
+            }
+
+            // Recalculate the hash of the last element on the next level if it has changed.
+            if let Some(last_index) = last_index {
+                // We start updating hashes once the `last_index` becomes a single hashed node.
+                if last_index > 0 && last_index < old_last_index && last_index % 2 == 0 {
+                    started_updating_hashes = true;
+                }
+
+                if started_updating_hashes && last_index > 0 {
+                    let key = ProofListKey::new(height, last_index);
+                    let hash = self.get_branch_unchecked(key);
+                    let parent_hash = if key.is_left() {
+                        HashTag::hash_single_node(&hash)
+                    } else {
+                        let left_sibling = self.get_branch_unchecked(key.as_left());
+                        HashTag::hash_node(&left_sibling, &hash)
+                    };
+                    self.base.put(&key.parent(), parent_hash);
+                }
+            }
+
+            last_index = match last_index {
+                Some(0) | None => None,
+                Some(i) => Some(i / 2),
+            };
+            old_last_index /= 2;
+        }
     }
 
     /// Appends an element to the back of the proof list.
@@ -535,24 +608,24 @@ where
     where
         I: IntoIterator<Item = V>,
     {
-        let first_index = self.len();
-        let mut last_index = first_index;
+        let old_list_len = self.len();
+        let mut new_list_len = old_list_len;
 
         for value in iter {
             self.base.put(
-                &ProofListKey::new(1, last_index),
+                &ProofListKey::new(1, new_list_len),
                 HashTag::hash_leaf(&value.to_bytes()),
             );
-            self.base.put(&ProofListKey::leaf(last_index), value);
-            last_index += 1;
+            self.base.put(&ProofListKey::leaf(new_list_len), value);
+            new_list_len += 1;
         }
 
-        if last_index == first_index {
+        if new_list_len == old_list_len {
             // No elements in the iterator; we're done.
             return;
         }
-        self.set_len(last_index);
-        self.update_range(first_index, last_index - 1);
+        self.set_len(new_list_len);
+        self.update_range(old_list_len, new_list_len - 1);
     }
 
     /// Changes a value at the specified position.
@@ -622,49 +695,16 @@ where
             return;
         }
 
-        let mut old_last_index = self.len() - 1;
+        let old_last_index = self.len() - 1;
         let old_height = self.height();
         self.set_len(new_length);
-        let mut last_index = Some(new_length - 1);
 
         // Remove values.
         for index in new_length..=old_last_index {
             self.base.remove(&ProofListKey::leaf(index));
         }
 
-        let mut started_updating_hashes = false;
-        for height in 1..old_height {
-            // Remove excessive branches on the level.
-            for index in last_index.map_or(0, |i| i + 1)..=old_last_index {
-                self.base.remove(&ProofListKey::new(height, index));
-            }
-
-            // Recalculate the hash of the last element on the next level if it has changed.
-            if let Some(last_index) = last_index {
-                // We start updating hashes once the `last_index` becomes a single hashed node.
-                if last_index > 0 && last_index < old_last_index && last_index % 2 == 0 {
-                    started_updating_hashes = true;
-                }
-
-                if started_updating_hashes && last_index > 0 {
-                    let key = ProofListKey::new(height, last_index);
-                    let hash = self.get_branch_unchecked(key);
-                    let parent_hash = if key.is_left() {
-                        HashTag::hash_single_node(&hash)
-                    } else {
-                        let left_sibling = self.get_branch_unchecked(key.as_left());
-                        HashTag::hash_node(&left_sibling, &hash)
-                    };
-                    self.base.put(&key.parent(), parent_hash);
-                }
-            }
-
-            last_index = match last_index {
-                Some(0) | None => None,
-                Some(i) => Some(i >> 1),
-            };
-            old_last_index >>= 1;
-        }
+        self.remove_range(old_last_index, old_height);
     }
 
     /// Removes the last element from the list and returns it, or returns `None`
