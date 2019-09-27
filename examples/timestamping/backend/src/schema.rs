@@ -54,7 +54,7 @@ pub struct TimestampEntry {
 
 impl TimestampEntry {
     /// New TimestampEntry.
-    pub fn new(timestamp: Timestamp, &tx_hash: &Hash, time: DateTime<Utc>) -> Self {
+    pub fn new(timestamp: Timestamp, tx_hash: Hash, time: DateTime<Utc>) -> Self {
         Self {
             timestamp,
             tx_hash,

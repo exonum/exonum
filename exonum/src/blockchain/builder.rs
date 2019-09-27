@@ -14,7 +14,6 @@
 
 //! The module responsible for the correct Exonum blockchain creation.
 
-use exonum_merkledb::Database;
 use futures::sync::mpsc;
 
 use std::sync::Arc;
@@ -23,8 +22,8 @@ use crate::{
     blockchain::{Blockchain, ConsensusConfig, Schema},
     crypto::{PublicKey, SecretKey},
     events::InternalRequest,
+    merkledb::{BinaryValue, Database},
     node::ApiSender,
-    proto::Any,
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
@@ -83,11 +82,7 @@ impl BlockchainBuilder {
     ) -> Self {
         // Add the built-in `Supervisor` service.
         let mut services = services.into_iter().collect::<Vec<_>>();
-        services.push(InstanceCollection::new(Supervisor).with_instance(
-            Supervisor::BUILTIN_ID,
-            Supervisor::BUILTIN_NAME,
-            (),
-        ));
+        services.push(Supervisor.into());
         self.with_rust_runtime(services)
     }
 
@@ -191,13 +186,17 @@ pub struct InstanceConfig {
     /// Service instance specification.
     pub instance_spec: InstanceSpec,
     /// Artifact deploy specification.
-    pub artifact_spec: Option<Any>,
+    pub artifact_spec: Option<Vec<u8>>,
     /// Service configuration parameters.
-    pub constructor: Any,
+    pub constructor: Vec<u8>,
 }
 
 impl InstanceConfig {
-    pub fn new(instance_spec: InstanceSpec, artifact_spec: Option<Any>, constructor: Any) -> Self {
+    pub fn new(
+        instance_spec: InstanceSpec,
+        artifact_spec: Option<Vec<u8>>,
+        constructor: Vec<u8>,
+    ) -> Self {
         InstanceConfig {
             instance_spec,
             artifact_spec,
@@ -229,14 +228,14 @@ impl InstanceCollection {
         mut self,
         id: InstanceId,
         name: impl Into<String>,
-        params: impl Into<Any>,
+        params: impl BinaryValue,
     ) -> Self {
         let spec = InstanceSpec {
             artifact: self.factory.artifact_id().into(),
             id,
             name: name.into(),
         };
-        let instance_config = InstanceConfig::new(spec, None, params.into());
+        let instance_config = InstanceConfig::new(spec, None, params.into_bytes());
         self.instances.push(instance_config);
         self
     }
@@ -281,11 +280,7 @@ mod tests {
 
         Blockchain::new(
             TemporaryDB::new(),
-            vec![InstanceCollection::new(Supervisor).with_instance(
-                Supervisor::BUILTIN_ID,
-                Supervisor::BUILTIN_NAME,
-                (),
-            )],
+            vec![InstanceCollection::from(Supervisor)],
             config.consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),

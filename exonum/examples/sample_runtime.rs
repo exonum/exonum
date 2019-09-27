@@ -16,29 +16,28 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{BlockchainBuilder, ConsensusConfig, ValidatorKeys},
+    blockchain::{BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
+    merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
     messages::Verified,
-    node::{ApiSender, Node, NodeApiConfig, NodeChannel, NodeConfig},
-    proto::Any,
+    node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        dispatcher::{self, Dispatcher, DispatcherSender, Error as DispatcherError},
+        dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
         supervisor::{DeployRequest, StartService, Supervisor},
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
-use exonum_merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB};
 use futures::{Future, IntoFuture};
 
 use exonum::keys::Keys;
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
-    convert::TryFrom,
     thread,
     time::Duration,
 };
@@ -47,12 +46,13 @@ use std::{
 #[derive(Debug, Default)]
 struct SampleService {
     counter: Cell<u64>,
+    name: String,
 }
 
 /// Sample runtime.
 #[derive(Debug, Default)]
 struct SampleRuntime {
-    deployed_artifacts: BTreeMap<ArtifactId, Any>,
+    deployed_artifacts: BTreeMap<ArtifactId, Vec<u8>>,
     started_services: BTreeMap<InstanceId, SampleService>,
 }
 
@@ -60,8 +60,6 @@ struct SampleRuntime {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 #[exonum(kind = "runtime")]
 enum SampleRuntimeError {
-    /// Unable to parse service configuration.
-    ConfigParseError = 0,
     /// Incorrect information to call transaction.
     IncorrectCallInfo = 1,
     /// Incorrect transaction payload.
@@ -78,7 +76,7 @@ impl Runtime for SampleRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: Any,
+        spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         Box::new(
             match self.deployed_artifacts.entry(artifact) {
@@ -107,19 +105,24 @@ impl Runtime for SampleRuntime {
             return Err(DispatcherError::ServiceIdExists.into());
         }
 
-        self.started_services
-            .insert(spec.id, SampleService::default());
+        self.started_services.insert(
+            spec.id,
+            SampleService {
+                name: spec.name.clone(),
+                ..SampleService::default()
+            },
+        );
         println!("Starting service: {:?}", spec);
         Ok(())
     }
 
-    /// `configure_service` request sets the counter value of the corresponding
+    /// `initialize_service` request sets the counter value of the corresponding
     /// `SampleService` instance
-    fn configure_service(
+    fn initialize_service(
         &self,
         _context: &Fork,
         descriptor: InstanceDescriptor,
-        parameters: Any,
+        params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let service_instance = self
             .started_services
@@ -127,10 +130,10 @@ impl Runtime for SampleRuntime {
             .ok_or(DispatcherError::ServiceNotStarted)?;
 
         let new_value =
-            u64::try_from(parameters).map_err(|e| (SampleRuntimeError::ConfigParseError, e))?;
+            u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         service_instance.counter.set(new_value);
         println!(
-            "Configuring service {} with value {}",
+            "Initializing service {} with value {}",
             descriptor.name, new_value
         );
         Ok(())
@@ -148,7 +151,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _context: &ExecutionContext,
+        context: &ExecutionContext,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -158,14 +161,14 @@ impl Runtime for SampleRuntime {
             .ok_or(SampleRuntimeError::IncorrectCallInfo)?;
 
         println!(
-            "Executing method {} of service {}",
-            call_info.method_id, call_info.instance_id
+            "Executing method {}#{} of service {}",
+            context.interface_name, call_info.method_id, call_info.instance_id
         );
 
-        // Simple transaction executor.
-        match call_info.method_id {
+        const SERVICE_INTERFACE: &str = "";
+        match (context.interface_name, call_info.method_id) {
             // Increment counter.
-            0 => {
+            (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
                 let counter = service.counter.get();
@@ -175,7 +178,7 @@ impl Runtime for SampleRuntime {
             }
 
             // Reset counter.
-            1 => {
+            (SERVICE_INTERFACE, 1) => {
                 if !payload.is_empty() {
                     Err(SampleRuntimeError::IncorrectPayload.into())
                 } else {
@@ -186,7 +189,14 @@ impl Runtime for SampleRuntime {
             }
 
             // Unknown transaction.
-            _ => Err(SampleRuntimeError::IncorrectCallInfo.into()),
+            (interface, method) => Err((
+                SampleRuntimeError::IncorrectCallInfo,
+                format!(
+                    "Incorrect information to call transaction. {}#{}",
+                    interface, method
+                ),
+            )
+                .into()),
         }
     }
 
@@ -200,7 +210,7 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
+    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
 
     fn after_commit(
         &self,
@@ -276,7 +286,7 @@ fn main() {
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain = BlockchainBuilder::new(db, genesis, service_keypair.clone())
-        .with_default_runtime(vec![])
+        .with_rust_runtime(vec![InstanceCollection::from(Supervisor)])
         .with_additional_runtime(SampleRuntime::default())
         .finalize(api_sender.clone(), channel.internal_requests.0.clone())
         .unwrap();
@@ -293,10 +303,10 @@ fn main() {
                 DeployRequest {
                     artifact: "255:sample_artifact".parse().unwrap(),
                     deadline_height,
-                    spec: Any::default(),
+                    spec: Vec::default(),
                 }
                 .sign(
-                    Supervisor::BUILTIN_ID,
+                    SUPERVISOR_INSTANCE_ID,
                     service_keypair.0,
                     &service_keypair.1,
                 ),
@@ -312,11 +322,11 @@ fn main() {
                 StartService {
                     artifact: "255:sample_artifact".parse().unwrap(),
                     name: instance_name.clone(),
-                    config: Any::from(10_u64),
+                    config: 10_u64.into_bytes(),
                     deadline_height,
                 }
                 .sign(
-                    Supervisor::BUILTIN_ID,
+                    SUPERVISOR_INSTANCE_ID,
                     service_keypair.0,
                     &service_keypair.1,
                 ),
@@ -362,6 +372,9 @@ fn main() {
             ))
             .unwrap();
         thread::sleep(Duration::from_secs(2));
+        api_sender
+            .send_external_message(ExternalMessage::Shutdown)
+            .unwrap();
     });
 
     node.run().unwrap();

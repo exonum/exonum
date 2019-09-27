@@ -20,7 +20,7 @@ use exonum::{
     crypto::{Hash, PublicKey},
     runtime::{
         rust::{Service, TransactionContext},
-        CallInfo, ExecutionError, InstanceDescriptor, InstanceId,
+        CallInfo, Caller, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
@@ -62,7 +62,7 @@ impl WalletService {
 }
 
 impl Service for WalletService {
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -73,17 +73,16 @@ impl WalletInterface for WalletService {
         context: TransactionContext,
         arg: TxCreateWallet,
     ) -> Result<(), ExecutionError> {
-        let (_, owner) = context
-            .caller()
-            .as_transaction()
+        let (owner, fork) = context
+            .verify_caller(Caller::author)
             .ok_or(Error::WrongInterfaceCaller)?;
 
-        let mut wallets = WalletSchema::new(context.fork()).wallets();
-        if wallets.contains(owner) {
+        let mut wallets = WalletSchema::new(fork).wallets();
+        if wallets.contains(&owner) {
             return Err(Error::WalletAlreadyExists.into());
         }
         wallets.put(
-            owner,
+            &owner,
             Wallet {
                 name: arg.name,
                 balance: 0,
@@ -95,15 +94,15 @@ impl WalletInterface for WalletService {
 
 impl IssueReceiver for WalletService {
     fn issue(&self, context: TransactionContext, arg: Issue) -> Result<(), ExecutionError> {
-        let instance_id = context
-            .caller()
-            .as_service()
+        let (instance_id, fork) = context
+            .verify_caller(Caller::as_service)
             .ok_or(Error::WrongInterfaceCaller)?;
+
         if instance_id != DepositService::ID {
             return Err(Error::UnauthorizedIssuer.into());
         }
 
-        let mut wallets = WalletSchema::new(context.fork()).wallets();
+        let mut wallets = WalletSchema::new(fork).wallets();
         let mut wallet = wallets.get(&arg.to).ok_or(Error::WalletNotFound)?;
         wallet.balance += arg.amount;
         wallets.put(&arg.to, wallet);
@@ -136,7 +135,7 @@ impl DepositService {
 }
 
 impl Service for DepositService {
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -218,7 +217,7 @@ impl AnyCall for AnyCallService {
 }
 
 impl Service for AnyCallService {
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

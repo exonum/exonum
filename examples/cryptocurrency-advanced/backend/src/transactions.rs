@@ -97,16 +97,16 @@ impl CryptocurrencyInterface for CryptocurrencyService {
 
         let mut schema = Schema::new(context.instance.name, context.fork());
 
-        let to = &arg.to;
+        let to = arg.to;
         let amount = arg.amount;
 
         if from == to {
             Err(Error::SenderSameAsReceiver)?;
         }
 
-        let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
+        let sender = schema.wallet(&from).ok_or(Error::SenderNotFound)?;
 
-        let receiver = schema.wallet(to).ok_or(Error::ReceiverNotFound)?;
+        let receiver = schema.wallet(&to).ok_or(Error::ReceiverNotFound)?;
 
         if sender.balance < amount {
             Err(Error::InsufficientCurrencyAmount)?
@@ -126,7 +126,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
 
         let mut schema = Schema::new(context.instance.name, context.fork());
 
-        if let Some(wallet) = schema.wallet(from) {
+        if let Some(wallet) = schema.wallet(&from) {
             let amount = arg.amount;
             schema.increase_wallet_balance(wallet, amount, tx_hash);
             Ok(())
@@ -143,9 +143,9 @@ impl CryptocurrencyInterface for CryptocurrencyService {
 
         let mut schema = Schema::new(context.instance.name, context.fork());
 
-        if schema.wallet(from).is_none() {
+        if schema.wallet(&from).is_none() {
             let name = &arg.name;
-            schema.create_wallet(from, name, tx_hash);
+            schema.create_wallet(&from, name, tx_hash);
             Ok(())
         } else {
             Err(Error::WalletAlreadyExists)?

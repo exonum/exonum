@@ -16,7 +16,7 @@
 
 pub use exonum::blockchain::{InstanceCollection, InstanceConfig};
 
-use exonum::{crypto, helpers::ValidatorId};
+use exonum::{crypto, helpers::ValidatorId, keys::Keys};
 use exonum_merkledb::TemporaryDB;
 
 use std::net::SocketAddr;
@@ -39,7 +39,7 @@ use crate::{runtime::RuntimeFactory, TestKit, TestNetwork};
 /// Outputs the status of the testkit, which includes:
 ///
 /// - Current blockchain height
-/// - Current [test network configuration][cfg]
+/// - Current test network configuration
 /// - Next network configuration if it is scheduled with [`commit_configuration_change`].
 ///
 /// ## Create block
@@ -66,7 +66,6 @@ use crate::{runtime::RuntimeFactory, TestKit, TestNetwork};
 /// Returns the latest block from the blockchain on success.
 ///
 /// [`serve`]: #method.serve
-/// [cfg]: struct.TestNetworkConfiguration.html
 /// [`create_block`]: struct.TestKit.html#method.create_block
 /// [`create_block_with_tx_hashes`]: struct.TestKit.html#method.create_block_with_tx_hashes
 /// [`commit_configuration_change`]: struct.TestKit.html#method.commit_configuration_change
@@ -108,7 +107,7 @@ use crate::{runtime::RuntimeFactory, TestKit, TestNetwork};
 #[derive(Debug)]
 pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
-    validator_count: Option<u16>,
+    test_network: Option<TestNetwork>,
     service_instances: Vec<InstanceCollection>,
     logger: bool,
     runtime_factories: Vec<Box<dyn RuntimeFactory>>,
@@ -119,7 +118,7 @@ impl TestKitBuilder {
     /// Creates testkit for the validator node.
     pub fn validator() -> Self {
         TestKitBuilder {
-            validator_count: None,
+            test_network: None,
             our_validator_id: Some(ValidatorId(0)),
             service_instances: Vec::new(),
             logger: false,
@@ -131,7 +130,7 @@ impl TestKitBuilder {
     /// Creates testkit for the auditor node.
     pub fn auditor() -> Self {
         TestKitBuilder {
-            validator_count: None,
+            test_network: None,
             our_validator_id: None,
             service_instances: Vec::new(),
             logger: false,
@@ -140,13 +139,31 @@ impl TestKitBuilder {
         }
     }
 
+    /// Creates the validator nodes from the specified keys.
+    pub fn with_keys(mut self, keys: impl IntoIterator<Item = Keys>) -> Self {
+        assert!(
+            self.test_network.is_none(),
+            "Number of validators is already specified"
+        );
+        self.test_network = Some(TestNetwork::with_our_role_from_keys(
+            self.our_validator_id,
+            keys,
+        ));
+
+        self
+    }
+
     /// Sets the number of validator nodes in the test network.
     pub fn with_validators(mut self, validator_count: u16) -> Self {
         assert!(
-            self.validator_count.is_none(),
+            self.test_network.is_none(),
             "Number of validators is already specified"
         );
-        self.validator_count = Some(validator_count);
+        self.test_network = Some(TestNetwork::with_our_role(
+            self.our_validator_id,
+            validator_count,
+        ));
+
         self
     }
 
@@ -180,8 +197,10 @@ impl TestKitBuilder {
         }
         crypto::init();
 
-        let network =
-            TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1));
+        let our_validator_id = self.our_validator_id;
+        let network = self
+            .test_network
+            .unwrap_or_else(|| TestNetwork::with_our_role(our_validator_id, 1));
         let genesis = network.genesis_config();
         TestKit::assemble(
             TemporaryDB::new(),

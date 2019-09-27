@@ -16,7 +16,6 @@ use exonum::{
     crypto,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    proto::Any,
     runtime::{self, dispatcher, rust::Transaction, CallInfo, ExecutionError},
 };
 use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
@@ -42,17 +41,17 @@ fn testkit_with_interfaces() -> TestKit {
         .with_service(InstanceCollection::new(WalletService).with_instance(
             WalletService::ID,
             "wallet",
-            Any::default(),
+            Vec::default(),
         ))
         .with_service(InstanceCollection::new(DepositService).with_instance(
             DepositService::ID,
             "deposit",
-            Any::default(),
+            Vec::default(),
         ))
         .with_service(InstanceCollection::new(AnyCallService).with_instance(
             AnyCallService::ID,
             "any-call",
-            Any::default(),
+            Vec::default(),
         ))
         .create()
 }
@@ -300,7 +299,10 @@ fn test_any_call_err_wrong_arg() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, runtime::rust::Error::ArgumentsParseError.into());
+    assert_eq!(
+        err.kind,
+        runtime::DispatcherError::MalformedArguments.into()
+    );
 }
 
 #[test]

@@ -12,16 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The set of specific for the Rust runtime implementation errors.
+use exonum::{
+    crypto::Hash,
+    merkledb::{Entry, IndexAccess, ObjectHash},
+};
 
-/// List of possible Rust runtime errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(crate = "crate", kind = "runtime")]
-pub enum Error {
-    /// Unable to parse artifact identifier or specified artifact has non-empty spec.
-    IncorrectArtifactId = 0,
-    /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
-    UnableToDeploy = 1,
-    /// Unspecified error during the call invocation.
-    UnspecifiedError = 2,
+use super::ConfigPropose;
+
+pub struct Schema<T: IndexAccess> {
+    access: T,
+}
+
+impl<T: IndexAccess> Schema<T> {
+    pub fn new(access: T) -> Self {
+        Self { access }
+    }
+
+    pub fn config_propose_entry(&self) -> Entry<T, ConfigPropose> {
+        Entry::new("config.propose", self.access.clone())
+    }
+
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![self.config_propose_entry().object_hash()]
+    }
 }
