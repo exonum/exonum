@@ -17,8 +17,7 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     exonum_merkledb::{Fork, Snapshot},
     node::ApiSender,
-    proto::Any,
-    runtime::dispatcher::{Dispatcher, DispatcherSender},
+    runtime::dispatcher::DispatcherSender,
     runtime::{
         ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
@@ -27,13 +26,14 @@ use exonum::{
 use exonum_testkit::{runtime::RuntimeFactory, TestKitBuilder};
 use futures::{Future, IntoFuture};
 use std::{sync::Arc, sync::RwLock};
+use exonum::runtime::dispatcher::DispatcherRef;
 
 // Tracks parts of state of runtime that we're interested in.
 #[derive(Debug)]
 struct RuntimeState {
     deployed_artifact: ArtifactId,
-    deploy_spec: Any,
-    config_params: Any,
+    deploy_spec: Vec<u8>,
+    config_params: Vec<u8>,
 }
 
 // Main purpose is to track and make some assertions on state of runtime.
@@ -43,13 +43,13 @@ struct RuntimeTester {
 }
 
 impl RuntimeTester {
-    fn deploy_artifact(&self, artifact: ArtifactId, deploy_spec: Any) {
+    fn deploy_artifact(&self, artifact: ArtifactId, deploy_spec: Vec<u8>) {
         let mut state = self.state.write().unwrap();
         state.deployed_artifact = artifact;
         state.deploy_spec = deploy_spec;
     }
 
-    fn configure_service(&self, config_params: Any) {
+    fn configure_service(&self, config_params: Vec<u8>) {
         let mut state = self.state.write().unwrap();
         state.config_params = config_params;
     }
@@ -59,13 +59,13 @@ impl RuntimeTester {
         state.deployed_artifact == *artifact_id
     }
 
-    fn assert_artifact_deployed(&self, artifact_id: ArtifactId, deploy_spec: Any) {
+    fn assert_artifact_deployed(&self, artifact_id: ArtifactId, deploy_spec: Vec<u8>) {
         let state = self.state.read().unwrap();
         assert_eq!(state.deployed_artifact, artifact_id);
         assert_eq!(state.deploy_spec, deploy_spec);
     }
 
-    fn assert_config_params_passed(&self, config_params: Any) {
+    fn assert_config_params_passed(&self, config_params: Vec<u8>) {
         let state = self.state.read().unwrap();
         assert_eq!(state.config_params, config_params)
     }
@@ -105,7 +105,7 @@ impl Runtime for TestRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        deploy_spec: Any,
+        deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         self.tester.deploy_artifact(artifact, deploy_spec);
         Box::new(Ok(()).into_future())
@@ -123,12 +123,7 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn configure_service(
-        &self,
-        _fork: &Fork,
-        _descriptor: InstanceDescriptor,
-        parameters: Any,
-    ) -> Result<(), ExecutionError> {
+    fn initialize_service(&self, _fork: &Fork, _instance: InstanceDescriptor, parameters: Vec<u8>) -> Result<(), ExecutionError> {
         self.tester.configure_service(parameters);
         Ok(())
     }
@@ -150,7 +145,7 @@ impl Runtime for TestRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
+    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
 
     fn after_commit(
         &self,
@@ -193,8 +188,8 @@ impl RuntimeFactory for TestRuntimeFactory {
 fn test_runtime_factory() {
     let tester = Arc::new(RuntimeTester::default());
 
-    let artifact_spec: Any = "deploy_spec".into();
-    let constructor: Any = "constructor_params".into();
+    let artifact_spec: Vec<u8> = "deploy_spec".into();
+    let constructor: Vec<u8> = "constructor_params".into();
     let instance_spec = InstanceSpec::new(
         1,
         "test_instance",
