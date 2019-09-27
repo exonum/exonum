@@ -42,7 +42,7 @@ pub struct IssueReceiverClient<'a>(CallContext<'a>);
 
 impl<'a> IssueReceiverClient<'a> {
     pub fn issue(&self, arg: Issue) -> Result<(), ExecutionError> {
-        self.0.call(IssueReceiver::NAME, 0, arg)
+        self.0.call(IssueReceiver::INTERFACE_NAME, 0, arg)
     }
 }
 

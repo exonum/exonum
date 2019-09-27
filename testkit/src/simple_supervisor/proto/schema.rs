@@ -12,16 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The set of specific for the Rust runtime implementation errors.
+use exonum::proto::schema::runtime;
 
-/// List of possible Rust runtime errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(crate = "crate", kind = "runtime")]
-pub enum Error {
-    /// Unable to parse artifact identifier or specified artifact has non-empty spec.
-    IncorrectArtifactId = 0,
-    /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
-    UnableToDeploy = 1,
-    /// Unspecified error during the call invocation.
-    UnspecifiedError = 2,
-}
+include!(concat!(env!("OUT_DIR"), "/simple_supervisor_mod.rs"));

@@ -13,25 +13,22 @@
 // limitations under the License.
 
 use exonum_derive::exonum_service;
-use exonum_merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB};
-
-use std::convert::TryFrom;
 
 use crate::{
     crypto::Hash,
-    proto::{
-        schema::tests::{TestServiceInit, TestServiceTx},
-        Any,
-    },
+    merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB},
+    proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, CallContext, CallInfo, Caller,
-        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
+        dispatcher::{Dispatcher, DispatcherRef},
+        error::ExecutionError,
+        CallContext, CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor,
+        InstanceId, InstanceSpec,
     },
 };
 
 use super::{
     service::{Service, ServiceFactory},
-    ArtifactId, Error, RustRuntime, TransactionContext,
+    ArtifactId, RustRuntime, TransactionContext,
 };
 
 const SERVICE_INSTANCE_ID: InstanceId = 2;
@@ -39,7 +36,7 @@ const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
 #[derive(Debug, ProtobufConvert)]
 #[exonum(pb = "TestServiceInit", crate = "crate")]
-struct Init {
+pub struct Init {
     msg: String,
 }
 
@@ -111,20 +108,20 @@ impl TestService for TestServiceImpl {
 }
 
 impl Service for TestServiceImpl {
-    fn configure(
+    fn initialize(
         &self,
-        _descriptor: InstanceDescriptor,
+        _instance: InstanceDescriptor,
         fork: &Fork,
-        arg: Any,
+        params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let arg = Init::try_from(arg).map_err(|e| (Error::ConfigParseError, e))?;
+        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
         let mut entry = Entry::new("constructor_entry", fork);
-        entry.set(arg.msg);
+        entry.set(init.msg);
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -146,7 +143,7 @@ fn test_basic_rust_runtime() {
     // Deploy service.
     let fork = db.fork();
     dispatcher
-        .deploy_and_register_artifact(&fork, &artifact, Any::default())
+        .deploy_and_register_artifact(&fork, &artifact, Vec::default())
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 
@@ -160,8 +157,7 @@ fn test_basic_rust_runtime() {
 
         let constructor = Init {
             msg: "constructor_message".to_owned(),
-        }
-        .into();
+        };
 
         let fork = db.fork();
 
@@ -183,8 +179,9 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let fork = db.fork();
+        let dispatcher_ref = DispatcherRef::new(&dispatcher);
         let context = ExecutionContext::new(
-            &dispatcher,
+            &dispatcher_ref,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
@@ -212,8 +209,9 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let fork = db.fork();
+        let dispatcher_ref = DispatcherRef::new(&dispatcher);
         let context = ExecutionContext::new(
-            &dispatcher,
+            &dispatcher_ref,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
