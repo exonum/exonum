@@ -521,6 +521,31 @@ impl<V: BinaryValue> ListProof<V> {
                 }
             })
     }
+
+    /// Provides access to the proof part of the view. Used in serialization.
+    pub fn proof_unchecked(&self) -> Vec<(ProofListKey, Hash)> {
+        self.proof
+            .iter()
+            .map(|entry| (entry.key, entry.hash))
+            .collect()
+    }
+
+    /// Creates `ListProof` from `proof` and `entries` vectors. Used to construct proof
+    /// after deserialization.
+    pub fn from_raw_parts(
+        proof: Vec<(ProofListKey, Hash)>,
+        entries: Vec<(u64, V)>,
+        length: u64,
+    ) -> Self {
+        Self {
+            proof: proof
+                .into_iter()
+                .map(|(key, hash)| HashedEntry::new(key, hash))
+                .collect(),
+            entries,
+            length,
+        }
+    }
 }
 
 /// Version of `ListProof` obtained after verification.

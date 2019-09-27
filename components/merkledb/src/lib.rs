@@ -152,7 +152,7 @@ pub use self::{
 // does not exist!'
 #[doc(no_inline)]
 pub use self::{
-    proof_list_index::{ListProof, ProofListIndex},
+    proof_list_index::{ListProof, ProofListIndex, ProofListKey},
     proof_map_index::{MapProof, ProofMapIndex},
 };
 

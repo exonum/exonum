@@ -14,16 +14,16 @@
 
 //! An implementation of a Merkelized version of an array list (Merkle tree).
 
-pub use self::proof::{CheckedListProof, ListProof, ListProofError, ValidationError};
+pub use self::{
+    key::ProofListKey,
+    proof::{CheckedListProof, ListProof, ListProofError, ValidationError},
+};
 
 use std::{marker::PhantomData, ops::RangeBounds};
 
 use exonum_crypto::Hash;
 
-use self::{
-    key::ProofListKey,
-    proof_builder::{BuildProof, MerkleTree},
-};
+use self::proof_builder::{BuildProof, MerkleTree};
 use crate::views::IndexAddress;
 use crate::{
     hash::HashTag,

@@ -21,6 +21,7 @@ use super::super::BinaryKey;
 const HEIGHT_SHIFT: u64 = 56;
 const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2_u64.pow(56) - 1
 
+/// ProofListKey represents position in Merkle Tree.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProofListKey {
     index: u64,
@@ -28,36 +29,39 @@ pub struct ProofListKey {
 }
 
 impl ProofListKey {
+    /// Creates new `ProofListKey` with `height` and `index`.
     pub fn new(height: u8, index: u64) -> Self {
         debug_assert!(height <= 58 && index <= MAX_INDEX);
         Self { height, index }
     }
 
+    /// ProofListKey height.
     pub fn height(&self) -> u8 {
         self.height
     }
 
+    /// ProofListKey index.
     pub fn index(&self) -> u64 {
         self.index
     }
 
-    pub fn leaf(index: u64) -> Self {
+    pub(crate) fn leaf(index: u64) -> Self {
         Self::new(0, index)
     }
 
-    pub fn as_db_key(&self) -> u64 {
+    pub(crate) fn as_db_key(&self) -> u64 {
         (u64::from(self.height) << HEIGHT_SHIFT) + self.index
     }
 
-    pub fn from_db_key(key: u64) -> Self {
+    pub(crate) fn from_db_key(key: u64) -> Self {
         Self::new((key >> HEIGHT_SHIFT) as u8, key & MAX_INDEX)
     }
 
-    pub fn parent(&self) -> Self {
+    pub(crate) fn parent(&self) -> Self {
         Self::new(self.height + 1, self.index >> 1)
     }
 
-    pub fn first_left_leaf_index(&self) -> u64 {
+    pub(crate) fn first_left_leaf_index(&self) -> u64 {
         if self.height < 2 {
             self.index
         } else {
@@ -65,15 +69,15 @@ impl ProofListKey {
         }
     }
 
-    pub fn is_left(&self) -> bool {
+    pub(crate) fn is_left(&self) -> bool {
         self.index.trailing_zeros() >= 1
     }
 
-    pub fn as_left(&self) -> Self {
+    pub(crate) fn as_left(&self) -> Self {
         Self::new(self.height, self.index & !1)
     }
 
-    pub fn as_right(&self) -> Self {
+    pub(crate) fn as_right(&self) -> Self {
         Self::new(self.height, self.index | 1)
     }
 }

@@ -67,6 +67,7 @@ pub use self::schema::{
         TransactionsResponse,
     },
     helpers::{BitVec, Hash, PublicKey, Signature},
+    proof::{HashedEntry, ListProof, ListProofEntry, ProofListKey},
     runtime::{AnyTx, CallInfo},
 };
 
@@ -78,15 +79,18 @@ mod macros;
 mod tests;
 
 use chrono::{DateTime, TimeZone, Utc};
+use exonum_merkledb::BinaryValue;
 use failure::Error;
-use protobuf::well_known_types;
+use protobuf::{well_known_types, RepeatedField};
 
 use std::collections::HashMap;
+use std::convert::TryInto;
 
 use crate::{
     crypto::{self},
     helpers::{Height, Round, ValidatorId},
 };
+use std::borrow::Cow;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
@@ -332,6 +336,86 @@ where
         pb.drain()
             .map(|(k, v)| ProtobufConvert::from_pb(v).map(|v| (k, v)))
             .collect::<Result<HashMap<_, _, _>, _>>()
+    }
+}
+
+impl<V> ProtobufConvert for exonum_merkledb::ListProof<V>
+where
+    V: BinaryValue,
+{
+    type ProtoStruct = ListProof;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut list_proof = ListProof::new();
+        list_proof.set_length(self.list_len());
+
+        let entries = self
+            .entries_unchecked()
+            .iter()
+            .map(|(index, value)| {
+                let mut entry = ListProofEntry::new();
+                entry.set_index(*index);
+                entry.set_value(value.to_bytes());
+                entry
+            })
+            .collect();
+
+        let proof = self
+            .proof_unchecked()
+            .iter()
+            .map(|entry| entry.into())
+            .collect();
+
+        list_proof.set_proof(RepeatedField::from_vec(proof));
+        list_proof.set_entries(RepeatedField::from_vec(entries));
+
+        list_proof
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        let proof = pb
+            .get_proof()
+            .iter()
+            .map(|entry| {
+                Ok((
+                    exonum_merkledb::ProofListKey::new(
+                        entry.get_key().get_height().try_into()?,
+                        entry.get_key().get_index(),
+                    ),
+                    crypto::Hash::from_bytes(Cow::Borrowed(entry.get_hash()))?,
+                ))
+            })
+            .collect::<Result<_, Error>>()?;
+
+        let entries = pb
+            .get_entries()
+            .iter()
+            .map(|entry| {
+                Ok((
+                    entry.get_index(),
+                    V::from_bytes(Cow::Borrowed(entry.get_value()))?,
+                ))
+            })
+            .collect::<Result<_, Error>>()?;
+
+        Ok(exonum_merkledb::ListProof::from_raw_parts(
+            proof,
+            entries,
+            pb.get_length(),
+        ))
+    }
+}
+
+impl From<&(exonum_merkledb::ProofListKey, crypto::Hash)> for HashedEntry {
+    fn from(entry: &(exonum_merkledb::ProofListKey, crypto::Hash)) -> Self {
+        let mut hashed_entry = HashedEntry::new();
+        let mut key = ProofListKey::new();
+
+        key.set_index(entry.0.index());
+        key.set_height(entry.0.height().into());
+        hashed_entry.set_key(key);
+        hashed_entry.set_hash(entry.1.to_bytes());
+        hashed_entry
     }
 }
 

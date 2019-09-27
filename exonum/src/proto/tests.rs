@@ -14,9 +14,9 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{BinaryValue, Database, ListProof, ObjectHash, ProofListIndex, TemporaryDB};
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt};
 
 use super::{schema, ProtobufConvert};
 use crate::crypto::{self, Hash, PublicKey, Signature};
@@ -298,4 +298,43 @@ fn test_struct_with_fixed_arrays_roundtrip() {
     let bytes = arr_struct.to_bytes();
     let struct_encode_round_trip = StructWithFixedArrays::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, arr_struct);
+}
+
+#[test]
+fn serialize_list_proof() {
+    let db = TemporaryDB::default();
+    let storage = db.fork();
+
+    let mut table = ProofListIndex::new("index", &storage);
+
+    let proof = table.get_proof(0);
+    assert_list_proof_roundtrip(proof);
+
+    for i in 0..10 {
+        table.push(i);
+    }
+
+    let proof = table.get_proof(5);
+    assert_list_proof_roundtrip(proof);
+
+    let proof = table.get_range_proof(5..15);
+    assert_list_proof_roundtrip(proof);
+}
+
+fn assert_list_proof_roundtrip<V>(proof: ListProof<V>)
+where
+    V: BinaryValue + ObjectHash + fmt::Debug,
+    ListProof<V>: ProtobufConvert + PartialEq,
+{
+    let pb = proof.to_pb();
+    let deserialized: ListProof<V> = ListProof::from_pb(pb).unwrap();
+    let checked_proof = deserialized
+        .check()
+        .expect("deserialized proof is not valid");
+
+    assert_eq!(proof, deserialized);
+    assert_eq!(
+        checked_proof.index_hash(),
+        proof.check().unwrap().index_hash()
+    );
 }

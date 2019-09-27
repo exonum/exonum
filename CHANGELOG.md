@@ -32,6 +32,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
   module in the `exonum`. (#1459)
 
+### New features
+
+#### exonum
+
+- `ProtobufConvert` is now implemented for `exonum_merkledb::ListProof`. (#1479)
+
 ## 0.12.1 - 2019-09-19
 
 ### Bug Fixes
