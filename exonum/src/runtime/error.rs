@@ -402,7 +402,6 @@ mod execution_result {
     {
         ExecutionStatus::deserialize(deserializer).map(From::from)
     }
-
 }
 
 #[cfg(test)]
@@ -543,5 +542,4 @@ mod tests {
         let panic = make_panic(1);
         assert_eq!(ExecutionError::from_panic(panic).description, "");
     }
-
 }

@@ -19,7 +19,7 @@ pub use self::{
     refs::{AnyObject, ObjectAccess, Ref, RefMut},
 };
 
-use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData, ops::Deref};
+use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData, ops::Deref, rc::Rc, sync::Arc};
 
 use super::{
     db::{Change, ChangesRef, ForkIter, ViewChanges},
@@ -367,20 +367,57 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     }
 }
 
-impl<T> IndexAccess for T
-where
-    T: Deref<Target = dyn Snapshot> + Clone,
-{
+impl<'a> IndexAccess for &'a dyn Snapshot {
     type Changes = ();
 
     fn snapshot(&self) -> &dyn Snapshot {
-        self.deref()
+        self.as_ref()
     }
 
-    fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
 }
 
 impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
+    type Changes = ();
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        self.as_ref()
+    }
+
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
+}
+
+impl<'a> IndexAccess for &'a Arc<dyn Snapshot> {
+    type Changes = ();
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        self.as_ref()
+    }
+
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
+}
+
+impl<'a> IndexAccess for &'a Rc<dyn Snapshot> {
+    type Changes = ();
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        self.as_ref()
+    }
+
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
+}
+
+impl IndexAccess for Arc<dyn Snapshot> {
+    type Changes = ();
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        self.as_ref()
+    }
+
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
+}
+
+impl IndexAccess for Rc<dyn Snapshot> {
     type Changes = ();
 
     fn snapshot(&self) -> &dyn Snapshot {

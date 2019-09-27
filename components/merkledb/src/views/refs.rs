@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    rc::Rc,
+    sync::Arc,
+};
 
 use crate::{
     views::{IndexAddress, IndexType, View},
@@ -218,11 +222,13 @@ pub trait ObjectAccess: IndexAccess {
     }
 }
 
+impl ObjectAccess for &dyn Snapshot {}
 impl ObjectAccess for &Box<dyn Snapshot> {}
-
+impl ObjectAccess for &Arc<dyn Snapshot> {}
+impl ObjectAccess for &Rc<dyn Snapshot> {}
+impl ObjectAccess for Arc<dyn Snapshot> {}
+impl ObjectAccess for Rc<dyn Snapshot> {}
 impl ObjectAccess for &Fork {}
-
-impl<T> ObjectAccess for T where T: Deref<Target = dyn Snapshot> + Clone {}
 
 impl Fork {
     /// See: [ObjectAccess::get_object][1].
