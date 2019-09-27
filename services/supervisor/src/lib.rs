@@ -28,19 +28,18 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain,
+    blockchain::{self, InstanceCollection},
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
-        InstanceDescriptor, InstanceId,
+        InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
 use exonum_merkledb::Snapshot;
 
 mod api;
 mod errors;
-pub mod multisig;
 mod proto;
 mod proto_structures;
 mod schema;
@@ -124,14 +123,22 @@ impl Service for Supervisor {
                     }
                 };
                 // TODO Rewrite on async await syntax. [ECR-3222]
-                context
-                    .dispatcher_channel()
-                    .request_deploy_artifact(artifact, spec, and_then);
+                context.dispatcher_channel().request_deploy_artifact(
+                    context.instance.id,
+                    artifact,
+                    spec,
+                    and_then,
+                );
             })
     }
 }
 
-impl Supervisor {
-    pub const BUILTIN_ID: InstanceId = 0;
-    pub const BUILTIN_NAME: &'static str = "supervisor";
+impl From<Supervisor> for InstanceCollection {
+    fn from(service: Supervisor) -> Self {
+        InstanceCollection::new(service).with_instance(
+            SUPERVISOR_INSTANCE_ID,
+            SUPERVISOR_INSTANCE_NAME,
+            Vec::default(),
+        )
+    }
 }

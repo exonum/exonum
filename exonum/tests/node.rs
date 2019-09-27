@@ -64,7 +64,7 @@ impl Service for CommitWatcherService {
             oneshot.send(()).unwrap();
         }
     }
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -78,7 +78,7 @@ struct StartCheckerService;
 impl StartCheckerInterface for StartCheckerService {}
 
 impl Service for StartCheckerService {
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

@@ -23,7 +23,7 @@ pub struct DeployRequest {
     // Artifact identifier.
     pub artifact: ArtifactId,
     /// Additional information for Runtime to deploy.
-    pub spec: Any,
+    pub spec: Vec<u8>,
     /// The height until which the deployment procedure should be completed.
     pub deadline_height: Height,
 }
@@ -35,7 +35,7 @@ pub struct DeployConfirmation {
     // Artifact identifier.
     pub artifact: ArtifactId,
     /// Additional information for Runtime to deploy.
-    pub spec: Any,
+    pub spec: Vec<u8>,
     /// The height until which the deployment procedure should be completed.
     pub deadline_height: Height,
 }
@@ -49,7 +49,7 @@ pub struct StartService {
     /// Instance name.
     pub name: String,
     /// Instance configuration.
-    pub config: Any,
+    pub config: Vec<u8>,
     /// The height until which the start service procedure should be completed.
     pub deadline_height: Height,
 }

@@ -128,10 +128,7 @@ impl ExonumCommand for GenerateConfig {
 
         let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
         let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
-        let master_key_path = self
-            .master_key_path
-            .unwrap_or_default()
-            .join(MASTER_KEY_FILE_NAME);
+        let master_key_path = get_master_key_path(self.master_key_path.clone())?;
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
 
@@ -174,6 +171,11 @@ impl ExonumCommand for GenerateConfig {
             master_key_path,
         })
     }
+}
+
+fn get_master_key_path(path: Option<PathBuf>) -> Result<PathBuf, Error> {
+    let path = path.map_or_else(|| Ok(PathBuf::new()), |path| path.canonicalize())?;
+    Ok(path.join(MASTER_KEY_FILE_NAME))
 }
 
 fn create_keys_and_files(

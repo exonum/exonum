@@ -156,7 +156,9 @@ impl ServiceFactory {
             };
 
             quote! {
-                #interface_trait::NAME => #interface_trait::dispatch(self, ctx, method, payload),
+                #interface_trait::INTERFACE_NAME => {
+                    #interface_trait::dispatch(self, ctx, method, payload)
+                }
             }
         });
 
@@ -172,13 +174,12 @@ impl ServiceFactory {
                     match interface_name {
                         #( #match_arms )*
                         other => {
-                            let kind = #cr::runtime::dispatcher::Error::NoSuchInterface;
                             let message = format!(
                                 "Service instance `{}` does not implement a `{}` interface.",
                                 ctx.instance.name,
                                 other
                             );
-                            Err((kind, message)).map_err(From::from)
+                            Err(#cr::runtime::DispatcherError::no_such_interface(message))
                         }
                     }
                 }

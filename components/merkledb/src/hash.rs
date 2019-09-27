@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use byteorder::{ByteOrder, LittleEndian};
-use hex::FromHex;
-
 use exonum_crypto::{Hash, HashStream, HASH_SIZE};
+use failure::Fail;
+use hex::FromHex;
 
 use crate::{proof_map_index::ProofPath, BinaryValue};
 
@@ -221,6 +221,19 @@ impl ObjectHash for [u8; HASH_SIZE] {
     fn object_hash(&self) -> Hash {
         Hash::new(*self)
     }
+}
+
+/// Errors that can occur while validating a `ListProof` or `MapProof` against
+/// a trusted collection hash.
+#[derive(Debug, Fail)]
+pub enum ValidationError<E: Fail> {
+    /// The hash of the proof is not equal to the trusted root hash.
+    #[fail(display = "hash of the proof is not equal to the trusted hash of the list")]
+    UnmatchedRootHash,
+
+    /// The proof is malformed.
+    #[fail(display = "Malformed proof: {}", _0)]
+    Malformed(#[fail(cause)] E),
 }
 
 #[cfg(test)]

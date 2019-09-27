@@ -12,33 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{
-    Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex, ObjectHash, Snapshot,
-    TemporaryDB,
-};
 use futures::{sync::mpsc, Future};
 
 use std::{collections::BTreeMap, panic, sync::Mutex};
 
 use crate::{
     blockchain::{
-        Blockchain, ExecutionErrorKind, ExecutionStatus, FatalError, InstanceCollection, Schema,
+        Blockchain, BlockchainBuilder, ExecutionErrorKind, ExecutionStatus, FatalError,
+        InstanceCollection, Schema,
     },
     crypto::{self, Hash},
     helpers::{generate_testnet_config, Height, ValidatorId},
+    merkledb::{
+        BinaryValue, Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex,
+        ObjectHash, Snapshot, TemporaryDB,
+    },
     messages::Verified,
     node::ApiSender,
-    proto::{schema::tests::*, Any},
+    proto::schema::tests::*,
     runtime::{
         dispatcher,
         error::ErrorKind,
         rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
-        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId,
+        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
 const IDX_NAME: &str = "idx_name";
-const TEST_SERVICE_ID: InstanceId = 255;
+const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
@@ -58,6 +59,12 @@ struct TestStart {
     value: u64,
 }
 
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[exonum(pb = "TestServiceTx", crate = "crate")]
+struct TestCallInitialize {
+    value: u64,
+}
+
 #[exonum_service(crate = "crate")]
 trait TestDispatcherInterface {
     fn test_execute(
@@ -65,11 +72,13 @@ trait TestDispatcherInterface {
         context: TransactionContext,
         arg: TestExecute,
     ) -> Result<(), ExecutionError>;
+
     fn test_deploy(
         &self,
         context: TransactionContext,
         arg: TestDeploy,
     ) -> Result<(), ExecutionError>;
+
     fn test_start(&self, context: TransactionContext, arg: TestStart)
         -> Result<(), ExecutionError>;
 }
@@ -84,14 +93,14 @@ trait TestDispatcherInterface {
 struct TestDispatcherService;
 
 impl Service for TestDispatcherService {
-    fn configure(
+    fn initialize(
         &self,
-        _descriptor: InstanceDescriptor,
+        _instance: InstanceDescriptor,
         _fork: &Fork,
-        params: Any,
+        params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        if params.clone().try_into::<()>().is_err() {
-            let v: TestExecute = params.try_into().expect("Expected `TestExecute`");
+        if !params.is_empty() {
+            let v = TestExecute::from_bytes(params.into()).unwrap();
             if v.value == 42 {
                 panic!("42!");
             } else {
@@ -104,7 +113,7 @@ impl Service for TestDispatcherService {
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -127,7 +136,7 @@ impl TestDispatcherInterface for TestDispatcherService {
 
         context.dispatch_action(dispatcher::Action::RegisterArtifact {
             artifact,
-            spec: ().into(),
+            spec: Vec::new(),
         });
 
         if arg.value == 42 {
@@ -147,9 +156,9 @@ impl TestDispatcherInterface for TestDispatcherService {
         drop(index);
 
         let config = match arg.value {
-            42 => TestExecute { value: 42 }.into(),
-            18 => TestExecute { value: 18 }.into(),
-            _ => ().into(),
+            42 => TestExecute { value: 42 }.into_bytes(),
+            18 => TestExecute { value: 18 }.into_bytes(),
+            _ => Vec::new(),
         };
 
         let artifact = if arg.value == 24 {
@@ -198,13 +207,13 @@ pub struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+
     fn before_commit(&self, context: BeforeCommitContext) {
         let mut index = ListIndex::new(IDX_NAME, context.fork);
         index.push(1);
-    }
-
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
     }
 }
 
@@ -228,7 +237,7 @@ impl Service for ServicePanicImpl {
         panic!("42");
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -253,7 +262,7 @@ impl Service for ServicePanicStorageErrorImpl {
         panic!(StorageError::new("42"));
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -294,7 +303,7 @@ impl TxResultCheckInterface for TxResultCheckService {
 }
 
 impl Service for TxResultCheckService {
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -361,14 +370,10 @@ fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) ->
     let api_channel = mpsc::channel(1);
     let internal_sender = mpsc::channel(1).0;
 
-    Blockchain::new(
-        TemporaryDB::new(),
-        instances,
-        config.consensus,
-        service_keypair,
-        ApiSender::new(api_channel.0),
-        internal_sender,
-    )
+    BlockchainBuilder::new(TemporaryDB::new(), config.consensus, service_keypair)
+        .with_rust_runtime(instances)
+        .finalize(ApiSender::new(api_channel.0), internal_sender)
+        .unwrap()
 }
 
 #[test]

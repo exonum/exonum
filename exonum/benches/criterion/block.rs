@@ -157,11 +157,7 @@ mod timestamping {
     }
 
     impl Service for Timestamping {
-        fn state_hash(
-            &self,
-            _descriptor: InstanceDescriptor,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
     }
@@ -310,11 +306,7 @@ mod cryptocurrency {
     }
 
     impl Service for Cryptocurrency {
-        fn state_hash(
-            &self,
-            _descriptor: InstanceDescriptor,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
     }
@@ -401,7 +393,6 @@ mod foreign_interface_call {
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
-        proto::Any,
         runtime::{
             self, dispatcher,
             rust::{Interface, Service, Transaction, TransactionContext},
@@ -447,7 +438,7 @@ mod foreign_interface_call {
     }
 
     impl Interface for dyn ForeignInterface {
-        const NAME: &'static str = "ForeignInterface";
+        const INTERFACE_NAME: &'static str = "ForeignInterface";
 
         fn dispatch(
             &self,
@@ -459,7 +450,7 @@ mod foreign_interface_call {
                 0u32 => {
                     let bytes = payload.into();
                     let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(|e| (runtime::rust::Error::ArgumentsParseError, e))?;
+                        .map_err(runtime::DispatcherError::malformed_arguments)?;
                     self.timestamp(ctx, arg)
                 }
                 _ => Err(dispatcher::Error::NoSuchMethod).map_err(From::from),
@@ -472,7 +463,7 @@ mod foreign_interface_call {
 
     impl<'a> ForeignInterfaceClient<'a> {
         fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
-            self.0.call(ForeignInterface::NAME, 0, arg)
+            self.0.call(ForeignInterface::INTERFACE_NAME, 0, arg)
         }
     }
 
@@ -546,11 +537,7 @@ mod foreign_interface_call {
     impl ERC30Tokens for Timestamping {}
 
     impl Service for Timestamping {
-        fn state_hash(
-            &self,
-            _descriptor: InstanceDescriptor,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
     }
@@ -558,11 +545,11 @@ mod foreign_interface_call {
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
             Self::new(t)
-                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", Any::default())
+                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", Vec::default())
                 .with_instance(
                     FOREIGN_INTERFACE_SERVICE_ID,
                     "timestamping-foreign",
-                    Any::default(),
+                    Vec::default(),
                 )
         }
     }

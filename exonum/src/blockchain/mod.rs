@@ -177,7 +177,7 @@ impl Blockchain {
         };
         self.merge(patch)?;
 
-        info!("GENESIS_BLOCK ====== hash={}", self.last_hash());
+        info!("GENESIS_BLOCK ====== hash={}", self.last_hash().to_hex());
 
         Ok(())
     }

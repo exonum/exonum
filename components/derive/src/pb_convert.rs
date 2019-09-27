@@ -455,27 +455,6 @@ impl ProtobufConvert {
             ProtobufConvert::Struct(data) => quote! { #data },
         }
     }
-
-    fn implement_any_conversion(&self) -> impl ToTokens {
-        let name = self.name();
-        let cr = self.cr();
-
-        quote! {
-            impl From<#name> for #cr::proto::Any {
-                fn from(v: #name) -> Self {
-                    Self::new(v)
-                }
-            }
-
-            impl std::convert::TryFrom<#cr::proto::Any> for #name {
-                type Error = failure::Error;
-
-                fn try_from(v: #cr::proto::Any) -> Result<Self, Self::Error> {
-                    v.try_into()
-                }
-            }
-        }
-    }
 }
 
 impl ToTokens for ProtobufConvert {
@@ -488,7 +467,6 @@ impl ToTokens for ProtobufConvert {
 
         let protobuf_convert = self.implement_protobuf_convert();
         let merkledb_traits = self.implement_merkledb_traits();
-        let any_conversion = self.implement_any_conversion();
         let serde_traits = if self.serde_needed() {
             let serde = self.implement_serde_protobuf_convert();
             quote! { #serde }
@@ -506,7 +484,6 @@ impl ToTokens for ProtobufConvert {
                 #protobuf_convert
                 #merkledb_traits
                 #serde_traits
-                #any_conversion
             }
         };
         tokens.extend(expanded)

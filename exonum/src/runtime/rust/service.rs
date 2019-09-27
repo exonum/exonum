@@ -22,12 +22,11 @@ use crate::{
     helpers::{Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
-    proto::Any,
     runtime::{
         api::ServiceApiBuilder,
-        dispatcher::{self, Dispatcher, DispatcherSender},
+        dispatcher::{self, DispatcherRef, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ExecutionContext,
+        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange, ExecutionContext,
         InstanceDescriptor, InstanceId, MethodId,
     },
 };
@@ -45,16 +44,16 @@ pub trait ServiceDispatcher: Send {
 }
 
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    fn configure(
+    fn initialize(
         &self,
         _instance: InstanceDescriptor,
         _fork: &Fork,
-        _params: Any,
+        _params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     fn before_commit(&self, _context: BeforeCommitContext) {}
 
@@ -153,7 +152,9 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     /// Enqueue dispatcher action.
     pub fn dispatch_action(&self, action: dispatcher::Action) {
-        self.inner.dispatch_action(action)
+        self.inner
+            .dispatcher
+            .dispatch_action(self.instance.id, action)
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
@@ -170,7 +171,21 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     #[doc(hidden)]
     /// Create a context to call interfaces of the specified service instance.
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
-        CallContext::new(self.inner, self.instance.id, called)
+        CallContext::from_execution_context(self.inner, self.instance.id, called)
+    }
+
+    /// Check the caller of this method with the specified closure.
+    ///
+    /// If the closure returns `Some(value)`, then the method returns `Some((value, fork))` thus you
+    /// get a write access to the blockchain state. Otherwise this method returns
+    /// an occurred error.
+    pub fn verify_caller<F, T>(&self, predicate: F) -> Option<(T, &Fork)>
+    where
+        F: Fn(&Caller) -> Option<T>,
+    {
+        // TODO Think about returning structure with the named fields instead of unnamed tuple
+        // to make code more clear. [ECR-3222]
+        predicate(&self.inner.caller).map(|result| (result, self.inner.fork))
     }
 }
 
@@ -183,7 +198,7 @@ pub struct BeforeCommitContext<'a> {
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a Dispatcher,
+    dispatcher: &'a DispatcherRef<'a>,
 }
 
 impl<'a> BeforeCommitContext<'a> {
@@ -191,13 +206,45 @@ impl<'a> BeforeCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
-        dispatcher: &'a Dispatcher,
+        dispatcher: &'a DispatcherRef<'a>,
     ) -> Self {
         Self {
             instance,
             fork,
             dispatcher,
         }
+    }
+
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a client to call interface methods of the specified service instance.
+    pub fn interface<T>(&self, called: InstanceId) -> T
+    where
+        T: From<CallContext<'a>>,
+    {
+        self.call_context(called).into()
+    }
+
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    #[doc(hidden)]
+    /// Create a context to call interfaces of the specified service instance.
+    pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
+        CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
+    }
+
+    /// Add a configuration update to pending actions. These changes will be applied immediately
+    /// before the block commit.
+    ///
+    /// Only the supervisor service is allowed to perform this action.
+    #[doc(hidden)]
+    pub fn update_config(&self, changes: Vec<ConfigChange>) {
+        self.dispatcher.dispatch_action(
+            self.instance.id,
+            dispatcher::Action::UpdateConfig {
+                caller_instance_id: self.instance.id,
+                changes,
+            },
+        )
     }
 }
 
@@ -288,14 +335,12 @@ impl<'a> Debug for AfterCommitContext<'a> {
 
 /// A service interface specification.
 pub trait Interface {
-    /// Fully qualified name of this interface for the [call info].
-    ///
-    /// [call info]: ../struct.CallInfo.html
-    const NAME: &'static str;
+    /// Fully qualified name of this interface.
+    const INTERFACE_NAME: &'static str;
     /// Invoke the specified method handler of the service instance.
     fn dispatch(
         &self,
-        ctx: TransactionContext,
+        context: TransactionContext,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;

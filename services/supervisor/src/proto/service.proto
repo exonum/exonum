@@ -14,10 +14,11 @@
 
 syntax = "proto3";
 
-package exonum.service.supervisor;
+package exonum.supervisor;
 
+import "helpers.proto";
 import "runtime.proto";
-import "google/protobuf/any.proto";
+import "blockchain.proto";
 
 // Transactions
 
@@ -26,7 +27,7 @@ message DeployRequest {
     // Artifact identifier.
     exonum.runtime.ArtifactId artifact = 1;
     // Additional information for Runtime to deploy.
-    google.protobuf.Any spec = 2;
+    bytes spec = 2;
     // The height until which the deployment procedure should be completed.
     uint64 deadline_height = 3;
 }
@@ -36,7 +37,7 @@ message DeployConfirmation {
     // Artifact identifier.
     exonum.runtime.ArtifactId artifact = 1;
     // Additional information for Runtime to deploy.
-    google.protobuf.Any spec = 2;
+    bytes spec = 2;
     // The height until which the deployment procedure should be completed.
     uint64 deadline_height = 3;
 }
@@ -48,7 +49,18 @@ message StartService {
     // Instance name.
     string name = 2;
     // Instance configuration.
-    google.protobuf.Any config = 3;
+    bytes config = 3;
     // The height until which the start service procedure should be completed.
     uint64 deadline_height = 4;
+}
+
+// Request for the configuration change
+message ConfigPropose {
+    uint64 actual_from = 1;
+    repeated exonum.runtime.ConfigChange changes = 2;
+}
+
+message ConfigVote {
+    exonum.Hash propose_hash = 1;
+    bool decision = 2;
 }

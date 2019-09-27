@@ -76,11 +76,11 @@ pub struct ServiceApiScope {
 
 impl ServiceApiScope {
     /// Create a new service API scope for the specified service instance.
-    pub fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
+    pub fn new(context: ApiContext, instance: InstanceDescriptor) -> Self {
         Self {
             inner: ApiScope::new(),
             context,
-            descriptor: instance_descriptor.into(),
+            descriptor: instance.into(),
         }
     }
 
@@ -259,11 +259,11 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Create a new service API builder for the specified service instance.
     #[doc(hidden)]
-    pub fn new(context: ApiContext, instance_descriptor: InstanceDescriptor) -> Self {
+    pub fn new(context: ApiContext, instance: InstanceDescriptor) -> Self {
         Self {
             context: context.clone(),
-            public_scope: ServiceApiScope::new(context.clone(), instance_descriptor),
-            private_scope: ServiceApiScope::new(context, instance_descriptor),
+            public_scope: ServiceApiScope::new(context.clone(), instance),
+            private_scope: ServiceApiScope::new(context, instance),
         }
     }
 

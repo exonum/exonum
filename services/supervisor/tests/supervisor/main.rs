@@ -21,10 +21,9 @@ use exonum::{
     crypto,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    proto::Any,
     runtime::{
         rust::{ServiceFactory, Transaction},
-        ArtifactId, InstanceId, RuntimeIdentifier,
+        ArtifactId, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor};
@@ -88,7 +87,7 @@ fn deploy_artifact_manually(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> crypto::Hash {
-    let service_id = Supervisor::BUILTIN_ID;
+    let service_id = SUPERVISOR_INSTANCE_ID;
     let keys = &testkit.validator(validator_id).service_keypair();
     let signed_request = request.clone().sign(service_id, keys.0, &keys.1);
     testkit.add_tx(signed_request.clone());
@@ -109,7 +108,7 @@ fn start_service_manually(
     request: &StartService,
     validator_id: ValidatorId,
 ) -> crypto::Hash {
-    let service_id = Supervisor::BUILTIN_ID;
+    let service_id = SUPERVISOR_INSTANCE_ID;
     let keys = &testkit.validator(validator_id).service_keypair();
     let signed_request = request.clone().sign(service_id, keys.0, &keys.1);
     testkit.add_tx(signed_request.clone());
@@ -121,7 +120,7 @@ fn deploy_confirmation(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let service_id = Supervisor::BUILTIN_ID;
+    let service_id = SUPERVISOR_INSTANCE_ID;
     let confirmation: DeployConfirmation = request.clone().into();
     let keys = &testkit.validator(validator_id).service_keypair();
     confirmation.sign(service_id, keys.0, &keys.1)
@@ -143,7 +142,7 @@ fn deploy_confirmation_hash_default(testkit: &TestKit, request: &DeployRequest) 
 fn deploy_request(artifact: ArtifactId, deadline_height: Height) -> DeployRequest {
     DeployRequest {
         artifact,
-        spec: Any::default(),
+        spec: Vec::default(),
         deadline_height,
     }
 }
@@ -156,7 +155,7 @@ fn start_service_request(
     StartService {
         artifact,
         name: name.into(),
-        config: Any::default(),
+        config: Vec::default(),
         deadline_height,
     }
 }
@@ -205,6 +204,7 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .create()
 }
@@ -212,6 +212,7 @@ fn testkit_with_inc_service() -> TestKit {
 fn testkit_with_inc_service_and_two_validators() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .with_validators(2)
         .create()
@@ -220,6 +221,7 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .with_validators(1)
         .create()
@@ -230,8 +232,16 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
     let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(collection)
         .create()
+}
+
+fn with_available_services() -> Vec<Box<dyn ServiceFactory>> {
+    vec![
+        Box::new(IncService) as Box<dyn ServiceFactory>,
+        Box::new(Supervisor) as Box<dyn ServiceFactory>,
+    ]
 }
 
 /// Just test that the Inc service works as intended.
@@ -338,7 +348,7 @@ fn test_try_run_unregistered_service_instance() {
     let request = StartService {
         artifact: artifact_default(),
         name: instance_name.into(),
-        config: Any::default(),
+        config: Vec::default(),
         deadline_height: Height(1000),
     };
     let hash = start_service(&api, request);
@@ -500,6 +510,7 @@ fn test_start_service_instance_twice() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
+        .with_service(Supervisor)
         .with_service(InstanceCollection::new(IncService))
         .create();
 
@@ -509,7 +520,7 @@ fn test_restart_node_and_start_service_instance() {
     let testkit_stopped = testkit.stop();
 
     // And start it again with the same service factory.
-    let mut testkit = testkit_stopped.resume(vec![IncService]);
+    let mut testkit = testkit_stopped.resume(with_available_services());
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
@@ -537,7 +548,7 @@ fn test_restart_node_and_start_service_instance() {
 
     // Restart the node again.
     let testkit_stopped = testkit.stop();
-    let mut testkit = testkit_stopped.resume(vec![IncService]);
+    let mut testkit = testkit_stopped.resume(with_available_services());
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
@@ -584,7 +595,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     testkit.create_block();
 
     // Restart the node again after the first block was created.
-    let mut testkit = testkit.stop().resume(vec![IncService]);
+    let mut testkit = testkit.stop().resume(with_available_services());
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
@@ -735,7 +746,7 @@ fn test_auditor_cant_send_requests() {
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
         // Manually signing the tx with auditor's keypair.
-        let service_id = Supervisor::BUILTIN_ID;
+        let service_id = SUPERVISOR_INSTANCE_ID;
         let confirmation: DeployConfirmation = request_deploy.clone().into();
         let keys = &testkit.us().service_keypair();
         confirmation.sign(service_id, keys.0, &keys.1)

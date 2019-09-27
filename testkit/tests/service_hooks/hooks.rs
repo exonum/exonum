@@ -98,7 +98,7 @@ impl Service for AfterCommitService {
         context.broadcast_transaction(tx);
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
