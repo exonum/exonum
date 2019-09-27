@@ -193,5 +193,4 @@ mod test {
         });
         assert!(connect_list.is_address_allowed(&address));
     }
-
 }

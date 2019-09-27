@@ -38,12 +38,11 @@ pub mod transactions;
 use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
-    proto::Any,
-    runtime::{api::ServiceApiBuilder, dispatcher, rust::Service, InstanceDescriptor},
+    merkledb::{BinaryValue, Fork, Snapshot},
+    runtime::{
+        api::ServiceApiBuilder, dispatcher, rust::Service, DispatcherError, InstanceDescriptor,
+    },
 };
-use exonum_merkledb::{Fork, Snapshot};
-
-use std::convert::TryFrom;
 
 use crate::{
     api::PublicApi as TimestampingApi,
@@ -56,24 +55,6 @@ use crate::{
 pub struct TimestampingService;
 
 impl Service for TimestampingService {
-    fn configure(
-        &self,
-        descriptor: InstanceDescriptor,
-        fork: &Fork,
-        params: Any,
-    ) -> Result<(), ExecutionError> {
-        let config = Config::try_from(params).map_err(|e| (Error::ConfigParseError, e))?;
-        if !dispatcher::Schema::new(fork)
-            .service_instances()
-            .contains(&config.time_service_name)
-        {
-            return Err(Error::TimeServiceNotFound.into());
-        }
-
-        Schema::new(descriptor.name, fork).config().set(config);
-        Ok(())
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         TimestampingApi.wire(builder);
     }
@@ -81,5 +62,25 @@ impl Service for TimestampingService {
     fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(descriptor.name, snapshot);
         schema.state_hash()
+    }
+
+    fn initialize(
+        &self,
+        instance: InstanceDescriptor,
+        fork: &Fork,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let config =
+            Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+
+        if !dispatcher::Schema::new(fork)
+            .service_instances()
+            .contains(&config.time_service_name)
+        {
+            return Err(Error::TimeServiceNotFound.into());
+        }
+
+        Schema::new(instance.name, fork).config().set(config);
+        Ok(())
     }
 }

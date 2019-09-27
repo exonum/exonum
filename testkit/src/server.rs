@@ -14,6 +14,7 @@
 
 use exonum::{
     api::{self, node::SharedNodeState, ApiAggregator, ApiBuilder, ApiScope},
+    blockchain::ConsensusConfig,
     crypto::Hash,
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
@@ -21,7 +22,7 @@ use exonum::{
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use super::{TestKit, TestNetworkConfiguration};
+use super::TestKit;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct CreateBlockQuery {
@@ -34,9 +35,7 @@ pub struct TestKitStatus {
     /// Current blockchain height.
     pub height: Height,
     /// Currently active network configuration.
-    pub configuration: TestNetworkConfiguration,
-    /// Scheduled network configuration (if any).
-    pub next_configuration: Option<TestNetworkConfiguration>,
+    pub configuration: ConsensusConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -55,8 +54,7 @@ impl TestkitServerApi {
         let testkit = self.read();
         Ok(TestKitStatus {
             height: testkit.height(),
-            configuration: testkit.configuration_change_proposal(),
-            next_configuration: testkit.next_configuration().cloned(),
+            configuration: testkit.consensus_config(),
         })
     }
 
@@ -216,11 +214,7 @@ mod tests {
     }
 
     impl Service for SampleService {
-        fn state_hash(
-            &self,
-            _descriptor: InstanceDescriptor,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
     }

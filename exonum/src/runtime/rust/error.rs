@@ -22,10 +22,6 @@ pub enum Error {
     IncorrectArtifactId = 0,
     /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
     UnableToDeploy = 1,
-    /// Unable to parse service configuration.
-    ConfigParseError = 2,
     /// Unspecified error during the call invocation.
-    UnspecifiedError = 3,
-    /// Unable to parse the method arguments of the service interface.
-    ArgumentsParseError = 4,
+    UnspecifiedError = 2,
 }

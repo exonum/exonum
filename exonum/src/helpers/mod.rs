@@ -17,6 +17,7 @@
 pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
 
 pub mod config;
+pub mod multisig;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
@@ -26,11 +27,13 @@ use log::SetLoggerError;
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::blockchain::{ConsensusConfig, Schema, ValidatorKeys};
-use crate::crypto::gen_keypair;
-use crate::exonum_merkledb::Fork;
-use crate::keys::Keys;
-use crate::node::{ConnectListConfig, NodeConfig};
+use crate::{
+    blockchain::{ConsensusConfig, Schema, ValidatorKeys},
+    crypto::gen_keypair,
+    exonum_merkledb::Fork,
+    keys::Keys,
+    node::{ConnectListConfig, NodeConfig},
+};
 
 mod types;
 
@@ -82,12 +85,16 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
 }
 
 /// Basic trait to validate user defined input.
-pub trait ValidateInput {
+pub trait ValidateInput: Sized {
     /// The type returned in the event of a validate error.
     type Error;
-    /// Performs parameters validation for this configuration and returns error if
+    /// Perform parameters validation for this configuration and return error if
     /// value is inconsistent.
     fn validate(&self) -> Result<(), Self::Error>;
+    /// The same as validate method, but returns the value itself as a successful result.
+    fn into_validated(self) -> Result<Self, Self::Error> {
+        self.validate().map(|_| self)
+    }
 }
 
 /// This routine is adapted from the *old* Path's `path_relative_from`

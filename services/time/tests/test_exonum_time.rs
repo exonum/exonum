@@ -23,12 +23,15 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionErrorKind, ExecutionStatus, Schema},
     crypto::{gen_keypair, PublicKey},
-    helpers::{Height, ValidatorId},
+    helpers::Height,
     messages::Verified,
     runtime::{rust::Transaction, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
+use exonum_testkit::{
+    simple_supervisor::{ConfigPropose, SimpleSupervisor},
+    ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode,
+};
 use exonum_time::{
     api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
     transactions::TxTime, TimeServiceFactory,
@@ -365,6 +368,7 @@ fn test_selected_time_less_than_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
         .with_service(TimeServiceInstance)
+        .with_service(SimpleSupervisor)
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -373,13 +377,17 @@ fn test_selected_time_less_than_time_in_storage() {
 
     let cfg_change_height = Height(5);
     let new_cfg = {
-        let mut cfg = testkit.configuration_change_proposal();
-        cfg.set_validators(vec![TestNode::new_validator(ValidatorId(0))]);
-        cfg.set_actual_from(cfg_change_height);
+        let mut cfg = testkit.consensus_config();
+        cfg.validator_keys = vec![testkit.network_mut().add_node().public_keys()];
         cfg
     };
-    testkit.commit_configuration_change(new_cfg);
-    testkit.create_blocks_until(cfg_change_height.previous());
+
+    testkit.create_block_with_transaction(
+        ConfigPropose::actual_from(cfg_change_height)
+            .consensus_config(new_cfg)
+            .into_tx(),
+    );
+    testkit.create_blocks_until(cfg_change_height);
 
     let validators = testkit.network().validators().to_vec();
     let (pub_key_1, sec_key_1) = validators[0].service_keypair();
@@ -533,6 +541,7 @@ fn test_endpoint_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_service(TimeServiceInstance)
+        .with_service(SimpleSupervisor)
         .create();
 
     let mut api = testkit.api();
@@ -593,17 +602,20 @@ fn test_endpoint_api() {
     let public_key_0 = validators[0].service_keypair().0;
     let cfg_change_height = Height(10);
     let new_cfg = {
-        let mut cfg = testkit.configuration_change_proposal();
-        cfg.set_validators(vec![
-            TestNode::new_validator(ValidatorId(3)),
-            validators[1].clone(),
-            validators[2].clone(),
-        ]);
-        cfg.set_actual_from(cfg_change_height);
+        let mut cfg = testkit.consensus_config();
+        cfg.validator_keys = vec![
+            testkit.network_mut().add_node().public_keys(),
+            validators[1].public_keys(),
+            validators[2].public_keys(),
+        ];
         cfg
     };
-    testkit.commit_configuration_change(new_cfg);
-    testkit.create_blocks_until(cfg_change_height.previous());
+    testkit.create_block_with_transaction(
+        ConfigPropose::actual_from(cfg_change_height)
+            .consensus_config(new_cfg)
+            .into_tx(),
+    );
+    testkit.create_blocks_until(cfg_change_height);
 
     current_validators_times.remove(&public_key_0);
     let validators = testkit.network().validators().to_vec();

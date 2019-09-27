@@ -12,22 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
-import "helpers.proto";
+use exonum::{
+    crypto::Hash,
+    merkledb::{Entry, IndexAccess, ObjectHash},
+};
 
-package exonum.proof;
+use super::ConfigPropose;
 
-message MapProof {
-    repeated OptionalEntry entries = 1;
-    repeated MapProofEntry proof = 2;
+pub struct Schema<T: IndexAccess> {
+    access: T,
 }
 
-message OptionalEntry {
-    bytes key = 1;
-    bytes value = 2;
-}
+impl<T: IndexAccess> Schema<T> {
+    pub fn new(access: T) -> Self {
+        Self { access }
+    }
 
-message MapProofEntry {
-    bytes proof_path = 1;
-    exonum.Hash hash = 2;
+    pub fn config_propose_entry(&self) -> Entry<T, ConfigPropose> {
+        Entry::new("config.propose", self.access.clone())
+    }
+
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![self.config_propose_entry().object_hash()]
+    }
 }

@@ -14,6 +14,10 @@
 
 //! The set of errors for the Dispatcher module.
 
+use std::fmt::Display;
+
+use super::ExecutionError;
+
 /// List of possible dispatcher errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 #[exonum(crate = "crate", kind = "dispatcher")]
@@ -40,4 +44,30 @@ pub enum Error {
     NoSuchMethod = 9,
     /// Maximum depth of the call stack has been reached.
     StackOverflow = 10,
+    /// This caller is not authorized to call this method.
+    UnauthorizedCaller = 11,
+    /// Malformed arguments for calling a service interface method.
+    MalformedArguments = 12,
+}
+
+impl Error {
+    /// Create a `NoSuchInterface` error with the specified error message.
+    pub fn no_such_interface(msg: impl Display) -> ExecutionError {
+        (Error::NoSuchInterface, msg).into()
+    }
+
+    /// Create a `NoSuchMethod` error with the specified error message.
+    pub fn no_such_method(msg: impl Display) -> ExecutionError {
+        (Error::NoSuchMethod, msg).into()
+    }
+
+    /// Create an `UnauthorizedCaller` error with the specified error message.
+    pub fn unauthorized_caller(msg: impl Display) -> ExecutionError {
+        (Error::UnauthorizedCaller, msg).into()
+    }
+
+    /// Create a `MalformedArguments` error with the specified error message.
+    pub fn malformed_arguments(msg: impl Display) -> ExecutionError {
+        (Error::MalformedArguments, msg).into()
+    }
 }

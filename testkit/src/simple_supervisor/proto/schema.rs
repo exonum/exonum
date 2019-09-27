@@ -12,22 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
-import "helpers.proto";
+use exonum::proto::schema::runtime;
 
-package exonum.proof;
-
-message MapProof {
-    repeated OptionalEntry entries = 1;
-    repeated MapProofEntry proof = 2;
-}
-
-message OptionalEntry {
-    bytes key = 1;
-    bytes value = 2;
-}
-
-message MapProofEntry {
-    bytes proof_path = 1;
-    exonum.Hash hash = 2;
-}
+include!(concat!(env!("OUT_DIR"), "/simple_supervisor_mod.rs"));
