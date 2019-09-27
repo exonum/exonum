@@ -26,7 +26,7 @@ use exonum::{
 };
 use exonum_testkit::{runtime::RuntimeFactory, TestKitBuilder};
 use futures::{Future, IntoFuture};
-use std::{cell::RefCell, sync::Arc};
+use std::{sync::Arc, sync::RwLock};
 
 // Tracks parts of state of runtime that we're interested in.
 #[derive(Debug)]
@@ -39,34 +39,34 @@ struct RuntimeState {
 // Main purpose is to track and make some assertions on state of runtime.
 #[derive(Debug)]
 struct RuntimeTester {
-    state: RefCell<RuntimeState>,
+    state: RwLock<RuntimeState>,
 }
 
 impl RuntimeTester {
     fn deploy_artifact(&self, artifact: ArtifactId, deploy_spec: Any) {
-        let mut state = self.state.borrow_mut();
+        let mut state = self.state.write().unwrap();
         state.deployed_artifact = artifact;
         state.deploy_spec = deploy_spec;
     }
 
     fn configure_service(&self, config_params: Any) {
-        let mut state = self.state.borrow_mut();
+        let mut state = self.state.write().unwrap();
         state.config_params = config_params;
     }
 
     fn is_artifact_deployed(&self, artifact_id: &ArtifactId) -> bool {
-        let state = self.state.borrow();
+        let state = self.state.read().unwrap();
         state.deployed_artifact == *artifact_id
     }
 
     fn assert_artifact_deployed(&self, artifact_id: ArtifactId, deploy_spec: Any) {
-        let state = self.state.borrow();
+        let state = self.state.read().unwrap();
         assert_eq!(state.deployed_artifact, artifact_id);
         assert_eq!(state.deploy_spec, deploy_spec);
     }
 
     fn assert_config_params_passed(&self, config_params: Any) {
-        let state = self.state.borrow();
+        let state = self.state.read().unwrap();
         assert_eq!(state.config_params, config_params)
     }
 }
@@ -82,14 +82,10 @@ impl Default for RuntimeTester {
             config_params: Default::default(),
         };
         Self {
-            state: RefCell::new(state),
+            state: RwLock::new(state),
         }
     }
 }
-
-// It's safe because in fact we don't leave the single thread scope during testing.
-unsafe impl Send for RuntimeTester {}
-unsafe impl Sync for RuntimeTester {}
 
 #[derive(Debug)]
 struct TestRuntime {
