@@ -185,7 +185,7 @@ impl BlockchainBuilder {
     }
 }
 
-/// DTO for service instance configuration.
+/// Instantiation parameters of service instance.
 #[derive(Debug)]
 pub struct InstanceConfig {
     /// Service instance specification.
