@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::Hash, runtime::ArtifactId, helpers::multisig::ValidatorMultisig};
+use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
 use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
 
 use super::{DeployConfirmation, DeployRequest, StartService};

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{helpers::Height, impl_serde_hex_for_binary_value, proto::Any, runtime::ArtifactId};
+use exonum::{helpers::Height, impl_serde_hex_for_binary_value, runtime::ArtifactId};
 
 use super::proto;
 

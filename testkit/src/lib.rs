@@ -180,7 +180,6 @@ use exonum::{
     node::{ApiSender, ExternalMessage, State as NodeState},
     runtime::{rust::ServiceFactory, InstanceId},
 };
-use exonum_supervisor::Supervisor;
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -241,19 +240,6 @@ impl TestKit {
             .create()
     }
 
-    /// Returns the list of the Instances enabled by default.
-    ///
-    /// Currently only `Supervisor` service is included.
-    fn default_service_instances() -> Vec<InstanceCollection> {
-        let supervisor_instance = InstanceCollection::new(Supervisor).with_instance(
-            Supervisor::BUILTIN_ID,
-            Supervisor::BUILTIN_NAME,
-            (),
-        );
-
-        vec![supervisor_instance]
-    }
-
     fn assemble(
         database: impl Into<CheckpointDb<TemporaryDB>>,
         service_factories: impl IntoIterator<Item = InstanceCollection>,
@@ -262,9 +248,6 @@ impl TestKit {
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
-
-        let default_instances = TestKit::default_service_instances();
-        let overall_instances = default_instances.into_iter().chain(service_factories);
 
         let db = database.into();
 

@@ -18,8 +18,6 @@ extern crate exonum_derive;
 extern crate exonum;
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate serde_derive;
 
 pub use self::{
     errors::Error,
