@@ -44,11 +44,10 @@ rust:
 
 cache:
   npm: true
+  cargo: true
   directories:
   - $HOME/.local
-  - $HOME/.cargo
   - $HOME/.kcov
-  - $TRAVIS_BUILD_DIR/target
   timeout: 900
 
 dist: xenial
