@@ -17,8 +17,8 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     exonum_merkledb::{Fork, Snapshot},
     node::ApiSender,
-    runtime::dispatcher::DispatcherSender,
     runtime::{
+        dispatcher::{DispatcherRef, DispatcherSender},
         ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
@@ -26,7 +26,6 @@ use exonum::{
 use exonum_testkit::{runtime::RuntimeFactory, TestKitBuilder};
 use futures::{Future, IntoFuture};
 use std::{sync::Arc, sync::RwLock};
-use exonum::runtime::dispatcher::DispatcherRef;
 
 // Tracks parts of state of runtime that we're interested in.
 #[derive(Debug)]
@@ -123,7 +122,12 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn initialize_service(&self, _fork: &Fork, _instance: InstanceDescriptor, parameters: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize_service(
+        &self,
+        _fork: &Fork,
+        _instance: InstanceDescriptor,
+        parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         self.tester.configure_service(parameters);
         Ok(())
     }
