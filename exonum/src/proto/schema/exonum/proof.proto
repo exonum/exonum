@@ -14,6 +14,7 @@
 
 syntax = "proto3";
 import "helpers.proto";
+import "google/protobuf/empty.proto";
 
 package exonum.proof;
 
@@ -24,7 +25,10 @@ message MapProof {
 
 message OptionalEntry {
     bytes key = 1;
-    bytes value = 2;
+    oneof maybe_value {
+        bytes value = 2;
+        google.protobuf.Empty no_value = 3;
+    }
 }
 
 message MapProofEntry {

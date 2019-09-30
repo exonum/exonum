@@ -89,6 +89,7 @@ use crate::{
     crypto::{self},
     helpers::{Height, Round, ValidatorId},
 };
+use protobuf::well_known_types::Empty;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
@@ -367,8 +368,9 @@ where
                 key.write(&mut buf);
                 entry.set_key(buf.to_vec());
 
-                if let Some(value) = value {
-                    entry.set_value(value.to_bytes());
+                match value {
+                    Some(value) => entry.set_value(value.to_bytes()),
+                    None => entry.set_no_value(Empty::new()),
                 }
 
                 entry
@@ -391,18 +393,23 @@ where
                     crypto::Hash::from_pb(entry.get_hash().clone())?,
                 ))
             })
-            .collect::<Result<Vec<(_, _)>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
 
         let entries = pb
             .get_entries()
             .iter()
             .map(|entry| {
                 let key = K::read(entry.get_key());
-                let value = V::from_bytes(Cow::Borrowed(entry.get_value())).ok();
 
-                (key, value)
+                let value = if entry.has_value() {
+                    Some(V::from_bytes(Cow::Borrowed(entry.get_value()))?)
+                } else {
+                    None
+                };
+
+                Ok((key, value))
             })
-            .collect();
+            .collect::<Result<Vec<_>, Error>>()?;
 
         Ok(exonum_merkledb::MapProof::from_raw_parts(&proof, entries))
     }
