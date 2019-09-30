@@ -197,7 +197,7 @@ impl InstanceConfig {
         artifact_spec: Option<Vec<u8>>,
         constructor: Vec<u8>,
     ) -> Self {
-        InstanceConfig {
+        Self {
             instance_spec,
             artifact_spec,
             constructor,
