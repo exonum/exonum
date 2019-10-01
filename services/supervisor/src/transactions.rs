@@ -98,13 +98,13 @@ impl SupervisorInterface for Supervisor {
         let blockchain_schema = blockchain::Schema::new(context.fork());
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded)?;
+            return Err(Error::DeadlineExceeded.into());
         }
         let schema = Schema::new(context.instance.name, context.fork());
 
         // Verifies that the deployment request is not yet registered.
         if schema.pending_deployments().contains(&deploy.artifact) {
-            return Err(Error::DeployRequestAlreadyRegistered)?;
+            return Err(Error::DeployRequestAlreadyRegistered.into());
         }
 
         // Verifies that transaction author is validator.
@@ -123,7 +123,7 @@ impl SupervisorInterface for Supervisor {
             .artifacts()
             .contains(&deploy.artifact.name)
         {
-            return Err(Error::AlreadyDeployed)?;
+            return Err(Error::AlreadyDeployed.into());
         }
 
         let confirmations = deploy_requests.confirm(&deploy, author);
@@ -146,7 +146,7 @@ impl SupervisorInterface for Supervisor {
 
         // Verifies that we doesn't reach deadline height.
         if confirmation.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded)?;
+            return Err(Error::DeadlineExceeded.into());
         }
         let schema = Schema::new(context.instance.name, context.fork());
 
@@ -166,7 +166,7 @@ impl SupervisorInterface for Supervisor {
             .pending_deployments()
             .contains(&confirmation.artifact)
         {
-            return Err(Error::DeployRequestNotRegistered)?;
+            return Err(Error::DeployRequestNotRegistered.into());
         }
 
         let confirmations = deploy_confirmations.confirm(&confirmation, author);
@@ -200,7 +200,7 @@ impl SupervisorInterface for Supervisor {
 
         // Verifies that we doesn't reach deadline height.
         if service.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded)?;
+            return Err(Error::DeadlineExceeded.into());
         }
         let mut pending_instances =
             Schema::new(context.instance.name, context.fork()).pending_instances();
@@ -219,7 +219,7 @@ impl SupervisorInterface for Supervisor {
             .service_instances()
             .contains(&service.name)
         {
-            return Err(Error::InstanceExists)?;
+            return Err(Error::InstanceExists.into());
         }
 
         let confirmations = pending_instances.confirm(&service, author);

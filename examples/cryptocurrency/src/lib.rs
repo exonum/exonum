@@ -245,7 +245,7 @@ pub mod contracts {
                 schema.wallets().put(&author, wallet);
                 Ok(())
             } else {
-                Err(Error::WalletAlreadyExists)?
+                Err(Error::WalletAlreadyExists)
             }
         }
 
@@ -258,19 +258,19 @@ pub mod contracts {
             let view = context.fork();
 
             if author == arg.to {
-                Err(Error::SenderSameAsReceiver)?
+                return Err(Error::SenderSameAsReceiver);
             }
 
             let schema = CurrencySchema::new(context.instance.name, view);
 
             let sender = match schema.wallet(&author) {
                 Some(val) => val,
-                None => Err(Error::SenderNotFound)?,
+                None => return Err(Error::SenderNotFound),
             };
 
             let receiver = match schema.wallet(&arg.to) {
                 Some(val) => val,
-                None => Err(Error::ReceiverNotFound)?,
+                None => return Err(Error::ReceiverNotFound),
             };
 
             let amount = arg.amount;
@@ -283,7 +283,7 @@ pub mod contracts {
                 wallets.put(&arg.to, receiver);
                 Ok(())
             } else {
-                Err(Error::InsufficientCurrencyAmount)?
+                Err(Error::InsufficientCurrencyAmount)
             }
         }
     }

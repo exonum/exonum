@@ -40,7 +40,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.37.0
+  - 1.38.0
 
 cache:
   npm: true
@@ -127,6 +127,10 @@ jobs:
   - name: unit-test
     script:
     - cargo test --all
+
+  # Run examples.
+  - name: examples
+    script:
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
     # - cargo run -p exonum-testkit --example configuration_change TODO enable after [ECR-3306]

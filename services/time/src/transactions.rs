@@ -51,7 +51,7 @@ impl TxTime {
         let keys = Schema::new(snapshot).consensus_config().validator_keys;
         let signed = keys.iter().any(|k| k.service_key == *author);
         if !signed {
-            Err(Error::UnknownSender)?
+            Err(Error::UnknownSender)
         } else {
             Ok(())
         }
@@ -67,7 +67,7 @@ impl TxTime {
         let mut validators_times = schema.validators_times();
         match validators_times.get(author) {
             // The validator time in the storage should be less than in the transaction.
-            Some(time) if time >= self.time => Err(Error::ValidatorTimeIsGreater)?,
+            Some(time) if time >= self.time => Err(Error::ValidatorTimeIsGreater),
             // Write the time for the validator.
             _ => {
                 validators_times.put(author, self.time);
