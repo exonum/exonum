@@ -332,8 +332,8 @@ pub struct ProtoSourceFile {
     pub content: String,
 }
 
-impl<'a> From<&'a (&'a str, &'a str)> for ProtoSourceFile {
-    fn from(v: &'a (&'a str, &'a str)) -> Self {
+impl From<&(&str, &str)> for ProtoSourceFile {
+    fn from(v: &(&str, &str)) -> Self {
         Self {
             name: v.0.to_owned(),
             content: v.1.to_owned(),
@@ -342,7 +342,7 @@ impl<'a> From<&'a (&'a str, &'a str)> for ProtoSourceFile {
 }
 
 /// Artifact Protobuf specification for the Exonum clients.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct ArtifactProtobufSpec {
     /// List of Protobuf files that make up the service interface. The first element in the tuple
     /// is the file name, the second one is its content.
@@ -351,18 +351,11 @@ pub struct ArtifactProtobufSpec {
     pub sources: Vec<ProtoSourceFile>,
 }
 
-impl ArtifactProtobufSpec {
-    pub fn from_str_list(sources_strings: &[(&str, &str)]) -> Self {
+impl From<&[(&str, &str)]> for ArtifactProtobufSpec {
+    fn from(sources_strings: &[(&str, &str)]) -> Self {
         let sources = sources_strings.iter().map(From::from).collect();
 
         Self { sources }
-    }
-}
-
-impl Default for ArtifactProtobufSpec {
-    /// Create blank artifact information without any proto sources.
-    fn default() -> Self {
-        Self { sources: vec![] }
     }
 }
 
