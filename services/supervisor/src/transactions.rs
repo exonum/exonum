@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
+use exonum::{
     blockchain,
     helpers::ValidateInput,
     runtime::{
@@ -25,8 +25,8 @@ use crate::{
 use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor};
 
 /// Supervisor service transactions.
-#[exonum_service(crate = "crate")]
-pub trait Transactions {
+#[exonum_service()]
+pub trait SupervisorInterface {
     /// Requests artifact deploy.
     ///
     /// This request should be sent by the each of validators.
@@ -88,7 +88,7 @@ impl ValidateInput for StartService {
     }
 }
 
-impl Transactions for Supervisor {
+impl SupervisorInterface for Supervisor {
     fn request_artifact_deploy(
         &self,
         context: TransactionContext,

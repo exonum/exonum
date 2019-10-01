@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::ObjectHash;
-use failure::Fail;
-
-use super::{DeployRequest, StartService};
-use crate::{
+use exonum::{
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder, ServiceApiState},
         rust::Transaction,
     },
 };
+use exonum_merkledb::ObjectHash;
+use failure::Fail;
+
+use super::{DeployRequest, StartService};
 
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {

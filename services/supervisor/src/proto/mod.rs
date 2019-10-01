@@ -14,8 +14,8 @@
 
 #![allow(bare_trait_objects)]
 
-include!(concat!(env!("OUT_DIR"), "/exonum_supervisor_mod.rs"));
-
 pub use self::service::*;
 
-use crate::proto::schema::*;
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+
+use exonum::proto::schema::*;
