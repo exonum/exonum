@@ -25,13 +25,13 @@ use exonum::{
     runtime::{
         dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
-        supervisor::{DeployRequest, StartService, Supervisor},
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
         SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
+use exonum_supervisor::{DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
 use exonum::keys::Keys;

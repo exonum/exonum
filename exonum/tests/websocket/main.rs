@@ -53,7 +53,7 @@ fn create_ws_client(addr: &str) -> WebSocketResult<Client<TcpStream>> {
             ok => return ok,
         }
     }
-    Err(last_err.unwrap())?
+    Err(last_err.unwrap())
 }
 
 fn recv_text_msg(client: &mut Client<TcpStream>) -> Option<String> {

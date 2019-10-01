@@ -110,8 +110,8 @@ impl GenerateConfig {
         provided: Option<SocketAddr>,
         external_address: SocketAddr,
     ) -> SocketAddr {
-        if provided.is_some() {
-            provided.unwrap()
+        if let Some(provided) = provided {
+            provided
         } else {
             let ip_address = match external_address.ip() {
                 IpAddr::V4(_) => "0.0.0.0".parse().unwrap(),

@@ -16,6 +16,7 @@ use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::mpsc, Future, IntoFuture};
 
 use std::sync::{
+    atomic::{AtomicBool, Ordering},
     mpsc::{channel, Sender},
     Arc,
 };
@@ -403,4 +404,94 @@ fn test_dispatcher_rust_runtime_no_service() {
             &tx_payload,
         )
         .expect_err("execute succeed");
+}
+
+#[derive(Debug, Clone)]
+struct ShutdownRuntime {
+    turned_off: Arc<AtomicBool>,
+}
+
+impl ShutdownRuntime {
+    fn new(turned_off: Arc<AtomicBool>) -> Self {
+        Self { turned_off }
+    }
+}
+
+impl Runtime for ShutdownRuntime {
+    fn deploy_artifact(
+        &mut self,
+        _artifact: ArtifactId,
+        _spec: Vec<u8>,
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        Box::new(Ok(()).into_future())
+    }
+
+    fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
+        false
+    }
+
+    fn start_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn initialize_service(
+        &self,
+        _fork: &Fork,
+        _instance: InstanceDescriptor,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn stop_service(&mut self, _instance: InstanceDescriptor) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn execute(&self, _: &ExecutionContext, _: &CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
+        StateHashAggregator::default()
+    }
+
+    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+
+    fn after_commit(
+        &self,
+        _dispatcher: &DispatcherSender,
+        _snapshot: &dyn Snapshot,
+        _service_keypair: &(PublicKey, SecretKey),
+        _tx_sender: &ApiSender,
+    ) {
+    }
+
+    fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+        None
+    }
+
+    fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
+
+    fn shutdown(&self) {
+        self.turned_off.store(true, Ordering::Relaxed);
+    }
+}
+
+#[test]
+fn test_shutdown() {
+    let turned_off_a = Arc::new(AtomicBool::new(false));
+    let turned_off_b = Arc::new(AtomicBool::new(false));
+
+    let runtime_a = ShutdownRuntime::new(turned_off_a.clone());
+    let runtime_b = ShutdownRuntime::new(turned_off_b.clone());
+
+    let dispatcher = DispatcherBuilder::new()
+        .with_runtime(2, runtime_a)
+        .with_runtime(3, runtime_b)
+        .finalize();
+
+    dispatcher.shutdown();
+
+    assert_eq!(turned_off_a.load(Ordering::Relaxed), true);
+    assert_eq!(turned_off_b.load(Ordering::Relaxed), true);
 }
