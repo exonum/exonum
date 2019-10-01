@@ -23,7 +23,7 @@ use exonum::{
         InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
-use exonum_testkit::{runtime::RuntimeFactory, TestKitBuilder};
+use exonum_testkit::TestKitBuilder;
 use futures::{Future, IntoFuture};
 use std::{sync::Arc, sync::RwLock};
 
@@ -167,23 +167,6 @@ impl From<TestRuntime> for (u32, Box<dyn Runtime>) {
     }
 }
 
-#[derive(Debug)]
-struct TestRuntimeFactory {
-    runtime_tester: Arc<RuntimeTester>,
-}
-
-impl TestRuntimeFactory {
-    fn with_runtime_tester(runtime_tester: Arc<RuntimeTester>) -> Self {
-        TestRuntimeFactory { runtime_tester }
-    }
-}
-
-impl RuntimeFactory for TestRuntimeFactory {
-    fn create_runtime(&self) -> (u32, Box<dyn Runtime>) {
-        TestRuntime::with_runtime_tester(self.runtime_tester.clone()).into()
-    }
-}
-
 // We assert that:
 //  1) TestRuntime was passed to the testing blockchain
 //  2) Artifact was deployed with correct deploy specification
@@ -210,10 +193,8 @@ fn test_runtime_factory() {
 
     // This causes artifact deploying and service instantiation.
     TestKitBuilder::validator()
-        .with_runtime_factory(
-            Box::new(TestRuntimeFactory::with_runtime_tester(tester.clone())),
-            instances,
-        )
+        .with_runtime(TestRuntime::with_runtime_tester(tester.clone()))
+        .with_instances(instances)
         .create();
 
     tester.assert_artifact_deployed(artifact_id, artifact_spec);

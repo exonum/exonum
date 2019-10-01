@@ -164,7 +164,6 @@ pub use crate::{
 };
 pub mod compare;
 pub mod proto;
-pub mod runtime;
 pub mod simple_supervisor;
 
 use exonum::{
@@ -181,7 +180,10 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
-    runtime::{rust::ServiceFactory, InstanceId},
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        InstanceId, Runtime,
+    },
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
@@ -195,7 +197,6 @@ use std::{
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::poll_events,
-    runtime::RuntimeFactory,
 };
 
 #[macro_use]
@@ -216,7 +217,6 @@ pub struct TestKit {
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
-    runtime_factories: Vec<Box<dyn RuntimeFactory>>,
 }
 
 impl fmt::Debug for TestKit {
@@ -236,21 +236,21 @@ impl TestKit {
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
+        let InstanceCollection { factory, instances } =
+            InstanceCollection::new(service_factory).with_instance(id, name, constructor);
+        let runtime = RustRuntime::new().with_available_service(factory);
+
         TestKitBuilder::validator()
-            .with_service(InstanceCollection::new(service_factory).with_instance(
-                id,
-                name,
-                constructor,
-            ))
+            .with_runtime(runtime)
+            .with_instances(instances)
             .create()
     }
 
     fn assemble(
         database: impl Into<CheckpointDb<TemporaryDB>>,
-        service_factories: impl IntoIterator<Item = InstanceCollection>,
         network: TestNetwork,
         genesis: ConsensusConfig,
-        runtime_factories: Vec<Box<dyn RuntimeFactory>>,
+        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
         instances: impl IntoIterator<Item = InstanceConfig>,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
@@ -260,12 +260,10 @@ impl TestKit {
 
         let db_handler = db.handler();
 
-        let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair())
-            // We always create Rust runtime
-            .with_rust_runtime(service_factories);
+        let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair());
 
-        for runtime_factory in runtime_factories.iter() {
-            builder = builder.with_additional_runtime(runtime_factory.create_runtime());
+        for runtime in runtimes {
+            builder = builder.with_additional_runtime(runtime);
         }
 
         let blockchain = builder
@@ -306,7 +304,6 @@ impl TestKit {
             events_stream,
             processing_lock,
             network,
-            runtime_factories,
         }
     }
 
@@ -744,16 +741,11 @@ impl TestKit {
         let Self {
             db_handler,
             network,
-            runtime_factories,
             ..
         } = self;
 
         let db = db_handler.into_inner();
-        StoppedTestKit {
-            network,
-            db,
-            runtime_factories,
-        }
+        StoppedTestKit { network, db }
     }
 }
 
@@ -825,7 +817,6 @@ impl TestKit {
 pub struct StoppedTestKit {
     db: CheckpointDb<TemporaryDB>,
     network: TestNetwork,
-    runtime_factories: Vec<Box<dyn RuntimeFactory>>,
 }
 
 impl StoppedTestKit {
@@ -853,13 +844,17 @@ impl StoppedTestKit {
         self,
         available_services: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
     ) -> TestKit {
+        let mut runtime = RustRuntime::new();
+        for service in available_services {
+            runtime = runtime.with_available_service(service);
+        }
+
         TestKit::assemble(
             self.db,
-            available_services.into_iter().map(InstanceCollection::new),
             self.network,
             // TODO make consensus config optional [ECR-3222]
             ConsensusConfig::default(),
-            self.runtime_factories,
+            vec![runtime.into()],
             vec![],
         )
     }
