@@ -79,16 +79,17 @@ mod macros;
 mod tests;
 
 use chrono::{DateTime, TimeZone, Utc};
-use exonum_merkledb::{self, proof_map_index::ProofPath, BinaryKey, BinaryValue};
+use exonum_merkledb::{self, proof_map_index::PROOF_PATH_SIZE, BinaryKey, BinaryValue};
 use failure::Error;
 use protobuf::{well_known_types, RepeatedField};
 
-use std::{borrow::Cow, collections::HashMap, iter::FromIterator};
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
     crypto::{self},
     helpers::{Height, Round, ValidatorId},
 };
+use exonum_merkledb::proof_map_index::ProofPath;
 use protobuf::well_known_types::Empty;
 
 /// Used for establishing correspondence between rust struct
@@ -387,6 +388,8 @@ where
             .get_proof()
             .iter()
             .map(|entry| {
+                let proof_path = entry.get_proof_path();
+                ensure!(proof_path.len() == PROOF_PATH_SIZE, "Not valid proof path");
                 Ok((
                     ProofPath::read(entry.get_proof_path()),
                     crypto::Hash::from_pb(entry.get_hash().clone())?,

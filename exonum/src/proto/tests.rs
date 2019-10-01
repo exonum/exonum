@@ -22,6 +22,7 @@ use std::{borrow::Cow, collections::HashMap, fmt};
 
 use super::{schema, ProtobufConvert};
 use crate::crypto::{self, Hash, PublicKey, Signature};
+use protobuf::RepeatedField;
 
 #[test]
 fn test_hash_pb_convert() {
@@ -303,7 +304,7 @@ fn test_struct_with_fixed_arrays_roundtrip() {
 }
 
 #[test]
-fn serialize_map_proof() {
+fn map_proof_serialize() {
     let db = TemporaryDB::default();
     let storage = db.fork();
 
@@ -340,4 +341,37 @@ where
         checked_proof.index_hash(),
         proof.check().unwrap().index_hash()
     );
+}
+
+#[test]
+fn map_proof_malformed_serialize() {
+    use self::schema::proof::{MapProof, MapProofEntry, OptionalEntry};
+    let mut proof = MapProof::new();
+    let mut proof_entry = MapProofEntry::new();
+    proof_entry.set_proof_path(vec![0_u8; 33]);
+    proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+
+    let res = exonum_merkledb::MapProof::<u8, u8>::from_pb(proof.clone());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Not valid proof path"));
+
+    let mut proof_entry = MapProofEntry::new();
+    let mut hash = schema::helpers::Hash::new();
+    hash.set_data(vec![0_u8; 31]);
+    proof_entry.set_hash(hash);
+    proof_entry.set_proof_path(vec![0_u8; 34]);
+    proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+
+    let res = exonum_merkledb::MapProof::<u8, u8>::from_pb(proof.clone());
+    assert!(res.unwrap_err().to_string().contains("Wrong Hash size"));
+
+    let mut entry = OptionalEntry::new();
+    entry.set_key(vec![0_u8; 31]);
+    proof.clear_proof();
+    proof.set_entries(RepeatedField::from_vec(vec![entry]));
+
+    // TODO: will panic at runtime, should change BinaryKey::read signature
+    let _res = exonum_merkledb::MapProof::<crypto::PublicKey, u8>::from_pb(proof.clone());
 }
