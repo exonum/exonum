@@ -17,12 +17,16 @@ use exonum::{
     helpers::ValidateInput,
     runtime::{
         dispatcher::{self, Action},
-        rust::TransactionContext,
-        ExecutionError, InstanceSpec,
+        rust::{interfaces::ConfigureCall, TransactionContext},
+        Caller, ConfigChange, DispatcherError, ExecutionError, InstanceSpec,
     },
 };
+use exonum_merkledb::ObjectHash;
 
-use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor};
+use super::{
+    ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, Error, Schema, StartService,
+    Supervisor,
+};
 
 /// Supervisor service transactions.
 #[exonum_service()]
@@ -52,6 +56,28 @@ pub trait SupervisorInterface {
         &self,
         context: TransactionContext,
         service: StartService,
+    ) -> Result<(), ExecutionError>;
+
+    /// Propose config change
+    ///
+    /// This request should be sent by one of validators as the proposition to change 
+    /// current configuration to new one. All another validators able to vote for this 
+    /// configuration by sending 'confirm_config_change' transaction.
+    fn propose_config_change(
+        &self,
+        context: TransactionContext,
+        artifact: ConfigPropose,
+    ) -> Result<(), ExecutionError>;
+    /// Confirm config change
+    ///
+    /// This confirm should be sent by validators to vote for proposed configuration.
+    /// Validator shouldn't vote for the configuration if it was an owner of 
+    /// 'propose_config_change' transaction.
+    /// The configuration will be applied if 2/3+1 validators voted for it.
+    fn confirm_config_change(
+        &self,
+        context: TransactionContext,
+        artifact: ConfigVote,
     ) -> Result<(), ExecutionError>;
 }
 
@@ -89,6 +115,101 @@ impl ValidateInput for StartService {
 }
 
 impl SupervisorInterface for Supervisor {
+    fn propose_config_change(
+        &self,
+        context: TransactionContext,
+        propose: ConfigPropose,
+    ) -> Result<(), ExecutionError> {
+        let author = context
+            .caller()
+            .author()
+            .expect("Wrong `Propose` initiator");
+        let (_, fork) = context
+            .verify_caller(Caller::as_transaction)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
+
+        // Check that the `actual_from` height is in the future.
+        if blockchain::Schema::new(fork).height() >= propose.actual_from {
+            return Err(Error::ActualFromIsPast).map_err(From::from);
+        }
+
+        let schema = Schema::new(context.instance.name, fork);
+        let propose_hash = propose.object_hash();
+        // Check that there are no pending config changes.
+        if schema.config_propose_entry().exists() {
+            return Err(Error::ConfigProposeExists).map_err(From::from);
+        }
+
+        // Perform config verification.
+        for change in &propose.changes {
+            match change {
+                ConfigChange::Consensus(config) => {
+                    config
+                        .validate()
+                        .map_err(|e| (Error::ConsensusConfigInvalid, e))?;
+                }
+
+                ConfigChange::Service(config) => {
+                    context
+                        .interface::<ConfigureCall>(config.instance_id)
+                        .verify_config(config.params.clone())
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+            }
+        }
+
+        // Verifies that transaction author is validator.
+        let mut config_confirms = schema.config_confirms();
+        config_confirms
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
+        config_confirms.confirm(&propose_hash, author);
+        schema.config_propose_entry().set(propose);
+
+        Ok(())
+    }
+
+    fn confirm_config_change(
+        &self,
+        context: TransactionContext,
+        vote: ConfigVote,
+    ) -> Result<(), ExecutionError> {
+        let blockchain_height = blockchain::Schema::new(context.fork()).height();
+        let schema = Schema::new(context.instance.name, context.fork());
+
+        // Verifies that this config proposal is registered.
+        if schema.config_propose_entry().object_hash() != vote.propose_hash {
+            Err(Error::ConfigProposeNotRegistered)?
+        }
+
+        let config_propose = schema.config_propose_entry().get().unwrap();
+        // Verifies that we doesn't reach deadline height.
+        if config_propose.actual_from < blockchain_height {
+            return Err(Error::DeadlineExceeded)?;
+        }
+
+        // Verifies that transaction author is validator.
+        let mut config_confirms = schema.config_confirms();
+        let author = context
+            .caller()
+            .author()
+            .expect("Wrong `ConfigConfirmation` initiator");
+
+        config_confirms
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
+        config_confirms.confirm(&vote.propose_hash, author);
+        trace!(
+            "Propose config {:?} has been confirmed by {:?}",
+            vote.propose_hash,
+            author
+        );
+
+        Ok(())
+    }
+
     fn request_artifact_deploy(
         &self,
         context: TransactionContext,

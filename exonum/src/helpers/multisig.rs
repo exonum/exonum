@@ -142,6 +142,12 @@ where
         len
     }
 
+    pub fn confirmations(&self, id: &V) -> usize {
+        let multisig_index = self.multisig_index();
+        let confirmations = multisig_index.get(id).unwrap_or_default();
+        confirmations.0.len()
+    }
+
     fn multisig_index(&self) -> ProofMapIndex<I, V, BinarySet<PublicKey>> {
         ProofMapIndex::new(self.index_name.clone(), self.access.clone())
     }

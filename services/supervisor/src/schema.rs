@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
 
-use super::{DeployConfirmation, DeployRequest, StartService};
+use super::{ConfigPropose, DeployConfirmation, DeployRequest, StartService};
 
 /// Service information schema.
 #[derive(Debug)]
@@ -57,6 +57,20 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
     pub fn pending_instances(&self) -> ValidatorMultisig<T, StartService> {
         ValidatorMultisig::new(
             [self.instance_name, ".pending_instances"].concat(),
+            self.access.clone(),
+        )
+    }
+
+    pub fn config_confirms(&self) -> ValidatorMultisig<T, Hash> {
+        ValidatorMultisig::new(
+            [self.instance_name, ".config_confirms"].concat(),
+            self.access.clone(),
+        )
+    }
+
+    pub fn config_propose_entry(&self) -> Entry<T, ConfigPropose> {
+        Entry::new(
+            [self.instance_name, ".config_propose_entry"].concat(),
             self.access.clone(),
         )
     }

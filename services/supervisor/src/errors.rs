@@ -31,4 +31,14 @@ pub enum Error {
     InvalidArtifactId = 6,
     /// Instance name is incorrect.
     InvalidInstanceName = 7,
+    /// Actual height for config proposal is in the past.
+    ActualFromIsPast = 8,
+    /// Active configuration change proposal already exists.
+    ConfigProposeExists = 9,
+    /// Malformed configuration change proposal.
+    MalformedConfigPropose = 10,
+    /// Invalid consensus configuration.
+    ConsensusConfigInvalid = 11,
+    /// This configuration change proposal is not registered.
+    ConfigProposeNotRegistered = 12,
 }

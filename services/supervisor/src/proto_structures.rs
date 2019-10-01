@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{helpers::Height, impl_serde_hex_for_binary_value, runtime::ArtifactId};
+use exonum::{
+    crypto::Hash,
+    exonum_merkledb::ObjectHash,
+    helpers::Height,
+    impl_serde_hex_for_binary_value,
+    runtime::{ArtifactId, ConfigChange},
+};
 
 use super::proto;
 
@@ -54,13 +60,33 @@ pub struct StartService {
     pub deadline_height: Height,
 }
 
+#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[exonum(pb = "proto::ConfigPropose")]
+pub struct ConfigPropose {
+    /// The height until which the update configuration procedure should be completed.
+    pub actual_from: Height,
+    /// New configuration proposition.
+    pub changes: Vec<ConfigChange>,
+}
+
+#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[exonum(pb = "proto::ConfigVote")]
+pub struct ConfigVote {
+    /// Hash of configuration proposition.
+    pub propose_hash: Hash,
+}
+
 impl_binary_key_for_binary_value! { DeployRequest }
 impl_binary_key_for_binary_value! { DeployConfirmation }
 impl_binary_key_for_binary_value! { StartService }
+impl_binary_key_for_binary_value! { ConfigPropose }
+impl_binary_key_for_binary_value! { ConfigVote }
 
 impl_serde_hex_for_binary_value! { DeployRequest }
 impl_serde_hex_for_binary_value! { DeployConfirmation }
 impl_serde_hex_for_binary_value! { StartService }
+impl_serde_hex_for_binary_value! { ConfigPropose }
+impl_serde_hex_for_binary_value! { ConfigVote }
 
 impl From<DeployRequest> for DeployConfirmation {
     fn from(v: DeployRequest) -> Self {
@@ -68,6 +94,14 @@ impl From<DeployRequest> for DeployConfirmation {
             artifact: v.artifact,
             deadline_height: v.deadline_height,
             spec: v.spec,
+        }
+    }
+}
+
+impl From<ConfigPropose> for ConfigVote {
+    fn from(v: ConfigPropose) -> Self {
+        Self {
+            propose_hash: v.object_hash(),
         }
     }
 }

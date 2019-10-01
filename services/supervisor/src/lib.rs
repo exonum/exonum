@@ -21,7 +21,9 @@ extern crate log;
 
 pub use self::{
     errors::Error,
-    proto_structures::{DeployConfirmation, DeployRequest, StartService},
+    proto_structures::{
+        ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, StartService,
+    },
     schema::Schema,
 };
 
@@ -34,7 +36,7 @@ use exonum::{
         InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{ObjectHash, Snapshot};
 
 mod api;
 mod errors;
@@ -75,6 +77,33 @@ impl Service for Supervisor {
             schema.pending_deployments().remove(&request.artifact);
 
             trace!("Removed outdated deployment request {:?}", request);
+        }
+
+        // Removes pending config proposal for which deadline was exceeded.
+        if schema
+            .config_propose_entry()
+            .get()
+            .filter(|proposal| proposal.actual_from < height)
+            .map(|_| Some(()))
+            .is_some()
+        {
+            trace!("Removed outdated config proposal");
+            schema.config_propose_entry().remove()
+        }
+
+        // Apply pending config in case 2/3+1 validators voted for it.
+        if schema.config_propose_entry().exists() {
+            let config_confirms = schema.config_confirms();
+            let confirmations =
+                config_confirms.confirmations(&schema.config_propose_entry().object_hash());
+            let validators = config_confirms.validators_len();
+            if confirmations >= validators * 2 / 3 + 1 {
+                // Perform the application of configs.
+                let proposal = schema.config_propose_entry().get().unwrap();
+                context.update_config(proposal.changes);
+                // Remove config from proposals.
+                schema.config_propose_entry().remove();
+            }
         }
     }
 
