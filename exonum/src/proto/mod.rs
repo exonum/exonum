@@ -340,9 +340,8 @@ where
 
 impl<K, V> ProtobufConvert for exonum_merkledb::MapProof<K, V>
 where
-    K: BinaryKey,
+    K: BinaryKey + ToOwned<Owned = K>,
     V: BinaryValue,
-    Vec<(K, Option<V>)>: FromIterator<(<K as ToOwned>::Owned, Option<V>)>,
 {
     type ProtoStruct = MapProof;
 
