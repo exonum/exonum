@@ -418,7 +418,7 @@ impl Dispatcher {
 
     /// Notify the runtimes that it has to shutdown.
     pub(crate) fn shutdown(&self) {
-        for (_, runtime) in &self.runtimes {
+        for runtime in self.runtimes.values() {
             runtime.shutdown();
         }
     }
