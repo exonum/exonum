@@ -311,6 +311,12 @@ pub trait Runtime: Send + Debug + 'static {
     /// The purpose of this method is to provide building blocks to create your own
     /// API processing mechanisms.
     fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
+
+    /// Notify the runtime that it has to shutdown.
+    ///
+    /// This callback is invoked before the node shutdown, so runtimes can stop themselves
+    /// gracefully.
+    fn shutdown(&self) {}
 }
 
 impl<T> From<T> for Box<dyn Runtime>

@@ -416,6 +416,13 @@ impl Dispatcher {
         has_changes
     }
 
+    /// Notify the runtimes that it has to shutdown.
+    pub(crate) fn shutdown(&self) {
+        for runtime in self.runtimes.values() {
+            runtime.shutdown();
+        }
+    }
+
     /// Register the service instance in the runtime lookup table.
     fn register_running_service(&mut self, instance: &InstanceSpec) {
         info!("Running service instance {:?}", instance);
