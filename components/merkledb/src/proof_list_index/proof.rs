@@ -20,8 +20,7 @@ use std::cmp::Ordering;
 use super::{key::ProofListKey, tree_height_by_length};
 use crate::{BinaryValue, HashTag};
 
-/// Validation errors associated with `ListProof`s.
-pub type ValidationError = crate::ValidationError<ListProofError>;
+pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 struct HashedEntry {
@@ -510,7 +509,7 @@ impl<V: BinaryValue> ListProof<V> {
     pub fn check_against_hash(
         &self,
         expected_list_hash: Hash,
-    ) -> Result<CheckedListProof<V>, ValidationError> {
+    ) -> Result<CheckedListProof<V>, ValidationError<ListProofError>> {
         self.check()
             .map_err(ValidationError::Malformed)
             .and_then(|checked_proof| {
