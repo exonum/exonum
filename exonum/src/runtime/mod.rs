@@ -323,24 +323,46 @@ where
     }
 }
 
+/// Artifact Protobuf file sources.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProtoSourceFile {
+    /// File name.
+    pub name: String,
+    /// File contents.
+    pub content: String,
+}
+
+impl<'a> From<&'a (&'a str, &'a str)> for ProtoSourceFile {
+    fn from(v: &'a (&'a str, &'a str)) -> Self {
+        Self {
+            name: v.0.to_owned(),
+            content: v.1.to_owned(),
+        }
+    }
+}
+
 /// Artifact Protobuf specification for the Exonum clients.
-#[derive(Debug, PartialEq)]
-pub struct ArtifactProtobufSpec<'a> {
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArtifactProtobufSpec {
     /// List of Protobuf files that make up the service interface. The first element in the tuple
     /// is the file name, the second one is its content.
     ///
     /// The common interface entry point is always in the `service.proto` file.
-    pub sources: &'a [(&'a str, &'a str)],
+    pub sources: Vec<ProtoSourceFile>,
 }
 
-impl<'a> Default for ArtifactProtobufSpec<'a> {
+impl ArtifactProtobufSpec {
+    pub fn from_str_list(sources_strs: &[(&str, &str)]) -> Self {
+        let sources = sources_strs.iter().map(From::from).collect();
+
+        Self { sources }
+    }
+}
+
+impl Default for ArtifactProtobufSpec {
     /// Create blank artifact information without any proto sources.
     fn default() -> Self {
-        const EMPTY_SOURCES: [(&str, &str); 0] = [];
-
-        Self {
-            sources: EMPTY_SOURCES.as_ref(),
-        }
+        Self { sources: vec![] }
     }
 }
 

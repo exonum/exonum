@@ -30,10 +30,10 @@ use crate::{
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
-    runtime::ArtifactId,
+    runtime::{ArtifactId, ProtoSourceFile},
 };
 
-use self::public::system::{DispatcherInfo, ProtoSource};
+use self::public::system::DispatcherInfo;
 
 pub mod private;
 pub mod public;
@@ -55,7 +55,7 @@ pub struct ApiNodeState {
 #[derive(Debug, Default)]
 pub struct DispatcherState {
     info: DispatcherInfo,
-    artifact_sources: HashMap<ArtifactId, Vec<ProtoSource>>,
+    artifact_sources: HashMap<ArtifactId, Vec<ProtoSourceFile>>,
 }
 
 impl DispatcherState {
@@ -69,12 +69,9 @@ impl DispatcherState {
             .clone()
             .into_iter()
             .filter_map(|artifact_id| {
-                dispatcher.artifact_protobuf_spec(&artifact_id).map(|info| {
-                    (
-                        artifact_id,
-                        info.sources.iter().map(ProtoSource::from).collect(),
-                    )
-                })
+                dispatcher
+                    .artifact_protobuf_spec(&artifact_id)
+                    .map(|info| (artifact_id, info.sources.clone()))
             })
             .collect();
 
@@ -207,7 +204,7 @@ impl SharedNodeState {
     }
 
     /// Returns the source files of the artifact with the specified identifier.
-    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<Vec<ProtoSource>> {
+    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<Vec<ProtoSourceFile>> {
         self.dispatcher
             .read()
             .expect("Expected read lock")

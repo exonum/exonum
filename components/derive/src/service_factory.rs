@@ -140,9 +140,9 @@ impl ServiceFactory {
             .expect("`proto_sources` attribute is not set properly");
 
         quote! {
-            #cr::runtime::ArtifactProtobufSpec {
-                sources: #proto_sources_mod::PROTO_SOURCES.as_ref(),
-            }
+            #cr::runtime::ArtifactProtobufSpec::from_str_list(
+                #proto_sources_mod::PROTO_SOURCES.as_ref(),
+            )
         }
     }
 
