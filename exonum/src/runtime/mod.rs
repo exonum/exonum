@@ -352,8 +352,8 @@ pub struct ArtifactProtobufSpec {
 }
 
 impl ArtifactProtobufSpec {
-    pub fn from_str_list(sources_strs: &[(&str, &str)]) -> Self {
-        let sources = sources_strs.iter().map(From::from).collect();
+    pub fn from_str_list(sources_strings: &[(&str, &str)]) -> Self {
+        let sources = sources_strings.iter().map(From::from).collect();
 
         Self { sources }
     }
