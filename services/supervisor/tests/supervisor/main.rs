@@ -23,10 +23,10 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{ServiceFactory, Transaction},
-        supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor},
         ArtifactId, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
+use exonum_supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor};
 
 use crate::inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME};
 

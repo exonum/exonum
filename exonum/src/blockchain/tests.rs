@@ -202,7 +202,7 @@ trait ServiceGood {}
     proto_sources = "crate::proto::schema",
     implements("ServiceGood")
 )]
-struct ServiceGoodImpl;
+pub struct ServiceGoodImpl;
 
 impl ServiceGood for ServiceGoodImpl {}
 

@@ -151,7 +151,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     /// Enqueue dispatcher action.
-    pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
+    pub fn dispatch_action(&self, action: dispatcher::Action) {
         self.inner
             .dispatcher
             .dispatch_action(self.instance.id, action)
@@ -315,7 +315,7 @@ impl<'a> AfterCommitContext<'a> {
     }
 
     /// Return a communication channel with the dispatcher.
-    pub(crate) fn dispatcher_channel(&self) -> &DispatcherSender {
+    pub fn dispatcher_channel(&self) -> &DispatcherSender {
         self.dispatcher
     }
 

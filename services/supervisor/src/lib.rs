@@ -12,15 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate exonum_derive;
+#[macro_use]
+extern crate exonum;
+#[macro_use]
+extern crate log;
+
 pub use self::{
     errors::Error,
-    proto::{DeployConfirmation, DeployRequest, StartService},
+    proto_structures::{DeployConfirmation, DeployRequest, StartService},
     schema::Schema,
 };
 
-use exonum_merkledb::Snapshot;
-
-use crate::{
+use exonum::{
     blockchain::{self, InstanceCollection},
     crypto::Hash,
     runtime::{
@@ -29,19 +34,20 @@ use crate::{
         InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
+use exonum_merkledb::Snapshot;
 
 mod api;
 mod errors;
 mod proto;
+mod proto_structures;
 mod schema;
 mod transactions;
 
 #[derive(Debug, ServiceFactory)]
 #[exonum(
-    crate = "crate",
-    proto_sources = "proto::schema",
+    proto_sources = "proto",
     artifact_name = "exonum-supervisor",
-    implements("transactions::Transactions")
+    implements("transactions::SupervisorInterface")
 )]
 pub struct Supervisor;
 

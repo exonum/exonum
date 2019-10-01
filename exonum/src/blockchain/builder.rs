@@ -27,7 +27,6 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        supervisor::Supervisor,
         InstanceId, InstanceSpec, Runtime,
     },
 };
@@ -69,20 +68,11 @@ impl BlockchainBuilder {
     }
 
     /// Add the built-in Rust runtime with the default built-in services.
-    ///
-    /// # List of the built-in services to be added:
-    ///
-    /// * The [`Supervisor`] service, which is responsible for adding, modifying and removing user
-    /// services during the operation of the blockchain.
-    ///
-    /// [`Supervisor`]: ../runtime/supervisor/index.html
     pub fn with_default_runtime(
         self,
         services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {
-        // Add the built-in `Supervisor` service.
-        let mut services = services.into_iter().collect::<Vec<_>>();
-        services.push(Supervisor.into());
+        let services = services.into_iter().collect::<Vec<_>>();
         self.with_rust_runtime(services)
     }
 
@@ -209,8 +199,10 @@ mod tests {
     use crate::{
         crypto,
         helpers::{generate_testnet_config, Height},
-        runtime::supervisor::Supervisor,
     };
+
+    // Import service from tests, so we won't have implement other one.
+    use crate::blockchain::tests::ServiceGoodImpl as SampleService;
 
     use super::*;
 
@@ -241,7 +233,10 @@ mod tests {
 
         Blockchain::new(
             TemporaryDB::new(),
-            vec![InstanceCollection::from(Supervisor)],
+            vec![
+                InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+                InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+            ],
             config.consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),
