@@ -30,9 +30,9 @@ use exonum_supervisor::{DeployConfirmation, DeployRequest, StartService, Supervi
 
 use crate::inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME};
 
+mod config;
 mod inc;
 mod proto;
-mod config;
 
 fn artifact_default() -> ArtifactId {
     ArtifactId {

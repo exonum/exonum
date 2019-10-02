@@ -83,16 +83,14 @@ impl Service for Supervisor {
         if schema
             .config_propose_entry()
             .get()
-            .filter(|proposal| proposal.actual_from < height)
+            .filter(|proposal| proposal.actual_from <= height)
             .map(|_| Some(()))
             .is_some()
         {
             trace!("Removed outdated config proposal");
             schema.config_propose_entry().remove()
-        }
-
-        // Apply pending config in case 2/3+1 validators voted for it.
-        if schema.config_propose_entry().exists() {
+        } else if schema.config_propose_entry().exists() {
+            // Apply pending config in case 2/3+1 validators voted for it.
             let config_confirms = schema.config_confirms();
             let confirmations =
                 config_confirms.confirmations(&schema.config_propose_entry().object_hash());

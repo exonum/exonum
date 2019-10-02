@@ -60,8 +60,8 @@ pub trait SupervisorInterface {
 
     /// Propose config change
     ///
-    /// This request should be sent by one of validators as the proposition to change 
-    /// current configuration to new one. All another validators able to vote for this 
+    /// This request should be sent by one of validators as the proposition to change
+    /// current configuration to new one. All another validators able to vote for this
     /// configuration by sending 'confirm_config_change' transaction.
     fn propose_config_change(
         &self,
@@ -71,7 +71,7 @@ pub trait SupervisorInterface {
     /// Confirm config change
     ///
     /// This confirm should be sent by validators to vote for proposed configuration.
-    /// Validator shouldn't vote for the configuration if it was an owner of 
+    /// Validator shouldn't vote for the configuration if it was an owner of
     /// 'propose_config_change' transaction.
     /// The configuration will be applied if 2/3+1 validators voted for it.
     fn confirm_config_change(
@@ -120,10 +120,7 @@ impl SupervisorInterface for Supervisor {
         context: TransactionContext,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        let author = context
-            .caller()
-            .author()
-            .expect("Wrong `Propose` initiator");
+        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
         let (_, fork) = context
             .verify_caller(Caller::as_transaction)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
@@ -146,7 +143,7 @@ impl SupervisorInterface for Supervisor {
                 ConfigChange::Consensus(config) => {
                     config
                         .validate()
-                        .map_err(|e| (Error::ConsensusConfigInvalid, e))?;
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
 
                 ConfigChange::Service(config) => {
@@ -185,17 +182,13 @@ impl SupervisorInterface for Supervisor {
 
         let config_propose = schema.config_propose_entry().get().unwrap();
         // Verifies that we doesn't reach deadline height.
-        if config_propose.actual_from < blockchain_height {
+        if config_propose.actual_from <= blockchain_height {
             return Err(Error::DeadlineExceeded)?;
         }
 
         // Verifies that transaction author is validator.
+        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
         let mut config_confirms = schema.config_confirms();
-        let author = context
-            .caller()
-            .author()
-            .expect("Wrong `ConfigConfirmation` initiator");
-
         config_confirms
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;

@@ -144,8 +144,11 @@ where
 
     pub fn confirmations(&self, id: &V) -> usize {
         let multisig_index = self.multisig_index();
-        let confirmations = multisig_index.get(id).unwrap_or_default();
-        confirmations.0.len()
+        if let Some(confirms) = multisig_index.get(id) {
+            confirms.0.len()
+        } else {
+            0
+        }
     }
 
     fn multisig_index(&self) -> ProofMapIndex<I, V, BinarySet<PublicKey>> {

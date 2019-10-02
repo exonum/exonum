@@ -37,8 +37,6 @@ pub enum Error {
     ConfigProposeExists = 9,
     /// Malformed configuration change proposal.
     MalformedConfigPropose = 10,
-    /// Invalid consensus configuration.
-    ConsensusConfigInvalid = 11,
     /// This configuration change proposal is not registered.
-    ConfigProposeNotRegistered = 12,
+    ConfigProposeNotRegistered = 11,
 }
