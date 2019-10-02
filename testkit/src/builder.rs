@@ -26,7 +26,7 @@ use exonum::{
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use crate::{TestKit, TestNetwork};
+use crate::{simple_supervisor::SimpleSupervisor, TestKit, TestNetwork};
 
 /// Builder for `TestKit`.
 ///
@@ -122,26 +122,12 @@ pub struct TestKitBuilder {
 impl TestKitBuilder {
     /// Creates testkit for the validator node.
     pub fn validator() -> Self {
-        TestKitBuilder {
-            test_network: None,
-            our_validator_id: Some(ValidatorId(0)),
-            logger: false,
-            rust_runtime: RustRuntime::new(),
-            additional_runtimes: HashMap::new(),
-            instances: vec![],
-        }
+        Self::new(true)
     }
 
     /// Creates testkit for the auditor node.
     pub fn auditor() -> Self {
-        TestKitBuilder {
-            test_network: None,
-            our_validator_id: None,
-            logger: false,
-            rust_runtime: RustRuntime::new(),
-            additional_runtimes: HashMap::new(),
-            instances: vec![],
-        }
+        Self::new(false)
     }
 
     /// Creates the validator nodes from the specified keys.
@@ -241,5 +227,24 @@ impl TestKitBuilder {
     pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let testkit = self.create();
         testkit.run(public_api_address, private_api_address);
+    }
+
+    // Creates testkit for validator or auditor node. Adds supervisor service by default.
+    fn new(is_validator: bool) -> Self {
+        let validator_id = if is_validator {
+            Some(ValidatorId(0))
+        } else {
+            None
+        };
+
+        Self {
+            test_network: None,
+            our_validator_id: validator_id,
+            logger: false,
+            rust_runtime: RustRuntime::new(),
+            additional_runtimes: HashMap::new(),
+            instances: vec![],
+        }
+        .with_service(SimpleSupervisor)
     }
 }
