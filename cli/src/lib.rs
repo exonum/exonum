@@ -95,6 +95,7 @@ use exonum::{
     node::Node,
     runtime::rust::ServiceFactory,
 };
+use exonum_supervisor::Supervisor;
 
 use std::sync::Arc;
 
@@ -115,7 +116,7 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
-        Self::default()
+        Self::default().with_service(Supervisor)
     }
 
     /// Adds new Rust service to the list of available services.

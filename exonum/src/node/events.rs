@@ -119,6 +119,9 @@ impl NodeHandler {
 
         // Flush transactions stored in tx_cache to persistent pool.
         self.flush_txs_into_pool();
+
+        // Notify blockchain about the shutdown.
+        self.blockchain.shutdown();
     }
 
     fn flush_txs_into_pool(&mut self) {

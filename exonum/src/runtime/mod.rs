@@ -105,7 +105,6 @@ pub mod rust;
 pub mod api;
 pub mod dispatcher;
 pub mod error;
-pub mod supervisor;
 
 use futures::Future;
 
@@ -312,6 +311,12 @@ pub trait Runtime: Send + Debug + 'static {
     /// The purpose of this method is to provide building blocks to create your own
     /// API processing mechanisms.
     fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
+
+    /// Notify the runtime that it has to shutdown.
+    ///
+    /// This callback is invoked before the node shutdown, so runtimes can stop themselves
+    /// gracefully.
+    fn shutdown(&self) {}
 }
 
 impl<T> From<T> for Box<dyn Runtime>
@@ -323,24 +328,39 @@ where
     }
 }
 
+/// Artifact Protobuf file sources.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProtoSourceFile {
+    /// File name.
+    pub name: String,
+    /// File contents.
+    pub content: String,
+}
+
+impl From<&(&str, &str)> for ProtoSourceFile {
+    fn from(v: &(&str, &str)) -> Self {
+        Self {
+            name: v.0.to_owned(),
+            content: v.1.to_owned(),
+        }
+    }
+}
+
 /// Artifact Protobuf specification for the Exonum clients.
-#[derive(Debug, PartialEq)]
-pub struct ArtifactProtobufSpec<'a> {
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ArtifactProtobufSpec {
     /// List of Protobuf files that make up the service interface. The first element in the tuple
     /// is the file name, the second one is its content.
     ///
     /// The common interface entry point is always in the `service.proto` file.
-    pub sources: &'a [(&'a str, &'a str)],
+    pub sources: Vec<ProtoSourceFile>,
 }
 
-impl<'a> Default for ArtifactProtobufSpec<'a> {
-    /// Create blank artifact information without any proto sources.
-    fn default() -> Self {
-        const EMPTY_SOURCES: [(&str, &str); 0] = [];
+impl From<&[(&str, &str)]> for ArtifactProtobufSpec {
+    fn from(sources_strings: &[(&str, &str)]) -> Self {
+        let sources = sources_strings.iter().map(From::from).collect();
 
-        Self {
-            sources: EMPTY_SOURCES.as_ref(),
-        }
+        Self { sources }
     }
 }
 

@@ -77,24 +77,6 @@ impl DispatcherInfo {
     }
 }
 
-/// Protobuf source file.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ProtoSource {
-    /// Source file name.
-    pub name: String,
-    /// Source file content.
-    pub content: String,
-}
-
-impl<'a> From<&'a (&'a str, &'a str)> for ProtoSource {
-    fn from(v: &'a (&'a str, &'a str)) -> Self {
-        Self {
-            name: v.0.to_owned(),
-            content: v.1.to_owned(),
-        }
-    }
-}
-
 /// Protobuf sources query parameters.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProtoSourcesQuery {
@@ -172,7 +154,7 @@ impl SystemApi {
                     Ok(EXONUM_PROTO_SOURCES
                         .as_ref()
                         .iter()
-                        .map(ProtoSource::from)
+                        .map(From::from)
                         .collect::<Vec<_>>())
                 }
             }

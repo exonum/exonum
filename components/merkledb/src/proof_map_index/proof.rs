@@ -25,8 +25,7 @@ use super::{
 };
 use crate::{BinaryValue, HashTag, ObjectHash};
 
-/// Validation errors associated with `ListProof`s.
-pub type ValidationError = crate::ValidationError<MapProofError>;
+pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -577,7 +576,7 @@ where
     pub fn check_against_hash(
         &self,
         expected_map_hash: Hash,
-    ) -> Result<CheckedMapProof<K, V>, ValidationError> {
+    ) -> Result<CheckedMapProof<K, V>, ValidationError<MapProofError>> {
         self.check()
             .map_err(ValidationError::Malformed)
             .and_then(|checked| {

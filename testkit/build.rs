@@ -27,11 +27,6 @@ fn main() {
             "hooks_example_protobuf_mod.rs",
         ),
         (
-            "tests/supervisor/proto",
-            vec!["tests/supervisor/proto"],
-            "supervisor_example_protobuf_mod.rs",
-        ),
-        (
             "tests/interfaces/proto",
             vec!["tests/interfaces/proto", &exonum_protos],
             "interfaces_protobuf_mod.rs",

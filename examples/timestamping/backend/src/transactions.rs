@@ -72,14 +72,13 @@ impl TimestampingInterface for TimestampingService {
 
         let hash = &arg.content.content_hash;
 
-        if let Some(_entry) = schema.timestamps().get(hash) {
-            Err(Error::HashAlreadyExists)?;
+        if schema.timestamps().get(hash).is_some() {
+            Err(Error::HashAlreadyExists)
+        } else {
+            trace!("Timestamp added: {:?}", arg);
+            let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);
+            schema.add_timestamp(entry);
+            Ok(())
         }
-
-        trace!("Timestamp added: {:?}", arg);
-        let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);
-        schema.add_timestamp(entry);
-
-        Ok(())
     }
 }

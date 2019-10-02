@@ -172,21 +172,30 @@ where
     T: IndexAccess,
     V: BinaryAttribute + Copy + Default,
 {
-    let index_name = index_address.fully_qualified_name();
+    // Actual name.
+    let index_name = index_address.name.clone();
+    // Full name for internal usage.
+    let index_full_name = index_address.fully_qualified_name();
 
     let mut pool = IndexesPool::new(index_access.clone());
-    let (metadata, is_new) = if let Some(metadata) = pool.index_metadata(&index_name) {
+    let (metadata, is_new) = if let Some(metadata) = pool.index_metadata(&index_full_name) {
         assert_eq!(
             metadata.index_type, index_type,
             "Index type does not match specified one"
         );
         (metadata, false)
     } else {
-        (pool.create_index_metadata(&index_name, index_type), true)
+        (
+            pool.create_index_metadata(&index_full_name, index_type),
+            true,
+        )
     };
 
-    let index_address = metadata.index_address();
-    let index_state = IndexState::new(index_access, index_name, metadata, is_new);
+    let mut index_address = metadata.index_address();
+    // Set index address name, since metadata itself doesn't know it.
+    index_address.name = index_name;
+
+    let index_state = IndexState::new(index_access, index_full_name, metadata, is_new);
     (index_address, index_state)
 }
 

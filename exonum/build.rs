@@ -49,13 +49,6 @@ fn main() {
         "exonum_tests_proto_mod.rs",
     );
 
-    // Supervisor service.
-    protobuf_generate(
-        "src/runtime/supervisor/proto",
-        &["src/proto/schema/exonum"],
-        "exonum_supervisor_mod.rs",
-    );
-
     // Exonum benchmarks.
     protobuf_generate(
         "benches/criterion/proto",

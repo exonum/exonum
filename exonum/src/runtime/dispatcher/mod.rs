@@ -415,6 +415,13 @@ impl Dispatcher {
         has_changes
     }
 
+    /// Notify the runtimes that it has to shutdown.
+    pub(crate) fn shutdown(&self) {
+        for runtime in self.runtimes.values() {
+            runtime.shutdown();
+        }
+    }
+
     /// Register the service instance in the runtime lookup table.
     fn register_running_service(&mut self, instance: &InstanceSpec) {
         info!("Running service instance {:?}", instance);
@@ -487,7 +494,7 @@ impl Dispatcher {
 }
 
 #[derive(Debug)]
-pub(crate) enum Action {
+pub enum Action {
     /// Register the deployed artifact in the dispatcher.
     /// Make sure that you successfully complete the deploy artifact procedure.
     RegisterArtifact { artifact: ArtifactId, spec: Vec<u8> },
@@ -622,7 +629,7 @@ impl DispatcherSender {
 
     /// Request an artifact deployment and invoke the callback if the deployment
     /// was successfully completed.
-    pub(super) fn request_deploy_artifact<F>(
+    pub fn request_deploy_artifact<F>(
         &self,
         caller: InstanceId,
         artifact: ArtifactId,
