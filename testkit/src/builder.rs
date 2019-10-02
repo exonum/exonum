@@ -159,7 +159,7 @@ impl TestKitBuilder {
     }
 
     /// Adds a Rust service to the testkit.
-    pub fn with_service(mut self, service: impl Into<InstanceCollection>) -> Self {
+    pub fn with_rust_service(mut self, service: impl Into<InstanceCollection>) -> Self {
         let InstanceCollection { factory, instances } = service.into();
         self.rust_runtime = self.rust_runtime.with_available_service(factory);
         self.instances.extend(instances);
@@ -245,6 +245,6 @@ impl TestKitBuilder {
             additional_runtimes: HashMap::new(),
             instances: vec![],
         }
-        .with_service(SimpleSupervisor)
+        .with_rust_service(SimpleSupervisor)
     }
 }

@@ -42,7 +42,7 @@ mod counter;
 mod proto;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
-    let testkit = TestKit::for_service(CounterService, SERVICE_NAME, SERVICE_ID, ());
+    let testkit = TestKit::for_rust_service(CounterService, SERVICE_NAME, SERVICE_ID, ());
     let api = testkit.api();
     (testkit, api)
 }
@@ -714,7 +714,7 @@ fn test_explorer_single_block() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(InstanceCollection::new(CounterService).with_instance(
+        .with_rust_service(InstanceCollection::new(CounterService).with_instance(
             SERVICE_ID,
             SERVICE_NAME,
             (),

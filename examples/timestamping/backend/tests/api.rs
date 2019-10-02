@@ -44,11 +44,11 @@ const SERVICE_NAME: &str = "my-timestamping";
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let mut testkit = TestKitBuilder::validator()
-        .with_service(
+        .with_rust_service(
             InstanceCollection::new(TimeServiceFactory::with_provider(mock_provider.clone()))
                 .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
         )
-        .with_service(InstanceCollection::new(TimestampingService).with_instance(
+        .with_rust_service(InstanceCollection::new(TimestampingService).with_instance(
             SERVICE_ID,
             SERVICE_NAME,
             Config {

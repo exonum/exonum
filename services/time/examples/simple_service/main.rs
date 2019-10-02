@@ -150,13 +150,13 @@ fn main() {
     let mock_provider = Arc::new(MockTimeProvider::default());
     // Create testkit for network with one validator.
     let mut testkit = TestKitBuilder::validator()
-        .with_service(
+        .with_rust_service(
             InstanceCollection::new(TimeServiceFactory::with_provider(
                 mock_provider.clone() as Arc<dyn TimeProvider>
             ))
             .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
         )
-        .with_service(InstanceCollection::new(MarkerService).with_instance(
+        .with_rust_service(InstanceCollection::new(MarkerService).with_instance(
             SERVICE_ID,
             SERVICE_NAME,
             (),

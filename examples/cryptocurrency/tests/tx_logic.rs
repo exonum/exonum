@@ -286,7 +286,7 @@ fn test_fuzz_transfers() {
 
 /// Initializes testkit with `CurrencyService`.
 fn init_testkit() -> TestKit {
-    TestKit::for_service(CryptocurrencyService, INSTANCE_NAME, INSTANCE_ID, Config)
+    TestKit::for_rust_service(CryptocurrencyService, INSTANCE_NAME, INSTANCE_ID, Config)
 }
 
 /// Creates a wallet with the given name and a random key.

@@ -57,7 +57,7 @@ impl TimeProvider for SystemTimeProvider {
 /// let service_id = 12;
 ///
 /// let mock_provider = MockTimeProvider::default();
-/// let mut testkit = TestKit::for_service(
+/// let mut testkit = TestKit::for_rust_service(
 ///     TimeServiceFactory::with_provider(mock_provider.clone()),
 ///     service_name,
 ///     service_id,

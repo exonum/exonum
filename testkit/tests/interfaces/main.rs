@@ -38,17 +38,17 @@ mod services;
 fn testkit_with_interfaces() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_service(InstanceCollection::new(WalletService).with_instance(
+        .with_rust_service(InstanceCollection::new(WalletService).with_instance(
             WalletService::ID,
             "wallet",
             Vec::default(),
         ))
-        .with_service(InstanceCollection::new(DepositService).with_instance(
+        .with_rust_service(InstanceCollection::new(DepositService).with_instance(
             DepositService::ID,
             "deposit",
             Vec::default(),
         ))
-        .with_service(InstanceCollection::new(AnyCallService).with_instance(
+        .with_rust_service(InstanceCollection::new(AnyCallService).with_instance(
             AnyCallService::ID,
             "any-call",
             Vec::default(),

@@ -303,7 +303,7 @@ impl CryptocurrencyApi {
 
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
-    let testkit = TestKit::for_service(CryptocurrencyService, SERVICE_NAME, SERVICE_ID, ());
+    let testkit = TestKit::for_rust_service(CryptocurrencyService, SERVICE_NAME, SERVICE_ID, ());
     let api = CryptocurrencyApi {
         inner: testkit.api(),
     };

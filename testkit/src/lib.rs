@@ -92,7 +92,7 @@
 //!     // Create testkit for network with four validators.
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
-//!         .with_service(TimestampingService)
+//!         .with_rust_service(TimestampingService)
 //!         .create();
 //!
 //!     // Create few transactions.
@@ -230,7 +230,7 @@ impl fmt::Debug for TestKit {
 
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given Rust service.
-    pub fn for_service(
+    pub fn for_rust_service(
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
         id: InstanceId,
@@ -398,7 +398,7 @@ impl TestKit {
     /// #
     /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_service(MyService)
+    ///     .with_rust_service(MyService)
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
@@ -793,7 +793,7 @@ impl TestKit {
 /// }
 ///
 /// let service = AfterCommitService::new();
-/// let mut testkit = TestKit::for_service(service.clone());
+/// let mut testkit = TestKit::for_rust_service(service.clone());
 /// testkit.create_blocks_until(Height(5));
 /// assert_eq!(service.counter(), 5);
 ///

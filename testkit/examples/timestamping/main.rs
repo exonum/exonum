@@ -88,7 +88,7 @@ fn main() {
     // Create a testkit for a network with four validators.
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(InstanceCollection::new(TimestampingService).with_instance(
+        .with_rust_service(InstanceCollection::new(TimestampingService).with_instance(
             instance_id,
             "timestamping",
             (),

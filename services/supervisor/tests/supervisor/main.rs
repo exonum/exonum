@@ -204,16 +204,16 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_service(Supervisor)
-        .with_service(InstanceCollection::new(IncService))
+        .with_rust_service(Supervisor)
+        .with_rust_service(InstanceCollection::new(IncService))
         .create()
 }
 
 fn testkit_with_inc_service_and_two_validators() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_service(Supervisor)
-        .with_service(InstanceCollection::new(IncService))
+        .with_rust_service(Supervisor)
+        .with_rust_service(InstanceCollection::new(IncService))
         .with_validators(2)
         .create()
 }
@@ -221,8 +221,8 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
-        .with_service(Supervisor)
-        .with_service(InstanceCollection::new(IncService))
+        .with_rust_service(Supervisor)
+        .with_rust_service(InstanceCollection::new(IncService))
         .with_validators(1)
         .create()
 }
@@ -232,8 +232,8 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
     let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()
-        .with_service(Supervisor)
-        .with_service(collection)
+        .with_rust_service(Supervisor)
+        .with_rust_service(collection)
         .create()
 }
 
@@ -509,8 +509,8 @@ fn test_start_service_instance_twice() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_service(Supervisor)
-        .with_service(InstanceCollection::new(IncService))
+        .with_rust_service(Supervisor)
+        .with_rust_service(InstanceCollection::new(IncService))
         .create();
 
     deploy_default(&mut testkit);
