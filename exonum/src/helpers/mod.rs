@@ -151,6 +151,11 @@ pub fn clear_consensus_messages_cache(fork: &Fork) {
     Schema::new(fork).consensus_messages_cache().clear();
 }
 
+/// Returns sufficient number of votes for the given validators number.
+pub fn byzantine_majority_count(total: usize) -> usize {
+    total * 2 / 3 + 1
+}
+
 #[test]
 fn test_path_relative_from() {
     let cases = vec![

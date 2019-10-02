@@ -442,7 +442,8 @@ fn service_config_change() {
     let params = "I am a new parameter".to_owned();
 
     let propose = ConfigProposeConfigurator::new(cfg_change_height)
-        .extend_service_config_propose(params.clone()).config_propose();
+        .extend_service_config_propose(params.clone())
+        .config_propose();
     let proposal_hash = propose.object_hash();
 
     testkit.create_block_with_transaction(sign_config_propose_transaction(
