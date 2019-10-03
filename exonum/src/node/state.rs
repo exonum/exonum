@@ -27,7 +27,7 @@ use crate::{
     blockchain::{contains_transaction, ConsensusConfig, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
-    helpers::{byzantine_majority_count, Height, Milliseconds, Round, ValidatorId},
+    helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
     messages::{
         AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
@@ -712,7 +712,7 @@ impl State {
 
     /// Returns sufficient number of votes for current validators number.
     pub fn majority_count(&self) -> usize {
-        byzantine_majority_count(self.validators().len())
+        byzantine_quorum(self.validators().len())
     }
 
     /// Returns current height.

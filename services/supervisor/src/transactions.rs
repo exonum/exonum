@@ -125,11 +125,9 @@ impl SupervisorInterface for Supervisor {
         context: TransactionContext,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
-        let (_, fork) = context
+        let ((_, author), fork) = context
             .verify_caller(Caller::as_transaction)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
-
         let schema = Schema::new(context.instance.name, fork);
 
         // Verifies that transaction author is validator.
@@ -200,18 +198,21 @@ impl SupervisorInterface for Supervisor {
         context: TransactionContext,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError> {
-        let blockchain_height = blockchain::Schema::new(context.fork()).height();
-        let schema = Schema::new(context.instance.name, context.fork());
+        let ((_, author), fork) = context
+            .verify_caller(Caller::as_transaction)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
+
+        let blockchain_height = blockchain::Schema::new(fork).height();
+        let schema = Schema::new(context.instance.name, fork);
 
         // Verifies that transaction author is validator.
-        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
         let mut config_confirms = schema.config_confirms();
         config_confirms
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        // Verifies that this config proposal is registered.
         if let Some(entry) = schema.config_propose_with_hash_entry().get() {
+            // Verifies that this config proposal is registered.
             if entry.propose_hash != vote.propose_hash {
                 return Err(Error::ConfigProposeNotRegistered.into());
             }
@@ -223,7 +224,7 @@ impl SupervisorInterface for Supervisor {
             }
 
             if config_confirms.confirmed_by(&entry.propose_hash, &author) {
-                return Err(Error::DeadlineExceeded.into());
+                return Err(Error::AttemptToVoteTwice.into());
             }
         } else {
             return Err(Error::ConfigProposeNotRegistered.into());

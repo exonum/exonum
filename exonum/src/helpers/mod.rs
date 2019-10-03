@@ -152,7 +152,7 @@ pub fn clear_consensus_messages_cache(fork: &Fork) {
 }
 
 /// Returns sufficient number of votes for the given validators number.
-pub fn byzantine_majority_count(total: usize) -> usize {
+pub fn byzantine_quorum(total: usize) -> usize {
     total * 2 / 3 + 1
 }
 

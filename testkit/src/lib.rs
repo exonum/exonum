@@ -174,7 +174,7 @@ use exonum::{
     blockchain::{Blockchain, BlockchainBuilder, ConsensusConfig, Schema as CoreSchema},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
-    helpers::{byzantine_majority_count, Height, ValidatorId},
+    helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
@@ -661,7 +661,7 @@ impl TestKit {
 
     /// Returns sufficient number of validators for the Byzantine Fault Tolerance consensus.
     pub fn majority_count(&self) -> usize {
-        byzantine_majority_count(self.network().validators().len())
+        byzantine_quorum(self.network().validators().len())
     }
 
     /// Returns the leader on the current height. At the moment first validator.

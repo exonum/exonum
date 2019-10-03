@@ -456,32 +456,6 @@ fn test_try_confirm_non_existing_proposal() {
 }
 
 #[test]
-fn test_create_expired_proposal() {
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(4)
-        .with_service(Supervisor)
-        .create();
-    let initiator_id = testkit.network().us().validator_id().unwrap();
-
-    testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
-
-    let consensus_config = consensus_config_propose_first_variant(&testkit);
-    let config_proposal = ConfigProposeConstructor::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(consensus_config.clone())
-        .config_propose();
-
-    testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            config_proposal,
-            initiator_id,
-        ))
-        .transactions[0]
-        .status()
-        .unwrap_err();
-}
-
-#[test]
 fn test_service_config_change() {
     let mut testkit = testkit_with_change_service_and_static_instance(4);
     let initiator_id = testkit.network().us().validator_id().unwrap();

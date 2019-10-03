@@ -30,7 +30,7 @@ pub use self::{
 use exonum::{
     blockchain::{self, InstanceCollection},
     crypto::Hash,
-    helpers::byzantine_majority_count,
+    helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
@@ -94,7 +94,7 @@ impl Service for Supervisor {
                 let confirmations = config_confirms.confirmations(&entry.propose_hash);
                 let validators = config_confirms.validators_len();
 
-                if confirmations >= byzantine_majority_count(validators) {
+                if confirmations >= byzantine_quorum(validators) {
                     // Perform the application of configs.
                     context.update_config(entry.config_propose.changes);
                     // Remove config from proposals.
