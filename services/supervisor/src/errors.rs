@@ -39,4 +39,6 @@ pub enum Error {
     MalformedConfigPropose = 10,
     /// This configuration change proposal is not registered.
     ConfigProposeNotRegistered = 11,
+    /// Transaction author attempts to vote twice.
+    AttemptToVoteTwice = 12,
 }

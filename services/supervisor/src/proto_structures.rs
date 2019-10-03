@@ -76,6 +76,13 @@ pub struct ConfigVote {
     pub propose_hash: Hash,
 }
 
+#[derive(Clone, Debug, PartialEq, ProtobufConvert)]
+#[exonum(pb = "proto::ConfigProposeEntry")]
+pub struct ConfigProposeEntry {
+    pub config_propose: ConfigPropose,
+    pub propose_hash: Hash,
+}
+
 impl_binary_key_for_binary_value! { DeployRequest }
 impl_binary_key_for_binary_value! { DeployConfirmation }
 impl_binary_key_for_binary_value! { StartService }

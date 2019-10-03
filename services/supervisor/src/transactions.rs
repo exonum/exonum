@@ -24,8 +24,8 @@ use exonum::{
 use exonum_merkledb::ObjectHash;
 
 use super::{
-    ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, Error, Schema, StartService,
-    Supervisor,
+    ConfigPropose, ConfigProposeEntry, ConfigVote, DeployConfirmation, DeployRequest, Error,
+    Schema, StartService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -41,6 +41,7 @@ pub trait SupervisorInterface {
         context: TransactionContext,
         artifact: DeployRequest,
     ) -> Result<(), ExecutionError>;
+
     /// Confirmation that the artifact was successfully deployed by the validator.
     ///
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
@@ -49,6 +50,7 @@ pub trait SupervisorInterface {
         context: TransactionContext,
         artifact: DeployConfirmation,
     ) -> Result<(), ExecutionError>;
+
     /// Requests start service.
     ///
     /// Service will be started if all of validators will send this confirmation.
@@ -63,16 +65,18 @@ pub trait SupervisorInterface {
     /// This request should be sent by one of validators as the proposition to change
     /// current configuration to new one. All another validators able to vote for this
     /// configuration by sending 'confirm_config_change' transaction.
+    /// Note: only one proposal at time is possible.
     fn propose_config_change(
         &self,
         context: TransactionContext,
         artifact: ConfigPropose,
     ) -> Result<(), ExecutionError>;
+
     /// Confirm config change
     ///
     /// This confirm should be sent by validators to vote for proposed configuration.
-    /// Validator shouldn't vote for the configuration if it was an owner of
-    /// 'propose_config_change' transaction.
+    /// Vote of the author of the propose_config_change transaction is taken into
+    /// account automatically.
     /// The configuration will be applied if 2/3+1 validators voted for it.
     fn confirm_config_change(
         &self,
@@ -125,16 +129,22 @@ impl SupervisorInterface for Supervisor {
             .verify_caller(Caller::as_transaction)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
+        let schema = Schema::new(context.instance.name, fork);
+
+        // Verifies that transaction author is validator.
+        let mut config_confirms = schema.config_confirms();
+        config_confirms
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
         // Check that the `actual_from` height is in the future.
         if blockchain::Schema::new(fork).height() >= propose.actual_from {
-            return Err(Error::ActualFromIsPast).map_err(From::from);
+            return Err(Error::ActualFromIsPast.into());
         }
 
-        let schema = Schema::new(context.instance.name, fork);
-        let propose_hash = propose.object_hash();
         // Check that there are no pending config changes.
-        if schema.config_propose_entry().exists() {
-            return Err(Error::ConfigProposeExists).map_err(From::from);
+        if schema.config_propose_with_hash_entry().exists() {
+            return Err(Error::ConfigProposeExists.into());
         }
 
         // Perform config verification.
@@ -155,14 +165,14 @@ impl SupervisorInterface for Supervisor {
             }
         }
 
-        // Verifies that transaction author is validator.
-        let mut config_confirms = schema.config_confirms();
-        config_confirms
-            .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
-
+        let propose_hash = propose.object_hash();
         config_confirms.confirm(&propose_hash, author);
-        schema.config_propose_entry().set(propose);
+
+        let config_entry = ConfigProposeEntry {
+            config_propose: propose,
+            propose_hash: propose_hash,
+        };
+        schema.config_propose_with_hash_entry().set(config_entry);
 
         Ok(())
     }
@@ -175,23 +185,31 @@ impl SupervisorInterface for Supervisor {
         let blockchain_height = blockchain::Schema::new(context.fork()).height();
         let schema = Schema::new(context.instance.name, context.fork());
 
-        // Verifies that this config proposal is registered.
-        if schema.config_propose_entry().object_hash() != vote.propose_hash {
-            Err(Error::ConfigProposeNotRegistered)?
-        }
-
-        let config_propose = schema.config_propose_entry().get().unwrap();
-        // Verifies that we doesn't reach deadline height.
-        if config_propose.actual_from <= blockchain_height {
-            return Err(Error::DeadlineExceeded)?;
-        }
-
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
         let mut config_confirms = schema.config_confirms();
         config_confirms
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
+
+        // Verifies that this config proposal is registered.
+        if let Some(entry) = schema.config_propose_with_hash_entry().get() {
+            if entry.propose_hash != vote.propose_hash {
+                return Err(Error::ConfigProposeNotRegistered.into());
+            }
+
+            let config_propose = entry.config_propose;
+            // Verifies that we doesn't reach deadline height.
+            if config_propose.actual_from <= blockchain_height {
+                return Err(Error::DeadlineExceeded.into());
+            }
+
+            if config_confirms.confirmed_by(&entry.propose_hash, &author) {
+                return Err(Error::DeadlineExceeded.into());
+            }
+        } else {
+            return Err(Error::ConfigProposeNotRegistered.into());
+        }
 
         config_confirms.confirm(&vote.propose_hash, author);
         trace!(

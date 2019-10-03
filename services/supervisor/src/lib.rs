@@ -37,7 +37,9 @@ use exonum::{
         InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
-use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_merkledb::Snapshot;
+
+use self::proto_structures::ConfigProposeEntry;
 
 mod api;
 mod errors;
@@ -80,29 +82,24 @@ impl Service for Supervisor {
             trace!("Removed outdated deployment request {:?}", request);
         }
 
-        // Removes pending config proposal for which deadline was exceeded.
-        if schema
-            .config_propose_entry()
-            .get()
-            .filter(|proposal| proposal.actual_from <= height)
-            .map(|_| Some(()))
-            .is_some()
-        {
-            trace!("Removed outdated config proposal");
-            schema.config_propose_entry().remove()
-        } else if schema.config_propose_entry().exists() {
-            // Apply pending config in case 2/3+1 validators voted for it.
-            let config_confirms = schema.config_confirms();
-            let confirmations =
-                config_confirms.confirmations(&schema.config_propose_entry().object_hash());
-            let validators = config_confirms.validators_len();
+        let entry = schema.config_propose_with_hash_entry().get();
+        if let Some(entry) = entry {
+            if entry.config_propose.actual_from <= height {
+                // Remove pending config proposal for which deadline was exceeded.
+                trace!("Removed outdated config proposal");
+                schema.config_propose_with_hash_entry().remove();
+            } else {
+                // Apply pending config in case 2/3+1 validators voted for it.
+                let config_confirms = schema.config_confirms();
+                let confirmations = config_confirms.confirmations(&entry.propose_hash);
+                let validators = config_confirms.validators_len();
 
-            if confirmations >= byzantine_majority_count(validators) {
-                // Perform the application of configs.
-                let proposal = schema.config_propose_entry().get().unwrap();
-                context.update_config(proposal.changes);
-                // Remove config from proposals.
-                schema.config_propose_entry().remove();
+                if confirmations >= byzantine_majority_count(validators) {
+                    // Perform the application of configs.
+                    context.update_config(entry.config_propose.changes);
+                    // Remove config from proposals.
+                    schema.config_propose_with_hash_entry().remove();
+                }
             }
         }
     }

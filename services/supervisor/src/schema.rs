@@ -15,7 +15,7 @@
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
 
-use super::{ConfigPropose, DeployConfirmation, DeployRequest, StartService};
+use super::{ConfigProposeEntry, DeployConfirmation, DeployRequest, StartService};
 
 /// Service information schema.
 #[derive(Debug)]
@@ -68,9 +68,9 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         )
     }
 
-    pub fn config_propose_entry(&self) -> Entry<T, ConfigPropose> {
+    pub fn config_propose_with_hash_entry(&self) -> Entry<T, ConfigProposeEntry> {
         Entry::new(
-            [self.instance_name, ".config_propose_entry"].concat(),
+            [self.instance_name, ".config_propose_with_hash_entry"].concat(),
             self.access.clone(),
         )
     }
@@ -82,6 +82,7 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
             self.deploy_confirmations().object_hash(),
             self.pending_deployments().object_hash(),
             self.pending_instances().object_hash(),
+            self.config_confirms().object_hash(),
         ]
     }
 }
