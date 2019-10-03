@@ -32,6 +32,26 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
   module in the `exonum`. (#1459)
 
+### New Features
+
+#### exonum-merkledb
+
+- `ProofListIndex` now implements `truncate()` and `pop()` methods, allowing
+  to eject elements from the list. (#1455)
+
+- `IndexAccess` trait is implemented for several new types, notably,
+  `Rc<dyn Snapshot>`, `Arc<dyn Snapshot>` and `Rc<Fork>`. (#1455)
+
+- `HashTag::hash_list()` was extended to support values of any appropriate type,
+  not only `Hash`. (#1455)
+  
+### Internal improvements
+
+#### exonum-merkledb
+
+- `ProofListIndex::extend()` method has been refactored, leading to up to 10x
+  performance improvements for large lists. (#1455)
+
 ## 0.12.1 - 2019-09-19
 
 ### Bug Fixes
