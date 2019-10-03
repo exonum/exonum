@@ -63,10 +63,10 @@ impl TestkitServerApi {
         let block_info = if let Some(tx_hashes) = tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
-                Err(api::Error::BadRequest(format!(
+                return Err(api::Error::BadRequest(format!(
                     "Transaction not in mempool: {}",
                     missing_tx.to_string()
-                )))?;
+                )));
             }
 
             // NB: checkpoints must correspond 1-to-1 to blocks.
@@ -81,9 +81,9 @@ impl TestkitServerApi {
 
     fn rollback(&self, height: Height) -> api::Result<Option<BlockWithTransactions>> {
         if height == Height(0) {
-            Err(api::Error::BadRequest(
+            return Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),
-            ))?;
+            ));
         }
 
         let mut testkit = self.write();

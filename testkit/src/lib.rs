@@ -171,14 +171,19 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
-    blockchain::{Blockchain, BlockchainBuilder, ConsensusConfig, Schema as CoreSchema},
+    blockchain::{
+        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
+    },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{rust::ServiceFactory, InstanceId},
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        InstanceId, Runtime,
+    },
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
@@ -224,27 +229,29 @@ impl fmt::Debug for TestKit {
 }
 
 impl TestKit {
-    /// Creates a new `TestKit` with a single validator with the given service.
+    /// Creates a new `TestKit` with a single validator with the given Rust service.
     pub fn for_service(
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
+        let InstanceCollection { factory, instances } =
+            InstanceCollection::new(service_factory).with_instance(id, name, constructor);
+        let runtime = RustRuntime::new().with_available_service(factory);
+
         TestKitBuilder::validator()
-            .with_service(InstanceCollection::new(service_factory).with_instance(
-                id,
-                name,
-                constructor,
-            ))
+            .with_runtime(runtime)
+            .with_instances(instances)
             .create()
     }
 
     fn assemble(
         database: impl Into<CheckpointDb<TemporaryDB>>,
-        service_factories: impl IntoIterator<Item = InstanceCollection>,
         network: TestNetwork,
         genesis: ConsensusConfig,
+        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        instances: impl IntoIterator<Item = InstanceConfig>,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
@@ -252,8 +259,15 @@ impl TestKit {
         let db = database.into();
 
         let db_handler = db.handler();
-        let blockchain = BlockchainBuilder::new(db, genesis, network.us().service_keypair())
-            .with_rust_runtime(service_factories)
+
+        let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair());
+
+        for runtime in runtimes {
+            builder = builder.with_additional_runtime(runtime);
+        }
+
+        let blockchain = builder
+            .with_builtin_instances(instances)
             .finalize(api_sender.clone(), mpsc::channel(0).0)
             .expect("Unable to create blockchain instance");
 
@@ -824,18 +838,24 @@ impl StoppedTestKit {
 
     /// Resumes the operation of the testkit.
     ///
-    /// Note that `available_services` may differ from the vector of services initially passed to
-    /// the `TestKit` (which is also what may happen with real Exonum apps).
+    /// Note that `available_services` may differ from the vector of Rust services initially passed
+    /// to the `TestKit` (which is also what may happen with real Exonum apps).
     pub fn resume(
         self,
         available_services: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
     ) -> TestKit {
+        let mut runtime = RustRuntime::new();
+        for service in available_services {
+            runtime = runtime.with_available_service(service);
+        }
+
         TestKit::assemble(
             self.db,
-            available_services.into_iter().map(InstanceCollection::new),
             self.network,
             // TODO make consensus config optional [ECR-3222]
             ConsensusConfig::default(),
+            vec![runtime.into()],
+            vec![],
         )
     }
 }

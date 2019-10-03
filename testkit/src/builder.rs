@@ -14,10 +14,18 @@
 
 //! Testkit builder.
 
-pub use exonum::blockchain::InstanceCollection;
+pub use exonum::blockchain::{InstanceCollection, InstanceConfig};
 
-use exonum::{crypto, helpers::ValidatorId, keys::Keys};
-use exonum_merkledb::TemporaryDB;
+use exonum::{
+    crypto,
+    helpers::ValidatorId,
+    keys::Keys,
+    merkledb::TemporaryDB,
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        Runtime,
+    },
+};
 
 use std::net::SocketAddr;
 
@@ -108,8 +116,10 @@ use crate::{TestKit, TestNetwork};
 pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     test_network: Option<TestNetwork>,
-    service_instances: Vec<InstanceCollection>,
     logger: bool,
+    rust_services: Vec<Box<dyn ServiceFactory>>,
+    runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    instances: Vec<InstanceConfig>,
 }
 
 impl TestKitBuilder {
@@ -118,8 +128,10 @@ impl TestKitBuilder {
         TestKitBuilder {
             test_network: None,
             our_validator_id: Some(ValidatorId(0)),
-            service_instances: Vec::new(),
             logger: false,
+            rust_services: vec![],
+            runtimes: vec![],
+            instances: vec![],
         }
     }
 
@@ -128,8 +140,10 @@ impl TestKitBuilder {
         TestKitBuilder {
             test_network: None,
             our_validator_id: None,
-            service_instances: Vec::new(),
             logger: false,
+            rust_services: vec![],
+            runtimes: vec![],
+            instances: vec![],
         }
     }
 
@@ -161,15 +175,31 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds a rust service to the testkit.
+    /// Adds a Rust service to the testkit. This is an old way convenient method that creates Rust
+    /// runtime implicitly and is applicable to Rust services only. Thus, it must not be used in
+    /// conjunction with the `.with_runtime()` method having the RustRuntime instance as an argument.
     pub fn with_service(mut self, service: impl Into<InstanceCollection>) -> Self {
-        self.service_instances.push(service.into());
+        let InstanceCollection { factory, instances } = service.into();
+        self.rust_services.push(factory);
+        self.instances.extend(instances);
         self
     }
 
     /// Enables a logger inside the testkit.
     pub fn with_logger(mut self) -> Self {
         self.logger = true;
+        self
+    }
+
+    /// Adds a runtime to the testkit. Must not be used with the Rust runtime as argument in
+    /// conjunction with the `.with_service()` method.
+    pub fn with_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+        self.runtimes.push(runtime.into());
+        self
+    }
+
+    pub fn with_instances(mut self, instances: impl IntoIterator<Item = InstanceConfig>) -> Self {
+        self.instances.extend(instances);
         self
     }
 
@@ -185,7 +215,25 @@ impl TestKitBuilder {
             .test_network
             .unwrap_or_else(|| TestNetwork::with_our_role(our_validator_id, 1));
         let genesis = network.genesis_config();
-        TestKit::assemble(TemporaryDB::new(), self.service_instances, network, genesis)
+
+        let mut runtimes = vec![];
+        if !self.rust_services.is_empty() {
+            // The old `.with_service()` API has been used so we have to create Rust runtime here.
+            let mut rust_runtime = RustRuntime::new();
+            for service in self.rust_services {
+                rust_runtime = rust_runtime.with_available_service(service);
+            }
+            runtimes.push(rust_runtime.into());
+        }
+        runtimes.extend(self.runtimes);
+
+        TestKit::assemble(
+            TemporaryDB::new(),
+            network,
+            genesis,
+            runtimes,
+            self.instances,
+        )
     }
 
     /// Starts a testkit web server, which listens to public and private APIs exposed by

@@ -148,7 +148,7 @@ impl CurrencyInterface for CurrencyService {
         let author = context.caller().author().unwrap();
 
         if author == arg.to {
-            Err(Error::Foo)?;
+            return Err(Error::Foo);
         }
         let view = context.fork();
         let height = CoreSchema::new(view).height();

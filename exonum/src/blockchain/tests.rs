@@ -140,7 +140,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         });
 
         if arg.value == 42 {
-            Err(dispatcher::Error::UnknownArtifactId)?;
+            return Err(dispatcher::Error::UnknownArtifactId.into());
         }
 
         Ok(())

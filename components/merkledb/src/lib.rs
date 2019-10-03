@@ -124,6 +124,7 @@
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
+    clippy::use_self,
 )]
 
 pub use self::{
