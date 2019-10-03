@@ -22,6 +22,7 @@ use exonum::{
     },
 };
 use exonum_merkledb::ObjectHash;
+use std::collections::BTreeSet;
 
 use super::{
     ConfigPropose, ConfigProposeEntry, ConfigVote, DeployConfirmation, DeployRequest, Error,
@@ -147,16 +148,33 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::ConfigProposeExists.into());
         }
 
+        // To prevent multiple consensus change proposition in one request
+        let mut multiple_consensus_propose = false;
+        // To prevent multiple service change proposition in one request
+        let mut service_ids = BTreeSet::new();
+
         // Perform config verification.
         for change in &propose.changes {
             match change {
                 ConfigChange::Consensus(config) => {
+                    if multiple_consensus_propose {
+                        trace!("Discarded multiple consensus change propositions in one request.");
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    multiple_consensus_propose = true;
+
                     config
                         .validate()
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
 
                 ConfigChange::Service(config) => {
+                    if service_ids.contains(&config.instance_id) {
+                        trace!("Discarded multiple service change propositions in one request.");
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    service_ids.insert(config.instance_id);
+
                     context
                         .interface::<ConfigureCall>(config.instance_id)
                         .verify_config(config.params.clone())

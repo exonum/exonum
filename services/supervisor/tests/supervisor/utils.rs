@@ -15,7 +15,7 @@
 use exonum_merkledb::Entry;
 use exonum_testkit::{TestKit, TestKitBuilder};
 
-use exonum::runtime::ServiceConfig;
+use exonum::runtime::{InstanceId, ServiceConfig};
 use exonum::{
     blockchain::{ConsensusConfig, InstanceCollection},
     crypto::Hash,
@@ -29,6 +29,9 @@ use crate::{
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
 use exonum_supervisor::{ConfigPropose, ConfigVote, Schema, Supervisor};
+
+pub const SECOND_SERVICE_ID: InstanceId = 119;
+pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
@@ -67,13 +70,13 @@ pub fn build_confirmation_transactions(
         .collect()
 }
 
-pub struct ConfigProposeConfigurator {
+pub struct ConfigProposeConstructor {
     config_propose: ConfigPropose,
 }
 
-impl ConfigProposeConfigurator {
+impl ConfigProposeConstructor {
     pub fn new(cfg_change_height: Height) -> Self {
-        ConfigProposeConfigurator {
+        ConfigProposeConstructor {
             config_propose: ConfigPropose {
                 actual_from: cfg_change_height,
                 changes: vec![],
@@ -93,6 +96,16 @@ impl ConfigProposeConfigurator {
             .changes
             .push(ConfigChange::Service(ServiceConfig {
                 instance_id: CONFIG_SERVICE_ID,
+                params: param.into_bytes(),
+            }));
+        self
+    }
+
+    pub fn extend_second_service_config_propose(mut self, param: String) -> Self {
+        self.config_propose
+            .changes
+            .push(ConfigChange::Service(ServiceConfig {
+                instance_id: SECOND_SERVICE_ID,
                 params: param.into_bytes(),
             }));
         self
@@ -130,9 +143,31 @@ pub fn testkit_with_change_service_and_static_instance(validator_count: u16) -> 
         .create()
 }
 
+pub fn testkit_with_two_change_service_and_static_instance(validator_count: u16) -> TestKit {
+    let service = ConfigChangeService;
+    let collection = InstanceCollection::new(service)
+        .with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ())
+        .with_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ());
+    TestKitBuilder::validator()
+        .with_validators(validator_count)
+        .with_service(Supervisor)
+        .with_service(collection)
+        .create()
+}
+
 pub fn check_service_actual_param(testkit: &TestKit, param: Option<String>) {
     let actual_params: Option<String> = Entry::new(
         format!("{}.params", CONFIG_SERVICE_NAME),
+        &testkit.snapshot(),
+    )
+    .get();
+
+    assert_eq!(actual_params, param);
+}
+
+pub fn check_second_service_actual_param(testkit: &TestKit, param: Option<String>) {
+    let actual_params: Option<String> = Entry::new(
+        format!("{}.params", SECOND_SERVICE_NAME),
         &testkit.snapshot(),
     )
     .get();
