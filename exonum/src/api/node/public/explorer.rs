@@ -18,7 +18,7 @@ use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
 use exonum_merkledb::{ObjectHash, Snapshot};
-use futures::{Future, IntoFuture};
+use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
 
 use std::{
@@ -33,14 +33,14 @@ use crate::{
         },
         node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
-        ApiBackend, ApiContext, ApiScope, Error as ApiError,
+        ApiBackend, ApiContext, ApiScope, Error as ApiError, FutureResult,
     },
     blockchain::Block,
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
     messages::{Precommit, SignedMessage, Verified},
-    node::ApiSender,
+    node::{ApiSender, ExternalMessage},
     runtime::CallInfo,
 };
 
@@ -279,14 +279,30 @@ impl ExplorerApi {
     pub fn add_transaction(
         sender: &ApiSender,
         query: TransactionHex,
-    ) -> Result<TransactionResponse, ApiError> {
-        let msg = SignedMessage::from_hex(query.tx_body)?;
-        let tx_hash = msg.object_hash();
-        // FIXME Don't ignore message error.
-        let _ = sender
-            .broadcast_transaction(msg.into_verified()?)
-            .map_err(ApiError::from);
-        Ok(TransactionResponse { tx_hash })
+    ) -> FutureResult<TransactionResponse> {
+        let verify_message = |hex: String| -> Result<_, failure::Error> {
+            let msg = SignedMessage::from_hex(hex)?;
+            let tx_hash = msg.object_hash();
+            let verified = msg.into_verified()?;
+            Ok((verified, tx_hash))
+        };
+
+        let sender = sender.clone();
+        let send_transaction = move |(verified, tx_hash)| {
+            sender
+                .clone()
+                .0
+                .send(ExternalMessage::Transaction(verified))
+                .map(move |_| TransactionResponse { tx_hash })
+                .map_err(|e| ApiError::InternalError(e.into()))
+        };
+
+        Box::new(
+            verify_message(query.tx_body)
+                .into_future()
+                .map_err(|e| ApiError::BadRequest(e.to_string()))
+                .and_then(send_transaction),
+        )
     }
 
     /// Subscribes to events.
