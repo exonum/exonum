@@ -22,7 +22,7 @@ use exonum::{
     node::ApiSender,
     runtime::{
         rust::{Service, TransactionContext},
-        AnyTx, InstanceDescriptor, InstanceId,
+        AnyTx, InstanceDescriptor, InstanceId, Runtime,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
@@ -120,9 +120,15 @@ pub fn consensus_keys() -> (PublicKey, SecretKey) {
 pub fn create_blockchain() -> Blockchain {
     let config = generate_testnet_config(1, 0)[0].clone();
     let service_keypair = config.service_keypair();
+
+    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+    let services =
+        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
+
     Blockchain::new(
         TemporaryDB::new(),
-        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
+        external_runtimes,
+        services,
         config.consensus,
         service_keypair,
         ApiSender(mpsc::channel(0).0),

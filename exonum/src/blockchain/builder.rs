@@ -72,7 +72,6 @@ impl BlockchainBuilder {
         self,
         services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {
-        let services = services.into_iter().collect::<Vec<_>>();
         self.with_rust_runtime(services)
     }
 
@@ -87,6 +86,17 @@ impl BlockchainBuilder {
             self.builtin_instances.extend(service.instances);
         }
         self.with_additional_runtime(runtime)
+    }
+
+    pub fn with_external_runtimes(
+        mut self,
+        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
+    ) -> Self {
+        for runtime in runtimes {
+            self.runtimes.push(runtime.into());
+        }
+
+        self
     }
 
     /// Add an additional runtime with the specified identifier.
@@ -211,9 +221,13 @@ mod tests {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
 
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let services = vec![];
+
         let blockchain = Blockchain::new(
             TemporaryDB::new(),
-            Vec::new(),
+            external_runtimes,
+            services,
             config.consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),
@@ -231,12 +245,16 @@ mod tests {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
 
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let services = vec![
+            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+        ];
+
         Blockchain::new(
             TemporaryDB::new(),
-            vec![
-                InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-                InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-            ],
+            external_runtimes,
+            services,
             config.consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),
@@ -250,9 +268,13 @@ mod tests {
         let consensus = ConsensusConfig::default();
         let service_keypair = crypto::gen_keypair();
 
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let services = vec![];
+
         Blockchain::new(
             TemporaryDB::new(),
-            Vec::new(),
+            external_runtimes,
+            services,
             consensus,
             service_keypair,
             ApiSender::new(mpsc::channel(0).0),

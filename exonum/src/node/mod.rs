@@ -66,6 +66,7 @@ use crate::{
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
+    runtime::Runtime,
 };
 
 mod basic;
@@ -909,6 +910,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
+        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
         services: impl IntoIterator<Item = InstanceCollection>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
@@ -919,6 +921,7 @@ impl Node {
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let blockchain = Blockchain::new(
             database,
+            external_runtimes,
             services,
             node_cfg.consensus.clone(),
             node_cfg.service_keypair(),
@@ -1208,18 +1211,17 @@ mod tests {
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(
-            TemporaryDB::new(),
-            vec![InstanceCollection::new(TestService).with_instance(
-                SERVICE_ID,
-                "test-service",
-                (),
-            )],
-            node_cfg,
-            None,
-        );
+        let services = vec![InstanceCollection::new(TestService).with_instance(
+            SERVICE_ID,
+            "test-service",
+            (),
+        )];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+
+        let mut node = Node::new(db, external_runtimes, services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1247,11 +1249,14 @@ mod tests {
     #[test]
     #[ignore = "TODO: We have to implement transactions verifier [ECR-3253]"]
     fn test_transaction_without_service() {
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let (p_key, s_key) = gen_keypair();
 
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(TemporaryDB::new(), Vec::new(), node_cfg, None);
+        let mut node = Node::new(db, external_runtimes, services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1269,8 +1274,9 @@ mod tests {
     fn test_good_internal_events_config() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 
     #[test]
@@ -1278,12 +1284,13 @@ mod tests {
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .internal_events_capacity = 0;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 
     #[test]
@@ -1291,12 +1298,13 @@ mod tests {
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .network_requests_capacity = 0;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 
     #[test]
@@ -1304,13 +1312,16 @@ mod tests {
     fn test_bad_internal_events_capacity_too_large() {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![];
+
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .internal_events_capacity = accidental_large_value;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 
     #[test]
@@ -1318,12 +1329,15 @@ mod tests {
     fn test_bad_network_requests_capacity_too_large() {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![];
+
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 }
