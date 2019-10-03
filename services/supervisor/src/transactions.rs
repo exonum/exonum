@@ -170,7 +170,7 @@ impl SupervisorInterface for Supervisor {
 
         let config_entry = ConfigProposeEntry {
             config_propose: propose,
-            propose_hash: propose_hash,
+            propose_hash,
         };
         schema.config_propose_with_hash_entry().set(config_entry);
 
