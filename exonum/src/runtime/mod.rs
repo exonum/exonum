@@ -40,16 +40,16 @@
 //! confirmations is equal to the total number of validators, each validator calls the dispatcher
 //! to start a new service instance.
 //!
-//! 4. // TODO modify instance configuration procedure.
+//! 4. Modify instance configuration procedure. TODO [ECR-3306]
 //!
-//! 5. // TODO stop instance procedure.
+//! 5. Stop instance procedure. TODO
 //!
 //! Each Exonum transaction is an [`AnyTx`] message with a correct signature.
 //!
 //! # Transaction Life Cycle
 //!
 //! 1. An Exonum client creates a transaction message which includes [CallInfo] information
-//! about the corresponding handler and serialized transaction parameters as a payload.
+//! about the corresponding method to call and serialized method parameters as a payload.
 //! The client then signs the message with the author's key pair.
 //!
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
@@ -68,6 +68,18 @@
 //!
 //! 6. After execution the transaction [execution status] is written into the blockchain.
 //!
+//! # Service interfaces
+//!
+//! In addition to its own methods, a service can implement methods of additional interfaces.
+//! In your own runtime implementation, you must provide support of the following interfaces:
+//!
+//! TODO: Think about runtime agnostic interfaces description. [ECR-3531]
+//!
+//! ## Configure
+//!
+//! Describes a procedure for updating the configuration of a service instance.
+//!
+//! See explanation in the Rust runtime definition of the [`Configure`] interface.
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
@@ -77,10 +89,15 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
+//! [`Configure`]: rust/interfaces/trait.Configure.html
 
 pub use self::{
+    dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
-    types::{AnyTx, ArtifactId, CallInfo, InstanceId, InstanceSpec, MethodId},
+    types::{
+        AnyTx, ArtifactId, CallInfo, ConfigChange, InstanceId, InstanceSpec, MethodId,
+        ServiceConfig,
+    },
 };
 
 #[macro_use]
@@ -88,26 +105,31 @@ pub mod rust;
 pub mod api;
 pub mod dispatcher;
 pub mod error;
-pub mod supervisor;
 
 use futures::Future;
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::fmt::Debug;
 
 use crate::{
     api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
     merkledb::{BinaryValue, Fork, Snapshot},
     node::ApiSender,
-    proto::Any,
 };
 
 use self::{
     api::ServiceApiBuilder,
-    dispatcher::{Dispatcher, DispatcherSender},
+    dispatcher::{DispatcherRef, DispatcherSender},
 };
 
 mod types;
+
+/// Persistent identifier of supervisor service instance.
+///
+/// Only a service with this ID can perform actions with the dispatcher.
+pub const SUPERVISOR_INSTANCE_ID: InstanceId = 0;
+/// Persistent name of supervisor service instance.
+pub const SUPERVISOR_INSTANCE_NAME: &str = "supervisor";
 
 /// List of predefined runtimes.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -162,7 +184,7 @@ pub trait Runtime: Send + Debug + 'static {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        deploy_spec: Any,
+        deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
     /// Return true if the specified artifact is deployed in this runtime.
@@ -185,18 +207,16 @@ pub trait Runtime: Send + Debug + 'static {
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
-    /// Configure a service instance with the given parameters.
+    /// Initialize a service instance with the given parameters.
     ///
     /// The configuration parameters passed to the method are discarded immediately.
     /// So the service instance should save them by itself if it is important for
     /// the service business logic.
     ///
-    /// This method is called in two cases:
-    ///
-    /// * After creating a new service instance by the [`start_service`] invocation. In this case,
-    /// if an error during this action occurs, the dispatcher will invoke [`stop_service`].
-    /// Make sure that this invocation will not fail.
-    /// * During the configuration change procedure. [ECR-3306]
+    /// This method is called after creating a new service instance by the [`start_service`].
+    /// If an error occurs during invocation of this method, the dispatcher invokes
+    /// [`stop_service`].
+    /// Therefore, it is recommended to avoid errors returned from the method.
     ///
     /// # Policy on Panics
     ///
@@ -205,11 +225,11 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// ['start_service`]: #start_service
     /// ['stop_service`]: #stop_service
-    fn configure_service(
+    fn initialize_service(
         &self,
         fork: &Fork,
-        descriptor: InstanceDescriptor,
-        parameters: Any,
+        instance: InstanceDescriptor,
+        parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
     /// Stop existing service instance with the given specification.
@@ -221,11 +241,21 @@ pub trait Runtime: Send + Debug + 'static {
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
 
-    /// Execute service transaction.
+    /// Dispatch payload to the method of a specific service instance.
+    /// Service instance name and method ID are provided in the `call_info` argument and
+    /// interface name is provided as the corresponding field of the `context` argument.
+    ///
+    /// # Notes for Runtime Developers.
+    ///
+    /// * If service does not implement required interface, return `NoSuchInterface` error.
+    /// * If interface does not have required method, return `NoSuchMethod` error.
+    /// * For compatibility reasons, the interface name for user transactions is currently
+    /// always blank. But it may be changed in future releases.
     ///
     /// # Policy on Panics
     ///
     /// Do not process. Panic will be processed by the method caller.
+    ///
     fn execute(
         &self,
         context: &ExecutionContext,
@@ -248,7 +278,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork);
+    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -281,6 +311,12 @@ pub trait Runtime: Send + Debug + 'static {
     /// The purpose of this method is to provide building blocks to create your own
     /// API processing mechanisms.
     fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
+
+    /// Notify the runtime that it has to shutdown.
+    ///
+    /// This callback is invoked before the node shutdown, so runtimes can stop themselves
+    /// gracefully.
+    fn shutdown(&self) {}
 }
 
 impl<T> From<T> for Box<dyn Runtime>
@@ -292,24 +328,39 @@ where
     }
 }
 
+/// Artifact Protobuf file sources.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProtoSourceFile {
+    /// File name.
+    pub name: String,
+    /// File contents.
+    pub content: String,
+}
+
+impl From<&(&str, &str)> for ProtoSourceFile {
+    fn from(v: &(&str, &str)) -> Self {
+        Self {
+            name: v.0.to_owned(),
+            content: v.1.to_owned(),
+        }
+    }
+}
+
 /// Artifact Protobuf specification for the Exonum clients.
-#[derive(Debug, PartialEq)]
-pub struct ArtifactProtobufSpec<'a> {
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ArtifactProtobufSpec {
     /// List of Protobuf files that make up the service interface. The first element in the tuple
     /// is the file name, the second one is its content.
     ///
     /// The common interface entry point is always in the `service.proto` file.
-    pub sources: &'a [(&'a str, &'a str)],
+    pub sources: Vec<ProtoSourceFile>,
 }
 
-impl<'a> Default for ArtifactProtobufSpec<'a> {
-    /// Create blank artifact information without any proto sources.
-    fn default() -> Self {
-        const EMPTY_SOURCES: [(&str, &str); 0] = [];
+impl From<&[(&str, &str)]> for ArtifactProtobufSpec {
+    fn from(sources_strings: &[(&str, &str)]) -> Self {
+        let sources = sources_strings.iter().map(From::from).collect();
 
-        Self {
-            sources: EMPTY_SOURCES.as_ref(),
-        }
+        Self { sources }
     }
 }
 
@@ -323,8 +374,8 @@ pub struct StateHashAggregator {
     pub instances: Vec<(InstanceId, Vec<Hash>)>,
 }
 
-/// The initiator of the transaction execution.
-#[derive(Debug, PartialEq)]
+/// The initiator of the method execution.
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Caller {
     /// A usual transaction from the Exonum client, authorized by its key pair.
     Transaction {
@@ -333,9 +384,9 @@ pub enum Caller {
         /// Public key of the user who signed this transaction.
         author: PublicKey,
     },
-    // This transaction is invoked during the transaction execution of a different service.
+    /// Method is invoked during the method execution of a different service.
     Service {
-        /// Identifier of the service instance which invoked this transaction.
+        /// Identifier of the service instance which invoked this method.
         instance_id: InstanceId,
     },
 }
@@ -343,18 +394,18 @@ pub enum Caller {
 impl Caller {
     /// Return the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
-        self.as_transaction().map(|(_hash, author)| *author)
+        self.as_transaction().map(|(_hash, author)| author)
     }
 
     /// Return the transaction hash, if it exists.
     pub fn transaction_hash(&self) -> Option<Hash> {
-        self.as_transaction().map(|(hash, _)| *hash)
+        self.as_transaction().map(|(hash, _)| hash)
     }
 
     /// Try to reinterpret caller as an authorized transaction.
-    pub fn as_transaction(&self) -> Option<(&Hash, &PublicKey)> {
+    pub fn as_transaction(&self) -> Option<(Hash, PublicKey)> {
         if let Caller::Transaction { hash, author } = self {
-            Some((hash, author))
+            Some((*hash, *author))
         } else {
             None
         }
@@ -384,10 +435,8 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field can only contains a core interfaces like `Configure` and
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
-    /// List of dispatcher actions that will be performed after execution finishes.
-    actions: Rc<RefCell<Vec<dispatcher::Action>>>,
     /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a Dispatcher,
+    dispatcher: &'a DispatcherRef<'a>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -396,23 +445,14 @@ impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
-    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: &'a DispatcherRef<'a>, fork: &'a Fork, caller: Caller) -> Self {
         Self {
             fork,
             caller,
-            actions: Rc::default(),
             dispatcher,
             interface_name: "",
             call_stack_depth: 0,
         }
-    }
-
-    pub(crate) fn dispatch_action(&self, action: dispatcher::Action) {
-        self.actions.borrow_mut().push(action);
-    }
-
-    pub(crate) fn take_actions(&self) -> Vec<dispatcher::Action> {
-        self.actions.borrow_mut().drain(..).collect()
     }
 }
 
@@ -452,21 +492,47 @@ pub enum ApiChange {
 /// Provide a low level context for the call of methods of a different service instance.
 #[derive(Debug)]
 pub struct CallContext<'a> {
-    /// Underlying execution context.
-    inner: &'a ExecutionContext<'a>,
     /// Identifier of the caller service instance.
     caller: InstanceId,
     /// Identifier of the called service instance.
     called: InstanceId,
+    /// The current state of the blockchain.
+    fork: &'a Fork,
+    /// Reference to the underlying runtime dispatcher.
+    dispatcher: &'a DispatcherRef<'a>,
+    /// Depth of call stack.
+    call_stack_depth: usize,
 }
 
 impl<'a> CallContext<'a> {
-    /// Create a new call context for the given execution context.
-    pub fn new(inner: &'a ExecutionContext<'a>, caller: InstanceId, called: InstanceId) -> Self {
+    /// Create a new call context.
+    pub fn new(
+        fork: &'a Fork,
+        dispatcher: &'a DispatcherRef<'a>,
+        caller: InstanceId,
+        called: InstanceId,
+    ) -> Self {
         Self {
-            inner,
             caller,
             called,
+            fork,
+            dispatcher,
+            call_stack_depth: 0,
+        }
+    }
+
+    /// Create a new call context for the given execution context.
+    pub fn from_execution_context(
+        inner: &'a ExecutionContext<'a>,
+        caller: InstanceId,
+        called: InstanceId,
+    ) -> Self {
+        Self {
+            caller,
+            called,
+            fork: inner.fork,
+            dispatcher: inner.dispatcher,
+            call_stack_depth: inner.call_stack_depth,
         }
     }
 
@@ -479,14 +545,13 @@ impl<'a> CallContext<'a> {
         // TODO ExecutionError here mislead about the true cause of an occurred error. [ECR-3222]
     ) -> Result<(), ExecutionError> {
         let context = ExecutionContext {
-            fork: self.inner.fork,
-            dispatcher: self.inner.dispatcher,
-            actions: self.inner.actions.clone(),
+            fork: self.fork,
+            dispatcher: self.dispatcher,
             caller: Caller::Service {
                 instance_id: self.caller,
             },
             interface_name: interface_name.as_ref(),
-            call_stack_depth: self.inner.call_stack_depth + 1,
+            call_stack_depth: self.call_stack_depth + 1,
         };
         let call_info = CallInfo {
             method_id,
@@ -502,8 +567,7 @@ impl<'a> CallContext<'a> {
             return Err((kind, msg).into());
         }
 
-        self.inner
-            .dispatcher
+        self.dispatcher
             .call(&context, &call_info, arguments.into_bytes().as_ref())
     }
 }

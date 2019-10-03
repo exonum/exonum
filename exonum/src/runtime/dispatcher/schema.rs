@@ -17,7 +17,7 @@
 use exonum_merkledb::{Entry, IndexAccess, KeySetIndex, MapIndex, ObjectHash, ProofMapIndex};
 
 use super::{ArtifactId, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
-use crate::{crypto::Hash, proto::Any, runtime::InstanceId};
+use crate::{crypto::Hash, runtime::InstanceId};
 
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
@@ -36,7 +36,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Additional information needed to deploy artifacts.
-    pub fn artifact_specs(&self) -> MapIndex<T, ArtifactId, Any> {
+    pub fn artifact_specs(&self) -> MapIndex<T, ArtifactId, Vec<u8>> {
         MapIndex::new("core.dispatcher.artifact_specs", self.access.clone())
     }
 
@@ -57,7 +57,11 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Add artifact specification to the set of the deployed artifacts.
-    pub(crate) fn add_artifact(&mut self, artifact: &ArtifactId, spec: Any) -> Result<(), Error> {
+    pub(crate) fn add_artifact(
+        &mut self,
+        artifact: &ArtifactId,
+        spec: Vec<u8>,
+    ) -> Result<(), Error> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact.name) {
             return Err(Error::ArtifactAlreadyDeployed);
@@ -103,7 +107,7 @@ impl<T: IndexAccess> Schema<T> {
         Ok(())
     }
 
-    pub fn artifacts_with_spec(&self) -> impl IntoIterator<Item = (ArtifactId, Any)> {
+    pub fn artifacts_with_spec(&self) -> impl IntoIterator<Item = (ArtifactId, Vec<u8>)> {
         // TODO remove reallocation [ECR-3222]
         self.artifact_specs().into_iter().collect::<Vec<_>>()
     }

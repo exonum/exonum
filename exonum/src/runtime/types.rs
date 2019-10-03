@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{is_allowed_latin1_char, is_valid_index_name, BinaryValue};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
-use crate::{helpers::ValidateInput, proto::schema};
+use crate::{
+    blockchain::ConsensusConfig,
+    helpers::ValidateInput,
+    merkledb::{is_allowed_latin1_char, is_valid_index_name, BinaryValue},
+    proto::schema,
+};
 
 use super::InstanceDescriptor;
 
@@ -26,12 +30,12 @@ use super::InstanceDescriptor;
 /// * This is a secondary identifier, mainly used in transaction messages.
 /// The primary one is a service instance name.
 ///
-/// * The core assigns this identifier when the service is started.
+/// * The dispatcher assigns this identifier when the service is started.
 pub type InstanceId = u32;
 /// Identifier of the method in the service interface required for the call.
 pub type MethodId = u32;
 
-/// Unique service transaction identifier.
+/// Information for calling the service method.
 #[derive(
     Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
 )]
@@ -278,6 +282,26 @@ impl ValidateInput for InstanceSpec {
         self.artifact.validate()?;
         Self::is_valid_name(&self.name)
     }
+}
+
+/// Configuration parameters of the certain service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::runtime::ServiceConfig", crate = "crate")]
+pub struct ServiceConfig {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
+    /// Raw bytes representation of service configuration parameters.
+    pub params: Vec<u8>,
+}
+
+/// This message contains one atomic configuration change.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "schema::runtime::ConfigChange", crate = "crate")]
+pub enum ConfigChange {
+    /// New consensus config.
+    Consensus(ConsensusConfig),
+    /// New service instance config.
+    Service(ServiceConfig),
 }
 
 #[test]

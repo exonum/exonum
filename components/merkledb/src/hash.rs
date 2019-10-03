@@ -267,5 +267,4 @@ mod tests {
 
         assert_eq!(empty_map_hash, HashTag::empty_map_hash());
     }
-
 }

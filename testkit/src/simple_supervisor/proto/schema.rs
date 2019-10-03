@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(bare_trait_objects)]
+use exonum::proto::schema::runtime;
 
-include!(concat!(env!("OUT_DIR"), "/exonum_supervisor_mod.rs"));
-
-pub use self::service::*;
-
-use crate::proto::schema::*;
+include!(concat!(env!("OUT_DIR"), "/simple_supervisor_mod.rs"));

@@ -14,6 +14,7 @@
 
 pub use self::{
     error::Error,
+    interfaces::Configure,
     service::{
         AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
         ServiceFactory, Transaction, TransactionContext,
@@ -21,6 +22,7 @@ pub use self::{
 };
 
 pub mod error;
+pub mod interfaces;
 
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future, IntoFuture};
@@ -35,12 +37,11 @@ use std::{
 use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     node::ApiSender,
-    proto::Any,
 };
 
 use super::{
     api::{ApiContext, ServiceApiBuilder},
-    dispatcher::{self, Dispatcher, DispatcherSender},
+    dispatcher::{self, DispatcherRef, DispatcherSender},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
@@ -217,9 +218,9 @@ impl Runtime for RustRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: Any,
+        spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        if !spec.is_null() && spec != ().into() {
+        if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             return Box::new(future::err(Error::IncorrectArtifactId.into()));
         }
@@ -262,21 +263,22 @@ impl Runtime for RustRuntime {
         Ok(())
     }
 
-    fn configure_service(
+    fn initialize_service(
         &self,
         fork: &Fork,
         descriptor: InstanceDescriptor,
-        parameters: Any,
+        parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        trace!("Configure service instance {}", descriptor);
-
         let instance = self
             .started_services
             .get(&descriptor.id)
             .ok_or(dispatcher::Error::ServiceNotStarted)?;
+
+        trace!("Initialize service instance {}", descriptor);
+
         instance
             .as_ref()
-            .configure(instance.descriptor(), fork, parameters)
+            .initialize(instance.descriptor(), fork, parameters)
     }
 
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
@@ -319,7 +321,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, dispatcher: &Dispatcher, fork: &mut Fork) {
+    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
                 instance.as_ref().before_commit(BeforeCommitContext::new(

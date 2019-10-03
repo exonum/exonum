@@ -22,6 +22,7 @@
     unsafe_code,
     bare_trait_objects
 )]
+#![allow(clippy::use_self)]
 // #![warn(clippy::pedantic)]
 // #![allow(
 //     // The following `cast_*` lints do not give alternatives:

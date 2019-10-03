@@ -28,10 +28,8 @@ use crate::{
 pub enum Error {
     /// Content hash already exists.
     HashAlreadyExists = 0,
-    /// Unable to parse service configuration.
-    ConfigParseError = 1,
     /// Time service with the specified name doesn't exist.
-    TimeServiceNotFound = 2,
+    TimeServiceNotFound = 1,
 }
 
 /// Timestamping transaction.
@@ -74,14 +72,13 @@ impl TimestampingInterface for TimestampingService {
 
         let hash = &arg.content.content_hash;
 
-        if let Some(_entry) = schema.timestamps().get(hash) {
-            Err(Error::HashAlreadyExists)?;
+        if schema.timestamps().get(hash).is_some() {
+            Err(Error::HashAlreadyExists)
+        } else {
+            trace!("Timestamp added: {:?}", arg);
+            let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);
+            schema.add_timestamp(entry);
+            Ok(())
         }
-
-        trace!("Timestamp added: {:?}", arg);
-        let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);
-        schema.add_timestamp(entry);
-
-        Ok(())
     }
 }

@@ -162,8 +162,7 @@ where
     /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
     where
-        I: BinaryKey,
-        I: ?Sized,
+        I: BinaryKey + ?Sized,
         S: Into<String>,
     {
         let (base, state) = IndexBuilder::new(index_access)

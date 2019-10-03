@@ -69,10 +69,10 @@ where
     /// Increase balance of the wallet and append new record to its history.
     ///
     /// Panics if there is no wallet with given public key.
-    pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
+    pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: Hash) {
         let wallet = {
             let mut history = self.wallet_history(&wallet.pub_key);
-            history.push(*transaction);
+            history.push(transaction);
             let history_hash = history.object_hash();
             let balance = wallet.balance;
             wallet.set_balance(balance + amount, &history_hash)
@@ -83,10 +83,10 @@ where
     /// Decrease balance of the wallet and append new record to its history.
     ///
     /// Panics if there is no wallet with given public key.
-    pub fn decrease_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
+    pub fn decrease_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: Hash) {
         let wallet = {
             let mut history = self.wallet_history(&wallet.pub_key);
-            history.push(*transaction);
+            history.push(transaction);
             let history_hash = history.object_hash();
             let balance = wallet.balance;
             wallet.set_balance(balance - amount, &history_hash)
@@ -95,10 +95,10 @@ where
     }
 
     /// Create new wallet and append first record to its history.
-    pub fn create_wallet(&mut self, key: &PublicKey, name: &str, transaction: &Hash) {
+    pub fn create_wallet(&mut self, key: &PublicKey, name: &str, transaction: Hash) {
         let wallet = {
             let mut history = self.wallet_history(key);
-            history.push(*transaction);
+            history.push(transaction);
             let history_hash = history.object_hash();
             Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash)
         };

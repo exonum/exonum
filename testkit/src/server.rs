@@ -14,6 +14,7 @@
 
 use exonum::{
     api::{self, node::SharedNodeState, ApiAggregator, ApiBuilder, ApiScope},
+    blockchain::ConsensusConfig,
     crypto::Hash,
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
@@ -21,7 +22,7 @@ use exonum::{
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use super::{TestKit, TestNetworkConfiguration};
+use super::TestKit;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct CreateBlockQuery {
@@ -34,9 +35,7 @@ pub struct TestKitStatus {
     /// Current blockchain height.
     pub height: Height,
     /// Currently active network configuration.
-    pub configuration: TestNetworkConfiguration,
-    /// Scheduled network configuration (if any).
-    pub next_configuration: Option<TestNetworkConfiguration>,
+    pub configuration: ConsensusConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -55,8 +54,7 @@ impl TestkitServerApi {
         let testkit = self.read();
         Ok(TestKitStatus {
             height: testkit.height(),
-            configuration: testkit.configuration_change_proposal(),
-            next_configuration: testkit.next_configuration().cloned(),
+            configuration: testkit.consensus_config(),
         })
     }
 
@@ -65,10 +63,10 @@ impl TestkitServerApi {
         let block_info = if let Some(tx_hashes) = tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
-                Err(api::Error::BadRequest(format!(
+                return Err(api::Error::BadRequest(format!(
                     "Transaction not in mempool: {}",
                     missing_tx.to_string()
-                )))?;
+                )));
             }
 
             // NB: checkpoints must correspond 1-to-1 to blocks.
@@ -83,9 +81,9 @@ impl TestkitServerApi {
 
     fn rollback(&self, height: Height) -> api::Result<Option<BlockWithTransactions>> {
         if height == Height(0) {
-            Err(api::Error::BadRequest(
+            return Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),
-            ))?;
+            ));
         }
 
         let mut testkit = self.write();
@@ -216,11 +214,7 @@ mod tests {
     }
 
     impl Service for SampleService {
-        fn state_hash(
-            &self,
-            _descriptor: InstanceDescriptor,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
     }

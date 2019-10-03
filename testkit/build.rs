@@ -7,6 +7,11 @@ fn main() {
     let protobuf_gen_data = [
         ("src/proto", vec!["src/proto"], "testkit_protobuf_mod.rs"),
         (
+            "src/simple_supervisor/proto",
+            vec!["src/simple_supervisor/proto", &exonum_protos],
+            "simple_supervisor_mod.rs",
+        ),
+        (
             "tests/inflating_currency/proto",
             vec!["tests/inflating_currency/proto", &exonum_protos],
             "currency_example_protobuf_mod.rs",
@@ -20,11 +25,6 @@ fn main() {
             "tests/service_hooks/proto",
             vec!["tests/service_hooks/proto"],
             "hooks_example_protobuf_mod.rs",
-        ),
-        (
-            "tests/supervisor/proto",
-            vec!["tests/supervisor/proto"],
-            "supervisor_example_protobuf_mod.rs",
         ),
         (
             "tests/interfaces/proto",

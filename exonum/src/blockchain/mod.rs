@@ -177,7 +177,7 @@ impl Blockchain {
         };
         self.merge(patch)?;
 
-        info!("GENESIS_BLOCK ====== hash={}", self.last_hash());
+        info!("GENESIS_BLOCK ====== hash={}", self.last_hash().to_hex());
 
         Ok(())
     }
@@ -451,6 +451,11 @@ impl Blockchain {
 
         self.merge(fork.into_patch())
             .expect("Unable to save messages to the consensus cache");
+    }
+
+    /// Callback to be called before the node shutdown.
+    pub(crate) fn shutdown(&self) {
+        self.dispatcher().shutdown();
     }
 }
 

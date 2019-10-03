@@ -192,7 +192,7 @@ impl Display for ExecutionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "An execution error occurred in {} with description: {}",
+            "An execution error `{}` occurred with description: {}",
             self.kind, self.description
         )
     }
@@ -402,7 +402,6 @@ mod execution_result {
     {
         ExecutionStatus::deserialize(deserializer).map(From::from)
     }
-
 }
 
 #[cfg(test)]
@@ -543,5 +542,4 @@ mod tests {
         let panic = make_panic(1);
         assert_eq!(ExecutionError::from_panic(panic).description, "");
     }
-
 }

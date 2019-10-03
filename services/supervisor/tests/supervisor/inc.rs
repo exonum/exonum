@@ -14,8 +14,6 @@
 
 use serde_derive::{Deserialize, Serialize};
 
-use crate::proto;
-
 use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
@@ -27,6 +25,8 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
+
+use crate::proto;
 
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
@@ -117,7 +117,7 @@ impl Service for IncService {
         PublicApi::wire(builder);
     }
 
-    fn state_hash(&self, _descriptor: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

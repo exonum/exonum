@@ -12,37 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate exonum_derive;
+#[macro_use]
+extern crate exonum;
+#[macro_use]
+extern crate log;
+
 pub use self::{
     errors::Error,
-    proto::{DeployConfirmation, DeployRequest, StartService},
+    proto_structures::{DeployConfirmation, DeployRequest, StartService},
     schema::Schema,
 };
 
-use exonum_merkledb::Snapshot;
-
-use crate::{
-    blockchain,
+use exonum::{
+    blockchain::{self, InstanceCollection},
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
-        InstanceDescriptor, InstanceId,
+        InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
+use exonum_merkledb::Snapshot;
 
 mod api;
 mod errors;
-pub mod multisig;
 mod proto;
+mod proto_structures;
 mod schema;
 mod transactions;
 
 #[derive(Debug, ServiceFactory)]
 #[exonum(
-    crate = "crate",
-    proto_sources = "proto::schema",
+    proto_sources = "proto",
     artifact_name = "exonum-supervisor",
-    implements("transactions::Transactions")
+    implements("transactions::SupervisorInterface")
 )]
 pub struct Supervisor;
 
@@ -116,14 +121,22 @@ impl Service for Supervisor {
                     }
                 };
                 // TODO Rewrite on async await syntax. [ECR-3222]
-                context
-                    .dispatcher_channel()
-                    .request_deploy_artifact(artifact, spec, and_then);
+                context.dispatcher_channel().request_deploy_artifact(
+                    context.instance.id,
+                    artifact,
+                    spec,
+                    and_then,
+                );
             })
     }
 }
 
-impl Supervisor {
-    pub const BUILTIN_ID: InstanceId = 0;
-    pub const BUILTIN_NAME: &'static str = "supervisor";
+impl From<Supervisor> for InstanceCollection {
+    fn from(service: Supervisor) -> Self {
+        InstanceCollection::new(service).with_instance(
+            SUPERVISOR_INSTANCE_ID,
+            SUPERVISOR_INSTANCE_NAME,
+            Vec::default(),
+        )
+    }
 }

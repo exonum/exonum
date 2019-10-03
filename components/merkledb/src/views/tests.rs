@@ -775,7 +775,12 @@ fn test_metadata_index_identifiers() {
             .family_id("family")
             .index_type(IndexType::ProofMap)
             .build::<()>();
-        assert_eq!(view.address, IndexAddress::new().append_bytes(&0_u64));
+        assert_eq!(
+            view.address,
+            IndexAddress::new()
+                .append_name("simple")
+                .append_bytes(&0_u64)
+        );
     }
 
     // Creates the second index metadata.
@@ -785,7 +790,12 @@ fn test_metadata_index_identifiers() {
             .family_id("family")
             .index_type(IndexType::ProofMap)
             .build::<()>();
-        assert_eq!(view.address, IndexAddress::new().append_bytes(&1_u64));
+        assert_eq!(
+            view.address,
+            IndexAddress::new()
+                .append_name("second")
+                .append_bytes(&1_u64)
+        );
     }
 
     // Tries to create the first index instance.
@@ -795,7 +805,12 @@ fn test_metadata_index_identifiers() {
             .family_id("family")
             .index_type(IndexType::ProofMap)
             .build::<()>();
-        assert_eq!(view.address, IndexAddress::new().append_bytes(&0_u64));
+        assert_eq!(
+            view.address,
+            IndexAddress::new()
+                .append_name("simple")
+                .append_bytes(&0_u64)
+        );
     }
 }
 
@@ -1034,4 +1049,14 @@ fn fork_from_patch() {
 
     db.merge(fork.into_patch())
         .expect("Fork created from patch should be merged successfully");
+}
+
+#[test]
+fn test_index_builder_index_address() {
+    let db = TemporaryDB::new();
+    // Creates the index metadata.
+    let fork = db.fork();
+    let (view, _) = IndexBuilder::new(&fork).index_name("test").build::<()>();
+
+    assert_eq!(view.address.name, "test");
 }
