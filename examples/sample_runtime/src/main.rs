@@ -26,8 +26,7 @@ use exonum::{
         dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
-        SUPERVISOR_INSTANCE_ID,
+        InstanceId, InstanceSpec, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -135,16 +134,6 @@ impl Runtime for SampleRuntime {
         service_instance.counter.set(new_value);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())
-    }
-
-    /// `stop_service` removes the service with the specified ID from the list of the started services.
-    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
-        println!("Stopping service: {}", descriptor);
-        self.started_services
-            .remove(&descriptor.id)
-            .map(drop)
-            .ok_or(DispatcherError::ServiceNotStarted)
-            .map_err(ExecutionError::from)
     }
 
     fn execute(

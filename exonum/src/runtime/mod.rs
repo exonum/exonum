@@ -224,15 +224,6 @@ pub trait Runtime: Send + Debug + 'static {
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
-    /// Stop existing service instance with the given specification.
-    ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
-    /// * If panic occurs, the runtime must ensure that it is in a consistent state.
-    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
-
     /// Dispatch payload to the method of a specific service instance.
     /// Service instance name and method ID are provided in the `call_info` argument and
     /// interface name is provided as the corresponding field of the `context` argument.

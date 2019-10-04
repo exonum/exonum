@@ -19,8 +19,8 @@ use exonum::{
     node::ApiSender,
     runtime::{
         dispatcher::{DispatcherRef, DispatcherSender},
-        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
+        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceSpec,
+        Runtime, StateHashAggregator,
     },
 };
 use exonum_testkit::TestKitBuilder;
@@ -129,10 +129,6 @@ impl Runtime for TestRuntime {
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         self.tester.configure_service(parameters);
-        Ok(())
-    }
-
-    fn stop_service(&mut self, _descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
         Ok(())
     }
 

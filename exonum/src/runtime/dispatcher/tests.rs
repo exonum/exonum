@@ -29,8 +29,8 @@ use crate::{
         dispatcher::Dispatcher,
         rust::{Error as RustRuntimeError, RustRuntime},
         ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError,
-        DispatcherRef, DispatcherSender, ExecutionContext, ExecutionError, InstanceDescriptor,
-        InstanceId, InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
+        DispatcherRef, DispatcherSender, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -131,10 +131,6 @@ impl Runtime for SampleRuntime {
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
-    fn stop_service(&mut self, _instance: InstanceDescriptor) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -440,10 +436,6 @@ impl Runtime for ShutdownRuntime {
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
-    fn stop_service(&mut self, _instance: InstanceDescriptor) -> Result<(), ExecutionError> {
         Ok(())
     }
 

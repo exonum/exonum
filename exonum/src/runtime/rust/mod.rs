@@ -307,16 +307,6 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
-        trace!("Stop service instance {}", descriptor);
-
-        self.started_services
-            .remove(&descriptor.id)
-            .ok_or(dispatcher::Error::ServiceNotStarted)
-            .map(drop)
-            .map_err(From::from)
-    }
-
     fn execute(
         &self,
         context: &ExecutionContext,
