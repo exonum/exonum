@@ -84,7 +84,7 @@ impl TestKitApi {
         Self::from_raw_parts(
             ApiAggregator::new(
                 testkit.blockchain().clone(),
-                SharedNodeState::new(testkit.blockchain(), 10_000),
+                SharedNodeState::new(&testkit.blockchain(), 10_000),
             ),
             testkit.api_sender.clone(),
         )

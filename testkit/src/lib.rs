@@ -323,14 +323,9 @@ impl TestKit {
         self.blockchain.snapshot()
     }
 
-    /// Returns a reference to the blockchain used by the testkit.
-    pub fn blockchain(&self) -> &Blockchain {
-        &self.blockchain
-    }
-
-    /// Returns a blockchain instance for low level manipulations with storage.
-    pub fn blockchain_mut(&mut self) -> &mut Blockchain {
-        &mut self.blockchain
+    /// Returns a blockchain used by the testkit.
+    pub fn blockchain(&self) -> Blockchain {
+        self.blockchain.clone()
     }
 
     /// Sets a checkpoint for a future [`rollback`](#method.rollback).
@@ -525,8 +520,7 @@ impl TestKit {
         I: IntoIterator<Item = Verified<AnyTx>>,
     {
         let tx_hashes: Vec<_> = {
-            let blockchain = self.blockchain_mut();
-            let fork = blockchain.fork();
+            let fork = self.blockchain.fork();
             let hashes = {
                 let mut schema = CoreSchema::new(&fork);
 
@@ -547,7 +541,7 @@ impl TestKit {
                     })
                     .collect()
             };
-            blockchain.merge(fork.into_patch()).unwrap();
+            self.blockchain.merge(fork.into_patch()).unwrap();
             hashes
         };
 
