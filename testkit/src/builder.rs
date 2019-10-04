@@ -187,9 +187,16 @@ impl TestKitBuilder {
         self
     }
 
+    /// Adds instances descriptions to the testkit that will be used for specification of builtin
+    /// services of testing blockchain.
     pub fn with_instances(mut self, instances: impl IntoIterator<Item = InstanceConfig>) -> Self {
         self.instances.extend(instances);
         self
+    }
+
+    /// Adds SimpleSupervisor service to the testkit.
+    pub fn with_simple_supervisor(self) -> Self {
+        self.with_rust_service(SimpleSupervisor)
     }
 
     /// Creates the testkit.
@@ -245,6 +252,5 @@ impl TestKitBuilder {
             additional_runtimes: HashMap::new(),
             instances: vec![],
         }
-        .with_rust_service(SimpleSupervisor)
     }
 }
