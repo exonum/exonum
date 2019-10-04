@@ -116,7 +116,7 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
-        Self::default().with_service(Supervisor)
+        Self::default()
     }
 
     /// Adds new Rust service to the list of available services.
@@ -125,11 +125,22 @@ impl NodeBuilder {
         self
     }
 
+    fn builtin_services(&self) -> Vec<InstanceCollection> {
+        // Supervisor service is enabled by default.
+        vec![InstanceCollection::from(Supervisor)]
+    }
+
     /// Configures the node using parameters provided by user from stdin and then runs it.
     ///
     /// Only Rust runtime is enabled.
     pub fn run(self) -> Result<(), failure::Error> {
         let command = Command::from_args();
+
+        let services = self
+            .builtin_services()
+            .into_iter()
+            .chain(self.services.into_iter().map(InstanceCollection::new));
+
         if let StandardResult::Run(run_config) = command.execute()? {
             let db_options = &run_config.node_config.database;
             let database: Arc<dyn Database> =
@@ -138,7 +149,7 @@ impl NodeBuilder {
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
             let node = Node::new(
                 database,
-                self.services.into_iter().map(InstanceCollection::new),
+                services,
                 run_config.node_config,
                 Some(node_config_path),
             );
