@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, Service},
-        InstanceDescriptor,
+        InstanceDescriptor, Runtime,
     },
 };
 use exonum_derive::{exonum_service, ServiceFactory};
@@ -112,12 +112,16 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
 
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let services = vec![
+            InstanceCollection::new(CommitWatcherService(RefCell::new(Some(commit_tx))))
+                .with_instance(2, "commit-watcher", ()),
+        ];
+
         let node = Node::new(
             TemporaryDB::new(),
-            vec![
-                InstanceCollection::new(CommitWatcherService(RefCell::new(Some(commit_tx))))
-                    .with_instance(2, "commit-watcher", ()),
-            ],
+            external_runtimes,
+            services,
             node_cfg,
             None,
         );
@@ -157,29 +161,28 @@ fn test_node_run() {
 
 #[test]
 fn test_node_restart_regression() {
-    let start_node =
-        |node_cfg: NodeConfig, db, start_times| {
-            let node =
-                Node::new(
-                    db,
-                    vec![
-                        InstanceCollection::new(StartCheckerServiceFactory(start_times))
-                            .with_instance(4, "startup-checker", ()),
-                    ],
-                    node_cfg,
-                    None,
-                );
+    let start_node = |node_cfg: NodeConfig, db, start_times| {
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let services = vec![
+            InstanceCollection::new(StartCheckerServiceFactory(start_times)).with_instance(
+                4,
+                "startup-checker",
+                (),
+            ),
+        ];
 
-            let api_tx = node.channel();
-            let node_thread = thread::spawn(move || {
-                node.run().unwrap();
-            });
-            // Wait for shutdown
-            api_tx
-                .send_external_message(ExternalMessage::Shutdown)
-                .unwrap();
-            node_thread.join().unwrap();
-        };
+        let node = Node::new(db, external_runtimes, services, node_cfg, None);
+
+        let api_tx = node.channel();
+        let node_thread = thread::spawn(move || {
+            node.run().unwrap();
+        });
+        // Wait for shutdown
+        api_tx
+            .send_external_message(ExternalMessage::Shutdown)
+            .unwrap();
+        node_thread.join().unwrap();
+    };
 
     let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;
     let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();

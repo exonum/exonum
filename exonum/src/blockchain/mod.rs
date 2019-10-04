@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, error::catch_panic},
+    runtime::{dispatcher::Dispatcher, error::catch_panic, Runtime},
 };
 
 mod block;
@@ -81,6 +81,7 @@ impl Blockchain {
     // TODO Write proper doc string. [ECR-3275]
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
+        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
         services: impl IntoIterator<Item = InstanceCollection>,
         genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
@@ -89,6 +90,7 @@ impl Blockchain {
     ) -> Self {
         BlockchainBuilder::new(database, genesis_config, service_keypair)
             .with_default_runtime(services)
+            .with_external_runtimes(external_runtimes)
             .finalize(api_sender, internal_requests)
             .expect("Unable to create blockchain instance")
     }

@@ -76,6 +76,8 @@ fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
     services: Vec<InstanceCollection>,
 ) -> Blockchain {
+    let external_runtimes: Vec<(u32, Box<dyn exonum::runtime::Runtime>)> = vec![];
+
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
     let genesis_config = ConsensusConfig {
@@ -88,6 +90,7 @@ fn create_blockchain(
 
     Blockchain::new(
         db,
+        external_runtimes,
         services,
         genesis_config,
         service_keypair,

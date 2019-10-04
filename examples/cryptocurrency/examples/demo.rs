@@ -64,10 +64,14 @@ fn node_config() -> NodeConfig {
 fn main() {
     exonum::helpers::init_logger().unwrap();
 
+    let external_runtimes: Vec<(u32, Box<dyn exonum::runtime::Runtime>)> = vec![];
+    let services = vec![InstanceCollection::new(CryptocurrencyService)];
+
     println!("Creating database in temporary dir...");
     let node = Node::new(
         TemporaryDB::new(),
-        vec![InstanceCollection::new(CryptocurrencyService)],
+        external_runtimes,
+        services,
         node_config(),
         None,
     );

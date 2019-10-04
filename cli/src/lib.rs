@@ -93,7 +93,7 @@ use exonum::{
     blockchain::InstanceCollection,
     exonum_merkledb::{Database, RocksDB},
     node::Node,
-    runtime::rust::ServiceFactory,
+    runtime::{rust::ServiceFactory, Runtime},
 };
 use exonum_supervisor::Supervisor;
 
@@ -111,6 +111,7 @@ pub mod password;
 #[derive(Debug, Default)]
 pub struct NodeBuilder {
     services: Vec<Box<dyn ServiceFactory>>,
+    external_runtimes: Vec<(u32, Box<dyn Runtime>)>,
 }
 
 impl NodeBuilder {
@@ -130,6 +131,14 @@ impl NodeBuilder {
         vec![InstanceCollection::from(Supervisor)]
     }
 
+    /// Adds a new Runtime to the list of available runtimes.
+    ///
+    /// Note that you don't have to add a Rust Runtime, since it's included by default.
+    pub fn with_external_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+        self.external_runtimes.push(runtime.into());
+        self
+    }
+
     /// Configures the node using parameters provided by user from stdin and then runs it.
     ///
     /// Only Rust runtime is enabled.
@@ -141,6 +150,8 @@ impl NodeBuilder {
             .into_iter()
             .chain(self.services.into_iter().map(InstanceCollection::new));
 
+        let runtimes = self.external_runtimes;
+
         if let StandardResult::Run(run_config) = command.execute()? {
             let db_options = &run_config.node_config.database;
             let database: Arc<dyn Database> =
@@ -149,6 +160,7 @@ impl NodeBuilder {
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
             let node = Node::new(
                 database,
+                runtimes,
                 services,
                 run_config.node_config,
                 Some(node_config_path),

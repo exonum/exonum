@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, Node},
     runtime::{
         rust::{Service, TransactionContext},
-        InstanceDescriptor, InstanceId,
+        InstanceDescriptor, InstanceId, Runtime,
     },
 };
 use exonum_merkledb::{Snapshot, TemporaryDB};
@@ -117,9 +117,14 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
+    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+    let services =
+        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
+
     let node = Node::new(
         TemporaryDB::new(),
-        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())],
+        external_runtimes,
+        services,
         node_cfg,
         None,
     );
