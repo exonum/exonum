@@ -820,42 +820,40 @@ pub struct StoppedTestKit {
 }
 
 impl StoppedTestKit {
-    /// Returns a snapshot of the database state.
+    /// Return a snapshot of the database state.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()
     }
 
-    /// Returns the height of latest committed block.
+    /// Return the height of latest committed block.
     pub fn height(&self) -> Height {
         let snapshot = self.snapshot();
         CoreSchema::new(&snapshot).height()
     }
 
-    /// Returns the reference to test network.
+    /// Return the reference to test network.
     pub fn network(&self) -> &TestNetwork {
         &self.network
     }
 
-    /// Resumes the operation of the testkit.
+    /// Resume the operation of the testkit.
     ///
-    /// Note that `available_services` may differ from the vector of Rust services initially passed
-    /// to the `TestKit` (which is also what may happen with real Exonum apps).
+    /// Note that `runtimes` may differ from the initially passed to the `TestKit`
+    /// (which is also what may happen with real Exonum apps).
+    ///
+    /// This method will not add the default Rust runtime, so you must do this explicitly.
     pub fn resume(
         self,
-        available_services: impl IntoIterator<Item = impl Into<Box<dyn ServiceFactory>>>,
+        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
     ) -> TestKit {
-        let mut runtime = RustRuntime::new();
-        for service in available_services {
-            runtime = runtime.with_available_service(service);
-        }
-
         TestKit::assemble(
             self.db,
             self.network,
             // TODO make consensus config optional [ECR-3222]
             ConsensusConfig::default(),
-            vec![runtime.into()],
-            vec![],
+            runtimes.into_iter().map(|x| x.into()),
+            // In this context, it is not possible to add new service instances.
+            Vec::new(),
         )
     }
 }

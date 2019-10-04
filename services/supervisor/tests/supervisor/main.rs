@@ -22,7 +22,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{ServiceFactory, Transaction},
+        rust::{RustRuntime, ServiceFactory, Transaction},
         ArtifactId, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -237,11 +237,10 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
         .create()
 }
 
-fn with_available_services() -> Vec<Box<dyn ServiceFactory>> {
-    vec![
-        Box::new(IncService) as Box<dyn ServiceFactory>,
-        Box::new(Supervisor) as Box<dyn ServiceFactory>,
-    ]
+fn runtime_with_available_services() -> RustRuntime {
+    RustRuntime::new()
+        .with_available_service(IncService)
+        .with_available_service(Supervisor)
 }
 
 /// Just test that the Inc service works as intended.
@@ -520,7 +519,7 @@ fn test_restart_node_and_start_service_instance() {
     let testkit_stopped = testkit.stop();
 
     // And start it again with the same service factory.
-    let mut testkit = testkit_stopped.resume(with_available_services());
+    let mut testkit = testkit_stopped.resume(vec![runtime_with_available_services()]);
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
@@ -548,7 +547,7 @@ fn test_restart_node_and_start_service_instance() {
 
     // Restart the node again.
     let testkit_stopped = testkit.stop();
-    let mut testkit = testkit_stopped.resume(with_available_services());
+    let mut testkit = testkit_stopped.resume(vec![runtime_with_available_services()]);
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
@@ -595,7 +594,9 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     testkit.create_block();
 
     // Restart the node again after the first block was created.
-    let mut testkit = testkit.stop().resume(with_available_services());
+    let mut testkit = testkit
+        .stop()
+        .resume(vec![runtime_with_available_services()]);
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
