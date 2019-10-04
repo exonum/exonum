@@ -519,7 +519,7 @@ fn test_restart_node_and_start_service_instance() {
     let testkit_stopped = testkit.stop();
 
     // And start it again with the same service factory.
-    let mut testkit = testkit_stopped.resume(vec![runtime_with_available_services()]);
+    let mut testkit = testkit_stopped.resume(std::iter::once(runtime_with_available_services()));
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
@@ -547,7 +547,7 @@ fn test_restart_node_and_start_service_instance() {
 
     // Restart the node again.
     let testkit_stopped = testkit.stop();
-    let mut testkit = testkit_stopped.resume(vec![runtime_with_available_services()]);
+    let mut testkit = testkit_stopped.resume(std::iter::once(runtime_with_available_services()));
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
@@ -596,7 +596,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     // Restart the node again after the first block was created.
     let mut testkit = testkit
         .stop()
-        .resume(vec![runtime_with_available_services()]);
+        .resume(std::iter::once(runtime_with_available_services()));
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
