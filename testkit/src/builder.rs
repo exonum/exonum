@@ -172,12 +172,12 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds a runtime to the testkit.
+    /// Adds a runtime to the testkit in addition to the default Rust runtime.
     ///
     /// # Panics
     ///
     /// - Panics if builder's instance already contains specified runtime.
-    pub fn with_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         let (id, runtime) = runtime.into();
         if id == RustRuntime::ID as u32 || self.additional_runtimes.contains_key(&id) {
             panic!("TestkitBuilder already contains runtime with id {}", id);

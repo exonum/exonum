@@ -193,7 +193,7 @@ fn test_runtime_factory() {
 
     // This causes artifact deploying and service instantiation.
     TestKitBuilder::validator()
-        .with_runtime(TestRuntime::with_runtime_tester(tester.clone()))
+        .with_additional_runtime(TestRuntime::with_runtime_tester(tester.clone()))
         .with_instances(instances)
         .create();
 

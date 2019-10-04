@@ -254,11 +254,8 @@ impl TestKit {
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
-
         let db = database.into();
-
         let db_handler = db.handler();
-
         let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair());
 
         for runtime in runtimes {
