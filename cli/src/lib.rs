@@ -111,6 +111,7 @@ pub mod password;
 #[derive(Debug, Default)]
 pub struct NodeBuilder {
     services: Vec<Box<dyn ServiceFactory>>,
+    instances: Vec<InstanceCollection>,
     external_runtimes: Vec<(u32, Box<dyn Runtime>)>,
 }
 
@@ -139,6 +140,18 @@ impl NodeBuilder {
         self
     }
 
+    /// Adds a new InstanceCollection to the list of available services.
+    ///
+    /// With that method you can start Exonum with already deployed & running service
+    /// instances.
+    ///
+    /// Note that if you add the `InstanceCollection` manually, you don't need to call
+    /// `with_service`, since `InstanceCollection` already contains a service inside.
+    pub fn with_instance_collection(mut self, instance_collection: InstanceCollection) -> Self {
+        self.instances.push(instance_collection);
+        self
+    }
+
     /// Configures the node using parameters provided by user from stdin and then runs it.
     ///
     /// Only Rust runtime is enabled.
@@ -148,7 +161,10 @@ impl NodeBuilder {
         let services = self
             .builtin_services()
             .into_iter()
+            .chain(self.instances.into_iter())
             .chain(self.services.into_iter().map(InstanceCollection::new));
+
+        let runtimes = self.external_runtimes;
 
         if let StandardResult::Run(run_config) = command.execute()? {
             let db_options = &run_config.node_config.database;
@@ -158,7 +174,7 @@ impl NodeBuilder {
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
             let node = Node::new(
                 database,
-                self.external_runtimes,
+                runtimes,
                 services,
                 run_config.node_config,
                 Some(node_config_path),
