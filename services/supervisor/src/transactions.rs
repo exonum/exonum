@@ -65,7 +65,7 @@ pub trait SupervisorInterface {
     ///
     /// This request should be sent by one of validators as the proposition to change
     /// current configuration to new one. All another validators able to vote for this
-    /// configuration by sending 'confirm_config_change' transaction.
+    /// configuration by sending `confirm_config_change` transaction.
     /// Note: only one proposal at time is possible.
     fn propose_config_change(
         &self,
@@ -279,7 +279,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = deploy_requests.confirm(&deploy, author);
-        if confirmations == deploy_requests.validators_amoun() {
+        if confirmations == deploy_requests.validators_amount() {
             trace!("Deploy artifact request accepted {:?}", deploy.artifact);
 
             let artifact = deploy.artifact.clone();
@@ -322,7 +322,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = deploy_confirmations.confirm(&confirmation, author);
-        if confirmations == deploy_confirmations.validators_amoun() {
+        if confirmations == deploy_confirmations.validators_amount() {
             trace!(
                 "Registering deployed artifact in dispatcher {:?}",
                 confirmation.artifact
@@ -375,7 +375,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = pending_instances.confirm(&service, author);
-        if confirmations == pending_instances.validators_amoun() {
+        if confirmations == pending_instances.validators_amount() {
             trace!(
                 "Request start service with name {:?} from artifact {:?}",
                 service.name,

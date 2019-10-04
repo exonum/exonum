@@ -89,7 +89,7 @@ impl Service for Supervisor {
             } else {
                 let config_confirms = schema.config_confirms();
                 let confirmations = config_confirms.confirmations(&entry.propose_hash);
-                let validators = config_confirms.validators_amoun();
+                let validators = config_confirms.validators_amount();
 
                 // Apply pending config in case 2/3+1 validators voted for it.
                 if confirmations >= byzantine_quorum(validators) {

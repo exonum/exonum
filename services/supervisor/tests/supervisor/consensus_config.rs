@@ -53,7 +53,7 @@ fn test_add_nodes_to_validators() {
 
 #[test]
 fn test_exclude_us_from_validators() {
-    let mut testkit = testkit(4);
+    let mut testkit = testkit_with_supervisor(4);
     let initiator_id = testkit.network().us().validator_id().unwrap();
 
     let new_consensus_config = {
@@ -90,7 +90,7 @@ fn test_exclude_us_from_validators() {
 
 #[test]
 fn test_exclude_other_from_validators() {
-    let mut testkit = testkit(4);
+    let mut testkit = testkit_with_supervisor(4);
     let initiator_id = testkit.network().us().validator_id().unwrap();
 
     let new_consensus_config = {
@@ -123,7 +123,7 @@ fn test_exclude_other_from_validators() {
 
 #[test]
 fn test_change_our_validator_id() {
-    let mut testkit = testkit(4);
+    let mut testkit = testkit_with_supervisor(4);
     let initiator_id = testkit.network().us().validator_id().unwrap();
 
     let new_consensus_config = {

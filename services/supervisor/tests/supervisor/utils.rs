@@ -121,7 +121,7 @@ impl ConfigProposeBuilder {
 pub fn consensus_config_propose_first_variant(testkit: &TestKit) -> ConsensusConfig {
     let mut cfg = testkit.consensus_config();
     // Change any config field.
-    // For test purpose ut doesn't matter what exactly filed will be changed.
+    // For test purpose it doesn't matter what exactly filed will be changed.
     cfg.min_propose_timeout += 1;
     cfg
 }
@@ -129,19 +129,20 @@ pub fn consensus_config_propose_first_variant(testkit: &TestKit) -> ConsensusCon
 pub fn consensus_config_propose_second_variant(testkit: &TestKit) -> ConsensusConfig {
     let mut cfg = testkit.consensus_config();
     // Change any config field.
-    // For test purpose ut doesn't matter what exactly filed will be changed.
+    // For test purpose it doesn't matter what exactly filed will be changed.
     cfg.min_propose_timeout += 2;
     cfg
 }
 
-pub fn testkit(validator_count: u16) -> TestKit {
+pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
+        .with_logger()
         .with_validators(validator_count)
         .with_service(Supervisor)
         .create()
 }
 
-pub fn testkit_with_service(validator_count: u16) -> TestKit {
+pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
     let service = ConfigChangeService;
     let collection =
         InstanceCollection::new(service).with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ());
@@ -152,7 +153,7 @@ pub fn testkit_with_service(validator_count: u16) -> TestKit {
         .create()
 }
 
-pub fn testkit_with_2_services(validator_count: u16) -> TestKit {
+pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
     let service = ConfigChangeService;
     let collection = InstanceCollection::new(service)
         .with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ())

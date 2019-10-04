@@ -109,7 +109,7 @@ where
         }
     }
 
-    pub fn validators_amoun(&self) -> usize {
+    pub fn validators_amount(&self) -> usize {
         self.validator_keys.len()
     }
 
