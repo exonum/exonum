@@ -67,9 +67,3 @@ message ConfigVote {
     // Hash of configuration proposition.
     exonum.Hash propose_hash = 1;
 }
-
-// Pending config change proposal and its hash
-message ConfigProposeEntry {
-    ConfigPropose config_propose = 1;
-    exonum.Hash propose_hash = 2;
-}

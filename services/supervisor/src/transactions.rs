@@ -22,11 +22,11 @@ use exonum::{
     },
 };
 use exonum_merkledb::ObjectHash;
-use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 use super::{
-    ConfigPropose, ConfigProposeEntry, ConfigVote, DeployConfirmation, DeployRequest, Error,
-    Schema, StartService, Supervisor,
+    schema::ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest,
+    Error, Schema, StartService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -70,7 +70,7 @@ pub trait SupervisorInterface {
     fn propose_config_change(
         &self,
         context: TransactionContext,
-        artifact: ConfigPropose,
+        propose: ConfigPropose,
     ) -> Result<(), ExecutionError>;
 
     /// Confirm config change
@@ -82,7 +82,7 @@ pub trait SupervisorInterface {
     fn confirm_config_change(
         &self,
         context: TransactionContext,
-        artifact: ConfigVote,
+        vote: ConfigVote,
     ) -> Result<(), ExecutionError>;
 }
 
@@ -136,30 +136,30 @@ impl SupervisorInterface for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        // Check that the `actual_from` height is in the future.
+        // Verifies that the `actual_from` height is in the future.
         if blockchain::Schema::new(fork).height() >= propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
 
-        // Check that there are no pending config changes.
-        if schema.config_propose_with_hash_entry().exists() {
+        // Verifies that there are no pending config changes.
+        if schema.pending_proposal().exists() {
             return Err(Error::ConfigProposeExists.into());
         }
 
         // To prevent multiple consensus change proposition in one request
-        let mut multiple_consensus_propose = false;
+        let mut consensus_propose_added = false;
         // To prevent multiple service change proposition in one request
-        let mut service_ids = BTreeSet::new();
+        let mut service_ids = HashSet::new();
 
         // Perform config verification.
         for change in &propose.changes {
             match change {
                 ConfigChange::Consensus(config) => {
-                    if multiple_consensus_propose {
+                    if consensus_propose_added {
                         trace!("Discarded multiple consensus change propositions in one request.");
                         return Err(Error::MalformedConfigPropose.into());
                     }
-                    multiple_consensus_propose = true;
+                    consensus_propose_added = true;
 
                     config
                         .validate()
@@ -184,11 +184,11 @@ impl SupervisorInterface for Supervisor {
         let propose_hash = propose.object_hash();
         config_confirms.confirm(&propose_hash, author);
 
-        let config_entry = ConfigProposeEntry {
+        let config_entry = ConfigProposalWithHash {
             config_propose: propose,
             propose_hash,
         };
-        schema.config_propose_with_hash_entry().set(config_entry);
+        schema.pending_proposal().set(config_entry);
 
         Ok(())
     }
@@ -211,23 +211,24 @@ impl SupervisorInterface for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        if let Some(entry) = schema.config_propose_with_hash_entry().get() {
-            // Verifies that this config proposal is registered.
-            if entry.propose_hash != vote.propose_hash {
-                return Err(Error::ConfigProposeNotRegistered.into());
-            }
+        let entry = schema
+            .pending_proposal()
+            .get()
+            .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
 
-            let config_propose = entry.config_propose;
-            // Verifies that we doesn't reach deadline height.
-            if config_propose.actual_from <= blockchain_height {
-                return Err(Error::DeadlineExceeded.into());
-            }
-
-            if config_confirms.confirmed_by(&entry.propose_hash, &author) {
-                return Err(Error::AttemptToVoteTwice.into());
-            }
-        } else {
+        // Verifies that this config proposal is registered.
+        if entry.propose_hash != vote.propose_hash {
             return Err(Error::ConfigProposeNotRegistered.into());
+        }
+
+        let config_propose = entry.config_propose;
+        // Verifies that we didn't reach the deadline height.
+        if config_propose.actual_from <= blockchain_height {
+            return Err(Error::DeadlineExceeded.into());
+        }
+
+        if config_confirms.confirmed_by(&entry.propose_hash, &author) {
+            return Err(Error::AttemptToVoteTwice.into());
         }
 
         config_confirms.confirm(&vote.propose_hash, author);
@@ -278,7 +279,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = deploy_requests.confirm(&deploy, author);
-        if confirmations == deploy_requests.validators_len() {
+        if confirmations == deploy_requests.validators_amoun() {
             trace!("Deploy artifact request accepted {:?}", deploy.artifact);
 
             let artifact = deploy.artifact.clone();
@@ -321,7 +322,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = deploy_confirmations.confirm(&confirmation, author);
-        if confirmations == deploy_confirmations.validators_len() {
+        if confirmations == deploy_confirmations.validators_amoun() {
             trace!(
                 "Registering deployed artifact in dispatcher {:?}",
                 confirmation.artifact
@@ -374,7 +375,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = pending_instances.confirm(&service, author);
-        if confirmations == pending_instances.validators_len() {
+        if confirmations == pending_instances.validators_amoun() {
             trace!(
                 "Request start service with name {:?} from artifact {:?}",
                 service.name,

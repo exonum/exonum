@@ -30,13 +30,15 @@ use crate::{
 };
 use exonum_supervisor::{ConfigPropose, ConfigVote, Schema, Supervisor};
 
+pub const CFG_CHANGE_HEIGHT: Height = Height(2);
+
 pub const SECOND_SERVICE_ID: InstanceId = 119;
 pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
     Schema::new(SUPERVISOR_INSTANCE_NAME, &snapshot)
-        .config_propose_with_hash_entry()
+        .pending_proposal()
         .get()
         .map(|entry| entry.config_propose)
 }
@@ -70,13 +72,13 @@ pub fn build_confirmation_transactions(
         .collect()
 }
 
-pub struct ConfigProposeConstructor {
+pub struct ConfigProposeBuilder {
     config_propose: ConfigPropose,
 }
 
-impl ConfigProposeConstructor {
+impl ConfigProposeBuilder {
     pub fn new(cfg_change_height: Height) -> Self {
-        ConfigProposeConstructor {
+        ConfigProposeBuilder {
             config_propose: ConfigPropose {
                 actual_from: cfg_change_height,
                 changes: vec![],
@@ -91,22 +93,22 @@ impl ConfigProposeConstructor {
         self
     }
 
-    pub fn extend_service_config_propose(mut self, param: String) -> Self {
+    pub fn extend_service_config_propose(mut self, params: String) -> Self {
         self.config_propose
             .changes
             .push(ConfigChange::Service(ServiceConfig {
                 instance_id: CONFIG_SERVICE_ID,
-                params: param.into_bytes(),
+                params: params.into_bytes(),
             }));
         self
     }
 
-    pub fn extend_second_service_config_propose(mut self, param: String) -> Self {
+    pub fn extend_second_service_config_propose(mut self, params: String) -> Self {
         self.config_propose
             .changes
             .push(ConfigChange::Service(ServiceConfig {
                 instance_id: SECOND_SERVICE_ID,
-                params: param.into_bytes(),
+                params: params.into_bytes(),
             }));
         self
     }
@@ -120,7 +122,7 @@ pub fn consensus_config_propose_first_variant(testkit: &TestKit) -> ConsensusCon
     let mut cfg = testkit.consensus_config();
     // Change any config field.
     // For test purpose ut doesn't matter what exactly filed will be changed.
-    cfg.min_propose_timeout = 20;
+    cfg.min_propose_timeout += 1;
     cfg
 }
 
@@ -128,11 +130,18 @@ pub fn consensus_config_propose_second_variant(testkit: &TestKit) -> ConsensusCo
     let mut cfg = testkit.consensus_config();
     // Change any config field.
     // For test purpose ut doesn't matter what exactly filed will be changed.
-    cfg.min_propose_timeout = 30;
+    cfg.min_propose_timeout += 2;
     cfg
 }
 
-pub fn testkit_with_change_service_and_static_instance(validator_count: u16) -> TestKit {
+pub fn testkit(validator_count: u16) -> TestKit {
+    TestKitBuilder::validator()
+        .with_validators(validator_count)
+        .with_service(Supervisor)
+        .create()
+}
+
+pub fn testkit_with_service(validator_count: u16) -> TestKit {
     let service = ConfigChangeService;
     let collection =
         InstanceCollection::new(service).with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ());
@@ -143,7 +152,7 @@ pub fn testkit_with_change_service_and_static_instance(validator_count: u16) -> 
         .create()
 }
 
-pub fn testkit_with_two_change_service_and_static_instance(validator_count: u16) -> TestKit {
+pub fn testkit_with_2_services(validator_count: u16) -> TestKit {
     let service = ConfigChangeService;
     let collection = InstanceCollection::new(service)
         .with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ())
