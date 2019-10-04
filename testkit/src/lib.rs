@@ -236,13 +236,12 @@ impl TestKit {
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
-        let InstanceCollection { factory, instances } =
-            InstanceCollection::new(service_factory).with_instance(id, name, constructor);
-        let runtime = RustRuntime::new().with_available_service(factory);
-
         TestKitBuilder::validator()
-            .with_runtime(runtime)
-            .with_instances(instances)
+            .with_rust_service(InstanceCollection::new(service_factory).with_instance(
+                id,
+                name,
+                constructor,
+            ))
             .create()
     }
 
