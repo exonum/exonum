@@ -47,7 +47,7 @@ pub struct BlockchainBuilder {
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
     /// List of the privileged services with the configuration parameters that are created directly
     /// in the genesis block.
-    pub builtin_instances: Vec<(InstanceSpec, Vec<u8>)>,
+    pub builtin_instances: Vec<InstanceConfig>,
 }
 
 impl BlockchainBuilder {
@@ -105,6 +105,15 @@ impl BlockchainBuilder {
         self
     }
 
+    /// Add instance specifications of builtin services.
+    pub fn with_builtin_instances(
+        mut self,
+        instances: impl IntoIterator<Item = InstanceConfig>,
+    ) -> Self {
+        self.builtin_instances.extend(instances);
+        self
+    }
+
     /// Returns blockchain instance, creates and commits the genesis block with the specified
     /// genesis configuration if the blockchain has not been initialized.
     /// Otherwise restores dispatcher state from database.
@@ -151,8 +160,13 @@ impl BlockchainBuilder {
             blockchain.merge({
                 let fork = blockchain.fork();
                 let mut dispatcher = blockchain.dispatcher();
-                for service in self.builtin_instances {
-                    dispatcher.add_builtin_service(&fork, service.0, service.1)?;
+                for instance_config in self.builtin_instances {
+                    dispatcher.add_builtin_service(
+                        &fork,
+                        instance_config.instance_spec,
+                        instance_config.artifact_spec.unwrap_or_default(),
+                        instance_config.constructor,
+                    )?;
                 }
                 fork.into_patch()
             })?;
@@ -166,13 +180,38 @@ impl BlockchainBuilder {
     }
 }
 
+/// Instantiation parameters of service instance.
+#[derive(Debug)]
+pub struct InstanceConfig {
+    /// Service instance specification.
+    pub instance_spec: InstanceSpec,
+    /// Artifact deploy specification.
+    pub artifact_spec: Option<Vec<u8>>,
+    /// Service configuration parameters.
+    pub constructor: Vec<u8>,
+}
+
+impl InstanceConfig {
+    pub fn new(
+        instance_spec: InstanceSpec,
+        artifact_spec: Option<Vec<u8>>,
+        constructor: Vec<u8>,
+    ) -> Self {
+        Self {
+            instance_spec,
+            artifact_spec,
+            constructor,
+        }
+    }
+}
+
 /// Rust runtime artifact with the list of instances.
 #[derive(Debug)]
 pub struct InstanceCollection {
     /// Rust services factory as a special case of an artifact.
     pub factory: Box<dyn ServiceFactory>,
     /// List of service instances with the initial configuration parameters.
-    pub instances: Vec<(InstanceSpec, Vec<u8>)>,
+    pub instances: Vec<InstanceConfig>,
 }
 
 impl InstanceCollection {
@@ -196,8 +235,8 @@ impl InstanceCollection {
             id,
             name: name.into(),
         };
-        let constructor = params.into_bytes();
-        self.instances.push((spec, constructor));
+        let instance_config = InstanceConfig::new(spec, None, params.into_bytes());
+        self.instances.push(instance_config);
         self
     }
 }
