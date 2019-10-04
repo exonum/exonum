@@ -121,6 +121,15 @@ impl RustRuntime {
         self.started_services.insert(instance.id, instance);
     }
 
+    fn remove_started_instance(&mut self, instance_id: InstanceId) -> Option<Instance> {
+        self.started_services
+            .remove(&instance_id)
+            .and_then(|instance| {
+                self.started_services_by_name.remove(&instance.name);
+                Some(instance)
+            })
+    }
+
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
@@ -149,6 +158,26 @@ impl RustRuntime {
         trace!("Deployed artifact: {}", artifact);
         self.deployed_artifacts.insert(artifact);
         Ok(())
+    }
+
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<&Instance, ExecutionError> {
+        let artifact = self.parse_artifact(&spec.artifact)?;
+
+        // Implement ensure like macro to reduce amount of boiler-plate code. [ECR-3222]
+
+        if !self.deployed_artifacts.contains(&artifact) {
+            return Err(dispatcher::Error::ArtifactNotDeployed.into());
+        }
+        if self.started_services.contains_key(&spec.id) {
+            return Err(dispatcher::Error::ServiceIdExists.into());
+        }
+        if self.started_services_by_name.contains_key(&spec.name) {
+            return Err(dispatcher::Error::ServiceNameExists.into());
+        }
+
+        let service = self.available_artifacts[&artifact].create_instance();
+        self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
+        Ok(&self.started_services[&spec.id])
     }
 
     fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
@@ -241,44 +270,41 @@ impl Runtime for RustRuntime {
             .map(ServiceFactory::artifact_protobuf_spec)
     }
 
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        let artifact = self.parse_artifact(&spec.artifact)?;
+    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        self.start_service(spec)?;
 
-        trace!("New service {} instance with id: {}", artifact, spec.id);
+        trace!("Started service {}", spec);
 
-        // Implement ensure like macro to reduce amount of boiler-plate code. [ECR-3222]
-
-        if !self.deployed_artifacts.contains(&artifact) {
-            return Err(dispatcher::Error::ArtifactNotDeployed.into());
-        }
-        if self.started_services.contains_key(&spec.id) {
-            return Err(dispatcher::Error::ServiceIdExists.into());
-        }
-        if self.started_services_by_name.contains_key(&spec.name) {
-            return Err(dispatcher::Error::ServiceNameExists.into());
-        }
-
-        let service = self.available_artifacts[&artifact].create_instance();
-        self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
         Ok(())
     }
 
-    fn initialize_service(
-        &self,
-        fork: &Fork,
-        descriptor: InstanceDescriptor,
+    fn add_service(
+        &mut self,
+        fork: &mut Fork,
+        spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self
-            .started_services
-            .get(&descriptor.id)
-            .ok_or(dispatcher::Error::ServiceNotStarted)?;
-
-        trace!("Initialize service instance {}", descriptor);
-
-        instance
-            .as_ref()
-            .initialize(instance.descriptor(), fork, parameters)
+        let result = {
+            let instance = self.start_service(spec)?;
+            let service = instance.as_ref();
+            let descriptor = instance.descriptor();
+            catch_panic(|| service.initialize(descriptor, fork, parameters))
+        };
+        // We have to check edge cases of the initialize result.
+        match result {
+            Ok(_) => {
+                fork.flush();
+                trace!("Added service instance {}", spec);
+                Ok(())
+            }
+            // If initialize failed it have to rollback any changes in fork and in the list
+            // of started services.
+            Err(e) => {
+                fork.rollback();
+                self.remove_started_instance(spec.id);
+                Err(e)
+            }
+        }
     }
 
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {

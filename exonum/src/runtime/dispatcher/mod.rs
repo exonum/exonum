@@ -104,7 +104,7 @@ impl Dispatcher {
     /// [`MAX_BUILTIN_INSTANCE_ID`]: constant.MAX_BUILTIN_INSTANCE_ID.html
     pub(crate) fn add_builtin_service(
         &mut self,
-        fork: &Fork,
+        fork: &mut Fork,
         spec: InstanceSpec,
         artifact_spec: impl BinaryValue,
         constructor: Vec<u8>,
@@ -120,7 +120,7 @@ impl Dispatcher {
             self.deploy_and_register_artifact(fork, &spec.artifact, artifact_spec)?;
         }
         // Start the built-in service instance.
-        self.start_service(fork, spec, constructor)
+        self.add_service(fork, spec, constructor)
     }
 
     pub(crate) fn state_hash(
@@ -234,15 +234,15 @@ impl Dispatcher {
         self.register_artifact(fork, &artifact, spec)
     }
 
-    /// Start and configure a new service instance. After that, write the information about the
+    /// Add a new service instance. After that, write the information about the
     /// service instance to the dispatcher's information schema.
     ///
     /// # Panics
     ///
     /// * If instance spec contains invalid service name.
-    pub(crate) fn start_service(
+    pub(crate) fn add_service(
         &mut self,
-        fork: &Fork,
+        fork: &mut Fork,
         spec: InstanceSpec,
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
@@ -252,49 +252,17 @@ impl Dispatcher {
         if self.runtime_lookup.contains_key(&spec.id) {
             return Err(Error::ServiceIdExists.into());
         }
-        // Try to start and initialize the service instance.
-        self.runtimes
+        // Try to add the service instance.
+        let runtime = self
+            .runtimes
             .get_mut(&spec.artifact.runtime_id)
-            .ok_or(Error::IncorrectRuntime)
-            .map_err(ExecutionError::from)
-            .and_then(|runtime| runtime.start_service(&spec))?;
-        // Try to initialize the started instance of the service, otherwise stop.
-        let initialize_result = self.runtimes[&spec.artifact.runtime_id]
-            .as_ref()
-            .initialize_service(fork, spec.as_descriptor(), constructor.into_bytes());
-
-        match initialize_result {
-            // Add service instance to the dispatcher schema.
-            Ok(_) => {
-                self.register_running_service(&spec);
-                Schema::new(fork)
-                    .add_service_instance(spec)
-                    .map_err(From::from)
-            }
-
-            // Handle error and stop errored service instance.
-            Err(e) => {
-                error!(
-                    "An error occurred while configuring the service {}: {}",
-                    spec.name, e
-                );
-
-                // TODO Find the way to avoid panic from the untrusted code. [ECR-3222]
-                let runtime = self
-                    .runtimes
-                    .get_mut(&spec.artifact.runtime_id)
-                    .unwrap_or_else(|| {
-                        panic!(FatalError::new(
-                            "Unable to find runtime to rollback a broken service instance."
-                        ))
-                    });
-                if let Err(e) = runtime.stop_service(spec.as_descriptor()) {
-                    panic!(FatalError::new(e.to_string()))
-                }
-
-                Err(e)
-            }
-        }
+            .ok_or(Error::IncorrectRuntime)?;
+        runtime.add_service(fork, &spec, constructor.into_bytes())?;
+        // Add service instance to the dispatcher schema.
+        self.register_running_service(&spec);
+        Schema::new(fork as &Fork)
+            .add_service_instance(spec)
+            .map_err(From::from)
     }
 
     // TODO documentation [ECR-3275]
@@ -435,13 +403,13 @@ impl Dispatcher {
         runtime_changes.push(ApiChange::InstanceAdded(instance.id));
     }
 
-    /// Start a new service instance.
+    /// Start a new previously added service instance.
     fn restart_service(&mut self, instance: &InstanceSpec) -> Result<(), ExecutionError> {
         let runtime = self
             .runtimes
             .get_mut(&instance.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
-        runtime.start_service(instance)?;
+        runtime.restart_service(instance)?;
         self.register_running_service(&instance);
         Ok(())
     }
@@ -498,9 +466,9 @@ pub enum Action {
     /// Register the deployed artifact in the dispatcher.
     /// Make sure that you successfully complete the deploy artifact procedure.
     RegisterArtifact { artifact: ArtifactId, spec: Vec<u8> },
-    /// Start the service instance with the specified params.
+    /// Add a new service instance with the specified params.
     /// Make sure that the artifact is deployed.
-    StartService {
+    AddService {
         artifact: ArtifactId,
         instance_name: String,
         config: Vec<u8>,
@@ -521,12 +489,12 @@ impl Action {
                 .register_artifact(fork, &artifact, spec)
                 .map_err(From::from),
 
-            Action::StartService {
+            Action::AddService {
                 artifact,
                 instance_name,
                 config,
             } => dispatcher
-                .start_service(
+                .add_service(
                     fork,
                     InstanceSpec {
                         artifact,

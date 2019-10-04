@@ -117,7 +117,7 @@ impl Runtime for SampleRuntime {
         id.runtime_id == self.runtime_type
     }
 
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         if spec.artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
@@ -125,10 +125,10 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn initialize_service(
-        &self,
-        _fork: &Fork,
-        _instance: InstanceDescriptor,
+    fn add_service(
+        &mut self,
+        _fork: &mut Fork,
+        _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -237,7 +237,7 @@ fn test_dispatcher_simple() {
     };
 
     // Check if the services are ready for deploy.
-    let fork = db.fork();
+    let mut fork = db.fork();
     dispatcher
         .deploy_and_register_artifact(&fork, &sample_rust_spec, Vec::default())
         .unwrap();
@@ -247,8 +247,8 @@ fn test_dispatcher_simple() {
 
     // Check if the services are ready for initiation.
     dispatcher
-        .start_service(
-            &fork,
+        .add_service(
+            &mut fork,
             InstanceSpec {
                 artifact: sample_rust_spec.clone(),
                 id: RUST_SERVICE_ID,
@@ -256,10 +256,10 @@ fn test_dispatcher_simple() {
             },
             Vec::default(),
         )
-        .expect("start_service failed for rust");
+        .expect("add_service failed for rust");
     dispatcher
-        .start_service(
-            &fork,
+        .add_service(
+            &mut fork,
             InstanceSpec {
                 artifact: sample_java_spec.clone(),
                 id: JAVA_SERVICE_ID,
@@ -267,7 +267,7 @@ fn test_dispatcher_simple() {
             },
             Vec::default(),
         )
-        .expect("start_service failed for java");
+        .expect("add_service failed for java");
 
     // Check if transactions are ready for execution.
     let tx_payload = [0x00_u8; 1];
@@ -374,12 +374,12 @@ fn test_dispatcher_rust_runtime_no_service() {
     );
 
     // Check if the services are ready to start.
-    let fork = db.fork();
+    let mut fork = db.fork();
 
     assert_eq!(
         dispatcher
-            .start_service(
-                &fork,
+            .add_service(
+                &mut fork,
                 InstanceSpec {
                     artifact: sample_rust_spec.clone(),
                     id: RUST_SERVICE_ID,
@@ -430,14 +430,14 @@ impl Runtime for ShutdownRuntime {
         false
     }
 
-    fn start_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn restart_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn initialize_service(
-        &self,
-        _fork: &Fork,
-        _instance: InstanceDescriptor,
+    fn add_service(
+        &mut self,
+        _fork: &mut Fork,
+        _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())

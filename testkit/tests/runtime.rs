@@ -118,14 +118,14 @@ impl Runtime for TestRuntime {
         Some(ArtifactProtobufSpec::default())
     }
 
-    fn start_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn restart_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn initialize_service(
-        &self,
-        _fork: &Fork,
-        _instance: InstanceDescriptor,
+    fn add_service(
+        &mut self,
+        _fork: &mut Fork,
+        _spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         self.tester.configure_service(parameters);
