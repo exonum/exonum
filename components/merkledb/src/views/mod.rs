@@ -19,7 +19,7 @@ pub use self::{
     refs::{AnyObject, ObjectAccess, Ref, RefMut},
 };
 
-use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData, ops::Deref};
+use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
 use super::{
     db::{Change, ChangesRef, ForkIter, ViewChanges},
@@ -367,28 +367,23 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     }
 }
 
-impl<T> IndexAccess for T
-where
-    T: Deref<Target = dyn Snapshot> + Clone,
-{
-    type Changes = ();
+macro_rules! impl_snapshot_access {
+    ($typ:ty) => {
+        impl IndexAccess for $typ {
+            type Changes = ();
 
-    fn snapshot(&self) -> &dyn Snapshot {
-        self.deref()
-    }
+            fn snapshot(&self) -> &dyn Snapshot {
+                self.as_ref()
+            }
 
-    fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
+            fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
+        }
+    };
 }
-
-impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
-    type Changes = ();
-
-    fn snapshot(&self) -> &dyn Snapshot {
-        self.as_ref()
-    }
-
-    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
-}
+impl_snapshot_access!(&'_ dyn Snapshot);
+impl_snapshot_access!(&'_ Box<dyn Snapshot>);
+impl_snapshot_access!(std::rc::Rc<dyn Snapshot>);
+impl_snapshot_access!(std::sync::Arc<dyn Snapshot>);
 
 fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     concat_keys!(key)

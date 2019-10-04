@@ -13,7 +13,7 @@
 // limitations under the License.
 use url::form_urlencoded::byte_serialize;
 
-use std::panic;
+use std::{panic, rc::Rc};
 
 use crate::{
     db,
@@ -443,7 +443,6 @@ fn multiple_views() {
     }
 }
 
-#[cfg(test)]
 #[test]
 fn multiple_indexes() {
     use crate::{ListIndex, MapIndex};
@@ -619,7 +618,6 @@ fn clear_sibling_views() {
     }
 
     let db = TemporaryDB::new();
-
     let fork = db.fork();
     {
         let mut view1 = View::new(&fork, IDX_1);
@@ -679,6 +677,57 @@ fn mutable_and_immutable_borrows() {
 #[should_panic]
 fn mutable_and_immutable_prefixed_borrows() {
     _mutable_and_immutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
+}
+
+#[test]
+fn views_based_on_rc_fork() {
+    fn test_lifetime<T: 'static>(_: T) {}
+
+    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
+    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
+
+    let db = TemporaryDB::new();
+    let fork = Rc::new(db.fork());
+
+    let view1 = View::new(fork.clone(), IDX_1);
+    let view2 = View::new(fork.clone(), IDX_2);
+    // Test that views have 'static lifetime.
+    test_lifetime(view1);
+    test_lifetime(view2);
+
+    let mut view1 = View::new(fork.clone(), IDX_1);
+    let mut view2 = View::new(fork.clone(), IDX_2);
+    view1.put(&vec![0], vec![1]);
+    view1.put(&vec![1], vec![2]);
+    assert_eq!(view1.get_bytes(&[0]), Some(vec![1]));
+    assert_eq!(view1.get_bytes(&[1]), Some(vec![2]));
+    view2.put(&vec![0], vec![3]);
+    view1.put(&vec![0], vec![3]);
+    drop(view1);
+    view2.put(&vec![2], vec![4]);
+    drop(view2);
+
+    {
+        // Check that changes introduced by the both views are reflected in the fork.
+        let mut view1 = View::new(&*fork, IDX_1);
+        assert_eq!(view1.get_bytes(&[0]), Some(vec![3]));
+        view1.remove(&vec![0]);
+        let view2 = View::new(fork.clone(), IDX_2);
+        assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
+    }
+
+    // ...and that these changes propagate to patch.
+    let patch = Rc::try_unwrap(fork).unwrap().into_patch();
+    db.merge_sync(patch).unwrap();
+    let snapshot = db.snapshot();
+    let view1 = View::new(&snapshot, IDX_1);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view1.get_bytes(&[1]), Some(vec![2]));
+
+    let view2 = View::new(&snapshot, IDX_2);
+    assert_eq!(view2.get_bytes(&[0]), Some(vec![3]));
+    assert_eq!(view2.get_bytes(&[1]), None);
+    assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
 }
 
 #[test]

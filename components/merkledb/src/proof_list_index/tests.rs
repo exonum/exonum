@@ -20,7 +20,7 @@ use serde_json::{self, json};
 
 use std::cmp;
 
-use super::{ListProof, ListProofError, ProofListIndex};
+use super::{key::ProofListKey, tree_height_by_length, ListProof, ListProofError, ProofListIndex};
 use crate::{BinaryValue, Database, HashTag, ObjectHash, TemporaryDB};
 
 const IDX_NAME: &str = "idx_name";
@@ -64,6 +64,65 @@ fn list_methods() {
     assert_eq!(index.get(0), Some(vec![1]));
     assert_eq!(index.get(1), Some(vec![2]));
     assert_eq!(index.get(2), Some(vec![3]));
+}
+
+#[test]
+fn extend_is_equivalent_to_sequential_pushes() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+
+    for _ in 0..10 {
+        index.clear();
+        let values: [u8; 32] = thread_rng().gen();
+        for &value in &values {
+            index.push(value);
+        }
+        let hash_after_pushes = index.object_hash();
+
+        index.clear();
+        index.extend(values.iter().cloned());
+        assert_eq!(index.object_hash(), hash_after_pushes);
+    }
+
+    // Try extending list in several calls.
+    for _ in 0..10 {
+        index.clear();
+        let values: [u8; 32] = thread_rng().gen();
+        for &value in &values {
+            index.push(value);
+        }
+        let hash_after_pushes = index.object_hash();
+
+        index.clear();
+        let mut iter = values.iter().cloned();
+        index.extend(iter.by_ref().take(5));
+        index.extend(iter.by_ref().take(8));
+        index.extend(iter.by_ref().take(3));
+        index.extend(iter);
+        assert_eq!(index.object_hash(), hash_after_pushes);
+    }
+
+    // Try mixing extensions and pushes
+    for _ in 0..10 {
+        index.clear();
+        let values: [u8; 32] = thread_rng().gen();
+        for &value in &values {
+            index.push(value);
+        }
+        let hash_after_pushes = index.object_hash();
+
+        index.clear();
+        let mut iter = values.iter().cloned();
+        index.extend(iter.by_ref().take(5));
+        for value in iter.by_ref().take(3) {
+            index.push(value);
+        }
+        index.extend(iter.by_ref().take(7));
+        index.push(iter.by_ref().next().unwrap());
+        index.extend(iter);
+        assert_eq!(index.object_hash(), hash_after_pushes);
+    }
 }
 
 #[test]
@@ -143,6 +202,7 @@ fn simple_proof() {
         proof.push_hash(1, 0, h0);
         proof
     });
+
     let proof = proof.check().unwrap();
     assert_eq!(proof.index_hash(), index.object_hash());
     assert_eq!(*proof.entries(), [(1, 4)]);
@@ -551,7 +611,7 @@ fn proof_with_range_end_exceeding_list_size() {
 }
 
 #[test]
-fn same_merkle_root() {
+fn setting_elements_leads_to_correct_list_hash() {
     let db = TemporaryDB::new();
     let hash1 = {
         let fork = db.fork();
@@ -577,6 +637,166 @@ fn same_merkle_root() {
         list.object_hash()
     };
     assert_eq!(hash1, hash2);
+}
+
+#[test]
+fn setting_elements_leads_to_correct_list_hash_randomized() {
+    const LIST_LEN: usize = 32;
+
+    let mut rng = thread_rng();
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+
+    for _ in 0..10 {
+        // Prepare two copies of values with sufficient intersection.
+        let values: [u16; LIST_LEN] = rng.gen();
+        let mut new_values: [u16; LIST_LEN] = rng.gen();
+        for i in 0..LIST_LEN {
+            if rng.gen::<bool>() {
+                new_values[i] = values[i];
+            }
+        }
+        let proof_ranges: Vec<_> = (0..50)
+            .map(|_| {
+                let start = rng.gen_range(0, LIST_LEN as u64);
+                let end = rng.gen_range(start, LIST_LEN as u64) + 1;
+                start..end
+            })
+            .collect();
+
+        list.clear();
+        list.extend(new_values.iter().cloned());
+        let list_hash = list.object_hash();
+        let expected_proofs: Vec<_> = proof_ranges
+            .iter()
+            .map(|range| list.get_range_proof(range.clone()))
+            .collect();
+
+        list.clear();
+        list.extend(values.iter().cloned());
+        for i in 0..values.len() {
+            if values[i] != new_values[i] {
+                list.set(i as u64, new_values[i]);
+            }
+        }
+        assert_eq!(list.object_hash(), list_hash);
+        for (i, range) in proof_ranges.into_iter().enumerate() {
+            let proof = list.get_range_proof(range.clone());
+            assert_eq!(
+                proof, expected_proofs[i],
+                "Unexpected proof for range {:?}",
+                range
+            );
+        }
+    }
+}
+
+#[test]
+fn truncating_list() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    list.extend(0_u32..30);
+    list.truncate(5);
+    assert_eq!(list.len(), 5);
+    assert_eq!(list.get(3), Some(3));
+    assert_eq!(list.get(7), None);
+    assert!(list.iter().eq(0_u32..5));
+    assert!(list.iter_from(3).eq(3_u32..5));
+
+    // Check that the branches are removed.
+    let level_lengths = vec![5, 5, 3, 2, 1];
+    for height in 1..tree_height_by_length(30) {
+        let level_len = level_lengths
+            .get(height as usize)
+            .copied()
+            .unwrap_or_default();
+        if level_len > 0 {
+            assert!(list
+                .get_branch(ProofListKey::new(height, level_len - 1))
+                .is_some());
+        }
+        for index in level_len..(level_len + 30) {
+            let key = ProofListKey::new(height, index);
+            assert!(
+                list.get_branch(key).is_none(),
+                "Branch wasn't removed: {:?}",
+                key
+            );
+        }
+    }
+}
+
+#[test]
+fn truncating_list_leads_to_expected_hash() {
+    let mut rng = thread_rng();
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+
+    for _ in 0..10 {
+        let values: [u32; 32] = rng.gen();
+        let truncated_len = rng.gen_range(5, 25);
+        let proof_ranges: Vec<_> = (0..50)
+            .map(|_| {
+                let start = rng.gen_range(0, truncated_len as u64);
+                let end = rng.gen_range(start, truncated_len as u64) + 1;
+                start..end
+            })
+            .collect();
+
+        list.clear();
+        list.extend(values[..truncated_len].iter().copied());
+        let list_hash = list.object_hash();
+        let expected_proofs: Vec<_> = proof_ranges
+            .iter()
+            .map(|range| list.get_range_proof(range.clone()))
+            .collect();
+
+        list.clear();
+        list.extend(values.iter().copied());
+        list.truncate(truncated_len as u64);
+        assert_eq!(list.object_hash(), list_hash);
+        for (i, range) in proof_ranges.into_iter().enumerate() {
+            let proof = list.get_range_proof(range.clone());
+            assert_eq!(
+                proof, expected_proofs[i],
+                "Unexpected proof for range {:?}",
+                range
+            );
+        }
+    }
+
+    // Check different values of `truncated_len` (including extreme ones).
+    let values: [u32; 17] = rng.gen();
+    for truncated_len in 0..=values.len() {
+        list.clear();
+        list.extend(values[..truncated_len].iter().copied());
+        let list_hash = list.object_hash();
+
+        list.clear();
+        list.extend(values.iter().copied());
+        list.truncate(truncated_len as u64);
+        assert_eq!(list.object_hash(), list_hash);
+    }
+}
+
+#[test]
+fn popping_element_from_list() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    list.extend(0_i32..10);
+
+    let mut count = 0;
+    while let Some(last) = list.pop() {
+        count += 1;
+        assert_eq!(last, 10 - count);
+        assert_eq!(list.len(), 10 - count as u64);
+    }
+    assert!(list.is_empty());
+    assert_eq!(list.object_hash(), HashTag::empty_list_hash());
 }
 
 #[test]
@@ -689,7 +909,6 @@ fn proofs_with_unexpected_branches() {
 
     let mut proof = ListProof::new(vec![(1, "foo".to_owned()), (2, "bar".to_owned())], 5);
     proof.push_hash(1, 6, Hash::zero());
-    assert_eq!(proof.check().unwrap_err(), ListProofError::UnexpectedBranch);
 }
 
 #[test]
@@ -773,18 +992,25 @@ fn invalid_proofs_with_no_values() {
 
 mod root_hash {
     use crate::{
-        hash::HashTag, proof_list_index::ProofListIndex, Database, ObjectHash, TemporaryDB,
+        hash::HashTag, proof_list_index::ProofListIndex, BinaryValue, Database, ObjectHash,
+        TemporaryDB,
     };
     use exonum_crypto::{self, Hash};
 
     /// Cross-verify `object_hash()` with `ProofListIndex` against expected root hash value.
-    fn assert_object_hash_correct(hashes: &[Hash]) {
-        let root_actual = HashTag::hash_list(hashes);
-        let root_index = proof_list_index_root(hashes);
+    fn assert_object_hash_correct<V>(values: &[V])
+    where
+        V: BinaryValue + Clone,
+    {
+        let root_actual = HashTag::hash_list(values);
+        let root_index = proof_list_index_root(values);
         assert_eq!(root_actual, root_index);
     }
 
-    fn proof_list_index_root(hashes: &[Hash]) -> Hash {
+    fn proof_list_index_root<V>(hashes: &[V]) -> Hash
+    where
+        V: BinaryValue + Clone,
+    {
         let db = TemporaryDB::new();
         let fork = db.fork();
         let mut index = ProofListIndex::new("merkle_root", &fork);
@@ -792,7 +1018,7 @@ mod root_hash {
         index.object_hash()
     }
 
-    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
+    fn to_list_of_hashes(bytes: &[&[u8]]) -> Vec<Hash> {
         bytes
             .iter()
             .map(|chunk| exonum_crypto::hash(chunk))
@@ -801,21 +1027,53 @@ mod root_hash {
 
     #[test]
     fn object_hash_single() {
-        assert_object_hash_correct(&hash_list(&[b"1"]));
+        assert_object_hash_correct(&to_list_of_hashes(&[b"1"]));
     }
 
     #[test]
     fn object_hash_even() {
-        assert_object_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4"]));
+        assert_object_hash_correct(&to_list_of_hashes(&[b"1", b"2", b"3", b"4"]));
     }
 
     #[test]
     fn object_hash_odd() {
-        assert_object_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4", b"5"]));
+        assert_object_hash_correct(&to_list_of_hashes(&[b"1", b"2", b"3", b"4", b"5"]));
+    }
+
+    #[test]
+    fn object_hash_with_integers() {
+        let numbers = [2_u32, 3, 5, 8, 13, 21, 34, 55];
+        for i in 1..numbers.len() {
+            assert_object_hash_correct(&numbers[..i]);
+        }
+    }
+
+    #[test]
+    fn object_hash_with_bytes() {
+        let bytes: Vec<_> = [b"foo" as &[_], b"bar", b"bark", b"lorem", b"ipsum"]
+            .iter()
+            .map(|slice| slice.to_vec())
+            .collect();
+        for i in 1..bytes.len() {
+            assert_object_hash_correct(&bytes[..i]);
+        }
+    }
+
+    #[test]
+    fn object_hash_with_strings() {
+        const STRING: &str =
+            "All human beings are born free and equal in dignity and rights. \
+             They are endowed with reason and conscience and should act towards one another \
+             in a spirit of brotherhood.";
+
+        let words: Vec<_> = STRING.split_whitespace().map(str::to_owned).collect();
+        for i in 1..words.len() {
+            assert_object_hash_correct(&words[..i]);
+        }
     }
 
     #[test]
     fn object_hash_empty() {
-        assert_object_hash_correct(&hash_list(&[]));
+        assert_object_hash_correct(&to_list_of_hashes(&[]));
     }
 }

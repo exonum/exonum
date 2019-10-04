@@ -16,7 +16,7 @@
 
 pub use self::proof::{CheckedListProof, ListProof, ListProofError, ValidationError};
 
-use std::{marker::PhantomData, ops::RangeBounds};
+use std::{cmp, iter, marker::PhantomData, ops::RangeBounds};
 
 use exonum_crypto::Hash;
 
@@ -245,11 +245,6 @@ where
         self.state.set(len)
     }
 
-    fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
-        debug_assert!(key.height() > 0);
-        self.base.put(&key, hash)
-    }
-
     /// Returns the element at the indicated position or `None` if the indicated position
     /// is out of bounds.
     ///
@@ -458,6 +453,122 @@ where
         }
     }
 
+    /// Updates levels of the tree with heights `2..` after the values in the range
+    /// `[first_index, last_index]` were updated.
+    ///
+    /// # Invariants
+    ///
+    /// - `self.len()` / `self.height()` is assumed to be correctly set.
+    /// - Value hashes (i.e., tree branches on level 1) are assumed to be updated.
+    fn update_range(&mut self, mut first_index: u64, mut last_index: u64) {
+        // Index of the last element on the current `height` of the tree.
+        let mut last_index_on_height = self.len() - 1;
+
+        for height in 1..self.height() {
+            // Check consistency of the index range.
+            debug_assert!(first_index <= last_index);
+            // Check consistency with the level length.
+            debug_assert!(last_index <= last_index_on_height);
+
+            // Calculate the start and stop indexes to process at the current `height`.
+
+            // The start index is always even, since during hashing we hash together
+            // an element with an even index and the following element (if it exists). Thus, we may
+            // need to decrease `first_index` by 1 to get the actual starting index if
+            // `first_index` is odd. The code below does just that; it is equivalent to
+            //
+            //    let mut index = first_index - (first_index % 2);
+            //
+            // ...just a bit faster.
+            let mut index = first_index & !1;
+
+            // To get the stop index, we may need to increase `last_index` to get an odd value,
+            // but we need to keep in mind the resulting index may be not in the tree.
+            // `last_index | 1` is equivalent to
+            //
+            //    last_index + (1 - last_index % 2)
+            //
+            // ...just a bit faster.
+            let stop_index = cmp::min(last_index | 1, last_index_on_height);
+
+            while index < stop_index {
+                let key = ProofListKey::new(height, index);
+                let branch_hash = HashTag::hash_node(
+                    &self.get_branch_unchecked(key),
+                    &self.get_branch_unchecked(key.as_right()),
+                );
+                self.base.put(&key.parent(), branch_hash);
+                index += 2;
+            }
+
+            if stop_index % 2 == 0 {
+                let key = ProofListKey::new(height, stop_index);
+                let branch_hash = HashTag::hash_single_node(&self.get_branch_unchecked(key));
+                self.base.put(&key.parent(), branch_hash);
+            }
+
+            first_index /= 2;
+            last_index /= 2;
+            last_index_on_height /= 2;
+        }
+
+        debug_assert_eq!(first_index, 0);
+        debug_assert_eq!(last_index, 0);
+        debug_assert_eq!(last_index_on_height, 0);
+    }
+
+    /// Removes the extra elements in the tree on heights `1..` and updates elements
+    /// where it is necessary.
+    ///
+    /// # Invariants
+    ///
+    /// - List length is assumed to be updated.
+    fn remove_range(&mut self, mut old_last_index: u64, old_height: u8) {
+        let new_length = self.len();
+        // New last index of the element on a certain height. The height of the tree
+        // may decrease after removing elements; we encode this case as `last_index == None`.
+        let mut last_index = Some(new_length - 1);
+
+        // Have we started updating hashes in the tree? Up to a certain height, we may just
+        // remove hashes from the tree. However, once the last element on the tree level is even
+        // and has its right neighbor removed, the hashes of the rightmost elements on each
+        // following height must be updated.
+        let mut started_updating_hashes = false;
+
+        for height in 1..old_height {
+            // Remove excessive branches on the level.
+            for index in last_index.map_or(0, |i| i + 1)..=old_last_index {
+                self.base.remove(&ProofListKey::new(height, index));
+            }
+
+            // Recalculate the hash of the last element on the next level if it has changed.
+            if let Some(last_index) = last_index {
+                // We start updating hashes once the `last_index` becomes a single hashed node.
+                if last_index > 0 && last_index < old_last_index && last_index % 2 == 0 {
+                    started_updating_hashes = true;
+                }
+
+                if started_updating_hashes && last_index > 0 {
+                    let key = ProofListKey::new(height, last_index);
+                    let hash = self.get_branch_unchecked(key);
+                    let parent_hash = if key.is_left() {
+                        HashTag::hash_single_node(&hash)
+                    } else {
+                        let left_sibling = self.get_branch_unchecked(key.as_left());
+                        HashTag::hash_node(&left_sibling, &hash)
+                    };
+                    self.base.put(&key.parent(), parent_hash);
+                }
+            }
+
+            last_index = match last_index {
+                Some(0) | None => None,
+                Some(i) => Some(i / 2),
+            };
+            old_last_index /= 2;
+        }
+    }
+
     /// Appends an element to the back of the proof list.
     ///
     /// # Examples
@@ -474,24 +585,7 @@ where
     /// assert!(!index.is_empty());
     /// ```
     pub fn push(&mut self, value: V) {
-        let len = self.len();
-        self.set_len(len + 1);
-        let mut key = ProofListKey::new(1, len);
-
-        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
-        self.base.put(&ProofListKey::leaf(len), value);
-        while key.height() < self.height() {
-            let hash = if key.is_left() {
-                HashTag::hash_single_node(&self.get_branch_unchecked(key))
-            } else {
-                HashTag::hash_node(
-                    &self.get_branch_unchecked(key.as_left()),
-                    &self.get_branch_unchecked(key),
-                )
-            };
-            key = key.parent();
-            self.set_branch(key, hash);
-        }
+        self.extend(iter::once(value));
     }
 
     /// Extends the proof list with the contents of an iterator.
@@ -513,9 +607,24 @@ where
     where
         I: IntoIterator<Item = V>,
     {
+        let old_list_len = self.len();
+        let mut new_list_len = old_list_len;
+
         for value in iter {
-            self.push(value)
+            self.base.put(
+                &ProofListKey::new(1, new_list_len),
+                HashTag::hash_leaf(&value.to_bytes()),
+            );
+            self.base.put(&ProofListKey::leaf(new_list_len), value);
+            new_list_len += 1;
         }
+
+        if new_list_len == old_list_len {
+            // No elements in the iterator; we're done.
+            return;
+        }
+        self.set_len(new_list_len);
+        self.update_range(old_list_len, new_list_len - 1);
     }
 
     /// Changes a value at the specified position.
@@ -548,21 +657,77 @@ where
                 index
             );
         }
-        let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
+        self.base.put(
+            &ProofListKey::new(1, index),
+            HashTag::hash_leaf(&value.to_bytes()),
+        );
         self.base.put(&ProofListKey::leaf(index), value);
-        while key.height() < self.height() {
-            let (left, right) = (key.as_left(), key.as_right());
-            let hash = if self.has_branch(right) {
-                HashTag::hash_node(
-                    &self.get_branch_unchecked(left),
-                    &self.get_branch_unchecked(right),
-                )
-            } else {
-                HashTag::hash_single_node(&self.get_branch_unchecked(left))
-            };
-            key = key.parent();
-            self.set_branch(key, hash);
+        self.update_range(index, index);
+    }
+
+    /// Shortens the list, keeping the indicated number of first `len` elements
+    /// and dropping the rest.
+    ///
+    /// If `len` is greater than the current state of the list, this has no effect.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let name = "name";
+    /// let fork = db.fork();
+    /// let mut index = ProofListIndex::new(name, &fork);
+    ///
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    /// assert_eq!(5, index.len());
+    /// index.truncate(3);
+    /// assert!(index.iter().eq(vec![1, 2, 3]));
+    /// ```
+    pub fn truncate(&mut self, new_length: u64) {
+        if self.len() <= new_length {
+            return;
+        }
+        if new_length == 0 {
+            self.clear();
+            return;
+        }
+
+        let old_last_index = self.len() - 1;
+        let old_height = self.height();
+        self.set_len(new_length);
+
+        // Remove values.
+        for index in new_length..=old_last_index {
+            self.base.remove(&ProofListKey::leaf(index));
+        }
+
+        self.remove_range(old_last_index, old_height);
+    }
+
+    /// Removes the last element from the list and returns it, or returns `None`
+    /// if the list is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = ProofListIndex::new("list", &fork);
+    /// assert_eq!(None, index.pop());
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.pop());
+    /// ```
+    pub fn pop(&mut self) -> Option<V> {
+        if self.is_empty() {
+            None
+        } else {
+            let last_element = self.get(self.len() - 1); // is always `Some(_)`
+            self.truncate(self.len() - 1);
+            last_element
         }
     }
 

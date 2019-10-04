@@ -465,7 +465,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
         Some(ExecutionStatus::ok())
     );
 
-    let schema = TimeSchema::new(INSTANCE_NAME, Rc::from(testkit.snapshot()));
+    let schema = TimeSchema::new(INSTANCE_NAME, Rc::<dyn Snapshot>::from(testkit.snapshot()));
 
     assert_eq!(schema.time().get(), Some(time0));
     assert_eq!(schema.validators_times().get(&pub_key), Some(time0));

@@ -16,20 +16,18 @@
 
 //! Property testing for key set index and value set index as a rust collection.
 
-use std::collections::HashSet;
-use std::hash::Hash;
-
 use modifier::Modifier;
 use proptest::{
-    collection::vec, prop_assert, prop_oneof, strategy, strategy::Strategy,
+    collection::vec, prop_assert, prop_oneof, proptest, strategy, strategy::Strategy,
     test_runner::TestCaseResult,
 };
 
-use exonum_merkledb::{Fork, KeySetIndex, ValueSetIndex};
+use std::{collections::HashSet, hash::Hash, rc::Rc};
 
-use crate::common::ACTIONS_MAX_LEN;
+use exonum_merkledb::{Fork, KeySetIndex, TemporaryDB, ValueSetIndex};
 
 mod common;
+use crate::common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
 
 #[derive(Debug, Clone)]
 enum SetAction<V> {
@@ -39,6 +37,15 @@ enum SetAction<V> {
     Remove(V),
     Clear,
     MergeFork,
+}
+
+impl<V> PartialEq<MergeFork> for SetAction<V> {
+    fn eq(&self, _: &MergeFork) -> bool {
+        match self {
+            SetAction::MergeFork => true,
+            _ => false,
+        }
+    }
 }
 
 fn generate_action() -> impl Strategy<Value = SetAction<u8>> {
@@ -68,84 +75,92 @@ where
     }
 }
 
-mod key_set_index {
-    use super::*;
-
-    impl<'a> Modifier<KeySetIndex<&'a Fork, u8>> for SetAction<u8> {
-        fn modify(self, set: &mut KeySetIndex<&'a Fork, u8>) {
-            match self {
-                SetAction::Put(k) => {
-                    set.insert(k);
-                }
-                SetAction::Remove(k) => {
-                    set.remove(&k);
-                }
-                SetAction::Clear => {
-                    set.clear();
-                }
-                _ => unreachable!(),
+impl Modifier<KeySetIndex<Rc<Fork>, u8>> for SetAction<u8> {
+    fn modify(self, set: &mut KeySetIndex<Rc<Fork>, u8>) {
+        match self {
+            SetAction::Put(k) => {
+                set.insert(k);
             }
+            SetAction::Remove(k) => {
+                set.remove(&k);
+            }
+            SetAction::Clear => {
+                set.clear();
+            }
+            _ => unreachable!(),
         }
     }
-
-    fn compare_collections(
-        key_set_index: &KeySetIndex<&Fork, u8>,
-        ref_set: &HashSet<u8>,
-    ) -> TestCaseResult {
-        for k in ref_set {
-            prop_assert!(key_set_index.contains(k));
-        }
-        for k in key_set_index.iter() {
-            prop_assert!(ref_set.contains(&k));
-        }
-        Ok(())
-    }
-
-    proptest_compare_collections!(
-        proptest_compare_to_rust_set,
-        KeySetIndex,
-        HashSet,
-        SetAction
-    );
 }
 
-mod value_set_index {
-    use super::*;
-
-    impl<'a> Modifier<ValueSetIndex<&'a Fork, u8>> for SetAction<u8> {
-        fn modify(self, set: &mut ValueSetIndex<&'a Fork, u8>) {
-            match self {
-                SetAction::Put(k) => {
-                    set.insert(k);
-                }
-                SetAction::Remove(k) => {
-                    set.remove(&k);
-                }
-                SetAction::Clear => {
-                    set.clear();
-                }
-                _ => unreachable!(),
+impl Modifier<ValueSetIndex<Rc<Fork>, u8>> for SetAction<u8> {
+    fn modify(self, set: &mut ValueSetIndex<Rc<Fork>, u8>) {
+        match self {
+            SetAction::Put(k) => {
+                set.insert(k);
             }
+            SetAction::Remove(k) => {
+                set.remove(&k);
+            }
+            SetAction::Clear => {
+                set.clear();
+            }
+            _ => unreachable!(),
         }
     }
+}
 
-    fn compare_collections(
-        value_set_index: &ValueSetIndex<&Fork, u8>,
-        ref_set: &HashSet<u8>,
-    ) -> TestCaseResult {
-        for k in ref_set {
-            prop_assert!(value_set_index.contains(k));
-        }
-        for (_, k) in value_set_index.iter() {
-            prop_assert!(ref_set.contains(&k));
-        }
-        Ok(())
+impl FromFork for KeySetIndex<Rc<Fork>, u8> {
+    fn from_fork(fork: Rc<Fork>) -> Self {
+        Self::new("test", fork)
     }
 
-    proptest_compare_collections!(
-        proptest_compare_to_rust_set,
-        ValueSetIndex,
-        HashSet,
-        SetAction
-    );
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+impl FromFork for ValueSetIndex<Rc<Fork>, u8> {
+    fn from_fork(fork: Rc<Fork>) -> Self {
+        Self::new("test", fork)
+    }
+
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+fn compare_key_set(set: &KeySetIndex<Rc<Fork>, u8>, ref_set: &HashSet<u8>) -> TestCaseResult {
+    for k in ref_set {
+        prop_assert!(set.contains(k));
+    }
+    for k in set.iter() {
+        prop_assert!(ref_set.contains(&k));
+    }
+    Ok(())
+}
+
+fn compare_value_set(set: &ValueSetIndex<Rc<Fork>, u8>, ref_set: &HashSet<u8>) -> TestCaseResult {
+    for k in ref_set {
+        prop_assert!(set.contains(k));
+    }
+    for (_, k) in set.iter() {
+        prop_assert!(ref_set.contains(&k));
+    }
+    Ok(())
+}
+
+#[test]
+fn compare_key_set_to_hash_set() {
+    let db = TemporaryDB::new();
+    proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
+        compare_collections(&db, actions, compare_key_set)?;
+    });
+}
+
+#[test]
+fn compare_value_set_to_hash_set() {
+    let db = TemporaryDB::new();
+    proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
+        compare_collections(&db, actions, compare_value_set)?;
+    });
 }

@@ -17,7 +17,7 @@ use std::ops::{Deref, DerefMut};
 use crate::{
     views::{IndexAddress, IndexType, View},
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofListIndex, ProofMapIndex, Snapshot, SparseListIndex, ValueSetIndex,
+    ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
 };
 
 pub trait AnyObject<T: IndexAccess> {
@@ -218,11 +218,7 @@ pub trait ObjectAccess: IndexAccess {
     }
 }
 
-impl ObjectAccess for &Box<dyn Snapshot> {}
-
-impl ObjectAccess for &Fork {}
-
-impl<T> ObjectAccess for T where T: Deref<Target = dyn Snapshot> + Clone {}
+impl<T> ObjectAccess for T where T: IndexAccess {}
 
 impl Fork {
     /// See: [ObjectAccess::get_object][1].
