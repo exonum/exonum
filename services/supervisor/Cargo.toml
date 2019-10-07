@@ -13,7 +13,6 @@ categories = ["cryptography"]
 description = "Exonum supervisor service."
 
 [dependencies]
-bincode = "1.1"
 byteorder = { version = "1.2.7", features = [ "i128" ] }
 failure = "0.1.5"
 serde = "1.0.0"
