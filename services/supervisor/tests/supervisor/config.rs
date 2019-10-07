@@ -34,18 +34,13 @@ fn test_multiple_consensus_change_proposes() {
         .extend_consensus_config_propose(consensus_config_propose_second_variant(&testkit))
         .config_propose();
 
-    let err = testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            config_proposal,
-            ValidatorId(0),
-        ))
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
+    let signed_proposal =
+        sign_config_propose_transaction(&testkit, config_proposal, ValidatorId(0));
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
 
-    assert_eq!(err.kind, Error::MalformedConfigPropose.into());
+    //assert_eq!(err.kind, Error::MalformedConfigPropose.into());
     assert_eq!(config_propose_entry(&testkit), None);
 }
 
@@ -245,13 +240,10 @@ fn test_send_confirmation_by_initiator() {
         propose_hash: proposal_hash,
     }
     .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
-    let err = testkit
-        .create_block_with_transaction(signed_confirm)
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::AttemptToVoteTwice.into());
+
+    let block = testkit.create_block_with_transaction(signed_confirm);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::AttemptToVoteTwice.into()));
 }
 
 #[test]
@@ -266,13 +258,9 @@ fn test_propose_config_change_by_incorrect_validator() {
     let keys = crypto::gen_keypair();
     let signed_confirm = config_proposal.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
 
-    let err = testkit
-        .create_block_with_transaction(signed_confirm)
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::UnknownAuthor.into());
+    let block = testkit.create_block_with_transaction(signed_confirm);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::UnknownAuthor.into()));
 }
 
 #[test]
@@ -301,13 +289,10 @@ fn test_confirm_config_by_incorrect_validator() {
         propose_hash: proposal_hash,
     }
     .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
-    let err = testkit
-        .create_block_with_transaction(signed_confirm)
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::UnknownAuthor.into());
+
+    let block = testkit.create_block_with_transaction(signed_confirm);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::UnknownAuthor.into()));
 }
 
 #[test]
@@ -331,14 +316,11 @@ fn test_try_confirm_non_existing_proposal() {
         .expect("Transaction with change propose discarded.");
 
     let wrong_hash = crypto::hash(&[0]);;
-    let signed_txs = build_confirmation_transactions(&testkit, wrong_hash, initiator_id);
-    let err = testkit
-        .create_block_with_transactions(signed_txs)
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::ConfigProposeNotRegistered.into());
+    let signed_confirm = build_confirmation_transactions(&testkit, wrong_hash, initiator_id);
+
+    let block = testkit.create_block_with_transactions(signed_confirm);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::ConfigProposeNotRegistered.into()));
 }
 
 #[test]
@@ -388,18 +370,12 @@ fn test_discard_errored_service_config_change() {
         .extend_consensus_config_propose(new_consensus_config)
         .config_propose();
 
-    let err = testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            propose,
-            ValidatorId(0),
-        ))
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
+    let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
 
-    assert_eq!(err.kind, Error::MalformedConfigPropose.into());
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
+
     assert_eq!(config_propose_entry(&testkit), None);
 }
 
@@ -416,18 +392,12 @@ fn test_discard_panicked_service_config_change() {
         .extend_consensus_config_propose(new_consensus_config)
         .config_propose();
 
-    let err = testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            propose,
-            ValidatorId(0),
-        ))
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
+    let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
 
-    assert_eq!(err.kind, Error::MalformedConfigPropose.into());
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
+
     assert_eq!(config_propose_entry(&testkit), None);
 }
 
@@ -442,17 +412,12 @@ fn test_incorrect_actual_from_field() {
         .config_propose();
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
-    let err = testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            propose,
-            ValidatorId(0),
-        ))
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::ActualFromIsPast.into());
+
+    let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
+
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::ActualFromIsPast.into()));
 }
 
 #[test]
@@ -482,17 +447,10 @@ fn test_another_configuration_change_proposal() {
         .extend_service_config_propose("I am an overridden parameter".to_string())
         .config_propose();
 
-    let err = testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            second_propose,
-            initiator_id,
-        ))
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::ConfigProposeExists.into());
+    let signed_proposal = sign_config_propose_transaction(&testkit, second_propose, initiator_id);
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::ConfigProposeExists.into()));
 
     let signed_txs = build_confirmation_transactions(&testkit, proposal_hash, initiator_id);
     testkit
@@ -527,13 +485,13 @@ fn test_service_config_discard_fake_supervisor() {
         .extend_service_config_propose(params.clone())
         .config_propose();
 
-    let err = testkit
-        .create_block_with_transaction(propose.sign(FAKE_SUPERVISOR_ID, keypair.0, &keypair.1))
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::UnknownAuthor.into());
+    let block = testkit.create_block_with_transaction(propose.sign(
+        FAKE_SUPERVISOR_ID,
+        keypair.0,
+        &keypair.1,
+    ));
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::UnknownAuthor.into()));
 }
 
 #[test]
@@ -688,17 +646,11 @@ fn test_services_config_discard_multiple_configs() {
         .extend_second_service_config_propose("I am a extra proposal".to_owned())
         .config_propose();
 
-    let err = testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            propose,
-            initiator_id,
-        ))
-        .transactions[0]
-        .status()
-        .unwrap_err()
-        .clone();
-    assert_eq!(err.kind, Error::MalformedConfigPropose.into());
+    let signed_proposal = sign_config_propose_transaction(&testkit, propose, initiator_id);
+
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
 
     assert_eq!(config_propose_entry(&testkit), None);
 }

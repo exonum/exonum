@@ -25,8 +25,8 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    schema::ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest,
-    Error, Schema, StartService, Supervisor,
+    ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, Error,
+    Schema, StartService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -156,7 +156,7 @@ impl SupervisorInterface for Supervisor {
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
-                        trace!("Discarded multiple consensus change propositions in one request.");
+                        trace!("Discarded multiple consensus change proposals in one request.");
                         return Err(Error::MalformedConfigPropose.into());
                     }
                     consensus_propose_added = true;
@@ -168,7 +168,7 @@ impl SupervisorInterface for Supervisor {
 
                 ConfigChange::Service(config) => {
                     if service_ids.contains(&config.instance_id) {
-                        trace!("Discarded multiple service change propositions in one request.");
+                        trace!("Discarded multiple service change proposals in one request.");
                         return Err(Error::MalformedConfigPropose.into());
                     }
                     service_ids.insert(config.instance_id);

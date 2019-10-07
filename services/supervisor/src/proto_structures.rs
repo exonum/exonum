@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde_derive::{Deserialize, Serialize};
+
 use exonum::{
     crypto::Hash,
     exonum_merkledb::ObjectHash,
@@ -60,7 +62,7 @@ pub struct StartService {
     pub deadline_height: Height,
 }
 
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::ConfigPropose")]
 pub struct ConfigPropose {
     /// The height until which the update configuration procedure should be completed.
@@ -74,6 +76,14 @@ pub struct ConfigPropose {
 pub struct ConfigVote {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,
+}
+
+/// Pending config change proposal entry
+#[derive(Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "proto::ConfigProposalWithHash")]
+pub struct ConfigProposalWithHash {
+    pub propose_hash: Hash,
+    pub config_propose: ConfigPropose,
 }
 
 impl_binary_key_for_binary_value! { DeployRequest }

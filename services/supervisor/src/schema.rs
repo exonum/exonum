@@ -12,41 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_derive::{Deserialize, Serialize};
+use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
 
-use exonum::{
-    crypto::{hash, Hash},
-    helpers::multisig::ValidatorMultisig,
-    runtime::ArtifactId,
-};
-use exonum_merkledb::{BinaryValue, Entry, IndexAccess, ObjectHash, ProofMapIndex};
-
-use std::borrow::Cow;
-
-use super::{ConfigPropose, DeployConfirmation, DeployRequest, StartService};
-
-/// Pending config change proposal entry
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ConfigProposalWithHash {
-    pub config_propose: ConfigPropose,
-    pub propose_hash: Hash,
-}
-
-impl BinaryValue for ConfigProposalWithHash {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
-}
-
-impl ObjectHash for ConfigProposalWithHash {
-    fn object_hash(&self) -> Hash {
-        hash(&self.to_bytes())
-    }
-}
+use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
 
 /// Service information schema.
 #[derive(Debug)]

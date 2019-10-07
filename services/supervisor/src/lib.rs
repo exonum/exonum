@@ -26,6 +26,7 @@ pub use self::{
     },
     schema::Schema,
 };
+pub(crate) use proto_structures::ConfigProposalWithHash;
 
 use exonum::{
     blockchain::{self, InstanceCollection},
