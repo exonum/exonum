@@ -33,7 +33,11 @@ use crate::{
 
 use super::RustArtifactId;
 
+/// Describes how the service instance processes interface method calls.
+///
+/// In almost all cases, it can be derived using a `ServiceFactory` macro.
 pub trait ServiceDispatcher: Send {
+    /// Handle the calling of an interface method within the specified context.
     fn call(
         &self,
         interface_name: &str,
@@ -43,7 +47,18 @@ pub trait ServiceDispatcher: Send {
     ) -> Result<(), ExecutionError>;
 }
 
+/// Describes an Exonum service instance.
+///
+/// That is, it determines how the service instance responds to certain specific
+/// requests and events from the runtime side.
 pub trait Service: ServiceDispatcher + Debug + 'static {
+    /// Initialize a new service instance with the given parameters.
+    ///
+    /// This method is called once after creating a new service instance.
+    ///
+    /// The configuration parameters passed to the method are discarded immediately.
+    /// So the service instance should save them by itself if it is important for
+    /// the service business logic.
     fn initialize(
         &self,
         _instance: InstanceDescriptor,
@@ -53,21 +68,57 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         Ok(())
     }
 
+    /// Return a list of root hashes of all Merkelized tables defined by this service,
+    /// as of the given snapshot of the blockchain state and service instance descriptor.
+
+    /// The core uses this list to [aggregate][1] hashes of tables defined by all services into a
+    /// single Merkelized meta-map.
+    /// The hash of this meta-map is considered the hash of the entire blockchain [state][2] and
+    /// is recorded as such in blocks and Precommit messages.
+    ///
+    /// [See also.][3]
+    ///
+    /// [1]: ../struct.StateHashAggregator.html
+    /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
+    /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
     fn state_hash(&self, instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
+    /// Perform storage operations on behalf of the service before committing the block.
+    ///
+    /// This changes affect `state_hash` that means this changes must be same for each node.
+    /// In other words you should use only data from context.
+    ///
+    /// The order of invoking `before_commit` method for every service instance depends on the ID.
+    /// `before_commit` for the service instance with the smallest ID is invoked first up to the
+    /// largest one.
+    /// Effectively, this means that services should not rely on a particular ordering of
+    /// Service::execute invocations.
     fn before_commit(&self, _context: BeforeCommitContext) {}
-
+    /// Handle block commit event.
+    ///
+    /// This handler is an optional callback method which is invoked by the blockchain
+    /// after each block commit. For example, a service can create one or more transactions
+    /// if a specific condition has occurred.
+    ///
+    /// *Try not to perform long operations in this handler*.
     fn after_commit(&self, _context: AfterCommitContext) {}
 
+    /// Extend API by handlers of this service.
+    ///
+    /// The request handlers are mounted on the `/api/services/{instance_name}` path at the
+    /// listen address of every full node in the blockchain network.
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
-    // TODO: add other hooks such as "on node startup", etc.
+
+    // TODO: add other hooks such as "on node startup", etc. [ECR-3222]
 }
 
+/// Describes service instance factory for the specific Rust artifact.
 pub trait ServiceFactory: Send + Debug + 'static {
+    /// Return the unique artifact identifier corresponding to the factory.
     fn artifact_id(&self) -> RustArtifactId;
-
+    /// Return the corresponding protobuf specification.
     fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec;
-
+    /// Create a new service instance.
     fn create_instance(&self) -> Box<dyn Service>;
 }
 
