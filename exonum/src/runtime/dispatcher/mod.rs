@@ -403,7 +403,7 @@ impl Dispatcher {
         runtime_changes.push(ApiChange::InstanceAdded(instance.id));
     }
 
-    /// Start a new previously added service instance.
+    /// Restart a new previously added service instance.
     fn restart_service(&mut self, instance: &InstanceSpec) -> Result<(), ExecutionError> {
         let runtime = self
             .runtimes

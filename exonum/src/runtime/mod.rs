@@ -198,7 +198,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Ensure that the deployed artifact has the following information, even if it is empty.
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec>;
 
-    /// Start previously added service instance with the given specification.
+    /// Restart previously added service instance with the given specification.
     ///
     /// # Policy on Panics
     ///
