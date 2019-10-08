@@ -47,9 +47,9 @@ pub trait PublicApi {
     /// Error type for the current API implementation.
     type Error: Fail;
     /// Returns an actual consensus configuration of the blockchain.
-    fn consensus_config(&self, _query: ()) -> Result<ConsensusConfig, Self::Error>;
+    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
     /// Returns an pending propose config change.
-    fn config_proposal(&self, _query: ()) -> Result<ConfigProposalWithHash, Self::Error>;
+    fn config_proposal(&self) -> Result<ConfigProposalWithHash, Self::Error>;
 }
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
@@ -84,15 +84,15 @@ impl PrivateApi for ApiImpl<'_> {
 impl PublicApi for ApiImpl<'_> {
     type Error = api::Error;
 
-    fn consensus_config(&self, _: ()) -> Result<ConsensusConfig, Self::Error> {
+    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
         Ok(CoreSchema::new(self.0.snapshot()).consensus_config())
     }
 
-    fn config_proposal(&self, _: ()) -> Result<ConfigProposalWithHash, Self::Error> {
+    fn config_proposal(&self) -> Result<ConfigProposalWithHash, Self::Error> {
         Schema::new(self.0.instance.name, self.0.snapshot())
             .pending_proposal()
             .get()
-            .ok_or_else(|| Self::Error::NotFound(format!("Pending config not found.")))
+            .ok_or_else(|| Self::Error::NotFound("Pending config not found.".to_string()))
     }
 }
 
@@ -110,10 +110,10 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         });
     builder
         .public_scope()
-        .endpoint("consensus-config", |state, query| {
-            ApiImpl(state).consensus_config(query)
+        .endpoint("consensus-config", |state, _query: ()| {
+            ApiImpl(state).consensus_config()
         })
-        .endpoint("config-proposal", |state, query| {
-            ApiImpl(state).config_proposal(query)
+        .endpoint("config-proposal", |state, _query: ()| {
+            ApiImpl(state).config_proposal()
         });
 }
