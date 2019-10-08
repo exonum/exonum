@@ -122,12 +122,12 @@ pub struct TestKitBuilder {
 impl TestKitBuilder {
     /// Creates testkit for the validator node.
     pub fn validator() -> Self {
-        Self::new(true)
+        Self::new(Some(ValidatorId(0)))
     }
 
     /// Creates testkit for the auditor node.
     pub fn auditor() -> Self {
-        Self::new(false)
+        Self::new(None)
     }
 
     /// Creates the validator nodes from the specified keys.
@@ -236,14 +236,8 @@ impl TestKitBuilder {
         testkit.run(public_api_address, private_api_address);
     }
 
-    // Creates testkit for validator or auditor node. Adds supervisor service by default.
-    fn new(is_validator: bool) -> Self {
-        let validator_id = if is_validator {
-            Some(ValidatorId(0))
-        } else {
-            None
-        };
-
+    // Creates testkit for validator or auditor node.
+    fn new(validator_id: Option<ValidatorId>) -> Self {
         Self {
             test_network: None,
             our_validator_id: validator_id,
