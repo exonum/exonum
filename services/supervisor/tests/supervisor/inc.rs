@@ -15,12 +15,12 @@
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::ExecutionError,
+    blockchain::{ExecutionError, InstanceCollection},
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{Service, TransactionContext},
-        InstanceDescriptor, InstanceId,
+        rust::{interfaces::verify_caller_is_supervisor, Configure, Service, TransactionContext},
+        DispatcherError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
@@ -83,7 +83,7 @@ pub trait IncInterface {
     artifact_name = "inc",
     artifact_version = "1.0.0",
     proto_sources = "proto",
-    implements("IncInterface")
+    implements("IncInterface", "Configure<Params = String>")
 )]
 pub struct IncService;
 
@@ -119,5 +119,51 @@ impl Service for IncService {
 
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
+    }
+}
+
+impl From<IncService> for InstanceCollection {
+    fn from(instance: IncService) -> Self {
+        InstanceCollection::new(instance).with_instance(SERVICE_ID, SERVICE_NAME, Vec::default())
+    }
+}
+
+impl Configure for IncService {
+    type Params = String;
+
+    fn verify_config(
+        &self,
+        context: TransactionContext,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        context
+            .verify_caller(verify_caller_is_supervisor)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
+
+        match params.as_ref() {
+            "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
+            "panic" => panic!("Aaaa!"),
+            _ => Ok(()),
+        }
+    }
+
+    fn apply_config(
+        &self,
+        context: TransactionContext,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        let (_, fork) = context
+            .verify_caller(verify_caller_is_supervisor)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
+
+        Entry::new(format!("{}.params", context.instance.name), fork).set(params.clone());
+
+        match params.as_ref() {
+            "apply_error" => {
+                Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
+            }
+            "apply_panic" => panic!("Aaaa!"),
+            _ => Ok(()),
+        }
     }
 }

@@ -102,7 +102,7 @@ use crate::{TestKit, TestNetwork};
 /// # }
 /// # fn main() {
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_service(MyService)
+///     .with_rust_service(MyService)
 ///     .with_validators(4)
 ///     .create();
 /// testkit.create_block();

@@ -56,11 +56,14 @@ message StartService {
 
 // Request for the configuration change
 message ConfigPropose {
+    // The height until which the update configuration procedure should be completed.
     uint64 actual_from = 1;
+    // New configuration proposition.
     repeated exonum.runtime.ConfigChange changes = 2;
 }
 
+// Confirmation vote for the configuration change
 message ConfigVote {
+    // Hash of configuration proposition.
     exonum.Hash propose_hash = 1;
-    bool decision = 2;
 }

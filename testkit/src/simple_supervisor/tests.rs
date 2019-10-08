@@ -38,11 +38,11 @@ use crate::{
     artifact_name = "config-change-test-service",
     implements("Configure<Params = String>")
 )]
-struct ConfigChangeService;
+pub struct ConfigChangeService;
 
 impl ConfigChangeService {
-    const INSTANCE_ID: InstanceId = 119;
-    const INSTANCE_NAME: &'static str = "config-change";
+    pub const INSTANCE_ID: InstanceId = 119;
+    pub const INSTANCE_NAME: &'static str = "config-change";
 }
 
 impl From<ConfigChangeService> for InstanceCollection {

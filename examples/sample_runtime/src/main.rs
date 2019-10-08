@@ -26,8 +26,7 @@ use exonum::{
         dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
         rust::Transaction,
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
-        SUPERVISOR_INSTANCE_ID,
+        InstanceId, InstanceSpec, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -69,6 +68,25 @@ enum SampleRuntimeError {
 impl SampleRuntime {
     /// Runtime identifier for the present runtime.
     const ID: u32 = 255;
+
+    /// Create a new service instance with the given specification.
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<&SampleService, ExecutionError> {
+        if !self.deployed_artifacts.contains_key(&spec.artifact) {
+            return Err(DispatcherError::ArtifactNotDeployed.into());
+        }
+        if self.started_services.contains_key(&spec.id) {
+            return Err(DispatcherError::ServiceIdExists.into());
+        }
+
+        self.started_services.insert(
+            spec.id,
+            SampleService {
+                name: spec.name.clone(),
+                ..SampleService::default()
+            },
+        );
+        Ok(&self.started_services[&spec.id])
+    }
 }
 
 impl Runtime for SampleRuntime {
@@ -96,57 +114,26 @@ impl Runtime for SampleRuntime {
         self.deployed_artifacts.contains_key(id)
     }
 
-    /// `start_service` request creates a new `SampleService` instance with the specified ID.
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        if !self.deployed_artifacts.contains_key(&spec.artifact) {
-            return Err(DispatcherError::ArtifactNotDeployed.into());
-        }
-        if self.started_services.contains_key(&spec.id) {
-            return Err(DispatcherError::ServiceIdExists.into());
-        }
-
-        self.started_services.insert(
-            spec.id,
-            SampleService {
-                name: spec.name.clone(),
-                ..SampleService::default()
-            },
-        );
-        println!("Starting service: {:?}", spec);
+    /// Starts an existing `SampleService` instance with the specified ID.
+    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        let instance = self.start_service(spec)?;
+        println!("Starting service {}: {:?}", spec, instance);
         Ok(())
     }
 
-    /// `initialize_service` request sets the counter value of the corresponding
-    /// `SampleService` instance
-    fn initialize_service(
-        &self,
-        _context: &Fork,
-        descriptor: InstanceDescriptor,
+    /// Starts a new service instance and sets the counter value for this.
+    fn add_service(
+        &mut self,
+        _fork: &mut Fork,
+        spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let service_instance = self
-            .started_services
-            .get(&descriptor.id)
-            .ok_or(DispatcherError::ServiceNotStarted)?;
-
+        let service_instance = self.start_service(spec)?;
         let new_value =
             u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         service_instance.counter.set(new_value);
-        println!(
-            "Initializing service {} with value {}",
-            descriptor.name, new_value
-        );
+        println!("Initializing service {} with value {}", spec, new_value);
         Ok(())
-    }
-
-    /// `stop_service` removes the service with the specified ID from the list of the started services.
-    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
-        println!("Stopping service: {}", descriptor);
-        self.started_services
-            .remove(&descriptor.id)
-            .map(drop)
-            .ok_or(DispatcherError::ServiceNotStarted)
-            .map_err(ExecutionError::from)
     }
 
     fn execute(

@@ -198,48 +198,31 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Ensure that the deployed artifact has the following information, even if it is empty.
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec>;
 
-    /// Start a new service instance with the given specification.
+    /// Restart previously added service instance with the given specification.
     ///
     /// # Policy on Panics
     ///
     /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     /// * If panic occurs, the runtime must ensure that it is in a consistent state.
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
+    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
-    /// Initialize a service instance with the given parameters.
+    /// Add a new service instance with the given specification and initial configuration.
     ///
     /// The configuration parameters passed to the method are discarded immediately.
     /// So the service instance should save them by itself if it is important for
     /// the service business logic.
     ///
-    /// This method is called after creating a new service instance by the [`start_service`].
-    /// If an error occurs during invocation of this method, the dispatcher invokes
-    /// [`stop_service`].
-    /// Therefore, it is recommended to avoid errors returned from the method.
-    ///
     /// # Policy on Panics
     ///
     /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
-    ///
-    /// ['start_service`]: #start_service
-    /// ['stop_service`]: #stop_service
-    fn initialize_service(
-        &self,
-        fork: &Fork,
-        instance: InstanceDescriptor,
+    fn add_service(
+        &mut self,
+        fork: &mut Fork,
+        spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
-
-    /// Stop existing service instance with the given specification.
-    ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
-    /// * If panic occurs, the runtime must ensure that it is in a consistent state.
-    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError>;
 
     /// Dispatch payload to the method of a specific service instance.
     /// Service instance name and method ID are provided in the `call_info` argument and

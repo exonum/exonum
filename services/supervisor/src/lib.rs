@@ -21,13 +21,17 @@ extern crate log;
 
 pub use self::{
     errors::Error,
-    proto_structures::{DeployConfirmation, DeployRequest, StartService},
+    proto_structures::{
+        ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, StartService,
+    },
     schema::Schema,
 };
+pub(crate) use proto_structures::ConfigProposalWithHash;
 
 use exonum::{
     blockchain::{self, InstanceCollection},
     crypto::Hash,
+    helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
@@ -75,6 +79,31 @@ impl Service for Supervisor {
             schema.pending_deployments().remove(&request.artifact);
 
             trace!("Removed outdated deployment request {:?}", request);
+        }
+
+        let entry = schema.pending_proposal().get();
+        if let Some(entry) = entry {
+            if entry.config_propose.actual_from <= height {
+                // Remove pending config proposal for which deadline was exceeded.
+                trace!("Removed outdated config proposal");
+                schema.pending_proposal().remove();
+            } else {
+                let config_confirms = schema.config_confirms();
+                let confirmations = config_confirms.confirmations(&entry.propose_hash);
+                let validators = config_confirms.validators_amount();
+
+                // Apply pending config in case 2/3+1 validators voted for it.
+                if confirmations >= byzantine_quorum(validators) {
+                    info!(
+                        "New configuration has been accepted: {:?}",
+                        entry.config_propose
+                    );
+                    // Perform the application of configs.
+                    context.update_config(entry.config_propose.changes);
+                    // Remove config from proposals.
+                    schema.pending_proposal().remove();
+                }
+            }
         }
     }
 

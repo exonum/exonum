@@ -176,10 +176,10 @@ use exonum::{
     },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
-    helpers::{Height, ValidatorId},
+    helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
-    node::{ApiSender, ExternalMessage, State as NodeState},
+    node::{ApiSender, ExternalMessage},
     runtime::{rust::ServiceFactory, InstanceId, Runtime},
 };
 use futures::{sync::mpsc, Future, Stream};
@@ -662,7 +662,7 @@ impl TestKit {
 
     /// Returns sufficient number of validators for the Byzantine Fault Tolerance consensus.
     pub fn majority_count(&self) -> usize {
-        NodeState::byzantine_majority_count(self.network().validators().len())
+        byzantine_quorum(self.network().validators().len())
     }
 
     /// Returns the leader on the current height. At the moment first validator.
