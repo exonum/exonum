@@ -32,7 +32,7 @@ use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
 mod proto;
 mod schema;
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 #[derive(Debug, ServiceFactory)]
 #[exonum(

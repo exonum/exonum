@@ -17,12 +17,17 @@ use exonum::{
     helpers::ValidateInput,
     runtime::{
         dispatcher::{self, Action},
-        rust::TransactionContext,
-        ExecutionError, InstanceSpec,
+        rust::{interfaces::ConfigureCall, TransactionContext},
+        Caller, ConfigChange, DispatcherError, ExecutionError, InstanceSpec,
     },
 };
+use exonum_merkledb::ObjectHash;
+use std::collections::HashSet;
 
-use super::{DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor};
+use super::{
+    ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, Error,
+    Schema, StartService, Supervisor,
+};
 
 /// Supervisor service transactions.
 #[exonum_service()]
@@ -37,6 +42,7 @@ pub trait SupervisorInterface {
         context: TransactionContext,
         artifact: DeployRequest,
     ) -> Result<(), ExecutionError>;
+
     /// Confirmation that the artifact was successfully deployed by the validator.
     ///
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
@@ -45,6 +51,7 @@ pub trait SupervisorInterface {
         context: TransactionContext,
         artifact: DeployConfirmation,
     ) -> Result<(), ExecutionError>;
+
     /// Requests start service.
     ///
     /// Service will be started if all of validators will send this confirmation.
@@ -52,6 +59,30 @@ pub trait SupervisorInterface {
         &self,
         context: TransactionContext,
         service: StartService,
+    ) -> Result<(), ExecutionError>;
+
+    /// Propose config change
+    ///
+    /// This request should be sent by one of validators as the proposition to change
+    /// current configuration to new one. All another validators able to vote for this
+    /// configuration by sending `confirm_config_change` transaction.
+    /// Note: only one proposal at time is possible.
+    fn propose_config_change(
+        &self,
+        context: TransactionContext,
+        propose: ConfigPropose,
+    ) -> Result<(), ExecutionError>;
+
+    /// Confirm config change
+    ///
+    /// This confirm should be sent by validators to vote for proposed configuration.
+    /// Vote of the author of the propose_config_change transaction is taken into
+    /// account automatically.
+    /// The configuration will be applied if 2/3+1 validators voted for it.
+    fn confirm_config_change(
+        &self,
+        context: TransactionContext,
+        vote: ConfigVote,
     ) -> Result<(), ExecutionError>;
 }
 
@@ -89,6 +120,127 @@ impl ValidateInput for StartService {
 }
 
 impl SupervisorInterface for Supervisor {
+    fn propose_config_change(
+        &self,
+        context: TransactionContext,
+        propose: ConfigPropose,
+    ) -> Result<(), ExecutionError> {
+        let ((_, author), fork) = context
+            .verify_caller(Caller::as_transaction)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
+        let schema = Schema::new(context.instance.name, fork);
+
+        // Verifies that transaction author is validator.
+        let mut config_confirms = schema.config_confirms();
+        config_confirms
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
+        // Verifies that the `actual_from` height is in the future.
+        if blockchain::Schema::new(fork).height() >= propose.actual_from {
+            return Err(Error::ActualFromIsPast.into());
+        }
+
+        // Verifies that there are no pending config changes.
+        if schema.pending_proposal().exists() {
+            return Err(Error::ConfigProposeExists.into());
+        }
+
+        // To prevent multiple consensus change proposition in one request
+        let mut consensus_propose_added = false;
+        // To prevent multiple service change proposition in one request
+        let mut service_ids = HashSet::new();
+
+        // Perform config verification.
+        for change in &propose.changes {
+            match change {
+                ConfigChange::Consensus(config) => {
+                    if consensus_propose_added {
+                        trace!("Discarded multiple consensus change proposals in one request.");
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    consensus_propose_added = true;
+
+                    config
+                        .validate()
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+
+                ConfigChange::Service(config) => {
+                    if service_ids.contains(&config.instance_id) {
+                        trace!("Discarded multiple service change proposals in one request.");
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    service_ids.insert(config.instance_id);
+
+                    context
+                        .interface::<ConfigureCall>(config.instance_id)
+                        .verify_config(config.params.clone())
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+            }
+        }
+
+        let propose_hash = propose.object_hash();
+        config_confirms.confirm(&propose_hash, author);
+
+        let config_entry = ConfigProposalWithHash {
+            config_propose: propose,
+            propose_hash,
+        };
+        schema.pending_proposal().set(config_entry);
+
+        Ok(())
+    }
+
+    fn confirm_config_change(
+        &self,
+        context: TransactionContext,
+        vote: ConfigVote,
+    ) -> Result<(), ExecutionError> {
+        let ((_, author), fork) = context
+            .verify_caller(Caller::as_transaction)
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
+
+        let blockchain_height = blockchain::Schema::new(fork).height();
+        let schema = Schema::new(context.instance.name, fork);
+
+        // Verifies that transaction author is validator.
+        let mut config_confirms = schema.config_confirms();
+        config_confirms
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
+
+        let entry = schema
+            .pending_proposal()
+            .get()
+            .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
+
+        // Verifies that this config proposal is registered.
+        if entry.propose_hash != vote.propose_hash {
+            return Err(Error::ConfigProposeNotRegistered.into());
+        }
+
+        let config_propose = entry.config_propose;
+        // Verifies that we didn't reach the deadline height.
+        if config_propose.actual_from <= blockchain_height {
+            return Err(Error::DeadlineExceeded.into());
+        }
+
+        if config_confirms.confirmed_by(&entry.propose_hash, &author) {
+            return Err(Error::AttemptToVoteTwice.into());
+        }
+
+        config_confirms.confirm(&vote.propose_hash, author);
+        trace!(
+            "Propose config {:?} has been confirmed by {:?}",
+            vote.propose_hash,
+            author
+        );
+
+        Ok(())
+    }
+
     fn request_artifact_deploy(
         &self,
         context: TransactionContext,
@@ -127,7 +279,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = deploy_requests.confirm(&deploy, author);
-        if confirmations == deploy_requests.validators_len() {
+        if confirmations == deploy_requests.validators_amount() {
             trace!("Deploy artifact request accepted {:?}", deploy.artifact);
 
             let artifact = deploy.artifact.clone();
@@ -170,7 +322,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = deploy_confirmations.confirm(&confirmation, author);
-        if confirmations == deploy_confirmations.validators_len() {
+        if confirmations == deploy_confirmations.validators_amount() {
             trace!(
                 "Registering deployed artifact in dispatcher {:?}",
                 confirmation.artifact
@@ -223,7 +375,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         let confirmations = pending_instances.confirm(&service, author);
-        if confirmations == pending_instances.validators_len() {
+        if confirmations == pending_instances.validators_amount() {
             trace!(
                 "Request add service with name {:?} from artifact {:?}",
                 service.name,

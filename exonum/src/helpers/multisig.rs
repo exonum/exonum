@@ -109,7 +109,7 @@ where
         }
     }
 
-    pub fn validators_len(&self) -> usize {
+    pub fn validators_amount(&self) -> usize {
         self.validator_keys.len()
     }
 
@@ -140,6 +140,12 @@ where
         let len = confirmations.0.len();
         multisig_index.put(id, confirmations);
         len
+    }
+
+    pub fn confirmations(&self, id: &V) -> usize {
+        self.multisig_index()
+            .get(id)
+            .map_or(0, |confirms| confirms.0.len())
     }
 
     fn multisig_index(&self) -> ProofMapIndex<I, V, BinarySet<PublicKey>> {

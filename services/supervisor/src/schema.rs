@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
 
-use super::{DeployConfirmation, DeployRequest, StartService};
+use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
 
 /// Service information schema.
 #[derive(Debug)]
@@ -61,6 +61,20 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         )
     }
 
+    pub fn config_confirms(&self) -> ValidatorMultisig<T, Hash> {
+        ValidatorMultisig::new(
+            [self.instance_name, ".config_confirms"].concat(),
+            self.access.clone(),
+        )
+    }
+
+    pub fn pending_proposal(&self) -> Entry<T, ConfigProposalWithHash> {
+        Entry::new(
+            [self.instance_name, ".pending_proposal"].concat(),
+            self.access.clone(),
+        )
+    }
+
     /// Returns hashes for tables with proofs.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
@@ -68,6 +82,7 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
             self.deploy_confirmations().object_hash(),
             self.pending_deployments().object_hash(),
             self.pending_instances().object_hash(),
+            self.config_confirms().object_hash(),
         ]
     }
 }

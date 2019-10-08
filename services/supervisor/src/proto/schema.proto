@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(bare_trait_objects)]
+syntax = "proto3";
 
-pub use self::schema::*;
-pub use self::service::*;
+package exonum.supervisor;
 
-include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+import "helpers.proto";
+import "service.proto";
 
-use exonum::proto::schema::*;
+message ConfigProposalWithHash {
+    exonum.Hash propose_hash = 1;
+    ConfigPropose config_propose = 2;
+}
