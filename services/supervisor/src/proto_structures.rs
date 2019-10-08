@@ -24,11 +24,11 @@ use exonum::{
 
 use super::proto;
 
-// Request for the artifact deployment.
+/// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::DeployRequest")]
 pub struct DeployRequest {
-    // Artifact identifier.
+    /// Artifact identifier.
     pub artifact: ArtifactId,
     /// Additional information for Runtime to deploy.
     pub spec: Vec<u8>,
@@ -36,11 +36,11 @@ pub struct DeployRequest {
     pub deadline_height: Height,
 }
 
-// Request for the artifact deployment.
+/// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::DeployConfirmation")]
 pub struct DeployConfirmation {
-    // Artifact identifier.
+    /// Artifact identifier.
     pub artifact: ArtifactId,
     /// Additional information for Runtime to deploy.
     pub spec: Vec<u8>,
@@ -48,7 +48,7 @@ pub struct DeployConfirmation {
     pub deadline_height: Height,
 }
 
-// Request for the artifact deployment.
+/// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::StartService")]
 pub struct StartService {
@@ -62,6 +62,7 @@ pub struct StartService {
     pub deadline_height: Height,
 }
 
+/// Request for the configuration change
 #[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::ConfigPropose")]
 pub struct ConfigPropose {
@@ -71,6 +72,7 @@ pub struct ConfigPropose {
     pub changes: Vec<ConfigChange>,
 }
 
+/// Confirmation vote for the configuration change
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::ConfigVote")]
 pub struct ConfigVote {
@@ -82,7 +84,9 @@ pub struct ConfigVote {
 #[derive(Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "proto::ConfigProposalWithHash")]
 pub struct ConfigProposalWithHash {
+    /// Hash of configuration proposition.
     pub propose_hash: Hash,
+    /// The configuration change proposal
     pub config_propose: ConfigPropose,
 }
 
