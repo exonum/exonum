@@ -180,10 +180,7 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, State as NodeState},
-    runtime::{
-        rust::{RustRuntime, ServiceFactory},
-        InstanceId, Runtime,
-    },
+    runtime::{rust::ServiceFactory, InstanceId, Runtime},
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
