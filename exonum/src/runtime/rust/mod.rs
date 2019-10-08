@@ -104,6 +104,7 @@ impl RustRuntime {
     /// Rust runtime identifier.
     pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
 
+    /// Creates a new Rust runtime instance.
     pub fn new() -> Self {
         Self::default()
     }
