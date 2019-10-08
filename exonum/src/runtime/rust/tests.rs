@@ -147,7 +147,7 @@ fn test_basic_rust_runtime() {
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 
-    // Init service
+    // Add service
     {
         let spec = InstanceSpec {
             artifact,
@@ -159,9 +159,11 @@ fn test_basic_rust_runtime() {
             msg: "constructor_message".to_owned(),
         };
 
-        let fork = db.fork();
+        let mut fork = db.fork();
 
-        dispatcher.start_service(&fork, spec, constructor).unwrap();
+        dispatcher
+            .add_service(&mut fork, spec, constructor)
+            .unwrap();
         {
             let entry = Entry::new("constructor_entry", &fork);
             assert_eq!(entry.get(), Some("constructor_message".to_owned()));

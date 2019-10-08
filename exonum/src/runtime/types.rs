@@ -284,6 +284,12 @@ impl ValidateInput for InstanceSpec {
     }
 }
 
+impl Display for InstanceSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}@{}:{}", self.artifact, self.id, self.name)
+    }
+}
+
 /// Configuration parameters of the certain service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::ServiceConfig", crate = "crate")]

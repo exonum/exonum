@@ -55,7 +55,7 @@ struct TestDeploy {
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
-struct TestStart {
+struct TestAdd {
     value: u64,
 }
 
@@ -79,8 +79,7 @@ trait TestDispatcherInterface {
         arg: TestDeploy,
     ) -> Result<(), ExecutionError>;
 
-    fn test_start(&self, context: TransactionContext, arg: TestStart)
-        -> Result<(), ExecutionError>;
+    fn test_add(&self, context: TransactionContext, arg: TestAdd) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -146,11 +145,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         Ok(())
     }
 
-    fn test_start(
-        &self,
-        context: TransactionContext,
-        arg: TestStart,
-    ) -> Result<(), ExecutionError> {
+    fn test_add(&self, context: TransactionContext, arg: TestAdd) -> Result<(), ExecutionError> {
         let mut index = Entry::new(context.instance.name, context.fork());
         index.set(arg.value);
         drop(index);
@@ -167,7 +162,7 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        context.dispatch_action(dispatcher::Action::StartService {
+        context.dispatch_action(dispatcher::Action::AddService {
             artifact,
             instance_name: format!("good-service-{}", arg.value),
             config,
@@ -682,7 +677,7 @@ fn test_dispatcher_start_service_good() {
         .contains(&"good-service-1".to_owned()));
     execute_transaction(
         &mut blockchain,
-        TestStart { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+        TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
     assert!(dispatcher::Schema::new(snapshot.as_ref())
@@ -705,7 +700,7 @@ fn test_dispatcher_start_service_rollback() {
         .contains(&"good-service-24".to_owned()));
     execute_transaction(
         &mut blockchain,
-        TestStart { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+        TestAdd { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
     assert!(!dispatcher::Schema::new(snapshot.as_ref())
@@ -722,7 +717,7 @@ fn test_dispatcher_start_service_rollback() {
         .contains(&"good-service-42".to_owned()));
     execute_transaction(
         &mut blockchain,
-        TestStart { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+        TestAdd { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
     assert!(!dispatcher::Schema::new(snapshot.as_ref())
@@ -739,7 +734,7 @@ fn test_dispatcher_start_service_rollback() {
         .contains(&"good-service-18".to_owned()));
     execute_transaction(
         &mut blockchain,
-        TestStart { value: 18 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+        TestAdd { value: 18 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
     assert!(!dispatcher::Schema::new(snapshot.as_ref())
