@@ -40,7 +40,6 @@ fn test_multiple_consensus_change_proposes() {
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
 
-    //assert_eq!(err.kind, Error::MalformedConfigPropose.into());
     assert_eq!(config_propose_entry(&testkit), None);
 }
 

@@ -31,6 +31,7 @@ use exonum_supervisor::{DeployConfirmation, DeployRequest, StartService, Supervi
 use crate::inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME};
 
 mod config;
+mod config_api;
 mod consensus_config;
 mod inc;
 mod proto;
