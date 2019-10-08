@@ -110,7 +110,7 @@ fn assert_config_change_is_applied(testkit: &TestKit) {
 fn add_nodes_to_validators() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(1)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -144,7 +144,7 @@ fn add_nodes_to_validators() {
 fn exclude_us_from_validators() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -175,7 +175,7 @@ fn exclude_us_from_validators() {
 fn exclude_other_from_validators() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -201,7 +201,7 @@ fn exclude_other_from_validators() {
 fn change_us_validator_id() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -228,7 +228,7 @@ fn change_us_validator_id() {
 fn service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -256,7 +256,7 @@ fn service_config_change() {
 fn discard_errored_service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -293,7 +293,7 @@ fn discard_errored_service_config_change() {
 fn discard_panicked_service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -330,7 +330,7 @@ fn discard_panicked_service_config_change() {
 fn incorrect_actual_from_field() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -353,7 +353,7 @@ fn incorrect_actual_from_field() {
 fn another_configuration_change_proposal() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -425,7 +425,7 @@ fn service_config_discard_fake_supervisor() {
 fn test_configuration_and_rollbacks() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(1)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .create();
 
     testkit.create_blocks_until(Height(5));
@@ -473,7 +473,7 @@ fn test_configuration_and_rollbacks() {
 fn service_config_rollback_apply_error() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -501,7 +501,7 @@ fn service_config_rollback_apply_error() {
 fn service_config_rollback_apply_panic() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -529,7 +529,7 @@ fn service_config_rollback_apply_panic() {
 fn service_config_apply_multiple_configs() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -559,7 +559,7 @@ fn service_config_apply_multiple_configs() {
 fn several_service_config_changes() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_simple_supervisor()
+        .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 

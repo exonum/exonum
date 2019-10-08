@@ -26,7 +26,7 @@ use exonum::{
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use crate::{simple_supervisor::SimpleSupervisor, TestKit, TestNetwork};
+use crate::{TestKit, TestNetwork};
 
 /// Builder for `TestKit`.
 ///
@@ -192,11 +192,6 @@ impl TestKitBuilder {
     pub fn with_instances(mut self, instances: impl IntoIterator<Item = InstanceConfig>) -> Self {
         self.instances.extend(instances);
         self
-    }
-
-    /// Adds SimpleSupervisor service to the testkit.
-    pub fn with_simple_supervisor(self) -> Self {
-        self.with_rust_service(SimpleSupervisor)
     }
 
     /// Creates the testkit.
