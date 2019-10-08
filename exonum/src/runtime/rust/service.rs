@@ -33,11 +33,12 @@ use crate::{
 
 use super::RustArtifactId;
 
-/// Describes how the service instance processes interface method calls.
+/// Describes how the service instance should dispatch concrete method calls
+/// (taking into account the interface to which method belongs).
 ///
-/// In almost all cases, it can be derived using a `ServiceFactory` macro.
+/// Usually, it can be derived using a `ServiceFactory` macro.
 pub trait ServiceDispatcher: Send {
-    /// Handle the calling of an interface method within the specified context.
+    /// Dispatch the interface method call within the specified context.
     fn call(
         &self,
         interface_name: &str,
@@ -50,9 +51,9 @@ pub trait ServiceDispatcher: Send {
 /// Describes an Exonum service instance.
 ///
 /// That is, it determines how the service instance responds to certain specific
-/// requests and events from the runtime side.
+/// requests and events from the runtime.
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    /// Initialize a new service instance with the given parameters.
+    /// Initializes a new service instance with the given parameters.
     ///
     /// This method is called once after creating a new service instance.
     ///
@@ -68,12 +69,12 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         Ok(())
     }
 
-    /// Return a list of root hashes of all Merkelized tables defined by this service,
-    /// as of the given snapshot of the blockchain state and service instance descriptor.
-
-    /// The core uses this list to [aggregate][1] hashes of tables defined by all services into a
+    /// Returns a list of root hashes of all Merkelized tables defined by the provided instance,
+    /// as of the given snapshot of the blockchain state.
+    ///
+    /// The core uses this list to [aggregate][1] hashes of tables defined by every service into a
     /// single Merkelized meta-map.
-    /// The hash of this meta-map is considered the hash of the entire blockchain [state][2] and
+    /// The hash of this meta-map is considered as the hash of the entire blockchain [state][2] and
     /// is recorded as such in blocks and Precommit messages.
     ///
     /// [See also.][3]
@@ -85,14 +86,14 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 
     /// Perform storage operations on behalf of the service before committing the block.
     ///
-    /// This changes affect `state_hash` that means this changes must be same for each node.
-    /// In other words you should use only data from context.
+    /// Any changes of storage state will affect `state_hash`, which means this method must act the same on different nodes.
+    /// In other words service should only use data available in the provided `BeforeCommitContext`.
     ///
     /// The order of invoking `before_commit` method for every service instance depends on the ID.
     /// `before_commit` for the service instance with the smallest ID is invoked first up to the
     /// largest one.
-    /// Effectively, this means that services should not rely on a particular ordering of
-    /// Service::execute invocations.
+    /// Effectively, this means that services must not rely on a particular ordering of
+    /// Service::before_commit invocations.
     fn before_commit(&self, _context: BeforeCommitContext) {}
     /// Handle block commit event.
     ///
@@ -103,7 +104,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// *Try not to perform long operations in this handler*.
     fn after_commit(&self, _context: AfterCommitContext) {}
 
-    /// Extend API by handlers of this service.
+    /// Attach the service API request handlers to the Exonum API schema.
     ///
     /// The request handlers are mounted on the `/api/services/{instance_name}` path at the
     /// listen address of every full node in the blockchain network.
@@ -114,11 +115,11 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 
 /// Describes service instance factory for the specific Rust artifact.
 pub trait ServiceFactory: Send + Debug + 'static {
-    /// Return the unique artifact identifier corresponding to the factory.
+    /// Returns the unique artifact identifier corresponding to the factory.
     fn artifact_id(&self) -> RustArtifactId;
-    /// Return the corresponding protobuf specification.
+    /// Return the protobuf specification used by instances of this service.
     fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec;
-    /// Create a new service instance.
+    /// Creates a new service instance.
     fn create_instance(&self) -> Box<dyn Service>;
 }
 
