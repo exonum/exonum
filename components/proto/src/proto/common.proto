@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-package exonum_common;
+package exonum.common;
 
 message BitVec {
     bytes data = 1;

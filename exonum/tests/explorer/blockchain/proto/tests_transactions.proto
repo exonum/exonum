@@ -19,17 +19,17 @@ import "types.proto";
 package exonum.tests.explorer;
 
 message CreateWallet {
-  exonum_crypto.PublicKey pubkey = 1;
+  exonum.crypto.PublicKey pubkey = 1;
   string name = 2;
 }
 
 message Transfer {
-  exonum_crypto.PublicKey from = 1;
-  exonum_crypto.PublicKey to = 2;
+  exonum.crypto.PublicKey from = 1;
+  exonum.crypto.PublicKey to = 2;
   uint64 amount = 3;
 }
 
 message Issue {
-  exonum_crypto.PublicKey to = 2;
+  exonum.crypto.PublicKey to = 2;
   uint64 amount = 3;
 }

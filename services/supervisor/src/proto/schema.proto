@@ -20,6 +20,6 @@ import "types.proto";
 import "service.proto";
 
 message ConfigProposalWithHash {
-    exonum_crypto.Hash propose_hash = 1;
+    exonum.crypto.Hash propose_hash = 1;
     ConfigPropose config_propose = 2;
 }

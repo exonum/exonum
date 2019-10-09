@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-package exonum_crypto;
+package exonum.crypto;
 
 message Hash { bytes data = 1; }
 

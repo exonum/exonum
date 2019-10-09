@@ -2,7 +2,7 @@
 
 extern crate exonum_build;
 
-use exonum_build::protobuf_generate;
+use exonum_build::{protobuf_generate, ProtoSources};
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
@@ -49,41 +49,48 @@ fn main() {
 
     create_path_to_protobuf_schema_env();
 
-    let crypto_protos = "../components/crypto/src/proto/schema";
-    let common_protos = "../components/proto/src/proto";
+    let crypto_protos = ProtoSources::Path("../components/crypto/src/proto/schema");
+    let common_protos = ProtoSources::Path("../components/proto/src/proto");
 
     // Exonum crypto.
     protobuf_generate(
-        &crypto_protos,
-        &[&crypto_protos],
+        &crypto_protos.path(),
+        &[crypto_protos],
         "exonum_crypto_proto_mod.rs",
     );
 
     // Exonum proto.
     protobuf_generate(
-        &common_protos,
-        &[&common_protos],
+        &common_protos.path(),
+        &[common_protos],
         "exonum_common_proto_mod.rs",
     );
 
     protobuf_generate(
         "src/proto/schema/exonum",
-        &["src/proto/schema/exonum", &common_protos, &crypto_protos],
+        &[
+            "src/proto/schema/exonum".into(),
+            common_protos,
+            crypto_protos,
+        ],
         "exonum_proto_mod.rs",
     );
 
     // Exonum external tests.
-    //TODO: change revert
     protobuf_generate(
         "tests/explorer/blockchain/proto",
-        &["src/proto/schema/exonum", &common_protos, &crypto_protos],
+        &[
+            "src/proto/schema/exonum".into(),
+            common_protos,
+            crypto_protos,
+        ],
         "exonum_tests_proto_mod.rs",
     );
 
     // Exonum benchmarks.
     protobuf_generate(
         "benches/criterion/proto",
-        &[&common_protos, &crypto_protos],
+        &[common_protos, crypto_protos],
         "exonum_benches_proto_mod.rs",
     );
 }

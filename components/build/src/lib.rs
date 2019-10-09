@@ -29,6 +29,37 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Enum represents various sources of protobuf files.
+#[derive(Debug, Copy, Clone)]
+pub enum ProtoSources<'a> {
+    /// Path to exonum core protobuf files.
+    Exonum,
+    /// Path to exonum crypto protobuf files.
+    Crypto,
+    /// Path to common protobuf files.
+    Common,
+    /// Path to manually specified protobuf sources.
+    Path(&'a str),
+}
+
+impl<'a> ProtoSources<'a> {
+    /// Returns path to protobuf files.
+    pub fn path(&self) -> String {
+        match self {
+            ProtoSources::Exonum => get_exonum_protobuf_files_path(),
+            ProtoSources::Common => get_exonum_protobuf_common_files_path(),
+            ProtoSources::Crypto => get_exonum_protobuf_crypto_files_path(),
+            ProtoSources::Path(path) => path.to_string(),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for ProtoSources<'a> {
+    fn from(path: &'a str) -> Self {
+        ProtoSources::Path(path)
+    }
+}
+
 /// Finds all .proto files in `path` and subfolders and returns a vector of their paths.
 fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
     WalkDir::new(path)
@@ -149,11 +180,9 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 /// // If you use types from `exonum` .proto files.
 /// use exonum::proto::schema::*;
 /// ```
-pub fn protobuf_generate<P, R, I, T>(input_dir: P, includes: I, mod_file_name: T)
+pub fn protobuf_generate<P, T>(input_dir: P, includes: &[ProtoSources], mod_file_name: T)
 where
     P: AsRef<Path>,
-    R: AsRef<Path>,
-    I: IntoIterator<Item = R>,
     T: AsRef<str>,
 {
     let out_dir = env::var("OUT_DIR")
@@ -163,22 +192,18 @@ where
     let proto_files = get_proto_files(&input_dir);
     generate_mod_rs(&out_dir, &proto_files, &mod_file_name.as_ref());
 
-    let includes = includes.into_iter().collect::<Vec<_>>();
+    let includes = includes.iter().collect::<Vec<_>>();
     // Converts paths to strings and adds input dir to includes.
-    let mut includes = includes
-        .iter()
-        .map(|s| {
-            s.as_ref()
-                .to_str()
-                .expect("Include dir name is not convertible to &str")
-        })
-        .collect::<Vec<_>>();
+    let mut includes = includes.iter().map(|s| s.path()).collect::<Vec<_>>();
     includes.push(
         input_dir
             .as_ref()
             .to_str()
-            .expect("Input dir name is not convertible to &str"),
+            .expect("Input dir name is not convertible to &str")
+            .into(),
     );
+
+    let includes: Vec<&str> = includes.iter().map(|s| &**s).collect();
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: out_dir
@@ -215,18 +240,18 @@ where
 ///    "protobuf_mod.rs",
 /// );
 /// ```
-pub fn get_exonum_protobuf_files_path() -> String {
+fn get_exonum_protobuf_files_path() -> String {
     env::var("DEP_EXONUM_PROTOBUF_PROTOS").expect("Failed to get exonum protobuf path")
 }
 
 /// Get path to the folder containing `exonum-crypto` protobuf files.
-pub fn get_exonum_protobuf_crypto_files_path() -> String {
+fn get_exonum_protobuf_crypto_files_path() -> String {
     env::var("DEP_EXONUM_PROTOBUF_CRYPTO_PROTOS")
         .expect("Failed to get exonum crypto protobuf path")
 }
 
 /// Get path to the folder containing `exonum-proto` protobuf files.
-pub fn get_exonum_protobuf_common_files_path() -> String {
+fn get_exonum_protobuf_common_files_path() -> String {
     env::var("DEP_EXONUM_PROTOBUF_COMMON_PROTOS")
         .expect("Failed to get exonum common protobuf path")
 }

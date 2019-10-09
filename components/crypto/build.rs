@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Common macros for crypto module.
-
 extern crate exonum_build;
 
-use exonum_build::protobuf_generate;
+use exonum_build::{protobuf_generate, ProtoSources};
 
 fn main() {
     gen_proto_files();
@@ -24,7 +22,11 @@ fn main() {
 
 #[cfg(feature = "protobuf_serialization")]
 fn gen_proto_files() {
-    protobuf_generate("src/proto", &["src/proto"], "protobuf_mod.rs");
+    protobuf_generate(
+        "src/proto",
+        &[ProtoSources::Path("src/proto")],
+        "protobuf_mod.rs",
+    );
 }
 
 #[cfg(not(feature = "protobuf_serialization"))]

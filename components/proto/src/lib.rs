@@ -125,7 +125,7 @@ impl ProtobufConvert for i16 {
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         ensure!(
             pb >= i32::from(i16::min_value()) && pb <= i32::from(i16::max_value()),
-            "i32 is our of range for valid i16"
+            "i32 is out of range for valid i16"
         );
         Ok(pb as i16)
     }

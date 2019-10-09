@@ -24,7 +24,7 @@ message TxTimestamp { Timestamp content = 1; }
 
 // Stores content's hash and some metadata about it.
 message Timestamp {
-  exonum_crypto.Hash content_hash = 1;
+  exonum.crypto.Hash content_hash = 1;
   string metadata = 2;
 }
 
@@ -32,7 +32,7 @@ message TimestampEntry {
   // Timestamp data.
   Timestamp timestamp = 1;
   // Hash of transaction.
-  exonum_crypto.Hash tx_hash = 2;
+  exonum.crypto.Hash tx_hash = 2;
   // Timestamp time.
   google.protobuf.Timestamp time = 3;
 }
