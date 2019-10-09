@@ -57,29 +57,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     run -d /tmp/exonum/db/0 -c /tmp/exonum/nodes/0/node.toml
   ```
 
-- `explorer/v1/block` endpoint returns a response in a "flat" format.
- <details>
-    <summary>Example response.</summary>
-  
-```json
-{
-    "proposer_id": 0,
-    "height": 1,
-    "tx_count": 0,
-    "prev_hash": "81abde95e4d1ed118d398067725dc4a85fc060a2df59a6fcae21dba3712bda34",
-    "tx_hash": "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9",
-    "state_hash": "2eab5971bd150b6c8057cb294e78c2548e2d6b6aae58399391f32782c34ce0d6",
-    "precommits": [
-        "bc13dae3e4f95a601aeb0d64f1f2b757d1a2695bf86e271aeb32d69134711e4301001001180222220a20b31cceeffff6df1eac0ef74dfe4ea1637290caf6259f6f094a33208549f476462a220a200f709bd11d876e83492e5db79d42aae6b17d554fe0d175d4a53e6e1b8fe867bb320c08e18fceec0510c8cb93bc026b3ef32da00630ba874e566096570eeff844b1b52826bbba452674399a149a57951bf54ad460d235a71e727eed2b74630dc7577c9ee5cfa28fde45226f05730d"
-    ],
-    "txs": [],
-    "time": "2019-10-01T17:07:45.663021Z"
-}
-```
-
-</details>
-
-
+- `explorer/v1/block` endpoint returns a response in a "flat" format. (#1386)
 
 - `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
   median precommit times in the `time` field within each returned block,
