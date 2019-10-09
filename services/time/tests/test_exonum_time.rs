@@ -98,7 +98,7 @@ fn assert_transaction_result<S: IndexAccess>(
 fn test_exonum_time_service_with_3_validators() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(TimeServiceInstance)
+        .with_rust_service(TimeServiceInstance)
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -159,7 +159,7 @@ fn test_exonum_time_service_with_3_validators() {
 fn test_exonum_time_service_with_4_validators() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(TimeServiceInstance)
+        .with_rust_service(TimeServiceInstance)
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -271,7 +271,7 @@ fn test_exonum_time_service_with_4_validators() {
 fn test_exonum_time_service_with_7_validators() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(7)
-        .with_service(TimeServiceInstance)
+        .with_rust_service(TimeServiceInstance)
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -321,7 +321,7 @@ fn test_exonum_time_service_with_7_validators() {
 fn test_mock_provider() {
     let mock_provider = MockTimeProvider::default();
     let mut testkit = TestKitBuilder::validator()
-        .with_service(
+        .with_rust_service(
             InstanceCollection::new(TimeServiceFactory::with_provider(mock_provider.clone()))
                 .with_instance(INSTANCE_ID, INSTANCE_NAME, ()),
         )
@@ -367,8 +367,8 @@ fn test_mock_provider() {
 fn test_selected_time_less_than_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_service(TimeServiceInstance)
-        .with_service(SimpleSupervisor)
+        .with_rust_service(TimeServiceInstance)
+        .with_rust_service(SimpleSupervisor)
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -430,7 +430,7 @@ fn test_selected_time_less_than_time_in_storage() {
 fn test_creating_transaction_is_not_validator() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_service(TimeServiceInstance)
+        .with_rust_service(TimeServiceInstance)
         .create();
 
     let (pub_key, sec_key) = gen_keypair();
@@ -448,7 +448,7 @@ fn test_creating_transaction_is_not_validator() {
 fn test_transaction_time_less_than_validator_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_service(TimeServiceInstance)
+        .with_rust_service(TimeServiceInstance)
         .create();
 
     let validator = &testkit.network().validators().to_vec()[0];
@@ -540,8 +540,8 @@ fn assert_all_validators_times_eq(
 fn test_endpoint_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(TimeServiceInstance)
-        .with_service(SimpleSupervisor)
+        .with_rust_service(TimeServiceInstance)
+        .with_rust_service(SimpleSupervisor)
         .create();
 
     let mut api = testkit.api();

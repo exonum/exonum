@@ -21,13 +21,10 @@ use exonum::{
     helpers::ValidatorId,
     keys::Keys,
     merkledb::TemporaryDB,
-    runtime::{
-        rust::{RustRuntime, ServiceFactory},
-        Runtime,
-    },
+    runtime::{rust::RustRuntime, Runtime},
 };
 
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{TestKit, TestNetwork};
 
@@ -105,7 +102,7 @@ use crate::{TestKit, TestNetwork};
 /// # }
 /// # fn main() {
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_service(MyService)
+///     .with_rust_service(MyService)
 ///     .with_validators(4)
 ///     .create();
 /// testkit.create_block();
@@ -117,34 +114,20 @@ pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     test_network: Option<TestNetwork>,
     logger: bool,
-    rust_services: Vec<Box<dyn ServiceFactory>>,
-    runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    rust_runtime: RustRuntime,
+    additional_runtimes: HashMap<u32, Box<dyn Runtime>>,
     instances: Vec<InstanceConfig>,
 }
 
 impl TestKitBuilder {
     /// Creates testkit for the validator node.
     pub fn validator() -> Self {
-        TestKitBuilder {
-            test_network: None,
-            our_validator_id: Some(ValidatorId(0)),
-            logger: false,
-            rust_services: vec![],
-            runtimes: vec![],
-            instances: vec![],
-        }
+        Self::new(Some(ValidatorId(0)))
     }
 
     /// Creates testkit for the auditor node.
     pub fn auditor() -> Self {
-        TestKitBuilder {
-            test_network: None,
-            our_validator_id: None,
-            logger: false,
-            rust_services: vec![],
-            runtimes: vec![],
-            instances: vec![],
-        }
+        Self::new(None)
     }
 
     /// Creates the validator nodes from the specified keys.
@@ -175,12 +158,10 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds a Rust service to the testkit. This is an old way convenient method that creates Rust
-    /// runtime implicitly and is applicable to Rust services only. Thus, it must not be used in
-    /// conjunction with the `.with_runtime()` method having the RustRuntime instance as an argument.
-    pub fn with_service(mut self, service: impl Into<InstanceCollection>) -> Self {
+    /// Adds a Rust service to the testkit.
+    pub fn with_rust_service(mut self, service: impl Into<InstanceCollection>) -> Self {
         let InstanceCollection { factory, instances } = service.into();
-        self.rust_services.push(factory);
+        self.rust_runtime = self.rust_runtime.with_available_service(factory);
         self.instances.extend(instances);
         self
     }
@@ -191,20 +172,30 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds a runtime to the testkit. Must not be used with the Rust runtime as argument in
-    /// conjunction with the `.with_service()` method.
-    pub fn with_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
-        self.runtimes.push(runtime.into());
+    /// Adds a runtime to the testkit in addition to the default Rust runtime.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if builder's instance already contains specified runtime.
+    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+        let (id, runtime) = runtime.into();
+        if id == RustRuntime::ID as u32 || self.additional_runtimes.contains_key(&id) {
+            panic!("TestkitBuilder already contains runtime with id {}", id);
+        }
+
+        self.additional_runtimes.insert(id, runtime);
         self
     }
 
+    /// Adds instances descriptions to the testkit that will be used for specification of builtin
+    /// services of testing blockchain.
     pub fn with_instances(mut self, instances: impl IntoIterator<Item = InstanceConfig>) -> Self {
         self.instances.extend(instances);
         self
     }
 
     /// Creates the testkit.
-    pub fn create(self) -> TestKit {
+    pub fn create(mut self) -> TestKit {
         if self.logger {
             exonum::helpers::init_logger().ok();
         }
@@ -216,22 +207,14 @@ impl TestKitBuilder {
             .unwrap_or_else(|| TestNetwork::with_our_role(our_validator_id, 1));
         let genesis = network.genesis_config();
 
-        let mut runtimes = vec![];
-        if !self.rust_services.is_empty() {
-            // The old `.with_service()` API has been used so we have to create Rust runtime here.
-            let mut rust_runtime = RustRuntime::new();
-            for service in self.rust_services {
-                rust_runtime = rust_runtime.with_available_service(service);
-            }
-            runtimes.push(rust_runtime.into());
-        }
-        runtimes.extend(self.runtimes);
+        let (id, runtime) = self.rust_runtime.into();
+        self.additional_runtimes.insert(id, runtime);
 
         TestKit::assemble(
             TemporaryDB::new(),
             network,
             genesis,
-            runtimes,
+            self.additional_runtimes.into_iter(),
             self.instances,
         )
     }
@@ -246,5 +229,17 @@ impl TestKitBuilder {
     pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let testkit = self.create();
         testkit.run(public_api_address, private_api_address);
+    }
+
+    // Creates testkit for validator or auditor node.
+    fn new(validator_id: Option<ValidatorId>) -> Self {
+        Self {
+            test_network: None,
+            our_validator_id: validator_id,
+            logger: false,
+            rust_runtime: RustRuntime::new(),
+            additional_runtimes: HashMap::new(),
+            instances: vec![],
+        }
     }
 }

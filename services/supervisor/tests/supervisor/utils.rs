@@ -138,7 +138,7 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_service(Supervisor)
+        .with_rust_service(Supervisor)
         .create()
 }
 
@@ -148,8 +148,8 @@ pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
         InstanceCollection::new(service).with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_service(Supervisor)
-        .with_service(collection)
+        .with_rust_service(Supervisor)
+        .with_rust_service(collection)
         .create()
 }
 
@@ -160,8 +160,8 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
         .with_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_service(Supervisor)
-        .with_service(collection)
+        .with_rust_service(Supervisor)
+        .with_rust_service(collection)
         .create()
 }
 

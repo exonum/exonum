@@ -37,7 +37,7 @@ fn after_commit_service_instances(factory: AfterCommitService) -> InstanceCollec
 fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_service(after_commit_service_instances(service.clone()))
+        .with_rust_service(after_commit_service_instances(service.clone()))
         .create();
 
     // Check that `after_commit` invoked on the correct height.
@@ -69,7 +69,7 @@ fn restart_testkit() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(after_commit_service_instances(service.clone()))
+        .with_rust_service(after_commit_service_instances(service.clone()))
         .create();
     testkit.create_blocks_until(Height(5));
 
@@ -111,7 +111,7 @@ fn restart_testkit() {
 #[test]
 fn tx_pool_is_retained_on_restart() {
     let mut testkit = TestKitBuilder::validator()
-        .with_service(after_commit_service_instances(AfterCommitService::new()))
+        .with_rust_service(after_commit_service_instances(AfterCommitService::new()))
         .create();
 
     let tx_hashes: Vec<_> = (100..105)

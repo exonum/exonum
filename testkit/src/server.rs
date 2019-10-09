@@ -223,7 +223,7 @@ mod tests {
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> (Arc<RwLock<TestKit>>, TestKitApi) {
         let testkit = TestKitBuilder::validator()
-            .with_service(InstanceCollection::new(SampleService).with_instance(
+            .with_rust_service(InstanceCollection::new(SampleService).with_instance(
                 TIMESTAMP_SERVICE_ID,
                 TIMESTAMP_SERVICE_NAME,
                 (),

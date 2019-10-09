@@ -41,7 +41,7 @@ mod proto;
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(InstanceCollection::new(CurrencyService).with_instance(
+        .with_rust_service(InstanceCollection::new(CurrencyService).with_instance(
             SERVICE_ID,
             SERVICE_NAME,
             (),

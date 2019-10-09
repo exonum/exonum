@@ -471,12 +471,12 @@ fn test_service_config_discard_fake_supervisor() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_service(InstanceCollection::new(Supervisor).with_instance(
+        .with_rust_service(InstanceCollection::new(Supervisor).with_instance(
             FAKE_SUPERVISOR_ID,
             "fake-supervisor",
             Vec::default(),
         ))
-        .with_service(ConfigChangeService)
+        .with_rust_service(ConfigChangeService)
         .create();
 
     let params = "I am a new parameter".to_owned();

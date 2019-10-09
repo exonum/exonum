@@ -92,7 +92,7 @@
 //!     // Create testkit for network with four validators.
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
-//!         .with_service(TimestampingService)
+//!         .with_rust_service(TimestampingService)
 //!         .create();
 //!
 //!     // Create few transactions.
@@ -180,10 +180,7 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{
-        rust::{RustRuntime, ServiceFactory},
-        InstanceId, Runtime,
-    },
+    runtime::{rust::ServiceFactory, InstanceId, Runtime},
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
@@ -230,19 +227,18 @@ impl fmt::Debug for TestKit {
 
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given Rust service.
-    pub fn for_service(
+    pub fn for_rust_service(
         service_factory: impl Into<Box<dyn ServiceFactory>>,
         name: impl Into<String>,
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
-        let InstanceCollection { factory, instances } =
-            InstanceCollection::new(service_factory).with_instance(id, name, constructor);
-        let runtime = RustRuntime::new().with_available_service(factory);
-
         TestKitBuilder::validator()
-            .with_runtime(runtime)
-            .with_instances(instances)
+            .with_rust_service(InstanceCollection::new(service_factory).with_instance(
+                id,
+                name,
+                constructor,
+            ))
             .create()
     }
 
@@ -255,11 +251,8 @@ impl TestKit {
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
-
         let db = database.into();
-
         let db_handler = db.handler();
-
         let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair());
 
         for runtime in runtimes {
@@ -398,7 +391,7 @@ impl TestKit {
     /// #
     /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_service(MyService)
+    ///     .with_rust_service(MyService)
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
@@ -793,7 +786,7 @@ impl TestKit {
 /// }
 ///
 /// let service = AfterCommitService::new();
-/// let mut testkit = TestKit::for_service(service.clone());
+/// let mut testkit = TestKit::for_rust_service(service.clone());
 /// testkit.create_blocks_until(Height(5));
 /// assert_eq!(service.counter(), 5);
 ///
