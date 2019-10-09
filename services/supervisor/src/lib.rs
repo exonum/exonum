@@ -22,11 +22,11 @@ extern crate log;
 pub use self::{
     errors::Error,
     proto_structures::{
-        ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, StartService,
+        ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest,
+        StartService,
     },
     schema::Schema,
 };
-pub(crate) use proto_structures::ConfigProposalWithHash;
 
 use exonum::{
     blockchain::{self, InstanceCollection},
