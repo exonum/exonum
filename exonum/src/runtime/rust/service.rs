@@ -58,7 +58,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// This method is called once after creating a new service instance.
     ///
     /// The parameters passed to the method are not saved by the framework
-    /// automatically, hence the user must take care of it if needed.
+    /// automatically, hence the user must do it manually, if needed.
     fn initialize(
         &self,
         _instance: InstanceDescriptor,
