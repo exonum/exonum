@@ -55,6 +55,8 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate exonum_proto;
 
 // Test dependencies.
 #[cfg(test)]
@@ -66,7 +68,6 @@ extern crate test;
 pub use exonum_crypto as crypto;
 pub use exonum_merkledb as merkledb;
 
-#[macro_use]
 pub mod proto;
 #[macro_use]
 pub mod messages;

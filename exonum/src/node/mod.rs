@@ -1148,6 +1148,7 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use exonum_merkledb::{BinaryValue, Snapshot, TemporaryDB};
+    use exonum_proto::ProtobufConvert;
 
     use crate::{
         blockchain::Schema,
@@ -1155,7 +1156,7 @@ mod tests {
         events::EventHandler,
         helpers,
         messages::AnyTx,
-        proto::{schema::tests::TxSimple, ProtobufConvert},
+        proto::schema::tests::TxSimple,
         runtime::{
             rust::{Service, Transaction, TransactionContext},
             ExecutionError, InstanceDescriptor, InstanceId,

@@ -16,12 +16,12 @@ syntax = "proto3";
 
 package exonum.examples.cryptocurrency_advanced;
 
-import "helpers.proto";
+import "types.proto";
 
 /// Transfer `amount` of the currency from one wallet to another.
 message Transfer {
   // `PublicKey` of receiver's wallet.
-  exonum.PublicKey to = 1;
+  exonum_crypto.PublicKey to = 1;
   // Amount of currency to transfer.
   uint64 amount = 2;
   // Auxiliary number to guarantee non-idempotence of transactions.
@@ -45,7 +45,7 @@ message CreateWallet {
 // Wallet information stored in the database.
 message Wallet {
   // `PublicKey` of the wallet.
-  exonum.PublicKey pub_key = 1;
+  exonum_crypto.PublicKey pub_key = 1;
   // Name of the wallet.
   string name = 2;
   // Current balance of the wallet.
@@ -53,7 +53,7 @@ message Wallet {
   // Length of the transactions history.
   uint64 history_len = 4;
   // `Hash` of the transactions history.
-  exonum.Hash history_hash = 5;
+  exonum_crypto.Hash history_hash = 5;
 }
 
 // Cryptocurrency configuration.

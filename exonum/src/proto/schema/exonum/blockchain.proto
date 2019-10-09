@@ -16,15 +16,15 @@ syntax = "proto3";
 
 package exonum;
 
-import "helpers.proto";
+import "types.proto";
 
 message Block {
   uint32 proposer_id = 1;
   uint64 height = 2;
   uint32 tx_count = 3;
-  exonum.Hash prev_hash = 4;
-  exonum.Hash tx_hash = 5;
-  exonum.Hash state_hash = 6;
+  exonum_crypto.Hash prev_hash = 4;
+  exonum_crypto.Hash tx_hash = 5;
+  exonum_crypto.Hash state_hash = 6;
 }
 
 message TxLocation {
@@ -37,10 +37,10 @@ message TxLocation {
 // Public keys of a validator.
 message ValidatorKeys {
   // Consensus key is used for messages related to the consensus algorithm.
-  exonum.PublicKey consensus_key = 1;
+  exonum_crypto.PublicKey consensus_key = 1;
   // Service key is used for services, for example, the configuration
   // updater service, the anchoring service, etc.
-  exonum.PublicKey service_key = 2;
+  exonum_crypto.PublicKey service_key = 2;
 }
 
 // Consensus algorithm parameters.

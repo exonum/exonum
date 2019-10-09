@@ -16,13 +16,7 @@
 
 // For protobuf generated files.
 #![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
 
-pub use self::inflating_cryptocurrency::{TxCreateWallet, TxTransfer, Wallet};
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-include!(concat!(
-    env!("OUT_DIR"),
-    "/currency_example_protobuf_mod.rs"
-));
-
-use crate::crypto::proto::*;
+pub use self::types::*;

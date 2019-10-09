@@ -15,6 +15,7 @@
 pub use crate::proto::schema::tests::TxConfig;
 
 use exonum_merkledb::BinaryValue;
+use exonum_proto::ProtobufConvert;
 
 use crate::{
     blockchain::{ConsensusConfig, ExecutionError, Schema},
@@ -22,7 +23,6 @@ use crate::{
     helpers::Height,
     merkledb::Snapshot,
     messages::{AnyTx, Verified},
-    proto::ProtobufConvert,
     runtime::{
         rust::{Service, Transaction, TransactionContext},
         InstanceDescriptor, InstanceId,

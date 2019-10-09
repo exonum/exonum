@@ -14,7 +14,8 @@
 
 syntax = "proto3";
 
-import "helpers.proto";
+import "types.proto";
+import "common.proto";
 import "google/protobuf/timestamp.proto";
 
 package exonum.tests;
@@ -24,13 +25,13 @@ message TimestampTx { bytes data = 1; }
 message TxAfterCommit { uint64 height = 1; }
 
 message TxConfig {
-  exonum.PublicKey from = 1;
+  exonum_crypto.PublicKey from = 1;
   bytes config = 2;
   uint64 actual_from = 3;
 }
 
 message TxSimple {
-  exonum.PublicKey public_key = 1;
+  exonum_crypto.PublicKey public_key = 1;
   string msg = 2;
 }
 
@@ -46,13 +47,13 @@ message BlockchainTestTxB {
 }
 
 message CreateWallet {
-  exonum.PublicKey pubkey = 1;
+  exonum_crypto.PublicKey pubkey = 1;
   string name = 2;
 }
 
 message Transfer {
-  exonum.PublicKey from = 1;
-  exonum.PublicKey to = 2;
+  exonum_crypto.PublicKey from = 1;
+  exonum_crypto.PublicKey to = 2;
   uint64 amount = 3;
 }
 
@@ -62,8 +63,8 @@ message Point {
 }
 
 message TestProtobufConvert {
-  exonum.PublicKey key = 1;
-  exonum.Hash hash = 2;
+  exonum_crypto.PublicKey key = 1;
+  exonum_crypto.Hash hash = 2;
   uint32 unsigned_32 = 3;
   uint64 unsigned_64 = 4;
   int32 regular_i32 = 5;
@@ -80,12 +81,12 @@ message TestProtobufConvert {
   bytes bytes_field = 16;
   string string_field = 17;
   Point message_field = 18;
-  exonum.BitVec bit_vec = 19;
+  exonum_common.BitVec bit_vec = 19;
   google.protobuf.Timestamp time = 20;
 }
 
 message TestProtobufConvertRepeated {
-  repeated exonum.PublicKey keys = 1;
+  repeated exonum_crypto.PublicKey keys = 1;
   repeated bytes bytes_array = 2;
   repeated string string_array = 3;
   repeated uint32 num_array = 4;

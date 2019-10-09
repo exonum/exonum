@@ -16,10 +16,10 @@ syntax = "proto3";
 
 package exonum.supervisor;
 
-import "helpers.proto";
+import "types.proto";
 import "service.proto";
 
 message ConfigProposalWithHash {
-    exonum.Hash propose_hash = 1;
+    exonum_crypto.Hash propose_hash = 1;
     ConfigPropose config_propose = 2;
 }

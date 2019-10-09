@@ -12,10 +12,23 @@ fn create_path_to_protobuf_schema_env() {
     // Workaround for https://github.com/rust-lang/cargo/issues/3544
     // We "link" exonum with exonum_protobuf library
     // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
-    let path = env::current_dir()
-        .expect("Failed to get current dir.")
-        .join("src/proto/schema/exonum");
-    println!("cargo:protos={}", path.to_str().unwrap());
+
+    let current_dir = env::current_dir().expect("Failed to get current dir.");
+
+    let protos = current_dir.join("src/proto/schema/exonum");
+    println!("cargo:protos={}", protos.to_str().unwrap());
+
+    let crypto_protos = current_dir
+        .join("../components/crypto/src/proto/schema")
+        .canonicalize()
+        .unwrap();
+    let common_protos = current_dir
+        .join("../components/proto/src/proto")
+        .canonicalize()
+        .unwrap();
+
+    println!("cargo:crypto_protos={}", crypto_protos.to_str().unwrap());
+    println!("cargo:common_protos={}", common_protos.to_str().unwrap());
 }
 
 fn write_user_agent_file() {
@@ -36,23 +49,41 @@ fn main() {
 
     create_path_to_protobuf_schema_env();
 
+    let crypto_protos = "../components/crypto/src/proto/schema";
+    let common_protos = "../components/proto/src/proto";
+
+    // Exonum crypto.
+    protobuf_generate(
+        &crypto_protos,
+        &[&crypto_protos],
+        "exonum_crypto_proto_mod.rs",
+    );
+
+    // Exonum proto.
+    protobuf_generate(
+        &common_protos,
+        &[&common_protos],
+        "exonum_common_proto_mod.rs",
+    );
+
     protobuf_generate(
         "src/proto/schema/exonum",
-        &["src/proto/schema/exonum"],
+        &["src/proto/schema/exonum", &common_protos, &crypto_protos],
         "exonum_proto_mod.rs",
     );
 
     // Exonum external tests.
+    //TODO: change revert
     protobuf_generate(
         "tests/explorer/blockchain/proto",
-        &["src/proto/schema/exonum"],
+        &["src/proto/schema/exonum", &common_protos, &crypto_protos],
         "exonum_tests_proto_mod.rs",
     );
 
     // Exonum benchmarks.
     protobuf_generate(
         "benches/criterion/proto",
-        &["src/proto/schema/exonum"],
+        &[&common_protos, &crypto_protos],
         "exonum_benches_proto_mod.rs",
     );
 }

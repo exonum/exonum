@@ -13,11 +13,12 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.12.0", path = "../../../exonum" }
-exonum-crypto = { version = "0.12.0", path = "../../../components/crypto" }
+exonum-crypto = { version = "0.12.0", path = "../../../components/crypto", features = ["protobuf_serialization"] }
 exonum-derive = { version = "0.12.0", path = "../../../components/derive" }
 exonum-merkledb = { version = "0.12.0", path = "../../../components/merkledb" }
 exonum-cli = { version = "0.12.0", path = "../../../cli" }
 exonum-time = { version = "0.12.0", path = "../../../services/time" }
+exonum-proto = { version = "0.12.0", path = "../../../components/proto" }
 serde = "1.0.10"
 serde_derive = "1.0.10"
 serde_json = "1.0.2"

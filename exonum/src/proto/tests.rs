@@ -35,14 +35,14 @@ fn test_hash_pb_convert() {
 
 #[test]
 fn test_hash_wrong_pb_convert() {
-    let pb_hash = schema::helpers::Hash::new();
+    let pb_hash = exonum_crypto::proto::types::Hash::new();
     assert!(<Hash as ProtobufConvert>::from_pb(pb_hash).is_err());
 
-    let mut pb_hash = schema::helpers::Hash::new();
+    let mut pb_hash = exonum_crypto::proto::types::Hash::new();
     pb_hash.set_data([7; crypto::HASH_SIZE + 1].to_vec());
     assert!(<Hash as ProtobufConvert>::from_pb(pb_hash).is_err());
 
-    let mut pb_hash = schema::helpers::Hash::new();
+    let mut pb_hash = exonum_crypto::proto::types::Hash::new();
     pb_hash.set_data([7; crypto::HASH_SIZE - 1].to_vec());
     assert!(<Hash as ProtobufConvert>::from_pb(pb_hash).is_err());
 }
@@ -61,14 +61,14 @@ fn test_pubkey_pb_convert() {
 
 #[test]
 fn test_pubkey_wrong_pb_convert() {
-    let pb_key = schema::helpers::PublicKey::new();
+    let pb_key = exonum_crypto::proto::types::PublicKey::new();
     assert!(<PublicKey as ProtobufConvert>::from_pb(pb_key).is_err());
 
-    let mut pb_key = schema::helpers::PublicKey::new();
+    let mut pb_key = exonum_crypto::proto::types::PublicKey::new();
     pb_key.set_data([7; crypto::PUBLIC_KEY_LENGTH + 1].to_vec());
     assert!(<PublicKey as ProtobufConvert>::from_pb(pb_key).is_err());
 
-    let mut pb_key = schema::helpers::PublicKey::new();
+    let mut pb_key = exonum_crypto::proto::types::PublicKey::new();
     pb_key.set_data([7; crypto::PUBLIC_KEY_LENGTH - 1].to_vec());
     assert!(<PublicKey as ProtobufConvert>::from_pb(pb_key).is_err());
 }
@@ -87,14 +87,14 @@ fn test_signature_pb_convert() {
 
 #[test]
 fn test_signature_wrong_pb_convert() {
-    let pb_sign = schema::helpers::Signature::new();
+    let pb_sign = exonum_crypto::proto::types::Signature::new();
     assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
 
-    let mut pb_sign = schema::helpers::Signature::new();
+    let mut pb_sign = exonum_crypto::proto::types::Signature::new();
     pb_sign.set_data([8; crypto::SIGNATURE_LENGTH + 1].to_vec());
     assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
 
-    let mut pb_sign = schema::helpers::Signature::new();
+    let mut pb_sign = exonum_crypto::proto::types::Signature::new();
     pb_sign.set_data([8; crypto::SIGNATURE_LENGTH - 1].to_vec());
     assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
 }

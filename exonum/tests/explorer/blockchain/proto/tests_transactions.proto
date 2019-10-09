@@ -14,22 +14,22 @@
 
 syntax = "proto3";
 
-import "helpers.proto";
+import "types.proto";
 
 package exonum.tests.explorer;
 
 message CreateWallet {
-  exonum.PublicKey pubkey = 1;
+  exonum_crypto.PublicKey pubkey = 1;
   string name = 2;
 }
 
 message Transfer {
-  exonum.PublicKey from = 1;
-  exonum.PublicKey to = 2;
+  exonum_crypto.PublicKey from = 1;
+  exonum_crypto.PublicKey to = 2;
   uint64 amount = 3;
 }
 
 message Issue {
-  exonum.PublicKey to = 2;
+  exonum_crypto.PublicKey to = 2;
   uint64 amount = 3;
 }

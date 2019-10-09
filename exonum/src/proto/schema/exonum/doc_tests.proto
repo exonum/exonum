@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "helpers.proto";
+import "types.proto";
 
 package exonum.doc_tests;
 
@@ -33,14 +33,14 @@ message TxB {
   /// ...
 }
 
-message MyTransaction { exonum.PublicKey public_key = 1; }
+message MyTransaction { exonum_crypto.PublicKey public_key = 1; }
 
 message MyStructSmall {
-  exonum.PublicKey key = 1;
+  exonum_crypto.PublicKey key = 1;
   uint32 num_field = 2;
   string string_field = 3;
 }
 message MyStructBig {
-  exonum.Hash hash = 1;
+  exonum_crypto.Hash hash = 1;
   MyStructSmall my_struct_small = 2;
 }

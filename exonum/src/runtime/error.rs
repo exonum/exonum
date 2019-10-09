@@ -15,6 +15,7 @@
 //! The set of errors for the Runtime module.
 
 use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_proto::ProtobufConvert;
 use protobuf::Message;
 
 use std::{any::Any, convert::TryFrom, fmt::Display, panic};
@@ -22,7 +23,7 @@ use std::{any::Any, convert::TryFrom, fmt::Display, panic};
 use crate::{
     blockchain::FatalError,
     crypto::{self, Hash},
-    proto::{schema::runtime, ProtobufConvert},
+    proto::schema::runtime,
 };
 
 /// Kind of execution error, indicates in which module error occurred.

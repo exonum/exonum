@@ -17,4 +17,7 @@
 // For rust-protobuf generated files.
 #![allow(bare_trait_objects)]
 
+use crate::crypto::proto::*;
+use exonum_proto::proto::*;
+
 include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));

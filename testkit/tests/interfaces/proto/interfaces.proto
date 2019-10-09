@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.testkit;
 
-import "helpers.proto";
+import "types.proto";
 import "runtime.proto";
 
 message CreateWallet {
@@ -24,7 +24,7 @@ message CreateWallet {
 }
 
 message Issue {
-  exonum.PublicKey to = 1;
+  exonum_crypto.PublicKey to = 1;
   uint64 amount = 2;
 }
 

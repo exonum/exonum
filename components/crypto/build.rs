@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module of the rust-protobuf generated files.
+//! Common macros for crypto module.
 
-// For protobuf generated files.
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+extern crate exonum_build;
 
-pub use self::inflating_cryptocurrency::{TxCreateWallet, TxTransfer, Wallet};
+use exonum_build::protobuf_generate;
 
-include!(concat!(
-    env!("OUT_DIR"),
-    "/currency_example_protobuf_mod.rs"
-));
+fn main() {
+    gen_proto_files();
+}
 
-use crate::crypto::proto::*;
+#[cfg(feature = "protobuf_serialization")]
+fn gen_proto_files() {
+    protobuf_generate("src/proto", &["src/proto"], "protobuf_mod.rs");
+}
+
+#[cfg(not(feature = "protobuf_serialization"))]
+fn gen_proto_files() {}

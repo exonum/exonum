@@ -16,12 +16,12 @@ syntax = "proto3";
 
 package exonum.examples.cryptocurrency;
 
-import "helpers.proto";
+import "types.proto";
 
 // Wallet struct used to persist data within the service.
 message Wallet {
   // Public key of the wallet owner.
-  exonum.PublicKey pub_key = 1;
+  exonum_crypto.PublicKey pub_key = 1;
   // Name of the wallet owner.
   string name = 2;
   // Current balance.
@@ -37,7 +37,7 @@ message TxCreateWallet {
 // Transaction type for transferring tokens between two wallets.
 message TxTransfer {
   // Public key of the receiver.
-  exonum.PublicKey to = 1;
+  exonum_crypto.PublicKey to = 1;
   // Number of tokens to transfer from sender's account to receiver's account.
   uint64 amount = 2;
   // Auxiliary number to guarantee non-idempotence of transactions.

@@ -14,13 +14,13 @@
 
 syntax = "proto3";
 
-import "helpers.proto";
+import "types.proto";
 
 package exonum.benchmarks;
 
-message TimestampTx { exonum.Hash data = 1; }
+message TimestampTx { exonum_crypto.Hash data = 1; }
 
 message CurrencyTx {
-  exonum.PublicKey to = 1;
+  exonum_crypto.PublicKey to = 1;
   uint32 seed = 2;
 }

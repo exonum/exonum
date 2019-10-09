@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.examples.timestamping;
 
-import "helpers.proto";
+import "types.proto";
 import "google/protobuf/timestamp.proto";
 
 /// Timestamping transaction.
@@ -24,7 +24,7 @@ message TxTimestamp { Timestamp content = 1; }
 
 // Stores content's hash and some metadata about it.
 message Timestamp {
-  exonum.Hash content_hash = 1;
+  exonum_crypto.Hash content_hash = 1;
   string metadata = 2;
 }
 
@@ -32,7 +32,7 @@ message TimestampEntry {
   // Timestamp data.
   Timestamp timestamp = 1;
   // Hash of transaction.
-  exonum.Hash tx_hash = 2;
+  exonum_crypto.Hash tx_hash = 2;
   // Timestamp time.
   google.protobuf.Timestamp time = 3;
 }

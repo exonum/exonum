@@ -1,5 +1,6 @@
 use chrono::Utc;
 use exonum_merkledb::ObjectHash;
+use exonum_proto::ProtobufConvert;
 use protobuf::Message as PbMessage;
 
 use std::convert::TryFrom;
@@ -8,7 +9,7 @@ use crate::{
     blockchain::{Block, BlockProof},
     crypto::{self, gen_keypair, Signature},
     helpers::{Height, Round, ValidatorId},
-    proto::{self, ProtobufConvert},
+    proto::{self},
 };
 
 use super::{
