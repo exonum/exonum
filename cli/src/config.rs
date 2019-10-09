@@ -17,7 +17,7 @@
 use exonum::blockchain::{ConsensusConfig, ValidatorKeys};
 use serde::{Deserialize, Serialize};
 
-use exonum::keys::Keys;
+use exonum_keys::Keys;
 use std::{net::SocketAddr, path::PathBuf};
 
 /// Base config.

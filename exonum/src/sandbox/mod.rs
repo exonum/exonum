@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use bit_vec::BitVec;
+use exonum_keys::Keys;
 use exonum_merkledb::{BinaryValue, HashTag, IndexAccess, MapProof, ObjectHash, TemporaryDB};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -28,7 +29,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::keys::Keys;
 use crate::{
     api::node::SharedNodeState,
     blockchain::{

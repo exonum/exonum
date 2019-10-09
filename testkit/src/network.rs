@@ -18,9 +18,9 @@ use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
     crypto::{self, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
-    keys::Keys,
     messages::{Precommit, Propose, Verified},
 };
+use exonum_keys::Keys;
 use exonum_merkledb::ObjectHash;
 
 // TODO Refactor TestNetwork and TestkitBuilder [ECR-3222]

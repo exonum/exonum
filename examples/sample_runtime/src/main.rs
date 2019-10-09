@@ -30,10 +30,10 @@ use exonum::{
     },
 };
 use exonum_derive::IntoExecutionError;
+use exonum_keys::Keys;
 use exonum_supervisor::{DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
-use exonum::keys::Keys;
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},

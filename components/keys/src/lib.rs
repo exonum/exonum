@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::crypto::{gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
+#[macro_use]
+extern crate serde_derive;
+
+use exonum_crypto::{gen_keypair_from_seed, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
 
-use exonum_crypto::KeyPair;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::{
