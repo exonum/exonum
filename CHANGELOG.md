@@ -57,6 +57,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     run -d /tmp/exonum/db/0 -c /tmp/exonum/nodes/0/node.toml
   ```
 
+- `explorer/v1/block` endpoint returns a response in a "flat" format. (#1386)
+
 - `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
   median precommit times in the `time` field within each returned block,
   rather than in a separate array. (#1278)
