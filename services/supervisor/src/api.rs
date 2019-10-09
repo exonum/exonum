@@ -23,8 +23,7 @@ use exonum_merkledb::ObjectHash;
 use failure::Fail;
 
 use super::{
-    schema::{ Schema}, ConfigProposalWithHash,
-    ConfigVote, DeployRequest, StartService,
+    schema::Schema, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest, StartService,
 };
 use exonum::blockchain::{ConsensusConfig, Schema as CoreSchema};
 
@@ -38,6 +37,9 @@ pub trait PrivateApi {
     /// Creates and broadcasts the `StartService` transaction, which is signed
     /// by the current node, and returns its hash.
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
+    /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
+    /// by the current node, and returns its hash.
+    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error>;
     /// Creates and broadcasts the `ConfigVote` transaction, which is signed
     /// by the current node, and returns its hash.
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
@@ -49,7 +51,7 @@ pub trait PublicApi {
     /// Returns an actual consensus configuration of the blockchain.
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
     /// Returns an pending propose config change.
-    fn config_proposal(&self) -> Result<ConfigProposalWithHash, Self::Error>;
+    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
 }
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
@@ -76,6 +78,10 @@ impl PrivateApi for ApiImpl<'_> {
         self.broadcast_transaction(service).map_err(From::from)
     }
 
+    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
+        self.broadcast_transaction(proposal).map_err(From::from)
+    }
+
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
         self.broadcast_transaction(vote).map_err(From::from)
     }
@@ -88,11 +94,10 @@ impl PublicApi for ApiImpl<'_> {
         Ok(CoreSchema::new(self.0.snapshot()).consensus_config())
     }
 
-    fn config_proposal(&self) -> Result<ConfigProposalWithHash, Self::Error> {
-        Schema::new(self.0.instance.name, self.0.snapshot())
+    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
+        Ok(Schema::new(self.0.instance.name, self.0.snapshot())
             .pending_proposal()
-            .get()
-            .ok_or_else(|| Self::Error::NotFound("Pending config not found.".to_string()))
+            .get())
     }
 }
 
@@ -104,6 +109,9 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         })
         .endpoint_mut("start-service", |state, query| {
             ApiImpl(state).start_service(query)
+        })
+        .endpoint_mut("propose-config", |state, query| {
+            ApiImpl(state).propose_config(query)
         })
         .endpoint_mut("confirm-config", |state, query| {
             ApiImpl(state).confirm_config(query)

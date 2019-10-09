@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_derive::{Deserialize};
-
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKitApi};
 
@@ -21,18 +19,11 @@ use exonum::blockchain::ConsensusConfig;
 use exonum::{
     crypto::Hash,
     helpers::ValidatorId,
-    runtime::api::Error,
+    runtime::{rust::Transaction, SUPERVISOR_INSTANCE_ID},
 };
 
 use crate::utils::*;
-use exonum_supervisor::{ConfigPropose, ConfigVote};
-
-/// Pending config change proposal entry
-#[derive(Debug, Deserialize)]
-pub struct ConfigProposalWithHash {
-    pub config_propose: ConfigPropose,
-    pub propose_hash: Hash,
-}
+use exonum_supervisor::{ConfigProposalWithHash, ConfigPropose, ConfigVote};
 
 fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
     api.public(ApiKind::Service("supervisor"))
@@ -40,15 +31,25 @@ fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
         .unwrap()
 }
 
-fn current_config_proposal(api: &TestKitApi) -> Result<ConfigProposalWithHash, Error> {
+fn current_config_proposal(api: &TestKitApi) -> Option<ConfigProposalWithHash> {
     api.public(ApiKind::Service("supervisor"))
         .get("config-proposal")
+        .unwrap()
 }
 
-fn confirm_config(api: &TestKitApi, request: ConfigVote) -> Hash {
+fn create_proposal(api: &TestKitApi, proposal: ConfigPropose) -> Hash {
     let hash: Hash = api
         .private(ApiKind::Service("supervisor"))
-        .query(&request)
+        .query(&proposal)
+        .post("propose-config")
+        .unwrap();
+    hash
+}
+
+fn confirm_config(api: &TestKitApi, confirm: ConfigVote) -> Hash {
+    let hash: Hash = api
+        .private(ApiKind::Service("supervisor"))
+        .query(&confirm)
         .post("confirm-config")
         .unwrap();
     hash
@@ -63,15 +64,14 @@ fn test_consensus_config_api() {
 }
 
 #[test]
-#[should_panic(expected = "NotFound")]
 fn test_config_proposal_api() {
     let testkit = testkit_with_supervisor(1);
 
-    current_config_proposal(&testkit.api()).unwrap();
+    assert_eq!(current_config_proposal(&testkit.api()), None);
 }
 
 #[test]
-fn test_change_config_base() {
+fn test_confirm_proposal_with_api() {
     let mut testkit = testkit_with_supervisor(2);
 
     let consensus_proposal = consensus_config_propose_first_variant(&testkit);
@@ -107,6 +107,47 @@ fn test_change_config_base() {
     );
     testkit.create_block();
     testkit.api().exonum_api().assert_tx_success(tx_hash);
+
+    testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
+
+    let consensus_config = actual_consensus_config(&testkit.api());
+    assert_eq!(consensus_proposal, consensus_config);
+}
+
+#[test]
+fn test_send_proposal_with_api() {
+    let mut testkit = testkit_with_supervisor(2);
+
+    let consensus_proposal = consensus_config_propose_first_variant(&testkit);
+
+    let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_consensus_config_propose(consensus_proposal.clone())
+        .config_propose();
+
+    // Create proposal
+    let hash = create_proposal(&testkit.api(), config_proposal.clone());
+    testkit.create_block();
+    testkit.api().exonum_api().assert_tx_success(hash);
+
+    // Get proposal info
+    let pending_config =
+        current_config_proposal(&testkit.api()).expect("Config proposal was not registered.");
+    let proposal_hash = config_proposal.object_hash();
+    assert_eq!(proposal_hash, pending_config.propose_hash);
+    assert_eq!(config_proposal, pending_config.config_propose);
+
+    // Sign confirmation transaction by second validator
+    let keys = testkit.network().validators()[1].service_keypair();
+    let signed_confirm = ConfigVote {
+        propose_hash: pending_config.propose_hash,
+    }
+    .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    // Confirm proposal
+    testkit
+        .create_block_with_transaction(signed_confirm)
+        .transactions[0]
+        .status()
+        .expect("Transaction with confirmations discarded.");
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
