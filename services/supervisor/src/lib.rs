@@ -18,6 +18,8 @@ extern crate exonum;
 #[macro_use]
 extern crate log;
 extern crate exonum_proto;
+#[macro_use]
+extern crate exonum_merkledb;
 
 pub use self::{
     errors::Error,

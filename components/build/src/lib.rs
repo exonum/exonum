@@ -272,7 +272,7 @@ where
     generate_mod_rs(&out_dir, &proto_files, &mod_file_name.as_ref());
 
     // Converts paths to strings and adds input dir to includes.
-    let mut includes: Vec<_> = includes.into_iter().map(|s| s.path()).collect();
+    let mut includes: Vec<_> = includes.iter().map(|s| s.path()).collect();
 
     includes.push(
         input_dir

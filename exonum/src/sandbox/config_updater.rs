@@ -15,7 +15,7 @@
 pub use crate::proto::schema::tests::TxConfig;
 
 use exonum_merkledb::BinaryValue;
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
 use crate::{
     blockchain::{ConsensusConfig, ExecutionError, Schema},

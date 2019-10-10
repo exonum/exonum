@@ -70,27 +70,3 @@ impl ProtobufConvert for ValidatorId {
         Ok(ValidatorId(pb as u16))
     }
 }
-
-// Think about bincode instead of protobuf. [ECR-3222]
-#[macro_export]
-macro_rules! impl_binary_key_for_binary_value {
-    ($type:ident) => {
-        impl exonum_merkledb::BinaryKey for $type {
-            fn size(&self) -> usize {
-                exonum_merkledb::BinaryValue::to_bytes(self).len()
-            }
-
-            fn write(&self, buffer: &mut [u8]) -> usize {
-                let bytes = exonum_merkledb::BinaryValue::to_bytes(self);
-                buffer.copy_from_slice(&bytes);
-                bytes.len()
-            }
-
-            fn read(buffer: &[u8]) -> Self::Owned {
-                // `unwrap` is safe because only this code uses for
-                // serialize and deserialize these keys.
-                <Self as exonum_merkledb::BinaryValue>::from_bytes(buffer.into()).unwrap()
-            }
-        }
-    };
-}
