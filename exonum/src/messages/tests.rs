@@ -9,7 +9,7 @@ use crate::{
     blockchain::{Block, BlockProof},
     crypto::{self, gen_keypair, Signature},
     helpers::{Height, Round, ValidatorId},
-    proto::self,
+    proto,
 };
 
 use super::{

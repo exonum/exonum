@@ -10,6 +10,7 @@ license = "Apache-2.0"
 keywords = ["protobuf", "exonum"]
 categories = ["development-tools"]
 description = "Helper macros for serialization structs in protobuf."
+links = "exonum_protobuf_common"
 
 [dependencies]
 chrono = { version = "0.4.6", features = ["serde"] }

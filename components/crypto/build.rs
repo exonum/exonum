@@ -13,6 +13,7 @@
 // limitations under the License.
 
 extern crate exonum_build;
+use std::env;
 
 use exonum_build::{protobuf_generate, ProtoSources};
 
@@ -22,6 +23,10 @@ fn main() {
 
 #[cfg(feature = "protobuf_serialization")]
 fn gen_proto_files() {
+    let current_dir = env::current_dir().expect("Failed to get current dir.");
+    let protos = current_dir.join("src/proto/schema");
+    println!("cargo:protos={}", protos.to_str().unwrap());
+
     protobuf_generate(
         "src/proto",
         &[ProtoSources::Path("src/proto")],

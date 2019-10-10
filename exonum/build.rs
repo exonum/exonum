@@ -17,18 +17,6 @@ fn create_path_to_protobuf_schema_env() {
 
     let protos = current_dir.join("src/proto/schema/exonum");
     println!("cargo:protos={}", protos.to_str().unwrap());
-
-    let crypto_protos = current_dir
-        .join("../components/crypto/src/proto/schema")
-        .canonicalize()
-        .unwrap();
-    let common_protos = current_dir
-        .join("../components/proto/src/proto")
-        .canonicalize()
-        .unwrap();
-
-    println!("cargo:crypto_protos={}", crypto_protos.to_str().unwrap());
-    println!("cargo:common_protos={}", common_protos.to_str().unwrap());
 }
 
 fn write_user_agent_file() {
