@@ -15,8 +15,10 @@
 //! Standard Exonum CLI command used to generate public and secret config files
 //! of the node using provided common configuration file.
 
-use exonum::blockchain::ValidatorKeys;
-use exonum_keys::{generate_keys, Keys};
+use exonum::{
+    blockchain::ValidatorKeys,
+    keys::{generate_keys, Keys},
+};
 use failure::{bail, Error};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;

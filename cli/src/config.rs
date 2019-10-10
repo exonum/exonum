@@ -14,10 +14,12 @@
 
 //! Contains various config structures used during configuration process.
 
-use exonum::blockchain::{ConsensusConfig, ValidatorKeys};
+use exonum::{
+    blockchain::{ConsensusConfig, ValidatorKeys},
+    keys::Keys,
+};
 use serde::{Deserialize, Serialize};
 
-use exonum_keys::Keys;
 use std::{net::SocketAddr, path::PathBuf};
 
 /// Base config.

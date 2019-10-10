@@ -64,6 +64,7 @@ extern crate lazy_static;
 extern crate test;
 
 pub use exonum_crypto as crypto;
+pub use exonum_keys as keys;
 pub use exonum_merkledb as merkledb;
 
 #[macro_use]

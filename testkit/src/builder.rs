@@ -19,10 +19,10 @@ pub use exonum::blockchain::{InstanceCollection, InstanceConfig};
 use exonum::{
     crypto,
     helpers::ValidatorId,
+    keys::Keys,
     merkledb::TemporaryDB,
     runtime::{rust::RustRuntime, Runtime},
 };
-use exonum_keys::Keys;
 
 use std::{collections::HashMap, net::SocketAddr};
 

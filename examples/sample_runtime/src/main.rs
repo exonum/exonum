@@ -19,6 +19,7 @@ use exonum::{
     blockchain::{BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
+    keys::Keys,
     merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
@@ -30,7 +31,6 @@ use exonum::{
     },
 };
 use exonum_derive::IntoExecutionError;
-use exonum_keys::Keys;
 use exonum_supervisor::{DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
