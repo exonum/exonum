@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Macros useful for working with types that implementing `BinaryKey` and `BinaryValue` traits.
+
 /// Fast concatenation of byte arrays and/or keys that implements
 /// `BinaryKey` trait.
 ///
@@ -63,7 +65,7 @@ macro_rules! impl_object_hash_for_binary_value {
 /// Implements `BinaryKey` trait for any type that implements `BinaryValue`.
 #[macro_export]
 macro_rules! impl_binary_key_for_binary_value {
-    ($type:ident) => {
+    ($type:ty) => {
         impl exonum_merkledb::BinaryKey for $type {
             fn size(&self) -> usize {
                 exonum_merkledb::BinaryValue::to_bytes(self).len()

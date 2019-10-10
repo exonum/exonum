@@ -1148,7 +1148,7 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use exonum_merkledb::{BinaryValue, Snapshot, TemporaryDB};
-    use exonum_proto::{ProtobufConvert, impl_binary_value_for_pb_message};
+    use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
     use crate::{
         blockchain::Schema,
