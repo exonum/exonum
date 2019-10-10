@@ -1,15 +1,12 @@
 extern crate exonum_build;
 
-use exonum_build::{protobuf_generate, ProtoSources};
+use exonum_build::ProtobufGenerator;
 
 fn main() {
-    protobuf_generate(
-        "src/proto",
-        &[
-            "src/proto".into(),
-            ProtoSources::Exonum,
-            ProtoSources::Crypto,
-        ],
-        "protobuf_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .input_dir("src/proto")
+        .add_path("src/proto")
+        .exonum()
+        .crypto()
+        .generate();
 }

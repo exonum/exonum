@@ -48,6 +48,8 @@ extern crate serde_derive;
 
 #[macro_use]
 mod macros;
+#[cfg(test)]
+mod tests;
 
 use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;

@@ -52,6 +52,16 @@ impl<'a> ProtoSources<'a> {
             ProtoSources::Path(path) => path.to_string(),
         }
     }
+
+    /// Most frequently used combination of proto dependencies.
+    /// TODO: maybe find a better name.
+    pub fn frequently_used() -> Vec<Self> {
+        vec![
+            ProtoSources::Exonum,
+            ProtoSources::Crypto,
+            ProtoSources::Path("src/proto"),
+        ]
+    }
 }
 
 impl<'a> From<&'a str> for ProtoSources<'a> {
@@ -150,6 +160,75 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
         .expect("Unable to write data to file");
 }
 
+///TODO: add doc
+#[derive(Debug)]
+pub struct ProtobufGenerator<'a> {
+    sources: Vec<ProtoSources<'a>>,
+    mod_name: &'a str,
+    input_dir: &'a str,
+}
+
+impl<'a> ProtobufGenerator<'a> {
+    ///TODO: add doc
+    pub fn with_mod_name(mod_name: &'a str) -> Self {
+        assert!(!mod_name.is_empty(), "Mod name is not specified");
+        Self {
+            sources: Vec::new(),
+            input_dir: "",
+            mod_name,
+        }
+    }
+
+    ///TODO: add doc
+    pub fn input_dir(mut self, path: &'a str) -> Self {
+        self.input_dir = path;
+        self
+    }
+
+    ///TODO: add doc
+    pub fn add_path(mut self, path: &'a str) -> Self {
+        self.sources.push(ProtoSources::Path(path));
+        self
+    }
+
+    ///TODO: add doc / maybe find the better name
+    pub fn frequently_used(mut self) -> Self {
+        self.sources.extend(ProtoSources::frequently_used());
+        self
+    }
+
+    ///TODO: add doc
+    pub fn common(mut self) -> Self {
+        self.sources.push(ProtoSources::Common);
+        self
+    }
+
+    ///TODO: add doc
+    pub fn crypto(mut self) -> Self {
+        self.sources.push(ProtoSources::Crypto);
+        self
+    }
+
+    ///TODO: add doc
+    pub fn exonum(mut self) -> Self {
+        self.sources.push(ProtoSources::Exonum);
+        self
+    }
+
+    ///TODO: add doc / maybe find the better name
+    pub fn includes(mut self, includes: &'a [ProtoSources]) -> Self {
+        self.sources.extend_from_slice(includes);
+        self
+    }
+
+    ///TODO: add doc
+    pub fn generate(self) {
+        assert!(!self.input_dir.is_empty(), "Input dir is not specified");
+        assert!(!self.sources.is_empty(), "Includes are not specified");
+        protobuf_generate(self.input_dir, &self.sources, self.mod_name);
+    }
+}
+
 /// Generates .rs files from .proto files.
 ///
 /// `protoc` executable from protobuf should be in `$PATH`
@@ -180,7 +259,7 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 /// // If you use types from `exonum` .proto files.
 /// use exonum::proto::schema::*;
 /// ```
-pub fn protobuf_generate<P, T>(input_dir: P, includes: &[ProtoSources], mod_file_name: T)
+fn protobuf_generate<P, T>(input_dir: P, includes: &[ProtoSources], mod_file_name: T)
 where
     P: AsRef<Path>,
     T: AsRef<str>,

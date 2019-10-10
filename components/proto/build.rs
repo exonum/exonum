@@ -1,6 +1,6 @@
 extern crate exonum_build;
 
-use exonum_build::{protobuf_generate, ProtoSources};
+use exonum_build::ProtobufGenerator;
 use std::env;
 
 fn main() {
@@ -8,9 +8,8 @@ fn main() {
     let protos = current_dir.join("src/proto");
     println!("cargo:protos={}", protos.to_str().unwrap());
 
-    protobuf_generate(
-        "src/proto",
-        &[ProtoSources::Path("src/proto")],
-        "protobuf_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .input_dir("src/proto")
+        .add_path("src/proto")
+        .generate();
 }

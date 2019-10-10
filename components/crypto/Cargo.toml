@@ -34,9 +34,9 @@ bit-vec = "0.6.1"
 tempdir = "0.3.7"
 
 [features]
-default = ["sodiumoxide-crypto", "protobuf_serialization", "with-serde"]
+default = ["sodiumoxide-crypto", "with-protobuf", "with-serde"]
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
-protobuf_serialization = ["exonum-proto"]
+with-protobuf = ["exonum-proto"]
 with-serde = []
 
 [build-dependencies]

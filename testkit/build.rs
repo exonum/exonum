@@ -1,6 +1,6 @@
 extern crate exonum_build;
 
-use exonum_build::{protobuf_generate, ProtoSources};
+use exonum_build::{ProtoSources, ProtobufGenerator};
 
 fn main() {
     let protobuf_gen_data = [
@@ -54,6 +54,9 @@ fn main() {
     ];
 
     for (input_dir, includes, mod_file_name) in protobuf_gen_data.into_iter() {
-        protobuf_generate(input_dir, includes, mod_file_name);
+        ProtobufGenerator::with_mod_name(mod_file_name)
+            .input_dir(input_dir)
+            .includes(includes)
+            .generate();
     }
 }

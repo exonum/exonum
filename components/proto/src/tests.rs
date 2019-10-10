@@ -12,26 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum_build;
-use std::env;
+use crate::ProtobufConvert;
+use bit_vec::BitVec;
 
-use exonum_build::ProtobufGenerator;
+#[test]
+fn test_bitvec_pb_convert() {
+    let bv = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
 
-fn main() {
-    gen_proto_files();
+    let pb_bv = bv.to_pb();
+    let pb_round_trip: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
+    assert_eq!(pb_round_trip, bv);
 }
-
-#[cfg(feature = "with-protobuf")]
-fn gen_proto_files() {
-    let current_dir = env::current_dir().expect("Failed to get current dir.");
-    let protos = current_dir.join("src/proto/schema");
-    println!("cargo:protos={}", protos.to_str().unwrap());
-
-    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
-        .input_dir("src/proto")
-        .add_path("src/proto")
-        .generate();
-}
-
-#[cfg(not(feature = "with-protobuf"))]
-fn gen_proto_files() {}

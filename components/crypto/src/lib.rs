@@ -55,7 +55,7 @@ use self::crypto_lib::sodiumoxide as crypto_impl;
 #[macro_use]
 mod macros;
 
-#[cfg(feature = "protobuf_serialization")]
+#[cfg(feature = "with-protobuf")]
 pub mod proto;
 
 pub(crate) mod crypto_lib;

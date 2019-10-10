@@ -1,13 +1,15 @@
 extern crate exonum_build;
 
-use exonum_build::protobuf_generate;
+use exonum_build::ProtobufGenerator;
 
 fn main() {
-    protobuf_generate("src/proto", &["src/proto".into()], "protobuf_mod.rs");
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .input_dir("src/proto")
+        .add_path("src/proto")
+        .generate();
 
-    protobuf_generate(
-        "examples/simple_service/proto",
-        &["examples/simple_service/proto".into()],
-        "simple_service_protobuf_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("simple_service_protobuf_mod.rs")
+        .input_dir("examples/simple_service/proto")
+        .add_path("examples/simple_service/proto")
+        .generate();
 }

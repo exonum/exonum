@@ -1,13 +1,9 @@
-use exonum_build::{protobuf_generate, ProtoSources};
+use exonum_build::ProtobufGenerator;
 
 fn main() {
-    protobuf_generate(
-        "src/proto",
-        &[
-            ProtoSources::Exonum,
-            ProtoSources::Path("src/proto"),
-            ProtoSources::Crypto,
-        ],
-        "protobuf_mod.rs",
-    )
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .input_dir("src/proto")
+        .add_path("src/proto")
+        .frequently_used()
+        .generate();
 }

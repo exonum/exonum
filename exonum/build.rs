@@ -2,7 +2,7 @@
 
 extern crate exonum_build;
 
-use exonum_build::{protobuf_generate, ProtoSources};
+use exonum_build::{ProtoSources, ProtobufGenerator};
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
@@ -41,46 +41,38 @@ fn main() {
     let common_protos = ProtoSources::Path("../components/proto/src/proto");
 
     // Exonum crypto.
-    protobuf_generate(
-        &crypto_protos.path(),
-        &[crypto_protos],
-        "exonum_crypto_proto_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("exonum_crypto_proto_mod.rs")
+        .input_dir(&crypto_protos.path())
+        .add_path(&crypto_protos.path())
+        .generate();
 
     // Exonum proto.
-    protobuf_generate(
-        &common_protos.path(),
-        &[common_protos],
-        "exonum_common_proto_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("exonum_common_proto_mod.rs")
+        .input_dir(&common_protos.path())
+        .add_path(&common_protos.path())
+        .generate();
 
-    protobuf_generate(
-        "src/proto/schema/exonum",
-        &[
-            "src/proto/schema/exonum".into(),
-            common_protos,
-            crypto_protos,
-        ],
-        "exonum_proto_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("exonum_proto_mod.rs")
+        .input_dir("src/proto/schema/exonum")
+        .add_path("src/proto/schema/exonum")
+        .crypto()
+        .common()
+        .generate();
 
     // Exonum external tests.
-    protobuf_generate(
-        "tests/explorer/blockchain/proto",
-        &[
-            "src/proto/schema/exonum".into(),
-            common_protos,
-            crypto_protos,
-        ],
-        "exonum_tests_proto_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
+        .input_dir("tests/explorer/blockchain/proto")
+        .add_path("src/proto/schema/exonum")
+        .crypto()
+        .common()
+        .generate();
 
     // Exonum benchmarks.
-    protobuf_generate(
-        "benches/criterion/proto",
-        &[common_protos, crypto_protos],
-        "exonum_benches_proto_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("exonum_benches_proto_mod.rs")
+        .input_dir("benches/criterion/proto")
+        .crypto()
+        .common()
+        .generate();
 }
 
 fn rust_version() -> Option<String> {
