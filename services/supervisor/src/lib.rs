@@ -17,7 +17,6 @@ extern crate exonum_derive;
 extern crate exonum;
 #[macro_use]
 extern crate log;
-#[macro_use]
 extern crate exonum_proto;
 
 pub use self::{

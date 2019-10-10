@@ -18,7 +18,7 @@ use exonum::{
     crypto::Hash,
     exonum_merkledb::ObjectHash,
     helpers::Height,
-    impl_serde_hex_for_binary_value,
+    impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value,
     runtime::{ArtifactId, ConfigChange},
 };
 
