@@ -28,7 +28,6 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
-    keys::Keys,
     messages::{
         AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
         Verified,
@@ -38,6 +37,7 @@ use crate::{
         ConnectInfo,
     },
 };
+use exonum_keys::Keys;
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 

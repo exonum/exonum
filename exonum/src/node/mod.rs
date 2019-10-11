@@ -25,7 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use crate::keys::{read_keys_from_file, Keys};
+use exonum_keys::{read_keys_from_file, Keys};
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
