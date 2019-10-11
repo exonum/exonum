@@ -282,7 +282,7 @@ where
             .into(),
     );
 
-    let includes: Vec<&str> = includes.iter().map(|s| &**s).collect();
+    let includes: Vec<&str> = includes.iter().map(String::as_str).collect();
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: out_dir
