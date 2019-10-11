@@ -9,10 +9,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `explorer/v1/block` endpoint with requested a height exceeding the current
-  blockchain height, responds with error message includes the current blockchain
-  height.. (#1498)
-
 - `system/v1/rebroadcast` endpoint has been removed. (#1445)
 
 - Added a possibility to specify compression algorithm for the database. (#1447)
@@ -44,6 +40,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   module in the `exonum`. (#1459)
 
 ### New Features
+
+#### exonum
+
+- `NotFound` error message for `explorer/v1/block` endpoint now includes
+  the actual blockchain height. (#1498)
 
 #### exonum-merkledb
 

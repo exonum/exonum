@@ -527,7 +527,7 @@ fn test_explorer_blocks_basic() {
 }
 
 #[test]
-fn test_explorer_block_base() {
+fn test_explorer_api_block_request() {
     let (mut testkit, api) = init_testkit();
     testkit.create_block();
 
