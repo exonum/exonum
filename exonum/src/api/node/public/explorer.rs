@@ -253,12 +253,14 @@ impl ExplorerApi {
 
     /// Return the content for a block at a specific height.
     pub fn block(snapshot: &dyn Snapshot, query: BlockQuery) -> Result<BlockInfo, ApiError> {
-        BlockchainExplorer::new(snapshot)
-            .block(query.height)
-            .map(From::from)
-            .ok_or_else(|| {
-                ApiError::NotFound(format!("Block for height: {} not found", query.height))
-            })
+        let explorer = BlockchainExplorer::new(snapshot);
+        explorer.block(query.height).map(From::from).ok_or_else(|| {
+            ApiError::NotFound(format!(
+                "Requested block height ({}) exceeds the blockchain height ({})",
+                query.height,
+                explorer.height()
+            ))
+        })
     }
 
     /// Search for a transaction, either committed or uncommitted, by the hash.
