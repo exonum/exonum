@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Macros useful for working with types that implementing `BinaryKey` and `BinaryValue` traits.
+//! Macros useful for work with types that implement `BinaryKey` and `BinaryValue` traits.
 
 /// Fast concatenation of byte arrays and/or keys that implements
 /// `BinaryKey` trait.
