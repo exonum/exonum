@@ -209,26 +209,22 @@ impl ProtobufConvert for bit_vec::BitVec {
 }
 
 macro_rules! impl_protobuf_convert_scalar {
-    ($name:tt) => {
-        impl ProtobufConvert for $name {
-            type ProtoStruct = $name;
-            fn to_pb(&self) -> Self::ProtoStruct {
-                *self
+    ( $( $name:tt ),* )=> {
+        $(
+            impl ProtobufConvert for $name {
+                type ProtoStruct = $name;
+                fn to_pb(&self) -> Self::ProtoStruct {
+                    *self
+                }
+                fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+                    Ok(pb)
+                }
             }
-            fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-                Ok(pb)
-            }
-        }
+        )*
     };
 }
 
-impl_protobuf_convert_scalar!(bool);
-impl_protobuf_convert_scalar!(u32);
-impl_protobuf_convert_scalar!(u64);
-impl_protobuf_convert_scalar!(i32);
-impl_protobuf_convert_scalar!(i64);
-impl_protobuf_convert_scalar!(f32);
-impl_protobuf_convert_scalar!(f64);
+impl_protobuf_convert_scalar! { bool, u32, u64, i32, i64, f32, f64 }
 
 macro_rules! impl_protobuf_convert_fixed_byte_array {
     ( $( $arr_len:expr ),* ) => {

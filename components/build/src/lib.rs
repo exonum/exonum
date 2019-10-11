@@ -59,7 +59,7 @@ impl<'a> ProtoSources<'a> {
         vec![
             ProtoSources::Exonum,
             ProtoSources::Crypto,
-            ProtoSources::Path("src/proto"),
+            ProtoSources::Common,
         ]
     }
 }
