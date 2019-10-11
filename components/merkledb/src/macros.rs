@@ -72,8 +72,8 @@ macro_rules! impl_binary_key_for_binary_value {
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                let bytes = exonum_merkledb::BinaryValue::to_bytes(self);
-                buffer.copy_from_slice(&bytes);
+                let mut bytes = exonum_merkledb::BinaryValue::to_bytes(self);
+                buffer.swap_with_slice(&mut bytes);
                 bytes.len()
             }
 

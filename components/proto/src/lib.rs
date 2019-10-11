@@ -57,8 +57,6 @@ use protobuf::well_known_types;
 
 use std::collections::HashMap;
 
-use core::fmt;
-
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
 pub trait ProtobufConvert: Sized {
@@ -177,7 +175,7 @@ impl ProtobufConvert for Vec<u8> {
 // as a map keys.
 impl<K, T, S> ProtobufConvert for HashMap<K, T, S>
 where
-    K: Eq + std::hash::Hash + fmt::Debug + Clone,
+    K: Eq + std::hash::Hash + std::fmt::Debug + Clone,
     T: ProtobufConvert,
     S: Default + std::hash::BuildHasher,
 {

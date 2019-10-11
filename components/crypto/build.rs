@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum_build;
 use std::env;
 
 use exonum_build::ProtobufGenerator;
@@ -28,7 +27,7 @@ fn gen_proto_files() {
     println!("cargo:protos={}", protos.to_str().unwrap());
 
     ProtobufGenerator::with_mod_name("protobuf_mod.rs")
-        .input_dir("src/proto")
+        .with_input_dir("src/proto")
         .add_path("src/proto")
         .generate();
 }

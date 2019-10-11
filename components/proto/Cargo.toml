@@ -5,11 +5,11 @@ edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
-documentation = "https://docs.rs/exonum-derive"
+documentation = "https://docs.rs/exonum-proto"
 license = "Apache-2.0"
 keywords = ["protobuf", "exonum"]
 categories = ["development-tools"]
-description = "Helper macros for serialization structs in protobuf."
+description = "Helper traits and macros for serialization structs in protobuf."
 links = "exonum_protobuf_common"
 
 [dependencies]

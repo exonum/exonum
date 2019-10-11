@@ -1,7 +1,5 @@
 // spell-checker:ignore rustc
 
-extern crate exonum_build;
-
 use exonum_build::{ProtoSources, ProtobufGenerator};
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
@@ -42,36 +40,36 @@ fn main() {
 
     // Exonum crypto.
     ProtobufGenerator::with_mod_name("exonum_crypto_proto_mod.rs")
-        .input_dir(&crypto_protos.path())
+        .with_input_dir(&crypto_protos.path())
         .add_path(&crypto_protos.path())
         .generate();
 
     // Exonum proto.
     ProtobufGenerator::with_mod_name("exonum_common_proto_mod.rs")
-        .input_dir(&common_protos.path())
+        .with_input_dir(&common_protos.path())
         .add_path(&common_protos.path())
         .generate();
 
     ProtobufGenerator::with_mod_name("exonum_proto_mod.rs")
-        .input_dir("src/proto/schema/exonum")
+        .with_input_dir("src/proto/schema/exonum")
         .add_path("src/proto/schema/exonum")
-        .crypto()
-        .common()
+        .with_crypto()
+        .with_common()
         .generate();
 
     // Exonum external tests.
     ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
-        .input_dir("tests/explorer/blockchain/proto")
+        .with_input_dir("tests/explorer/blockchain/proto")
         .add_path("src/proto/schema/exonum")
-        .crypto()
-        .common()
+        .with_crypto()
+        .with_common()
         .generate();
 
     // Exonum benchmarks.
     ProtobufGenerator::with_mod_name("exonum_benches_proto_mod.rs")
-        .input_dir("benches/criterion/proto")
-        .crypto()
-        .common()
+        .with_input_dir("benches/criterion/proto")
+        .with_crypto()
+        .with_common()
         .generate();
 }
 

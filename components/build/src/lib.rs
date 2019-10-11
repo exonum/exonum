@@ -160,75 +160,6 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
         .expect("Unable to write data to file");
 }
 
-///TODO: add doc
-#[derive(Debug)]
-pub struct ProtobufGenerator<'a> {
-    sources: Vec<ProtoSources<'a>>,
-    mod_name: &'a str,
-    input_dir: &'a str,
-}
-
-impl<'a> ProtobufGenerator<'a> {
-    ///TODO: add doc
-    pub fn with_mod_name(mod_name: &'a str) -> Self {
-        assert!(!mod_name.is_empty(), "Mod name is not specified");
-        Self {
-            sources: Vec::new(),
-            input_dir: "",
-            mod_name,
-        }
-    }
-
-    ///TODO: add doc
-    pub fn input_dir(mut self, path: &'a str) -> Self {
-        self.input_dir = path;
-        self
-    }
-
-    ///TODO: add doc
-    pub fn add_path(mut self, path: &'a str) -> Self {
-        self.sources.push(ProtoSources::Path(path));
-        self
-    }
-
-    ///TODO: add doc / maybe find the better name
-    pub fn frequently_used(mut self) -> Self {
-        self.sources.extend(ProtoSources::frequently_used());
-        self
-    }
-
-    ///TODO: add doc
-    pub fn common(mut self) -> Self {
-        self.sources.push(ProtoSources::Common);
-        self
-    }
-
-    ///TODO: add doc
-    pub fn crypto(mut self) -> Self {
-        self.sources.push(ProtoSources::Crypto);
-        self
-    }
-
-    ///TODO: add doc
-    pub fn exonum(mut self) -> Self {
-        self.sources.push(ProtoSources::Exonum);
-        self
-    }
-
-    ///TODO: add doc / maybe find the better name
-    pub fn includes(mut self, includes: &'a [ProtoSources]) -> Self {
-        self.sources.extend_from_slice(includes);
-        self
-    }
-
-    ///TODO: add doc
-    pub fn generate(self) {
-        assert!(!self.input_dir.is_empty(), "Input dir is not specified");
-        assert!(!self.sources.is_empty(), "Includes are not specified");
-        protobuf_generate(self.input_dir, &self.sources, self.mod_name);
-    }
-}
-
 /// Generates .rs files from .proto files.
 ///
 /// `protoc` executable from protobuf should be in `$PATH`
@@ -237,12 +168,14 @@ impl<'a> ProtobufGenerator<'a> {
 ///
 /// In `build.rs`
 /// ```no_run
-/// extern crate exonum_build;
+///use exonum_build::ProtobufGenerator;
 ///
-/// use exonum_build::protobuf_generate;
-///
-/// // Includes usually should contain input_dir.
-/// protobuf_generate("src/proto", &["src/proto"], "example_mod.rs")
+///ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
+///   .with_input_dir("src/proto")
+///   .add_path("src/proto") // Includes usually should contain input_dir.
+///   .with_crypto()
+///   .with_common()
+///   .generate();
 /// ```
 /// After successful run `$OUT_DIR` will contain \*.rs for each \*.proto file in
 /// "src/proto/\*\*/" and example_mod.rs which will include all generated .rs files
@@ -259,6 +192,82 @@ impl<'a> ProtobufGenerator<'a> {
 /// // If you use types from `exonum` .proto files.
 /// use exonum::proto::schema::*;
 /// ```
+#[derive(Debug)]
+pub struct ProtobufGenerator<'a> {
+    includes: Vec<ProtoSources<'a>>,
+    mod_name: &'a str,
+    input_dir: &'a str,
+}
+
+impl<'a> ProtobufGenerator<'a> {
+    /// Name of the rust module generated from input proto files.
+    ///
+    /// # Panics
+    ///
+    /// If the `mod_name` is empty.
+    pub fn with_mod_name(mod_name: &'a str) -> Self {
+        assert!(!mod_name.is_empty(), "Mod name is not specified");
+        Self {
+            includes: Vec::new(),
+            input_dir: "",
+            mod_name,
+        }
+    }
+
+    /// Directory containing input protobuf files.
+    pub fn with_input_dir(mut self, path: &'a str) -> Self {
+        self.input_dir = path;
+        self
+    }
+
+    /// Directory containing proto files that will be included.
+    pub fn add_path(mut self, path: &'a str) -> Self {
+        self.includes.push(ProtoSources::Path(path));
+        self
+    }
+
+    /// Convenience method to specify the most frequently used include directories.
+    pub fn with_frequently_used(mut self) -> Self {
+        self.includes.extend(ProtoSources::frequently_used());
+        self
+    }
+
+    /// Common types for all crates.
+    pub fn with_common(mut self) -> Self {
+        self.includes.push(ProtoSources::Common);
+        self
+    }
+
+    /// Proto files from `exonum-crypto` crate (`Hash`, `PublicKey`, etc..).
+    pub fn with_crypto(mut self) -> Self {
+        self.includes.push(ProtoSources::Crypto);
+        self
+    }
+
+    /// Exonum core related proto files,
+    pub fn with_exonum(mut self) -> Self {
+        self.includes.push(ProtoSources::Exonum);
+        self
+    }
+
+    /// Add multiple include directories.
+    pub fn with_includes(mut self, includes: &'a [ProtoSources]) -> Self {
+        self.includes.extend_from_slice(includes);
+        self
+    }
+
+    /// Generate proto files from specified sources.
+    ///
+    /// # Panics
+    ///
+    /// If the `input_dir` or `includes` are empty.
+    pub fn generate(self) {
+        assert!(!self.input_dir.is_empty(), "Input dir is not specified");
+        assert!(!self.includes.is_empty(), "Includes are not specified");
+        protobuf_generate(self.input_dir, &self.includes, self.mod_name);
+    }
+}
+
 fn protobuf_generate<P, T>(input_dir: P, includes: &[ProtoSources], mod_file_name: T)
 where
     P: AsRef<Path>,
@@ -272,7 +281,7 @@ where
     generate_mod_rs(&out_dir, &proto_files, &mod_file_name.as_ref());
 
     // Converts paths to strings and adds input dir to includes.
-    let mut includes: Vec<_> = includes.iter().map(|s| s.path()).collect();
+    let mut includes: Vec<_> = includes.iter().map(ProtoSources::path).collect();
 
     includes.push(
         input_dir
@@ -282,7 +291,7 @@ where
             .into(),
     );
 
-    let includes: Vec<&str> = includes.iter().map(|s| &**s).collect();
+    let includes: Vec<&str> = includes.iter().map(String::as_str).collect();
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: out_dir
@@ -304,21 +313,6 @@ where
 /// Get path to the folder containing `exonum` protobuf files.
 ///
 /// Needed for code generation of .proto files which import `exonum` provided .proto files.
-///
-/// # Examples
-///
-/// ```no_run
-/// extern crate exonum_build;
-///
-/// use exonum_build::{protobuf_generate, get_exonum_protobuf_files_path};
-///
-/// let exonum_protos = get_exonum_protobuf_files_path();
-/// protobuf_generate(
-///    "src/proto",
-///    &["src/proto", &exonum_protos],
-///    "protobuf_mod.rs",
-/// );
-/// ```
 fn get_exonum_protobuf_files_path() -> String {
     env::var("DEP_EXONUM_PROTOBUF_PROTOS").expect("Failed to get exonum protobuf path")
 }
