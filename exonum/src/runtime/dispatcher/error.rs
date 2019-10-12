@@ -48,6 +48,12 @@ pub enum Error {
     UnauthorizedCaller = 11,
     /// Malformed arguments for calling a service interface method.
     MalformedArguments = 12,
+    /// Service pretended to be another service in the action request.
+    FakeInitiator = 13,
+    /// Action requested at the inappropriate time.
+    /// E.g. action that requires mutable access to the database, requested
+    /// in the `after_commit`.
+    InappropriateTimeForAction = 14,
 }
 
 impl Error {

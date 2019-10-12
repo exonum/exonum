@@ -26,12 +26,12 @@ use crate::{
         api::ServiceApiBuilder,
         dispatcher::{self, DispatcherRef, DispatcherSender},
         error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange, ExecutionContext,
+        AnyTx, ArtifactProtobufSpec, CallInfo, Caller, ConfigChange, ExecutionContext,
         InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
-use super::RustArtifactId;
+use super::{CallContext, RustArtifactId};
 
 pub trait ServiceDispatcher: Send {
     fn call(

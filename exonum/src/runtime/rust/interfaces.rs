@@ -16,10 +16,10 @@
 
 use crate::{
     merkledb::BinaryValue,
-    runtime::{CallContext, Caller, DispatcherError, MethodId, SUPERVISOR_INSTANCE_ID},
+    runtime::{Caller, DispatcherError, MethodId, SUPERVISOR_INSTANCE_ID},
 };
 
-use super::{ExecutionError, Interface, TransactionContext};
+use super::{CallContext, ExecutionError, Interface, TransactionContext};
 
 /// Fully qualified name of the ['Configure`] interface.
 ///

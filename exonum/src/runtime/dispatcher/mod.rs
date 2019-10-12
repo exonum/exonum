@@ -36,9 +36,19 @@ use crate::{
 use super::{
     api::ApiContext,
     error::{catch_panic, ExecutionError},
-    rust::interfaces::ConfigureCall,
-    ApiChange, ArtifactId, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange,
-    ExecutionContext, InstanceId, InstanceSpec, Runtime, SUPERVISOR_INSTANCE_ID,
+    // TODO dispatcher shouldn't rely on the rust implementation
+    rust::{interfaces::ConfigureCall, CallContext},
+    ApiChange,
+    ArtifactId,
+    ArtifactProtobufSpec,
+    CallInfo,
+    Caller,
+    ConfigChange,
+    ExecutionContext,
+    InstanceId,
+    InstanceSpec,
+    Runtime,
+    SUPERVISOR_INSTANCE_ID,
 };
 
 mod error;
@@ -415,7 +425,7 @@ impl Dispatcher {
     }
 
     /// Perform a configuration update with the specified changes.
-    fn update_config(
+    pub(crate) fn update_config(
         &self,
         fork: &mut Fork,
         caller_instance_id: InstanceId,
@@ -458,6 +468,11 @@ impl Dispatcher {
                 }
             }
         })
+    }
+
+    /// Assigns an instance identificator to the new service instance.
+    pub(crate) fn assign_instance_id(&self, fork: &Fork) -> InstanceId {
+        Schema::new(fork as &Fork).assign_instance_id()
     }
 }
 

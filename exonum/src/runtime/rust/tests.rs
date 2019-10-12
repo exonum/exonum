@@ -21,14 +21,14 @@ use crate::{
     runtime::{
         dispatcher::{Dispatcher, DispatcherRef},
         error::ExecutionError,
-        CallContext, CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor,
-        InstanceId, InstanceSpec,
+        CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor, InstanceId,
+        InstanceSpec,
     },
 };
 
 use super::{
     service::{Service, ServiceFactory},
-    ArtifactId, RustRuntime, TransactionContext,
+    ArtifactId, CallContext, RustRuntime, TransactionContext,
 };
 
 const SERVICE_INSTANCE_ID: InstanceId = 2;

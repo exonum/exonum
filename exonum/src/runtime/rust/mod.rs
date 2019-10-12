@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub use self::{
+    call_context::CallContext,
     error::Error,
     interfaces::Configure,
     service::{
@@ -21,6 +22,7 @@ pub use self::{
     },
 };
 
+mod call_context;
 pub mod error;
 pub mod interfaces;
 
