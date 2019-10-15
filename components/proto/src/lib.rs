@@ -193,14 +193,14 @@ where
 impl ProtobufConvert for bit_vec::BitVec {
     type ProtoStruct = BitVec;
 
-    fn to_pb(&self) -> BitVec {
+    fn to_pb(&self) -> Self::ProtoStruct {
         let mut bit_vec = BitVec::new();
         bit_vec.set_data(self.to_bytes());
         bit_vec.set_len(self.len() as u64);
         bit_vec
     }
 
-    fn from_pb(pb: BitVec) -> Result<Self, Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         let data = pb.get_data();
         let mut bit_vec = bit_vec::BitVec::from_bytes(data);
         bit_vec.truncate(pb.get_len() as usize);

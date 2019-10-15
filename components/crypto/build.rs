@@ -17,10 +17,10 @@ use std::env;
 use exonum_build::ProtobufGenerator;
 
 fn main() {
+    #[cfg(feature = "with-protobuf")]
     gen_proto_files();
 }
 
-#[cfg(feature = "with-protobuf")]
 fn gen_proto_files() {
     let current_dir = env::current_dir().expect("Failed to get current dir.");
     let protos = current_dir.join("src/proto/schema");
@@ -31,6 +31,3 @@ fn gen_proto_files() {
         .add_path("src/proto")
         .generate();
 }
-
-#[cfg(not(feature = "with-protobuf"))]
-fn gen_proto_files() {}
