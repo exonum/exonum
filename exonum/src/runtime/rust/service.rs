@@ -33,7 +33,12 @@ use crate::{
 
 use super::{CallContext, RustArtifactId};
 
+/// Describes how the service instance should dispatch specific method calls
+/// with consideration of the interface where the method belongs.
+///
+/// Usually, `ServiceDispatcher` can be derived using the `ServiceFactory` macro.
 pub trait ServiceDispatcher: Send {
+    /// Dispatches the interface method call within the specified context.
     fn call(
         &self,
         interface_name: &str,
@@ -43,7 +48,17 @@ pub trait ServiceDispatcher: Send {
     ) -> Result<(), ExecutionError>;
 }
 
+/// Describes an Exonum service instance.
+///
+/// That is, `Service` determines how a service instance responds to certain requests and events
+/// from the runtime.
 pub trait Service: ServiceDispatcher + Debug + 'static {
+    /// Initializes a new service instance with the given parameters.
+    ///
+    /// This method is called once after creating a new service instance.
+    ///
+    /// The parameters passed to the method are not saved by the framework
+    /// automatically, hence the user must do it manually, if needed.
     fn initialize(
         &self,
         _instance: InstanceDescriptor,
@@ -53,21 +68,56 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         Ok(())
     }
 
+    /// Returns a list of root hashes of the Merkelized tables defined by the provided instance,
+    /// based on the given snapshot of the blockchain state.
+    ///
+    /// The core uses this list to [aggregate][1] hashes of tables defined by every service into a
+    /// single Merkelized meta-map.
+    /// The hash of this meta-map is considered as the hash of the entire blockchain [state][2] and
+    /// is recorded as such in blocks and Precommit messages.
+    ///
+    /// [See also.][3]
+    ///
+    /// [1]: ../struct.StateHashAggregator.html
+    /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
+    /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
     fn state_hash(&self, instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
+    /// Performs storage operations on behalf of the service before committing the block.
+    ///
+    /// Any changes of the storage state will affect `state_hash`, which means this method must
+    /// act similarly on different nodes. In other words, the service should only use data available
+    /// in the provided `BeforeCommitContext`.
+    ///
+    /// The order of invoking the `before_commit` method is an implementation detail. Effectively,
+    /// this means that services must not rely on a particular ordering of `Service::before_commit`
+    /// invocations.
     fn before_commit(&self, _context: BeforeCommitContext) {}
-
+    /// Handles block commit event.
+    ///
+    /// This handler is an optional callback method which is invoked by the blockchain
+    /// after each block commit. For example, a service can create one or more transactions
+    /// if a specific condition has occurred.
+    ///
+    /// *Try not to perform long operations in this handler*.
     fn after_commit(&self, _context: AfterCommitContext) {}
 
+    /// Attaches the request handlers of the service API to the Exonum API schema.
+    ///
+    /// The request handlers are mounted on the `/api/services/{instance_name}` path at the
+    /// listen address of every full node in the blockchain network.
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
-    // TODO: add other hooks such as "on node startup", etc.
+
+    // TODO: add other hooks such as "on node startup", etc. [ECR-3222]
 }
 
+/// Describes a service instance factory for the specific Rust artifact.
 pub trait ServiceFactory: Send + Debug + 'static {
+    /// Returns the unique artifact identifier corresponding to the factory.
     fn artifact_id(&self) -> RustArtifactId;
-
+    /// Returns the Protobuf specification used by the instances of this service.
     fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec;
-
+    /// Creates a new service instance.
     fn create_instance(&self) -> Box<dyn Service>;
 }
 
@@ -90,7 +140,7 @@ pub trait Transaction: BinaryValue {
     /// Identifier of the service method which executes the given transaction.
     const METHOD_ID: MethodId;
 
-    /// Create unsigned service transaction from the value.
+    /// Creates an unsigned service transaction from the value.
     fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
         AnyTx {
             call_info: CallInfo {
@@ -101,7 +151,7 @@ pub trait Transaction: BinaryValue {
         }
     }
 
-    /// Sign the value as a transaction with the specified instance identifier.
+    /// Signs the value as a transaction with the specified instance identifier.
     fn sign(
         self,
         service_id: InstanceId,
@@ -122,7 +172,8 @@ pub struct TransactionContext<'a, 'b> {
 }
 
 impl<'a, 'b> TransactionContext<'a, 'b> {
-    /// Create a new transaction context for the specified execution context and the instance descriptor.
+    /// Creates a new transaction context for the specified execution context and the instance
+    /// descriptor.
     pub(crate) fn new(context: &'a ExecutionContext<'b>, instance: InstanceDescriptor<'a>) -> Self {
         Self {
             inner: context,
@@ -130,17 +181,17 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         }
     }
 
-    /// Return the writable snapshot of the current blockchain state.
+    /// Returns a writable snapshot of the current blockchain state.
     pub fn fork(&self) -> &Fork {
         self.inner.fork
     }
 
-    /// Return the initiator of the actual transaction execution.
+    /// Returns the initiator of the actual transaction execution.
     pub fn caller(&self) -> &Caller {
         &self.inner.caller
     }
 
-    /// Return validator ID if the transaction author is validator.
+    /// Returns the validator ID if the transaction author is a validator.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         self.caller().author().and_then(|author| {
@@ -159,7 +210,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
     #[doc(hidden)]
-    /// Create a client to call interface methods of the specified service instance.
+    /// Creates a client to call interface methods of the specified service instance.
     pub fn interface<T>(&self, called: InstanceId) -> T
     where
         T: From<CallContext<'a>>,
@@ -169,12 +220,12 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
     #[doc(hidden)]
-    /// Create a context to call interfaces of the specified service instance.
+    /// Creates a context to call interfaces of the specified service instance.
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
         CallContext::from_execution_context(self.inner, self.instance.id, called)
     }
 
-    /// Check the caller of this method with the specified closure.
+    /// Checks the caller of this method with the specified closure.
     ///
     /// If the closure returns `Some(value)`, then the method returns `Some((value, fork))` thus you
     /// get a write access to the blockchain state. Otherwise this method returns
@@ -202,7 +253,7 @@ pub struct BeforeCommitContext<'a> {
 }
 
 impl<'a> BeforeCommitContext<'a> {
-    /// Create a new `BeforeCommit` context.
+    /// Creates a new `BeforeCommit` context.
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
@@ -227,12 +278,12 @@ impl<'a> BeforeCommitContext<'a> {
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
     #[doc(hidden)]
-    /// Create a context to call interfaces of the specified service instance.
+    /// Creates a context to call interfaces of the specified service instance.
     pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
         CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
     }
 
-    /// Add a configuration update to pending actions. These changes will be applied immediately
+    /// Adds a configuration update to pending actions. These changes will be applied immediately
     /// before the block commit.
     ///
     /// Only the supervisor service is allowed to perform this action.
@@ -263,7 +314,7 @@ pub struct AfterCommitContext<'a> {
 }
 
 impl<'a> AfterCommitContext<'a> {
-    /// Create a new `AfterCommit` context.
+    /// Creates a new `AfterCommit` context.
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
@@ -280,7 +331,7 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Return a validator ID if the current node is validator.
+    /// Returns the validator ID if the current node is a validator.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot)
@@ -288,13 +339,13 @@ impl<'a> AfterCommitContext<'a> {
             .find_validator(|validator_keys| self.service_keypair.0 == validator_keys.service_key)
     }
 
-    /// Return a current blockchain height. This height is "height of the last committed block".
+    /// Returns a current blockchain height. This height is "height of the latest committed block".
     pub fn height(&self) -> Height {
         // TODO Perhaps we should optimize this method [ECR-3222]
         CoreSchema::new(self.snapshot).height()
     }
 
-    /// Sign and broadcast transaction to other nodes in the network.
+    /// Signs and broadcasts a transaction to the other nodes in the network.
     pub fn broadcast_transaction(&self, tx: impl Transaction) {
         let msg = tx.sign(
             self.instance.id,
@@ -306,7 +357,7 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Broadcast transaction to the other nodes in the network.
+    /// Broadcasts a transaction to the other nodes in the network.
     /// This transaction should be signed externally.
     pub fn broadcast_signed_transaction(&self, msg: Verified<AnyTx>) {
         if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
@@ -314,12 +365,12 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Return a communication channel with the dispatcher.
+    /// Returns a communication channel with the dispatcher.
     pub fn dispatcher_channel(&self) -> &DispatcherSender {
         self.dispatcher
     }
 
-    /// Return a transaction broadcaster.
+    /// Returns a transaction broadcaster.
     pub fn transaction_broadcaster(&self) -> ApiSender {
         self.tx_sender.clone()
     }
@@ -337,7 +388,7 @@ impl<'a> Debug for AfterCommitContext<'a> {
 pub trait Interface {
     /// Fully qualified name of this interface.
     const INTERFACE_NAME: &'static str;
-    /// Invoke the specified method handler of the service instance.
+    /// Invokes the specified method handler of the service instance.
     fn dispatch(
         &self,
         context: TransactionContext,

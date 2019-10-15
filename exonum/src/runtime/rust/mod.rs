@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Built-in Rust runtime module.
+
 pub use self::{
     call_context::CallContext,
     error::Error,
@@ -101,10 +103,26 @@ impl AsMut<dyn Service + 'static> for Instance {
 }
 
 impl RustRuntime {
+    /// Rust runtime identifier.
     pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
 
+    /// Creates a new Rust runtime instance.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+        let artifact = service_factory.artifact_id();
+        trace!("Added available artifact {}", artifact);
+        self.available_artifacts.insert(artifact, service_factory);
+    }
+
+    pub fn with_available_service(
+        mut self,
+        service_factory: impl Into<Box<dyn ServiceFactory>>,
+    ) -> Self {
+        self.add_service_factory(service_factory.into());
+        self
     }
 
     fn parse_artifact(&self, artifact: &ArtifactId) -> Result<RustArtifactId, ExecutionError> {
@@ -130,20 +148,6 @@ impl RustRuntime {
                 self.started_services_by_name.remove(&instance.name);
                 Some(instance)
             })
-    }
-
-    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
-        let artifact = service_factory.artifact_id();
-        trace!("Added available artifact {}", artifact);
-        self.available_artifacts.insert(artifact, service_factory);
-    }
-
-    pub fn with_available_service(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-    ) -> Self {
-        self.add_service_factory(service_factory.into());
-        self
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {

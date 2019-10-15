@@ -527,6 +527,28 @@ fn test_explorer_blocks_basic() {
 }
 
 #[test]
+fn test_explorer_api_block_request() {
+    let (mut testkit, api) = init_testkit();
+    testkit.create_block();
+
+    let response: Value = api
+        .public(ApiKind::Explorer)
+        .get("v1/block?height=1")
+        .unwrap();
+    assert_eq!(response["height"], 1);
+
+    let response = api
+        .public(ApiKind::Explorer)
+        .get::<Value>("v1/block?height=10")
+        .unwrap_err();
+
+    assert_matches!(
+        response,
+        ApiError::NotFound(ref body) if body == "Requested block height (10) exceeds the blockchain height (1)"
+    );
+}
+
+#[test]
 fn test_explorer_blocks_skip_empty_small() {
     use exonum::api::node::public::explorer::BlocksRange;
     use exonum::helpers::Height;

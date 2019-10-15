@@ -31,9 +31,9 @@ use crate::{
     blockchain::{ConsensusConfig, Schema, ValidatorKeys},
     crypto::gen_keypair,
     exonum_merkledb::Fork,
-    keys::Keys,
     node::{ConnectListConfig, NodeConfig},
 };
+use exonum_keys::Keys;
 
 mod types;
 
