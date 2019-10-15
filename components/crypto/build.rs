@@ -21,6 +21,7 @@ fn main() {
     gen_proto_files();
 }
 
+#[cfg(feature = "with-protobuf")]
 fn gen_proto_files() {
     let current_dir = env::current_dir().expect("Failed to get current dir.");
     let protos = current_dir.join("src/proto/schema");
