@@ -35,7 +35,7 @@ pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::CreateWallet")]
 pub struct CreateWallet {
     pub pubkey: PublicKey,
@@ -51,7 +51,7 @@ impl CreateWallet {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::Transfer")]
 pub struct Transfer {
     pub from: PublicKey,

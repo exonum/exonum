@@ -41,25 +41,25 @@ use crate::{
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
 struct TestExecute {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
 struct TestDeploy {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
 struct TestAdd {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
 struct TestCallInitialize {
     value: u64,
@@ -268,7 +268,7 @@ lazy_static! {
     static ref EXECUTION_STATUS: Mutex<Result<(), ExecutionError>> = Mutex::new(Ok(()));
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
 struct TxResult {
     value: u64,

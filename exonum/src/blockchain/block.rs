@@ -27,7 +27,7 @@ use crate::{
 ///
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::Block", crate = "crate")]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.

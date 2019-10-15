@@ -26,7 +26,6 @@ use crate::{
     proto,
     runtime::InstanceId,
 };
-
 use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 
 /// Defines `&str` constants with given name and value.
@@ -61,7 +60,7 @@ define_names!(
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
-#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::TxLocation", crate = "crate")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.

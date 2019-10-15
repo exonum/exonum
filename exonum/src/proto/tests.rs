@@ -29,7 +29,7 @@ fn test_date_time_pb_convert() {
     assert_eq!(pb_round_trip, dt);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::tests::Point", crate = "crate")]
 struct Point {
     x: u32,
@@ -49,7 +49,7 @@ fn test_simple_struct_round_trip() {
     assert_eq!(point_encode_round_trip, point);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::tests::TestProtobufConvert", crate = "crate")]
 struct StructWithScalarTypes {
     key: PublicKey,
@@ -108,7 +108,7 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::tests::TestProtobufConvertRepeated", crate = "crate")]
 struct StructWithRepeatedTypes {
     keys: Vec<PublicKey>,

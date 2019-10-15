@@ -30,7 +30,7 @@ use crate::{
 /// Protobuf based container for any signed messages.
 ///
 /// See module [documentation](index.html#examples) for examples.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "consensus::SignedMessage", crate = "crate")]
 pub struct SignedMessage {
     /// Message payload.
@@ -720,7 +720,7 @@ impl BlockResponse {
 
 /// This type describes all possible types of Exonum messages
 /// which are used in p2p communications.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "consensus::ExonumMessage", crate = "crate")]
 pub enum ExonumMessage {
     /// Exonum transaction.

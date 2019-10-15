@@ -25,8 +25,6 @@ mod dt {
     use exonum_derive::{BinaryValue, ObjectHash};
     use exonum_proto_derive::ProtobufConvert;
     use exonum_merkledb::BinaryValue;
-    use exonum_proto::ProtobufConvert;
-    use protobuf::Message;
 
     #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[exonum(pb = "proto::common::SimpleMessage")]

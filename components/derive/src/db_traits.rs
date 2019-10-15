@@ -58,9 +58,9 @@ impl DbObject {
                 }
 
                 fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
-                    let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
+                    let mut block = <Self as exonum_proto::ProtobufConvert>::ProtoStruct::new();
                     block.merge_from_bytes(value.as_ref())?;
-                    ProtobufConvert::from_pb(block)
+                    exonum_proto::ProtobufConvert::from_pb(block)
                 }
             }
         }
@@ -71,8 +71,22 @@ impl ToTokens for DbObject {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = &self.ident;
 
+        let mod_name = Ident::new(
+            &format!("binary_value_impl_{}", self.ident),
+            Span::call_site(),
+        );
+
         let binary_value = self.implement_binary_value();
-        let expanded = quote! { #binary_value };
+        let expanded = quote! {
+            mod #mod_name {
+                use super::*;
+
+                use protobuf::Message as _ProtobufMessage;
+                use exonum_proto::ProtobufConvert;
+
+                #binary_value
+            }
+        };
 
         tokens.extend(expanded);
     }

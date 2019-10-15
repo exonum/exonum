@@ -131,8 +131,19 @@ impl AnyTx {
 /// # }
 /// ```
 #[derive(
-    Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord,
+Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, BinaryValue, ObjectHash
 )]
+#[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
+pub struct ArtifactId {
+    /// Runtime identifier.
+    pub runtime_id: u32,
+    /// Unique artifact name.
+    pub name: String,
+}
+
+#[derive(Debug, Clone,  PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
 pub struct ArtifactId {
     /// Runtime identifier.
@@ -218,7 +229,7 @@ impl FromStr for ArtifactId {
 }
 
 /// Exhaustive service instance specification.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.

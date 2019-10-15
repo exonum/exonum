@@ -40,13 +40,13 @@ pub struct Init {
     msg: String,
 }
 
-#[derive(Debug, ProtobufConvert)]
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
 struct TxA {
     value: u64,
 }
 
-#[derive(Debug, ProtobufConvert)]
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "TestServiceTx", crate = "crate")]
 struct TxB {
     value: u64,
