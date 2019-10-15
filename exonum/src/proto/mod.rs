@@ -65,7 +65,8 @@ impl ProtobufConvert for ValidatorId {
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         ensure!(
             pb <= u32::from(u16::max_value()),
-            "u32 is out of range for valid ValidatorId"
+            "{} is out of range for valid ValidatorId",
+            pb
         );
         Ok(ValidatorId(pb as u16))
     }
