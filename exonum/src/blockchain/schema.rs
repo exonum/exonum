@@ -19,6 +19,7 @@ use exonum_merkledb::{
 
 use std::mem;
 
+use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 use crate::{
     crypto::{self, Hash, PublicKey},
     helpers::{Height, Round},
@@ -26,7 +27,6 @@ use crate::{
     proto,
     runtime::InstanceId,
 };
-use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {

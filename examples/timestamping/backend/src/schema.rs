@@ -22,7 +22,9 @@ use exonum_proto_derive::ProtobufConvert;
 use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(
+    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
+)]
 #[exonum(pb = "proto::Timestamp")]
 pub struct Timestamp {
     /// Hash of the content.

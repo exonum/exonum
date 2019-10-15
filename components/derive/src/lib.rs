@@ -30,11 +30,13 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
+///TODO: add doc
 #[proc_macro_derive(BinaryValue)]
 pub fn binary_value(input: TokenStream) -> TokenStream {
     db_traits::binary_value(input)
 }
 
+///TODO: add doc
 #[proc_macro_derive(ObjectHash)]
 pub fn object_hash(input: TokenStream) -> TokenStream {
     db_traits::object_hash(input)

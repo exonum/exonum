@@ -11,23 +11,24 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use proc_macro2::{Ident, Span};
+
+use darling::FromDeriveInput;
 use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
-use darling::{FromDeriveInput, FromMeta};
 use syn::DeriveInput;
 
 #[derive(Debug, FromDeriveInput)]
-struct DbObject {
+struct BinaryValueStruct {
     ident: Ident,
 }
 
 #[derive(Debug, FromDeriveInput)]
-struct DbObjectHash {
+struct ObjectHashStruct {
     ident: Ident,
 }
 
-impl DbObjectHash {
+impl ObjectHashStruct {
     pub fn implement_object_hash(&self) -> impl ToTokens {
         let name = &self.ident;
 
@@ -43,10 +44,9 @@ impl DbObjectHash {
     }
 }
 
-impl DbObject {
+impl BinaryValueStruct {
     pub fn implement_binary_value(&self) -> impl ToTokens {
         let name = &self.ident;
-        let cr = "";
 
         quote! {
             // This trait assumes that we work with trusted data so we can unwrap here.
@@ -67,10 +67,8 @@ impl DbObject {
     }
 }
 
-impl ToTokens for DbObject {
+impl ToTokens for BinaryValueStruct {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let name = &self.ident;
-
         let mod_name = Ident::new(
             &format!("binary_value_impl_{}", self.ident),
             Span::call_site(),
@@ -92,10 +90,8 @@ impl ToTokens for DbObject {
     }
 }
 
-impl ToTokens for DbObjectHash {
+impl ToTokens for ObjectHashStruct {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let name = &self.ident;
-
         let object_hash = self.implement_object_hash();
         let expanded = quote! { #object_hash };
 
@@ -106,7 +102,7 @@ impl ToTokens for DbObjectHash {
 pub fn binary_value(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
-    let db_object = DbObject::from_derive_input(&input)
+    let db_object = BinaryValueStruct::from_derive_input(&input)
         .unwrap_or_else(|e| panic!("BinaryValue: {}", e));
     let tokens = quote! {#db_object};
     tokens.into()
@@ -115,9 +111,8 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
 pub fn object_hash(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
-    let db_object = DbObjectHash::from_derive_input(&input)
-        .unwrap_or_else(|e| panic!("ObjectHash: {}", e));
+    let db_object =
+        ObjectHashStruct::from_derive_input(&input).unwrap_or_else(|e| panic!("ObjectHash: {}", e));
     let tokens = quote! {#db_object};
     tokens.into()
 }
-

@@ -23,7 +23,7 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, ServiceFactory, BinaryValue, ObjectHash};
+use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::Snapshot;
 use exonum_proto_derive::ProtobufConvert;
 
@@ -35,7 +35,9 @@ use std::sync::{
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq, BinaryValue, ObjectHash)]
+#[derive(
+    Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq, BinaryValue, ObjectHash,
+)]
 #[exonum(pb = "proto::TxAfterCommit")]
 pub struct TxAfterCommit {
     pub height: Height,

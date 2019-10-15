@@ -381,13 +381,6 @@ impl ProtobufConvert {
         }
     }
 
-    fn cr(&self) -> &CratePath {
-        match self {
-            ProtobufConvert::Enum(inner) => &inner.attrs.cr,
-            ProtobufConvert::Struct(inner) => &inner.attrs.cr,
-        }
-    }
-
     fn serde_needed(&self) -> bool {
         match self {
             ProtobufConvert::Enum(inner) => inner.attrs.serde_pb_convert,
@@ -464,7 +457,7 @@ impl ToTokens for ProtobufConvert {
             Span::call_site(),
         );
         let protobuf_convert = self.implement_protobuf_convert();
-//        let merkledb_traits = self.implement_merkledb_traits();
+        //        let merkledb_traits = self.implement_merkledb_traits();
         let serde_traits = if self.serde_needed() {
             let serde = self.implement_serde_protobuf_convert();
             quote! { #serde }
@@ -473,17 +466,17 @@ impl ToTokens for ProtobufConvert {
         };
 
         let expanded = quote! {
-            mod #mod_name {
-                use super::*;
+                    mod #mod_name {
+                        use super::*;
 
-                use protobuf::Message as _ProtobufMessage;
-                use exonum_proto::ProtobufConvert;
+                        use protobuf::Message as _ProtobufMessage;
+                        use exonum_proto::ProtobufConvert;
 
-                #protobuf_convert
-//                #merkledb_traits
-                #serde_traits
-            }
-        };
+                        #protobuf_convert
+        //                #merkledb_traits
+                        #serde_traits
+                    }
+                };
         tokens.extend(expanded)
     }
 }

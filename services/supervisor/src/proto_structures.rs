@@ -83,7 +83,9 @@ pub struct ConfigVote {
 }
 
 /// Pending config change proposal entry
-#[derive(Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize, BinaryValue, ObjectHash)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize, BinaryValue, ObjectHash,
+)]
 #[exonum(pb = "proto::ConfigProposalWithHash")]
 pub struct ConfigProposalWithHash {
     /// Hash of configuration proposition.

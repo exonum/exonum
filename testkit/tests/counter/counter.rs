@@ -28,7 +28,7 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory, BinaryValue, ObjectHash};
+use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
 use exonum_proto_derive::ProtobufConvert;
 use futures::{Future, IntoFuture};

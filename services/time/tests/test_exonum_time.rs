@@ -645,4 +645,3 @@ fn test_endpoint_api() {
     assert_current_validators_times_eq(&mut api, &current_validators_times);
     assert_all_validators_times_eq(&mut api, &all_validators_times);
 }
-
