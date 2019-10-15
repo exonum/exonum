@@ -48,11 +48,13 @@ pub enum MailboxContext {
 /// from services to `Blockchain`, and delegating the allowed actions to the dispatcher.
 /// Also `BlockchainSecretary` creates notifications for `Blockchain` about performed actions
 /// so `Blockchain` will be able to do any follow-up things if they are needed.
+#[derive(Debug)]
 pub struct BlockchainSecretary {
     context: MailboxContext,
 }
 
 /// Enum denoting the result of authorization process.
+#[derive(Debug)]
 enum AuthoriziationResult {
     /// Author of the request is authorized to request changes.
     Valid,
@@ -184,11 +186,22 @@ impl BlockchainSecretary {
         };
 
         catch_panic(|| match request {
+            // Immutable action.
             Action::StartDeploy { artifact, spec } => {
+                // Request the dispatcher to start deploy process and wait until it completed.
+                // Please note that it doesn't mean completion of the deployment process,
+                // because after that artifact should be registered as deployed.
+
+                // TODO: Get rid of `wait` here.
                 dispatcher.deploy_artifact(artifact, spec).wait()
             }
 
+            // Mutable action.
             Action::RegisterArtifact { artifact, spec } => {
+                // Request the dispatcher to registed artifact as deployed.
+                // Performing this action means the completion of the deployment process,
+                // artifact will be avaiable in the list of deployed artifacts.
+
                 let fork = fork.ok_or(DispatcherError::InappropriateTimeForAction)?;
 
                 dispatcher.register_artifact(fork, &artifact, spec)?;
@@ -198,11 +211,15 @@ impl BlockchainSecretary {
                 Ok(())
             }
 
+            // Mutable action.
             Action::AddService {
                 artifact,
                 instance_name,
                 config,
             } => {
+                // Request the dispatcher to start an instance of service given the
+                // deployed artifact.
+
                 let fork = fork.ok_or(DispatcherError::InappropriateTimeForAction)?;
 
                 let instance_spec = InstanceSpec {
@@ -226,6 +243,9 @@ impl BlockchainSecretary {
                 caller_instance_id,
                 changes,
             } => {
+                // Request dispatcher to change the configuration of the blockchain
+                // part (internal or service).
+
                 let fork = fork.ok_or(DispatcherError::InappropriateTimeForAction)?;
 
                 dispatcher.update_config(fork, caller_instance_id, changes);

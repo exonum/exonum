@@ -53,7 +53,6 @@ use crate::{
 
 mod block;
 mod builder;
-mod mailbox;
 mod schema;
 #[cfg(test)]
 mod tests;

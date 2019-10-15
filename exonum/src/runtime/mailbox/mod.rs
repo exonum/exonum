@@ -14,10 +14,7 @@
 
 //! The module containing interfaces to request changes in the blockchain structure.
 
-// TODO For development puposes, remove it later
-#![allow(dead_code)]
-
-pub(super) mod blockchain_secretary;
+pub mod blockchain_secretary;
 
 use std::collections::HashMap;
 
@@ -69,7 +66,7 @@ impl std::fmt::Debug for BlockchainMailbox {
 
 impl BlockchainMailbox {
     /// Creates a new empty mailbox.
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
@@ -96,7 +93,7 @@ impl BlockchainMailbox {
     }
 
     /// Consumes a mailbox, receiving the notifications about performed actions.
-    pub(in crate::blockchain) fn get_notifications(self) -> Vec<Notification> {
+    pub fn get_notifications(self) -> Vec<Notification> {
         self.notifications
     }
 }
