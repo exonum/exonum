@@ -48,7 +48,12 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, error::catch_panic, Runtime},
+    runtime::{
+        dispatcher::Dispatcher,
+        error::catch_panic,
+        mailbox::{BlockchainMailbox, BlockchainSecretary, MailboxContext},
+        Runtime,
+    },
 };
 
 mod block;
@@ -237,7 +242,17 @@ impl Blockchain {
 
             // Skip execution for genesis block.
             if height > Height(0) {
-                dispatcher.before_commit(&mut fork);
+                let mut mailbox = BlockchainMailbox::new();
+                dispatcher.before_commit(&mut mailbox, &mut fork);
+
+                let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
+
+                secretary.process_requests_mut(&mut mailbox, &mut dispatcher, &mut fork);
+
+                for notification in mailbox.get_notifications() {
+                    // TODO
+                    // unimplemented!();
+                }
             }
 
             // Get tx & state hash.
@@ -315,9 +330,27 @@ impl Blockchain {
 
         fork.flush();
 
-        let tx_result = catch_panic(|| dispatcher.execute(fork, tx_hash, &transaction));
+        let mut mailbox = BlockchainMailbox::new();
+
+        let tx_result =
+            catch_panic(|| dispatcher.execute(fork, &mut mailbox, tx_hash, &transaction)).and_then(
+                |()| {
+                    let secretary = BlockchainSecretary::new(MailboxContext::TxExecution(
+                        transaction.payload().call_info.clone(),
+                    ));
+
+                    secretary.process_requests_mut(&mut mailbox, dispatcher, fork)
+                },
+            );
         match &tx_result {
-            Ok(_) => fork.flush(),
+            Ok(_) => {
+                fork.flush();
+
+                for notification in mailbox.get_notifications() {
+                    // TODO
+                    // unimplemented!();
+                }
+            }
             Err(e) => {
                 if e.kind == ExecutionErrorKind::Panic {
                     error!("{:?} transaction execution panicked: {:?}", transaction, e);
@@ -382,11 +415,30 @@ impl Blockchain {
             fork.into_patch()
         };
         self.merge(patch)?;
-        // Invokes `after_commit` for each service in order of their identifiers
-        self.dispatcher()
-            .after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
+
+        // Invoke `after_commit` for each service in order of their identifiers
+        let mut dispatcher = self.dispatcher();
+        let mut mailbox = BlockchainMailbox::new();
+        dispatcher.after_commit(
+            &mut mailbox,
+            self.snapshot(),
+            &self.service_keypair,
+            &self.api_sender,
+        );
+
+        // Process requests obtained during the `after_commit` call.
+        let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
+
+        secretary.process_requests(&mut mailbox, &mut dispatcher);
+        for notification in mailbox.get_notifications() {
+            // TODO
+            // unimplemented!();
+        }
+
+        let api_changes = dispatcher.notify_api_changes(&ApiContext::with_blockchain(self));
+
         // Send `RestartApi` request if the dispatcher state has been modified.
-        if self.notify_api_changes() {
+        if api_changes {
             self.internal_requests
                 .clone()
                 .send(InternalRequest::RestartApi)

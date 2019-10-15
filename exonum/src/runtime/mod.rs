@@ -94,6 +94,7 @@
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
+    mailbox::BlockchainMailbox,
     types::{
         AnyTx, ArtifactId, CallInfo, ConfigChange, InstanceId, InstanceSpec, MethodId,
         ServiceConfig,
@@ -105,6 +106,7 @@ pub mod rust;
 pub mod api;
 pub mod dispatcher;
 pub mod error;
+pub mod mailbox;
 
 use futures::Future;
 
@@ -118,10 +120,7 @@ use crate::{
     node::ApiSender,
 };
 
-use self::{
-    api::ServiceApiBuilder,
-    dispatcher::{DispatcherRef, DispatcherSender},
-};
+use self::{api::ServiceApiBuilder, dispatcher::DispatcherRef};
 
 mod types;
 
@@ -262,7 +261,12 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork);
+    fn before_commit(
+        &self,
+        dispatcher: &DispatcherRef,
+        mailbox: &BlockchainMailbox,
+        fork: &mut Fork,
+    );
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -272,7 +276,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// them into the log.
     fn after_commit(
         &self,
-        dispatcher: &DispatcherSender,
+        mailbox: &BlockchainMailbox,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
@@ -419,6 +423,8 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field can only contains a core interfaces like `Configure` and
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
+    /// Reference to the blockchain mailbox.
+    pub mailbox: &'a BlockchainMailbox,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a DispatcherRef<'a>,
     /// Depth of call stack.
@@ -429,11 +435,17 @@ impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
-    pub(crate) fn new(dispatcher: &'a DispatcherRef<'a>, fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(
+        dispatcher: &'a DispatcherRef<'a>,
+        mailbox: &'a mut BlockchainMailbox,
+        fork: &'a Fork,
+        caller: Caller,
+    ) -> Self {
         Self {
             fork,
             caller,
             dispatcher,
+            mailbox,
             interface_name: "",
             call_stack_depth: 0,
         }

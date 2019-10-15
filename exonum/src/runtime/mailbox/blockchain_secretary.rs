@@ -75,14 +75,24 @@ impl BlockchainSecretary {
     /// Processes requests within immutable context.
     /// Since any failures won't affect the blockchain state, they are simply ignored.
     pub fn process_requests(&self, mailbox: &mut BlockchainMailbox, dispatcher: &mut Dispatcher) {
-        for (request_initiator, (request, and_then)) in mailbox.drain_requests() {
-            let authorized_access = self.verify_caller(request_initiator);
+        // During requests processing new requests may appear.
+        loop {
+            let requests = mailbox.drain_requests();
 
-            // Ignore unauthorized requests.
-            if let AuthoriziationResult::Valid = authorized_access {
-                // Requests within an immutable context are considered independent
-                // so we don't care about the result.
-                let _result = self.process_request(mailbox, dispatcher, None, request, and_then);
+            if requests.is_empty() {
+                break;
+            }
+
+            for (request_initiator, (request, and_then)) in requests {
+                let authorized_access = self.verify_caller(request_initiator);
+
+                // Ignore unauthorized requests.
+                if let AuthoriziationResult::Valid = authorized_access {
+                    // Requests within an immutable context are considered independent
+                    // so we don't care about the result.
+                    let _result =
+                        self.process_request(mailbox, dispatcher, None, request, and_then);
+                }
             }
         }
     }
@@ -96,39 +106,53 @@ impl BlockchainSecretary {
         dispatcher: &mut Dispatcher,
         fork: &mut Fork,
     ) -> Result<(), ExecutionError> {
-        for (request_initiator, (request, and_then)) in mailbox.drain_requests() {
-            // `verify_caller` will return `Err` only if requests processing
-            // should be stopped.
-            let authorized_access = self.verify_caller(request_initiator);
+        // During requests processing new requests may appear.
+        loop {
+            let requests = mailbox.drain_requests();
 
-            match authorized_access {
-                // We should stop. Revert changes and return an error.
-                // Rolling back the fork is up to caller.
-                AuthoriziationResult::AbortProcessing(err) => return Err(err),
-                // We should skip only that one request.
-                AuthoriziationResult::ShouldSkip => continue,
-                // We're ok, continue processing.
-                AuthoriziationResult::Valid => {}
+            if requests.is_empty() {
+                break;
             }
 
-            let result =
-                self.process_request(mailbox, dispatcher, Some(fork), request.clone(), and_then);
+            for (request_initiator, (request, and_then)) in requests {
+                // `verify_caller` will return `Err` only if requests processing
+                // should be stopped.
+                let authorized_access = self.verify_caller(request_initiator);
 
-            match result {
-                Ok(_) => {
-                    self.flush_if_needed(fork);
-                    trace!("Successfully completed request {:?}", request);
+                match authorized_access {
+                    // We should stop. Revert changes and return an error.
+                    // Rolling back the fork is up to caller.
+                    AuthoriziationResult::AbortProcessing(err) => return Err(err),
+                    // We should skip only that one request.
+                    AuthoriziationResult::ShouldSkip => continue,
+                    // We're ok, continue processing.
+                    AuthoriziationResult::Valid => {}
                 }
-                Err(err) => {
-                    // Cancel any changes occured during the errored request.
-                    fork.rollback();
 
-                    trace!(
-                        "Error occured during request {:?} within context {:?}",
-                        request,
-                        self.context
-                    );
-                    self.check_if_should_stop(err)?;
+                let result = self.process_request(
+                    mailbox,
+                    dispatcher,
+                    Some(fork),
+                    request.clone(),
+                    and_then,
+                );
+
+                match result {
+                    Ok(_) => {
+                        self.flush_if_needed(fork);
+                        trace!("Successfully completed request {:?}", request);
+                    }
+                    Err(err) => {
+                        // Cancel any changes occured during the errored request.
+                        fork.rollback();
+
+                        trace!(
+                            "Error occured during request {:?} within context {:?}",
+                            request,
+                            self.context
+                        );
+                        self.check_if_should_stop(err)?;
+                    }
                 }
             }
         }
@@ -248,7 +272,7 @@ impl BlockchainSecretary {
 
                 let fork = fork.ok_or(DispatcherError::InappropriateTimeForAction)?;
 
-                dispatcher.update_config(fork, caller_instance_id, changes);
+                dispatcher.update_config(mailbox, fork, caller_instance_id, changes);
                 Ok(())
             }
         })

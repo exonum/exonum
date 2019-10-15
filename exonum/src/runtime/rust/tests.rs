@@ -21,8 +21,8 @@ use crate::{
     runtime::{
         dispatcher::{Dispatcher, DispatcherRef},
         error::ExecutionError,
-        CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor, InstanceId,
-        InstanceSpec,
+        BlockchainMailbox, CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor,
+        InstanceId, InstanceSpec,
     },
 };
 
@@ -140,6 +140,9 @@ fn test_basic_rust_runtime() {
     // Create dummy dispatcher.
     let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()]);
 
+    // Create dummy blockchain mailbox.
+    let mut mailbox = BlockchainMailbox::new();
+
     // Deploy service.
     let fork = db.fork();
     dispatcher
@@ -184,6 +187,7 @@ fn test_basic_rust_runtime() {
         let dispatcher_ref = DispatcherRef::new(&dispatcher);
         let context = ExecutionContext::new(
             &dispatcher_ref,
+            &mut mailbox,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
@@ -214,6 +218,7 @@ fn test_basic_rust_runtime() {
         let dispatcher_ref = DispatcherRef::new(&dispatcher);
         let context = ExecutionContext::new(
             &dispatcher_ref,
+            &mut mailbox,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,

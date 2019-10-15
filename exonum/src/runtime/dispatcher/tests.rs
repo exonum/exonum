@@ -28,8 +28,8 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         rust::{Error as RustRuntimeError, RustRuntime},
-        ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError,
-        DispatcherRef, DispatcherSender, ExecutionContext, ExecutionError, InstanceId,
+        ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, BlockchainMailbox, CallInfo,
+        Caller, DispatcherError, DispatcherRef, ExecutionContext, ExecutionError, InstanceId,
         InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
     },
 };
@@ -151,11 +151,17 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _dispatcher: &DispatcherRef,
+        _mailbox: &BlockchainMailbox,
+        _fork: &mut Fork,
+    ) {
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _mailbox: &BlockchainMailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -269,7 +275,13 @@ fn test_dispatcher_simple() {
     let tx_payload = [0x00_u8; 1];
 
     let dispatcher_ref = DispatcherRef::new(&dispatcher);
-    let context = ExecutionContext::new(&dispatcher_ref, &fork, Caller::Service { instance_id: 1 });
+    let mut mailbox = BlockchainMailbox::new();
+    let context = ExecutionContext::new(
+        &dispatcher_ref,
+        &mut mailbox,
+        &fork,
+        Caller::Service { instance_id: 1 },
+    );
     dispatcher
         .call(
             &context,
@@ -391,8 +403,13 @@ fn test_dispatcher_rust_runtime_no_service() {
     let tx_payload = [0x00_u8; 1];
 
     let dispatcher_ref = DispatcherRef::new(&dispatcher);
-    let context =
-        ExecutionContext::new(&dispatcher_ref, &fork, Caller::Service { instance_id: 15 });
+    let mut mailbox = BlockchainMailbox::new();
+    let context = ExecutionContext::new(
+        &dispatcher_ref,
+        &mut mailbox,
+        &fork,
+        Caller::Service { instance_id: 15 },
+    );
     dispatcher
         .call(
             &context,
@@ -447,11 +464,17 @@ impl Runtime for ShutdownRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _dispatcher: &DispatcherRef,
+        _mailbox: &BlockchainMailbox,
+        _fork: &mut Fork,
+    ) {
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _mailbox: &BlockchainMailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,

@@ -41,6 +41,7 @@ use super::{
     ApiChange,
     ArtifactId,
     ArtifactProtobufSpec,
+    BlockchainMailbox,
     CallInfo,
     Caller,
     ConfigChange,
@@ -48,7 +49,6 @@ use super::{
     InstanceId,
     InstanceSpec,
     Runtime,
-    SUPERVISOR_INSTANCE_ID,
 };
 
 mod error;
@@ -279,12 +279,14 @@ impl Dispatcher {
     pub(crate) fn execute(
         &mut self,
         fork: &mut Fork,
+        mailbox: &mut BlockchainMailbox,
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let dispatcher_ref = DispatcherRef::new(self);
         let context = ExecutionContext::new(
             &dispatcher_ref,
+            mailbox,
             fork,
             Caller::Transaction {
                 author: tx.author(),
@@ -292,11 +294,6 @@ impl Dispatcher {
             },
         );
         self.call(&context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
-        // Execute pending dispatcher actions.
-        // TODO Take care about the rollbacks during the actions execution. [ECR-3559]
-        for action in context.dispatcher.take_actions() {
-            action.execute(self, fork)?;
-        }
         Ok(())
     }
 
@@ -320,46 +317,23 @@ impl Dispatcher {
         runtime.execute(context, call_info, arguments)
     }
 
-    pub(crate) fn before_commit(&mut self, fork: &mut Fork) {
+    pub(crate) fn before_commit(&mut self, mailbox: &mut BlockchainMailbox, fork: &mut Fork) {
         let dispatcher_ref = DispatcherRef::new(self);
         for runtime in self.runtimes.values() {
-            runtime.before_commit(&dispatcher_ref, fork);
-        }
-        // Execute pending dispatcher actions.
-        // TODO Take care about the rollbacks during the actions execution. [ECR-3559]
-        for action in dispatcher_ref.take_actions() {
-            let _ = action.execute(self, fork).map_err(|e| {
-                error!(
-                    "An error occurred while performing the dispatcher action. {}",
-                    e
-                )
-            });
+            runtime.before_commit(&dispatcher_ref, mailbox, fork);
         }
     }
 
     pub(crate) fn after_commit(
         &mut self,
+        mailbox: &mut BlockchainMailbox,
         snapshot: impl AsRef<dyn Snapshot>,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
-        let channel = DispatcherSender::new();
         self.runtimes.values().for_each(|runtime| {
-            runtime.after_commit(&channel, snapshot.as_ref(), &service_keypair, &tx_sender)
+            runtime.after_commit(mailbox, snapshot.as_ref(), &service_keypair, &tx_sender)
         });
-
-        for request in channel.take_deploy_requests() {
-            match self
-                .deploy_artifact(request.artifact.clone(), request.spec.clone())
-                .wait()
-            {
-                Ok(_) => request.completed(),
-                Err(e) => warn!(
-                    "An error during deploy artifact {:?} occurred {:?}",
-                    request.artifact, e
-                ),
-            }
-        }
     }
 
     /// Return additional information about the artifact if it is deployed.
@@ -427,6 +401,7 @@ impl Dispatcher {
     /// Perform a configuration update with the specified changes.
     pub(crate) fn update_config(
         &self,
+        mailbox: &mut BlockchainMailbox,
         fork: &mut Fork,
         caller_instance_id: InstanceId,
         changes: Vec<ConfigChange>,
@@ -453,6 +428,7 @@ impl Dispatcher {
                     let context = CallContext::new(
                         fork,
                         &dispatcher_ref,
+                        mailbox,
                         caller_instance_id,
                         config.instance_id,
                     );
@@ -495,69 +471,9 @@ pub enum Action {
         changes: Vec<ConfigChange>,
     },
 }
-
-impl Action {
-    fn execute(self, dispatcher: &mut Dispatcher, fork: &mut Fork) -> Result<(), ExecutionError> {
-        // TODO Take care about the graceful panics handling during the actions execution. [ECR-3559]
-        catch_panic(|| match self {
-            Action::RegisterArtifact { artifact, spec } => dispatcher
-                .register_artifact(fork, &artifact, spec)
-                .map_err(From::from),
-
-            Action::AddService {
-                artifact,
-                instance_name,
-                config,
-            } => dispatcher
-                .add_service(
-                    fork,
-                    InstanceSpec {
-                        artifact,
-                        name: instance_name,
-                        id: Schema::new(fork as &Fork).assign_instance_id(),
-                    },
-                    config,
-                )
-                .map_err(From::from),
-
-            Action::UpdateConfig {
-                caller_instance_id,
-                changes,
-            } => {
-                dispatcher.update_config(fork, caller_instance_id, changes);
-                Ok(())
-            }
-        })
-    }
-}
-
-struct DeployArtifactRequest {
-    artifact: ArtifactId,
-    spec: Vec<u8>,
-    /// The operation to be performed if this request was successfully processed.
-    and_then: Box<dyn FnOnce() + 'static>,
-}
-
-impl DeployArtifactRequest {
-    /// Invoke request callback.
-    fn completed(self) {
-        (self.and_then)();
-    }
-}
-
-impl std::fmt::Debug for DeployArtifactRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("DeployArtifactRequest")
-            .field(&self.artifact)
-            .finish()
-    }
-}
-
 /// Reference to the underlying runtime dispatcher.
 #[derive(Debug)]
 pub struct DispatcherRef<'a> {
-    /// List of dispatcher actions that will be performed after execution finishes.
-    actions: RefCell<Vec<Action>>,
     /// Reference to the underlying runtime dispatcher.
     inner: &'a Dispatcher,
 }
@@ -565,10 +481,7 @@ pub struct DispatcherRef<'a> {
 impl<'a> DispatcherRef<'a> {
     /// Create a new instance.
     pub(crate) fn new(dispatcher: &'a Dispatcher) -> Self {
-        Self {
-            inner: dispatcher,
-            actions: RefCell::default(),
-        }
+        Self { inner: dispatcher }
     }
 
     /// Call the corresponding runtime method.
@@ -579,64 +492,5 @@ impl<'a> DispatcherRef<'a> {
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         self.inner.call(context, call_info, arguments)
-    }
-
-    pub(crate) fn dispatch_action(&self, caller: InstanceId, action: Action) {
-        assert!(
-            caller == SUPERVISOR_INSTANCE_ID,
-            "Only the supervisor service is allowed to perform dispatcher actions."
-        );
-        self.actions.borrow_mut().push(action);
-    }
-
-    pub(crate) fn take_actions(&self) -> Vec<Action> {
-        self.actions.borrow_mut().drain(..).collect()
-    }
-}
-
-// TODO Implement proper pending deploy logic [ECR-3291]
-
-/// Channel to communicate with the dispatcher.
-#[derive(Debug)]
-pub struct DispatcherSender {
-    deploy_request: RefCell<Vec<DeployArtifactRequest>>,
-}
-
-impl DispatcherSender {
-    /// Create a new instance.
-    fn new() -> Self {
-        Self {
-            deploy_request: RefCell::default(),
-        }
-    }
-
-    /// Request an artifact deployment and invoke the callback if the deployment
-    /// was successfully completed.
-    pub fn request_deploy_artifact<F>(
-        &self,
-        caller: InstanceId,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-        and_then: F,
-    ) where
-        F: FnOnce() + 'static,
-    {
-        assert!(
-            caller == SUPERVISOR_INSTANCE_ID,
-            "Only the supervisor service is allowed to perform dispatcher actions."
-        );
-
-        self.deploy_request
-            .borrow_mut()
-            .push(DeployArtifactRequest {
-                artifact,
-                spec,
-                and_then: Box::new(and_then),
-            })
-    }
-
-    /// Take requests from this channel.
-    fn take_deploy_requests(self) -> Vec<DeployArtifactRequest> {
-        self.deploy_request.into_inner()
     }
 }

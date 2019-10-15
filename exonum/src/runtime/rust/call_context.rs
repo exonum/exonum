@@ -15,7 +15,8 @@
 use exonum_merkledb::{BinaryValue, Fork};
 
 use crate::runtime::{
-    CallInfo, Caller, DispatcherRef, ExecutionContext, ExecutionError, InstanceId, MethodId,
+    BlockchainMailbox, CallInfo, Caller, DispatcherRef, ExecutionContext, ExecutionError,
+    InstanceId, MethodId,
 };
 
 // TODO Write a full documentation when the interservice communications are fully implemented. [ECR-3493]
@@ -30,6 +31,8 @@ pub struct CallContext<'a> {
     fork: &'a Fork,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a DispatcherRef<'a>,
+    /// Reference to the blockchain mailbox.
+    mailbox: &'a BlockchainMailbox,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -39,6 +42,7 @@ impl<'a> CallContext<'a> {
     pub fn new(
         fork: &'a Fork,
         dispatcher: &'a DispatcherRef<'a>,
+        mailbox: &'a BlockchainMailbox,
         caller: InstanceId,
         called: InstanceId,
     ) -> Self {
@@ -47,6 +51,7 @@ impl<'a> CallContext<'a> {
             called,
             fork,
             dispatcher,
+            mailbox,
             call_stack_depth: 0,
         }
     }
@@ -61,6 +66,7 @@ impl<'a> CallContext<'a> {
             caller,
             called,
             fork: inner.fork,
+            mailbox: inner.mailbox,
             dispatcher: inner.dispatcher,
             call_stack_depth: inner.call_stack_depth,
         }
@@ -77,6 +83,7 @@ impl<'a> CallContext<'a> {
         let context = ExecutionContext {
             fork: self.fork,
             dispatcher: self.dispatcher,
+            mailbox: self.mailbox,
             caller: Caller::Service {
                 instance_id: self.caller,
             },

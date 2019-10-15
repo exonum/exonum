@@ -33,6 +33,7 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
+        mailbox::Action,
         rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
@@ -133,10 +134,13 @@ impl TestDispatcherInterface for TestDispatcherService {
             ServiceGoodImpl.artifact_id().into()
         };
 
-        context.dispatch_action(dispatcher::Action::RegisterArtifact {
-            artifact,
-            spec: Vec::new(),
-        });
+        context.request_action(
+            Action::RegisterArtifact {
+                artifact,
+                spec: Vec::new(),
+            },
+            None,
+        );
 
         if arg.value == 42 {
             return Err(dispatcher::Error::UnknownArtifactId.into());
@@ -162,11 +166,14 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        context.dispatch_action(dispatcher::Action::AddService {
-            artifact,
-            instance_name: format!("good-service-{}", arg.value),
-            config,
-        });
+        context.request_action(
+            Action::AddService {
+                artifact,
+                instance_name: format!("good-service-{}", arg.value),
+                config,
+            },
+            None,
+        );
 
         Ok(())
     }

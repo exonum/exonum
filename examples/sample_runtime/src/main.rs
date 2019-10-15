@@ -24,10 +24,11 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
+        dispatcher::{self, DispatcherRef, Error as DispatcherError},
         rust::Transaction,
-        AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceId, InstanceSpec, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, ArtifactProtobufSpec, BlockchainMailbox, CallInfo, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -197,11 +198,17 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _dispatcher: &DispatcherRef,
+        _mailbox: &BlockchainMailbox,
+        _fork: &mut Fork,
+    ) {
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _mailbox: &BlockchainMailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,

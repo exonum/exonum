@@ -24,10 +24,11 @@ use crate::{
     node::ApiSender,
     runtime::{
         api::ServiceApiBuilder,
-        dispatcher::{self, DispatcherRef, DispatcherSender},
+        dispatcher::DispatcherRef,
         error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallInfo, Caller, ConfigChange, ExecutionContext,
-        InstanceDescriptor, InstanceId, MethodId,
+        mailbox::{Action, AfterRequestCompleted},
+        AnyTx, ArtifactProtobufSpec, BlockchainMailbox, CallInfo, Caller, ConfigChange,
+        ExecutionContext, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
@@ -201,11 +202,16 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         })
     }
 
-    /// Enqueue dispatcher action.
-    pub fn dispatch_action(&self, action: dispatcher::Action) {
+    /// Adds a request to the list of pending actions. These changes will be applied immediately
+    /// before the block commit.
+    ///
+    /// Currently only the supervisor service is allowed to perform this action.
+    /// If any other instance will call this method, the request will be ignored.
+    #[doc(hidden)]
+    pub fn request_action(&self, action: Action, and_then: AfterRequestCompleted) {
         self.inner
-            .dispatcher
-            .dispatch_action(self.instance.id, action)
+            .mailbox
+            .add_request(self.instance.id, action, and_then);
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
@@ -250,6 +256,8 @@ pub struct BeforeCommitContext<'a> {
     pub fork: &'a Fork,
     /// Reference to the underlying runtime dispatcher.
     dispatcher: &'a DispatcherRef<'a>,
+    /// Reference to the blockchain mailbox.
+    mailbox: &'a BlockchainMailbox,
 }
 
 impl<'a> BeforeCommitContext<'a> {
@@ -258,18 +266,20 @@ impl<'a> BeforeCommitContext<'a> {
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
         dispatcher: &'a DispatcherRef<'a>,
+        mailbox: &'a BlockchainMailbox,
     ) -> Self {
         Self {
             instance,
             fork,
             dispatcher,
+            mailbox,
         }
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
     #[doc(hidden)]
     /// Create a client to call interface methods of the specified service instance.
-    pub fn interface<T>(&self, called: InstanceId) -> T
+    pub fn interface<T>(&'a self, called: InstanceId) -> T
     where
         T: From<CallContext<'a>>,
     {
@@ -279,23 +289,38 @@ impl<'a> BeforeCommitContext<'a> {
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
     #[doc(hidden)]
     /// Creates a context to call interfaces of the specified service instance.
-    pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
-        CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
+    pub fn call_context(&'a self, called: InstanceId) -> CallContext<'a> {
+        CallContext::new(
+            self.fork,
+            self.dispatcher,
+            self.mailbox,
+            self.instance.id,
+            called,
+        )
+    }
+
+    /// Adds a request to the list of pending actions. These changes will be applied immediately
+    /// before the block commit.
+    ///
+    /// Currently only the supervisor service is allowed to perform this action.
+    /// If any other instance will call this method, the request will be ignored.
+    #[doc(hidden)]
+    pub fn request_action(&self, action: Action, and_then: AfterRequestCompleted) {
+        self.mailbox.add_request(self.instance.id, action, and_then);
     }
 
     /// Adds a configuration update to pending actions. These changes will be applied immediately
     /// before the block commit.
     ///
     /// Only the supervisor service is allowed to perform this action.
+    /// If any other instance will call this method, the request will be ignored.
     #[doc(hidden)]
     pub fn update_config(&self, changes: Vec<ConfigChange>) {
-        self.dispatcher.dispatch_action(
-            self.instance.id,
-            dispatcher::Action::UpdateConfig {
-                caller_instance_id: self.instance.id,
-                changes,
-            },
-        )
+        let action = Action::UpdateConfig {
+            caller_instance_id: self.instance.id,
+            changes,
+        };
+        self.mailbox.add_request(self.instance.id, action, None);
     }
 }
 
@@ -307,8 +332,8 @@ pub struct AfterCommitContext<'a> {
     pub snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
-    /// Channel to communicate with the dispatcher.
-    dispatcher: &'a DispatcherSender,
+    /// Reference to the blockchain mailbox.
+    mailbox: &'a BlockchainMailbox,
     /// Channel to send signed transactions to the transactions pool.
     tx_sender: &'a ApiSender,
 }
@@ -318,12 +343,12 @@ impl<'a> AfterCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
-        dispatcher: &'a DispatcherSender,
+        mailbox: &'a BlockchainMailbox,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            dispatcher,
+            mailbox,
             instance,
             snapshot,
             service_keypair,
@@ -365,9 +390,14 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Returns a communication channel with the dispatcher.
-    pub fn dispatcher_channel(&self) -> &DispatcherSender {
-        self.dispatcher
+    /// Adds a request to the list of pending actions. These changes will be applied immediately
+    /// before the block commit.
+    ///
+    /// Currently only the supervisor service is allowed to perform this action.
+    /// If any other instance will call this method, the request will be ignored.
+    #[doc(hidden)]
+    pub fn request_action(&self, action: Action, and_then: AfterRequestCompleted) {
+        self.mailbox.add_request(self.instance.id, action, and_then);
     }
 
     /// Returns a transaction broadcaster.

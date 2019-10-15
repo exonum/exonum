@@ -14,9 +14,11 @@
 
 //! The module containing interfaces to request changes in the blockchain structure.
 
-pub mod blockchain_secretary;
+mod blockchain_secretary;
 
-use std::collections::HashMap;
+pub use blockchain_secretary::{BlockchainSecretary, MailboxContext};
+
+use std::{cell::RefCell, collections::HashMap};
 
 use crate::runtime::{ArtifactId, ConfigChange, InstanceId, InstanceSpec};
 
@@ -54,7 +56,7 @@ pub type AfterRequestCompleted = Option<Box<dyn FnOnce() + 'static>>;
 /// callback is not called at the some point of time as failed/ignored request.
 #[derive(Default)]
 pub struct BlockchainMailbox {
-    requests: HashMap<InstanceId, (Action, AfterRequestCompleted)>,
+    requests: RefCell<HashMap<InstanceId, (Action, AfterRequestCompleted)>>,
     notifications: Vec<Notification>,
 }
 
@@ -72,24 +74,25 @@ impl BlockchainMailbox {
 
     /// Adds a request for action to the mailbox.
     pub fn add_request(
-        &mut self,
+        &self,
         instance_id: InstanceId,
         action: Action,
         and_then: AfterRequestCompleted,
     ) {
-        self.requests.insert(instance_id, (action, and_then));
+        let mut requests = self.requests.borrow_mut();
+        requests.insert(instance_id, (action, and_then));
     }
 
     /// Adds a notification about completed event to the mailbox.
-    pub fn add_notification(&mut self, notification: Notification) {
+    pub(self) fn add_notification(&mut self, notification: Notification) {
         self.notifications.push(notification);
     }
 
     /// Drains requests from the mailbox.
     pub(self) fn drain_requests(&mut self) -> HashMap<InstanceId, (Action, AfterRequestCompleted)> {
-        let mut requests = HashMap::default();
+        let mut requests = RefCell::new(HashMap::default());
         std::mem::swap(&mut requests, &mut self.requests);
-        requests
+        requests.into_inner()
     }
 
     /// Consumes a mailbox, receiving the notifications about performed actions.

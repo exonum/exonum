@@ -16,7 +16,8 @@ use exonum::{
     blockchain,
     helpers::ValidateInput,
     runtime::{
-        dispatcher::{self, Action},
+        dispatcher::{self},
+        mailbox::Action,
         rust::{interfaces::ConfigureCall, TransactionContext},
         Caller, ConfigChange, DispatcherError, ExecutionError, InstanceSpec,
     },
@@ -332,10 +333,13 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
-            context.dispatch_action(Action::RegisterArtifact {
-                artifact: confirmation.artifact,
-                spec: confirmation.spec,
-            });
+            context.request_action(
+                Action::RegisterArtifact {
+                    artifact: confirmation.artifact,
+                    spec: confirmation.spec,
+                },
+                None,
+            );
         }
 
         Ok(())
@@ -383,11 +387,14 @@ impl SupervisorInterface for Supervisor {
             );
             // We have enough confirmations to add a new service instance,
             // if this action fails this transaction will be canceled.
-            context.dispatch_action(Action::AddService {
-                artifact: service.artifact,
-                instance_name: service.name,
-                config: service.config,
-            })
+            context.request_action(
+                Action::AddService {
+                    artifact: service.artifact,
+                    instance_name: service.name,
+                    config: service.config,
+                },
+                None,
+            )
         }
 
         Ok(())

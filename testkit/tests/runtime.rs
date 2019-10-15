@@ -18,9 +18,8 @@ use exonum::{
     exonum_merkledb::{Fork, Snapshot},
     node::ApiSender,
     runtime::{
-        dispatcher::{DispatcherRef, DispatcherSender},
-        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceSpec,
-        Runtime, StateHashAggregator,
+        dispatcher::DispatcherRef, mailbox::BlockchainMailbox, ArtifactId, ArtifactProtobufSpec,
+        CallInfo, ExecutionContext, ExecutionError, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
 use exonum_testkit::TestKitBuilder;
@@ -145,11 +144,17 @@ impl Runtime for TestRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _dispatcher: &DispatcherRef,
+        _mailbox: &BlockchainMailbox,
+        _fork: &mut Fork,
+    ) {
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _mailbox: &BlockchainMailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,

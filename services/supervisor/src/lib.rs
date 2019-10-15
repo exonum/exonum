@@ -34,6 +34,7 @@ use exonum::{
     helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
+        mailbox::Action,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
         InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
@@ -150,12 +151,8 @@ impl Service for Supervisor {
                     }
                 };
                 // TODO Rewrite on async await syntax. [ECR-3222]
-                context.dispatcher_channel().request_deploy_artifact(
-                    context.instance.id,
-                    artifact,
-                    spec,
-                    and_then,
-                );
+                let action = Action::StartDeploy { artifact, spec };
+                context.request_action(action, Some(Box::new(and_then)));
             })
     }
 }

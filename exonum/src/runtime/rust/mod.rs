@@ -45,10 +45,10 @@ use crate::{
 
 use super::{
     api::{ApiContext, ServiceApiBuilder},
-    dispatcher::{self, DispatcherRef, DispatcherSender},
+    dispatcher::{self, DispatcherRef},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, BlockchainMailbox, CallInfo, ExecutionContext,
+    InstanceDescriptor, InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 mod service;
@@ -343,13 +343,19 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork) {
+    fn before_commit(
+        &self,
+        dispatcher: &DispatcherRef,
+        mailbox: &BlockchainMailbox,
+        fork: &mut Fork,
+    ) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
                 instance.as_ref().before_commit(BeforeCommitContext::new(
                     instance.descriptor(),
                     fork,
                     dispatcher,
+                    mailbox,
                 ));
                 Ok(())
             });
@@ -369,7 +375,7 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
-        dispatcher: &DispatcherSender,
+        mailbox: &BlockchainMailbox,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
@@ -378,7 +384,7 @@ impl Runtime for RustRuntime {
             service.as_ref().after_commit(AfterCommitContext::new(
                 service.descriptor(),
                 snapshot,
-                dispatcher,
+                mailbox,
                 service_keypair,
                 tx_sender,
             ));
