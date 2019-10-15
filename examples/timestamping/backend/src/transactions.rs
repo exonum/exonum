@@ -34,7 +34,7 @@ pub enum Error {
 }
 
 /// Timestamping transaction.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::TxTimestamp")]
 pub struct TxTimestamp {
     /// Timestamp content.
@@ -42,7 +42,7 @@ pub struct TxTimestamp {
 }
 
 /// Timestamping configuration parameters.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::Config")]
 pub struct Config {
     /// Time oracle service name.

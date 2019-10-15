@@ -50,7 +50,7 @@ pub mod schema {
     //
     // [1]: https://exonum.com/doc/version/latest/architecture/serialization
     /// Wallet struct used to persist data within the service.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[exonum(pb = "proto::Wallet")]
     pub struct Wallet {
         /// Public key of the wallet owner.
@@ -130,7 +130,7 @@ pub mod transactions {
     use exonum_proto_derive::ProtobufConvert;
 
     /// Service configuration parameters.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[exonum(pb = "proto::Config")]
     pub struct Config;
 
@@ -138,7 +138,7 @@ pub mod transactions {
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxCreateWallet` transactions are processed.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[exonum(pb = "proto::TxCreateWallet")]
     pub struct TxCreateWallet {
         /// UTF-8 string with the owner's name.
@@ -149,7 +149,7 @@ pub mod transactions {
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxTransfer` transactions are processed.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[exonum(pb = "proto::TxTransfer")]
     pub struct TxTransfer {
         /// Public key of the receiver.

@@ -27,7 +27,7 @@ use exonum_proto_derive::ProtobufConvert;
 use super::proto;
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::DeployRequest")]
 pub struct DeployRequest {
     /// Artifact identifier.
@@ -39,7 +39,7 @@ pub struct DeployRequest {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::DeployConfirmation")]
 pub struct DeployConfirmation {
     /// Artifact identifier.
@@ -51,7 +51,7 @@ pub struct DeployConfirmation {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::StartService")]
 pub struct StartService {
     /// Artifact identifier.
@@ -65,7 +65,7 @@ pub struct StartService {
 }
 
 /// Request for the configuration change
-#[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::ConfigPropose")]
 pub struct ConfigPropose {
     /// The height until which the update configuration procedure should be completed.
@@ -75,7 +75,7 @@ pub struct ConfigPropose {
 }
 
 /// Confirmation vote for the configuration change
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::ConfigVote")]
 pub struct ConfigVote {
     /// Hash of configuration proposition.
@@ -83,7 +83,7 @@ pub struct ConfigVote {
 }
 
 /// Pending config change proposal entry
-#[derive(Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::ConfigProposalWithHash")]
 pub struct ConfigProposalWithHash {
     /// Hash of configuration proposition.

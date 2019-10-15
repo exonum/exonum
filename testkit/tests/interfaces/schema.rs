@@ -17,11 +17,12 @@ use exonum::{
     merkledb::{IndexAccess, MapIndex},
 };
 use exonum_proto_derive::ProtobufConvert;
+use exonum_derive::{BinaryValue, ObjectHash};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::Wallet")]
 pub struct Wallet {
     pub name: String,

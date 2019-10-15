@@ -20,7 +20,7 @@ use exonum_proto_derive::ProtobufConvert;
 use super::proto;
 
 /// Wallet information stored in the database.
-#[derive(Clone, Debug, ProtobufConvert)]
+#[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::Wallet", serde_pb_convert)]
 pub struct Wallet {
     /// `PublicKey` of the wallet.

@@ -36,7 +36,7 @@ mod proto;
 
 // Simple service implementation.
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::TxTimestamp")]
 struct TxTimestamp {
     message: String,

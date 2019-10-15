@@ -28,7 +28,7 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
+use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory, BinaryValue, ObjectHash};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
 use exonum_proto_derive::ProtobufConvert;
 use futures::{Future, IntoFuture};
@@ -81,11 +81,11 @@ impl<'a, T: IndexAccess> CounterSchema<T> {
 
 // // // // Transactions // // // //
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::TxReset")]
 pub struct TxReset;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::TxIncrement")]
 pub struct TxIncrement {
     by: u64,

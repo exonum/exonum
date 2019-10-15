@@ -26,7 +26,7 @@ use exonum_proto_derive::ProtobufConvert;
 
 use super::SimpleSupervisor;
 
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::service::ConfigPropose")]
 pub struct ConfigPropose {
     pub changes: Vec<ConfigChange>,

@@ -141,17 +141,6 @@ pub struct ArtifactId {
     pub name: String,
 }
 
-#[derive(Debug, Clone,  PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
-pub struct ArtifactId {
-    /// Runtime identifier.
-    pub runtime_id: u32,
-    /// Unique artifact name.
-    pub name: String,
-}
-
 impl ArtifactId {
     /// Creates a new artifact identifier from the given runtime id and name
     /// or returns error if the resulting artifact id is not correct.

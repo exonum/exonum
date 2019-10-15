@@ -29,7 +29,7 @@ pub enum Error {
 }
 
 /// Transaction that is sent by the validator after the commit of the block.
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::TxTime")]
 pub struct TxTime {
     /// Time of the validator.

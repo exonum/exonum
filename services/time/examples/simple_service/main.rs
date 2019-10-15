@@ -86,7 +86,7 @@ impl<'a, T: IndexAccess> MarkerSchema<'a, T> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "proto::TxMarker")]
 /// Transaction, which must be executed no later than the specified time (field `time`).
 pub struct TxMarker {

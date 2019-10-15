@@ -108,7 +108,7 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash, BinaryValue, ObjectHash)]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::tests::TestProtobufConvertRepeated", crate = "crate")]
 struct StructWithRepeatedTypes {
     keys: Vec<PublicKey>,
@@ -138,7 +138,7 @@ fn test_repeated_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, rep_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::tests::TestProtobufConvertMap", crate = "crate")]
 struct StructWithMaps {
     num_map: HashMap<u32, u64>,
@@ -179,7 +179,7 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, ProtobufConvert)]
+#[derive(Clone, Copy, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
 struct StructWithFixedArrays {
     fixed_array_8: [u8; 8],
