@@ -28,8 +28,9 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
+use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
+use exonum_proto_derive::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};

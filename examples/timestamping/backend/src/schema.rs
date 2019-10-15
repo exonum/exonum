@@ -17,6 +17,7 @@
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_proto_derive::ProtobufConvert;
 
 use crate::{proto, transactions::Config};
 

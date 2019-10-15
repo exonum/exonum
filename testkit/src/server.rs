@@ -160,6 +160,7 @@ mod tests {
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
+    use exonum_proto_derive::ProtobufConvert;
 
     use crate::{InstanceCollection, TestKitApi, TestKitBuilder};
 

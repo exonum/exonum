@@ -25,6 +25,7 @@ use exonum::{
     },
 };
 use exonum_merkledb::{Snapshot, TemporaryDB};
+use exonum_proto_derive::ProtobufConvert;
 
 use std::{
     net::SocketAddr,

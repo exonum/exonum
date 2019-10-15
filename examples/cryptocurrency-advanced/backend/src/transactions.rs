@@ -15,6 +15,7 @@
 //! Cryptocurrency transactions.
 
 use exonum::{crypto::PublicKey, runtime::rust::TransactionContext};
+use exonum_proto_derive::ProtobufConvert;
 
 use super::{proto, schema::Schema, CryptocurrencyService};
 

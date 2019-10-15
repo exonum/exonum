@@ -22,7 +22,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, ConfigChange, InstanceId, ServiceConfig},
 };
-use exonum_derive::ProtobufConvert;
+use exonum_proto_derive::ProtobufConvert;
 
 use super::SimpleSupervisor;
 

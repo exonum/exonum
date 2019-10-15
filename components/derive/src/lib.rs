@@ -20,9 +20,9 @@
 
 extern crate proc_macro;
 
+mod db_traits;
 mod execution_error;
 mod exonum_service;
-mod pb_convert;
 mod service_factory;
 
 use darling::FromMeta;
@@ -30,46 +30,14 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
-/// Derive `ProtobufConvert` trait.
-///
-/// Attributes:
-///
-/// ## Required
-///
-/// * `#[exonum(pb = "path")]`
-///
-/// Path is the name of the corresponding protobuf generated struct.
-///
-/// ## Optional
-///
-/// * `#[exonum(crate = "path")]`
-///
-/// Prefix of the `exonum` crate(usually "crate" or "exonum").
-///
-/// * `#[exonum(serde_pb_convert)]`
-///
-/// Implement `serde::{Serialize, Deserialize}` using structs that were generated with
-/// protobuf.
-/// For example, it should be used if you want json representation of your struct
-/// to be compatible with protobuf representation (including proper nesting of fields).
-/// ```text
-/// For example, struct with `exonum::crypto::Hash` with this
-/// (de)serializer will be represented as
-/// StructName {
-///     "hash": {
-///         data: [1, 2, ...]
-///     },
-///     // ...
-/// }
-/// // With default (de)serializer.
-/// StructName {
-///     "hash": "12af..." // HEX
-///     // ...
-/// }
-/// ```
-#[proc_macro_derive(ProtobufConvert, attributes(exonum))]
-pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
-    pb_convert::implement_protobuf_convert(input)
+#[proc_macro_derive(BinaryValue)]
+pub fn binary_value(input: TokenStream) -> TokenStream {
+    db_traits::binary_value(input)
+}
+
+#[proc_macro_derive(ObjectHash)]
+pub fn object_hash(input: TokenStream) -> TokenStream {
+    db_traits::object_hash(input)
 }
 
 /// Derive `ServiceFactory` and `ServiceDispatcher` traits.

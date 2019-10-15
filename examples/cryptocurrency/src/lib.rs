@@ -41,6 +41,7 @@ pub mod proto;
 pub mod schema {
     use exonum::crypto::{Hash, PublicKey};
     use exonum_merkledb::{IndexAccess, MapIndex};
+    use exonum_proto_derive::ProtobufConvert;
 
     use super::proto;
 
@@ -126,6 +127,7 @@ pub mod transactions {
     use exonum::crypto::PublicKey;
 
     use super::proto;
+    use exonum_proto_derive::ProtobufConvert;
 
     /// Service configuration parameters.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]

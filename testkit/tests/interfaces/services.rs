@@ -23,8 +23,9 @@ use exonum::{
         CallInfo, Caller, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
+use exonum_derive::{exonum_service, ServiceFactory};
 use exonum_merkledb::Snapshot;
+use exonum_proto_derive::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::{

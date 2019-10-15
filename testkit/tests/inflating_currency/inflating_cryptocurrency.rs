@@ -22,8 +22,9 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
+use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
 use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
+use exonum_proto_derive::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use super::proto;

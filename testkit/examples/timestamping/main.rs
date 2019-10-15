@@ -29,6 +29,7 @@ use exonum::{
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_proto_derive::ProtobufConvert;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
 
 mod proto;

@@ -15,5 +15,7 @@ members = [
     "components/derive",
     "components/merkledb",
     "components/proto",
+    "components/proto-derive",
+    "components/derive-test",
 ]
 exclude = [ "exonum/fuzz" ]

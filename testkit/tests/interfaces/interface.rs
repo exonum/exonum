@@ -21,7 +21,8 @@ use exonum::{
         CallContext, ExecutionError,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert};
+use exonum_derive::exonum_service;
+use exonum_proto_derive::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto;

@@ -22,6 +22,8 @@ use exonum::{
     runtime::{ArtifactId, ConfigChange},
 };
 
+use exonum_proto_derive::ProtobufConvert;
+
 use super::proto;
 
 /// Request for the artifact deployment.

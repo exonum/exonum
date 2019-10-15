@@ -23,8 +23,9 @@ use exonum::{
         DispatcherError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
+use exonum_derive::{exonum_service, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
+use exonum_proto_derive::ProtobufConvert;
 
 use crate::proto;
 

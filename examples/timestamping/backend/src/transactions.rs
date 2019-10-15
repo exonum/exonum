@@ -15,6 +15,7 @@
 //! Timestamping transactions.
 
 use exonum::runtime::rust::TransactionContext;
+use exonum_proto_derive::ProtobufConvert;
 use exonum_time::schema::TimeSchema;
 
 use crate::{
