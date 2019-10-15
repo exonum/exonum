@@ -36,7 +36,7 @@ use super::{Action, AfterRequestCompleted, BlockchainMailbox, Notification};
 /// if `MailboxContext` is the `TxExecution`, then any failure appeared during
 /// processing will be reported (so blockchain core will be able to revert the transaction).
 /// Otherwise any failure will be simply ignored.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MailboxContext {
     /// Mailbox processing happening during the transaction execution process.
     TxExecution(CallInfo),
@@ -48,38 +48,46 @@ pub enum MailboxContext {
 /// from services to `Blockchain`, and delegating the allowed actions to the dispatcher.
 /// Also `BlockchainSecretary` creates notifications for `Blockchain` about performed actions
 /// so `Blockchain` will be able to do any follow-up things if they are needed.
-pub struct BlockchainSecretary<'a> {
+pub struct BlockchainSecretary {
     context: MailboxContext,
-    fork: Option<&'a mut Fork>,
 }
 
-impl<'a> BlockchainSecretary<'a> {
-    pub fn new(context: MailboxContext, fork: Option<&'a mut Fork>) -> Self {
-        Self { context, fork }
+/// Enum denoting the result of authorization process.
+enum AuthoriziationResult {
+    /// Author of the request is authorized to request changes.
+    Valid,
+    /// Author of the request is not authorized, but we can safely
+    /// just skip this request.
+    ShouldSkip,
+    /// Author of the request is not authorized and request processing
+    /// should be stopped.
+    AbortProcessing(ExecutionError),
+}
+
+impl BlockchainSecretary {
+    /// Creates a new `BlockchainSecretary` instance.
+    pub fn new(context: MailboxContext) -> Self {
+        Self { context }
     }
 
-    pub fn process_requests(
-        &self,
-        mailbox: &mut BlockchainMailbox,
-        dispatcher: &mut Dispatcher,
-    ) -> Result<(), ExecutionError> {
+    /// Processes requests within immutable context.
+    /// Since any failures won't affect the blockchain state, they are simply ignored.
+    pub fn process_requests(&self, mailbox: &mut BlockchainMailbox, dispatcher: &mut Dispatcher) {
         for (request_initiator, (request, and_then)) in mailbox.drain_requests() {
-            let authorized_access = self.verify_caller(request_initiator)?;
+            let authorized_access = self.verify_caller(request_initiator);
 
             // Ignore unauthorized requests.
-            if !authorized_access {
-                continue;
+            if let AuthoriziationResult::Valid = authorized_access {
+                // Requests within an immutable context are considered independent
+                // so we don't care about the result.
+                let _result = self.process_request(mailbox, dispatcher, None, request, and_then);
             }
-
-            // TODO should we exit early on first error?
-            // Since there is no more than one action per instance, we should just collect
-            // results.
-            self.process_request(mailbox, dispatcher, None, request, and_then)?;
         }
-
-        Ok(())
     }
 
+    /// Processes requests within mutable context.
+    /// Depending on the mailbox context, failure of request execution
+    /// may lead to the stop of the whole processing process.
     pub fn process_requests_mut(
         &self,
         mailbox: &mut BlockchainMailbox,
@@ -87,18 +95,71 @@ impl<'a> BlockchainSecretary<'a> {
         fork: &mut Fork,
     ) -> Result<(), ExecutionError> {
         for (request_initiator, (request, and_then)) in mailbox.drain_requests() {
-            let authorized_access = self.verify_caller(request_initiator)?;
+            // `verify_caller` will return `Err` only if requests processing
+            // should be stopped.
+            let authorized_access = self.verify_caller(request_initiator);
 
-            // Ignore unauthorized requests.
-            if !authorized_access {
-                continue;
+            match authorized_access {
+                // We should stop. Revert changes and return an error.
+                // Rolling back the fork is up to caller.
+                AuthoriziationResult::AbortProcessing(err) => return Err(err),
+                // We should skip only that one request.
+                AuthoriziationResult::ShouldSkip => continue,
+                // We're ok, continue processing.
+                AuthoriziationResult::Valid => {}
             }
 
-            // TODO should we exit early on first error?
-            self.process_request(mailbox, dispatcher, Some(fork), request, and_then)?;
+            let result =
+                self.process_request(mailbox, dispatcher, Some(fork), request.clone(), and_then);
+
+            match result {
+                Ok(_) => {
+                    self.flush_if_needed(fork);
+                    trace!("Successfully completed request {:?}", request);
+                }
+                Err(err) => {
+                    // Cancel any changes occured during the errored request.
+                    fork.rollback();
+
+                    trace!(
+                        "Error occured during request {:?} within context {:?}",
+                        request,
+                        self.context
+                    );
+                    self.check_if_should_stop(err)?;
+                }
+            }
         }
 
         Ok(())
+    }
+
+    /// Depending on the context of the mailbox flush the fork if needed:
+    /// if requests are independent, we should flush the fork after each request,
+    /// so failure of one request won't affect others.
+    fn flush_if_needed(&self, fork: &mut Fork) {
+        if let MailboxContext::NoTx = self.context {
+            fork.flush();
+        }
+    }
+
+    /// Depending on the context of the mailbox decides if we should stop processing
+    /// requests or can continue.
+    fn check_if_should_stop(&self, err: ExecutionError) -> Result<(), ExecutionError> {
+        match self.context {
+            MailboxContext::TxExecution(_) => {
+                // Requests created within transaction execution process are considered
+                // highly tied (since multiple requests are possible only if one service
+                // called transaction of other service, and both of them requested an action),
+                // so failure of the one means failure of others too.
+                Err(err)
+            }
+            _ => {
+                // If this is not a transaction execution context (e.g. `before_commit`),
+                // requests are considered independent, so we can safely skip failed one.
+                Ok(())
+            }
+        }
     }
 
     fn process_request(
@@ -175,29 +236,36 @@ impl<'a> BlockchainSecretary<'a> {
     }
 
     /// Checks if caller has sufficient rights to perform request.
-    /// If context is `TxExecution` then unauthorized request is considered
-    /// an error and `Err` will be returned.
-    /// Otherwise unauthorized access will result in `Ok(false)`.
-    fn verify_caller(&self, initiator: InstanceId) -> Result<bool, ExecutionError> {
+    fn verify_caller(&self, initiator: InstanceId) -> AuthoriziationResult {
         let authorized_access = is_authorized_for_requests(initiator);
 
+        // In the transaction execution context unauthorized access is an error.
         if let MailboxContext::TxExecution(ref call_info) = self.context {
             if call_info.instance_id != initiator {
-                return Err(DispatcherError::FakeInitiator.into());
+                return AuthoriziationResult::AbortProcessing(
+                    DispatcherError::FakeInitiator.into(),
+                );
             }
 
             if !authorized_access {
-                return Err(DispatcherError::UnauthorizedCaller.into());
+                return AuthoriziationResult::AbortProcessing(
+                    DispatcherError::UnauthorizedCaller.into(),
+                );
             }
         }
 
-        Ok(authorized_access)
+        if authorized_access {
+            AuthoriziationResult::Valid
+        } else {
+            AuthoriziationResult::ShouldSkip
+        }
     }
 }
 
 /// Internal function encapsulating the check for service
 /// to have sufficient rights to request actions from the blockchain.
 fn is_authorized_for_requests(instance_id: InstanceId) -> bool {
+    // Currently, only Supervisor service is authorized to request changes.
     instance_id == crate::runtime::SUPERVISOR_INSTANCE_ID
 }
 

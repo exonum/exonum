@@ -46,6 +46,15 @@ pub type AfterRequestCompleted = Option<Box<dyn FnOnce() + 'static>>;
 ///
 /// Thus, it's highly recommended for runtimes to create a proxy entity and manage creating
 /// requests manually.
+///
+/// **Policy on request failures:**
+///
+/// Services **will not** be notified if request was failed or ignored. So it's up to the service
+/// implementors to build the logic in such a way that lack of result will not break the service
+/// state.
+///
+/// Services are able to provide `AfterRequestCompleted` callback and consider the situation when
+/// callback is not called at the some point of time as failed/ignored request.
 #[derive(Default)]
 pub struct BlockchainMailbox {
     requests: HashMap<InstanceId, (Action, AfterRequestCompleted)>,
@@ -92,15 +101,20 @@ impl BlockchainMailbox {
     }
 }
 
-#[derive(Debug)]
+/// Internal notification for blockchain core about actions happened during the
+/// mailbox processing.
+#[derive(Debug, Clone)]
 pub enum Notification {
-    ArtifactDeployed {
-        artifact: ArtifactId,
-    },
+    /// Notification about adding a deployed artifact into some runtime.
+    ArtifactDeployed { artifact: ArtifactId },
+    /// Notifiaction about instance added into some runtime.
     InstanceStarted {
         instance: InstanceSpec,
         part_of_core_api: bool,
     },
+    /// Notification about instance removed from some runtime.
+    /// Currently not used (since `Runtime::stop` method was removed) and
+    /// can not be emitted.
     InstanceRemoved {
         instance: InstanceSpec,
         part_of_core_api: bool,
@@ -108,7 +122,7 @@ pub enum Notification {
 }
 
 /// Enum denoting a request to perform a change in the Exonum blockchain structure.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Action {
     /// Request to start artifact deployment process.
     StartDeploy { artifact: ArtifactId, spec: Vec<u8> },
