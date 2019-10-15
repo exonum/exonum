@@ -398,8 +398,8 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             self, dispatcher,
-            rust::{Interface, Service, Transaction, TransactionContext},
-            AnyTx, CallContext, InstanceDescriptor, InstanceId, MethodId,
+            rust::{CallContext, Interface, Service, Transaction, TransactionContext},
+            AnyTx, InstanceDescriptor, InstanceId, MethodId,
         },
     };
     use exonum_merkledb::Snapshot;

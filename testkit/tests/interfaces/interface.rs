@@ -17,8 +17,8 @@
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{Interface, TransactionContext},
-        CallContext, ExecutionError,
+        rust::{CallContext, Interface, TransactionContext},
+        ExecutionError,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert};
