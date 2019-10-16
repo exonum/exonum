@@ -17,6 +17,7 @@ use std::env;
 use exonum_build::ProtobufGenerator;
 
 fn main() {
+    #[cfg(feature = "with-protobuf")]
     gen_proto_files();
 }
 
@@ -31,6 +32,3 @@ fn gen_proto_files() {
         .add_path("src/proto")
         .generate();
 }
-
-#[cfg(not(feature = "with-protobuf"))]
-fn gen_proto_files() {}

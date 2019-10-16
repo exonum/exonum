@@ -19,6 +19,7 @@ use exonum::{
     blockchain::{BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
+    keys::Keys,
     merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
@@ -33,7 +34,6 @@ use exonum_derive::IntoExecutionError;
 use exonum_supervisor::{DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
-use exonum::keys::Keys;
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},

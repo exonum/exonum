@@ -67,6 +67,7 @@ extern crate lazy_static;
 extern crate test;
 
 pub use exonum_crypto as crypto;
+pub use exonum_keys as keys;
 pub use exonum_merkledb as merkledb;
 
 #[macro_use]
@@ -81,8 +82,6 @@ pub mod api;
 #[doc(hidden)]
 pub mod events;
 pub mod explorer;
-#[doc(hidden)]
-pub mod keys;
 pub mod node;
 #[macro_use]
 pub mod runtime;

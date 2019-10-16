@@ -37,7 +37,6 @@ exonum-proto = { version = "0.12.0", path = "../components/proto" }
 exonum-proto-derive = { version = "0.12.0", path = "../components/proto-derive"}
 exonum-crypto = { path="../components/crypto", version="0.12.0" }
 
-
 [dev-dependencies]
 hex = "0.4"
 rand = "0.7"

@@ -22,7 +22,10 @@ use exonum::{
 use exonum_merkledb::ObjectHash;
 use failure::Fail;
 
-use super::{DeployRequest, StartService};
+use super::{
+    schema::Schema, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest, StartService,
+};
+use exonum::blockchain::{ConsensusConfig, Schema as CoreSchema};
 
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {
@@ -34,6 +37,21 @@ pub trait PrivateApi {
     /// Creates and broadcasts the `StartService` transaction, which is signed
     /// by the current node, and returns its hash.
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
+    /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
+    /// by the current node, and returns its hash.
+    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error>;
+    /// Creates and broadcasts the `ConfigVote` transaction, which is signed
+    /// by the current node, and returns its hash.
+    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
+}
+
+pub trait PublicApi {
+    /// Error type for the current API implementation.
+    type Error: Fail;
+    /// Returns an actual consensus configuration of the blockchain.
+    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
+    /// Returns an pending propose config change.
+    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
 }
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
@@ -59,6 +77,28 @@ impl PrivateApi for ApiImpl<'_> {
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error> {
         self.broadcast_transaction(service).map_err(From::from)
     }
+
+    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
+        self.broadcast_transaction(proposal).map_err(From::from)
+    }
+
+    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
+        self.broadcast_transaction(vote).map_err(From::from)
+    }
+}
+
+impl PublicApi for ApiImpl<'_> {
+    type Error = api::Error;
+
+    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
+        Ok(CoreSchema::new(self.0.snapshot()).consensus_config())
+    }
+
+    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
+        Ok(Schema::new(self.0.instance.name, self.0.snapshot())
+            .pending_proposal()
+            .get())
+    }
 }
 
 pub fn wire(builder: &mut ServiceApiBuilder) {
@@ -69,5 +109,19 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         })
         .endpoint_mut("start-service", |state, query| {
             ApiImpl(state).start_service(query)
+        })
+        .endpoint_mut("propose-config", |state, query| {
+            ApiImpl(state).propose_config(query)
+        })
+        .endpoint_mut("confirm-config", |state, query| {
+            ApiImpl(state).confirm_config(query)
+        });
+    builder
+        .public_scope()
+        .endpoint("consensus-config", |state, _query: ()| {
+            ApiImpl(state).consensus_config()
+        })
+        .endpoint("config-proposal", |state, _query: ()| {
+            ApiImpl(state).config_proposal()
         });
 }

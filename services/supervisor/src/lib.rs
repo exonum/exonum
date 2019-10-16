@@ -14,21 +14,19 @@
 
 #[macro_use]
 extern crate exonum_derive;
-extern crate exonum;
 #[macro_use]
 extern crate log;
-extern crate exonum_proto;
 #[macro_use]
 extern crate exonum_merkledb;
 
 pub use self::{
     errors::Error,
     proto_structures::{
-        ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, StartService,
+        ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest,
+        StartService,
     },
     schema::Schema,
 };
-pub(crate) use proto_structures::ConfigProposalWithHash;
 
 use exonum::{
     blockchain::{self, InstanceCollection},
