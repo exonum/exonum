@@ -40,7 +40,7 @@ use crate::{
     BinaryValue,
     ObjectHash,
 )]
-#[exonum(pb = "proto::Block", crate = "crate")]
+#[exonum(pb = "proto::Block")]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.
     pub proposer_id: ValidatorId,

@@ -388,36 +388,6 @@ impl ProtobufConvert {
         }
     }
 
-    fn implement_merkledb_traits(&self) -> impl ToTokens {
-        let name = self.name();
-        let cr = self.cr();
-
-        quote! {
-            impl exonum_merkledb::ObjectHash for #name {
-                fn object_hash(&self) -> #cr::crypto::Hash {
-                    use exonum_merkledb::BinaryValue;
-                    let v = self.to_bytes();
-                    #cr::crypto::hash(&v)
-                }
-            }
-
-            // This trait assumes that we work with trusted data so we can unwrap here.
-            impl exonum_merkledb::BinaryValue for #name {
-                fn to_bytes(&self) -> Vec<u8> {
-                    self.to_pb().write_to_bytes().expect(
-                        concat!("Failed to serialize in BinaryValue for ", stringify!(#name))
-                    )
-                }
-
-                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
-                    let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
-                    block.merge_from_bytes(value.as_ref())?;
-                    ProtobufConvert::from_pb(block)
-                }
-            }
-        }
-    }
-
     fn implement_serde_protobuf_convert(&self) -> impl ToTokens {
         let name = self.name();
         quote! {

@@ -35,19 +35,19 @@ const SERVICE_INSTANCE_ID: InstanceId = 2;
 const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
 #[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceInit", crate = "crate")]
+#[exonum(pb = "TestServiceInit")]
 pub struct Init {
     msg: String,
 }
 
 #[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[exonum(pb = "TestServiceTx")]
 struct TxA {
     value: u64,
 }
 
 #[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[exonum(pb = "TestServiceTx")]
 struct TxB {
     value: u64,
 }

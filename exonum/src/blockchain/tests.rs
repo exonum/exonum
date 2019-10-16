@@ -42,25 +42,25 @@ const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[exonum(pb = "TestServiceTx")]
 struct TestExecute {
     value: u64,
 }
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[exonum(pb = "TestServiceTx")]
 struct TestDeploy {
     value: u64,
 }
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[exonum(pb = "TestServiceTx")]
 struct TestAdd {
     value: u64,
 }
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[exonum(pb = "TestServiceTx")]
 struct TestCallInitialize {
     value: u64,
 }
@@ -269,7 +269,7 @@ lazy_static! {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[exonum(pb = "TestServiceTx")]
 struct TxResult {
     value: u64,
 }

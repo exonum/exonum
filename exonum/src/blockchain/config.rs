@@ -34,7 +34,7 @@ use crate::{
 /// `consensus_key` is used for internal operations in the consensus process,
 /// while the `service_key` is used in services.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(crate = "crate", pb = "blockchain::ValidatorKeys")]
+#[exonum(pb = "blockchain::ValidatorKeys")]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
@@ -79,7 +79,7 @@ impl ValidateInput for ValidatorKeys {
     BinaryValue,
     ObjectHash,
 )]
-#[exonum(crate = "crate", pb = "blockchain::Config")]
+#[exonum(pb = "blockchain::Config")]
 pub struct ConsensusConfig {
     /// List of validators public keys.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

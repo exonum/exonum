@@ -30,7 +30,7 @@ fn test_date_time_pb_convert() {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::Point", crate = "crate")]
+#[exonum(pb = "schema::tests::Point")]
 struct Point {
     x: u32,
     y: u32,
@@ -50,7 +50,7 @@ fn test_simple_struct_round_trip() {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestProtobufConvert", crate = "crate")]
+#[exonum(pb = "schema::tests::TestProtobufConvert")]
 struct StructWithScalarTypes {
     key: PublicKey,
     hash: Hash,
@@ -109,7 +109,7 @@ fn test_scalar_struct_round_trip() {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestProtobufConvertRepeated", crate = "crate")]
+#[exonum(pb = "schema::tests::TestProtobufConvertRepeated")]
 struct StructWithRepeatedTypes {
     keys: Vec<PublicKey>,
     bytes_array: Vec<Vec<u8>>,
@@ -180,7 +180,7 @@ fn test_struct_with_maps_roundtrip() {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
+#[exonum(pb = "schema::tests::TestFixedArrays")]
 struct StructWithFixedArrays {
     fixed_array_8: [u8; 8],
     fixed_array_16: [u8; 16],
