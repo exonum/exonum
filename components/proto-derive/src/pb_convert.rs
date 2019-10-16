@@ -21,13 +21,11 @@ use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Fields, Path, Type
 
 use std::convert::TryFrom;
 
-use super::{find_exonum_meta, CratePath};
+use super::find_exonum_meta;
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ProtobufConvertStructAttrs {
-    #[darling(rename = "crate")]
-    cr: CratePath,
     pb: Option<Path>,
     serde_pb_convert: bool,
 }
@@ -35,7 +33,6 @@ struct ProtobufConvertStructAttrs {
 impl Default for ProtobufConvertStructAttrs {
     fn default() -> Self {
         Self {
-            cr: CratePath::default(),
             pb: None,
             serde_pb_convert: false,
         }
@@ -55,8 +52,6 @@ impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ProtobufConvertEnumAttrs {
-    #[darling(rename = "crate")]
-    cr: CratePath,
     pb: Option<Path>,
     serde_pb_convert: bool,
     oneof_field: Ident,
@@ -65,7 +60,6 @@ struct ProtobufConvertEnumAttrs {
 impl Default for ProtobufConvertEnumAttrs {
     fn default() -> Self {
         Self {
-            cr: CratePath::default(),
             pb: None,
             oneof_field: syn::parse_str("message").unwrap(),
             serde_pb_convert: false,

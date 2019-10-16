@@ -119,6 +119,7 @@ mod timestamping {
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
+    use exonum_proto_derive::ProtobufConvert;
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -171,13 +172,13 @@ mod timestamping {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
     #[exonum(pb = "proto::TimestampTx")]
     pub struct Tx {
         data: Hash,
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
     #[exonum(pb = "proto::TimestampTx")]
     pub struct PanickingTx {
         data: Hash,
@@ -215,6 +216,7 @@ mod cryptocurrency {
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
+    use exonum_proto_derive::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
     use super::gen_keypair_from_rng;
@@ -321,7 +323,7 @@ mod cryptocurrency {
     }
 
     /// Transfers one unit of currency from `from` to `to`.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
     #[exonum(pb = "proto::CurrencyTx")]
     pub struct Tx {
         to: PublicKey,
@@ -329,7 +331,7 @@ mod cryptocurrency {
     }
 
     /// Same as `Tx`, but without cryptographic proofs in `execute`.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
     #[exonum(pb = "proto::CurrencyTx")]
     pub struct SimpleTx {
         to: PublicKey,
@@ -337,7 +339,7 @@ mod cryptocurrency {
     }
 
     /// Same as `SimpleTx`, but signals an error 50% of the time.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
     #[exonum(pb = "proto::CurrencyTx")]
     pub struct RollbackTx {
         to: PublicKey,
@@ -403,6 +405,7 @@ mod foreign_interface_call {
         },
     };
     use exonum_merkledb::Snapshot;
+    use exonum_proto_derive::ProtobufConvert;
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -411,13 +414,13 @@ mod foreign_interface_call {
     const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
     const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
     #[exonum(pb = "proto::TimestampTx")]
     pub struct SelfTx {
         data: Hash,
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
     #[exonum(pb = "proto::TimestampTx")]
     pub struct ForeignTx {
         data: Hash,

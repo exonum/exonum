@@ -133,14 +133,14 @@ impl AnyTx {
 #[derive(
     Debug,
     Clone,
-    ProtobufConvert,
-    Serialize,
-    Deserialize,
     PartialEq,
     Eq,
     Hash,
     PartialOrd,
     Ord,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
     BinaryValue,
     ObjectHash,
 )]
@@ -241,7 +241,7 @@ impl FromStr for ArtifactId {
     BinaryValue,
     ObjectHash,
 )]
-#[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
+#[exonum(pb = "schema::runtime::InstanceSpec")]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///

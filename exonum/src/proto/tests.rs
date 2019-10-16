@@ -139,7 +139,7 @@ fn test_repeated_struct_round_trip() {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestProtobufConvertMap", crate = "crate")]
+#[exonum(pb = "schema::tests::TestProtobufConvertMap")]
 struct StructWithMaps {
     num_map: HashMap<u32, u64>,
     string_map: HashMap<u32, String>,

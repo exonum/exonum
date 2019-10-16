@@ -237,7 +237,7 @@ impl Propose {
 /// A node broadcasts `Prevote` in response to `Propose` when it has
 /// received all the transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::Prevote", crate = "crate")]
+#[exonum(pb = "consensus::Prevote")]
 pub struct Prevote {
     /// The validator id.
     pub validator: ValidatorId,
@@ -488,7 +488,7 @@ impl TransactionsResponse {
 /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::ProposeRequest", crate = "crate")]
+#[exonum(pb = "consensus::ProposeRequest")]
 pub struct ProposeRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -660,7 +660,7 @@ impl PrevotesRequest {
 /// `PeersRequest` message is sent regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::peers_timeout`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::PeersRequest", crate = "crate")]
+#[exonum(pb = "consensus::PeersRequest")]
 pub struct PeersRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
