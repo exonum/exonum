@@ -199,7 +199,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     }
 
     /// Returns a reference to the communication channel between supervisor and blockchain core.
-    pub fn communication_channel(&self) -> &CommunicationChannel<()> {
+    pub fn communication_channel(&self) -> &CommunicationChannel {
         self.inner.communication_channel
     }
 
@@ -244,7 +244,7 @@ pub struct BeforeCommitContext<'a> {
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
     /// Reference to the communication channel.
-    communication_channel: &'a CommunicationChannel<'a, ()>,
+    communication_channel: &'a CommunicationChannel<'a>,
 }
 
 impl<'a> BeforeCommitContext<'a> {
@@ -252,7 +252,7 @@ impl<'a> BeforeCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
-        communication_channel: &'a CommunicationChannel<'a, ()>,
+        communication_channel: &'a CommunicationChannel<'a>,
     ) -> Self {
         Self {
             instance,
@@ -284,7 +284,7 @@ impl<'a> BeforeCommitContext<'a> {
     }
 
     /// Returns a reference to the communication channel between supervisor and blockchain core.
-    pub fn communication_channel(&self) -> &CommunicationChannel<()> {
+    pub fn communication_channel(&self) -> &CommunicationChannel {
         self.communication_channel
     }
 }
@@ -298,7 +298,7 @@ pub struct AfterCommitContext<'a> {
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
     /// Reference to the communication channel.
-    communication_channel: &'a CommunicationChannel<'a, ()>,
+    communication_channel: &'a CommunicationChannel<'a>,
     /// Channel to send signed transactions to the transactions pool.
     tx_sender: &'a ApiSender,
 }
@@ -308,7 +308,7 @@ impl<'a> AfterCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
-        communication_channel: &'a CommunicationChannel<'a, ()>,
+        communication_channel: &'a CommunicationChannel<'a>,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
@@ -356,7 +356,7 @@ impl<'a> AfterCommitContext<'a> {
     }
 
     /// Returns a reference to the communication channel between supervisor and blockchain core.
-    pub fn communication_channel(&self) -> &CommunicationChannel<()> {
+    pub fn communication_channel(&self) -> &CommunicationChannel {
         self.communication_channel
     }
 

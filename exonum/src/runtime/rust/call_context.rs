@@ -29,7 +29,7 @@ pub struct CallContext<'a> {
     /// The current state of the blockchain.
     fork: &'a Fork,
     /// Reference to the communication channel.
-    communication_channel: &'a CommunicationChannel<'a, ()>,
+    communication_channel: &'a CommunicationChannel<'a>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -38,7 +38,7 @@ impl<'a> CallContext<'a> {
     /// Create a new call context.
     pub fn new(
         fork: &'a Fork,
-        communication_channel: &'a CommunicationChannel<'a, ()>,
+        communication_channel: &'a CommunicationChannel<'a>,
         caller: InstanceId,
         called: InstanceId,
     ) -> Self {

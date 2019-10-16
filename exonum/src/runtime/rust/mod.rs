@@ -343,7 +343,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, communication_channel: &CommunicationChannel<()>, fork: &mut Fork) {
+    fn before_commit(&self, communication_channel: &CommunicationChannel, fork: &mut Fork) {
         for instance in self.started_services.values() {
             let result = catch_panic(|| {
                 instance.as_ref().before_commit(BeforeCommitContext::new(
@@ -369,7 +369,7 @@ impl Runtime for RustRuntime {
 
     fn after_commit(
         &self,
-        communication_channel: &CommunicationChannel<()>,
+        communication_channel: &CommunicationChannel,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,

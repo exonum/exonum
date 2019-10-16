@@ -21,7 +21,7 @@ use crate::runtime::{
 pub trait SupervisorAccess {}
 
 #[derive(Debug)]
-pub struct CommunicationChannel<'a, T> {
+pub struct CommunicationChannel<'a, T = ()> {
     dispatcher: &'a Dispatcher,
     pub(crate) mailbox: &'a BlockchainMailbox,
     phantom: std::marker::PhantomData<T>,

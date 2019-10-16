@@ -264,7 +264,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, communication_channel: &CommunicationChannel<()>, fork: &mut Fork);
+    fn before_commit(&self, communication_channel: &CommunicationChannel, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -274,7 +274,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// them into the log.
     fn after_commit(
         &self,
-        communication_channel: &CommunicationChannel<()>,
+        communication_channel: &CommunicationChannel,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
@@ -422,7 +422,7 @@ pub struct ExecutionContext<'a> {
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
     /// Reference to the communication channel.
-    pub communication_channel: &'a CommunicationChannel<'a, ()>,
+    pub communication_channel: &'a CommunicationChannel<'a>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -432,7 +432,7 @@ impl<'a> ExecutionContext<'a> {
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
     pub(crate) fn new(
-        communication_channel: &'a CommunicationChannel<'a, ()>,
+        communication_channel: &'a CommunicationChannel<'a>,
         fork: &'a Fork,
         caller: Caller,
     ) -> Self {
