@@ -37,10 +37,23 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
 
+#### exonum-proto
+
+- Introduced new crate `exonum-proto`. Trait `ProtobufConvert` is moved to
+  `exonum-proto` crate. (#1496)
+
+#### exonum-build
+
+- Method `protobuf_generate` is now private, use `exonum_build::ProtobufGenerator`
+  instead (#1496).
+
 #### exonum-crypto
 
 - Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
   module in the `exonum`. (#1459)
+  
+- Protobuf serialization for crypto types are now implemented in `exonum-crypto`
+  crate (#1496).
 
 ### New Features
 

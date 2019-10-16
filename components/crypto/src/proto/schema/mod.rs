@@ -12,24 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+//! Module of the rust-protobuf generated files.
 
-import "types.proto";
+// For protobuf generated files.
+#![allow(bare_trait_objects)]
 
-package exonum.tests.explorer;
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-message CreateWallet {
-  exonum.crypto.PublicKey pubkey = 1;
-  string name = 2;
-}
-
-message Transfer {
-  exonum.crypto.PublicKey from = 1;
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
-}
-
-message Issue {
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
-}
+pub use self::types::*;

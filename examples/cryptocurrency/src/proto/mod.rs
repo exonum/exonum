@@ -21,4 +21,4 @@ pub use self::service::{Config, TxCreateWallet, TxTransfer, Wallet};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::proto::schema::*;
+use exonum::crypto::proto::*;

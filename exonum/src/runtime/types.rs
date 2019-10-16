@@ -19,7 +19,9 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 use crate::{
     blockchain::ConsensusConfig,
     helpers::ValidateInput,
-    merkledb::{is_allowed_latin1_char, is_valid_index_name, BinaryValue},
+    merkledb::{
+        impl_binary_key_for_binary_value, is_allowed_latin1_char, is_valid_index_name, BinaryValue,
+    },
     proto::schema,
 };
 

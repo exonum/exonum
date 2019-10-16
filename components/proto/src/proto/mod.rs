@@ -12,17 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+//! Module of the rust-protobuf generated files.
 
-package exonum;
+// For protobuf generated files.
+#![allow(bare_trait_objects)]
 
-message Hash { bytes data = 1; }
-
-message PublicKey { bytes data = 1; }
-
-message Signature { bytes data = 1; }
-
-message BitVec {
-  bytes data = 1;
-  uint64 len = 2;
-}
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));

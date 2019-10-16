@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.supervisor;
 
-import "helpers.proto";
+import "types.proto";
 import "runtime.proto";
 import "blockchain.proto";
 
@@ -65,5 +65,5 @@ message ConfigPropose {
 // Confirmation vote for the configuration change
 message ConfigVote {
     // Hash of configuration proposition.
-    exonum.Hash propose_hash = 1;
+    exonum.crypto.Hash propose_hash = 1;
 }

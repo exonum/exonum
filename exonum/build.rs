@@ -1,8 +1,6 @@
 // spell-checker:ignore rustc
 
-extern crate exonum_build;
-
-use exonum_build::protobuf_generate;
+use exonum_build::{ProtoSources, ProtobufGenerator};
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
@@ -12,10 +10,11 @@ fn create_path_to_protobuf_schema_env() {
     // Workaround for https://github.com/rust-lang/cargo/issues/3544
     // We "link" exonum with exonum_protobuf library
     // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
-    let path = env::current_dir()
-        .expect("Failed to get current dir.")
-        .join("src/proto/schema/exonum");
-    println!("cargo:protos={}", path.to_str().unwrap());
+
+    let current_dir = env::current_dir().expect("Failed to get current dir.");
+
+    let protos = current_dir.join("src/proto/schema/exonum");
+    println!("cargo:protos={}", protos.to_str().unwrap());
 }
 
 fn write_user_agent_file() {
@@ -36,25 +35,42 @@ fn main() {
 
     create_path_to_protobuf_schema_env();
 
-    protobuf_generate(
-        "src/proto/schema/exonum",
-        &["src/proto/schema/exonum"],
-        "exonum_proto_mod.rs",
-    );
+    let crypto_protos = ProtoSources::Path("../components/crypto/src/proto/schema");
+    let common_protos = ProtoSources::Path("../components/proto/src/proto");
+
+    // Exonum crypto.
+    ProtobufGenerator::with_mod_name("exonum_crypto_proto_mod.rs")
+        .with_input_dir(&crypto_protos.path())
+        .add_path(&crypto_protos.path())
+        .generate();
+
+    // Exonum proto.
+    ProtobufGenerator::with_mod_name("exonum_common_proto_mod.rs")
+        .with_input_dir(&common_protos.path())
+        .add_path(&common_protos.path())
+        .generate();
+
+    ProtobufGenerator::with_mod_name("exonum_proto_mod.rs")
+        .with_input_dir("src/proto/schema/exonum")
+        .add_path("src/proto/schema/exonum")
+        .with_crypto()
+        .with_common()
+        .generate();
 
     // Exonum external tests.
-    protobuf_generate(
-        "tests/explorer/blockchain/proto",
-        &["src/proto/schema/exonum"],
-        "exonum_tests_proto_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
+        .with_input_dir("tests/explorer/blockchain/proto")
+        .add_path("src/proto/schema/exonum")
+        .with_crypto()
+        .with_common()
+        .generate();
 
     // Exonum benchmarks.
-    protobuf_generate(
-        "benches/criterion/proto",
-        &["src/proto/schema/exonum"],
-        "exonum_benches_proto_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("exonum_benches_proto_mod.rs")
+        .with_input_dir("benches/criterion/proto")
+        .with_crypto()
+        .with_common()
+        .generate();
 }
 
 fn rust_version() -> Option<String> {
