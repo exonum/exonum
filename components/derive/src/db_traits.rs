@@ -104,7 +104,7 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
 
     let db_object = BinaryValueStruct::from_derive_input(&input)
         .unwrap_or_else(|e| panic!("BinaryValue: {}", e));
-    let tokens = quote! {#db_object};
+    let tokens = quote! { #db_object };
     tokens.into()
 }
 
@@ -113,6 +113,6 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
 
     let db_object =
         ObjectHashStruct::from_derive_input(&input).unwrap_or_else(|e| panic!("ObjectHash: {}", e));
-    let tokens = quote! {#db_object};
+    let tokens = quote! { #db_object };
     tokens.into()
 }
