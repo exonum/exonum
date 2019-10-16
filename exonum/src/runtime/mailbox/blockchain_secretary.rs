@@ -16,8 +16,6 @@
 //! `BlockchainMailbox`.
 
 // TODO only for development purposes, remove it later
-#![allow(dead_code)]
-
 use futures::Future;
 
 use exonum_merkledb::Fork;
@@ -25,7 +23,7 @@ use exonum_merkledb::Fork;
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError},
     error::{catch_panic, ExecutionError},
-    CallInfo, InstanceId, InstanceSpec,
+    CallInfo, InstanceSpec,
 };
 
 use super::{Action, AfterRequestCompleted, BlockchainMailbox, Notification};
@@ -51,19 +49,6 @@ pub enum MailboxContext {
 #[derive(Debug)]
 pub struct BlockchainSecretary {
     context: MailboxContext,
-}
-
-/// Enum denoting the result of authorization process.
-#[derive(Debug, PartialEq)]
-enum AuthoriziationResult {
-    /// Author of the request is authorized to request changes.
-    Valid,
-    /// Author of the request is not authorized, but we can safely
-    /// just skip this request.
-    ShouldSkip,
-    /// Author of the request is not authorized and request processing
-    /// should be stopped.
-    AbortProcessing(ExecutionError),
 }
 
 impl BlockchainSecretary {
@@ -123,11 +108,11 @@ impl BlockchainSecretary {
                         trace!("Successfully completed request {:?}", request);
                     }
                     Err(err) => {
-                        // Cancel any changes occured during the errored request.
+                        // Cancel any changes occurred during the errored request.
                         fork.rollback();
 
                         trace!(
-                            "Error occured during request {:?} within context {:?}",
+                            "Error occurred during request {:?} within context {:?}",
                             request,
                             self.context
                         );
@@ -202,9 +187,9 @@ impl BlockchainSecretary {
 
             // Mutable action.
             Action::RegisterArtifact { artifact, spec } => {
-                // Request the dispatcher to registed artifact as deployed.
+                // Request the dispatcher to registered artifact as deployed.
                 // Performing this action means the completion of the deployment process,
-                // artifact will be avaiable in the list of deployed artifacts.
+                // artifact will be available in the list of deployed artifacts.
 
                 let fork = fork.ok_or(DispatcherError::InappropriateTimeForAction)?;
 
@@ -258,13 +243,6 @@ impl BlockchainSecretary {
         })
         .and_then(callback)
     }
-}
-
-/// Internal function encapsulating the check for service
-/// to have sufficient rights to request actions from the blockchain.
-fn is_authorized_for_requests(instance_id: InstanceId) -> bool {
-    // Currently, only Supervisor service is authorized to request changes.
-    instance_id == crate::runtime::SUPERVISOR_INSTANCE_ID
 }
 
 /// Internal function encapsulating the check for service

@@ -31,13 +31,11 @@ use crate::{
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
+        communication_channel::SupervisorAccess,
         dispatcher,
         error::ErrorKind,
         mailbox::Action,
-        rust::{
-            communication_channel::SupervisorAccess, BeforeCommitContext, Service, ServiceFactory,
-            Transaction, TransactionContext,
-        },
+        rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -139,7 +137,9 @@ impl TestDispatcherInterface for TestDispatcherService {
             ServiceGoodImpl.artifact_id().into()
         };
 
-        context.communication_channel(self).request_action(
+        let communication_channel = context.communication_channel().supervisor_interface(self);
+
+        communication_channel.request_action(
             Action::RegisterArtifact {
                 artifact,
                 spec: Vec::new(),
@@ -171,7 +171,9 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        context.communication_channel(self).request_action(
+        let communication_channel = context.communication_channel().supervisor_interface(self);
+
+        communication_channel.request_action(
             Action::AddService {
                 artifact,
                 instance_name: format!("good-service-{}", arg.value),

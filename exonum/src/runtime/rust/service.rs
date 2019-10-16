@@ -198,7 +198,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         })
     }
 
-    /// Returns a reference to the communication channel between supervisor and blockcahin core.
+    /// Returns a reference to the communication channel between supervisor and blockchain core.
     pub fn communication_channel(&self) -> &CommunicationChannel<()> {
         self.inner.communication_channel
     }
@@ -283,7 +283,7 @@ impl<'a> BeforeCommitContext<'a> {
         )
     }
 
-    /// Returns a reference to the communication channel between supervisor and blockcahin core.
+    /// Returns a reference to the communication channel between supervisor and blockchain core.
     pub fn communication_channel(&self) -> &CommunicationChannel<()> {
         self.communication_channel
     }
@@ -355,7 +355,7 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Returns a reference to the communication channel between supervisor and blockcahin core.
+    /// Returns a reference to the communication channel between supervisor and blockchain core.
     pub fn communication_channel(&self) -> &CommunicationChannel<()> {
         self.communication_channel
     }

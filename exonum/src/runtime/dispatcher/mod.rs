@@ -35,16 +35,15 @@ use crate::{
 use super::{
     api::ApiContext,
     error::{catch_panic, ExecutionError},
+    mailbox::BlockchainMailbox,
     // TODO dispatcher shouldn't rely on the rust implementation
     rust::{interfaces::ConfigureCall, CallContext},
     ApiChange,
     ArtifactId,
     ArtifactProtobufSpec,
-    BlockchainMailbox,
     CallInfo,
     Caller,
     CommunicationChannel,
-    CommunicationChannelContext,
     ConfigChange,
     ExecutionContext,
     InstanceId,
@@ -284,8 +283,7 @@ impl Dispatcher {
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        let communication_channel =
-            CommunicationChannel::new(CommunicationChannelContext::Tx, mailbox, self);
+        let communication_channel = CommunicationChannel::new(mailbox, self);
 
         let context = ExecutionContext::new(
             &communication_channel,
@@ -320,8 +318,7 @@ impl Dispatcher {
     }
 
     pub(crate) fn before_commit(&mut self, mailbox: &BlockchainMailbox, fork: &mut Fork) {
-        let communication_channel =
-            CommunicationChannel::new(CommunicationChannelContext::BeforeCommit, mailbox, self);
+        let communication_channel = CommunicationChannel::new(mailbox, self);
         for runtime in self.runtimes.values() {
             runtime.before_commit(&communication_channel, fork);
         }
@@ -334,8 +331,7 @@ impl Dispatcher {
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
-        let communication_channel =
-            CommunicationChannel::new(CommunicationChannelContext::AfterCommit, mailbox, self);
+        let communication_channel = CommunicationChannel::new(mailbox, self);
         self.runtimes.values().for_each(|runtime| {
             runtime.after_commit(
                 &communication_channel,
@@ -435,7 +431,7 @@ impl Dispatcher {
 
 
                 let communication_channel =
-                    CommunicationChannel::new(CommunicationChannelContext::AfterCommit, mailbox, self);
+                    CommunicationChannel::new(mailbox, self);
 
                 let configure_result = catch_panic(|| {
                     let context = CallContext::new(
@@ -458,7 +454,7 @@ impl Dispatcher {
         })
     }
 
-    /// Assigns an instance identificator to the new service instance.
+    /// Assigns an instance identifier to the new service instance.
     pub(crate) fn assign_instance_id(&self, fork: &Fork) -> InstanceId {
         Schema::new(fork as &Fork).assign_instance_id()
     }

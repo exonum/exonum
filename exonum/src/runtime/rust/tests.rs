@@ -19,10 +19,9 @@ use crate::{
     merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        dispatcher::{Dispatcher, DispatcherRef},
-        error::ExecutionError,
-        BlockchainMailbox, CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor,
-        InstanceId, InstanceSpec,
+        communication_channel::CommunicationChannel, dispatcher::Dispatcher, error::ExecutionError,
+        mailbox::BlockchainMailbox, CallInfo, Caller, DispatcherError, ExecutionContext,
+        InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -141,7 +140,7 @@ fn test_basic_rust_runtime() {
     let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()]);
 
     // Create dummy blockchain mailbox.
-    let mut mailbox = BlockchainMailbox::new();
+    let mailbox = BlockchainMailbox::new();
 
     // Deploy service.
     let fork = db.fork();
@@ -184,10 +183,9 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxA { value: ARG_A_VALUE }.into_bytes();
         let fork = db.fork();
-        let dispatcher_ref = DispatcherRef::new(&dispatcher);
+        let communication_channel = CommunicationChannel::new(&mailbox, &dispatcher);
         let context = ExecutionContext::new(
-            &dispatcher_ref,
-            &mut mailbox,
+            &communication_channel,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,
@@ -215,10 +213,9 @@ fn test_basic_rust_runtime() {
         };
         let payload = TxB { value: ARG_B_VALUE }.into_bytes();
         let fork = db.fork();
-        let dispatcher_ref = DispatcherRef::new(&dispatcher);
+        let communication_channel = CommunicationChannel::new(&mailbox, &dispatcher);
         let context = ExecutionContext::new(
-            &dispatcher_ref,
-            &mut mailbox,
+            &communication_channel,
             &fork,
             Caller::Service {
                 instance_id: SERVICE_INSTANCE_ID,

@@ -28,23 +28,11 @@ pub type AfterRequestCompleted = Option<Box<dyn FnOnce() + 'static>>;
 /// An interface for runtimes to interact with the Exonum blockchain core.
 ///
 /// All the requests added to the mailbox will be processed by the core `Blockchain` structure.
-/// However, `Blockchain` structure can legitimately ignore any of the requests if it will decide
-/// that request initiator has no permission to request such a change.
 ///
 /// **Important note:** All the requests received after the transaction execution are considered
 /// **the part of execution process**. So, if service requests blockchain to perform some action
-/// and blockchain declines this request, the transaction will be treated as failed and, as a
-/// result, rolled back.
-///
-/// If request gets declined after any other runtime method invocation, it will be simply ignored.
-///
-/// In theory, runtimes can provide services the possibility to write directly to the mailbox.
-/// However, since services considered untrusted code by default, any runtime implementation
-/// should be aware that service can pretend to be some another service in ordere to make
-/// Exonum core do what it want.
-///
-/// Thus, it's highly recommended for runtimes to create a proxy entity and manage creating
-/// requests manually.
+/// and an error occurs during the request processing, the transaction will be treated as failed
+/// and, as a result, rolled back.
 ///
 /// **Policy on request failures:**
 ///
@@ -94,6 +82,7 @@ impl BlockchainMailbox {
     // on start of the node aren't added into notifications list.
     // This should be fixed and notifications mechanism should be used instead of
     // `dispatcher.notify_api_changes`.
+    #[allow(dead_code)]
     /// Consumes a mailbox, receiving the notifications about performed actions.
     pub fn get_notifications(self) -> Vec<Notification> {
         self.notifications
@@ -106,15 +95,8 @@ impl BlockchainMailbox {
 pub enum Notification {
     /// Notification about adding a deployed artifact into some runtime.
     ArtifactDeployed { artifact: ArtifactId },
-    /// Notifiaction about instance added into some runtime.
+    /// Notification about instance added into some runtime.
     InstanceStarted {
-        instance: InstanceSpec,
-        part_of_core_api: bool,
-    },
-    /// Notification about instance removed from some runtime.
-    /// Currently not used (since `Runtime::stop` method was removed) and
-    /// can not be emitted.
-    InstanceRemoved {
         instance: InstanceSpec,
         part_of_core_api: bool,
     },

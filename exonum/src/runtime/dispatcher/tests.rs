@@ -26,11 +26,13 @@ use crate::{
     merkledb::{Fork, Snapshot},
     node::ApiSender,
     runtime::{
+        communication_channel::CommunicationChannel,
         dispatcher::Dispatcher,
+        mailbox::BlockchainMailbox,
         rust::{Error as RustRuntimeError, RustRuntime},
-        ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, BlockchainMailbox, CallInfo,
-        Caller, DispatcherError, DispatcherRef, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
+        ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError,
+        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
+        RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -151,17 +153,11 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(
-        &self,
-        _dispatcher: &DispatcherRef,
-        _mailbox: &BlockchainMailbox,
-        _fork: &mut Fork,
-    ) {
-    }
+    fn before_commit(&self, _communication_channel: &CommunicationChannel<()>, _fork: &mut Fork) {}
 
     fn after_commit(
         &self,
-        _mailbox: &BlockchainMailbox,
+        _communication_channel: &CommunicationChannel<()>,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -274,11 +270,11 @@ fn test_dispatcher_simple() {
     // Check if transactions are ready for execution.
     let tx_payload = [0x00_u8; 1];
 
-    let dispatcher_ref = DispatcherRef::new(&dispatcher);
-    let mut mailbox = BlockchainMailbox::new();
+    let mailbox = BlockchainMailbox::new();
+
+    let communication_channel = CommunicationChannel::new(&mailbox, &dispatcher);
     let context = ExecutionContext::new(
-        &dispatcher_ref,
-        &mut mailbox,
+        &communication_channel,
         &fork,
         Caller::Service { instance_id: 1 },
     );
@@ -402,11 +398,11 @@ fn test_dispatcher_rust_runtime_no_service() {
     // Check if transactions are ready for execution.
     let tx_payload = [0x00_u8; 1];
 
-    let dispatcher_ref = DispatcherRef::new(&dispatcher);
-    let mut mailbox = BlockchainMailbox::new();
+    let mailbox = BlockchainMailbox::new();
+
+    let communication_channel = CommunicationChannel::new(&mailbox, &dispatcher);
     let context = ExecutionContext::new(
-        &dispatcher_ref,
-        &mut mailbox,
+        &communication_channel,
         &fork,
         Caller::Service { instance_id: 15 },
     );
@@ -464,17 +460,11 @@ impl Runtime for ShutdownRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(
-        &self,
-        _dispatcher: &DispatcherRef,
-        _mailbox: &BlockchainMailbox,
-        _fork: &mut Fork,
-    ) {
-    }
+    fn before_commit(&self, _communication_channel: &CommunicationChannel<()>, _fork: &mut Fork) {}
 
     fn after_commit(
         &self,
-        _mailbox: &BlockchainMailbox,
+        _communication_channel: &CommunicationChannel<()>,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,

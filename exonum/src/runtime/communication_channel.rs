@@ -14,35 +14,22 @@
 
 use crate::runtime::{
     dispatcher::Dispatcher,
-    mailbox::{Action, AfterRequestCompleted},
-    BlockchainMailbox, CallInfo, ConfigChange, ExecutionContext, ExecutionError, InstanceId,
+    mailbox::{Action, AfterRequestCompleted, BlockchainMailbox},
+    CallInfo, ConfigChange, ExecutionContext, ExecutionError, InstanceId,
 };
 
 pub trait SupervisorAccess {}
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub(crate) enum CommunicationChannelContext {
-    Tx,
-    BeforeCommit,
-    AfterCommit,
-}
-
 #[derive(Debug)]
 pub struct CommunicationChannel<'a, T> {
-    context: CommunicationChannelContext,
     dispatcher: &'a Dispatcher,
     pub(crate) mailbox: &'a BlockchainMailbox,
     phantom: std::marker::PhantomData<T>,
 }
 
 impl<'a, T> CommunicationChannel<'a, T> {
-    pub(crate) fn new(
-        context: CommunicationChannelContext,
-        mailbox: &'a BlockchainMailbox,
-        dispatcher: &'a Dispatcher,
-    ) -> Self {
+    pub(crate) fn new(mailbox: &'a BlockchainMailbox, dispatcher: &'a Dispatcher) -> Self {
         Self {
-            context,
             mailbox,
             dispatcher,
             phantom: std::marker::PhantomData,
@@ -56,21 +43,16 @@ impl<'a, T> CommunicationChannel<'a, T> {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        assert_ne!(
-            self.context,
-            CommunicationChannelContext::AfterCommit,
-            "Calls in `after_commit` are forbidden"
-        );
         self.dispatcher.call(context, call_info, arguments)
     }
 
-    /// Opens an exteneded interface.
+    /// Opens an extended interface for supervisor.
     #[doc(hidden)]
     pub fn supervisor_interface<A>(&'a self, _requestor: &A) -> CommunicationChannel<'a, A>
     where
         A: SupervisorAccess,
     {
-        CommunicationChannel::<A>::new(self.context, self.mailbox, self.dispatcher)
+        CommunicationChannel::<A>::new(self.mailbox, self.dispatcher)
     }
 }
 

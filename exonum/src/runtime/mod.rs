@@ -95,14 +95,11 @@ pub use self::{
     communication_channel::CommunicationChannel,
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
-    mailbox::BlockchainMailbox,
     types::{
         AnyTx, ArtifactId, CallInfo, ConfigChange, InstanceId, InstanceSpec, MethodId,
         ServiceConfig,
     },
 };
-
-pub(crate) use self::communication_channel::CommunicationChannelContext;
 
 #[macro_use]
 pub mod rust;
@@ -110,6 +107,8 @@ pub mod api;
 pub mod communication_channel;
 pub mod dispatcher;
 pub mod error;
+
+#[doc(hidden)]
 pub mod mailbox;
 
 use futures::Future;

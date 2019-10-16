@@ -249,7 +249,7 @@ impl Blockchain {
                 let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
 
                 // We don't care about result, secretary will rollback any failed requests
-                // occured during procesing.
+                // occurred during processing.
                 let _result =
                     secretary.process_requests_mut(&mut mailbox, &mut dispatcher, &mut fork);
             }
@@ -331,16 +331,14 @@ impl Blockchain {
 
         let mut mailbox = BlockchainMailbox::new();
 
-        let tx_result =
-            catch_panic(|| dispatcher.execute(fork, &mut mailbox, tx_hash, &transaction)).and_then(
-                |()| {
-                    let secretary = BlockchainSecretary::new(MailboxContext::TxExecution(
-                        transaction.payload().call_info.clone(),
-                    ));
+        let tx_result = catch_panic(|| dispatcher.execute(fork, &mailbox, tx_hash, &transaction))
+            .and_then(|()| {
+                let secretary = BlockchainSecretary::new(MailboxContext::TxExecution(
+                    transaction.payload().call_info.clone(),
+                ));
 
-                    secretary.process_requests_mut(&mut mailbox, dispatcher, fork)
-                },
-            );
+                secretary.process_requests_mut(&mut mailbox, dispatcher, fork)
+            });
         match &tx_result {
             Ok(_) => {
                 fork.flush();
@@ -414,7 +412,7 @@ impl Blockchain {
         let mut dispatcher = self.dispatcher();
         let mut mailbox = BlockchainMailbox::new();
         dispatcher.after_commit(
-            &mut mailbox,
+            &mailbox,
             self.snapshot(),
             &self.service_keypair,
             &self.api_sender,
