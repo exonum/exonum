@@ -246,7 +246,7 @@ impl Blockchain {
 
                 dispatcher.before_commit(&mailbox, &mut fork);
 
-                let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
+                let secretary = BlockchainSecretary::new(MailboxContext::OutsideTxExecution);
 
                 // We don't care about result, secretary will rollback any failed requests
                 // occurred during processing.
@@ -419,7 +419,7 @@ impl Blockchain {
         );
 
         // Process requests obtained during the `after_commit` call.
-        let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
+        let secretary = BlockchainSecretary::new(MailboxContext::OutsideTxExecution);
 
         secretary.process_requests(&mut mailbox, &mut dispatcher);
 

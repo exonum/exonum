@@ -39,7 +39,7 @@ pub enum MailboxContext {
     /// Mailbox processing happening during the transaction execution process.
     TxExecution(CallInfo),
     /// Mailbox processing outside of the transaction execution process.
-    NoTx,
+    OutsideTxExecution,
 }
 
 /// `BlockchainSecretary` is an intermediate entity capable of processing the requests
@@ -129,7 +129,7 @@ impl BlockchainSecretary {
     /// if requests are independent, we should flush the fork after each request,
     /// so failure of one request won't affect others.
     fn flush_if_needed(&self, fork: &mut Fork) {
-        if let MailboxContext::NoTx = self.context {
+        if let MailboxContext::OutsideTxExecution = self.context {
             fork.flush();
         }
     }
