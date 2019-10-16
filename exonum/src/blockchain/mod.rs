@@ -247,12 +247,10 @@ impl Blockchain {
 
                 let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
 
-                secretary.process_requests_mut(&mut mailbox, &mut dispatcher, &mut fork);
-
-                for notification in mailbox.get_notifications() {
-                    // TODO
-                    // unimplemented!();
-                }
+                // We don't care about result, secretary will rollback any failed requests
+                // occured during procesing.
+                let _result =
+                    secretary.process_requests_mut(&mut mailbox, &mut dispatcher, &mut fork);
             }
 
             // Get tx & state hash.
@@ -345,11 +343,6 @@ impl Blockchain {
         match &tx_result {
             Ok(_) => {
                 fork.flush();
-
-                for notification in mailbox.get_notifications() {
-                    // TODO
-                    // unimplemented!();
-                }
             }
             Err(e) => {
                 if e.kind == ExecutionErrorKind::Panic {
@@ -430,10 +423,6 @@ impl Blockchain {
         let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
 
         secretary.process_requests(&mut mailbox, &mut dispatcher);
-        for notification in mailbox.get_notifications() {
-            // TODO
-            // unimplemented!();
-        }
 
         let api_changes = dispatcher.notify_api_changes(&ApiContext::with_blockchain(self));
 

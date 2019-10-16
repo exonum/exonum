@@ -84,17 +84,21 @@ impl BlockchainMailbox {
     }
 
     /// Adds a notification about completed event to the mailbox.
-    pub(self) fn add_notification(&mut self, notification: Notification) {
+    fn add_notification(&mut self, notification: Notification) {
         self.notifications.push(notification);
     }
 
     /// Drains requests from the mailbox.
-    pub(self) fn drain_requests(&mut self) -> HashMap<InstanceId, (Action, AfterRequestCompleted)> {
+    fn drain_requests(&mut self) -> HashMap<InstanceId, (Action, AfterRequestCompleted)> {
         let mut requests = RefCell::new(HashMap::default());
         std::mem::swap(&mut requests, &mut self.requests);
         requests.into_inner()
     }
 
+    // TODO: currently blockchain doesn't read notifications, because services started
+    // on start of the node aren't added into notifications list.
+    // This should be fixed and notifications mechanism should be used instead of
+    // `dispatcher.notify_api_changes`.
     /// Consumes a mailbox, receiving the notifications about performed actions.
     pub fn get_notifications(self) -> Vec<Notification> {
         self.notifications

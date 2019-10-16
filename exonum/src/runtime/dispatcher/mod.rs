@@ -18,7 +18,6 @@ use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future};
 
 use std::{
-    cell::RefCell,
     collections::{BTreeMap, HashMap},
     panic,
 };
@@ -452,25 +451,6 @@ impl Dispatcher {
     }
 }
 
-#[derive(Debug)]
-pub enum Action {
-    /// Register the deployed artifact in the dispatcher.
-    /// Make sure that you successfully complete the deploy artifact procedure.
-    RegisterArtifact { artifact: ArtifactId, spec: Vec<u8> },
-    /// Add a new service instance with the specified params.
-    /// Make sure that the artifact is deployed.
-    AddService {
-        artifact: ArtifactId,
-        instance_name: String,
-        config: Vec<u8>,
-    },
-    /// Perform a configuration update with the specified changes.
-    /// Make sure that no errors occur when applying these changes.
-    UpdateConfig {
-        caller_instance_id: InstanceId,
-        changes: Vec<ConfigChange>,
-    },
-}
 /// Reference to the underlying runtime dispatcher.
 #[derive(Debug)]
 pub struct DispatcherRef<'a> {
