@@ -41,6 +41,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Introduced new crate `exonum-proto`. Trait `ProtobufConvert` is moved to
   `exonum-proto` crate. (#1496)
+  
+#### exonum-proto-derive
+  
+- Introduced new crate `exonum-proto-derive`. Derive macro `ProtobufConvert` is
+  moved to `exonum-proto-derive` crate. (#1501)
+  
+- Derive macro `ProtobufConvert` now doesn't derive `BinaryValue` and `ObjectHash`
+  traits. There are separate macros for them in `exonum-derive` crate. (#1501)
 
 #### exonum-build
 

@@ -30,13 +30,45 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
-///TODO: add doc
+/// Derive `BinaryValue` trait.
+/// Target type must implement `ProtobufConvert` trait.
+///
+/// # Example
+/// ```ignore
+/// #[derive(Clone, Debug, ProtobufConvert, BinaryValue)]
+/// #[exonum(pb = "proto::Wallet")]
+/// pub struct Wallet {
+///     /// `PublicKey` of the wallet.
+///     pub pub_key: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
+/// }
+///
+/// let wallet = Wallet::new();
+/// let bytes = wallet.to_bytes();
+/// ```
 #[proc_macro_derive(BinaryValue)]
 pub fn binary_value(input: TokenStream) -> TokenStream {
     db_traits::binary_value(input)
 }
 
-///TODO: add doc
+/// Derive `ObjectHash` trait.
+/// Target type must implement `BinaryValue` trait.
+///
+/// # Example
+/// ```ignore
+/// #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+/// #[exonum(pb = "proto::Wallet")]
+/// pub struct Wallet {
+///     /// `PublicKey` of the wallet.
+///     pub pub_key: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
+/// }
+///
+/// let wallet = Wallet::new();
+/// let hash = wallet.object_hash();
+/// ```
 #[proc_macro_derive(ObjectHash)]
 pub fn object_hash(input: TokenStream) -> TokenStream {
     db_traits::object_hash(input)
