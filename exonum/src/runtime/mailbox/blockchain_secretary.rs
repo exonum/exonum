@@ -202,9 +202,7 @@ impl BlockchainSecretary {
                 // artifact will be available in the list of deployed artifacts.
 
                 let fork = fork.ok_or(DispatcherError::InappropriateTimeForAction)?;
-
                 dispatcher.register_artifact(fork, &artifact, spec)?;
-
                 mailbox.add_notification(Notification::ArtifactDeployed { artifact });
 
                 Ok(())
@@ -246,7 +244,6 @@ impl BlockchainSecretary {
                 // part (internal or service).
 
                 let fork = fork.ok_or(DispatcherError::InappropriateTimeForAction)?;
-
                 dispatcher.update_config(mailbox, fork, caller_instance_id, changes);
                 Ok(())
             }

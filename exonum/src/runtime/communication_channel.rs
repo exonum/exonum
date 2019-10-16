@@ -18,16 +18,22 @@ use crate::runtime::{
     CallInfo, ConfigChange, ExecutionContext, ExecutionError, InstanceId,
 };
 
+/// Marker trait for `Supervisor` entities. Implementors of that trait can get access
+/// to the extended interface of `CommunicationChannel`.
+#[doc(hidden)]
 pub trait SupervisorAccess {}
 
+/// Communication channel is an proxy entity for performing service calls from
+/// other service instances.
 #[derive(Debug)]
 pub struct CommunicationChannel<'a, T = ()> {
-    dispatcher: &'a Dispatcher,
     pub(crate) mailbox: &'a BlockchainMailbox,
+    dispatcher: &'a Dispatcher,
     phantom: std::marker::PhantomData<T>,
 }
 
 impl<'a, T> CommunicationChannel<'a, T> {
+    /// Creates a new communication channel.
     pub(crate) fn new(mailbox: &'a BlockchainMailbox, dispatcher: &'a Dispatcher) -> Self {
         Self {
             mailbox,

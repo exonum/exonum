@@ -429,7 +429,6 @@ impl Dispatcher {
                     config.instance_id
                 );
 
-
                 let communication_channel =
                     CommunicationChannel::new(mailbox, self);
 
