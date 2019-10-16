@@ -70,8 +70,19 @@ impl BlockchainSecretary {
 
             for (request, and_then) in requests {
                 // Requests within an immutable context are considered independent
-                // so we don't care about the result.
-                let _result = self.process_request(mailbox, dispatcher, None, request, and_then);
+                // so we don't care about the result (however, we'll add it to the log).
+                let result =
+                    self.process_request(mailbox, dispatcher, None, request.clone(), and_then);
+
+                match result {
+                    Ok(_) => trace!("Successfully completed request {:?}", request),
+                    Err(err) => {
+                        warn!(
+                            "Error occurred during request {:?} within context {:?}: {:?}",
+                            request, self.context, &err
+                        );
+                    }
+                }
             }
         }
     }
@@ -111,10 +122,9 @@ impl BlockchainSecretary {
                         // Cancel any changes occurred during the errored request.
                         fork.rollback();
 
-                        trace!(
-                            "Error occurred during request {:?} within context {:?}",
-                            request,
-                            self.context
+                        warn!(
+                            "Error occurred during request {:?} within context {:?}: {:?}",
+                            request, self.context, &err
                         );
                         self.check_if_should_stop(err)?;
                     }
