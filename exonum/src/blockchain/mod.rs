@@ -243,7 +243,8 @@ impl Blockchain {
             // Skip execution for genesis block.
             if height > Height(0) {
                 let mut mailbox = BlockchainMailbox::new();
-                dispatcher.before_commit(&mut mailbox, &mut fork);
+
+                dispatcher.before_commit(&mailbox, &mut fork);
 
                 let secretary = BlockchainSecretary::new(MailboxContext::NoTx);
 

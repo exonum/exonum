@@ -54,7 +54,7 @@ pub struct BlockchainSecretary {
 }
 
 /// Enum denoting the result of authorization process.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum AuthoriziationResult {
     /// Author of the request is authorized to request changes.
     Valid,
@@ -83,16 +83,10 @@ impl BlockchainSecretary {
                 break;
             }
 
-            for (request_initiator, (request, and_then)) in requests {
-                let authorized_access = self.verify_caller(request_initiator);
-
-                // Ignore unauthorized requests.
-                if let AuthoriziationResult::Valid = authorized_access {
-                    // Requests within an immutable context are considered independent
-                    // so we don't care about the result.
-                    let _result =
-                        self.process_request(mailbox, dispatcher, None, request, and_then);
-                }
+            for (request, and_then) in requests {
+                // Requests within an immutable context are considered independent
+                // so we don't care about the result.
+                let _result = self.process_request(mailbox, dispatcher, None, request, and_then);
             }
         }
     }
@@ -114,21 +108,7 @@ impl BlockchainSecretary {
                 break;
             }
 
-            for (request_initiator, (request, and_then)) in requests {
-                // `verify_caller` will return `Err` only if requests processing
-                // should be stopped.
-                let authorized_access = self.verify_caller(request_initiator);
-
-                match authorized_access {
-                    // We should stop. Revert changes and return an error.
-                    // Rolling back the fork is up to caller.
-                    AuthoriziationResult::AbortProcessing(err) => return Err(err),
-                    // We should skip only that one request.
-                    AuthoriziationResult::ShouldSkip => continue,
-                    // We're ok, continue processing.
-                    AuthoriziationResult::Valid => {}
-                }
-
+            for (request, and_then) in requests {
                 let result = self.process_request(
                     mailbox,
                     dispatcher,
@@ -278,32 +258,6 @@ impl BlockchainSecretary {
         })
         .and_then(callback)
     }
-
-    /// Checks if caller has sufficient rights to perform request.
-    fn verify_caller(&self, initiator: InstanceId) -> AuthoriziationResult {
-        let authorized_access = is_authorized_for_requests(initiator);
-
-        // In the transaction execution context unauthorized access is an error.
-        if let MailboxContext::TxExecution(ref call_info) = self.context {
-            if call_info.instance_id != initiator {
-                return AuthoriziationResult::AbortProcessing(
-                    DispatcherError::FakeInitiator.into(),
-                );
-            }
-
-            if !authorized_access {
-                return AuthoriziationResult::AbortProcessing(
-                    DispatcherError::UnauthorizedCaller.into(),
-                );
-            }
-        }
-
-        if authorized_access {
-            AuthoriziationResult::Valid
-        } else {
-            AuthoriziationResult::ShouldSkip
-        }
-    }
 }
 
 /// Internal function encapsulating the check for service
@@ -318,4 +272,23 @@ fn is_authorized_for_requests(instance_id: InstanceId) -> bool {
 fn is_part_of_core_api(instance_spec: &InstanceSpec) -> bool {
     // Currently, only Rust runtime uses API schema provided by Exonum.
     instance_spec.artifact.runtime_id == crate::runtime::RuntimeIdentifier::Rust as u32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_part_of_core_api() {
+        let rust_runtime_id = crate::runtime::RuntimeIdentifier::Rust as u32;
+
+        let rust_artifact = format!("{}:artifact_name", rust_runtime_id);
+        let rust_instance_spec = InstanceSpec::new(1024, "instance", &rust_artifact).unwrap();
+        assert_eq!(is_part_of_core_api(&rust_instance_spec), true);
+
+        let non_rust_artifact = format!("{}:artifact_name", rust_runtime_id + 1);
+        let non_rust_instance_spec =
+            InstanceSpec::new(1024, "instance", &non_rust_artifact).unwrap();
+        assert_eq!(is_part_of_core_api(&non_rust_instance_spec), false);
+    }
 }

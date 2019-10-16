@@ -23,12 +23,8 @@ use crate::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        api::ServiceApiBuilder,
-        dispatcher::DispatcherRef,
-        error::ExecutionError,
-        mailbox::{Action, AfterRequestCompleted},
-        AnyTx, ArtifactProtobufSpec, BlockchainMailbox, CallInfo, Caller, ConfigChange,
-        ExecutionContext, InstanceDescriptor, InstanceId, MethodId,
+        api::ServiceApiBuilder, error::ExecutionError, AnyTx, ArtifactProtobufSpec, CallInfo,
+        Caller, CommunicationChannel, ExecutionContext, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
@@ -202,16 +198,9 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         })
     }
 
-    /// Adds a request to the list of pending actions. These changes will be applied immediately
-    /// before the block commit.
-    ///
-    /// Currently only the supervisor service is allowed to perform this action.
-    /// If any other instance will call this method, the request will be ignored.
-    #[doc(hidden)]
-    pub fn request_action(&self, action: Action, and_then: AfterRequestCompleted) {
-        self.inner
-            .mailbox
-            .add_request(self.instance.id, action, and_then);
+    /// Returns a reference to the communication channel between supervisor and blockcahin core.
+    pub fn communication_channel(&self) -> &CommunicationChannel<()> {
+        self.inner.communication_channel
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
@@ -254,10 +243,8 @@ pub struct BeforeCommitContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a Fork,
-    /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a DispatcherRef<'a>,
-    /// Reference to the blockchain mailbox.
-    mailbox: &'a BlockchainMailbox,
+    /// Reference to the communication channel.
+    communication_channel: &'a CommunicationChannel<'a, ()>,
 }
 
 impl<'a> BeforeCommitContext<'a> {
@@ -265,14 +252,12 @@ impl<'a> BeforeCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         fork: &'a Fork,
-        dispatcher: &'a DispatcherRef<'a>,
-        mailbox: &'a BlockchainMailbox,
+        communication_channel: &'a CommunicationChannel<'a, ()>,
     ) -> Self {
         Self {
             instance,
             fork,
-            dispatcher,
-            mailbox,
+            communication_channel,
         }
     }
 
@@ -292,35 +277,15 @@ impl<'a> BeforeCommitContext<'a> {
     pub fn call_context(&'a self, called: InstanceId) -> CallContext<'a> {
         CallContext::new(
             self.fork,
-            self.dispatcher,
-            self.mailbox,
+            self.communication_channel,
             self.instance.id,
             called,
         )
     }
 
-    /// Adds a request to the list of pending actions. These changes will be applied immediately
-    /// before the block commit.
-    ///
-    /// Currently only the supervisor service is allowed to perform this action.
-    /// If any other instance will call this method, the request will be ignored.
-    #[doc(hidden)]
-    pub fn request_action(&self, action: Action, and_then: AfterRequestCompleted) {
-        self.mailbox.add_request(self.instance.id, action, and_then);
-    }
-
-    /// Adds a configuration update to pending actions. These changes will be applied immediately
-    /// before the block commit.
-    ///
-    /// Only the supervisor service is allowed to perform this action.
-    /// If any other instance will call this method, the request will be ignored.
-    #[doc(hidden)]
-    pub fn update_config(&self, changes: Vec<ConfigChange>) {
-        let action = Action::UpdateConfig {
-            caller_instance_id: self.instance.id,
-            changes,
-        };
-        self.mailbox.add_request(self.instance.id, action, None);
+    /// Returns a reference to the communication channel between supervisor and blockcahin core.
+    pub fn communication_channel(&self) -> &CommunicationChannel<()> {
+        self.communication_channel
     }
 }
 
@@ -332,8 +297,8 @@ pub struct AfterCommitContext<'a> {
     pub snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
-    /// Reference to the blockchain mailbox.
-    mailbox: &'a BlockchainMailbox,
+    /// Reference to the communication channel.
+    communication_channel: &'a CommunicationChannel<'a, ()>,
     /// Channel to send signed transactions to the transactions pool.
     tx_sender: &'a ApiSender,
 }
@@ -343,12 +308,12 @@ impl<'a> AfterCommitContext<'a> {
     pub(crate) fn new(
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
-        mailbox: &'a BlockchainMailbox,
+        communication_channel: &'a CommunicationChannel<'a, ()>,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            mailbox,
+            communication_channel,
             instance,
             snapshot,
             service_keypair,
@@ -390,14 +355,9 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Adds a request to the list of pending actions. These changes will be applied immediately
-    /// before the block commit.
-    ///
-    /// Currently only the supervisor service is allowed to perform this action.
-    /// If any other instance will call this method, the request will be ignored.
-    #[doc(hidden)]
-    pub fn request_action(&self, action: Action, and_then: AfterRequestCompleted) {
-        self.mailbox.add_request(self.instance.id, action, and_then);
+    /// Returns a reference to the communication channel between supervisor and blockcahin core.
+    pub fn communication_channel(&self) -> &CommunicationChannel<()> {
+        self.communication_channel
     }
 
     /// Returns a transaction broadcaster.

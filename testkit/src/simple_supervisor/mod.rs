@@ -23,6 +23,7 @@ use exonum::{
     helpers::ValidateInput,
     merkledb::Snapshot,
     runtime::{
+        communication_channel::SupervisorAccess,
         rust::{interfaces::ConfigureCall, BeforeCommitContext, Service, TransactionContext},
         Caller, ConfigChange, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
@@ -122,11 +123,15 @@ impl Service for SimpleSupervisor {
             return;
         };
         // Perform the application of configs.
-        context.update_config(proposal.changes);
+        let communication_channel = context.communication_channel().supervisor_interface(self);
+
+        communication_channel.update_config(Self::BUILTIN_ID, proposal.changes);
         // Remove config from proposals.
         schema.config_propose_entry().remove();
     }
 }
+
+impl SupervisorAccess for SimpleSupervisor {}
 
 impl SimpleSupervisor {
     pub const BUILTIN_ID: InstanceId = 0;

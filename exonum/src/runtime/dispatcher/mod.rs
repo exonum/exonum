@@ -43,6 +43,8 @@ use super::{
     BlockchainMailbox,
     CallInfo,
     Caller,
+    CommunicationChannel,
+    CommunicationChannelContext,
     ConfigChange,
     ExecutionContext,
     InstanceId,
@@ -278,14 +280,15 @@ impl Dispatcher {
     pub(crate) fn execute(
         &mut self,
         fork: &mut Fork,
-        mailbox: &mut BlockchainMailbox,
+        mailbox: &BlockchainMailbox,
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        let dispatcher_ref = DispatcherRef::new(self);
+        let communication_channel =
+            CommunicationChannel::new(CommunicationChannelContext::Tx, mailbox, self);
+
         let context = ExecutionContext::new(
-            &dispatcher_ref,
-            mailbox,
+            &communication_channel,
             fork,
             Caller::Transaction {
                 author: tx.author(),
@@ -316,22 +319,30 @@ impl Dispatcher {
         runtime.execute(context, call_info, arguments)
     }
 
-    pub(crate) fn before_commit(&mut self, mailbox: &mut BlockchainMailbox, fork: &mut Fork) {
-        let dispatcher_ref = DispatcherRef::new(self);
+    pub(crate) fn before_commit(&mut self, mailbox: &BlockchainMailbox, fork: &mut Fork) {
+        let communication_channel =
+            CommunicationChannel::new(CommunicationChannelContext::BeforeCommit, mailbox, self);
         for runtime in self.runtimes.values() {
-            runtime.before_commit(&dispatcher_ref, mailbox, fork);
+            runtime.before_commit(&communication_channel, fork);
         }
     }
 
     pub(crate) fn after_commit(
         &mut self,
-        mailbox: &mut BlockchainMailbox,
+        mailbox: &BlockchainMailbox,
         snapshot: impl AsRef<dyn Snapshot>,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
+        let communication_channel =
+            CommunicationChannel::new(CommunicationChannelContext::AfterCommit, mailbox, self);
         self.runtimes.values().for_each(|runtime| {
-            runtime.after_commit(mailbox, snapshot.as_ref(), &service_keypair, &tx_sender)
+            runtime.after_commit(
+                &communication_channel,
+                snapshot.as_ref(),
+                &service_keypair,
+                &tx_sender,
+            )
         });
     }
 
@@ -400,7 +411,7 @@ impl Dispatcher {
     /// Perform a configuration update with the specified changes.
     pub(crate) fn update_config(
         &self,
-        mailbox: &mut BlockchainMailbox,
+        mailbox: &BlockchainMailbox,
         fork: &mut Fork,
         caller_instance_id: InstanceId,
         changes: Vec<ConfigChange>,
@@ -422,12 +433,14 @@ impl Dispatcher {
                     config.instance_id
                 );
 
+
+                let communication_channel =
+                    CommunicationChannel::new(CommunicationChannelContext::AfterCommit, mailbox, self);
+
                 let configure_result = catch_panic(|| {
-                    let dispatcher_ref = DispatcherRef::new(self);
                     let context = CallContext::new(
                         fork,
-                        &dispatcher_ref,
-                        mailbox,
+                        &communication_channel,
                         caller_instance_id,
                         config.instance_id,
                     );
@@ -448,29 +461,5 @@ impl Dispatcher {
     /// Assigns an instance identificator to the new service instance.
     pub(crate) fn assign_instance_id(&self, fork: &Fork) -> InstanceId {
         Schema::new(fork as &Fork).assign_instance_id()
-    }
-}
-
-/// Reference to the underlying runtime dispatcher.
-#[derive(Debug)]
-pub struct DispatcherRef<'a> {
-    /// Reference to the underlying runtime dispatcher.
-    inner: &'a Dispatcher,
-}
-
-impl<'a> DispatcherRef<'a> {
-    /// Create a new instance.
-    pub(crate) fn new(dispatcher: &'a Dispatcher) -> Self {
-        Self { inner: dispatcher }
-    }
-
-    /// Call the corresponding runtime method.
-    pub(crate) fn call(
-        &self,
-        context: &ExecutionContext,
-        call_info: &CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        self.inner.call(context, call_info, arguments)
     }
 }

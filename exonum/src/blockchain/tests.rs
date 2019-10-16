@@ -34,7 +34,10 @@ use crate::{
         dispatcher,
         error::ErrorKind,
         mailbox::Action,
-        rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
+        rust::{
+            communication_channel::SupervisorAccess, BeforeCommitContext, Service, ServiceFactory,
+            Transaction, TransactionContext,
+        },
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -118,6 +121,8 @@ impl Service for TestDispatcherService {
     }
 }
 
+impl SupervisorAccess for TestDispatcherService {}
+
 impl TestDispatcherInterface for TestDispatcherService {
     fn test_deploy(
         &self,
@@ -134,7 +139,7 @@ impl TestDispatcherInterface for TestDispatcherService {
             ServiceGoodImpl.artifact_id().into()
         };
 
-        context.request_action(
+        context.communication_channel(self).request_action(
             Action::RegisterArtifact {
                 artifact,
                 spec: Vec::new(),
@@ -166,7 +171,7 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        context.request_action(
+        context.communication_channel(self).request_action(
             Action::AddService {
                 artifact,
                 instance_name: format!("good-service-{}", arg.value),

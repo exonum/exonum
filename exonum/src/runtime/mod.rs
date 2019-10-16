@@ -92,6 +92,7 @@
 //! [`Configure`]: rust/interfaces/trait.Configure.html
 
 pub use self::{
+    communication_channel::CommunicationChannel,
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
     mailbox::BlockchainMailbox,
@@ -101,9 +102,12 @@ pub use self::{
     },
 };
 
+pub(crate) use self::communication_channel::CommunicationChannelContext;
+
 #[macro_use]
 pub mod rust;
 pub mod api;
+pub mod communication_channel;
 pub mod dispatcher;
 pub mod error;
 pub mod mailbox;
@@ -120,7 +124,7 @@ use crate::{
     node::ApiSender,
 };
 
-use self::{api::ServiceApiBuilder, dispatcher::DispatcherRef};
+use self::api::ServiceApiBuilder;
 
 mod types;
 
@@ -261,12 +265,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(
-        &self,
-        dispatcher: &DispatcherRef,
-        mailbox: &BlockchainMailbox,
-        fork: &mut Fork,
-    );
+    fn before_commit(&self, communication_channel: &CommunicationChannel<()>, fork: &mut Fork);
 
     /// Calls `after_commit` for all the services stored in the runtime.
     ///
@@ -276,7 +275,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// them into the log.
     fn after_commit(
         &self,
-        mailbox: &BlockchainMailbox,
+        communication_channel: &CommunicationChannel<()>,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
@@ -423,10 +422,8 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field can only contains a core interfaces like `Configure` and
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
-    /// Reference to the blockchain mailbox.
-    pub mailbox: &'a BlockchainMailbox,
-    /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a DispatcherRef<'a>,
+    /// Reference to the communication channel.
+    pub communication_channel: &'a CommunicationChannel<'a, ()>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -436,16 +433,14 @@ impl<'a> ExecutionContext<'a> {
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
     pub(crate) fn new(
-        dispatcher: &'a DispatcherRef<'a>,
-        mailbox: &'a mut BlockchainMailbox,
+        communication_channel: &'a CommunicationChannel<'a, ()>,
         fork: &'a Fork,
         caller: Caller,
     ) -> Self {
         Self {
             fork,
             caller,
-            dispatcher,
-            mailbox,
+            communication_channel,
             interface_name: "",
             call_stack_depth: 0,
         }

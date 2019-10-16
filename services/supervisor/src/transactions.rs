@@ -333,7 +333,9 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
-            context.request_action(
+            let communication_channel = context.communication_channel().supervisor_interface(self);
+
+            communication_channel.request_action(
                 Action::RegisterArtifact {
                     artifact: confirmation.artifact,
                     spec: confirmation.spec,
@@ -387,7 +389,9 @@ impl SupervisorInterface for Supervisor {
             );
             // We have enough confirmations to add a new service instance,
             // if this action fails this transaction will be canceled.
-            context.request_action(
+            let communication_channel = context.communication_channel().supervisor_interface(self);
+
+            communication_channel.request_action(
                 Action::AddService {
                     artifact: service.artifact,
                     instance_name: service.name,

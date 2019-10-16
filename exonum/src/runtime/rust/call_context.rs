@@ -15,8 +15,7 @@
 use exonum_merkledb::{BinaryValue, Fork};
 
 use crate::runtime::{
-    BlockchainMailbox, CallInfo, Caller, DispatcherRef, ExecutionContext, ExecutionError,
-    InstanceId, MethodId,
+    CallInfo, Caller, CommunicationChannel, ExecutionContext, ExecutionError, InstanceId, MethodId,
 };
 
 // TODO Write a full documentation when the interservice communications are fully implemented. [ECR-3493]
@@ -29,10 +28,8 @@ pub struct CallContext<'a> {
     called: InstanceId,
     /// The current state of the blockchain.
     fork: &'a Fork,
-    /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a DispatcherRef<'a>,
-    /// Reference to the blockchain mailbox.
-    mailbox: &'a BlockchainMailbox,
+    /// Reference to the communication channel.
+    communication_channel: &'a CommunicationChannel<'a, ()>,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -41,8 +38,7 @@ impl<'a> CallContext<'a> {
     /// Create a new call context.
     pub fn new(
         fork: &'a Fork,
-        dispatcher: &'a DispatcherRef<'a>,
-        mailbox: &'a BlockchainMailbox,
+        communication_channel: &'a CommunicationChannel<'a, ()>,
         caller: InstanceId,
         called: InstanceId,
     ) -> Self {
@@ -50,8 +46,7 @@ impl<'a> CallContext<'a> {
             caller,
             called,
             fork,
-            dispatcher,
-            mailbox,
+            communication_channel,
             call_stack_depth: 0,
         }
     }
@@ -66,8 +61,7 @@ impl<'a> CallContext<'a> {
             caller,
             called,
             fork: inner.fork,
-            mailbox: inner.mailbox,
-            dispatcher: inner.dispatcher,
+            communication_channel: inner.communication_channel,
             call_stack_depth: inner.call_stack_depth,
         }
     }
@@ -82,8 +76,7 @@ impl<'a> CallContext<'a> {
     ) -> Result<(), ExecutionError> {
         let context = ExecutionContext {
             fork: self.fork,
-            dispatcher: self.dispatcher,
-            mailbox: self.mailbox,
+            communication_channel: self.communication_channel,
             caller: Caller::Service {
                 instance_id: self.caller,
             },
@@ -104,7 +97,7 @@ impl<'a> CallContext<'a> {
             return Err((kind, msg).into());
         }
 
-        self.dispatcher
+        self.communication_channel
             .call(&context, &call_info, arguments.into_bytes().as_ref())
     }
 }
