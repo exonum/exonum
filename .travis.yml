@@ -59,8 +59,13 @@ env:
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - RUSTC_WRAPPER=sccache
+  - SCCACHE_VERS=0.2.12
   matrix:
   - FEATURE=test
+
+before_install:
+  - sccache -V || cargo install sccache --vers $SCCACHE_VERS --force
 
 jobs:
   include:
