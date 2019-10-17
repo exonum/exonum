@@ -31,7 +31,6 @@ use crate::{
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
-        communication_channel::SupervisorAccess,
         dispatcher,
         error::ErrorKind,
         mailbox::Action,
@@ -119,8 +118,6 @@ impl Service for TestDispatcherService {
     }
 }
 
-impl SupervisorAccess for TestDispatcherService {}
-
 impl TestDispatcherInterface for TestDispatcherService {
     fn test_deploy(
         &self,
@@ -137,7 +134,7 @@ impl TestDispatcherInterface for TestDispatcherService {
             ServiceGoodImpl.artifact_id().into()
         };
 
-        let communication_channel = context.communication_channel().supervisor_interface(self);
+        let communication_channel = context.supervisor_extensions().unwrap();
 
         communication_channel.request_action(
             Action::RegisterArtifact {
@@ -171,7 +168,7 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        let communication_channel = context.communication_channel().supervisor_interface(self);
+        let communication_channel = context.supervisor_extensions().unwrap();
 
         communication_channel.request_action(
             Action::AddService {

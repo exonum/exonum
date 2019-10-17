@@ -23,8 +23,11 @@ use crate::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        api::ServiceApiBuilder, error::ExecutionError, AnyTx, ArtifactProtobufSpec, CallInfo,
-        Caller, CommunicationChannel, ExecutionContext, InstanceDescriptor, InstanceId, MethodId,
+        api::ServiceApiBuilder,
+        communication_channel::{CommunicationChannel, SupervisorAccess},
+        error::ExecutionError,
+        AnyTx, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+        InstanceId, MethodId,
     },
 };
 
@@ -198,9 +201,16 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         })
     }
 
-    /// Returns a reference to the communication channel between supervisor and blockchain core.
-    pub fn communication_channel(&self) -> &CommunicationChannel {
-        self.inner.communication_channel
+    // Provides a supervisor interface to an authorized instance.
+    #[doc(hidden)]
+    pub fn supervisor_extensions(&self) -> Option<CommunicationChannel<SupervisorAccess>> {
+        if !is_supervisor(self.instance.id) {
+            return None;
+        };
+
+        let supervisor_interface = self.inner.communication_channel.supervisor_interface();
+
+        Some(supervisor_interface)
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
@@ -283,9 +293,16 @@ impl<'a> BeforeCommitContext<'a> {
         )
     }
 
-    /// Returns a reference to the communication channel between supervisor and blockchain core.
-    pub fn communication_channel(&self) -> &CommunicationChannel {
-        self.communication_channel
+    // Provides a supervisor interface to an authorized instance.
+    #[doc(hidden)]
+    pub fn supervisor_extensions(&self) -> Option<CommunicationChannel<SupervisorAccess>> {
+        if !is_supervisor(self.instance.id) {
+            return None;
+        };
+
+        let supervisor_interface = self.communication_channel.supervisor_interface();
+
+        Some(supervisor_interface)
     }
 }
 
@@ -364,6 +381,18 @@ impl<'a> AfterCommitContext<'a> {
     pub fn transaction_broadcaster(&self) -> ApiSender {
         self.tx_sender.clone()
     }
+
+    // Provides a supervisor interface to an authorized instance.
+    #[doc(hidden)]
+    pub fn supervisor_extensions(&self) -> Option<CommunicationChannel<SupervisorAccess>> {
+        if !is_supervisor(self.instance.id) {
+            return None;
+        };
+
+        let supervisor_interface = self.communication_channel.supervisor_interface();
+
+        Some(supervisor_interface)
+    }
 }
 
 impl<'a> Debug for AfterCommitContext<'a> {
@@ -385,4 +414,8 @@ pub trait Interface {
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
+}
+
+fn is_supervisor(instance_id: InstanceId) -> bool {
+    instance_id == crate::runtime::SUPERVISOR_INSTANCE_ID
 }

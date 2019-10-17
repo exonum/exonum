@@ -34,7 +34,6 @@ use exonum::{
     helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
-        communication_channel::SupervisorAccess,
         mailbox::Action,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
         InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
@@ -101,8 +100,7 @@ impl Service for Supervisor {
                         entry.config_propose
                     );
                     // Perform the application of configs.
-                    let communication_channel =
-                        context.communication_channel().supervisor_interface(self);
+                    let communication_channel = context.supervisor_extensions().unwrap();
 
                     communication_channel
                         .update_config(context.instance.id, entry.config_propose.changes);
@@ -157,15 +155,12 @@ impl Service for Supervisor {
                 };
                 // TODO Rewrite on async await syntax. [ECR-3222]
                 let action = Action::StartDeploy { artifact, spec };
-                let communication_channel =
-                    context.communication_channel().supervisor_interface(self);
+                let communication_channel = context.supervisor_extensions().unwrap();
 
                 communication_channel.request_action(action, Some(Box::new(and_then)));
             })
     }
 }
-
-impl SupervisorAccess for Supervisor {}
 
 impl From<Supervisor> for InstanceCollection {
     fn from(service: Supervisor) -> Self {

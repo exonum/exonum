@@ -18,10 +18,12 @@ use crate::runtime::{
     CallInfo, ConfigChange, ExecutionContext, ExecutionError, InstanceId,
 };
 
-/// Marker trait for `Supervisor` entities. Implementors of that trait can get access
-/// to the extended interface of `CommunicationChannel`.
+/// Marker struct for `Supervisor` entities.
+/// It is used as a type parameter for `CommunicationChannel` to provide
+/// `Supervisor`-related functionality.
 #[doc(hidden)]
-pub trait SupervisorAccess {}
+#[derive(Debug)]
+pub struct SupervisorAccess {}
 
 /// Communication channel is an proxy entity for performing service calls from
 /// other service instances.
@@ -54,18 +56,12 @@ impl<'a, T> CommunicationChannel<'a, T> {
 
     /// Opens an extended interface for supervisor.
     #[doc(hidden)]
-    pub fn supervisor_interface<A>(&'a self, _requestor: &A) -> CommunicationChannel<'a, A>
-    where
-        A: SupervisorAccess,
-    {
-        CommunicationChannel::<A>::new(self.mailbox, self.dispatcher)
+    pub fn supervisor_interface(&'a self) -> CommunicationChannel<'a, SupervisorAccess> {
+        CommunicationChannel::<SupervisorAccess>::new(self.mailbox, self.dispatcher)
     }
 }
 
-impl<'a, T> CommunicationChannel<'a, T>
-where
-    T: SupervisorAccess,
-{
+impl<'a> CommunicationChannel<'a, SupervisorAccess> {
     /// Adds a request to the list of pending actions. These changes will be applied immediately
     /// before the block commit.
     ///
