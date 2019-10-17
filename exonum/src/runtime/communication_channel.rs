@@ -42,7 +42,7 @@ impl<'a, T> CommunicationChannel<'a, T> {
         }
     }
 
-    /// Call the corresponding runtime method.
+    /// Calls the corresponding service method.
     pub fn call(
         &self,
         context: &ExecutionContext,
@@ -69,6 +69,9 @@ where
     /// Adds a request to the list of pending actions. These changes will be applied immediately
     /// before the block commit.
     ///
+    /// If `and_then` callback is provided, it will be executed on the main thread right after
+    /// request completion. Any panic occurred during callback call will be suppressed.
+    ///
     /// Currently only the supervisor service is allowed to perform this action.
     /// If any other instance will call this method, the request will be ignored.
     #[doc(hidden)]
@@ -87,6 +90,6 @@ where
             caller_instance_id,
             changes,
         };
-        self.mailbox.add_request(action, None);
+        self.request_action(action, None);
     }
 }

@@ -28,6 +28,11 @@ use crate::runtime::{
 
 use super::{Action, AfterRequestCompleted, BlockchainMailbox, Notification};
 
+// A constant denoting the maximum number of iterations during mailbox processing.
+// Exceeding that limit will mean an error in services implementation (e.g., a cyclic
+// dependency: update of config A depend on update on config B, and vice versa).
+const PROCESSING_ITERATIONS_LIMIT: usize = 4;
+
 /// Mailbox processing context.
 ///
 /// This enum defines the rules of requests processing:
@@ -61,7 +66,18 @@ impl BlockchainSecretary {
     /// Since any failures won't affect the blockchain state, they are simply ignored.
     pub fn process_requests(&self, mailbox: &mut BlockchainMailbox, dispatcher: &mut Dispatcher) {
         // During requests processing new requests may appear.
+        let mut n_iters = 0;
         loop {
+            if n_iters >= PROCESSING_ITERATIONS_LIMIT {
+                // Too much iterations, quit.
+                warn!(
+                    "A cycle appeared during the requests processing within context {:?}",
+                    self.context
+                );
+                return;
+            }
+            n_iters += 1;
+
             let requests = mailbox.drain_requests();
 
             if requests.is_empty() {
@@ -97,7 +113,18 @@ impl BlockchainSecretary {
         fork: &mut Fork,
     ) -> Result<(), ExecutionError> {
         // During requests processing new requests may appear.
+        let mut n_iters = 0;
         loop {
+            if n_iters >= PROCESSING_ITERATIONS_LIMIT {
+                // Too much iterations, quit.
+                warn!(
+                    "A cycle appeared during the requests processing within context {:?}",
+                    self.context
+                );
+                return Err(DispatcherError::RequestLoop.into());
+            }
+            n_iters += 1;
+
             let requests = mailbox.drain_requests();
 
             if requests.is_empty() {

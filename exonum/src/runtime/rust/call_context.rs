@@ -31,6 +31,8 @@ pub struct CallContext<'a> {
     /// Reference to the communication channel.
     communication_channel: &'a CommunicationChannel<'a>,
     /// Depth of call stack.
+    /// Since we can call services from other services, we should be aware
+    /// of the recursion and terminate tx execution if recursion limit was exceeded.
     call_stack_depth: usize,
 }
 
