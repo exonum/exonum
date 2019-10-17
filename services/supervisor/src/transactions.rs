@@ -66,7 +66,7 @@ pub trait SupervisorInterface {
     /// This request should be sent by one of validators as the proposition to change
     /// current configuration to new one. All another validators able to vote for this
     /// configuration by sending `confirm_config_change` transaction.
-    /// Note: only one proposal at time is possible.
+    /// Note: only one config proposal could be applied at the block.
     fn propose_config_change(
         &self,
         context: TransactionContext,
@@ -141,8 +141,8 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::ActualFromIsPast.into());
         }
 
-        // Verifies that there are no pending config changes.
-        if schema.pending_proposal().exists() {
+        // Verifies that there are no pending config changes assigned to same height.
+        if schema.pending_propose_hashes().contains(&propose.actual_from.0) {
             return Err(Error::ConfigProposeExists.into());
         }
 
@@ -185,10 +185,11 @@ impl SupervisorInterface for Supervisor {
         config_confirms.confirm(&propose_hash, author);
 
         let config_entry = ConfigProposalWithHash {
-            config_propose: propose,
+            config_propose: propose.clone(),
             propose_hash,
         };
-        schema.pending_proposal().set(config_entry);
+
+        schema.pending_propose_hashes().put(&propose.actual_from.0, config_entry);
 
         Ok(())
     }
@@ -211,26 +212,19 @@ impl SupervisorInterface for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        let entry = schema
-            .pending_proposal()
-            .get()
-            .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
-
         // Verifies that this config proposal is registered.
-        if entry.propose_hash != vote.propose_hash {
-            return Err(Error::ConfigProposeNotRegistered.into());
-        }
-
-        let config_propose = entry.config_propose;
+        let proposal = schema.pending_propose_hashes().values().find(|proposal|
+            vote.propose_hash == proposal.propose_hash).ok_or_else(|| {
+            Error::ConfigProposeNotRegistered
+        })?;
         // Verifies that we didn't reach the deadline height.
-        if config_propose.actual_from <= blockchain_height {
+        if proposal.config_propose.actual_from <= blockchain_height {
             return Err(Error::DeadlineExceeded.into());
         }
 
-        if config_confirms.confirmed_by(&entry.propose_hash, &author) {
+        if config_confirms.confirmed_by(&proposal.propose_hash, &author) {
             return Err(Error::AttemptToVoteTwice.into());
         }
-
         config_confirms.confirm(&vote.propose_hash, author);
         trace!(
             "Propose config {:?} has been confirmed by {:?}",

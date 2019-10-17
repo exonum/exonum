@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
 
 use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
 
@@ -68,9 +68,9 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         )
     }
 
-    pub fn pending_proposal(&self) -> Entry<T, ConfigProposalWithHash> {
-        Entry::new(
-            [self.instance_name, ".pending_proposal"].concat(),
+    pub fn pending_propose_hashes(&self) -> ProofMapIndex<T, u64, ConfigProposalWithHash> {
+        ProofMapIndex::new(
+            [self.instance_name, ".pending_propose_hashes"].concat(),
             self.access.clone(),
         )
     }

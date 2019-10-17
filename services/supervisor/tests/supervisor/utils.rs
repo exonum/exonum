@@ -37,10 +37,16 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
+    let proposal = Schema::new(SUPERVISOR_INSTANCE_NAME, &snapshot)
+        .pending_propose_hashes().values().next()
+        .map(|entry| entry.config_propose);
+    proposal
+}
+
+pub fn count_of_pending_config_proposals(testkit: &TestKit) -> usize {
+    let snapshot = testkit.snapshot();
     Schema::new(SUPERVISOR_INSTANCE_NAME, &snapshot)
-        .pending_proposal()
-        .get()
-        .map(|entry| entry.config_propose)
+        .pending_propose_hashes().keys().count()
 }
 
 pub fn sign_config_propose_transaction(

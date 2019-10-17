@@ -31,7 +31,7 @@ fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
         .unwrap()
 }
 
-fn current_config_proposal(api: &TestKitApi) -> Option<ConfigProposalWithHash> {
+fn current_config_proposal(api: &TestKitApi) -> Vec<ConfigProposalWithHash> {
     api.public(ApiKind::Service("supervisor"))
         .get("config-proposal")
         .unwrap()
@@ -67,7 +67,7 @@ fn test_consensus_config_api() {
 fn test_config_proposal_api() {
     let testkit = testkit_with_supervisor(1);
 
-    assert_eq!(current_config_proposal(&testkit.api()), None);
+    assert!(current_config_proposal(&testkit.api()).is_empty());
 }
 
 #[test]
@@ -92,8 +92,10 @@ fn test_confirm_proposal_with_api() {
         .expect("Transaction with change propose discarded.");
 
     // Get proposal info
-    let pending_config =
-        current_config_proposal(&testkit.api()).expect("Config proposal was not registered.");
+    let pending_configs =
+        current_config_proposal(&testkit.api());
+    assert_eq!(pending_configs.len(), 1,  "Config proposal was not registered.");
+    let pending_config = pending_configs.get(0).unwrap();
     let proposal_hash = config_proposal.object_hash();
     assert_eq!(proposal_hash, pending_config.propose_hash);
     assert_eq!(config_proposal, pending_config.config_propose);
@@ -130,8 +132,10 @@ fn test_send_proposal_with_api() {
     testkit.api().exonum_api().assert_tx_success(hash);
 
     // Get proposal info
-    let pending_config =
-        current_config_proposal(&testkit.api()).expect("Config proposal was not registered.");
+    let pending_configs =
+        current_config_proposal(&testkit.api());
+    assert_eq!(pending_configs.len(), 1, "Config proposal was not registered.");
+    let pending_config = pending_configs.get(0).unwrap();
     let proposal_hash = config_proposal.object_hash();
     assert_eq!(proposal_hash, pending_config.propose_hash);
     assert_eq!(config_proposal, pending_config.config_propose);
@@ -154,3 +158,5 @@ fn test_send_proposal_with_api() {
     let consensus_config = actual_consensus_config(&testkit.api());
     assert_eq!(consensus_proposal, consensus_config);
 }
+
+// 2 proposals to same height simultaneously

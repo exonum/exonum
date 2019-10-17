@@ -81,30 +81,27 @@ impl Service for Supervisor {
             trace!("Removed outdated deployment request {:?}", request);
         }
 
-        let entry = schema.pending_proposal().get();
+        let entry = schema.pending_propose_hashes().get(&height.next().0);
         if let Some(entry) = entry {
-            if entry.config_propose.actual_from <= height {
-                // Remove pending config proposal for which deadline was exceeded.
-                trace!("Removed outdated config proposal");
-                schema.pending_proposal().remove();
-            } else {
-                let config_confirms = schema.config_confirms();
-                let confirmations = config_confirms.confirmations(&entry.propose_hash);
-                let validators = config_confirms.validators_amount();
+            let config_confirms = schema.config_confirms();
+            let confirmations = config_confirms.confirmations(&entry.propose_hash);
+            let validators = config_confirms.validators_amount();
 
-                // Apply pending config in case 2/3+1 validators voted for it.
-                if confirmations >= byzantine_quorum(validators) {
-                    info!(
-                        "New configuration has been accepted: {:?}",
-                        entry.config_propose
-                    );
-                    // Perform the application of configs.
-                    context.update_config(entry.config_propose.changes);
-                    // Remove config from proposals.
-                    schema.pending_proposal().remove();
-                }
+            // Apply pending config in case 2/3+1 validators voted for it.
+            if confirmations >= byzantine_quorum(validators) {
+                info!(
+                    "New configuration has been accepted: {:?}",
+                    entry.config_propose
+                );
+                // Perform the application of configs.
+                context.update_config(entry.config_propose.changes);
+                // Remove config from proposals.
+                schema.pending_propose_hashes().remove(&height.next().0);
             }
         }
+
+        // Remove pending config proposal for which deadline was exceeded.
+        schema.pending_propose_hashes().remove(&height.0);
     }
 
     fn after_commit(&self, context: AfterCommitContext) {

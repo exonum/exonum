@@ -40,7 +40,7 @@ fn test_multiple_consensus_change_proposes() {
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn test_deadline_config_exceeded() {
         .expect("Transaction with change propose discarded.");
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.consensus_config(), consensus_config);
 }
 
@@ -89,7 +89,7 @@ fn test_sent_new_config_after_expired_one() {
         .status()
         .expect("Transaction with change propose discarded.");
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 
     // Send config one more time and vote for it
     let cfg_change_height = Height(5);
@@ -117,7 +117,7 @@ fn test_sent_new_config_after_expired_one() {
         .expect("Transaction with confirmations discarded.");
     testkit.create_blocks_until(cfg_change_height);
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.consensus_config(), second_consensus_config);
 }
 
@@ -159,7 +159,7 @@ fn test_discard_config_with_not_enough_confirms() {
         .expect("Transaction with confirmations discarded.");
 
     testkit.create_blocks_until(cfg_change_height.next());
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.consensus_config(), base_consensus_config);
 }
 
@@ -208,7 +208,7 @@ fn test_apply_config_by_min_required_majority() {
         .status()
         .expect("Transaction with confirmation discarded.");
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.consensus_config(), consensus_config);
 }
 
@@ -352,7 +352,7 @@ fn test_service_config_change() {
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     check_service_actual_param(&testkit, Some(params));
 }
 
@@ -375,7 +375,7 @@ fn test_discard_errored_service_config_change() {
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 }
 
 #[test]
@@ -397,7 +397,7 @@ fn test_discard_panicked_service_config_change() {
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 }
 
 #[test]
@@ -459,7 +459,7 @@ fn test_another_configuration_change_proposal() {
         .expect("Transaction with confirmations discarded.");
     testkit.create_blocks_until(cfg_change_height);
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     check_service_actual_param(&testkit, Some(params));
 }
 
@@ -528,14 +528,14 @@ fn test_test_configuration_and_rollbacks() {
         .expect("Transaction with confirmations discarded.");
 
     testkit.create_blocks_until(cfg_change_height);
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.consensus_config(), new_config);
 
     testkit.checkpoint();
     testkit.create_block();
     testkit.rollback();
     assert_eq!(testkit.consensus_config(), new_config);
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 
     testkit.rollback();
 
@@ -543,7 +543,7 @@ fn test_test_configuration_and_rollbacks() {
     // the proposal is effectively forgotten.
     testkit.create_blocks_until(Height(4));
     assert_eq!(testkit.consensus_config(), old_config);
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 }
 
 #[test]
@@ -566,7 +566,7 @@ fn test_service_config_discard_single_apply_error() {
         .expect("Transaction with change propose discarded.");
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 
     check_service_actual_param(&testkit, None);
 }
@@ -593,7 +593,7 @@ fn test_service_config_discard_single_apply_panic() {
         .expect("Transaction with change propose discarded.");
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     check_service_actual_param(&testkit, None);
 }
 
@@ -639,19 +639,19 @@ fn test_services_config_discard_multiple_configs() {
 
     let params = "I am a new parameter".to_owned();
 
-    let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+    let proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
         .extend_second_service_config_propose(params.clone())
         .extend_second_service_config_propose("I am a extra proposal".to_owned())
         .config_propose();
 
-    let signed_proposal = sign_config_propose_transaction(&testkit, propose, initiator_id);
+    let signed_proposal = sign_config_propose_transaction(&testkit, proposal, initiator_id);
 
     let block = testkit.create_block_with_transaction(signed_proposal);
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 }
 
 #[test]
@@ -663,15 +663,15 @@ fn test_several_service_config_changes() {
         let cfg_change_height = Height(2 * i);
         let params = format!("Change {}", i);
 
-        let propose = ConfigProposeBuilder::new(cfg_change_height)
+        let proposal = ConfigProposeBuilder::new(cfg_change_height)
             .extend_service_config_propose(params.clone())
             .config_propose();
-        let proposal_hash = propose.object_hash();
+        let proposal_hash = proposal.object_hash();
 
         testkit
             .create_block_with_transaction(sign_config_propose_transaction(
                 &testkit,
-                propose,
+                proposal,
                 initiator_id,
             ))
             .transactions[0]
@@ -681,11 +681,72 @@ fn test_several_service_config_changes() {
         let signed_txs = build_confirmation_transactions(&testkit, proposal_hash, initiator_id);
         testkit.create_block_with_transactions(signed_txs)[0]
             .status()
-            .unwrap();
+            .expect("Transaction with confirmations discarded.");
 
         testkit.create_blocks_until(cfg_change_height);
-        assert_eq!(config_propose_entry(&testkit), None);
+        assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     }
 
     check_service_actual_param(&testkit, Some("Change 4".to_string()));
 }
+
+#[test]
+fn test_apply_config_on_actual_from_height() {
+    let mut testkit = testkit_with_supervisor_and_2_services(1);
+    let initiator_id = testkit.network().us().validator_id().unwrap();
+
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
+
+    let params = "I am a new parameter".to_owned();
+
+    let proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_service_config_propose(params.clone())
+        .config_propose();
+
+    let signed_proposal = sign_config_propose_transaction(&testkit, proposal, initiator_id);
+
+    testkit.create_block_with_transaction(signed_proposal).transactions[0]
+        .status().expect("Transaction with change propose discarded.");
+    assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+
+    testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
+}
+
+#[test]
+fn test_two_config_to_same_height() {
+    let mut testkit = testkit_with_supervisor_and_2_services(2);
+    let initiator_id = testkit.network().us().validator_id().unwrap();
+
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
+
+    let params = "I am a first parameter".to_owned();
+
+    let first_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_service_config_propose(params.clone())
+        .config_propose();
+    let first_proposal_hash = first_proposal.object_hash();
+
+    let signed_proposal = sign_config_propose_transaction(&testkit, first_proposal, initiator_id);
+
+    testkit.create_block_with_transaction(signed_proposal).transactions[0]
+        .status().expect("Transaction with change propose discarded.");
+    assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+
+    // Create second proposal with same `actual from` height
+    let second_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_service_config_propose("I am a second parameter".to_owned())
+        .config_propose();
+    let second_proposal_hash = second_proposal.object_hash();
+    let signed_proposal = sign_config_propose_transaction(&testkit, second_proposal, initiator_id);
+
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::ConfigProposeExists.into()));
+    assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+}
+
+// 2 proposals to same height from diff validator
+// 2 propoasls(from same validato) to diff height
+// 2 proposal from diff validator to diff height

@@ -51,7 +51,7 @@ pub trait PublicApi {
     /// Returns an actual consensus configuration of the blockchain.
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
     /// Returns an pending propose config change.
-    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
+    fn config_proposal(&self) -> Result<Vec<ConfigProposalWithHash>, Self::Error>;
 }
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
@@ -79,7 +79,13 @@ impl PrivateApi for ApiImpl<'_> {
     }
 
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
-        self.broadcast_transaction(proposal).map_err(From::from)
+        // Discard proposes whose `actual from` heights are same with already registered proposes
+        if Schema::new(self.0.instance.name,self.0.snapshot())
+            .pending_propose_hashes().contains(&proposal.actual_from.0) {
+            Err(Self::Error::from(failure::format_err!("Config proposal with the same height already registered")))
+        } else {
+            self.broadcast_transaction(proposal).map_err(From::from)
+        }
     }
 
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
@@ -94,10 +100,10 @@ impl PublicApi for ApiImpl<'_> {
         Ok(CoreSchema::new(self.0.snapshot()).consensus_config())
     }
 
-    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
+    fn config_proposal(&self) -> Result<Vec<ConfigProposalWithHash>, Self::Error> {
         Ok(Schema::new(self.0.instance.name, self.0.snapshot())
-            .pending_proposal()
-            .get())
+            .pending_propose_hashes().values()
+            .collect())
     }
 }
 
