@@ -59,8 +59,14 @@ env:
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - SCCACHE_VERS=0.2.12
   matrix:
   - FEATURE=test
+
+before_install:
+  - sccache -V || cargo install sccache --vers $SCCACHE_VERS --force
+  - export RUSTC_WRAPPER=sccache
+
 
 jobs:
   include:
@@ -149,12 +155,11 @@ jobs:
     # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
 
 before_cache:
-  - |
-    cd $TRAVIS_BUILD_DIR/target/debug
-    rm -rf incremental examples
-    find . -maxdepth 1 -type f -executable -delete
-    find deps -type f -size +20M -delete
-    du -h -d 1 .
+  # `cache: cargo` directive adds the following command to the before_cache phase of the job in order to reduce cache size.
+  # We explicitly added it because our before_cache script is customised.
+  - rm -rf $TRAVIS_HOME/.cargo/registry/src
+  # Remove all libraries and artifacts related to exonum. An exception is a exonum_sodiumoxide crate. We want to cache it.
+  - find target -name '*exonum*' -and -not -name '*exonum_sodiumoxide*' -and -not -name '*exonum_libsodium*' -prune -exec rm -rf {} \;
 
 notifications:
   webhooks:
