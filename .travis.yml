@@ -149,12 +149,8 @@ jobs:
     # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
 
 before_cache:
-  - |
-    cd $TRAVIS_BUILD_DIR/target/debug
-    rm -rf incremental examples
-    find . -maxdepth 1 -type f -executable -delete
-    find deps -type f -size +20M -delete
-    du -h -d 1 .
+  - rm -rf $TRAVIS_HOME/.cargo/registry/src
+  - find target -name '*exonum*' -and -not -name '*exonum_sodiumoxide*' -and -not -name '*exonum_libsodium*' -prune -exec rm -rf {} \;
 
 notifications:
   webhooks:
