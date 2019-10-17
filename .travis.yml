@@ -149,7 +149,10 @@ jobs:
     # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
 
 before_cache:
+  # `cache: cargo` directive adds the following command to the before_cache phase of the job in order to reduce cache size.
+  # We explicitly added it because our before_cache script is customised.
   - rm -rf $TRAVIS_HOME/.cargo/registry/src
+  # Remove all libraries and artifacts related to exonum. An exception is a exonum_sodiumoxide crate. We want to cache it.
   - find target -name '*exonum*' -and -not -name '*exonum_sodiumoxide*' -and -not -name '*exonum_libsodium*' -prune -exec rm -rf {} \;
 
 notifications:
