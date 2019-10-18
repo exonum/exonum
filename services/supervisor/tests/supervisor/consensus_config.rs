@@ -46,7 +46,7 @@ fn test_add_nodes_to_validators() {
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(testkit.consensus_config(), new_consensus_config);
 }
@@ -82,7 +82,7 @@ fn test_exclude_us_from_validators() {
 
     let new_validators = testkit.network().validators();
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.consensus_config(), new_consensus_config);
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_ne!(old_validators, new_validators);
@@ -116,7 +116,7 @@ fn test_exclude_other_from_validators() {
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.consensus_config(), new_consensus_config);
     assert_eq!(testkit.network().us().validator_id(), Some(initiator_id));
 }
@@ -149,7 +149,7 @@ fn test_change_our_validator_id() {
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
 
-    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());
     assert_eq!(testkit.consensus_config(), new_consensus_config);

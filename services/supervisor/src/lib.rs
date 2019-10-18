@@ -22,7 +22,7 @@ extern crate log;
 pub use self::{
     errors::Error,
     proto_structures::{
-        ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest,
+        ConfigProposalInfo, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest,
         StartService,
     },
     schema::Schema,
@@ -81,27 +81,27 @@ impl Service for Supervisor {
             trace!("Removed outdated deployment request {:?}", request);
         }
 
-        let entry = schema.pending_propose_hashes().get(&height.next().0);
-        if let Some(entry) = entry {
+        let entry = schema.pending_proposals().get(&height.next());
+        if let Some(proposal_info) = entry {
             let config_confirms = schema.config_confirms();
-            let confirmations = config_confirms.confirmations(&entry.propose_hash);
+            let confirmations = config_confirms.confirmations(&proposal_info.propose_hash);
             let validators = config_confirms.validators_amount();
 
             // Apply pending config in case 2/3+1 validators voted for it.
             if confirmations >= byzantine_quorum(validators) {
                 info!(
                     "New configuration has been accepted: {:?}",
-                    entry.config_propose
+                    proposal_info.config_propose
                 );
                 // Perform the application of configs.
-                context.update_config(entry.config_propose.changes);
-                // Remove config from proposals.
-                schema.pending_propose_hashes().remove(&height.next().0);
+                context.update_config(proposal_info.config_propose.changes);
+                // Remove config from pending proposals.
+                schema.pending_proposals().remove(&height.next());
             }
         }
 
         // Remove pending config proposal for which deadline was exceeded.
-        schema.pending_propose_hashes().remove(&height.0);
+        schema.pending_proposals().remove(&height);
     }
 
     fn after_commit(&self, context: AfterCommitContext) {

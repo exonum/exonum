@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
+use exonum::{
+    crypto::Hash, helpers::multisig::ValidatorMultisig, helpers::Height, runtime::ArtifactId,
+};
+use exonum_merkledb::{IndexAccess, MapIndex, ObjectHash, ProofMapIndex};
 
-use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
+use super::{ConfigProposalInfo, DeployConfirmation, DeployRequest, StartService};
 
 /// Service information schema.
 #[derive(Debug)]
@@ -68,9 +70,9 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         )
     }
 
-    pub fn pending_propose_hashes(&self) -> ProofMapIndex<T, u64, ConfigProposalWithHash> {
-        ProofMapIndex::new(
-            [self.instance_name, ".pending_propose_hashes"].concat(),
+    pub fn pending_proposals(&self) -> MapIndex<T, Height, ConfigProposalInfo> {
+        MapIndex::new(
+            [self.instance_name, ".pending_proposals"].concat(),
             self.access.clone(),
         )
     }

@@ -15,7 +15,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
-    crypto::Hash,
+    crypto::{Hash, PublicKey},
     exonum_merkledb::ObjectHash,
     helpers::Height,
     impl_serde_hex_for_binary_value,
@@ -80,10 +80,12 @@ pub struct ConfigVote {
     pub propose_hash: Hash,
 }
 
-/// Pending config change proposal entry
+/// Pending config change proposal info
 #[derive(Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "proto::ConfigProposalWithHash")]
-pub struct ConfigProposalWithHash {
+#[exonum(pb = "proto::ConfigProposalInfo")]
+pub struct ConfigProposalInfo {
+    /// Author PublicKey of configuration proposition.
+    pub author: PublicKey,
     /// Hash of configuration proposition.
     pub propose_hash: Hash,
     /// The configuration change proposal

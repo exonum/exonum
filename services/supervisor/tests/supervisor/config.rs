@@ -705,8 +705,11 @@ fn test_apply_config_on_actual_from_height() {
 
     let signed_proposal = sign_config_propose_transaction(&testkit, proposal, initiator_id);
 
-    testkit.create_block_with_transaction(signed_proposal).transactions[0]
-        .status().expect("Transaction with change propose discarded.");
+    testkit
+        .create_block_with_transaction(signed_proposal)
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
     assert_eq!(count_of_pending_config_proposals(&testkit), 1);
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
@@ -721,32 +724,110 @@ fn test_two_config_to_same_height() {
 
     assert_eq!(count_of_pending_config_proposals(&testkit), 0);
 
-    let params = "I am a first parameter".to_owned();
-
+    // Create first proposal
     let first_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_service_config_propose(params.clone())
+        .extend_service_config_propose("I am a first parameter".to_owned())
         .config_propose();
-    let first_proposal_hash = first_proposal.object_hash();
 
-    let signed_proposal = sign_config_propose_transaction(&testkit, first_proposal, initiator_id);
-
-    testkit.create_block_with_transaction(signed_proposal).transactions[0]
-        .status().expect("Transaction with change propose discarded.");
+    let signed_proposal =
+        sign_config_propose_transaction(&testkit, first_proposal.clone(), initiator_id);
+    testkit
+        .create_block_with_transaction(signed_proposal)
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
     assert_eq!(count_of_pending_config_proposals(&testkit), 1);
 
     // Create second proposal with same `actual from` height
     let second_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose("I am a second parameter".to_owned())
         .config_propose();
-    let second_proposal_hash = second_proposal.object_hash();
     let signed_proposal = sign_config_propose_transaction(&testkit, second_proposal, initiator_id);
 
     let block = testkit.create_block_with_transaction(signed_proposal);
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::ConfigProposeExists.into()));
+
     assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+    assert_eq!(config_proposals(&testkit), vec![first_proposal]);
 }
 
-// 2 proposals to same height from diff validator
-// 2 propoasls(from same validato) to diff height
-// 2 proposal from diff validator to diff height
+#[test]
+fn test_two_config_from_author() {
+    let mut testkit = testkit_with_supervisor_and_2_services(2);
+    let initiator_id = testkit.network().us().validator_id().unwrap();
+
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
+
+    // Create first proposal
+    let first_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_service_config_propose("I am a first parameter".to_owned())
+        .config_propose();
+
+    let signed_proposal =
+        sign_config_propose_transaction(&testkit, first_proposal.clone(), initiator_id);
+    testkit
+        .create_block_with_transaction(signed_proposal)
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+    assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+
+    // Create second proposal with same `actual from` height
+    let second_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT.next())
+        .extend_service_config_propose("I am a second parameter".to_owned())
+        .config_propose();
+    let signed_proposal = sign_config_propose_transaction(&testkit, second_proposal, initiator_id);
+
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::DiscardingSecondProposal.into()));
+
+    assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+    assert_eq!(config_proposals(&testkit), vec![first_proposal]);
+}
+
+#[test]
+fn test_two_config_from_two_author() {
+    let mut testkit = testkit_with_supervisor_and_2_services(2);
+
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
+
+    // Create first proposal
+    let first_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_service_config_propose("I am a first parameter".to_owned())
+        .config_propose();
+
+    let signed_proposal =
+        sign_config_propose_transaction(&testkit, first_proposal.clone(), ValidatorId(0));
+    testkit
+        .create_block_with_transaction(signed_proposal)
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+    assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+
+    // Create second proposal with same `actual from` height
+    let second_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT.next())
+        .extend_service_config_propose("I am a second parameter".to_owned())
+        .config_propose();
+    let signed_proposal =
+        sign_config_propose_transaction(&testkit, second_proposal.clone(), ValidatorId(1));
+
+    testkit
+        .create_block_with_transaction(signed_proposal)
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+
+    assert_eq!(count_of_pending_config_proposals(&testkit), 2);
+    assert!(config_proposals(&testkit).contains(&first_proposal));
+    assert!(config_proposals(&testkit).contains(&second_proposal));
+
+    testkit.create_block();
+    assert_eq!(count_of_pending_config_proposals(&testkit), 1);
+    assert!(config_proposals(&testkit).contains(&second_proposal));
+
+    testkit.create_block();
+    assert_eq!(count_of_pending_config_proposals(&testkit), 0);
+}

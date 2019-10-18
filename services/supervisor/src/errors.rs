@@ -41,4 +41,6 @@ pub enum Error {
     ConfigProposeNotRegistered = 11,
     /// Transaction author attempts to vote twice.
     AttemptToVoteTwice = 12,
+    /// Another change proposal from the author already in pending list.
+    DiscardingSecondProposal = 13,
 }

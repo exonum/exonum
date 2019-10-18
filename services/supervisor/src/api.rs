@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum::{
+    blockchain::{ConsensusConfig, Schema as CoreSchema},
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder, ServiceApiState},
@@ -22,10 +23,7 @@ use exonum::{
 use exonum_merkledb::ObjectHash;
 use failure::Fail;
 
-use super::{
-    schema::Schema, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest, StartService,
-};
-use exonum::blockchain::{ConsensusConfig, Schema as CoreSchema};
+use super::{schema::Schema, ConfigPropose, ConfigVote, DeployRequest, StartService};
 
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {
@@ -50,8 +48,8 @@ pub trait PublicApi {
     type Error: Fail;
     /// Returns an actual consensus configuration of the blockchain.
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
-    /// Returns an pending propose config change.
-    fn config_proposal(&self) -> Result<Vec<ConfigProposalWithHash>, Self::Error>;
+    /// Returns pending proposals config change.
+    fn config_proposals(&self) -> Result<Vec<(Hash, ConfigPropose)>, Self::Error>;
 }
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
@@ -80,11 +78,14 @@ impl PrivateApi for ApiImpl<'_> {
 
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         // Discard proposes whose `actual from` heights are same with already registered proposes
-        if Schema::new(self.0.instance.name,self.0.snapshot())
-            .pending_propose_hashes().contains(&proposal.actual_from.0) {
-            Err(Self::Error::from(failure::format_err!("Config proposal with the same height already registered")))
-        } else {
+        let schema = Schema::new(self.0.instance.name, self.0.snapshot());
+        let proposals_by_height = schema.pending_proposals().get(&proposal.actual_from);
+        if let None = proposals_by_height {
             self.broadcast_transaction(proposal).map_err(From::from)
+        } else {
+            Err(Self::Error::from(failure::format_err!(
+                "Config proposal with the same height has already been registered"
+            )))
         }
     }
 
@@ -100,9 +101,12 @@ impl PublicApi for ApiImpl<'_> {
         Ok(CoreSchema::new(self.0.snapshot()).consensus_config())
     }
 
-    fn config_proposal(&self) -> Result<Vec<ConfigProposalWithHash>, Self::Error> {
-        Ok(Schema::new(self.0.instance.name, self.0.snapshot())
-            .pending_propose_hashes().values()
+    fn config_proposals(&self) -> Result<Vec<(Hash, ConfigPropose)>, Self::Error> {
+        let schema = Schema::new(self.0.instance.name, self.0.snapshot());
+        Ok(schema
+            .pending_proposals()
+            .values()
+            .map(|proposal| (proposal.propose_hash, proposal.config_propose))
             .collect())
     }
 }
@@ -127,7 +131,7 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         .endpoint("consensus-config", |state, _query: ()| {
             ApiImpl(state).consensus_config()
         })
-        .endpoint("config-proposal", |state, _query: ()| {
-            ApiImpl(state).config_proposal()
+        .endpoint("config-proposals", |state, _query: ()| {
+            ApiImpl(state).config_proposals()
         });
 }

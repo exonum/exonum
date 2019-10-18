@@ -17,13 +17,14 @@ use exonum_testkit::{ApiKind, TestKitApi};
 
 use exonum::blockchain::ConsensusConfig;
 use exonum::{
+    api::Error as ApiError,
     crypto::Hash,
     helpers::ValidatorId,
     runtime::{rust::Transaction, SUPERVISOR_INSTANCE_ID},
 };
 
 use crate::utils::*;
-use exonum_supervisor::{ConfigProposalWithHash, ConfigPropose, ConfigVote};
+use exonum_supervisor::{ConfigPropose, ConfigVote};
 
 fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
     api.public(ApiKind::Service("supervisor"))
@@ -31,9 +32,9 @@ fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
         .unwrap()
 }
 
-fn current_config_proposal(api: &TestKitApi) -> Vec<ConfigProposalWithHash> {
+fn current_config_proposals(api: &TestKitApi) -> Vec<(Hash, ConfigPropose)> {
     api.public(ApiKind::Service("supervisor"))
-        .get("config-proposal")
+        .get("config-proposals")
         .unwrap()
 }
 
@@ -67,7 +68,7 @@ fn test_consensus_config_api() {
 fn test_config_proposal_api() {
     let testkit = testkit_with_supervisor(1);
 
-    assert!(current_config_proposal(&testkit.api()).is_empty());
+    assert!(current_config_proposals(&testkit.api()).is_empty());
 }
 
 #[test]
@@ -92,21 +93,19 @@ fn test_confirm_proposal_with_api() {
         .expect("Transaction with change propose discarded.");
 
     // Get proposal info
-    let pending_configs =
-        current_config_proposal(&testkit.api());
-    assert_eq!(pending_configs.len(), 1,  "Config proposal was not registered.");
-    let pending_config = pending_configs.get(0).unwrap();
-    let proposal_hash = config_proposal.object_hash();
-    assert_eq!(proposal_hash, pending_config.propose_hash);
-    assert_eq!(config_proposal, pending_config.config_propose);
+    let pending_configs = current_config_proposals(&testkit.api());
+    assert_eq!(
+        pending_configs.len(),
+        1,
+        "Config proposal was not registered."
+    );
+    let (pending_config_hash, pending_config_propose) = pending_configs.get(0).unwrap();
+    let propose_hash = config_proposal.object_hash();
+    assert_eq!(&propose_hash, pending_config_hash);
+    assert_eq!(&config_proposal, pending_config_propose);
 
     // Confirm proposal
-    let tx_hash = confirm_config(
-        &testkit.api(),
-        ConfigVote {
-            propose_hash: pending_config.propose_hash,
-        },
-    );
+    let tx_hash = confirm_config(&testkit.api(), ConfigVote { propose_hash });
     testkit.create_block();
     testkit.api().exonum_api().assert_tx_success(tx_hash);
 
@@ -132,20 +131,20 @@ fn test_send_proposal_with_api() {
     testkit.api().exonum_api().assert_tx_success(hash);
 
     // Get proposal info
-    let pending_configs =
-        current_config_proposal(&testkit.api());
-    assert_eq!(pending_configs.len(), 1, "Config proposal was not registered.");
-    let pending_config = pending_configs.get(0).unwrap();
-    let proposal_hash = config_proposal.object_hash();
-    assert_eq!(proposal_hash, pending_config.propose_hash);
-    assert_eq!(config_proposal, pending_config.config_propose);
+    let pending_configs = current_config_proposals(&testkit.api());
+    assert_eq!(
+        pending_configs.len(),
+        1,
+        "Config proposal was not registered."
+    );
+    let (pending_config_hash, pending_config_propose) = pending_configs.get(0).unwrap();
+    let propose_hash = config_proposal.object_hash();
+    assert_eq!(&propose_hash, pending_config_hash);
+    assert_eq!(&config_proposal, pending_config_propose);
 
     // Sign confirmation transaction by second validator
     let keys = testkit.network().validators()[1].service_keypair();
-    let signed_confirm = ConfigVote {
-        propose_hash: pending_config.propose_hash,
-    }
-    .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    let signed_confirm = ConfigVote { propose_hash }.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
     // Confirm proposal
     testkit
         .create_block_with_transaction(signed_confirm)
@@ -159,4 +158,87 @@ fn test_send_proposal_with_api() {
     assert_eq!(consensus_proposal, consensus_config);
 }
 
-// 2 proposals to same height simultaneously
+#[test]
+fn test_send_two_proposals_with_api() {
+    let mut testkit = testkit_with_supervisor(2);
+
+    let first_proposal = consensus_config_propose_first_variant(&testkit);
+    let first_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_consensus_config_propose(first_proposal.clone())
+        .config_propose();
+
+    // Create first proposal through testkit tx mechanism
+    testkit
+        .create_block_with_transaction(sign_config_propose_transaction(
+            &testkit,
+            first_config_proposal.clone(),
+            ValidatorId(1),
+        ))
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+
+    let second_proposal = consensus_config_propose_second_variant(&testkit);
+    let second_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_consensus_config_propose(second_proposal.clone())
+        .config_propose();
+    // Try to create second proposal with api
+    let error = testkit
+        .api()
+        .private(ApiKind::Service("supervisor"))
+        .query(&second_config_proposal)
+        .post::<Hash>("propose-config")
+        .unwrap_err();
+
+    assert_matches!(
+        error,
+        ApiError::InternalError(ref body) if body.to_string() ==
+                "Config proposal with the same height has already been registered"
+    );
+}
+
+#[test]
+fn test_pending_proposals_api() {
+    let mut testkit = testkit_with_supervisor(2);
+
+    let first_proposal = consensus_config_propose_first_variant(&testkit);
+    let first_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_consensus_config_propose(first_proposal.clone())
+        .config_propose();
+    testkit
+        .create_block_with_transaction(sign_config_propose_transaction(
+            &testkit,
+            first_config_proposal.clone(),
+            ValidatorId(0),
+        ))
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+
+    let second_proposal = consensus_config_propose_second_variant(&testkit);
+    let second_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT.next())
+        .extend_consensus_config_propose(second_proposal.clone())
+        .config_propose();
+    testkit
+        .create_block_with_transaction(sign_config_propose_transaction(
+            &testkit,
+            second_config_proposal.clone(),
+            ValidatorId(1),
+        ))
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+
+    // Get proposals info
+    let pending_configs = current_config_proposals(&testkit.api());
+    assert_eq!(
+        pending_configs.len(),
+        2,
+        "Config proposal was not registered."
+    );
+
+    let first_proposal_hash = first_config_proposal.object_hash();
+    let second_proposal_hash = second_config_proposal.object_hash();
+    assert!(pending_configs.contains(&(first_proposal_hash, first_config_proposal)));
+    assert!(pending_configs.contains(&(second_proposal_hash, second_config_proposal)));
+}

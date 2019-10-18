@@ -29,6 +29,7 @@ exonum-merkledb = { version = "0.12.0", path = "../../components/merkledb" }
 
 [dev-dependencies]
 exonum-testkit = { version = "0.12.0", path = "../../testkit" }
+assert_matches = "1.2.0"
 
 [build-dependencies]
 exonum-build = { version = "0.12.0", path = "../../components/build" }

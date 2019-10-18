@@ -14,7 +14,7 @@
 
 //! Common widely used type definitions.
 
-use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryValue, ObjectHash};
+use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryKey, BinaryValue, ObjectHash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{borrow::Cow, fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
 use zeroize::Zeroize;
@@ -345,6 +345,21 @@ impl FromStr for Height {
 
     fn from_str(s: &str) -> Result<Self, ParseIntError> {
         u64::from_str(s).map(Height)
+    }
+}
+
+impl BinaryKey for Height {
+    fn size(&self) -> usize {
+        8
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        self.0.write(&mut buffer[0..8]);
+        self.size()
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        Self(u64::read(&buffer[0..8]))
     }
 }
 

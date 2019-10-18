@@ -25,7 +25,7 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, Error,
+    ConfigProposalInfo, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, Error,
     Schema, StartService, Supervisor,
 };
 
@@ -142,8 +142,18 @@ impl SupervisorInterface for Supervisor {
         }
 
         // Verifies that there are no pending config changes assigned to same height.
-        if schema.pending_propose_hashes().contains(&propose.actual_from.0) {
+        if schema.pending_proposals().contains(&propose.actual_from) {
             return Err(Error::ConfigProposeExists.into());
+        }
+
+        // Verify that the author doesn't has proposal in pending list
+        if schema
+            .pending_proposals()
+            .values()
+            .find(|proposal_info| proposal_info.author == author)
+            .is_some()
+        {
+            return Err(Error::DiscardingSecondProposal.into());
         }
 
         // To prevent multiple consensus change proposition in one request
@@ -184,12 +194,15 @@ impl SupervisorInterface for Supervisor {
         let propose_hash = propose.object_hash();
         config_confirms.confirm(&propose_hash, author);
 
-        let config_entry = ConfigProposalWithHash {
+        let config_info = ConfigProposalInfo {
+            author,
             config_propose: propose.clone(),
             propose_hash,
         };
 
-        schema.pending_propose_hashes().put(&propose.actual_from.0, config_entry);
+        schema
+            .pending_proposals()
+            .put(&propose.actual_from, config_info);
 
         Ok(())
     }
@@ -213,10 +226,11 @@ impl SupervisorInterface for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that this config proposal is registered.
-        let proposal = schema.pending_propose_hashes().values().find(|proposal|
-            vote.propose_hash == proposal.propose_hash).ok_or_else(|| {
-            Error::ConfigProposeNotRegistered
-        })?;
+        let proposal = schema
+            .pending_proposals()
+            .values()
+            .find(|proposal| proposal.propose_hash == vote.propose_hash)
+            .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
         // Verifies that we didn't reach the deadline height.
         if proposal.config_propose.actual_from <= blockchain_height {
             return Err(Error::DeadlineExceeded.into());
