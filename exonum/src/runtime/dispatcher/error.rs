@@ -52,8 +52,6 @@ pub enum Error {
     /// E.g. action that requires mutable access to the database, requested
     /// in the `after_commit`.
     InappropriateTimeForAction = 13,
-    /// Request caused an endless loop which was forcibly exited.
-    RequestLoop = 14,
 }
 
 impl Error {

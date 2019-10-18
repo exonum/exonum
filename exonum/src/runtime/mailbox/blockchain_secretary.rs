@@ -15,7 +15,6 @@
 //! This module contains the entities capable of processing messages received through
 //! `BlockchainMailbox`.
 
-// TODO only for development purposes, remove it later
 use futures::Future;
 
 use exonum_merkledb::Fork;
@@ -27,11 +26,6 @@ use crate::runtime::{
 };
 
 use super::{Action, AfterRequestCompleted, BlockchainMailbox, Notification};
-
-// A constant denoting the maximum number of iterations during mailbox processing.
-// Exceeding that limit will mean an error in services implementation (e.g., a cyclic
-// dependency: update of config A depend on update on config B, and vice versa).
-const PROCESSING_ITERATIONS_LIMIT: usize = 4;
 
 /// Mailbox processing context.
 ///
@@ -65,39 +59,20 @@ impl BlockchainSecretary {
     /// Processes requests within immutable context.
     /// Since any failures won't affect the blockchain state, they are simply ignored.
     pub fn process_requests(&self, mailbox: &mut BlockchainMailbox, dispatcher: &mut Dispatcher) {
-        // During requests processing new requests may appear.
-        let mut n_iters = 0;
-        loop {
-            if n_iters >= PROCESSING_ITERATIONS_LIMIT {
-                // Too much iterations, quit.
-                warn!(
-                    "A cycle appeared during the requests processing within context {:?}",
-                    self.context
-                );
-                return;
-            }
-            n_iters += 1;
+        let requests = mailbox.drain_requests();
 
-            let requests = mailbox.drain_requests();
+        for (request, and_then) in requests {
+            // Requests within an immutable context are considered independent
+            // so we don't care about the result (however, we'll add it to the log).
+            let result = self.process_request(mailbox, dispatcher, None, request.clone(), and_then);
 
-            if requests.is_empty() {
-                break;
-            }
-
-            for (request, and_then) in requests {
-                // Requests within an immutable context are considered independent
-                // so we don't care about the result (however, we'll add it to the log).
-                let result =
-                    self.process_request(mailbox, dispatcher, None, request.clone(), and_then);
-
-                match result {
-                    Ok(_) => trace!("Successfully completed request {:?}", request),
-                    Err(err) => {
-                        warn!(
-                            "Error occurred during request {:?} within context {:?}: {:?}",
-                            request, self.context, &err
-                        );
-                    }
+            match result {
+                Ok(_) => trace!("Successfully completed request {:?}", request),
+                Err(err) => {
+                    warn!(
+                        "Error occurred during request {:?} within context {:?}: {:?}",
+                        request, self.context, &err
+                    );
                 }
             }
         }
@@ -112,49 +87,26 @@ impl BlockchainSecretary {
         dispatcher: &mut Dispatcher,
         fork: &mut Fork,
     ) -> Result<(), ExecutionError> {
-        // During requests processing new requests may appear.
-        let mut n_iters = 0;
-        loop {
-            if n_iters >= PROCESSING_ITERATIONS_LIMIT {
-                // Too much iterations, quit.
-                warn!(
-                    "A cycle appeared during the requests processing within context {:?}",
-                    self.context
-                );
-                return Err(DispatcherError::RequestLoop.into());
-            }
-            n_iters += 1;
+        let requests = mailbox.drain_requests();
 
-            let requests = mailbox.drain_requests();
+        for (request, and_then) in requests {
+            let result =
+                self.process_request(mailbox, dispatcher, Some(fork), request.clone(), and_then);
 
-            if requests.is_empty() {
-                break;
-            }
+            match result {
+                Ok(_) => {
+                    self.flush_if_needed(fork);
+                    trace!("Successfully completed request {:?}", request);
+                }
+                Err(err) => {
+                    // Cancel any changes occurred during the errored request.
+                    fork.rollback();
 
-            for (request, and_then) in requests {
-                let result = self.process_request(
-                    mailbox,
-                    dispatcher,
-                    Some(fork),
-                    request.clone(),
-                    and_then,
-                );
-
-                match result {
-                    Ok(_) => {
-                        self.flush_if_needed(fork);
-                        trace!("Successfully completed request {:?}", request);
-                    }
-                    Err(err) => {
-                        // Cancel any changes occurred during the errored request.
-                        fork.rollback();
-
-                        warn!(
-                            "Error occurred during request {:?} within context {:?}: {:?}",
-                            request, self.context, &err
-                        );
-                        self.check_if_should_stop(err)?;
-                    }
+                    warn!(
+                        "Error occurred during request {:?} within context {:?}: {:?}",
+                        request, self.context, &err
+                    );
+                    self.check_if_should_stop(err)?;
                 }
             }
         }
