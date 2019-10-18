@@ -113,7 +113,7 @@ pub fn protobuf_convert(input: TokenStream) -> TokenStream {
     pb_convert::implement_protobuf_convert(input)
 }
 
-pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
+pub(crate) fn find_protobuf_convert_meta(args: &[Attribute]) -> Option<NestedMeta> {
     args.as_ref()
         .iter()
         .filter_map(|a| a.parse_meta().ok())

@@ -21,7 +21,7 @@ use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Fields, Path, Type
 
 use std::convert::TryFrom;
 
-use super::find_exonum_meta;
+use super::find_protobuf_convert_meta;
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -43,7 +43,7 @@ impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_protobuf_convert_meta(args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
@@ -71,7 +71,7 @@ impl TryFrom<&[Attribute]> for ProtobufConvertEnumAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_protobuf_convert_meta(args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
