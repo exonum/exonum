@@ -12,24 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+use crate::ProtobufConvert;
+use bit_vec::BitVec;
 
-import "types.proto";
+#[test]
+fn test_bitvec_pb_convert() {
+    let bv = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
 
-package exonum.tests.explorer;
-
-message CreateWallet {
-  exonum.crypto.PublicKey pubkey = 1;
-  string name = 2;
-}
-
-message Transfer {
-  exonum.crypto.PublicKey from = 1;
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
-}
-
-message Issue {
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
+    let pb_bv = bv.to_pb();
+    let pb_round_trip: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
+    assert_eq!(pb_round_trip, bv);
 }

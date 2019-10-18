@@ -18,6 +18,6 @@
 
 pub use self::tests_transactions::{CreateWallet, Transfer};
 
-include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));
+use exonum::crypto::proto::*;
 
-use exonum::proto::schema::*;
+include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));

@@ -1,10 +1,9 @@
-use exonum_build::{get_exonum_protobuf_files_path, protobuf_generate};
+use exonum_build::ProtobufGenerator;
 
 fn main() {
-    let exonum_protos = get_exonum_protobuf_files_path();
-    protobuf_generate(
-        "src/proto",
-        &["src/proto", &exonum_protos],
-        "protobuf_mod.rs",
-    );
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .with_input_dir("src/proto")
+        .add_path("src/proto")
+        .with_frequently_used()
+        .generate();
 }

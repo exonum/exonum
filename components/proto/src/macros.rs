@@ -1,5 +1,3 @@
-// limitations under the License.
-
 // Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

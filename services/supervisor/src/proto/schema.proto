@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.supervisor;
 
-import "helpers.proto";
+import "types.proto";
 import "service.proto";
 
 message ConfigProposalInfo {

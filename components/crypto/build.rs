@@ -12,24 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+use std::env;
 
-import "types.proto";
+use exonum_build::ProtobufGenerator;
 
-package exonum.tests.explorer;
-
-message CreateWallet {
-  exonum.crypto.PublicKey pubkey = 1;
-  string name = 2;
+fn main() {
+    #[cfg(feature = "with-protobuf")]
+    gen_proto_files();
 }
 
-message Transfer {
-  exonum.crypto.PublicKey from = 1;
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
-}
+#[cfg(feature = "with-protobuf")]
+fn gen_proto_files() {
+    let current_dir = env::current_dir().expect("Failed to get current dir.");
+    let protos = current_dir.join("src/proto/schema");
+    println!("cargo:protos={}", protos.to_str().unwrap());
 
-message Issue {
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .with_input_dir("src/proto")
+        .add_path("src/proto")
+        .generate();
 }

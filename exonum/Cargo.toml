@@ -26,8 +26,8 @@ byteorder = { version = "1.2.7", features = [ "i128" ] }
 hex = "0.4"
 bit-vec = "0.6.0"
 rand = "0.7"
-serde = "1.0.10"
-serde_derive = "1.0.64"
+serde = "1.0.101"
+serde_derive = "1.0.101"
 serde_json = "1.0.19"
 serde_str = "0.1.0"
 erased-serde = "0.3"
@@ -50,7 +50,7 @@ chrono = { version = "0.4.6", features = ["serde"] }
 uuid = { version = "0.7.1", features = ["serde"] }
 snow = { version = "0.6.0", default-features = false }
 rust_decimal = "1.0"
-protobuf = { version = "2.8.0", features = ["with-serde"] }
+protobuf = { version = "2.8.1", features = ["with-serde"] }
 ctrlc = "3.1.1"
 rpassword = "4.0.1"
 zeroize = "0.9.1"
@@ -61,6 +61,7 @@ exonum-crypto = { version = "0.12.0", path = "../components/crypto" }
 exonum-derive = { version = "0.12.0", path = "../components/derive" }
 exonum-keys = { version = "0.12.0", path = "../components/keys" }
 exonum-merkledb = { version = "0.12.0", path = "../components/merkledb" }
+exonum-proto = { version = "0.12.0", path = "../components/proto" }
 
 [dev-dependencies]
 criterion = "0.3.0"
@@ -80,12 +81,13 @@ harness = false
 path = "benches/criterion/lib.rs"
 
 [features]
-default = ["sodiumoxide-crypto", "with-serde", "rocksdb_snappy"]
+default = ["sodiumoxide-crypto", "with-serde", "rocksdb_snappy", "with-protobuf"]
 float_serialize = []
 long_benchmarks = []
 metrics-log = []
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
 with-serde = []
+with-protobuf = []
 rocksdb_snappy = ["exonum-merkledb/rocksdb_snappy"]
 rocksdb_lz4 = ["exonum-merkledb/rocksdb_lz4"]
 rocksdb_zlib = ["exonum-merkledb/rocksdb_zlib"]

@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.simple_supervisor;
 
-import "helpers.proto";
+import "types.proto";
 import "runtime.proto";
 import "blockchain.proto";
 
