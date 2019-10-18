@@ -15,7 +15,7 @@
 //! Cryptocurrency transactions.
 
 use exonum::{crypto::PublicKey, runtime::rust::TransactionContext};
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto_derive::{protobuf_convert};
 
 use super::{proto, schema::Schema, CryptocurrencyService};
 
@@ -45,8 +45,8 @@ pub enum Error {
 }
 
 /// Transfer `amount` of the currency from one wallet to another.
-#[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "proto::Transfer", serde_pb_convert)]
+#[protobuf_convert(source = "proto::Transfer", serde_pb_convert)]
+#[derive(Clone, Debug, BinaryValue, ObjectHash)]
 pub struct Transfer {
     /// `PublicKey` of receiver's wallet.
     pub to: PublicKey,
@@ -59,8 +59,8 @@ pub struct Transfer {
 }
 
 /// Issue `amount` of the currency to the `wallet`.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "proto::Issue")]
+#[protobuf_convert(source = "proto::Issue")]
+#[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
 pub struct Issue {
     /// Issued amount of currency.
     pub amount: u64,
@@ -71,8 +71,8 @@ pub struct Issue {
 }
 
 /// Create wallet with the given `name`.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "proto::CreateWallet")]
+#[protobuf_convert(source = "proto::CreateWallet")]
+#[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
 pub struct CreateWallet {
     /// Name of the new wallet.
     pub name: String,

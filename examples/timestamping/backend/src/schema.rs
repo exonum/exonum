@@ -17,15 +17,15 @@
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto_derive::protobuf_convert;
 
 use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
+#[protobuf_convert(source = "proto::Timestamp")]
 #[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
+    Serialize, Deserialize, Clone, Debug, PartialEq, BinaryValue, ObjectHash,
 )]
-#[exonum(pb = "proto::Timestamp")]
 pub struct Timestamp {
     /// Hash of the content.
     pub content_hash: Hash,
@@ -44,8 +44,8 @@ impl Timestamp {
 }
 
 /// Timestamp entry.
-#[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "proto::TimestampEntry", serde_pb_convert)]
+#[protobuf_convert(source = "proto::TimestampEntry", serde_pb_convert)]
+#[derive(Clone, Debug, BinaryValue, ObjectHash)]
 pub struct TimestampEntry {
     /// Timestamp data.
     pub timestamp: Timestamp,

@@ -38,10 +38,10 @@ pub type InstanceId = u32;
 pub type MethodId = u32;
 
 /// Information for calling the service method.
+#[protobuf_convert(source = "schema::runtime::CallInfo")]
 #[derive(
-    Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
+    Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize,
 )]
-#[exonum(pb = "schema::runtime::CallInfo")]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
     /// corresponding runtime to execute a transaction.
@@ -89,8 +89,8 @@ impl CallInfo {
 ///     &keypair.1
 /// );
 /// ```
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::AnyTx")]
+#[protobuf_convert(source = "schema::runtime::AnyTx")]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
     pub call_info: CallInfo,
@@ -130,6 +130,7 @@ impl AnyTx {
 /// # Ok(())
 /// # }
 /// ```
+#[protobuf_convert(source = "schema::runtime::ArtifactId")]
 #[derive(
     Debug,
     Clone,
@@ -140,11 +141,9 @@ impl AnyTx {
     Ord,
     Serialize,
     Deserialize,
-    ProtobufConvert,
     BinaryValue,
     ObjectHash,
 )]
-#[exonum(pb = "schema::runtime::ArtifactId")]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
@@ -229,19 +228,18 @@ impl FromStr for ArtifactId {
 }
 
 /// Exhaustive service instance specification.
+#[protobuf_convert(source = "schema::runtime::InstanceSpec")]
 #[derive(
     Debug,
     Clone,
     PartialEq,
     Eq,
     Hash,
-    ProtobufConvert,
     Serialize,
     Deserialize,
     BinaryValue,
     ObjectHash,
 )]
-#[exonum(pb = "schema::runtime::InstanceSpec")]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///
@@ -315,8 +313,8 @@ impl Display for InstanceSpec {
 }
 
 /// Configuration parameters of the certain service instance.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::ServiceConfig")]
+#[protobuf_convert(source = "schema::runtime::ServiceConfig")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ServiceConfig {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -325,8 +323,8 @@ pub struct ServiceConfig {
 }
 
 /// This message contains one atomic configuration change.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::ConfigChange")]
+#[protobuf_convert(source = "schema::runtime::ConfigChange")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConfigChange {
     /// New consensus config.
     Consensus(ConsensusConfig),

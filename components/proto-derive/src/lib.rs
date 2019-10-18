@@ -21,6 +21,7 @@
 extern crate proc_macro;
 
 mod pb_convert;
+mod pb_convert2;
 
 use darling::FromMeta;
 use proc_macro::TokenStream;
@@ -67,6 +68,11 @@ use syn::{Attribute, NestedMeta};
 #[proc_macro_derive(ProtobufConvert, attributes(exonum))]
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
     pb_convert::implement_protobuf_convert(input)
+}
+
+#[proc_macro_attribute]
+pub fn protobuf_convert(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    pb_convert2::implement_protobuf_convert(attrs, input)
 }
 
 pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
