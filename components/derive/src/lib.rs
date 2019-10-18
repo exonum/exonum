@@ -35,8 +35,8 @@ use syn::{Attribute, NestedMeta};
 ///
 /// # Example
 /// ```ignore
-/// #[protobuf_convert(source = "proto::Wallet")]
 /// #[derive(Clone, Debug, BinaryValue)]
+/// #[protobuf_convert(source = "proto::Wallet")]
 /// pub struct Wallet {
 ///     /// `PublicKey` of the wallet.
 ///     pub pub_key: PublicKey,
@@ -58,7 +58,7 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
 /// # Example
 /// ```ignore
 /// #[protobuf_convert(source = "proto::Wallet")]
-/// #[derive(Clone, Debug, BinaryValue, ObjectHash)]
+/// #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 /// pub struct Wallet {
 ///     /// `PublicKey` of the wallet.
 ///     pub pub_key: PublicKey,

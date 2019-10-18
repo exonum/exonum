@@ -45,10 +45,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-proto-derive
 
 - Introduced a new crate `exonum-proto-derive`. Derive macro `ProtobufConvert` is
-  changed to attribute macros(its name changed to `protobuf_convert`) and moved
-  to this crate. (#1501)
+  moved to this crate. (#1501)
 
-- Attribute macro `protobuf_convert` now doesn't derive `BinaryValue` and `ObjectHash`
+- Derive macro `ProtobufConvert` now doesn't derive `BinaryValue` and `ObjectHash`
   traits. There are separate derive macros for them in `exonum-derive` crate. (#1501)
 
 #### exonum-build

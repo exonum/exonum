@@ -34,7 +34,7 @@ use exonum::{
         AnyTx, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_proto_derive::protobuf_convert;
+use exonum_proto_derive::ProtobufConvert;
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
 use exonum_time::{
     schema::TimeSchema,
@@ -86,8 +86,8 @@ impl<'a, T: IndexAccess> MarkerSchema<'a, T> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxMarker")]
-#[derive(Serialize, Deserialize, Debug, Clone, BinaryValue, ObjectHash)]
 /// Transaction, which must be executed no later than the specified time (field `time`).
 pub struct TxMarker {
     mark: i32,

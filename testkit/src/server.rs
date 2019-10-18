@@ -160,7 +160,7 @@ mod tests {
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
-    use exonum_proto_derive::protobuf_convert;
+    use exonum_proto_derive::ProtobufConvert;
 
     use crate::{InstanceCollection, TestKitApi, TestKitBuilder};
 
@@ -171,8 +171,8 @@ mod tests {
     const TIMESTAMP_SERVICE_ID: u32 = 2;
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
 
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::examples::TxTimestamp")]
-    #[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
     struct TxTimestamp {
         message: String,
     }

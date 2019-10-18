@@ -32,6 +32,7 @@ use syn::{Attribute, NestedMeta};
 /// ## Required
 ///
 /// * `#[protobuf_convert(source = "path")]`
+///
 /// ```ignore
 /// #[derive(Clone, Debug, BinaryValue, ObjectHash, ProtobufConvert)]
 /// #[protobuf_convert(source = "proto::Wallet")]
@@ -45,7 +46,7 @@ use syn::{Attribute, NestedMeta};
 /// let wallet = Wallet::new();
 /// let serialized_wallet = wallet.to_pb();
 ///
-/// let deserialized_wallet = ProtobufConvert::from_pb(seserialized_wallet).unwrap();
+/// let deserialized_wallet = ProtobufConvert::from_pb(serialized_wallet).unwrap();
 /// assert_eq!(wallet, deserialized_wallet);
 /// ```
 ///
@@ -60,7 +61,7 @@ use syn::{Attribute, NestedMeta};
 /// ```
 ///
 /// This macro can also be applied to enums. In proto files enums are represented
-/// by oneof field. You can specify oneof field name, default is "message".
+/// by `oneof` field. You can specify `oneof` field name, default is "message".
 /// ```ignore
 /// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ProtobufConvert)]
 /// #[protobuf_convert(source = "schema::runtime::ConfigChange", oneof_field = "message")]
@@ -107,15 +108,15 @@ use syn::{Attribute, NestedMeta};
 ///     // ...
 /// }
 /// ```
-#[proc_macro_attribute]
-pub fn protobuf_convert(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    pb_convert::implement_protobuf_convert(attrs, input)
+#[proc_macro_derive(ProtobufConvert, attributes(protobuf_convert))]
+pub fn protobuf_convert(input: TokenStream) -> TokenStream {
+    pb_convert::implement_protobuf_convert(input)
 }
 
 pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
     args.as_ref()
         .iter()
         .filter_map(|a| a.parse_meta().ok())
-        .find(|m| m.path().is_ident("exonum"))
+        .find(|m| m.path().is_ident("protobuf_convert"))
         .map(NestedMeta::from)
 }
