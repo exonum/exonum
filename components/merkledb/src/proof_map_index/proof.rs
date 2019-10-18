@@ -16,7 +16,6 @@ use exonum_crypto::Hash;
 use failure::Fail;
 use serde::{Deserializer, Serializer};
 use serde_derive::{Deserialize, Serialize};
-use exonum_proto_derive::ProtobufConvert;
 
 use std::borrow::Cow;
 
@@ -24,7 +23,7 @@ use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
     node::BranchNode,
 };
-use crate::{BinaryValue, HashTag, ObjectHash};
+use crate::{BinaryValue, HashTag, ObjectHash, };
 
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
@@ -265,7 +264,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
-#[derive(Clone, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
