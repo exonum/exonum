@@ -1,44 +1,74 @@
-extern crate exonum_build;
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-use exonum_build::{get_exonum_protobuf_files_path, protobuf_generate};
+use exonum_build::{ProtoSources, ProtobufGenerator};
 
 fn main() {
-    let exonum_protos = get_exonum_protobuf_files_path();
     let protobuf_gen_data = [
-        ("src/proto", vec!["src/proto"], "testkit_protobuf_mod.rs"),
+        (
+            "src/proto",
+            vec!["src/proto".into()],
+            "testkit_protobuf_mod.rs",
+        ),
         (
             "src/simple_supervisor/proto",
-            vec!["src/simple_supervisor/proto", &exonum_protos],
+            vec![
+                "src/simple_supervisor/proto".into(),
+                ProtoSources::Exonum,
+                ProtoSources::Crypto,
+            ],
             "simple_supervisor_mod.rs",
         ),
         (
             "tests/inflating_currency/proto",
-            vec!["tests/inflating_currency/proto", &exonum_protos],
+            vec![
+                "tests/inflating_currency/proto".into(),
+                ProtoSources::Exonum,
+                ProtoSources::Crypto,
+            ],
             "currency_example_protobuf_mod.rs",
         ),
         (
             "tests/counter/proto",
-            vec!["tests/counter/proto"],
+            vec!["tests/counter/proto".into()],
             "counter_example_protobuf_mod.rs",
         ),
         (
             "tests/service_hooks/proto",
-            vec!["tests/service_hooks/proto"],
+            vec!["tests/service_hooks/proto".into()],
             "hooks_example_protobuf_mod.rs",
         ),
         (
             "tests/interfaces/proto",
-            vec!["tests/interfaces/proto", &exonum_protos],
+            vec![
+                "tests/interfaces/proto".into(),
+                ProtoSources::Exonum,
+                ProtoSources::Crypto,
+            ],
             "interfaces_protobuf_mod.rs",
         ),
         (
             "examples/timestamping/proto",
-            vec!["examples/timestamping/proto"],
+            vec!["examples/timestamping/proto".into()],
             "timestamping_example_protobuf_mod.rs",
         ),
     ];
 
     for (input_dir, includes, mod_file_name) in protobuf_gen_data.into_iter() {
-        protobuf_generate(input_dir, includes, mod_file_name);
+        ProtobufGenerator::with_mod_name(mod_file_name)
+            .with_input_dir(input_dir)
+            .with_includes(includes)
+            .generate();
     }
 }

@@ -15,6 +15,7 @@
 pub use crate::proto::schema::tests::TimestampTx;
 
 use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_proto::impl_binary_value_for_pb_message;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 use crate::{

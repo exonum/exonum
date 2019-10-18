@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Macros useful for work with types that implement `BinaryKey` and `BinaryValue` traits.
+
 /// Fast concatenation of byte arrays and/or keys that implements
 /// `BinaryKey` trait.
 ///
@@ -56,5 +58,30 @@ macro_rules! impl_object_hash_for_binary_value {
                 }
             }
         )*
+    };
+}
+
+// Think about bincode instead of protobuf. [ECR-3222]
+/// Implements `BinaryKey` trait for any type that implements `BinaryValue`.
+#[macro_export]
+macro_rules! impl_binary_key_for_binary_value {
+    ($type:ty) => {
+        impl exonum_merkledb::BinaryKey for $type {
+            fn size(&self) -> usize {
+                exonum_merkledb::BinaryValue::to_bytes(self).len()
+            }
+
+            fn write(&self, buffer: &mut [u8]) -> usize {
+                let mut bytes = exonum_merkledb::BinaryValue::to_bytes(self);
+                buffer.swap_with_slice(&mut bytes);
+                bytes.len()
+            }
+
+            fn read(buffer: &[u8]) -> Self::Owned {
+                // `unwrap` is safe because only this code uses for
+                // serialize and deserialize these keys.
+                <Self as exonum_merkledb::BinaryValue>::from_bytes(buffer.into()).unwrap()
+            }
+        }
     };
 }

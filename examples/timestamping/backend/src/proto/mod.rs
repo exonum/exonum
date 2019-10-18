@@ -20,4 +20,4 @@ pub use self::service::{Config, Timestamp, TimestampEntry, TxTimestamp};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::proto::schema::*;
+use exonum::crypto::proto::*;

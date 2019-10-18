@@ -15,9 +15,9 @@
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
-extern crate exonum;
-#[macro_use]
 extern crate log;
+#[macro_use]
+extern crate exonum_merkledb;
 
 pub use self::{
     errors::Error,

@@ -14,22 +14,9 @@
 
 syntax = "proto3";
 
-import "types.proto";
+package exonum.common;
 
-package exonum.tests.explorer;
-
-message CreateWallet {
-  exonum.crypto.PublicKey pubkey = 1;
-  string name = 2;
-}
-
-message Transfer {
-  exonum.crypto.PublicKey from = 1;
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
-}
-
-message Issue {
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
+message BitVec {
+    bytes data = 1;
+    uint64 len = 2;
 }
