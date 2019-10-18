@@ -41,7 +41,7 @@ pub mod proto;
 pub mod schema {
     use exonum::crypto::{Hash, PublicKey};
     use exonum_merkledb::{IndexAccess, MapIndex};
-    use exonum_proto_derive::protobuf_convert;
+    use exonum_proto_derive::ProtobufConvert;
 
     use super::proto;
 
@@ -50,8 +50,8 @@ pub mod schema {
     //
     // [1]: https://exonum.com/doc/version/latest/architecture/serialization
     /// Wallet struct used to persist data within the service.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::Wallet")]
-    #[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
     pub struct Wallet {
         /// Public key of the wallet owner.
         pub pub_key: PublicKey,
@@ -127,19 +127,19 @@ pub mod transactions {
     use exonum::crypto::PublicKey;
 
     use super::proto;
-    use exonum_proto_derive::protobuf_convert;
+    use exonum_proto_derive::ProtobufConvert;
 
     /// Service configuration parameters.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::Config")]
-    #[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
     pub struct Config;
 
     /// Transaction type for creating a new wallet.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxCreateWallet` transactions are processed.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TxCreateWallet")]
-    #[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
     pub struct TxCreateWallet {
         /// UTF-8 string with the owner's name.
         pub name: String,
@@ -150,7 +150,7 @@ pub mod transactions {
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxTransfer` transactions are processed.
     #[protobuf_convert(source = "proto::TxTransfer")]
-    #[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     pub struct TxTransfer {
         /// Public key of the receiver.
         pub to: PublicKey,

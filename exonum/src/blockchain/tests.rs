@@ -41,26 +41,26 @@ use crate::{
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Serialize, Deserialize, Debug, Clone, BinaryValue, ObjectHash)]
 struct TestExecute {
     value: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Serialize, Deserialize, Debug, Clone, BinaryValue, ObjectHash)]
 struct TestDeploy {
     value: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Serialize, Deserialize, Debug, Clone, BinaryValue, ObjectHash)]
 struct TestAdd {
     value: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Serialize, Deserialize, Debug, Clone, BinaryValue, ObjectHash)]
 struct TestCallInitialize {
     value: u64,
 }
@@ -269,7 +269,7 @@ lazy_static! {
 }
 
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 struct TxResult {
     value: u64,
 }

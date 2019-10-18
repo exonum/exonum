@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use darling::FromMeta;
+use darling::{FromDeriveInput, FromMeta};
 use heck::SnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
-use syn::{
-    parse_macro_input, Attribute, AttributeArgs, Data, DataEnum, DataStruct, DeriveInput, Fields,
-    Path, Type, Variant,
-};
+use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Fields, Path, Type, Variant};
 
 use std::convert::TryFrom;
 
-use super::find_exonum_meta;
+use super::find_protobuf_convert_meta;
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -42,11 +39,11 @@ impl Default for ProtobufConvertStructAttrs {
     }
 }
 
-impl TryFrom<&[Attribute]> for ProtobufConvertEnumAttrs {
+impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_protobuf_convert_meta(args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
@@ -70,29 +67,30 @@ impl Default for ProtobufConvertEnumAttrs {
     }
 }
 
-#[derive(Debug)]
-struct ProtobufConvertStruct {
-    input: DeriveInput,
-    fields: Vec<Ident>,
-    attrs: ProtobufConvertStructAttrs,
-}
-
-impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
+impl TryFrom<&[Attribute]> for ProtobufConvertEnumAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_protobuf_convert_meta(args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
 }
 
+#[derive(Debug)]
+struct ProtobufConvertStruct {
+    name: Ident,
+    fields: Vec<Ident>,
+    attrs: ProtobufConvertStructAttrs,
+}
+
 impl ProtobufConvertStruct {
     fn from_derive_input(
-        input: DeriveInput,
+        name: Ident,
         data: &DataStruct,
-        attrs: ProtobufConvertStructAttrs,
+        attrs: &[Attribute],
     ) -> Result<Self, darling::Error> {
+        let attrs = ProtobufConvertStructAttrs::try_from(attrs)?;
         let fields = data
             .fields
             .iter()
@@ -100,7 +98,7 @@ impl ProtobufConvertStruct {
             .collect();
 
         Ok(Self {
-            input,
+            name,
             attrs,
             fields,
         })
@@ -109,7 +107,7 @@ impl ProtobufConvertStruct {
 
 impl ToTokens for ProtobufConvertStruct {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let name = &self.input.ident;
+        let name = &self.name;
         let pb_name = &self.attrs.source;
         let from_pb_impl = {
             let getters = self
@@ -193,17 +191,18 @@ impl TryFrom<&Variant> for ParsedVariant {
 
 #[derive(Debug)]
 struct ProtobufConvertEnum {
-    input: DeriveInput,
+    name: Ident,
     variants: Vec<ParsedVariant>,
     attrs: ProtobufConvertEnumAttrs,
 }
 
 impl ProtobufConvertEnum {
     fn from_derive_input(
-        input: DeriveInput,
+        name: Ident,
         data: &DataEnum,
-        attrs: ProtobufConvertEnumAttrs,
+        attrs: &[Attribute],
     ) -> Result<Self, darling::Error> {
+        let attrs = ProtobufConvertEnumAttrs::try_from(attrs)?;
         let variants = data
             .variants
             .iter()
@@ -211,7 +210,7 @@ impl ProtobufConvertEnum {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
-            input,
+            name,
             attrs,
             variants,
         })
@@ -227,7 +226,7 @@ impl ProtobufConvertEnum {
             );
             quote! { #pb #oneof_enum }
         };
-        let name = &self.input.ident;
+        let name = &self.name;
         let pb_name = &self.attrs.source;
         let oneof = &self.attrs.oneof_field;
 
@@ -290,7 +289,7 @@ impl ProtobufConvertEnum {
     }
 
     fn impl_enum_conversions(&self) -> impl ToTokens {
-        let name = &self.input.ident;
+        let name = &self.name;
         let conversions = self.variants.iter().map(|variant| {
             let variant_name = &variant.name;
             let field_name = &variant.field_name;
@@ -344,48 +343,35 @@ enum ProtobufConvert {
     Struct(ProtobufConvertStruct),
 }
 
-impl ProtobufConvert {
-    fn from_derive_input(attrs: AttributeArgs, input: TokenStream) -> Result<Self, darling::Error> {
-        let input: DeriveInput = syn::parse(input).unwrap();
-
+impl FromDeriveInput for ProtobufConvert {
+    fn from_derive_input(input: &DeriveInput) -> Result<Self, darling::Error> {
         match &input.data {
-            Data::Struct(data) => {
-                let args = match ProtobufConvertStructAttrs::from_list(&attrs) {
-                    Ok(v) => v,
-                    Err(e) => panic!(format!("{:?}", e)),
-                };
-
-                Ok(ProtobufConvert::Struct(
-                    ProtobufConvertStruct::from_derive_input(input.clone(), data, args).unwrap(),
-                ))
-            }
-            Data::Enum(data) => {
-                let args = match ProtobufConvertEnumAttrs::from_list(&attrs) {
-                    Ok(v) => v,
-                    Err(e) => panic!(format!("{:?}", e)),
-                };
-
-                Ok(ProtobufConvert::Enum(
-                    ProtobufConvertEnum::from_derive_input(input.clone(), data, args).unwrap(),
-                ))
-            }
+            Data::Struct(data) => Ok(ProtobufConvert::Struct(
+                ProtobufConvertStruct::from_derive_input(
+                    input.ident.clone(),
+                    data,
+                    input.attrs.as_ref(),
+                )?,
+            )),
+            Data::Enum(data) => Ok(ProtobufConvert::Enum(
+                ProtobufConvertEnum::from_derive_input(
+                    input.ident.clone(),
+                    data,
+                    input.attrs.as_ref(),
+                )?,
+            )),
             _ => Err(darling::Error::unsupported_shape(
                 "Only for enums and structs.",
             )),
         }
     }
+}
 
+impl ProtobufConvert {
     fn name(&self) -> &Ident {
         match self {
-            ProtobufConvert::Enum(inner) => &inner.input.ident,
-            ProtobufConvert::Struct(inner) => &inner.input.ident,
-        }
-    }
-
-    fn input(&self) -> &DeriveInput {
-        match self {
-            ProtobufConvert::Enum(inner) => &inner.input,
-            ProtobufConvert::Struct(inner) => &inner.input,
+            ProtobufConvert::Enum(inner) => &inner.name,
+            ProtobufConvert::Struct(inner) => &inner.name,
         }
     }
 
@@ -442,11 +428,7 @@ impl ToTokens for ProtobufConvert {
             quote! {}
         };
 
-        let input = self.input().clone();
-
         let expanded = quote! {
-            #input
-
             mod #mod_name {
                 use super::*;
 
@@ -461,15 +443,9 @@ impl ToTokens for ProtobufConvert {
     }
 }
 
-pub fn implement_protobuf_convert(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    let attr_args = parse_macro_input!(attrs as AttributeArgs);
-
-    let protobuf_convert = ProtobufConvert::from_derive_input(attr_args, input)
+pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
+    let input = ProtobufConvert::from_derive_input(&syn::parse(input).unwrap())
         .unwrap_or_else(|e| panic!("ProtobufConvert: {}", e));
-
-    let tokens = quote! {
-        #protobuf_convert
-    };
-
+    let tokens = quote! {#input};
     tokens.into()
 }

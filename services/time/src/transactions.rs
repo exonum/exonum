@@ -15,7 +15,7 @@
 use chrono::{DateTime, Utc};
 use exonum::{blockchain::Schema, crypto::PublicKey, runtime::rust::TransactionContext};
 use exonum_merkledb::IndexAccess;
-use exonum_proto_derive::protobuf_convert;
+use exonum_proto_derive::ProtobufConvert;
 
 use crate::{proto, schema::TimeSchema, TimeService};
 
@@ -29,8 +29,8 @@ pub enum Error {
 }
 
 /// Transaction that is sent by the validator after the commit of the block.
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTime")]
-#[derive(Serialize, Deserialize, Debug, Clone, BinaryValue, ObjectHash)]
 pub struct TxTime {
     /// Time of the validator.
     pub time: DateTime<Utc>,

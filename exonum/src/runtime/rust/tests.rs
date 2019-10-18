@@ -34,20 +34,20 @@ use super::{
 const SERVICE_INSTANCE_ID: InstanceId = 2;
 const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceInit")]
-#[derive(Debug, BinaryValue, ObjectHash)]
 pub struct Init {
     msg: String,
 }
 
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Debug, BinaryValue, ObjectHash)]
 struct TxA {
     value: u64,
 }
 
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Debug, BinaryValue, ObjectHash)]
 struct TxB {
     value: u64,
 }

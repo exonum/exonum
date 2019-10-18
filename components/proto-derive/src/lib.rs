@@ -22,18 +22,68 @@ extern crate proc_macro;
 
 mod pb_convert;
 
-use darling::FromMeta;
 use proc_macro::TokenStream;
-use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
-/// ProtobufConvert attribute macros.
+/// ProtobufConvert derive macro.
 ///
 /// Attributes:
 ///
 /// ## Required
 ///
 /// * `#[protobuf_convert(source = "path")]`
+///
+/// ```ignore
+/// #[derive(Clone, Debug, BinaryValue, ObjectHash, ProtobufConvert)]
+/// #[protobuf_convert(source = "proto::Wallet")]
+/// pub struct Wallet {
+///     /// `PublicKey` of the wallet.
+///     pub pub_key: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
+/// }
+///
+/// let wallet = Wallet::new();
+/// let serialized_wallet = wallet.to_pb();
+///
+/// let deserialized_wallet = ProtobufConvert::from_pb(serialized_wallet).unwrap();
+/// assert_eq!(wallet, deserialized_wallet);
+/// ```
+///
+/// Corresponding proto file:
+/// ```text
+/// message Wallet {
+///  // Public key of the wallet owner.
+///  exonum.crypto.PublicKey pub_key = 1;
+///  // Current balance.
+///  uint64 balance = 2;
+/// }
+/// ```
+///
+/// This macro can also be applied to enums. In proto files enums are represented
+/// by `oneof` field. You can specify `oneof` field name, default is "message".
+/// ```ignore
+/// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ProtobufConvert)]
+/// #[protobuf_convert(source = "schema::runtime::ConfigChange", oneof_field = "message")]
+/// pub enum ConfigChange {
+///    /// New consensus config.
+///    Consensus(ConsensusConfig),
+///    /// New service instance config.
+///    Service(ServiceConfig),
+/// }
+/// ```
+///
+/// Corresponding proto file:
+/// ```test
+/// message ConfigChange {
+///  oneof message {
+///    // New consensus config.
+///    exonum.Config consensus = 1;
+///    // New service instance config.
+///    ServiceConfig service = 2;
+///  }
+/// }
+/// ```
 ///
 /// Path is the name of the corresponding protobuf generated struct.
 ///
@@ -43,12 +93,12 @@ use syn::{Attribute, NestedMeta};
 /// protobuf.
 /// For example, it should be used if you want json representation of your struct
 /// to be compatible with protobuf representation (including proper nesting of fields).
-/// ```text
 /// For example, struct with `exonum::crypto::Hash` with this
 /// (de)serializer will be represented as
+/// ```text
 /// StructName {
 ///     "hash": {
-///         data: [1, 2, ...]
+///         "data": [1, 2, ...]
 ///     },
 ///     // ...
 /// }
@@ -58,31 +108,15 @@ use syn::{Attribute, NestedMeta};
 ///     // ...
 /// }
 /// ```
-#[proc_macro_attribute]
-pub fn protobuf_convert(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    pb_convert::implement_protobuf_convert(attrs, input)
+#[proc_macro_derive(ProtobufConvert, attributes(protobuf_convert))]
+pub fn protobuf_convert(input: TokenStream) -> TokenStream {
+    pb_convert::implement_protobuf_convert(input)
 }
 
-pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
+pub(crate) fn find_protobuf_convert_meta(args: &[Attribute]) -> Option<NestedMeta> {
     args.as_ref()
         .iter()
         .filter_map(|a| a.parse_meta().ok())
-        .find(|m| m.path().is_ident("exonum"))
+        .find(|m| m.path().is_ident("protobuf_convert"))
         .map(NestedMeta::from)
-}
-
-#[derive(Debug, FromMeta, PartialEq, Eq)]
-#[darling(default)]
-struct CratePath(syn::Path);
-
-impl Default for CratePath {
-    fn default() -> Self {
-        Self(syn::parse_str("exonum").unwrap())
-    }
-}
-
-impl ToTokens for CratePath {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        self.0.to_tokens(tokens)
-    }
 }

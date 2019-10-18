@@ -189,6 +189,7 @@ toml
 toolchain
 txvec
 tymethod
+uint
 unboxed
 unflushed
 unreceived
