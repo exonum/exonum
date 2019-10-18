@@ -29,7 +29,7 @@ use exonum_proto::ProtobufConvert;
 pub mod schema;
 
 #[cfg(test)]
-pub mod tests;
+mod tests;
 
 impl ProtobufConvert for Height {
     type ProtoStruct = u64;
