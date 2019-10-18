@@ -35,8 +35,8 @@ use syn::{Attribute, NestedMeta};
 ///
 /// # Example
 /// ```ignore
-/// #[derive(Clone, Debug, ProtobufConvert, BinaryValue)]
-/// #[exonum(pb = "proto::Wallet")]
+/// #[protobuf_convert(source = "proto::Wallet")]
+/// #[derive(Clone, Debug, BinaryValue)]
 /// pub struct Wallet {
 ///     /// `PublicKey` of the wallet.
 ///     pub pub_key: PublicKey,
@@ -57,8 +57,8 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 /// ```ignore
-/// #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-/// #[exonum(pb = "proto::Wallet")]
+/// #[protobuf_convert(source = "proto::Wallet")]
+/// #[derive(Clone, Debug, BinaryValue, ObjectHash)]
 /// pub struct Wallet {
 ///     /// `PublicKey` of the wallet.
 ///     pub pub_key: PublicKey,

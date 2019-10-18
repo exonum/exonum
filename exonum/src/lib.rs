@@ -57,7 +57,6 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-extern crate exonum_proto;
 
 // Test dependencies.
 #[cfg(test)]

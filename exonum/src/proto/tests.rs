@@ -29,8 +29,8 @@ fn test_date_time_pb_convert() {
     assert_eq!(pb_round_trip, dt);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::Point")]
+#[protobuf_convert(source = "schema::tests::Point")]
+#[derive(Debug, PartialEq, BinaryValue, ObjectHash)]
 struct Point {
     x: u32,
     y: u32,
@@ -49,8 +49,8 @@ fn test_simple_struct_round_trip() {
     assert_eq!(point_encode_round_trip, point);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestProtobufConvert")]
+#[protobuf_convert(source = "schema::tests::TestProtobufConvert")]
+#[derive(Debug, PartialEq, BinaryValue, ObjectHash)]
 struct StructWithScalarTypes {
     key: PublicKey,
     hash: Hash,
@@ -108,8 +108,8 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestProtobufConvertRepeated")]
+#[protobuf_convert(source = "schema::tests::TestProtobufConvertRepeated")]
+#[derive(Debug, PartialEq, BinaryValue, ObjectHash)]
 struct StructWithRepeatedTypes {
     keys: Vec<PublicKey>,
     bytes_array: Vec<Vec<u8>>,
@@ -138,8 +138,8 @@ fn test_repeated_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, rep_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestProtobufConvertMap")]
+#[protobuf_convert(source = "schema::tests::TestProtobufConvertMap")]
+#[derive(Debug, PartialEq, BinaryValue, ObjectHash)]
 struct StructWithMaps {
     num_map: HashMap<u32, u64>,
     string_map: HashMap<u32, String>,
@@ -179,8 +179,8 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "schema::tests::TestFixedArrays")]
+#[protobuf_convert(source = "schema::tests::TestFixedArrays")]
+#[derive(Clone, Copy, Debug, PartialEq, BinaryValue, ObjectHash)]
 struct StructWithFixedArrays {
     fixed_array_8: [u8; 8],
     fixed_array_16: [u8; 16],

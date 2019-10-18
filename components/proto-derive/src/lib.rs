@@ -27,23 +27,17 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
-/// Derive `ProtobufConvert` trait.
+/// ProtobufConvert attribute macros.
 ///
 /// Attributes:
 ///
 /// ## Required
 ///
-/// * `#[exonum(pb = "path")]`
+/// * `#[protobuf_convert(source = "path")]`
 ///
 /// Path is the name of the corresponding protobuf generated struct.
 ///
-/// ## Optional
-///
-/// * `#[exonum(crate = "path")]`
-///
-/// Prefix of the `exonum` crate(usually "crate" or "exonum").
-///
-/// * `#[exonum(serde_pb_convert)]`
+/// * `#[protobuf_convert(source = "path", serde_pb_convert)]`
 ///
 /// Implement `serde::{Serialize, Deserialize}` using structs that were generated with
 /// protobuf.
@@ -64,9 +58,9 @@ use syn::{Attribute, NestedMeta};
 ///     // ...
 /// }
 /// ```
-#[proc_macro_derive(ProtobufConvert, attributes(exonum))]
-pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
-    pb_convert::implement_protobuf_convert(input)
+#[proc_macro_attribute]
+pub fn protobuf_convert(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    pb_convert::implement_protobuf_convert(attrs, input)
 }
 
 pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {

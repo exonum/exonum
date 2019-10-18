@@ -27,20 +27,10 @@ use crate::{
 ///
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
+#[protobuf_convert(source = "proto::Block")]
 #[derive(
-    Clone,
-    PartialEq,
-    Eq,
-    Ord,
-    PartialOrd,
-    Debug,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
+    Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, BinaryValue, ObjectHash,
 )]
-#[exonum(pb = "proto::Block")]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.
     pub proposer_id: ValidatorId,

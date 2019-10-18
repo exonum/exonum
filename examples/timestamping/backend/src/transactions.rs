@@ -15,7 +15,7 @@
 //! Timestamping transactions.
 
 use exonum::runtime::rust::TransactionContext;
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto_derive::protobuf_convert;
 use exonum_time::schema::TimeSchema;
 
 use crate::{
@@ -34,16 +34,16 @@ pub enum Error {
 }
 
 /// Timestamping transaction.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "proto::TxTimestamp")]
+#[protobuf_convert(source = "proto::TxTimestamp")]
+#[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
 pub struct TxTimestamp {
     /// Timestamp content.
     pub content: Timestamp,
 }
 
 /// Timestamping configuration parameters.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[exonum(pb = "proto::Config")]
+#[protobuf_convert(source = "proto::Config")]
+#[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
 pub struct Config {
     /// Time oracle service name.
     pub time_service_name: String,
