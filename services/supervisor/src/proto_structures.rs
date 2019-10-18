@@ -84,9 +84,7 @@ pub struct ConfigVote {
 
 /// Pending config change proposal entry
 #[protobuf_convert(source = "proto::ConfigProposalWithHash")]
-#[derive(
-    Clone, Debug, Eq, PartialEq, Serialize, Deserialize, BinaryValue, ObjectHash,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, BinaryValue, ObjectHash)]
 pub struct ConfigProposalWithHash {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,

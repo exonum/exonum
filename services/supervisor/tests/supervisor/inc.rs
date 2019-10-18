@@ -67,9 +67,7 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
 }
 
 #[protobuf_convert(source = "proto::TxInc")]
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, BinaryValue, ObjectHash,
-)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, BinaryValue, ObjectHash)]
 pub struct TxInc {
     pub seed: u64,
 }

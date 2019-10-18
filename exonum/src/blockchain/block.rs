@@ -29,16 +29,7 @@ use crate::{
 /// other information, but not the transactions themselves.
 #[protobuf_convert(source = "proto::Block")]
 #[derive(
-    Clone,
-    PartialEq,
-    Eq,
-    Ord,
-    PartialOrd,
-    Debug,
-    Serialize,
-    Deserialize,
-    BinaryValue,
-    ObjectHash,
+    Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, BinaryValue, ObjectHash,
 )]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.

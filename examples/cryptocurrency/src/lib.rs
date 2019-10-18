@@ -131,7 +131,7 @@ pub mod transactions {
 
     /// Service configuration parameters.
     #[protobuf_convert(source = "proto::Config")]
-    #[derive(Serialize, Deserialize, Clone, Debug,  BinaryValue, ObjectHash)]
+    #[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
     pub struct Config;
 
     /// Transaction type for creating a new wallet.
@@ -139,7 +139,7 @@ pub mod transactions {
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxCreateWallet` transactions are processed.
     #[protobuf_convert(source = "proto::TxCreateWallet")]
-    #[derive(Serialize, Deserialize, Clone, Debug,  BinaryValue, ObjectHash)]
+    #[derive(Serialize, Deserialize, Clone, Debug, BinaryValue, ObjectHash)]
     pub struct TxCreateWallet {
         /// UTF-8 string with the owner's name.
         pub name: String,

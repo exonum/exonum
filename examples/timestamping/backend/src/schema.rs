@@ -23,9 +23,7 @@ use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
 #[protobuf_convert(source = "proto::Timestamp")]
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, BinaryValue, ObjectHash,
-)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, BinaryValue, ObjectHash)]
 pub struct Timestamp {
     /// Hash of the content.
     pub content_hash: Hash,

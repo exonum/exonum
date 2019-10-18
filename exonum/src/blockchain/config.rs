@@ -68,17 +68,7 @@ impl ValidateInput for ValidatorKeys {
 /// For additional information on the Exonum consensus algorithm, refer to
 /// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
 #[protobuf_convert(source = "blockchain::Config")]
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, BinaryValue, ObjectHash)]
 pub struct ConsensusConfig {
     /// List of validators public keys.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

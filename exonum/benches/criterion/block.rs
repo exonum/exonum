@@ -172,14 +172,14 @@ mod timestamping {
         }
     }
 
+    #[protobuf_convert(source = "proto::TimestampTx")]
     #[derive(Serialize, Deserialize, Clone, Debug, ObjectHash, BinaryValue)]
-    #[exonum(pb = "proto::TimestampTx")]
     pub struct Tx {
         data: Hash,
     }
 
+    #[protobuf_convert(source = "proto::TimestampTx")]
     #[derive(Serialize, Deserialize, Clone, Debug, ObjectHash, BinaryValue)]
-    #[exonum(pb = "proto::TimestampTx")]
     pub struct PanickingTx {
         data: Hash,
     }
@@ -323,24 +323,24 @@ mod cryptocurrency {
     }
 
     /// Transfers one unit of currency from `from` to `to`.
+    #[protobuf_convert(source = "proto::CurrencyTx")]
     #[derive(Serialize, Deserialize, Clone, Debug, ObjectHash, BinaryValue)]
-    #[exonum(pb = "proto::CurrencyTx")]
     pub struct Tx {
         to: PublicKey,
         seed: u32,
     }
 
     /// Same as `Tx`, but without cryptographic proofs in `execute`.
+    #[protobuf_convert(source = "proto::CurrencyTx")]
     #[derive(Serialize, Deserialize, Clone, Debug, ObjectHash, BinaryValue)]
-    #[exonum(pb = "proto::CurrencyTx")]
     pub struct SimpleTx {
         to: PublicKey,
         seed: u32,
     }
 
     /// Same as `SimpleTx`, but signals an error 50% of the time.
+    #[protobuf_convert(source = "proto::CurrencyTx")]
     #[derive(Serialize, Deserialize, Clone, Debug, ObjectHash, BinaryValue)]
-    #[exonum(pb = "proto::CurrencyTx")]
     pub struct RollbackTx {
         to: PublicKey,
         seed: u32,
@@ -414,14 +414,14 @@ mod foreign_interface_call {
     const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
     const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
 
+    #[protobuf_convert(source = "proto::TimestampTx")]
     #[derive(Serialize, Deserialize, Clone, Debug, ObjectHash, BinaryValue)]
-    #[exonum(pb = "proto::TimestampTx")]
     pub struct SelfTx {
         data: Hash,
     }
 
+    #[protobuf_convert(source = "proto::TimestampTx")]
     #[derive(Serialize, Deserialize, Clone, Debug, ObjectHash, BinaryValue)]
-    #[exonum(pb = "proto::TimestampTx")]
     pub struct ForeignTx {
         data: Hash,
     }

@@ -39,9 +39,7 @@ pub type MethodId = u32;
 
 /// Information for calling the service method.
 #[protobuf_convert(source = "schema::runtime::CallInfo")]
-#[derive(
-    Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize,
-)]
+#[derive(Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
     /// corresponding runtime to execute a transaction.
@@ -229,17 +227,7 @@ impl FromStr for ArtifactId {
 
 /// Exhaustive service instance specification.
 #[protobuf_convert(source = "schema::runtime::InstanceSpec")]
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, BinaryValue, ObjectHash)]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///

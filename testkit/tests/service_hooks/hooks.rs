@@ -36,9 +36,7 @@ pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
 #[protobuf_convert(source = "proto::TxAfterCommit")]
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, BinaryValue, ObjectHash,
-)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, BinaryValue, ObjectHash)]
 pub struct TxAfterCommit {
     pub height: Height,
 }
