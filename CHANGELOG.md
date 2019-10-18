@@ -39,7 +39,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-proto
 
-- Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` changed to is moved
+- Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` changed is moved
   to `exonum-proto` crate. (#1496)
 
 #### exonum-proto-derive
