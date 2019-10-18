@@ -16,6 +16,8 @@ syntax = "proto3";
 
 package exonum.runtime;
 
+option java_package = "com.exonum.binding.messages";
+
 import "blockchain.proto";
 import "google/protobuf/empty.proto";
 
@@ -26,11 +28,6 @@ message CallInfo {
   uint32 instance_id = 1;
   // Identifier of the method in the service interface required for the call.
   uint32 method_id = 2;
-}
-
-message AnyTx {
-  CallInfo call_info = 1;
-  bytes arguments = 2;
 }
 
 message ArtifactId {
