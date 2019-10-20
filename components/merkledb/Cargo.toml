@@ -30,7 +30,7 @@ serde_derive = "1.0"
 serde_json = "1.0"
 smallvec = "0.6"
 tempfile = "3.0"
-uuid = { version="0.7", features = ["v4"] }
+uuid = { version="0.8", features = ["v4"] }
 rand = "0.7"
 protobuf = "2.8.0"
 
