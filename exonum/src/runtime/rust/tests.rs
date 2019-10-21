@@ -19,9 +19,12 @@ use crate::{
     merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        communication_channel::CommunicationChannel, dispatcher::Dispatcher, error::ExecutionError,
-        mailbox::BlockchainMailbox, CallInfo, Caller, DispatcherError, ExecutionContext,
-        InstanceDescriptor, InstanceId, InstanceSpec,
+        communication_channel::CommunicationChannel,
+        dispatcher::Dispatcher,
+        error::ExecutionError,
+        mailbox::{BlockchainMailbox, MailboxContext},
+        CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor, InstanceId,
+        InstanceSpec,
     },
 };
 
@@ -140,7 +143,7 @@ fn test_basic_rust_runtime() {
     let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()]);
 
     // Create dummy blockchain mailbox.
-    let mailbox = BlockchainMailbox::new();
+    let mailbox = BlockchainMailbox::new(MailboxContext::OutsideTxExecution);
 
     // Deploy service.
     let fork = db.fork();

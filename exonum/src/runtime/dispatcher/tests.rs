@@ -28,7 +28,7 @@ use crate::{
     runtime::{
         communication_channel::CommunicationChannel,
         dispatcher::Dispatcher,
-        mailbox::BlockchainMailbox,
+        mailbox::{BlockchainMailbox, MailboxContext},
         rust::{Error as RustRuntimeError, RustRuntime},
         ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
@@ -270,7 +270,7 @@ fn test_dispatcher_simple() {
     // Check if transactions are ready for execution.
     let tx_payload = [0x00_u8; 1];
 
-    let mailbox = BlockchainMailbox::new();
+    let mailbox = BlockchainMailbox::new(MailboxContext::OutsideTxExecution);
 
     let communication_channel = CommunicationChannel::new(&mailbox, &dispatcher);
     let context = ExecutionContext::new(
@@ -398,7 +398,7 @@ fn test_dispatcher_rust_runtime_no_service() {
     // Check if transactions are ready for execution.
     let tx_payload = [0x00_u8; 1];
 
-    let mailbox = BlockchainMailbox::new();
+    let mailbox = BlockchainMailbox::new(MailboxContext::OutsideTxExecution);
 
     let communication_channel = CommunicationChannel::new(&mailbox, &dispatcher);
     let context = ExecutionContext::new(

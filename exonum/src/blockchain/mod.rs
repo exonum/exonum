@@ -51,7 +51,7 @@ use crate::{
     runtime::{
         dispatcher::Dispatcher,
         error::catch_panic,
-        mailbox::{BlockchainMailbox, BlockchainSecretary, MailboxContext},
+        mailbox::{BlockchainMailbox, MailboxContext},
         Runtime,
     },
 };
@@ -242,16 +242,13 @@ impl Blockchain {
 
             // Skip execution for genesis block.
             if height > Height(0) {
-                let mut mailbox = BlockchainMailbox::new();
+                let mut mailbox = BlockchainMailbox::new(MailboxContext::OutsideTxExecution);
 
                 dispatcher.before_commit(&mailbox, &mut fork);
 
-                let secretary = BlockchainSecretary::new(MailboxContext::OutsideTxExecution);
-
-                // We don't care about result, secretary will rollback any failed requests
-                // occurred during processing.
-                let _result =
-                    secretary.process_requests_mut(&mut mailbox, &mut dispatcher, &mut fork);
+                // We don't care about result, mailbox will rollback (and log)
+                // any failed requests encountered during processing.
+                let _result = mailbox.process_requests_mut(&mut dispatcher, &mut fork);
             }
 
             // Get tx & state hash.
@@ -329,16 +326,11 @@ impl Blockchain {
 
         fork.flush();
 
-        let mut mailbox = BlockchainMailbox::new();
+        let mailbox_context = MailboxContext::TxExecution(transaction.payload().call_info.clone());
+        let mut mailbox = BlockchainMailbox::new(mailbox_context);
 
         let tx_result = catch_panic(|| dispatcher.execute(fork, &mailbox, tx_hash, &transaction))
-            .and_then(|()| {
-                let secretary = BlockchainSecretary::new(MailboxContext::TxExecution(
-                    transaction.payload().call_info.clone(),
-                ));
-
-                secretary.process_requests_mut(&mut mailbox, dispatcher, fork)
-            });
+            .and_then(|()| mailbox.process_requests_mut(dispatcher, fork));
         match &tx_result {
             Ok(_) => {
                 fork.flush();
@@ -410,7 +402,7 @@ impl Blockchain {
 
         // Invoke `after_commit` for each service in order of their identifiers
         let mut dispatcher = self.dispatcher();
-        let mut mailbox = BlockchainMailbox::new();
+        let mut mailbox = BlockchainMailbox::new(MailboxContext::OutsideTxExecution);
         dispatcher.after_commit(
             &mailbox,
             self.snapshot(),
@@ -418,10 +410,7 @@ impl Blockchain {
             &self.api_sender,
         );
 
-        // Process requests obtained during the `after_commit` call.
-        let secretary = BlockchainSecretary::new(MailboxContext::OutsideTxExecution);
-
-        secretary.process_requests(&mut mailbox, &mut dispatcher);
+        mailbox.process_requests(&mut dispatcher);
 
         let api_changes = dispatcher.notify_api_changes(&ApiContext::with_blockchain(self));
 
