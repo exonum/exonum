@@ -203,7 +203,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
 
     // Provides a supervisor interface to an authorized instance.
     #[doc(hidden)]
-    pub fn supervisor_extensions(&self) -> Option<CommunicationChannel<SupervisorAccess>> {
+    pub fn supervisor_extensions(&self) -> Option<SupervisorAccess> {
         if !is_supervisor(self.instance.id) {
             return None;
         };
@@ -295,7 +295,7 @@ impl<'a> BeforeCommitContext<'a> {
 
     // Provides a supervisor interface to an authorized instance.
     #[doc(hidden)]
-    pub fn supervisor_extensions(&self) -> Option<CommunicationChannel<SupervisorAccess>> {
+    pub fn supervisor_extensions(&self) -> Option<SupervisorAccess> {
         if !is_supervisor(self.instance.id) {
             return None;
         };
@@ -384,7 +384,7 @@ impl<'a> AfterCommitContext<'a> {
 
     // Provides a supervisor interface to an authorized instance.
     #[doc(hidden)]
-    pub fn supervisor_extensions(&self) -> Option<CommunicationChannel<SupervisorAccess>> {
+    pub fn supervisor_extensions(&self) -> Option<SupervisorAccess> {
         if !is_supervisor(self.instance.id) {
             return None;
         };

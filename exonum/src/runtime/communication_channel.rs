@@ -18,29 +18,27 @@ use crate::runtime::{
     CallInfo, ConfigChange, ExecutionContext, ExecutionError, InstanceId,
 };
 
-/// Marker struct for `Supervisor` entities.
-/// It is used as a type parameter for `CommunicationChannel` to provide
-/// `Supervisor`-related functionality.
+/// Interface for supervisor access to the mailbox.
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct SupervisorAccess {}
+pub struct SupervisorAccess<'a> {
+    mailbox: &'a BlockchainMailbox,
+}
 
 /// Communication channel is an proxy entity for performing service calls from
 /// other service instances.
 #[derive(Debug)]
-pub struct CommunicationChannel<'a, T = ()> {
+pub struct CommunicationChannel<'a> {
     pub(crate) mailbox: &'a BlockchainMailbox,
     dispatcher: &'a Dispatcher,
-    phantom: std::marker::PhantomData<T>,
 }
 
-impl<'a, T> CommunicationChannel<'a, T> {
+impl<'a> CommunicationChannel<'a> {
     /// Creates a new communication channel.
     pub(crate) fn new(mailbox: &'a BlockchainMailbox, dispatcher: &'a Dispatcher) -> Self {
         Self {
             mailbox,
             dispatcher,
-            phantom: std::marker::PhantomData,
         }
     }
 
@@ -56,12 +54,17 @@ impl<'a, T> CommunicationChannel<'a, T> {
 
     /// Opens an extended interface for supervisor.
     #[doc(hidden)]
-    pub fn supervisor_interface(&'a self) -> CommunicationChannel<'a, SupervisorAccess> {
-        CommunicationChannel::<SupervisorAccess>::new(self.mailbox, self.dispatcher)
+    pub fn supervisor_interface(&'a self) -> SupervisorAccess<'a> {
+        SupervisorAccess::new(self.mailbox)
     }
 }
 
-impl<'a> CommunicationChannel<'a, SupervisorAccess> {
+impl<'a> SupervisorAccess<'a> {
+    /// Creates a new SupervisorAccess entity.
+    pub fn new(mailbox: &'a BlockchainMailbox) -> Self {
+        Self { mailbox }
+    }
+
     /// Adds a request to the list of pending actions. These changes will be applied immediately
     /// before the block commit.
     ///
