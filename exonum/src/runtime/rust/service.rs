@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use futures::Future;
 
 use std::fmt::{self, Debug};
 
@@ -23,27 +24,24 @@ use crate::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        api::ServiceApiBuilder,
-        dispatcher::{self, DispatcherRef, DispatcherSender},
-        error::ExecutionError,
-        AnyTx, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange, ExecutionContext,
-        InstanceDescriptor, InstanceId, MethodId,
+        api::ServiceApiBuilder, dispatcher::Dispatcher, AnyTx, ArtifactId, ArtifactProtobufSpec,
+        CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
-use super::RustArtifactId;
+use super::{CallContext, RustArtifactId};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
 ///
 /// Usually, `ServiceDispatcher` can be derived using the `ServiceFactory` macro.
-pub trait ServiceDispatcher: Send {
+pub trait ServiceDispatcher: Send + Sync {
     /// Dispatches the interface method call within the specified context.
     fn call(
         &self,
         interface_name: &str,
         method: MethodId,
-        ctx: TransactionContext,
+        ctx: CallContext,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 }
@@ -92,7 +90,8 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// The order of invoking the `before_commit` method is an implementation detail. Effectively,
     /// this means that services must not rely on a particular ordering of `Service::before_commit`
     /// invocations.
-    fn before_commit(&self, _context: BeforeCommitContext) {}
+    fn before_commit(&self, _context: CallContext) {}
+
     /// Handles block commit event.
     ///
     /// This handler is an optional callback method which is invoked by the blockchain
@@ -112,7 +111,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 }
 
 /// Describes a service instance factory for the specific Rust artifact.
-pub trait ServiceFactory: Send + Debug + 'static {
+pub trait ServiceFactory: Send + Sync + Debug + 'static {
     /// Returns the unique artifact identifier corresponding to the factory.
     fn artifact_id(&self) -> RustArtifactId;
     /// Returns the Protobuf specification used by the instances of this service.
@@ -162,143 +161,6 @@ pub trait Transaction: BinaryValue {
     }
 }
 
-/// Provide the context for the transaction under execution.
-#[derive(Debug)]
-pub struct TransactionContext<'a, 'b> {
-    /// Service instance associated with the current context.
-    pub instance: InstanceDescriptor<'a>,
-    /// Underlying execution context.
-    inner: &'a ExecutionContext<'b>,
-}
-
-impl<'a, 'b> TransactionContext<'a, 'b> {
-    /// Creates a new transaction context for the specified execution context and the instance
-    /// descriptor.
-    pub(crate) fn new(context: &'a ExecutionContext<'b>, instance: InstanceDescriptor<'a>) -> Self {
-        Self {
-            inner: context,
-            instance,
-        }
-    }
-
-    /// Returns a writable snapshot of the current blockchain state.
-    pub fn fork(&self) -> &Fork {
-        self.inner.fork
-    }
-
-    /// Returns the initiator of the actual transaction execution.
-    pub fn caller(&self) -> &Caller {
-        &self.inner.caller
-    }
-
-    /// Returns the validator ID if the transaction author is a validator.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        // TODO Perhaps we should optimize this method [ECR-3222]
-        self.caller().author().and_then(|author| {
-            CoreSchema::new(self.fork())
-                .consensus_config()
-                .find_validator(|validator_keys| author == validator_keys.service_key)
-        })
-    }
-
-    /// Enqueue dispatcher action.
-    pub fn dispatch_action(&self, action: dispatcher::Action) {
-        self.inner
-            .dispatcher
-            .dispatch_action(self.instance.id, action)
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
-    #[doc(hidden)]
-    /// Creates a client to call interface methods of the specified service instance.
-    pub fn interface<T>(&self, called: InstanceId) -> T
-    where
-        T: From<CallContext<'a>>,
-    {
-        self.call_context(called).into()
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
-    #[doc(hidden)]
-    /// Creates a context to call interfaces of the specified service instance.
-    pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
-        CallContext::from_execution_context(self.inner, self.instance.id, called)
-    }
-
-    /// Checks the caller of this method with the specified closure.
-    ///
-    /// If the closure returns `Some(value)`, then the method returns `Some((value, fork))` thus you
-    /// get a write access to the blockchain state. Otherwise this method returns
-    /// an occurred error.
-    pub fn verify_caller<F, T>(&self, predicate: F) -> Option<(T, &Fork)>
-    where
-        F: Fn(&Caller) -> Option<T>,
-    {
-        // TODO Think about returning structure with the named fields instead of unnamed tuple
-        // to make code more clear. [ECR-3222]
-        predicate(&self.inner.caller).map(|result| (result, self.inner.fork))
-    }
-}
-
-/// Provide context for the `before_commit` handler.
-#[derive(Debug)]
-pub struct BeforeCommitContext<'a> {
-    /// Service instance associated with the current context.
-    pub instance: InstanceDescriptor<'a>,
-    /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
-    /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a Fork,
-    /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a DispatcherRef<'a>,
-}
-
-impl<'a> BeforeCommitContext<'a> {
-    /// Creates a new `BeforeCommit` context.
-    pub(crate) fn new(
-        instance: InstanceDescriptor<'a>,
-        fork: &'a Fork,
-        dispatcher: &'a DispatcherRef<'a>,
-    ) -> Self {
-        Self {
-            instance,
-            fork,
-            dispatcher,
-        }
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
-    #[doc(hidden)]
-    /// Create a client to call interface methods of the specified service instance.
-    pub fn interface<T>(&self, called: InstanceId) -> T
-    where
-        T: From<CallContext<'a>>,
-    {
-        self.call_context(called).into()
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
-    #[doc(hidden)]
-    /// Creates a context to call interfaces of the specified service instance.
-    pub fn call_context(&self, called: InstanceId) -> CallContext<'a> {
-        CallContext::new(self.fork, self.dispatcher, self.instance.id, called)
-    }
-
-    /// Adds a configuration update to pending actions. These changes will be applied immediately
-    /// before the block commit.
-    ///
-    /// Only the supervisor service is allowed to perform this action.
-    #[doc(hidden)]
-    pub fn update_config(&self, changes: Vec<ConfigChange>) {
-        self.dispatcher.dispatch_action(
-            self.instance.id,
-            dispatcher::Action::UpdateConfig {
-                caller_instance_id: self.instance.id,
-                changes,
-            },
-        )
-    }
-}
-
 /// Provide context for the `after_commit` handler.
 pub struct AfterCommitContext<'a> {
     /// Service instance associated with the current context.
@@ -307,8 +169,7 @@ pub struct AfterCommitContext<'a> {
     pub snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
-    /// Channel to communicate with the dispatcher.
-    dispatcher: &'a DispatcherSender,
+    dispatcher: &'a mut Dispatcher,
     /// Channel to send signed transactions to the transactions pool.
     tx_sender: &'a ApiSender,
 }
@@ -316,9 +177,9 @@ pub struct AfterCommitContext<'a> {
 impl<'a> AfterCommitContext<'a> {
     /// Creates a new `AfterCommit` context.
     pub(crate) fn new(
+        dispatcher: &'a mut Dispatcher,
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
-        dispatcher: &'a DispatcherSender,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
@@ -365,14 +226,35 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
-    /// Returns a communication channel with the dispatcher.
-    pub fn dispatcher_channel(&self) -> &DispatcherSender {
-        self.dispatcher
-    }
-
     /// Returns a transaction broadcaster.
     pub fn transaction_broadcaster(&self) -> ApiSender {
         self.tx_sender.clone()
+    }
+
+    // Provides a supervisor interface to an authorized instance.
+    #[doc(hidden)]
+    pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions> {
+        if !is_supervisor(self.instance.id) {
+            return None;
+        }
+        Some(SupervisorExtensions {
+            dispatcher: &mut *self.dispatcher,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct SupervisorExtensions<'a> {
+    dispatcher: &'a mut Dispatcher,
+}
+
+impl SupervisorExtensions<'_> {
+    pub fn start_deploy(
+        &mut self,
+        artifact: ArtifactId,
+        spec: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        self.dispatcher.deploy_artifact(artifact, spec).wait()
     }
 }
 
@@ -391,8 +273,12 @@ pub trait Interface {
     /// Invokes the specified method handler of the service instance.
     fn dispatch(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
+}
+
+fn is_supervisor(instance_id: InstanceId) -> bool {
+    instance_id == crate::runtime::SUPERVISOR_INSTANCE_ID
 }

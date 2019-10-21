@@ -33,7 +33,7 @@ use crate::{
     runtime::{
         dispatcher,
         error::ErrorKind,
-        rust::{BeforeCommitContext, Service, ServiceFactory, Transaction, TransactionContext},
+        rust::{CallContext, Service, ServiceFactory, Transaction},
         AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -67,19 +67,11 @@ struct TestCallInitialize {
 
 #[exonum_service(crate = "crate")]
 trait TestDispatcherInterface {
-    fn test_execute(
-        &self,
-        context: TransactionContext,
-        arg: TestExecute,
-    ) -> Result<(), ExecutionError>;
+    fn test_execute(&self, context: CallContext, arg: TestExecute) -> Result<(), ExecutionError>;
 
-    fn test_deploy(
-        &self,
-        context: TransactionContext,
-        arg: TestDeploy,
-    ) -> Result<(), ExecutionError>;
+    fn test_deploy(&self, context: CallContext, arg: TestDeploy) -> Result<(), ExecutionError>;
 
-    fn test_add(&self, context: TransactionContext, arg: TestAdd) -> Result<(), ExecutionError>;
+    fn test_add(&self, context: CallContext, arg: TestAdd) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -118,26 +110,21 @@ impl Service for TestDispatcherService {
 }
 
 impl TestDispatcherInterface for TestDispatcherService {
-    fn test_deploy(
-        &self,
-        context: TransactionContext,
-        arg: TestDeploy,
-    ) -> Result<(), ExecutionError> {
-        let mut index = Entry::new(context.instance.name, context.fork());
-        index.set(arg.value);
-        drop(index);
+    fn test_deploy(&self, mut context: CallContext, arg: TestDeploy) -> Result<(), ExecutionError> {
+        {
+            let mut index = Entry::new(context.instance().name, context.fork());
+            index.set(arg.value);
+        }
 
         let artifact = if arg.value == 24 {
             ServicePanicImpl.artifact_id().into()
         } else {
             ServiceGoodImpl.artifact_id().into()
         };
-
-        context.dispatch_action(dispatcher::Action::RegisterArtifact {
-            artifact,
-            spec: Vec::new(),
-        });
-
+        context
+            .supervisor_extensions()
+            .unwrap()
+            .register_artifact(artifact, vec![])?;
         if arg.value == 42 {
             return Err(dispatcher::Error::UnknownArtifactId.into());
         }
@@ -145,8 +132,8 @@ impl TestDispatcherInterface for TestDispatcherService {
         Ok(())
     }
 
-    fn test_add(&self, context: TransactionContext, arg: TestAdd) -> Result<(), ExecutionError> {
-        let mut index = Entry::new(context.instance.name, context.fork());
+    fn test_add(&self, mut context: CallContext, arg: TestAdd) -> Result<(), ExecutionError> {
+        let mut index = Entry::new(context.instance().name, context.fork());
         index.set(arg.value);
         drop(index);
 
@@ -162,24 +149,20 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        context.dispatch_action(dispatcher::Action::AddService {
+        context.supervisor_extensions().unwrap().add_service(
             artifact,
-            instance_name: format!("good-service-{}", arg.value),
+            format!("good-service-{}", arg.value),
             config,
-        });
+        )?;
 
         Ok(())
     }
 
-    fn test_execute(
-        &self,
-        context: TransactionContext,
-        arg: TestExecute,
-    ) -> Result<(), ExecutionError> {
+    fn test_execute(&self, context: CallContext, arg: TestExecute) -> Result<(), ExecutionError> {
         if arg.value == 42 {
             panic!(StorageError::new("42"))
         }
-        let mut index = ListIndex::new(context.instance.name, context.fork());
+        let mut index = ListIndex::new(context.instance().name, context.fork());
         index.push(arg.value);
         index.push(42 / arg.value);
         Ok(())
@@ -206,8 +189,8 @@ impl Service for ServiceGoodImpl {
         vec![]
     }
 
-    fn before_commit(&self, context: BeforeCommitContext) {
-        let mut index = ListIndex::new(IDX_NAME, context.fork);
+    fn before_commit(&self, context: CallContext) {
+        let mut index = ListIndex::new(IDX_NAME, context.fork());
         index.push(1);
     }
 }
@@ -228,7 +211,7 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn before_commit(&self, _context: BeforeCommitContext) {
+    fn before_commit(&self, _context: CallContext) {
         panic!("42");
     }
 
@@ -253,7 +236,7 @@ struct ServicePanicStorageErrorImpl;
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn before_commit(&self, _context: BeforeCommitContext) {
+    fn before_commit(&self, _context: CallContext) {
         panic!(StorageError::new("42"));
     }
 
@@ -276,7 +259,7 @@ struct TxResult {
 
 #[exonum_service(crate = "crate")]
 trait TxResultCheckInterface {
-    fn tx_result(&self, context: TransactionContext, arg: TxResult) -> Result<(), ExecutionError>;
+    fn tx_result(&self, context: CallContext, arg: TxResult) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -290,7 +273,7 @@ trait TxResultCheckInterface {
 struct TxResultCheckService;
 
 impl TxResultCheckInterface for TxResultCheckService {
-    fn tx_result(&self, context: TransactionContext, arg: TxResult) -> Result<(), ExecutionError> {
+    fn tx_result(&self, context: CallContext, arg: TxResult) -> Result<(), ExecutionError> {
         let mut entry = create_entry(context.fork());
         entry.set(arg.value);
         EXECUTION_STATUS.lock().unwrap().clone()

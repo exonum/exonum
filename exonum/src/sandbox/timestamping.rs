@@ -23,7 +23,7 @@ use crate::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
     runtime::{
-        rust::{Service, Transaction, TransactionContext},
+        rust::{CallContext, Service, Transaction},
         AnyTx, InstanceDescriptor, InstanceId,
     },
 };
@@ -32,11 +32,7 @@ pub const DATA_SIZE: usize = 64;
 
 #[exonum_service(crate = "crate")]
 pub trait TimestampingInterface {
-    fn timestamp(
-        &self,
-        context: TransactionContext,
-        arg: TimestampTx,
-    ) -> Result<(), ExecutionError>;
+    fn timestamp(&self, context: CallContext, arg: TimestampTx) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -50,11 +46,7 @@ pub trait TimestampingInterface {
 pub struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(
-        &self,
-        _context: TransactionContext,
-        _arg: TimestampTx,
-    ) -> Result<(), ExecutionError> {
+    fn timestamp(&self, _context: CallContext, _arg: TimestampTx) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

@@ -910,7 +910,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
+        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Arc<dyn Runtime>)>>,
         services: impl IntoIterator<Item = InstanceCollection>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
@@ -1158,7 +1158,7 @@ mod tests {
         messages::AnyTx,
         proto::schema::tests::TxSimple,
         runtime::{
-            rust::{Service, Transaction, TransactionContext},
+            rust::{CallContext, Service, Transaction},
             ExecutionError, InstanceDescriptor, InstanceId,
         },
     };
@@ -1171,7 +1171,7 @@ mod tests {
 
     #[exonum_service(crate = "crate")]
     pub trait TestInterface {
-        fn simple(&self, context: TransactionContext, arg: TxSimple) -> Result<(), ExecutionError>;
+        fn simple(&self, context: CallContext, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug, ServiceFactory)]
@@ -1185,11 +1185,7 @@ mod tests {
     struct TestService;
 
     impl TestInterface for TestService {
-        fn simple(
-            &self,
-            _context: TransactionContext,
-            _arg: TxSimple,
-        ) -> Result<(), ExecutionError> {
+        fn simple(&self, _context: CallContext, _arg: TxSimple) -> Result<(), ExecutionError> {
             Ok(())
         }
     }
@@ -1220,7 +1216,7 @@ mod tests {
             "test-service",
             (),
         )];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
 
         let mut node = Node::new(db, external_runtimes, services, node_cfg, None);
 
@@ -1252,7 +1248,7 @@ mod tests {
     fn test_transaction_without_service() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let (p_key, s_key) = gen_keypair();
 
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
@@ -1275,7 +1271,7 @@ mod tests {
     fn test_good_internal_events_config() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
@@ -1285,7 +1281,7 @@ mod tests {
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1299,7 +1295,7 @@ mod tests {
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1314,7 +1310,7 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
@@ -1331,7 +1327,7 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();

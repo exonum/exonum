@@ -24,7 +24,7 @@ use exonum::{
     blockchain::{ExecutionError, Schema},
     crypto::{gen_keypair, Hash},
     runtime::{
-        rust::{Service, Transaction, TransactionContext},
+        rust::{CallContext, Service, Transaction},
         InstanceDescriptor,
     },
 };
@@ -51,11 +51,7 @@ impl TxTimestamp {
 
 #[exonum_service]
 trait TimestampingInterface {
-    fn timestamp(
-        &self,
-        context: TransactionContext,
-        arg: TxTimestamp,
-    ) -> Result<(), ExecutionError>;
+    fn timestamp(&self, context: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -68,11 +64,7 @@ trait TimestampingInterface {
 struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(
-        &self,
-        _context: TransactionContext,
-        _arg: TxTimestamp,
-    ) -> Result<(), ExecutionError> {
+    fn timestamp(&self, _context: CallContext, _arg: TxTimestamp) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

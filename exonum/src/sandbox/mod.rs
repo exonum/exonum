@@ -1134,7 +1134,7 @@ fn sandbox_with_services_uninitialized(
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
-    let external_runtimes: Vec<(u32, Box<dyn crate::runtime::Runtime>)> = vec![];
+    let external_runtimes: Vec<(u32, Arc<dyn crate::runtime::Runtime>)> = vec![];
     let api_channel = mpsc::channel(100);
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
@@ -1251,7 +1251,7 @@ mod tests {
         crypto::{gen_keypair_from_seed, Hash, Seed},
         proto::schema::tests::TxAfterCommit,
         runtime::{
-            rust::{AfterCommitContext, Service, Transaction, TransactionContext},
+            rust::{AfterCommitContext, CallContext, Service, Transaction},
             AnyTx, InstanceDescriptor, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
@@ -1263,7 +1263,7 @@ mod tests {
     pub trait AfterCommitInterface {
         fn after_commit(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: TxAfterCommit,
         ) -> Result<(), ExecutionError>;
     }
@@ -1281,7 +1281,7 @@ mod tests {
     impl AfterCommitInterface for AfterCommitService {
         fn after_commit(
             &self,
-            _context: TransactionContext,
+            _context: CallContext,
             _arg: TxAfterCommit,
         ) -> Result<(), ExecutionError> {
             Ok(())

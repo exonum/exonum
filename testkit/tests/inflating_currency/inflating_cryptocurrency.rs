@@ -18,7 +18,7 @@ use exonum::{
     helpers::Height,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{Service, TransactionContext},
+        rust::{CallContext, Service},
         InstanceDescriptor, InstanceId,
     },
 };
@@ -125,14 +125,14 @@ pub enum Error {
 #[exonum_service]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> Result<(), Error>;
+    fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error>;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error>;
 }
 
 impl CurrencyInterface for CurrencyService {
-    fn create_wallet(&self, context: TransactionContext, arg: TxCreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
         let height = CoreSchema::new(context.fork()).height();
@@ -144,7 +144,7 @@ impl CurrencyInterface for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
         if author == arg.to {

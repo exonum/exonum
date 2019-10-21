@@ -242,8 +242,7 @@ impl ApiAggregator {
         let dispatcher = self.blockchain.dispatcher();
         let context = ApiContext::with_blockchain(&blockchain);
         endpoints.extend(dispatcher.api_endpoints(&context));
-
-        trace!("Create actix-web worker with api: {:#?}", endpoints);
+        trace!("Created actix-web worker with api: {:#?}", endpoints);
 
         match access {
             ApiAccess::Public => backend.extend(

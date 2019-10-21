@@ -24,18 +24,14 @@ use crate::{
     merkledb::Snapshot,
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{Service, Transaction, TransactionContext},
+        rust::{CallContext, Service, Transaction},
         InstanceDescriptor, InstanceId,
     },
 };
 
 #[exonum_service(crate = "crate")]
 pub trait ConfigUpdaterInterface {
-    fn update_config(
-        &self,
-        context: TransactionContext,
-        arg: TxConfig,
-    ) -> Result<(), ExecutionError>;
+    fn update_config(&self, context: CallContext, arg: TxConfig) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -49,11 +45,7 @@ pub trait ConfigUpdaterInterface {
 pub struct ConfigUpdaterService;
 
 impl ConfigUpdaterInterface for ConfigUpdaterService {
-    fn update_config(
-        &self,
-        context: TransactionContext,
-        arg: TxConfig,
-    ) -> Result<(), ExecutionError> {
+    fn update_config(&self, context: CallContext, arg: TxConfig) -> Result<(), ExecutionError> {
         Schema::new(context.fork())
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());

@@ -76,7 +76,7 @@ fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
     services: Vec<InstanceCollection>,
 ) -> Blockchain {
-    let external_runtimes: Vec<(u32, Box<dyn exonum::runtime::Runtime>)> = vec![];
+    let external_runtimes: Vec<(u32, Arc<dyn exonum::runtime::Runtime>)> = vec![];
 
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
@@ -114,7 +114,7 @@ mod timestamping {
         crypto::Hash,
         messages::Verified,
         runtime::{
-            rust::{Service, Transaction, TransactionContext},
+            rust::{CallContext, Service, Transaction},
             AnyTx, InstanceDescriptor, InstanceId,
         },
     };
@@ -128,11 +128,11 @@ mod timestamping {
 
     #[exonum_service]
     pub trait TimestampingInterface {
-        fn timestamp(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
+        fn timestamp(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError>;
 
         fn timestamp_panic(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: PanickingTx,
         ) -> Result<(), ExecutionError>;
     }
@@ -146,13 +146,13 @@ mod timestamping {
     pub struct Timestamping;
 
     impl TimestampingInterface for Timestamping {
-        fn timestamp(&self, _context: TransactionContext, _arg: Tx) -> Result<(), ExecutionError> {
+        fn timestamp(&self, _context: CallContext, _arg: Tx) -> Result<(), ExecutionError> {
             Ok(())
         }
 
         fn timestamp_panic(
             &self,
-            _context: TransactionContext,
+            _context: CallContext,
             _arg: PanickingTx,
         ) -> Result<(), ExecutionError> {
             panic!("panic text");
@@ -210,7 +210,7 @@ mod cryptocurrency {
         crypto::{Hash, PublicKey},
         messages::Verified,
         runtime::{
-            rust::{Service, Transaction, TransactionContext},
+            rust::{CallContext, Service, Transaction},
             AnyTx, ErrorKind, InstanceDescriptor, InstanceId,
         },
     };
@@ -230,17 +230,17 @@ mod cryptocurrency {
     #[exonum_service]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
-        fn transfer(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
+        fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError>;
         /// Same as `Tx`, but without cryptographic proofs in `execute`.
         fn transfer_without_proof(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: SimpleTx,
         ) -> Result<(), ExecutionError>;
         /// Same as `SimpleTx`, but signals an error 50% of the time.
         fn transfer_error_sometimes(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: RollbackTx,
         ) -> Result<(), ExecutionError>;
     }
@@ -254,7 +254,7 @@ mod cryptocurrency {
     pub struct Cryptocurrency;
 
     impl CryptocurrencyInterface for Cryptocurrency {
-        fn transfer(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError> {
+        fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
 
             let mut index = ProofMapIndex::new("provable_balances", context.fork());
@@ -269,7 +269,7 @@ mod cryptocurrency {
 
         fn transfer_without_proof(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: SimpleTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
@@ -286,7 +286,7 @@ mod cryptocurrency {
 
         fn transfer_error_sometimes(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: RollbackTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
@@ -398,8 +398,8 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             self, dispatcher,
-            rust::{Interface, Service, Transaction, TransactionContext},
-            AnyTx, CallContext, InstanceDescriptor, InstanceId, MethodId,
+            rust::{CallContext, Interface, Service, Transaction},
+            AnyTx, InstanceDescriptor, InstanceId, MethodId,
         },
     };
     use exonum_merkledb::Snapshot;
@@ -425,19 +425,17 @@ mod foreign_interface_call {
 
     #[exonum_service]
     pub trait SelfInterface {
-        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
-            -> Result<(), ExecutionError>;
+        fn timestamp(&self, context: CallContext, arg: SelfTx) -> Result<(), ExecutionError>;
 
         fn timestamp_foreign(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: ForeignTx,
         ) -> Result<(), ExecutionError>;
     }
 
     pub trait ForeignInterface {
-        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
-            -> Result<(), ExecutionError>;
+        fn timestamp(&self, context: CallContext, arg: SelfTx) -> Result<(), ExecutionError>;
     }
 
     impl Interface for dyn ForeignInterface {
@@ -445,7 +443,7 @@ mod foreign_interface_call {
 
         fn dispatch(
             &self,
-            ctx: TransactionContext,
+            ctx: CallContext,
             method: MethodId,
             payload: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -465,7 +463,7 @@ mod foreign_interface_call {
     pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
 
     impl<'a> ForeignInterfaceClient<'a> {
-        fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
+        fn timestamp(&mut self, arg: SelfTx) -> Result<(), ExecutionError> {
             self.0.call(ForeignInterface::INTERFACE_NAME, 0, arg)
         }
     }
@@ -500,31 +498,23 @@ mod foreign_interface_call {
     pub struct Timestamping;
 
     impl SelfInterface for Timestamping {
-        fn timestamp(
-            &self,
-            _context: TransactionContext,
-            _arg: SelfTx,
-        ) -> Result<(), ExecutionError> {
+        fn timestamp(&self, _context: CallContext, _arg: SelfTx) -> Result<(), ExecutionError> {
             Ok(())
         }
 
         fn timestamp_foreign(
             &self,
-            context: TransactionContext,
+            mut context: CallContext,
             arg: ForeignTx,
         ) -> Result<(), ExecutionError> {
             context
-                .interface::<ForeignInterfaceClient>(FOREIGN_INTERFACE_SERVICE_ID)
+                .interface::<ForeignInterfaceClient>(FOREIGN_INTERFACE_SERVICE_ID)?
                 .timestamp(SelfTx { data: arg.data })
         }
     }
 
     impl ForeignInterface for Timestamping {
-        fn timestamp(
-            &self,
-            context: TransactionContext,
-            _arg: SelfTx,
-        ) -> Result<(), ExecutionError> {
+        fn timestamp(&self, context: CallContext, _arg: SelfTx) -> Result<(), ExecutionError> {
             assert_eq!(
                 context.caller().as_service().unwrap(),
                 SELF_INTERFACE_SERVICE_ID

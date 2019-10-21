@@ -51,9 +51,9 @@ impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
                 darling::Error::unexpected_type("Expected `&self` or `&mut self` as an argument")
             })?;
 
-        method_args_iter.next().ok_or_else(|| {
-            darling::Error::unexpected_type("Expected `TransactionContext` argument")
-        })?;
+        method_args_iter
+            .next()
+            .ok_or_else(|| darling::Error::unexpected_type("Expected `CallContext` argument"))?;
 
         let arg_type = method_args_iter
             .next()
@@ -195,17 +195,17 @@ impl ExonumService {
                 const INTERFACE_NAME: &'static str = #interface_name;
 
                 fn dispatch(
-                        &self,
-                        ctx: #cr::runtime::rust::TransactionContext,
-                        method: #cr::runtime::MethodId,
-                        payload: &[u8]
-                    ) -> Result<(), #cr::runtime::error::ExecutionError> {
+                    &self,
+                    ctx: #cr::runtime::rust::CallContext,
+                    method: #cr::runtime::MethodId,
+                    payload: &[u8],
+                ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match method {
                         #( #match_arms )*
                         other => {
                             let message = format!(
                                 "Method with ID {} is absent in the '{}' interface of the instance `{}`",
-                                other, stringify!(#trait_name), ctx.instance.name,
+                                other, stringify!(#trait_name), ctx.instance().name,
                             );
                             Err(#cr::runtime::DispatcherError::no_such_method(message))
                         }

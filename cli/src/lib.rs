@@ -111,7 +111,7 @@ pub mod password;
 #[derive(Debug, Default)]
 pub struct NodeBuilder {
     services: Vec<Box<dyn ServiceFactory>>,
-    external_runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    external_runtimes: Vec<(u32, Arc<dyn Runtime>)>,
 }
 
 impl NodeBuilder {
@@ -134,7 +134,7 @@ impl NodeBuilder {
     /// Adds a new Runtime to the list of available runtimes.
     ///
     /// Note that you don't have to add a Rust Runtime, since it's included by default.
-    pub fn with_external_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+    pub fn with_external_runtime(mut self, runtime: impl Into<(u32, Arc<dyn Runtime>)>) -> Self {
         self.external_runtimes.push(runtime.into());
         self
     }

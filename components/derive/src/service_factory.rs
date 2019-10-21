@@ -168,7 +168,7 @@ impl ServiceFactory {
                     &self,
                     interface_name: &str,
                     method: #cr::runtime::MethodId,
-                    ctx: #cr::runtime::rust::TransactionContext,
+                    ctx: #cr::runtime::rust::CallContext,
                     payload: &[u8],
                 ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match interface_name {
@@ -176,7 +176,7 @@ impl ServiceFactory {
                         other => {
                             let message = format!(
                                 "Service instance `{}` does not implement a `{}` interface.",
-                                ctx.instance.name,
+                                ctx.instance().name,
                                 other
                             );
                             Err(#cr::runtime::DispatcherError::no_such_interface(message))

@@ -72,6 +72,7 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
+    // FIXME: remove `dispatcher`.
     dispatcher: Arc<Mutex<Dispatcher>>,
     internal_requests: mpsc::Sender<InternalRequest>,
 }
@@ -81,7 +82,7 @@ impl Blockchain {
     // TODO Write proper doc string. [ECR-3275]
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
+        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Arc<dyn Runtime>)>>,
         services: impl IntoIterator<Item = InstanceCollection>,
         genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
@@ -184,18 +185,10 @@ impl Blockchain {
         Ok(())
     }
 
+    // TODO: remove
     // This method is needed for EJB.
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
-        // TODO check if service exists? [ECR-3222]
-
-        // if !self.dispatcher.services().contains_key(&service_id) {
-        //     return Err(format_err!(
-        //         "Unable to broadcast transaction: no service with ID={} found",
-        //         service_id
-        //     ));
-        // }
-
         self.api_sender.broadcast_transaction(Verified::from_value(
             tx,
             self.service_keypair.0,
@@ -317,7 +310,9 @@ impl Blockchain {
 
         let tx_result = catch_panic(|| dispatcher.execute(fork, tx_hash, &transaction));
         match &tx_result {
-            Ok(_) => fork.flush(),
+            Ok(_) => {
+                fork.flush();
+            }
             Err(e) => {
                 if e.kind == ExecutionErrorKind::Panic {
                     error!("{:?} transaction execution panicked: {:?}", transaction, e);
@@ -382,11 +377,15 @@ impl Blockchain {
             fork.into_patch()
         };
         self.merge(patch)?;
-        // Invokes `after_commit` for each service in order of their identifiers
-        self.dispatcher()
-            .after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
+
+        // Invoke `after_commit` for each service in order of their identifiers
+        let mut dispatcher = self.dispatcher();
+        dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
+
+        let api_changes = dispatcher.notify_api_changes(&ApiContext::with_blockchain(self));
+
         // Send `RestartApi` request if the dispatcher state has been modified.
-        if self.notify_api_changes() {
+        if api_changes {
             self.internal_requests
                 .clone()
                 .send(InternalRequest::RestartApi)

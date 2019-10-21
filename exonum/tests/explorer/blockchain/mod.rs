@@ -21,14 +21,14 @@ use exonum::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        rust::{Service, TransactionContext},
+        rust::{CallContext, Service},
         AnyTx, InstanceDescriptor, InstanceId, Runtime,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
 use futures::sync::mpsc;
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 pub const SERVICE_ID: InstanceId = 4;
 
@@ -76,8 +76,8 @@ pub enum Error {
 
 #[exonum_service]
 pub trait ExplorerTransactions {
-    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
-    fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error>;
+    fn create_wallet(&self, context: CallContext, arg: CreateWallet) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext, arg: Transfer) -> Result<(), Error>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -90,7 +90,7 @@ pub trait ExplorerTransactions {
 struct MyService;
 
 impl ExplorerTransactions for MyService {
-    fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, _context: CallContext, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -98,7 +98,7 @@ impl ExplorerTransactions for MyService {
         }
     }
 
-    fn transfer(&self, _context: TransactionContext, _arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, _context: CallContext, _arg: Transfer) -> Result<(), Error> {
         panic!("oops");
     }
 }
@@ -121,7 +121,7 @@ pub fn create_blockchain() -> Blockchain {
     let config = generate_testnet_config(1, 0)[0].clone();
     let service_keypair = config.service_keypair();
 
-    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+    let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
     let services =
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
 

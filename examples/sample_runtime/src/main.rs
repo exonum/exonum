@@ -24,7 +24,7 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
+        dispatcher::{self, Dispatcher, Error as DispatcherError},
         rust::Transaction,
         AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceId, InstanceSpec, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
@@ -35,22 +35,30 @@ use exonum_supervisor::{DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
 use std::{
-    cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, RwLock,
+    },
     thread,
     time::Duration,
 };
 
 /// Service instance with a counter.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct SampleService {
-    counter: Cell<u64>,
+    counter: Arc<AtomicU64>,
     name: String,
 }
 
 /// Sample runtime.
 #[derive(Debug, Default)]
 struct SampleRuntime {
+    inner: RwLock<Inner>,
+}
+
+#[derive(Debug, Default)]
+struct Inner {
     deployed_artifacts: BTreeMap<ArtifactId, Vec<u8>>,
     started_services: BTreeMap<InstanceId, SampleService>,
 }
@@ -68,9 +76,11 @@ enum SampleRuntimeError {
 impl SampleRuntime {
     /// Runtime identifier for the present runtime.
     const ID: u32 = 255;
+}
 
+impl Inner {
     /// Create a new service instance with the given specification.
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<&SampleService, ExecutionError> {
+    fn start_service(&mut self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
             return Err(DispatcherError::ArtifactNotDeployed.into());
         }
@@ -85,11 +95,9 @@ impl SampleRuntime {
                 ..SampleService::default()
             },
         );
-        Ok(&self.started_services[&spec.id])
+        Ok(self.started_services[&spec.id].clone())
     }
-}
 
-impl Runtime for SampleRuntime {
     /// In the present simplest case, the artifact is added into the deployed artifacts table.
     fn deploy_artifact(
         &mut self,
@@ -109,43 +117,61 @@ impl Runtime for SampleRuntime {
             .into_future(),
         )
     }
+}
+
+impl Runtime for SampleRuntime {
+    fn deploy_artifact(
+        &self,
+        artifact: ArtifactId,
+        spec: Vec<u8>,
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        self.inner.write().unwrap().deploy_artifact(artifact, spec)
+    }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        self.deployed_artifacts.contains_key(id)
+        self.inner
+            .read()
+            .unwrap()
+            .deployed_artifacts
+            .contains_key(id)
     }
 
     /// Starts an existing `SampleService` instance with the specified ID.
-    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        let instance = self.start_service(spec)?;
+    fn restart_service(&self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        let instance = self.inner.write().unwrap().start_service(spec)?;
         println!("Starting service {}: {:?}", spec, instance);
         Ok(())
     }
 
     /// Starts a new service instance and sets the counter value for this.
     fn add_service(
-        &mut self,
-        _fork: &mut Fork,
+        &self,
+        _fork: &Fork,
         spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let service_instance = self.start_service(spec)?;
+        let service_instance = self.inner.write().unwrap().start_service(spec)?;
         let new_value =
             u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-        service_instance.counter.set(new_value);
+        service_instance.counter.store(new_value, Ordering::SeqCst);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())
     }
 
     fn execute(
         &self,
-        context: &ExecutionContext,
+        context: ExecutionContext,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let service = self
+            .inner
+            .read()
+            .unwrap()
             .started_services
             .get(&call_info.instance_id)
-            .ok_or(SampleRuntimeError::IncorrectCallInfo)?;
+            .ok_or(SampleRuntimeError::IncorrectCallInfo)?
+            .clone();
 
         println!(
             "Executing method {}#{} of service {}",
@@ -158,9 +184,8 @@ impl Runtime for SampleRuntime {
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
-                let counter = service.counter.get();
-                println!("Updating counter value to {}", counter + value);
-                service.counter.set(value + counter);
+                let old_value = service.counter.fetch_add(value, Ordering::SeqCst);
+                println!("Updating counter value to {}", old_value + value);
                 Ok(())
             }
 
@@ -170,7 +195,7 @@ impl Runtime for SampleRuntime {
                     Err(SampleRuntimeError::IncorrectPayload.into())
                 } else {
                     println!("Resetting counter");
-                    service.counter.set(0);
+                    service.counter.store(0, Ordering::SeqCst);
                     Ok(())
                 }
             }
@@ -188,7 +213,10 @@ impl Runtime for SampleRuntime {
     }
 
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.deployed_artifacts
+        self.inner
+            .read()
+            .unwrap()
+            .deployed_artifacts
             .get(id)
             .map(|_| ArtifactProtobufSpec::default())
     }
@@ -197,11 +225,17 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _context: ExecutionContext,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _dispatcher: &mut Dispatcher,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -209,9 +243,9 @@ impl Runtime for SampleRuntime {
     }
 }
 
-impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
+impl From<SampleRuntime> for (u32, Arc<dyn Runtime>) {
     fn from(inner: SampleRuntime) -> Self {
-        (SampleRuntime::ID, Box::new(inner))
+        (SampleRuntime::ID, Arc::new(inner))
     }
 }
 

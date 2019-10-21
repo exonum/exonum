@@ -155,7 +155,7 @@ mod tests {
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::{
-            rust::{Service, Transaction, TransactionContext},
+            rust::{CallContext, Service, Transaction},
             InstanceDescriptor,
         },
     };
@@ -196,17 +196,13 @@ mod tests {
 
     #[exonum_service]
     trait SampleServiceInterface {
-        fn timestamp(
-            &self,
-            context: TransactionContext,
-            arg: TxTimestamp,
-        ) -> Result<(), ExecutionError>;
+        fn timestamp(&self, context: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
     }
 
     impl SampleServiceInterface for SampleService {
         fn timestamp(
             &self,
-            _context: TransactionContext,
+            _context: CallContext,
             _arg: TxTimestamp,
         ) -> Result<(), ExecutionError> {
             Ok(())

@@ -18,9 +18,8 @@ use exonum::{
     exonum_merkledb::{Fork, Snapshot},
     node::ApiSender,
     runtime::{
-        dispatcher::{DispatcherRef, DispatcherSender},
-        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceSpec,
-        Runtime, StateHashAggregator,
+        dispatcher::Dispatcher, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
 use exonum_testkit::TestKitBuilder;
@@ -102,7 +101,7 @@ impl TestRuntime {
 
 impl Runtime for TestRuntime {
     fn deploy_artifact(
-        &mut self,
+        &self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
@@ -118,13 +117,13 @@ impl Runtime for TestRuntime {
         Some(ArtifactProtobufSpec::default())
     }
 
-    fn restart_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn restart_service(&self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
         Ok(())
     }
 
     fn add_service(
-        &mut self,
-        _fork: &mut Fork,
+        &self,
+        _fork: &Fork,
         _spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -134,7 +133,7 @@ impl Runtime for TestRuntime {
 
     fn execute(
         &self,
-        _context: &ExecutionContext,
+        _context: ExecutionContext,
         _call_info: &CallInfo,
         _arguments: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -145,11 +144,17 @@ impl Runtime for TestRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _context: ExecutionContext,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _dispatcher: &mut Dispatcher,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -157,9 +162,9 @@ impl Runtime for TestRuntime {
     }
 }
 
-impl From<TestRuntime> for (u32, Box<dyn Runtime>) {
+impl From<TestRuntime> for (u32, Arc<dyn Runtime>) {
     fn from(inner: TestRuntime) -> Self {
-        (TestRuntime::ID, Box::new(inner))
+        (TestRuntime::ID, Arc::new(inner))
     }
 }
 

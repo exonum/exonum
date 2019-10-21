@@ -17,7 +17,7 @@ use futures::{sync::mpsc, Future, IntoFuture};
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    mpsc::{channel, Sender},
+    mpsc::{sync_channel, SyncSender},
     Arc,
 };
 
@@ -29,8 +29,8 @@ use crate::{
         dispatcher::Dispatcher,
         rust::{Error as RustRuntimeError, RustRuntime},
         ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError,
-        DispatcherRef, DispatcherSender, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
+        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
+        RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -51,7 +51,7 @@ impl DispatcherBuilder {
         }
     }
 
-    fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
+    fn with_runtime(mut self, id: u32, runtime: impl Into<Arc<dyn Runtime>>) -> Self {
         self.dispatcher.runtimes.insert(id, runtime.into());
         self
     }
@@ -72,7 +72,7 @@ struct SampleRuntime {
     runtime_type: u32,
     instance_id: InstanceId,
     method_id: MethodId,
-    api_changes_sender: Sender<(u32, Vec<ApiChange>)>,
+    api_changes_sender: SyncSender<(u32, Vec<ApiChange>)>,
 }
 
 #[derive(Debug, IntoExecutionError)]
@@ -86,7 +86,7 @@ impl SampleRuntime {
         runtime_type: u32,
         instance_id: InstanceId,
         method_id: MethodId,
-        api_changes_sender: Sender<(u32, Vec<ApiChange>)>,
+        api_changes_sender: SyncSender<(u32, Vec<ApiChange>)>,
     ) -> Self {
         Self {
             runtime_type,
@@ -97,9 +97,15 @@ impl SampleRuntime {
     }
 }
 
+impl From<SampleRuntime> for Arc<dyn Runtime> {
+    fn from(value: SampleRuntime) -> Self {
+        Arc::new(value)
+    }
+}
+
 impl Runtime for SampleRuntime {
     fn deploy_artifact(
-        &mut self,
+        &self,
         artifact: ArtifactId,
         _spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
@@ -117,7 +123,7 @@ impl Runtime for SampleRuntime {
         id.runtime_id == self.runtime_type
     }
 
-    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn restart_service(&self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         if spec.artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
@@ -126,8 +132,8 @@ impl Runtime for SampleRuntime {
     }
 
     fn add_service(
-        &mut self,
-        _fork: &mut Fork,
+        &self,
+        _fork: &Fork,
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -136,7 +142,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _: &ExecutionContext,
+        _: ExecutionContext,
         call_info: &CallInfo,
         _: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -151,11 +157,17 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _context: ExecutionContext,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _dispatcher: &mut Dispatcher,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -174,8 +186,8 @@ impl Runtime for SampleRuntime {
 
 #[test]
 fn test_builder() {
-    let runtime_a = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, channel().0);
-    let runtime_b = SampleRuntime::new(SampleRuntimes::Second as u32, 1, 0, channel().0);
+    let runtime_a = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, sync_channel(1).0);
+    let runtime_b = SampleRuntime::new(SampleRuntimes::Second as u32, 1, 0, sync_channel(1).0);
 
     let dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime_a.runtime_type, runtime_a)
@@ -204,7 +216,7 @@ fn test_dispatcher_simple() {
     // Create dispatcher and test data.
     let db = Arc::new(TemporaryDB::new());
 
-    let (changes_tx, changes_rx) = channel();
+    let (changes_tx, changes_rx) = sync_channel(16);
     let runtime_a = SampleRuntime::new(
         SampleRuntimes::First as u32,
         RUST_SERVICE_ID,
@@ -244,7 +256,7 @@ fn test_dispatcher_simple() {
     // Check if the services are ready for initiation.
     dispatcher
         .add_service(
-            &mut fork,
+            &fork,
             InstanceSpec {
                 artifact: sample_rust_spec.clone(),
                 id: RUST_SERVICE_ID,
@@ -255,7 +267,7 @@ fn test_dispatcher_simple() {
         .expect("add_service failed for rust");
     dispatcher
         .add_service(
-            &mut fork,
+            &fork,
             InstanceSpec {
                 artifact: sample_java_spec.clone(),
                 id: JAVA_SERVICE_ID,
@@ -268,11 +280,10 @@ fn test_dispatcher_simple() {
     // Check if transactions are ready for execution.
     let tx_payload = [0x00_u8; 1];
 
-    let dispatcher_ref = DispatcherRef::new(&dispatcher);
-    let context = ExecutionContext::new(&dispatcher_ref, &fork, Caller::Service { instance_id: 1 });
     dispatcher
         .call(
-            &context,
+            &mut fork,
+            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -280,7 +291,8 @@ fn test_dispatcher_simple() {
 
     dispatcher
         .call(
-            &context,
+            &mut fork,
+            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
             &tx_payload,
         )
@@ -288,7 +300,8 @@ fn test_dispatcher_simple() {
 
     dispatcher
         .call(
-            &context,
+            &mut fork,
+            Caller::Service { instance_id: 1 },
             &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
             &tx_payload,
         )
@@ -296,7 +309,8 @@ fn test_dispatcher_simple() {
 
     dispatcher
         .call(
-            &context,
+            &mut fork,
+            Caller::Service { instance_id: 1 },
             &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -375,7 +389,7 @@ fn test_dispatcher_rust_runtime_no_service() {
     assert_eq!(
         dispatcher
             .add_service(
-                &mut fork,
+                &fork,
                 InstanceSpec {
                     artifact: sample_rust_spec.clone(),
                     id: RUST_SERVICE_ID,
@@ -390,12 +404,10 @@ fn test_dispatcher_rust_runtime_no_service() {
     // Check if transactions are ready for execution.
     let tx_payload = [0x00_u8; 1];
 
-    let dispatcher_ref = DispatcherRef::new(&dispatcher);
-    let context =
-        ExecutionContext::new(&dispatcher_ref, &fork, Caller::Service { instance_id: 15 });
     dispatcher
         .call(
-            &context,
+            &mut fork,
+            Caller::Service { instance_id: 15 },
             &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -413,9 +425,15 @@ impl ShutdownRuntime {
     }
 }
 
+impl From<ShutdownRuntime> for Arc<dyn Runtime> {
+    fn from(value: ShutdownRuntime) -> Self {
+        Arc::new(value)
+    }
+}
+
 impl Runtime for ShutdownRuntime {
     fn deploy_artifact(
-        &mut self,
+        &self,
         _artifact: ArtifactId,
         _spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
@@ -426,20 +444,20 @@ impl Runtime for ShutdownRuntime {
         false
     }
 
-    fn restart_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn restart_service(&self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
         Ok(())
     }
 
     fn add_service(
-        &mut self,
-        _fork: &mut Fork,
+        &self,
+        _fork: &Fork,
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn execute(&self, _: &ExecutionContext, _: &CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
+    fn execute(&self, _: ExecutionContext, _: &CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -447,11 +465,17 @@ impl Runtime for ShutdownRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
+    fn before_commit(
+        &self,
+        _context: ExecutionContext,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
 
     fn after_commit(
         &self,
-        _dispatcher: &DispatcherSender,
+        _dispatcher: &mut Dispatcher,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,

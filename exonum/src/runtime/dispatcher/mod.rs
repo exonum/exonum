@@ -18,14 +18,14 @@ use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future};
 
 use std::{
-    cell::RefCell,
     collections::{BTreeMap, HashMap},
     panic,
+    sync::Arc,
 };
 
 use crate::{
     api::ApiBuilder,
-    blockchain::{self, FatalError, IndexCoordinates, IndexOwner},
+    blockchain::{FatalError, IndexCoordinates, IndexOwner},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::ValidateInput,
     merkledb::BinaryValue,
@@ -34,11 +34,8 @@ use crate::{
 };
 
 use super::{
-    api::ApiContext,
-    error::{catch_panic, ExecutionError},
-    rust::interfaces::ConfigureCall,
-    ApiChange, ArtifactId, ArtifactProtobufSpec, CallContext, CallInfo, Caller, ConfigChange,
-    ExecutionContext, InstanceId, InstanceSpec, Runtime, SUPERVISOR_INSTANCE_ID,
+    api::ApiContext, error::ExecutionError, ApiChange, ArtifactId, ArtifactProtobufSpec, Caller,
+    ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -51,36 +48,36 @@ mod tests;
 /// By analogy with the privileged ports of the network, we use a range 0..1023 of instance
 /// identifiers for built-in services which can be created only during the blockchain genesis
 /// block creation.
+// FIXME: remove
 pub const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
 
-#[derive(Default)]
-pub struct Dispatcher {
-    runtimes: BTreeMap<u32, Box<dyn Runtime>>,
-    runtime_lookup: HashMap<InstanceId, u32>,
-    api_changes: BTreeMap<u32, Vec<ApiChange>>,
+#[derive(Debug)]
+struct ServiceInfo {
+    runtime_id: u32,
+    name: String,
 }
 
-impl std::fmt::Debug for Dispatcher {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("Dispatcher")
-            .field("runtimes", &self.runtimes)
-            .finish()
-    }
+#[derive(Debug, Default)]
+pub struct Dispatcher {
+    runtimes: BTreeMap<u32, Arc<dyn Runtime>>,
+    service_infos: BTreeMap<InstanceId, ServiceInfo>,
+    api_changes: BTreeMap<u32, Vec<ApiChange>>,
 }
 
 impl Dispatcher {
     /// Create a new dispatcher with the specified runtimes.
     pub(crate) fn with_runtimes(
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        runtimes: impl IntoIterator<Item = (u32, Arc<dyn Runtime>)>,
     ) -> Self {
         Self {
             runtimes: runtimes.into_iter().collect(),
-            runtime_lookup: HashMap::default(),
+            service_infos: BTreeMap::new(),
             api_changes: BTreeMap::new(),
         }
     }
 
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
+    // FIXME: remove in favor of "on node start" hook
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
@@ -102,9 +99,10 @@ impl Dispatcher {
     /// * If instance id is greater than [`MAX_BUILTIN_INSTANCE_ID`]
     ///
     /// [`MAX_BUILTIN_INSTANCE_ID`]: constant.MAX_BUILTIN_INSTANCE_ID.html
+    // FIXME: remove in favor of processing transactions in genesis block
     pub(crate) fn add_builtin_service(
         &mut self,
-        fork: &mut Fork,
+        fork: &Fork,
         spec: InstanceSpec,
         artifact_spec: impl BinaryValue,
         constructor: Vec<u8>,
@@ -149,6 +147,7 @@ impl Dispatcher {
         aggregator
     }
 
+    // FIXME: remove in favor of "on node start" hook
     pub(crate) fn api_endpoints(
         &self,
         context: &ApiContext,
@@ -171,13 +170,13 @@ impl Dispatcher {
     ///
     /// * If artifact identifier is invalid.
     pub(crate) fn deploy_artifact(
-        &mut self,
+        &self,
         artifact: ArtifactId,
         spec: impl BinaryValue,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         debug_assert!(artifact.validate().is_ok());
 
-        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
+        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
             runtime.deploy_artifact(artifact, spec.into_bytes())
         } else {
             Box::new(future::err(Error::IncorrectRuntime.into()))
@@ -192,7 +191,7 @@ impl Dispatcher {
     /// * If artifact identifier is invalid.
     /// * If artifact was not deployed.
     pub(crate) fn register_artifact(
-        &mut self,
+        &self,
         fork: &Fork,
         artifact: &ArtifactId,
         spec: impl BinaryValue,
@@ -223,7 +222,7 @@ impl Dispatcher {
     }
 
     pub(crate) fn deploy_and_register_artifact(
-        &mut self,
+        &self,
         fork: &Fork,
         artifact: &ArtifactId,
         spec: impl BinaryValue,
@@ -242,25 +241,25 @@ impl Dispatcher {
     /// * If instance spec contains invalid service name.
     pub(crate) fn add_service(
         &mut self,
-        fork: &mut Fork,
+        fork: &Fork,
         spec: InstanceSpec,
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
 
         // Check that service doesn't use existing identifiers.
-        if self.runtime_lookup.contains_key(&spec.id) {
+        if self.service_infos.contains_key(&spec.id) {
             return Err(Error::ServiceIdExists.into());
         }
         // Try to add the service instance.
         let runtime = self
             .runtimes
-            .get_mut(&spec.artifact.runtime_id)
+            .get(&spec.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
         runtime.add_service(fork, &spec, constructor.into_bytes())?;
         // Add service instance to the dispatcher schema.
         self.register_running_service(&spec);
-        Schema::new(fork as &Fork)
+        Schema::new(fork)
             .add_service_instance(spec)
             .map_err(From::from)
     }
@@ -272,58 +271,61 @@ impl Dispatcher {
         tx_id: Hash,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        let dispatcher_ref = DispatcherRef::new(self);
-        let context = ExecutionContext::new(
-            &dispatcher_ref,
-            fork,
-            Caller::Transaction {
-                author: tx.author(),
-                hash: tx_id,
-            },
-        );
-        self.call(&context, &tx.as_ref().call_info, &tx.as_ref().arguments)?;
-        // Execute pending dispatcher actions.
-        // TODO Take care about the rollbacks during the actions execution. [ECR-3559]
-        for action in context.dispatcher.take_actions() {
-            action.execute(self, fork)?;
-        }
-        Ok(())
+        let caller = Caller::Transaction {
+            author: tx.author(),
+            hash: tx_id,
+        };
+        let call_info = &tx.as_ref().call_info;
+        let runtime = self.runtime_for_service(call_info.instance_id)?;
+        let context = ExecutionContext::new(self, fork, caller);
+        runtime.execute(context, call_info, &tx.as_ref().arguments)
     }
 
-    /// Call the corresponding runtime method.
-    pub(crate) fn call(
+    /// Looks up the runtime for the specified service instance. Returns a reference to
+    /// the runtime, or an error if the service with the sepcified instance ID does not exist.
+    pub(crate) fn runtime_for_service(
         &self,
-        context: &ExecutionContext,
-        call_info: &CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        let runtime_id = self
-            .runtime_lookup
-            .get(&call_info.instance_id)
+        instance_id: InstanceId,
+    ) -> Result<Arc<dyn Runtime>, ExecutionError> {
+        let ServiceInfo { runtime_id, .. } = self
+            .service_infos
+            .get(&instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
-
         let runtime = self
             .runtimes
             .get(&runtime_id)
-            .ok_or(Error::IncorrectRuntime)?;
+            .ok_or(Error::IncorrectRuntime)?
+            .to_owned();
+        Ok(runtime)
+    }
 
+    #[cfg(test)]
+    pub(crate) fn call(
+        &mut self,
+        fork: &mut Fork,
+        caller: Caller,
+        call_info: &super::CallInfo,
+        arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        let runtime = self.runtime_for_service(call_info.instance_id)?;
+        let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, arguments)
     }
 
     pub(crate) fn before_commit(&mut self, fork: &mut Fork) {
-        let dispatcher_ref = DispatcherRef::new(self);
-        for runtime in self.runtimes.values() {
-            runtime.before_commit(&dispatcher_ref, fork);
-        }
-        // Execute pending dispatcher actions.
-        // TODO Take care about the rollbacks during the actions execution. [ECR-3559]
-        for action in dispatcher_ref.take_actions() {
-            let _ = action.execute(self, fork).map_err(|e| {
-                error!(
-                    "An error occurred while performing the dispatcher action. {}",
-                    e
-                )
-            });
+        let service_ids: Vec<_> = self
+            .service_infos
+            .iter()
+            .map(|(id, info)| (*id, info.runtime_id))
+            .collect();
+        for (service_id, runtime_id) in service_ids {
+            let runtime = self.runtimes[&runtime_id].clone();
+            let context = ExecutionContext::new(self, fork, Caller::BeforeCommit);
+            if runtime.before_commit(context, service_id).is_ok() {
+                fork.flush();
+            } else {
+                fork.rollback();
+            }
         }
     }
 
@@ -333,23 +335,10 @@ impl Dispatcher {
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
-        let channel = DispatcherSender::new();
-        self.runtimes.values().for_each(|runtime| {
-            runtime.after_commit(&channel, snapshot.as_ref(), &service_keypair, &tx_sender)
+        let runtimes = self.runtimes.clone();
+        runtimes.values().for_each(|runtime| {
+            runtime.after_commit(self, snapshot.as_ref(), &service_keypair, &tx_sender)
         });
-
-        for request in channel.take_deploy_requests() {
-            match self
-                .deploy_artifact(request.artifact.clone(), request.spec.clone())
-                .wait()
-            {
-                Ok(_) => request.completed(),
-                Err(e) => warn!(
-                    "An error during deploy artifact {:?} occurred {:?}",
-                    request.artifact, e
-                ),
-            }
-        }
     }
 
     /// Return additional information about the artifact if it is deployed.
@@ -366,6 +355,13 @@ impl Dispatcher {
         } else {
             false
         }
+    }
+
+    /// Returns the name corresponding to the specified `instance_id`.
+    pub(crate) fn service_name(&self, instance_id: InstanceId) -> Option<&str> {
+        self.service_infos
+            .get(&instance_id)
+            .map(|info| info.name.as_str())
     }
 
     /// Notify the runtime about API changes and return true if there are such changes.
@@ -393,8 +389,13 @@ impl Dispatcher {
     /// Register the service instance in the runtime lookup table.
     fn register_running_service(&mut self, instance: &InstanceSpec) {
         info!("Running service instance {:?}", instance);
-        self.runtime_lookup
-            .insert(instance.id, instance.artifact.runtime_id);
+        self.service_infos.insert(
+            instance.id,
+            ServiceInfo {
+                runtime_id: instance.artifact.runtime_id,
+                name: instance.name.to_owned(),
+            },
+        );
         // Add service instance to the list of modified APIs.
         let runtime_changes = self
             .api_changes
@@ -407,221 +408,17 @@ impl Dispatcher {
     fn restart_service(&mut self, instance: &InstanceSpec) -> Result<(), ExecutionError> {
         let runtime = self
             .runtimes
-            .get_mut(&instance.artifact.runtime_id)
+            .get(&instance.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
+
+        // FIXME: unwrap is most probably unsafe.
         runtime.restart_service(instance)?;
         self.register_running_service(&instance);
         Ok(())
     }
 
-    /// Perform a configuration update with the specified changes.
-    fn update_config(
-        &self,
-        fork: &mut Fork,
-        caller_instance_id: InstanceId,
-        changes: Vec<ConfigChange>,
-    ) {
-        // An error while configuring one of the service instances should not affect others.
-        changes.into_iter().for_each(|change| match change {
-            ConfigChange::Consensus(config) => {
-                trace!("Updating consensus configuration {:?}", config);
-
-                blockchain::Schema::new(fork as &Fork)
-                    .consensus_config_entry()
-                    .set(config);
-                fork.flush();
-            }
-
-            ConfigChange::Service(config) => {
-                trace!(
-                    "Updating service instance configuration, instance ID is {}",
-                    config.instance_id
-                );
-
-                let configure_result = catch_panic(|| {
-                    let dispatcher_ref = DispatcherRef::new(self);
-                    let context = CallContext::new(
-                        fork,
-                        &dispatcher_ref,
-                        caller_instance_id,
-                        config.instance_id,
-                    );
-                    ConfigureCall::from(context).apply_config(config.params)
-                });
-
-                match configure_result {
-                    Ok(_) => fork.flush(),
-                    Err(e) => {
-                        fork.rollback();
-                        error!("An error occurred while performing the service configuration apply. {}", e);
-                    }
-                }
-            }
-        })
-    }
-}
-
-#[derive(Debug)]
-pub enum Action {
-    /// Register the deployed artifact in the dispatcher.
-    /// Make sure that you successfully complete the deploy artifact procedure.
-    RegisterArtifact { artifact: ArtifactId, spec: Vec<u8> },
-    /// Add a new service instance with the specified params.
-    /// Make sure that the artifact is deployed.
-    AddService {
-        artifact: ArtifactId,
-        instance_name: String,
-        config: Vec<u8>,
-    },
-    /// Perform a configuration update with the specified changes.
-    /// Make sure that no errors occur when applying these changes.
-    UpdateConfig {
-        caller_instance_id: InstanceId,
-        changes: Vec<ConfigChange>,
-    },
-}
-
-impl Action {
-    fn execute(self, dispatcher: &mut Dispatcher, fork: &mut Fork) -> Result<(), ExecutionError> {
-        // TODO Take care about the graceful panics handling during the actions execution. [ECR-3559]
-        catch_panic(|| match self {
-            Action::RegisterArtifact { artifact, spec } => dispatcher
-                .register_artifact(fork, &artifact, spec)
-                .map_err(From::from),
-
-            Action::AddService {
-                artifact,
-                instance_name,
-                config,
-            } => dispatcher
-                .add_service(
-                    fork,
-                    InstanceSpec {
-                        artifact,
-                        name: instance_name,
-                        id: Schema::new(fork as &Fork).assign_instance_id(),
-                    },
-                    config,
-                )
-                .map_err(From::from),
-
-            Action::UpdateConfig {
-                caller_instance_id,
-                changes,
-            } => {
-                dispatcher.update_config(fork, caller_instance_id, changes);
-                Ok(())
-            }
-        })
-    }
-}
-
-struct DeployArtifactRequest {
-    artifact: ArtifactId,
-    spec: Vec<u8>,
-    /// The operation to be performed if this request was successfully processed.
-    and_then: Box<dyn FnOnce() + 'static>,
-}
-
-impl DeployArtifactRequest {
-    /// Invoke request callback.
-    fn completed(self) {
-        (self.and_then)();
-    }
-}
-
-impl std::fmt::Debug for DeployArtifactRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("DeployArtifactRequest")
-            .field(&self.artifact)
-            .finish()
-    }
-}
-
-/// Reference to the underlying runtime dispatcher.
-#[derive(Debug)]
-pub struct DispatcherRef<'a> {
-    /// List of dispatcher actions that will be performed after execution finishes.
-    actions: RefCell<Vec<Action>>,
-    /// Reference to the underlying runtime dispatcher.
-    inner: &'a Dispatcher,
-}
-
-impl<'a> DispatcherRef<'a> {
-    /// Create a new instance.
-    pub(crate) fn new(dispatcher: &'a Dispatcher) -> Self {
-        Self {
-            inner: dispatcher,
-            actions: RefCell::default(),
-        }
-    }
-
-    /// Call the corresponding runtime method.
-    pub(crate) fn call(
-        &self,
-        context: &ExecutionContext,
-        call_info: &CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        self.inner.call(context, call_info, arguments)
-    }
-
-    pub(crate) fn dispatch_action(&self, caller: InstanceId, action: Action) {
-        assert!(
-            caller == SUPERVISOR_INSTANCE_ID,
-            "Only the supervisor service is allowed to perform dispatcher actions."
-        );
-        self.actions.borrow_mut().push(action);
-    }
-
-    pub(crate) fn take_actions(&self) -> Vec<Action> {
-        self.actions.borrow_mut().drain(..).collect()
-    }
-}
-
-// TODO Implement proper pending deploy logic [ECR-3291]
-
-/// Channel to communicate with the dispatcher.
-#[derive(Debug)]
-pub struct DispatcherSender {
-    deploy_request: RefCell<Vec<DeployArtifactRequest>>,
-}
-
-impl DispatcherSender {
-    /// Create a new instance.
-    fn new() -> Self {
-        Self {
-            deploy_request: RefCell::default(),
-        }
-    }
-
-    /// Request an artifact deployment and invoke the callback if the deployment
-    /// was successfully completed.
-    pub fn request_deploy_artifact<F>(
-        &self,
-        caller: InstanceId,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-        and_then: F,
-    ) where
-        F: FnOnce() + 'static,
-    {
-        assert!(
-            caller == SUPERVISOR_INSTANCE_ID,
-            "Only the supervisor service is allowed to perform dispatcher actions."
-        );
-
-        self.deploy_request
-            .borrow_mut()
-            .push(DeployArtifactRequest {
-                artifact,
-                spec,
-                and_then: Box::new(and_then),
-            })
-    }
-
-    /// Take requests from this channel.
-    fn take_deploy_requests(self) -> Vec<DeployArtifactRequest> {
-        self.deploy_request.into_inner()
+    /// Assigns an instance identifier to the new service instance.
+    pub(crate) fn assign_instance_id(&self, fork: &Fork) -> InstanceId {
+        Schema::new(fork as &Fork).assign_instance_id()
     }
 }

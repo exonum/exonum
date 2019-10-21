@@ -16,8 +16,8 @@ use exonum::{
     blockchain,
     helpers::ValidateInput,
     runtime::{
-        dispatcher::{self, Action},
-        rust::{interfaces::ConfigureCall, TransactionContext},
+        dispatcher,
+        rust::{CallContext, ConfigureCall},
         Caller, ConfigChange, DispatcherError, ExecutionError, InstanceSpec,
     },
 };
@@ -39,7 +39,7 @@ pub trait SupervisorInterface {
     /// will be successful it will send `confirm_artifact_deploy` transaction.
     fn request_artifact_deploy(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         artifact: DeployRequest,
     ) -> Result<(), ExecutionError>;
 
@@ -48,7 +48,7 @@ pub trait SupervisorInterface {
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
     fn confirm_artifact_deploy(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         artifact: DeployConfirmation,
     ) -> Result<(), ExecutionError>;
 
@@ -57,7 +57,7 @@ pub trait SupervisorInterface {
     /// Service will be started if all of validators will send this confirmation.
     fn start_service(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         service: StartService,
     ) -> Result<(), ExecutionError>;
 
@@ -69,7 +69,7 @@ pub trait SupervisorInterface {
     /// Note: only one proposal at time is possible.
     fn propose_config_change(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError>;
 
@@ -81,7 +81,7 @@ pub trait SupervisorInterface {
     /// The configuration will be applied if 2/3+1 validators voted for it.
     fn confirm_config_change(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError>;
 }
@@ -122,16 +122,16 @@ impl ValidateInput for StartService {
 impl SupervisorInterface for Supervisor {
     fn propose_config_change(
         &self,
-        context: TransactionContext,
+        mut context: CallContext,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         let ((_, author), fork) = context
             .verify_caller(Caller::as_transaction)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
-        let schema = Schema::new(context.instance.name, fork);
+        let schema = Schema::new(context.instance().name, fork);
 
         // Verifies that transaction author is validator.
-        let mut config_confirms = schema.config_confirms();
+        let config_confirms = schema.config_confirms();
         config_confirms
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
@@ -174,15 +174,16 @@ impl SupervisorInterface for Supervisor {
                     service_ids.insert(config.instance_id);
 
                     context
-                        .interface::<ConfigureCall>(config.instance_id)
+                        .interface::<ConfigureCall>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
             }
         }
 
+        let schema = Schema::new(context.instance().name, context.fork());
         let propose_hash = propose.object_hash();
-        config_confirms.confirm(&propose_hash, author);
+        schema.config_confirms().confirm(&propose_hash, author);
 
         let config_entry = ConfigProposalWithHash {
             config_propose: propose,
@@ -195,7 +196,7 @@ impl SupervisorInterface for Supervisor {
 
     fn confirm_config_change(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError> {
         let ((_, author), fork) = context
@@ -203,7 +204,7 @@ impl SupervisorInterface for Supervisor {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let blockchain_height = blockchain::Schema::new(fork).height();
-        let schema = Schema::new(context.instance.name, fork);
+        let schema = Schema::new(context.instance().name, fork);
 
         // Verifies that transaction author is validator.
         let mut config_confirms = schema.config_confirms();
@@ -243,7 +244,7 @@ impl SupervisorInterface for Supervisor {
 
     fn request_artifact_deploy(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
         deploy.validate()?;
@@ -252,7 +253,7 @@ impl SupervisorInterface for Supervisor {
         if deploy.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded.into());
         }
-        let schema = Schema::new(context.instance.name, context.fork());
+        let schema = Schema::new(context.instance().name, context.fork());
 
         // Verifies that the deployment request is not yet registered.
         if schema.pending_deployments().contains(&deploy.artifact) {
@@ -290,7 +291,7 @@ impl SupervisorInterface for Supervisor {
 
     fn confirm_artifact_deploy(
         &self,
-        context: TransactionContext,
+        mut context: CallContext,
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
@@ -300,7 +301,7 @@ impl SupervisorInterface for Supervisor {
         if confirmation.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded.into());
         }
-        let schema = Schema::new(context.instance.name, context.fork());
+        let schema = Schema::new(context.instance().name, context.fork());
 
         // Verifies that transaction author is validator.
         let mut deploy_confirmations = schema.deploy_confirmations();
@@ -332,10 +333,8 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
-            context.dispatch_action(Action::RegisterArtifact {
-                artifact: confirmation.artifact,
-                spec: confirmation.spec,
-            });
+            let mut extensions = context.supervisor_extensions().unwrap();
+            extensions.register_artifact(confirmation.artifact, confirmation.spec)?;
         }
 
         Ok(())
@@ -343,7 +342,7 @@ impl SupervisorInterface for Supervisor {
 
     fn start_service(
         &self,
-        context: TransactionContext,
+        mut context: CallContext,
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;
@@ -355,7 +354,7 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::DeadlineExceeded.into());
         }
         let mut pending_instances =
-            Schema::new(context.instance.name, context.fork()).pending_instances();
+            Schema::new(context.instance().name, context.fork()).pending_instances();
         let author = context
             .caller()
             .author()
@@ -381,13 +380,10 @@ impl SupervisorInterface for Supervisor {
                 service.name,
                 service.artifact
             );
-            // We have enough confirmations to add a new service instance,
+            // We have enough confirmations to add a new service instance;
             // if this action fails this transaction will be canceled.
-            context.dispatch_action(Action::AddService {
-                artifact: service.artifact,
-                instance_name: service.name,
-                config: service.config,
-            })
+            let mut extensions = context.supervisor_extensions().unwrap();
+            extensions.add_service(service.artifact, service.name, service.config)?;
         }
 
         Ok(())

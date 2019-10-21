@@ -19,16 +19,14 @@ use crate::{
     merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        dispatcher::{Dispatcher, DispatcherRef},
-        error::ExecutionError,
-        CallContext, CallInfo, Caller, DispatcherError, ExecutionContext, InstanceDescriptor,
-        InstanceId, InstanceSpec,
+        dispatcher::Dispatcher, error::ExecutionError, CallInfo, Caller, DispatcherError,
+        InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
 use super::{
     service::{Service, ServiceFactory},
-    ArtifactId, RustRuntime, TransactionContext,
+    ArtifactId, CallContext, RustRuntime,
 };
 
 const SERVICE_INSTANCE_ID: InstanceId = 2;
@@ -54,8 +52,8 @@ struct TxB {
 
 #[exonum_service(crate = "crate")]
 trait TestService {
-    fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
-    fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
+    fn method_a(&self, context: CallContext, arg: TxA) -> Result<(), ExecutionError>;
+    fn method_b(&self, context: CallContext, arg: TxB) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -78,13 +76,13 @@ impl<'a> From<CallContext<'a>> for TestServiceClient<'a> {
 }
 
 impl<'a> TestServiceClient<'a> {
-    fn method_b(&self, arg: TxB) -> Result<(), ExecutionError> {
+    fn method_b(&mut self, arg: TxB) -> Result<(), ExecutionError> {
         self.0.call("", 1, arg)
     }
 }
 
 impl TestService for TestServiceImpl {
-    fn method_a(&self, context: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
+    fn method_a(&self, mut context: CallContext, arg: TxA) -> Result<(), ExecutionError> {
         {
             let fork = context.fork();
             let mut entry = Entry::new("method_a_entry", fork);
@@ -93,13 +91,13 @@ impl TestService for TestServiceImpl {
 
         // Test calling one service from another.
         context
-            .interface::<TestServiceClient>(SERVICE_INSTANCE_ID)
+            .interface::<TestServiceClient>(SERVICE_INSTANCE_ID)?
             .method_b(TxB { value: arg.value })
             .expect("Failed to dispatch call");
         Ok(())
     }
 
-    fn method_b(&self, context: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
+    fn method_b(&self, context: CallContext, arg: TxB) -> Result<(), ExecutionError> {
         let fork = context.fork();
         let mut entry = Entry::new("method_b_entry", fork);
         entry.set(arg.value);
@@ -129,10 +127,8 @@ impl Service for TestServiceImpl {
 #[test]
 fn test_basic_rust_runtime() {
     let db = TemporaryDB::new();
-
     // Create a runtime and a service.
     let mut runtime = RustRuntime::new();
-
     let service_factory = Box::new(TestServiceImpl);
     let artifact: ArtifactId = service_factory.artifact_id().into();
     runtime.add_service_factory(service_factory);
@@ -148,84 +144,66 @@ fn test_basic_rust_runtime() {
     db.merge(fork.into_patch()).unwrap();
 
     // Add service
+    let spec = InstanceSpec {
+        artifact,
+        id: SERVICE_INSTANCE_ID,
+        name: SERVICE_INSTANCE_NAME.to_owned(),
+    };
+    let constructor = Init {
+        msg: "constructor_message".to_owned(),
+    };
+    let fork = db.fork();
+    dispatcher.add_service(&fork, spec, constructor).unwrap();
+
     {
-        let spec = InstanceSpec {
-            artifact,
-            id: SERVICE_INSTANCE_ID,
-            name: SERVICE_INSTANCE_NAME.to_owned(),
-        };
-
-        let constructor = Init {
-            msg: "constructor_message".to_owned(),
-        };
-
-        let mut fork = db.fork();
-
-        dispatcher
-            .add_service(&mut fork, spec, constructor)
-            .unwrap();
-        {
-            let entry = Entry::new("constructor_entry", &fork);
-            assert_eq!(entry.get(), Some("constructor_message".to_owned()));
-        }
-
-        db.merge(fork.into_patch()).unwrap();
+        let entry = Entry::new("constructor_entry", &fork);
+        assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
+    db.merge(fork.into_patch()).unwrap();
 
     // Execute transaction method A.
+    const ARG_A_VALUE: u64 = 11;
+    let call_info = CallInfo {
+        instance_id: SERVICE_INSTANCE_ID,
+        method_id: 0,
+    };
+    let payload = TxA { value: ARG_A_VALUE }.into_bytes();
+    let mut fork = db.fork();
+
+    let caller = Caller::Service {
+        instance_id: SERVICE_INSTANCE_ID,
+    };
+    dispatcher
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+
     {
-        const ARG_A_VALUE: u64 = 11;
-        let call_info = CallInfo {
-            instance_id: SERVICE_INSTANCE_ID,
-            method_id: 0,
-        };
-        let payload = TxA { value: ARG_A_VALUE }.into_bytes();
-        let fork = db.fork();
-        let dispatcher_ref = DispatcherRef::new(&dispatcher);
-        let context = ExecutionContext::new(
-            &dispatcher_ref,
-            &fork,
-            Caller::Service {
-                instance_id: SERVICE_INSTANCE_ID,
-            },
-        );
-        dispatcher.call(&context, &call_info, &payload).unwrap();
-
-        {
-            let entry = Entry::new("method_a_entry", &fork);
-            assert_eq!(entry.get(), Some(ARG_A_VALUE));
-        }
-        {
-            let entry = Entry::new("method_b_entry", &fork);
-            assert_eq!(entry.get(), Some(ARG_A_VALUE));
-        }
-
-        db.merge(fork.into_patch()).unwrap();
+        let entry = Entry::new("method_a_entry", &fork);
+        assert_eq!(entry.get(), Some(ARG_A_VALUE));
+        let entry = Entry::new("method_b_entry", &fork);
+        assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
+    db.merge(fork.into_patch()).unwrap();
+
     // Execute transaction method B.
+    const ARG_B_VALUE: u64 = 22;
+    let call_info = CallInfo {
+        instance_id: SERVICE_INSTANCE_ID,
+        method_id: 1,
+    };
+    let payload = TxB { value: ARG_B_VALUE }.into_bytes();
+    let mut fork = db.fork();
+
+    let caller = Caller::Service {
+        instance_id: SERVICE_INSTANCE_ID,
+    };
+    dispatcher
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+
     {
-        const ARG_B_VALUE: u64 = 22;
-        let call_info = CallInfo {
-            instance_id: SERVICE_INSTANCE_ID,
-            method_id: 1,
-        };
-        let payload = TxB { value: ARG_B_VALUE }.into_bytes();
-        let fork = db.fork();
-        let dispatcher_ref = DispatcherRef::new(&dispatcher);
-        let context = ExecutionContext::new(
-            &dispatcher_ref,
-            &fork,
-            Caller::Service {
-                instance_id: SERVICE_INSTANCE_ID,
-            },
-        );
-        dispatcher.call(&context, &call_info, &payload).unwrap();
-
-        {
-            let entry = Entry::new("method_b_entry", &fork);
-            assert_eq!(entry.get(), Some(ARG_B_VALUE));
-        }
-
-        db.merge(fork.into_patch()).unwrap();
+        let entry = Entry::new("method_b_entry", &fork);
+        assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
+    db.merge(fork.into_patch()).unwrap();
 }

@@ -197,7 +197,7 @@ pub mod contracts {
         crypto::Hash,
         runtime::{
             api::ServiceApiBuilder,
-            rust::{Service, TransactionContext},
+            rust::{CallContext, Service},
             InstanceDescriptor,
         },
     };
@@ -216,9 +216,9 @@ pub mod contracts {
     #[exonum_service]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
-        fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> Result<(), Error>;
+        fn create_wallet(&self, ctx: CallContext, arg: TxCreateWallet) -> Result<(), Error>;
         /// Transfers `amount` of the currency from one wallet to another.
-        fn transfer(&self, ctx: TransactionContext, arg: TxTransfer) -> Result<(), Error>;
+        fn transfer(&self, ctx: CallContext, arg: TxTransfer) -> Result<(), Error>;
     }
 
     /// Cryptocurrency service implementation.
@@ -227,18 +227,14 @@ pub mod contracts {
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {
-        fn create_wallet(
-            &self,
-            context: TransactionContext,
-            arg: TxCreateWallet,
-        ) -> Result<(), Error> {
+        fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error> {
             let author = context
                 .caller()
                 .author()
                 .expect("Wrong 'TxCreateWallet' initiator");
 
             let view = context.fork();
-            let schema = CurrencySchema::new(context.instance.name, view);
+            let schema = CurrencySchema::new(context.instance().name, view);
             if schema.wallet(&author).is_none() {
                 let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
@@ -249,7 +245,7 @@ pub mod contracts {
             }
         }
 
-        fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> Result<(), Error> {
+        fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error> {
             let author = context
                 .caller()
                 .author()
@@ -261,7 +257,7 @@ pub mod contracts {
                 return Err(Error::SenderSameAsReceiver);
             }
 
-            let schema = CurrencySchema::new(context.instance.name, view);
+            let schema = CurrencySchema::new(context.instance().name, view);
 
             let sender = match schema.wallet(&author) {
                 Some(val) => val,

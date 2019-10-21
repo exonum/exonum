@@ -19,7 +19,7 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{interfaces::verify_caller_is_supervisor, Configure, Service, TransactionContext},
+        rust::{interfaces::verify_caller_is_supervisor, CallContext, Configure, Service},
         DispatcherError, InstanceDescriptor, InstanceId,
     },
 };
@@ -73,7 +73,7 @@ pub struct TxInc {
 
 #[exonum_service]
 pub trait IncInterface {
-    fn inc(&self, context: TransactionContext, arg: TxInc) -> Result<(), ExecutionError>;
+    fn inc(&self, context: CallContext, arg: TxInc) -> Result<(), ExecutionError>;
 }
 
 /// Very simple test service that has one tx and one endpoint.
@@ -88,8 +88,8 @@ pub trait IncInterface {
 pub struct IncService;
 
 impl IncInterface for IncService {
-    fn inc(&self, context: TransactionContext, _arg: TxInc) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.instance.name, context.fork());
+    fn inc(&self, context: CallContext, _arg: TxInc) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(context.instance().name, context.fork());
         schema.inc();
         Ok(())
     }
@@ -133,7 +133,7 @@ impl Configure for IncService {
 
     fn verify_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -149,14 +149,14 @@ impl Configure for IncService {
 
     fn apply_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context
             .verify_caller(verify_caller_is_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance.name), fork).set(params.clone());
+        Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());
 
         match params.as_ref() {
             "apply_error" => {

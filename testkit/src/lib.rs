@@ -246,7 +246,7 @@ impl TestKit {
         database: impl Into<CheckpointDb<TemporaryDB>>,
         network: TestNetwork,
         genesis: ConsensusConfig,
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        runtimes: impl IntoIterator<Item = (u32, Arc<dyn Runtime>)>,
         instances: impl IntoIterator<Item = InstanceConfig>,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
@@ -831,7 +831,7 @@ impl StoppedTestKit {
     /// This method will not add the default Rust runtime, so you must do this explicitly.
     pub fn resume(
         self,
-        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
+        runtimes: impl IntoIterator<Item = impl Into<(u32, Arc<dyn Runtime>)>>,
     ) -> TestKit {
         TestKit::assemble(
             self.db,

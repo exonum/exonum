@@ -15,11 +15,12 @@
 //! Important interservice communication interfaces.
 
 use crate::{
+    blockchain,
     merkledb::BinaryValue,
-    runtime::{CallContext, Caller, DispatcherError, MethodId, SUPERVISOR_INSTANCE_ID},
+    runtime::{Caller, ConfigChange, DispatcherError, MethodId, SUPERVISOR_INSTANCE_ID},
 };
 
-use super::{ExecutionError, Interface, TransactionContext};
+use super::{CallContext, ExecutionError, Interface};
 
 /// Fully qualified name of the ['Configure`] interface.
 ///
@@ -30,6 +31,7 @@ pub const CONFIGURE_INTERFACE_NAME: &str = "Configure";
 ///
 /// [`Configure::verify_config`]: trait.Configure.html#tymethod.verify_config
 pub const VERIFY_CONFIG_METHOD_ID: MethodId = 0;
+
 /// Identifier of the [`Configure::apply_config`] method.
 ///
 /// [`Configure::apply_config`]: trait.Configure.html#tymethod.apply_config
@@ -37,7 +39,7 @@ pub const APPLY_CONFIG_METHOD_ID: MethodId = 1;
 
 /// Describes a procedure for updating the configuration of a service instance.
 pub trait Configure {
-    /// The specific type of parameters passed during the service instance configuration.    
+    /// The specific type of parameters passed during the service instance configuration.
     type Params: BinaryValue;
     /// Verify a new configuration parameters before their actual application.
     ///
@@ -57,7 +59,7 @@ pub trait Configure {
     /// [identifier]: ../../constant.SUPERVISOR_INSTANCE_ID.html
     fn verify_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
     /// Update service configuration with the given parameters.
@@ -77,7 +79,7 @@ pub trait Configure {
     /// [identifier]: ../../constant.SUPERVISOR_INSTANCE_ID.html
     fn apply_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
 }
@@ -87,7 +89,7 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
 
     fn dispatch(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -106,7 +108,8 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
                 let kind = DispatcherError::NoSuchMethod;
                 let message = format!(
                     "Method with ID {} is absent in the 'Configure' interface of the instance `{}`",
-                    other, context.instance.name,
+                    other,
+                    context.instance().name,
                 );
                 Err((kind, message)).map_err(From::from)
             }
@@ -129,14 +132,14 @@ impl<'a> From<CallContext<'a>> for ConfigureCall<'a> {
 impl<'a> ConfigureCall<'a> {
     /// Invoke the corresponding [method](trait.Configure.html#tymethod.verify_config)
     /// of the interface.
-    pub fn verify_config(&self, params: impl BinaryValue) -> Result<(), ExecutionError> {
+    pub fn verify_config(&mut self, params: impl BinaryValue) -> Result<(), ExecutionError> {
         self.0
             .call(CONFIGURE_INTERFACE_NAME, VERIFY_CONFIG_METHOD_ID, params)
     }
 
     /// Invoke the corresponding [method](trait.Configure.html#tymethod.apply_config)
     /// of the interface.
-    pub fn apply_config(&self, params: impl BinaryValue) -> Result<(), ExecutionError> {
+    pub fn apply_config(&mut self, params: impl BinaryValue) -> Result<(), ExecutionError> {
         self.0
             .call(CONFIGURE_INTERFACE_NAME, APPLY_CONFIG_METHOD_ID, params)
     }
@@ -149,6 +152,58 @@ pub fn verify_caller_is_supervisor(caller: &Caller) -> Option<()> {
             Some(())
         } else {
             None
+        }
+    })
+}
+
+/// Applies configuration changes, isolating each of them with by using `Fork` checkpoints.
+///
+/// # Safety
+///
+/// This function should be used with extreme care. It makes the following assumptions:
+///
+/// - The function must be called at the end of the transaction execution. If the transaction
+///   errors / panics afterwards, the changes to the configs will not be rolled back.
+/// - No changes to the blockchain state should be introduced before the call to this function.
+///   Any changes that are introduced will be committed regardless of the execution status,
+///   or the status of application of any config change. This is if the execution wasn't interrupted
+///   by a panic / error *before* hitting the call; if this happens, the usual rules apply.
+///
+/// These restrictions are the result of `Fork` not having multi-layered checkpoints.
+// TODO: move to `supervisor` crate.
+pub fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
+    let mut extensions = context.supervisor_extensions().unwrap();
+    // An error while configuring one of the service instances should not affect others.
+    changes.into_iter().for_each(|change| match change {
+        ConfigChange::Consensus(config) => {
+            trace!("Updating consensus configuration {:?}", config);
+
+            let result = extensions.isolate(|context| {
+                blockchain::Schema::new(context.fork())
+                    .consensus_config_entry()
+                    .set(config);
+                Ok(())
+            });
+            assert!(result.is_ok());
+        }
+
+        ConfigChange::Service(config) => {
+            trace!(
+                "Updating service instance configuration, instance ID is {}",
+                config.instance_id
+            );
+
+            let configure_result = extensions.isolate(|mut context| {
+                context
+                    .interface::<ConfigureCall>(config.instance_id)?
+                    .apply_config(config.params.clone())
+            });
+            if let Err(e) = configure_result {
+                error!(
+                    "An error occurred while applying service configuration. {}",
+                    e
+                );
+            }
         }
     })
 }

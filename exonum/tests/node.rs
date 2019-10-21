@@ -31,7 +31,6 @@ use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
-    cell::RefCell,
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
@@ -48,11 +47,11 @@ trait CommitWatcherInterface {}
     implements("CommitWatcherInterface"),
     service_constructor = "CommitWatcherService::new_instance"
 )]
-struct CommitWatcherService(pub RefCell<Option<oneshot::Sender<()>>>);
+struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 
 impl CommitWatcherService {
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(Self(RefCell::new(self.0.borrow_mut().take())))
+        Box::new(Self(Mutex::new(self.0.lock().unwrap().take())))
     }
 }
 
@@ -60,7 +59,7 @@ impl CommitWatcherInterface for CommitWatcherService {}
 
 impl Service for CommitWatcherService {
     fn after_commit(&self, _context: AfterCommitContext) {
-        if let Some(oneshot) = self.0.borrow_mut().take() {
+        if let Some(oneshot) = self.0.lock().unwrap().take() {
             oneshot.send(()).unwrap();
         }
     }
@@ -112,9 +111,9 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let services = vec![
-            InstanceCollection::new(CommitWatcherService(RefCell::new(Some(commit_tx))))
+            InstanceCollection::new(CommitWatcherService(Mutex::new(Some(commit_tx))))
                 .with_instance(2, "commit-watcher", ()),
         ];
 
@@ -162,7 +161,7 @@ fn test_node_run() {
 #[test]
 fn test_node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, db, start_times| {
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let services = vec![
             InstanceCollection::new(StartCheckerServiceFactory(start_times)).with_instance(
                 4,

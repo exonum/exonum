@@ -44,7 +44,7 @@ pub struct BlockchainBuilder {
     /// Keypair, which  is used to sign service transactions on behalf of this node.
     pub service_keypair: (PublicKey, SecretKey),
     /// List of the supported runtimes.
-    pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    pub runtimes: Vec<(u32, Arc<dyn Runtime>)>,
     /// List of the privileged services with the configuration parameters that are created directly
     /// in the genesis block.
     pub builtin_instances: Vec<InstanceConfig>,
@@ -90,7 +90,7 @@ impl BlockchainBuilder {
 
     pub fn with_external_runtimes(
         mut self,
-        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
+        runtimes: impl IntoIterator<Item = impl Into<(u32, Arc<dyn Runtime>)>>,
     ) -> Self {
         for runtime in runtimes {
             self.runtimes.push(runtime.into());
@@ -100,7 +100,7 @@ impl BlockchainBuilder {
     }
 
     /// Add an additional runtime with the specified identifier.
-    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Arc<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
     }
@@ -158,11 +158,11 @@ impl BlockchainBuilder {
             );
             // Adds builtin services.
             blockchain.merge({
-                let mut fork = blockchain.fork();
+                let fork = blockchain.fork();
                 let mut dispatcher = blockchain.dispatcher();
                 for instance_config in self.builtin_instances {
                     dispatcher.add_builtin_service(
-                        &mut fork,
+                        &fork,
                         instance_config.instance_spec,
                         instance_config.artifact_spec.unwrap_or_default(),
                         instance_config.constructor,
@@ -260,7 +260,7 @@ mod tests {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let services = vec![];
 
         let blockchain = Blockchain::new(
@@ -284,7 +284,7 @@ mod tests {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let services = vec![
             InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
             InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
@@ -307,7 +307,7 @@ mod tests {
         let consensus = ConsensusConfig::default();
         let service_keypair = crypto::gen_keypair();
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
         let services = vec![];
 
         Blockchain::new(

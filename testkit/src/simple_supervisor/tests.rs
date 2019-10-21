@@ -19,8 +19,7 @@ use exonum::{
     merkledb::{Entry, Snapshot},
     runtime::{
         rust::{
-            interfaces::verify_caller_is_supervisor, Configure, Service, Transaction,
-            TransactionContext,
+            interfaces::verify_caller_is_supervisor, CallContext, Configure, Service, Transaction,
         },
         DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
@@ -66,7 +65,7 @@ impl Configure for ConfigChangeService {
 
     fn verify_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -82,14 +81,14 @@ impl Configure for ConfigChangeService {
 
     fn apply_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context
             .verify_caller(verify_caller_is_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance.name), fork).set(params.clone());
+        Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());
 
         match params.as_ref() {
             "apply_error" => {

@@ -23,7 +23,7 @@ use exonum::{
     helpers::ValidateInput,
     merkledb::Snapshot,
     runtime::{
-        rust::{interfaces::ConfigureCall, BeforeCommitContext, Service, TransactionContext},
+        rust::{interfaces::update_configs, CallContext, ConfigureCall, Service},
         Caller, ConfigChange, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
@@ -56,33 +56,31 @@ pub enum Error {
 
 #[exonum_service]
 pub trait Transactions {
-    fn change_config(
-        &self,
-        context: TransactionContext,
-        arg: ConfigPropose,
-    ) -> Result<(), ExecutionError>;
+    fn change_config(&self, context: CallContext, arg: ConfigPropose)
+        -> Result<(), ExecutionError>;
 }
 
 impl Transactions for SimpleSupervisor {
     fn change_config(
         &self,
-        context: TransactionContext,
+        mut context: CallContext,
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        let (_, fork) = context
+        context
             .verify_caller(Caller::as_transaction)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Check that the `actual_from` height is in the future.
-        if blockchain::Schema::new(fork).height() >= arg.actual_from {
+        if blockchain::Schema::new(context.fork()).height() >= arg.actual_from {
             return Err(Error::ActualFromIsPast).map_err(From::from);
         }
 
-        let schema = Schema::new(fork);
+        let schema = Schema::new(context.fork());
         // Check that there are no pending config changes.
         if schema.config_propose_entry().exists() {
             return Err(Error::ConfigProposeExists).map_err(From::from);
         }
+
         // Perform config verification.
         for change in &arg.changes {
             match change {
@@ -94,13 +92,15 @@ impl Transactions for SimpleSupervisor {
 
                 ConfigChange::Service(config) => {
                     context
-                        .interface::<ConfigureCall>(config.instance_id)
+                        .interface::<ConfigureCall>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
             }
         }
+
         // Add verified config proposal to the pending config changes.
+        let schema = Schema::new(context.fork());
         schema.config_propose_entry().set(arg);
         Ok(())
     }
@@ -111,19 +111,22 @@ impl Service for SimpleSupervisor {
         Schema::new(snapshot).state_hash()
     }
 
-    fn before_commit(&self, context: BeforeCommitContext) {
-        let schema = Schema::new(context.fork);
+    fn before_commit(&self, mut context: CallContext) {
+        let schema = Schema::new(context.fork());
         let proposal = if let Some(proposal) =
             schema.config_propose_entry().get().filter(|proposal| {
-                proposal.actual_from == blockchain::Schema::new(context.fork).height().next()
+                proposal.actual_from == blockchain::Schema::new(context.fork()).height().next()
             }) {
             proposal
         } else {
             return;
         };
+
         // Perform the application of configs.
-        context.update_config(proposal.changes);
+        update_configs(&mut context, proposal.changes);
+
         // Remove config from proposals.
+        let schema = Schema::new(context.fork());
         schema.config_propose_entry().remove();
     }
 }
