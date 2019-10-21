@@ -30,6 +30,11 @@ message CallInfo {
   uint32 method_id = 2;
 }
 
+message AnyTx {
+  CallInfo call_info = 1;
+  bytes arguments = 2;
+}
+
 message ArtifactId {
   uint32 runtime_id = 1;
   string name = 2;
