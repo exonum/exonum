@@ -23,12 +23,12 @@ fn main() {
 #[cfg(feature = "with-protobuf")]
 fn gen_proto_files() {
     let current_dir = env::current_dir().expect("Failed to get current dir.");
-    let protos = current_dir.join("src/proof_map_index/proto");
+    let protos = current_dir.join("src/proto");
     println!("cargo:protos={}", protos.to_str().unwrap());
 
     ProtobufGenerator::with_mod_name("protobuf_mod.rs")
-        .with_input_dir("src/proof_map_index/proto")
-        .add_path("src/proof_map_index/proto")
+        .with_input_dir("src/proto")
+        .add_path("src/proto")
         .with_crypto()
         .generate();
 }

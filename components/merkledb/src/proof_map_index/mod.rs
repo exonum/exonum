@@ -44,7 +44,6 @@ mod key;
 mod node;
 mod proof;
 mod proof_builder;
-mod proto;
 #[cfg(test)]
 mod tests;
 

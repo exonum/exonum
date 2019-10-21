@@ -119,8 +119,10 @@ impl<K, V> ProtobufConvert for crate::MapProof<K, V>
 mod tests {
     use std::fmt;
     use exonum_proto::ProtobufConvert;
+    use exonum_crypto::{PublicKey, proto::types};
 
-    use crate::{TemporaryDB, ProofMapIndex,Database, BinaryKey, BinaryValue, ObjectHash, MapProof};
+    use crate::{TemporaryDB, ProofMapIndex,Database, BinaryKey, BinaryValue, ObjectHash, MapProof, proto};
+    use protobuf::RepeatedField;
 
     #[test]
     fn serialize_map_proof() {
@@ -160,5 +162,38 @@ mod tests {
             checked_proof.index_hash(),
             proof.check().unwrap().index_hash()
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn map_proof_malformed_serialize() {
+        let mut proof = proto::MapProof::new();
+        let mut proof_entry = proto::MapProofEntry::new();
+        proof_entry.set_proof_path(vec![0_u8; 33]);
+        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+
+        let res = MapProof::<u8, u8>::from_pb(proof.clone());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Not valid proof path"));
+
+        let mut proof_entry = proto::MapProofEntry::new();
+        let mut hash = types::Hash::new();
+        hash.set_data(vec![0_u8; 31]);
+        proof_entry.set_hash(hash);
+        proof_entry.set_proof_path(vec![0_u8; 34]);
+        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+
+        let res = MapProof::<u8, u8>::from_pb(proof.clone());
+        assert!(res.unwrap_err().to_string().contains("Wrong Hash size"));
+
+        let mut entry = proto::OptionalEntry::new();
+        entry.set_key(vec![0_u8; 31]);
+        proof.clear_proof();
+        proof.set_entries(RepeatedField::from_vec(vec![entry]));
+
+        // TODO: will panic at runtime, should change BinaryKey::read signature
+        let _res = MapProof::<PublicKey, u8>::from_pb(proof.clone());
     }
 }
