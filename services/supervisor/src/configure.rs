@@ -12,34 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Important interservice communication interfaces.
+//! Configuration interface used by the supervisor to change service configuration.
 
-use crate::{
-    merkledb::BinaryValue,
-    runtime::{Caller, DispatcherError, MethodId, SUPERVISOR_INSTANCE_ID},
+use exonum::runtime::{
+    rust::{CallContext, Interface},
+    DispatcherError, ExecutionError, MethodId,
 };
-
-use super::{CallContext, ExecutionError, Interface};
+use exonum_merkledb::BinaryValue;
 
 /// Fully qualified name of the ['Configure`] interface.
 ///
 /// ['Configure`]: trait.Configure.html
-pub const CONFIGURE_INTERFACE_NAME: &str = "Configure";
+pub const CONFIGURE_INTERFACE_NAME: &str = "exonum.Configure";
 
 /// Identifier of the [`Configure::verify_config`] method.
 ///
 /// [`Configure::verify_config`]: trait.Configure.html#tymethod.verify_config
-pub const VERIFY_CONFIG_METHOD_ID: MethodId = 0;
+const VERIFY_CONFIG_METHOD_ID: MethodId = 0;
 
 /// Identifier of the [`Configure::apply_config`] method.
 ///
 /// [`Configure::apply_config`]: trait.Configure.html#tymethod.apply_config
-pub const APPLY_CONFIG_METHOD_ID: MethodId = 1;
+const APPLY_CONFIG_METHOD_ID: MethodId = 1;
 
 /// Describes a procedure for updating the configuration of a service instance.
 pub trait Configure {
     /// The specific type of parameters passed during the service instance configuration.
     type Params: BinaryValue;
+
     /// Verify a new configuration parameters before their actual application.
     ///
     /// This method is called by the new configuration change proposal. If the proposed
@@ -61,6 +61,7 @@ pub trait Configure {
         context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
+
     /// Update service configuration with the given parameters.
     ///
     /// The configuration parameters passed to the method are discarded immediately.
@@ -142,15 +143,4 @@ impl<'a> ConfigureCall<'a> {
         self.0
             .call(CONFIGURE_INTERFACE_NAME, APPLY_CONFIG_METHOD_ID, params)
     }
-}
-
-/// Verify that the caller of this method is supervisor service.
-pub fn verify_caller_is_supervisor(caller: &Caller) -> Option<()> {
-    caller.as_service().and_then(|instance_id| {
-        if instance_id == SUPERVISOR_INSTANCE_ID {
-            Some(())
-        } else {
-            None
-        }
-    })
 }

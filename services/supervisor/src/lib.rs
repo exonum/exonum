@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub use self::{
+    configure::{Configure, ConfigureCall, CONFIGURE_INTERFACE_NAME},
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
@@ -28,7 +29,7 @@ use exonum::{
     helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{interfaces::ConfigureCall, AfterCommitContext, CallContext, Service, Transaction},
+        rust::{AfterCommitContext, CallContext, Service, Transaction},
         InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
@@ -36,6 +37,7 @@ use exonum_derive::*;
 use exonum_merkledb::Snapshot;
 
 mod api;
+mod configure;
 mod errors;
 mod proto;
 mod proto_structures;

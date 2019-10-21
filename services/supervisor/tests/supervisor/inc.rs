@@ -19,14 +19,15 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{interfaces::verify_caller_is_supervisor, CallContext, Configure, Service},
-        DispatcherError, InstanceDescriptor, InstanceId,
+        rust::{CallContext, Service},
+        Caller, DispatcherError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
 
 use crate::proto;
+use exonum_supervisor::Configure;
 
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
@@ -137,7 +138,7 @@ impl Configure for IncService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(verify_caller_is_supervisor)
+            .verify_caller(Caller::as_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {
@@ -153,7 +154,7 @@ impl Configure for IncService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context
-            .verify_caller(verify_caller_is_supervisor)
+            .verify_caller(Caller::as_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());

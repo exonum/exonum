@@ -17,14 +17,12 @@
 pub use self::{
     call_context::{CallContext, SupervisorExtensions},
     error::Error,
-    interfaces::{Configure, ConfigureCall},
     service::{
         AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
     },
 };
 
 pub mod error;
-pub mod interfaces;
 
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{future, Future, IntoFuture};

@@ -18,10 +18,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::{Entry, Snapshot},
     runtime::{
-        rust::{
-            interfaces::verify_caller_is_supervisor, CallContext, Configure, Service, Transaction,
-        },
-        DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
+        rust::{CallContext, Service, Transaction},
+        Caller, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::ServiceFactory;
@@ -29,7 +27,7 @@ use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
     simple::{Schema, Supervisor, SupervisorInterface},
-    ConfigPropose,
+    ConfigPropose, Configure,
 };
 
 #[derive(Debug, ServiceFactory)]
@@ -69,7 +67,7 @@ impl Configure for ConfigChangeService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(verify_caller_is_supervisor)
+            .verify_caller(Caller::as_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {
@@ -85,7 +83,7 @@ impl Configure for ConfigChangeService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context
-            .verify_caller(verify_caller_is_supervisor)
+            .verify_caller(Caller::as_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());

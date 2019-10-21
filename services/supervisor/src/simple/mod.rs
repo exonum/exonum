@@ -20,13 +20,13 @@ use exonum::{
     helpers::ValidateInput,
     merkledb::Snapshot,
     runtime::{
-        rust::{CallContext, ConfigureCall, Service},
+        rust::{CallContext, Service},
         Caller, DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
 
-use crate::{update_configs, ConfigChange, ConfigPropose};
+use crate::{update_configs, ConfigChange, ConfigPropose, ConfigureCall};
 
 mod schema;
 pub use self::schema::Schema;

@@ -16,9 +16,7 @@ use exonum::{
     blockchain,
     helpers::ValidateInput,
     runtime::{
-        dispatcher,
-        rust::{CallContext, ConfigureCall},
-        Caller, DispatcherError, ExecutionError, InstanceSpec,
+        dispatcher, rust::CallContext, Caller, DispatcherError, ExecutionError, InstanceSpec,
     },
 };
 use exonum_derive::*;
@@ -27,8 +25,8 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
-    DeployRequest, Error, Schema, StartService, Supervisor,
+    ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
+    DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor,
 };
 
 /// Supervisor service transactions.

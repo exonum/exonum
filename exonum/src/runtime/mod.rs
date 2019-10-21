@@ -401,6 +401,17 @@ impl Caller {
             None
         }
     }
+
+    /// Verify that the caller of this method is supervisor service.
+    pub fn as_supervisor(&self) -> Option<()> {
+        self.as_service().and_then(|instance_id| {
+            if instance_id == SUPERVISOR_INSTANCE_ID {
+                Some(())
+            } else {
+                None
+            }
+        })
+    }
 }
 
 /// Provide the current state of the blockchain and the caller information in respect of the transaction
