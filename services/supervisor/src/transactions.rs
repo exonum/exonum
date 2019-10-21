@@ -21,7 +21,9 @@ use exonum::{
         Caller, ConfigChange, DispatcherError, ExecutionError, InstanceSpec,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
+
 use std::collections::HashSet;
 
 use super::{
@@ -156,7 +158,9 @@ impl SupervisorInterface for Supervisor {
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
-                        trace!("Discarded multiple consensus change proposals in one request.");
+                        log::trace!(
+                            "Discarded multiple consensus change proposals in one request."
+                        );
                         return Err(Error::MalformedConfigPropose.into());
                     }
                     consensus_propose_added = true;
@@ -168,7 +172,7 @@ impl SupervisorInterface for Supervisor {
 
                 ConfigChange::Service(config) => {
                     if service_ids.contains(&config.instance_id) {
-                        trace!("Discarded multiple service change proposals in one request.");
+                        log::trace!("Discarded multiple service change proposals in one request.");
                         return Err(Error::MalformedConfigPropose.into());
                     }
                     service_ids.insert(config.instance_id);
@@ -233,7 +237,7 @@ impl SupervisorInterface for Supervisor {
         }
 
         config_confirms.confirm(&vote.propose_hash, author);
-        trace!(
+        log::trace!(
             "Propose config {:?} has been confirmed by {:?}",
             vote.propose_hash,
             author
@@ -281,7 +285,7 @@ impl SupervisorInterface for Supervisor {
 
         let confirmations = deploy_requests.confirm(&deploy, author);
         if confirmations == deploy_requests.validators_amount() {
-            trace!("Deploy artifact request accepted {:?}", deploy.artifact);
+            log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
 
             let artifact = deploy.artifact.clone();
             schema.pending_deployments().put(&artifact, deploy);
@@ -324,7 +328,7 @@ impl SupervisorInterface for Supervisor {
 
         let confirmations = deploy_confirmations.confirm(&confirmation, author);
         if confirmations == deploy_confirmations.validators_amount() {
-            trace!(
+            log::trace!(
                 "Registering deployed artifact in dispatcher {:?}",
                 confirmation.artifact
             );
@@ -375,7 +379,7 @@ impl SupervisorInterface for Supervisor {
 
         let confirmations = pending_instances.confirm(&service, author);
         if confirmations == pending_instances.validators_amount() {
-            trace!(
+            log::trace!(
                 "Request add service with name {:?} from artifact {:?}",
                 service.name,
                 service.artifact

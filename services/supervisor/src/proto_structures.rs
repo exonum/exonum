@@ -21,6 +21,8 @@ use exonum::{
     impl_serde_hex_for_binary_value,
     runtime::{ArtifactId, ConfigChange},
 };
+use exonum_derive::*;
+use exonum_merkledb::impl_binary_key_for_binary_value;
 
 use super::proto;
 

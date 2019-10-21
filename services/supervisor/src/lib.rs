@@ -12,13 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate exonum_merkledb;
-
 pub use self::{
     errors::Error,
     proto_structures::{
@@ -38,6 +31,7 @@ use exonum::{
         InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::Snapshot;
 
 mod api;
@@ -60,10 +54,6 @@ impl Service for Supervisor {
         Schema::new(descriptor.name, snapshot).state_hash()
     }
 
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::wire(builder)
-    }
-
     fn before_commit(&self, mut context: CallContext) {
         let schema = Schema::new(context.instance().name, context.fork());
         let height = blockchain::Schema::new(context.fork()).height();
@@ -78,14 +68,14 @@ impl Service for Supervisor {
         for request in requests_to_remove {
             schema.pending_deployments().remove(&request.artifact);
 
-            trace!("Removed outdated deployment request {:?}", request);
+            log::trace!("Removed outdated deployment request {:?}", request);
         }
 
         let entry = schema.pending_proposal().get();
         if let Some(entry) = entry {
             if entry.config_propose.actual_from <= height {
                 // Remove pending config proposal for which deadline was exceeded.
-                trace!("Removed outdated config proposal");
+                log::trace!("Removed outdated config proposal");
                 schema.pending_proposal().remove();
             } else {
                 let config_confirms = schema.config_confirms();
@@ -94,7 +84,7 @@ impl Service for Supervisor {
 
                 // Apply pending config in case 2/3+1 validators voted for it.
                 if confirmations >= byzantine_quorum(validators) {
-                    info!(
+                    log::info!(
                         "New configuration has been accepted: {:?}",
                         entry.config_propose
                     );
@@ -133,12 +123,12 @@ impl Service for Supervisor {
             let mut extensions = context.supervisor_extensions().unwrap();
             if extensions.start_deploy(artifact, spec).is_err() {
                 // FIXME: what should be the appropriate reaction here?
-                error!("Cannot deploy service");
+                log::error!("Cannot deploy service");
                 continue;
             }
 
             if is_validator {
-                trace!(
+                log::trace!(
                     "Sent confirmation for deployment request {:?}",
                     unconfirmed_request
                 );
@@ -146,10 +136,14 @@ impl Service for Supervisor {
                 let transaction = DeployConfirmation::from(unconfirmed_request);
                 tx_sender
                     .broadcast_transaction(transaction.sign(instance_id, keypair.0, &keypair.1))
-                    .map_err(|e| error!("Couldn't broadcast transaction {}.", e))
+                    .map_err(|e| log::error!("Couldn't broadcast transaction {}", e))
                     .ok();
             }
         }
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::wire(builder)
     }
 }
 
