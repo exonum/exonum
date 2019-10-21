@@ -25,15 +25,15 @@ use exonum::{
     },
 };
 use exonum_derive::ServiceFactory;
+use exonum_testkit::{TestKit, TestKitBuilder};
 
-use crate::{
-    simple_supervisor::{ConfigPropose, Schema, SimpleSupervisor},
-    TestKit, TestKitBuilder,
+use exonum_supervisor::{
+    simple::{Schema, Supervisor, SupervisorInterface},
+    ConfigPropose,
 };
 
 #[derive(Debug, ServiceFactory)]
 #[exonum(
-    proto_sources = "super::proto::schema",
     artifact_name = "config-change-test-service",
     implements("Configure<Params = String>")
 )]
@@ -109,7 +109,7 @@ fn assert_config_change_is_applied(testkit: &TestKit) {
 fn add_nodes_to_validators() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(1)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -126,7 +126,7 @@ fn add_nodes_to_validators() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
 
     testkit.create_blocks_until(cfg_change_height.previous());
@@ -143,7 +143,7 @@ fn add_nodes_to_validators() {
 fn exclude_us_from_validators() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -159,7 +159,7 @@ fn exclude_us_from_validators() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -174,7 +174,7 @@ fn exclude_us_from_validators() {
 fn exclude_other_from_validators() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -188,7 +188,7 @@ fn exclude_other_from_validators() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -200,7 +200,7 @@ fn exclude_other_from_validators() {
 fn change_us_validator_id() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .create();
 
     let cfg_change_height = Height(5);
@@ -214,7 +214,7 @@ fn change_us_validator_id() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -227,7 +227,7 @@ fn change_us_validator_id() {
 fn service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -237,7 +237,7 @@ fn service_config_change() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -255,7 +255,7 @@ fn service_config_change() {
 fn discard_errored_service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -273,7 +273,7 @@ fn discard_errored_service_config_change() {
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
             .service_config(ConfigChangeService::INSTANCE_ID, "error".to_owned())
             .consensus_config(new_consensus_config)
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -292,7 +292,7 @@ fn discard_errored_service_config_change() {
 fn discard_panicked_service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -310,7 +310,7 @@ fn discard_panicked_service_config_change() {
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
             .service_config(ConfigChangeService::INSTANCE_ID, "panic".to_owned())
             .consensus_config(new_consensus_config)
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -329,7 +329,7 @@ fn discard_panicked_service_config_change() {
 fn incorrect_actual_from_field() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -341,7 +341,7 @@ fn incorrect_actual_from_field() {
         .create_block_with_transaction(
             ConfigPropose::actual_from(cfg_change_height)
                 .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-                .into_tx(),
+                .sign_for_simple_supervisor(),
         )
         .transactions[0]
         .status()
@@ -352,7 +352,7 @@ fn incorrect_actual_from_field() {
 fn another_configuration_change_proposal() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -362,7 +362,7 @@ fn another_configuration_change_proposal() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     // Try to commit second config change propose.
     testkit
@@ -372,7 +372,7 @@ fn another_configuration_change_proposal() {
                     ConfigChangeService::INSTANCE_ID,
                     "I am an overridden parameter".to_owned(),
                 )
-                .into_tx(),
+                .sign_for_simple_supervisor(),
         )
         .transactions[0]
         .status()
@@ -398,7 +398,7 @@ fn service_config_discard_fake_supervisor() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(InstanceCollection::new(SimpleSupervisor).with_instance(
+        .with_rust_service(InstanceCollection::new(Supervisor).with_instance(
             FAKE_SUPERVISOR_ID,
             "fake-supervisor",
             Vec::default(),
@@ -409,13 +409,15 @@ fn service_config_discard_fake_supervisor() {
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
 
-    testkit
-        .create_block_with_transaction(
-            ConfigPropose::actual_from(cfg_change_height)
-                .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-                .sign(FAKE_SUPERVISOR_ID, keypair.0, &keypair.1),
-        )
-        .transactions[0]
+    let propose = ConfigPropose::actual_from(cfg_change_height)
+        .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
+    let tx = Transaction::<dyn SupervisorInterface>::sign(
+        propose,
+        FAKE_SUPERVISOR_ID,
+        keypair.0,
+        &keypair.1,
+    );
+    testkit.create_block_with_transaction(tx).transactions[0]
         .status()
         .unwrap_err();
 }
@@ -424,7 +426,7 @@ fn service_config_discard_fake_supervisor() {
 fn test_configuration_and_rollbacks() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(1)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .create();
 
     testkit.create_blocks_until(Height(5));
@@ -446,7 +448,7 @@ fn test_configuration_and_rollbacks() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
 
     testkit.create_blocks_until(cfg_change_height);
@@ -472,7 +474,7 @@ fn test_configuration_and_rollbacks() {
 fn service_config_rollback_apply_error() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -482,7 +484,7 @@ fn service_config_rollback_apply_error() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -500,7 +502,7 @@ fn service_config_rollback_apply_error() {
 fn service_config_rollback_apply_panic() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -510,7 +512,7 @@ fn service_config_rollback_apply_panic() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -528,7 +530,7 @@ fn service_config_rollback_apply_panic() {
 fn service_config_apply_multiple_configs() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -540,7 +542,7 @@ fn service_config_apply_multiple_configs() {
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
             .service_config(ConfigChangeService::INSTANCE_ID, "apply_panic".to_owned())
             .service_config(ConfigChangeService::INSTANCE_ID, "apply_error".to_owned())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -558,7 +560,7 @@ fn service_config_apply_multiple_configs() {
 fn several_service_config_changes() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(Supervisor)
         .with_rust_service(ConfigChangeService)
         .create();
 
@@ -569,7 +571,7 @@ fn several_service_config_changes() {
         testkit.create_block_with_transaction(
             ConfigPropose::actual_from(cfg_change_height)
                 .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-                .into_tx(),
+                .sign_for_simple_supervisor(),
         )[0]
         .status()
         .unwrap();

@@ -151,9 +151,7 @@ impl ExonumService {
                 .iter()
                 .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
                     quote! {
-                        impl #cr::runtime::rust::Transaction for #arg_type {
-                            type Service = &'static dyn #trait_name;
-
+                        impl #cr::runtime::rust::Transaction<dyn #trait_name> for #arg_type {
                             const INTERFACE_NAME: &'static str = #interface_name;
                             const METHOD_ID: #cr::runtime::MethodId = #id;
                         }

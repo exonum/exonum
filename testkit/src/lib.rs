@@ -164,7 +164,6 @@ pub use crate::{
 };
 pub mod compare;
 pub mod proto;
-pub mod simple_supervisor;
 
 use exonum::{
     api::{

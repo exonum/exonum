@@ -28,10 +28,8 @@ use exonum::{
     runtime::{rust::Transaction, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{
-    simple_supervisor::{ConfigPropose, SimpleSupervisor},
-    ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode,
-};
+use exonum_supervisor::{simple::Supervisor as SimpleSupervisor, ConfigPropose};
+use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
     api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
     transactions::TxTime, TimeServiceFactory,
@@ -385,7 +383,7 @@ fn test_selected_time_less_than_time_in_storage() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_cfg)
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -613,7 +611,7 @@ fn test_endpoint_api() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_cfg)
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 

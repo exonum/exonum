@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum::{
+    blockchain::{ConsensusConfig, Schema as CoreSchema},
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder, ServiceApiState},
@@ -23,23 +24,27 @@ use exonum_merkledb::ObjectHash;
 use failure::Fail;
 
 use super::{
-    schema::Schema, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest, StartService,
+    schema::Schema, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
+    ConfigVote, DeployRequest, StartService,
 };
-use exonum::blockchain::{ConsensusConfig, Schema as CoreSchema};
 
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {
     /// Error type for the current API implementation.
     type Error: Fail;
+
     /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
     /// by the current node, and returns its hash.
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
+
     /// Creates and broadcasts the `StartService` transaction, which is signed
     /// by the current node, and returns its hash.
     fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
+
     /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
     /// by the current node, and returns its hash.
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error>;
+
     /// Creates and broadcasts the `ConfigVote` transaction, which is signed
     /// by the current node, and returns its hash.
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
@@ -57,7 +62,10 @@ pub trait PublicApi {
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
 
 impl<'a> ApiImpl<'a> {
-    fn broadcast_transaction(&self, transaction: impl Transaction) -> Result<Hash, failure::Error> {
+    fn broadcast_transaction(
+        &self,
+        transaction: impl Transaction<dyn SupervisorInterface>,
+    ) -> Result<Hash, failure::Error> {
         let keypair = self.0.service_keypair;
         let signed = transaction.sign(self.0.instance.id, keypair.0, &keypair.1);
 

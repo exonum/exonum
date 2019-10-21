@@ -94,10 +94,7 @@
 pub use self::{
     dispatcher::Error as DispatcherError,
     error::{ErrorKind, ExecutionError},
-    types::{
-        AnyTx, ArtifactId, CallInfo, ConfigChange, InstanceId, InstanceSpec, MethodId,
-        ServiceConfig,
-    },
+    types::{AnyTx, ArtifactId, CallInfo, InstanceId, InstanceSpec, MethodId},
 };
 
 #[macro_use]

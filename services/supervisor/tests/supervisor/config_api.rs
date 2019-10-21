@@ -78,7 +78,7 @@ fn test_confirm_proposal_with_api() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_proposal.clone())
-        .config_propose();
+        .build();
 
     // Create proposal
     testkit
@@ -122,7 +122,7 @@ fn test_send_proposal_with_api() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_proposal.clone())
-        .config_propose();
+        .build();
 
     // Create proposal
     let hash = create_proposal(&testkit.api(), config_proposal.clone());

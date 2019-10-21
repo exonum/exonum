@@ -15,20 +15,22 @@
 use exonum_merkledb::Entry;
 use exonum_testkit::{TestKit, TestKitBuilder};
 
-use exonum::runtime::{InstanceId, ServiceConfig};
+use exonum::runtime::InstanceId;
 use exonum::{
     blockchain::{ConsensusConfig, InstanceCollection},
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, ConfigChange, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME},
+    runtime::{rust::Transaction, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME},
 };
 
 use crate::{
     IncService as ConfigChangeService, SERVICE_ID as CONFIG_SERVICE_ID,
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
-use exonum_supervisor::{ConfigPropose, ConfigVote, Schema, Supervisor};
+use exonum_supervisor::{
+    ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
+};
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(2);
 
@@ -49,7 +51,7 @@ pub fn sign_config_propose_transaction(
     initiator_id: ValidatorId,
 ) -> Verified<AnyTx> {
     let keys = &testkit.validator(initiator_id).service_keypair();
-    config.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1)
+    config.sign_for_supervisor(keys.0, &keys.1)
 }
 
 pub fn build_confirmation_transactions(
@@ -113,7 +115,7 @@ impl ConfigProposeBuilder {
         self
     }
 
-    pub fn config_propose(&self) -> ConfigPropose {
+    pub fn build(&self) -> ConfigPropose {
         self.config_propose.clone()
     }
 }

@@ -18,7 +18,7 @@ use exonum::{
     runtime::{
         dispatcher,
         rust::{CallContext, ConfigureCall},
-        Caller, ConfigChange, DispatcherError, ExecutionError, InstanceSpec,
+        Caller, DispatcherError, ExecutionError, InstanceSpec,
     },
 };
 use exonum_derive::*;
@@ -27,12 +27,12 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation, DeployRequest, Error,
-    Schema, StartService, Supervisor,
+    ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
+    DeployRequest, Error, Schema, StartService, Supervisor,
 };
 
 /// Supervisor service transactions.
-#[exonum_service()]
+#[exonum_service]
 pub trait SupervisorInterface {
     /// Requests artifact deploy.
     ///

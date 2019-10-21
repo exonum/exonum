@@ -17,7 +17,6 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use crate::{
-    blockchain::ConsensusConfig,
     helpers::ValidateInput,
     merkledb::{
         impl_binary_key_for_binary_value, is_allowed_latin1_char, is_valid_index_name, BinaryValue,
@@ -290,26 +289,6 @@ impl Display for InstanceSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}@{}:{}", self.artifact, self.id, self.name)
     }
-}
-
-/// Configuration parameters of the certain service instance.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::ServiceConfig", crate = "crate")]
-pub struct ServiceConfig {
-    /// Corresponding service instance ID.
-    pub instance_id: InstanceId,
-    /// Raw bytes representation of service configuration parameters.
-    pub params: Vec<u8>,
-}
-
-/// This message contains one atomic configuration change.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::ConfigChange", crate = "crate")]
-pub enum ConfigChange {
-    /// New consensus config.
-    Consensus(ConsensusConfig),
-    /// New service instance config.
-    Service(ServiceConfig),
 }
 
 #[test]

@@ -134,15 +134,17 @@ impl ServiceFactory {
 
     fn artifact_protobuf_spec(&self) -> impl ToTokens {
         let cr = &self.cr;
-        let proto_sources_mod = self
-            .proto_sources
-            .as_ref()
-            .expect("`proto_sources` attribute is not set properly");
 
-        quote! {
-            #cr::runtime::ArtifactProtobufSpec::from(
-                #proto_sources_mod::PROTO_SOURCES.as_ref(),
-            )
+        if let Some(ref proto_sources_mod) = self.proto_sources {
+            quote! {
+                #cr::runtime::ArtifactProtobufSpec::from(
+                    #proto_sources_mod::PROTO_SOURCES.as_ref(),
+                )
+            }
+        } else {
+            quote! {
+                #cr::runtime::ArtifactProtobufSpec { sources: vec![] }
+            }
         }
     }
 

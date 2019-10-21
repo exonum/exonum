@@ -15,16 +15,21 @@
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
+    blockchain::ConsensusConfig,
     crypto::Hash,
     exonum_merkledb::ObjectHash,
     helpers::Height,
     impl_serde_hex_for_binary_value,
-    runtime::{ArtifactId, ConfigChange},
+    messages::{AnyTx, Verified},
+    runtime::{rust::Transaction, ArtifactId, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
+use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
-use exonum_merkledb::impl_binary_key_for_binary_value;
+use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
 
-use super::proto;
+use super::{
+    proto, simple::SupervisorInterface as SimpleInterface, transactions::SupervisorInterface,
+};
 
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert)]
@@ -64,6 +69,26 @@ pub struct StartService {
     pub deadline_height: Height,
 }
 
+/// Configuration parameters of the certain service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "proto::ServiceConfig")]
+pub struct ServiceConfig {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
+    /// Raw bytes representation of service configuration parameters.
+    pub params: Vec<u8>,
+}
+
+/// This message contains one atomic configuration change.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
+#[exonum(pb = "proto::ConfigChange")]
+pub enum ConfigChange {
+    /// New consensus config.
+    Consensus(ConsensusConfig),
+    /// New service instance config.
+    Service(ServiceConfig),
+}
+
 /// Request for the configuration change
 #[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::ConfigPropose")]
@@ -72,6 +97,54 @@ pub struct ConfigPropose {
     pub actual_from: Height,
     /// New configuration proposition.
     pub changes: Vec<ConfigChange>,
+}
+
+impl ConfigPropose {
+    /// Signs the proposal for the supervisor service.
+    pub fn sign_for_supervisor(
+        self,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Verified<AnyTx> {
+        Transaction::<dyn SupervisorInterface>::sign(
+            self,
+            SUPERVISOR_INSTANCE_ID,
+            public_key,
+            secret_key,
+        )
+    }
+
+    /// Signs the proposal for a simple supervisor with a randomly generated keypair.
+    pub fn sign_for_simple_supervisor(self) -> Verified<AnyTx> {
+        let (public_key, secret_key) = exonum_crypto::gen_keypair();
+        Transaction::<dyn SimpleInterface>::sign(
+            self,
+            SUPERVISOR_INSTANCE_ID,
+            public_key,
+            &secret_key,
+        )
+    }
+
+    /// Creates a new proposal which activates at the specified height.
+    pub fn actual_from(height: Height) -> Self {
+        Self {
+            actual_from: height,
+            changes: Vec::default(),
+        }
+    }
+
+    pub fn consensus_config(mut self, config: ConsensusConfig) -> Self {
+        self.changes.push(ConfigChange::Consensus(config));
+        self
+    }
+
+    pub fn service_config(mut self, instance_id: InstanceId, config: impl BinaryValue) -> Self {
+        self.changes.push(ConfigChange::Service(ServiceConfig {
+            instance_id,
+            params: config.into_bytes(),
+        }));
+        self
+    }
 }
 
 /// Confirmation vote for the configuration change

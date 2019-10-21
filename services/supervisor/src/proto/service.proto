@@ -24,46 +24,64 @@ import "blockchain.proto";
 
 // Request for the artifact deployment.
 message DeployRequest {
-    // Artifact identifier.
-    exonum.runtime.ArtifactId artifact = 1;
-    // Additional information for Runtime to deploy.
-    bytes spec = 2;
-    // The height until which the deployment procedure should be completed.
-    uint64 deadline_height = 3;
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+  // Additional information for Runtime to deploy.
+  bytes spec = 2;
+  // The height until which the deployment procedure should be completed.
+  uint64 deadline_height = 3;
 }
 
 // Confirmation that the artifact was successfully deployed by the validator.
 message DeployConfirmation {
-    // Artifact identifier.
-    exonum.runtime.ArtifactId artifact = 1;
-    // Additional information for Runtime to deploy.
-    bytes spec = 2;
-    // The height until which the deployment procedure should be completed.
-    uint64 deadline_height = 3;
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+  // Additional information for Runtime to deploy.
+  bytes spec = 2;
+  // The height until which the deployment procedure should be completed.
+  uint64 deadline_height = 3;
 }
 
 // Request for the start service instance
 message StartService {
-    // Artifact identifier.
-    exonum.runtime.ArtifactId artifact = 1;
-    // Instance name.
-    string name = 2;
-    // Instance configuration.
-    bytes config = 3;
-    // The height until which the start service procedure should be completed.
-    uint64 deadline_height = 4;
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+  // Instance name.
+  string name = 2;
+  // Instance configuration.
+  bytes config = 3;
+  // The height until which the start service procedure should be completed.
+  uint64 deadline_height = 4;
+}
+
+// Configuration parameters of the certain service instance.
+message ServiceConfig {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+  // Raw bytes representation of service configuration parameters.
+  bytes params = 2;
+}
+
+// This message contains one atomic configuration change.
+message ConfigChange {
+  oneof message {
+    // New consensus config.
+    exonum.Config consensus = 1;
+    // New service instance config.
+    ServiceConfig service = 2;
+  }
 }
 
 // Request for the configuration change
 message ConfigPropose {
-    // The height until which the update configuration procedure should be completed.
-    uint64 actual_from = 1;
-    // New configuration proposition.
-    repeated exonum.runtime.ConfigChange changes = 2;
+  // The height until which the update configuration procedure should be completed.
+  uint64 actual_from = 1;
+  // New configuration proposition.
+  repeated ConfigChange changes = 2;
 }
 
 // Confirmation vote for the configuration change
 message ConfigVote {
-    // Hash of configuration proposition.
-    exonum.crypto.Hash propose_hash = 1;
+  // Hash of configuration proposition.
+  exonum.crypto.Hash propose_hash = 1;
 }

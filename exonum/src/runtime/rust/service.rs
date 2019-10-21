@@ -130,9 +130,7 @@ where
 }
 
 /// Transaction specification for a specific service interface.
-pub trait Transaction: BinaryValue {
-    /// Service interface associated with the given transaction.
-    type Service;
+pub trait Transaction<Svc: ?Sized>: BinaryValue {
     /// Identifier of the service interface required for the call.
     #[doc(hidden)]
     const INTERFACE_NAME: &'static str;
@@ -207,7 +205,7 @@ impl<'a> AfterCommitContext<'a> {
     }
 
     /// Signs and broadcasts a transaction to the other nodes in the network.
-    pub fn broadcast_transaction(&self, tx: impl Transaction) {
+    pub fn broadcast_transaction<Svc: ?Sized>(&self, tx: impl Transaction<Svc>) {
         let msg = tx.sign(
             self.instance.id,
             self.service_keypair.0,
