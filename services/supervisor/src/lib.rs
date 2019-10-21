@@ -100,7 +100,9 @@ impl Service for Supervisor {
                         entry.config_propose
                     );
                     // Perform the application of configs.
-                    let communication_channel = context.supervisor_extensions().unwrap();
+                    let communication_channel = context
+                        .supervisor_extensions()
+                        .expect("Bug: supervisor entity can't acquire supervisor access channel");
 
                     communication_channel
                         .update_config(context.instance.id, entry.config_propose.changes);
@@ -155,7 +157,9 @@ impl Service for Supervisor {
                 };
                 // TODO Rewrite on async await syntax. [ECR-3222]
                 let action = Action::StartDeploy { artifact, spec };
-                let communication_channel = context.supervisor_extensions().unwrap();
+                let communication_channel = context
+                    .supervisor_extensions()
+                    .expect("Bug: supervisor entity can't acquire supervisor access channel");
 
                 communication_channel.request_action(action, Some(Box::new(and_then)));
             })

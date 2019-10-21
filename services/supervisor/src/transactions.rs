@@ -333,7 +333,9 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
-            let communication_channel = context.supervisor_extensions().unwrap();
+            let communication_channel = context
+                .supervisor_extensions()
+                .expect("Bug: supervisor entity can't acquire supervisor access channel");
 
             communication_channel.request_action(
                 Action::RegisterArtifact {
@@ -389,7 +391,9 @@ impl SupervisorInterface for Supervisor {
             );
             // We have enough confirmations to add a new service instance,
             // if this action fails this transaction will be canceled.
-            let communication_channel = context.supervisor_extensions().unwrap();
+            let communication_channel = context
+                .supervisor_extensions()
+                .expect("Bug: supervisor entity can't acquire supervisor access channel");
 
             communication_channel.request_action(
                 Action::AddService {

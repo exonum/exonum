@@ -206,7 +206,7 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
     pub fn supervisor_extensions(&self) -> Option<SupervisorAccess> {
         if !is_supervisor(self.instance.id) {
             return None;
-        };
+        }
 
         let supervisor_interface = self.inner.communication_channel.supervisor_interface();
 
@@ -298,7 +298,7 @@ impl<'a> BeforeCommitContext<'a> {
     pub fn supervisor_extensions(&self) -> Option<SupervisorAccess> {
         if !is_supervisor(self.instance.id) {
             return None;
-        };
+        }
 
         let supervisor_interface = self.communication_channel.supervisor_interface();
 
@@ -387,7 +387,7 @@ impl<'a> AfterCommitContext<'a> {
     pub fn supervisor_extensions(&self) -> Option<SupervisorAccess> {
         if !is_supervisor(self.instance.id) {
             return None;
-        };
+        }
 
         let supervisor_interface = self.communication_channel.supervisor_interface();
 
