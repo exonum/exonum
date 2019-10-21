@@ -17,8 +17,7 @@ function header() {
     echo
 }
 
-# TODO: Substitute with a real repo
-PROTO_REPO_URI="https://github.com/skletsun/test_repo.git"
+PROTO_REPO_URI="https://github.com/exonum/exonum-proto.git"
 PROTO_REPO_TMP_DIR="/tmp/_proto_repo_tmp"
 
 BRANCH_RPEFIX="update-proto"
