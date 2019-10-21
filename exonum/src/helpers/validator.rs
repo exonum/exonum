@@ -17,8 +17,7 @@ use exonum_merkledb::Snapshot;
 
 use crate::{blockchain::Schema as CoreSchema, helpers::ValidatorId};
 
-/// Attempts to find a `ValidatorId` of current node.
-/// Returns `None` if node is an auditor.
+/// Attempts to find a `ValidatorId` by the provided service public key.
 pub fn validator_id(snapshot: &dyn Snapshot, service_public_key: PublicKey) -> Option<ValidatorId> {
     CoreSchema::new(snapshot)
         .consensus_config()
