@@ -123,7 +123,7 @@ impl SupervisorInterface for Supervisor {
     fn propose_config_change(
         &self,
         context: TransactionContext,
-        propose: ConfigPropose,
+        config_propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         let ((_, author), fork) = context
             .verify_caller(Caller::as_transaction)
@@ -137,12 +137,12 @@ impl SupervisorInterface for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that the `actual_from` height is in the future.
-        if blockchain::Schema::new(fork).height() >= propose.actual_from {
+        if blockchain::Schema::new(fork).height() >= config_propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
 
         // Verifies that there are no pending config changes assigned to the same height.
-        if schema.pending_proposals().contains(&propose.actual_from) {
+        if schema.pending_proposals().contains(&config_propose.actual_from) {
             return Err(Error::ConfigProposeExists.into());
         }
 
@@ -150,8 +150,7 @@ impl SupervisorInterface for Supervisor {
         if schema
             .pending_proposals()
             .values()
-            .find(|proposal_info| proposal_info.author == author)
-            .is_some()
+            .any(|proposal_info| proposal_info.author == author)
         {
             return Err(Error::ValidatorAlreadyProposed.into());
         }
@@ -162,7 +161,7 @@ impl SupervisorInterface for Supervisor {
         let mut service_ids = HashSet::new();
 
         // Perform config verification.
-        for change in &propose.changes {
+        for change in &config_propose.changes {
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
@@ -191,12 +190,12 @@ impl SupervisorInterface for Supervisor {
             }
         }
 
-        let propose_hash = propose.object_hash();
+        let propose_hash = config_propose.object_hash();
         config_confirms.confirm(&propose_hash, author);
-        let actual_from = propose.actual_from;
+        let actual_from = config_propose.actual_from;
         let config_info = ConfigProposalInfo {
             author,
-            config_propose: propose.clone(),
+            config_propose,
             propose_hash,
         };
 

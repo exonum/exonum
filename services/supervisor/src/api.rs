@@ -79,13 +79,13 @@ impl PrivateApi for ApiImpl<'_> {
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         // Discard proposes whose `actual from` heights are the same with already registered proposes
         let schema = Schema::new(self.0.instance.name, self.0.snapshot());
-        let proposals_by_height = schema.pending_proposals().get(&proposal.actual_from);
-        if proposals_by_height.is_none() {
+        let proposal_for_height = schema.pending_proposals().get(&proposal.actual_from);
+        if proposal_for_height.is_none() {
             self.broadcast_transaction(proposal).map_err(From::from)
         } else {
-            Err(Self::Error::from(failure::format_err!(
+            Err(failure::format_err!(
                 "Config proposal with the same height has already been registered"
-            )))
+            ).into())
         }
     }
 
