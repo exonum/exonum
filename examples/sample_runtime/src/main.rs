@@ -34,30 +34,22 @@ use exonum_supervisor::{DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
 use std::{
+    cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, RwLock,
-    },
     thread,
     time::Duration,
 };
 
 /// Service instance with a counter.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 struct SampleService {
-    counter: Arc<AtomicU64>,
+    counter: Cell<u64>,
     name: String,
 }
 
 /// Sample runtime.
 #[derive(Debug, Default)]
 struct SampleRuntime {
-    inner: RwLock<Inner>,
-}
-
-#[derive(Debug, Default)]
-struct Inner {
     deployed_artifacts: BTreeMap<ArtifactId, Vec<u8>>,
     started_services: BTreeMap<InstanceId, SampleService>,
 }
@@ -75,11 +67,9 @@ enum SampleRuntimeError {
 impl SampleRuntime {
     /// Runtime identifier for the present runtime.
     const ID: u32 = 255;
-}
 
-impl Inner {
     /// Create a new service instance with the given specification.
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
+    fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
             return Err(DispatcherError::ArtifactNotDeployed.into());
         }
@@ -87,14 +77,10 @@ impl Inner {
             return Err(DispatcherError::ServiceIdExists.into());
         }
 
-        self.started_services.insert(
-            spec.id,
-            SampleService {
-                name: spec.name.clone(),
-                ..SampleService::default()
-            },
-        );
-        Ok(self.started_services[&spec.id].clone())
+        Ok(SampleService {
+            name: spec.name.clone(),
+            ..SampleService::default()
+        })
     }
 
     /// In the present simplest case, the artifact is added into the deployed artifacts table.
@@ -124,21 +110,18 @@ impl Runtime for SampleRuntime {
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        self.inner.write().unwrap().deploy_artifact(artifact, spec)
+        self.deploy_artifact(artifact, spec)
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        self.inner
-            .read()
-            .unwrap()
-            .deployed_artifacts
-            .contains_key(id)
+        self.deployed_artifacts.contains_key(id)
     }
 
     /// Starts an existing `SampleService` instance with the specified ID.
     fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        let instance = self.inner.write().unwrap().start_service(spec)?;
+        let instance = self.start_service(spec)?;
         println!("Starting service {}: {:?}", spec, instance);
+        self.started_services.insert(spec.id, instance);
         Ok(())
     }
 
@@ -149,10 +132,10 @@ impl Runtime for SampleRuntime {
         spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let service_instance = self.inner.write().unwrap().start_service(spec)?;
+        let service_instance = self.start_service(spec)?;
         let new_value =
             u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-        service_instance.counter.store(new_value, Ordering::SeqCst);
+        service_instance.counter.set(new_value);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())
     }
@@ -164,13 +147,9 @@ impl Runtime for SampleRuntime {
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let service = self
-            .inner
-            .read()
-            .unwrap()
             .started_services
             .get(&call_info.instance_id)
-            .ok_or(SampleRuntimeError::IncorrectCallInfo)?
-            .clone();
+            .ok_or(SampleRuntimeError::IncorrectCallInfo)?;
 
         println!(
             "Executing method {}#{} of service {}",
@@ -183,8 +162,9 @@ impl Runtime for SampleRuntime {
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
-                let old_value = service.counter.fetch_add(value, Ordering::SeqCst);
-                println!("Updating counter value to {}", old_value + value);
+                let counter = service.counter.get();
+                println!("Updating counter value to {}", counter + value);
+                service.counter.set(value + counter);
                 Ok(())
             }
 
@@ -194,28 +174,27 @@ impl Runtime for SampleRuntime {
                     Err(SampleRuntimeError::IncorrectPayload.into())
                 } else {
                     println!("Resetting counter");
-                    service.counter.store(0, Ordering::SeqCst);
+                    service.counter.set(0);
                     Ok(())
                 }
             }
 
             // Unknown transaction.
-            (interface, method) => Err((
-                SampleRuntimeError::IncorrectCallInfo,
-                format!(
-                    "Incorrect information to call transaction. {}#{}",
-                    interface, method
-                ),
-            )
-                .into()),
+            (interface, method) => {
+                let err = (
+                    SampleRuntimeError::IncorrectCallInfo,
+                    format!(
+                        "Incorrect information to call transaction. {}#{}",
+                        interface, method
+                    ),
+                );
+                Err(err.into())
+            }
         }
     }
 
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.inner
-            .read()
-            .unwrap()
-            .deployed_artifacts
+        self.deployed_artifacts
             .get(id)
             .map(|_| ArtifactProtobufSpec::default())
     }

@@ -37,7 +37,7 @@ use super::{CallContext, RustArtifactId};
 /// with consideration of the interface where the method belongs.
 ///
 /// Usually, `ServiceDispatcher` can be derived using the `ServiceFactory` macro.
-pub trait ServiceDispatcher: Send + Sync {
+pub trait ServiceDispatcher: Send {
     /// Dispatches the interface method call within the specified context.
     fn call(
         &self,
@@ -113,7 +113,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 }
 
 /// Describes a service instance factory for the specific Rust artifact.
-pub trait ServiceFactory: Send + Sync + Debug + 'static {
+pub trait ServiceFactory: Send + Debug + 'static {
     /// Returns the unique artifact identifier corresponding to the factory.
     fn artifact_id(&self) -> RustArtifactId;
     /// Returns the Protobuf specification used by the instances of this service.
