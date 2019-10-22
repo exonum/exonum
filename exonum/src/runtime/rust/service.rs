@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use futures::IntoFuture;
 
 use std::fmt::{self, Debug};
 
@@ -249,11 +250,20 @@ pub struct SupervisorExtensions<'a> {
 }
 
 impl SupervisorExtensions<'_> {
-    /// Starts the deployment of an artifact.
-    pub fn start_deploy(&mut self, artifact: ArtifactId, spec: impl BinaryValue) {
+    /// Starts the deployment of an artifact. The provided callback is executed after
+    /// the deployment is completed.
+    pub fn start_deploy<F>(
+        &mut self,
+        artifact: ArtifactId,
+        spec: impl BinaryValue,
+        and_then: impl FnOnce() -> F + 'static,
+    ) where
+        F: IntoFuture<Item = (), Error = ExecutionError> + 'static,
+    {
         let action = Action::StartDeploy {
             artifact,
             spec: spec.into_bytes(),
+            and_then: Box::new(|| Box::new(and_then().into_future())),
         };
         self.mailbox.push(action);
     }

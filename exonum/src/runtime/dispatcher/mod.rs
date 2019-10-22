@@ -19,7 +19,7 @@ use futures::{future, Future};
 
 use std::{
     collections::{BTreeMap, HashMap},
-    panic,
+    fmt, panic,
 };
 
 use crate::{
@@ -441,17 +441,39 @@ impl Mailbox {
     }
 }
 
-#[derive(Debug)]
+type BoxedExecFuture = Box<dyn Future<Item = (), Error = ExecutionError>>;
+
 pub enum Action {
-    StartDeploy { artifact: ArtifactId, spec: Vec<u8> },
+    StartDeploy {
+        artifact: ArtifactId,
+        spec: Vec<u8>,
+        and_then: Box<dyn FnOnce() -> BoxedExecFuture>,
+    },
+}
+
+impl fmt::Debug for Action {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Action::StartDeploy { artifact, spec, .. } => formatter
+                .debug_struct("StartDeploy")
+                .field("artifact", artifact)
+                .field("spec", spec)
+                .finish(),
+        }
+    }
 }
 
 impl Action {
     fn execute(self, dispatcher: &mut Dispatcher) {
         match self {
-            Action::StartDeploy { artifact, spec } => {
+            Action::StartDeploy {
+                artifact,
+                spec,
+                and_then,
+            } => {
                 dispatcher
                     .deploy_artifact(artifact.clone(), spec)
+                    .and_then(|()| and_then())
                     .wait()
                     .unwrap_or_else(|e| {
                         error!("Deploying artifact {:?} failed: {}", artifact, e);

@@ -156,8 +156,7 @@ impl Service for Supervisor {
     fn after_commit(&self, mut context: AfterCommitContext) {
         let schema = Schema::new(context.instance.name, context.snapshot);
         let pending_deployments = schema.pending_deployments();
-        let tx_sender = context.transaction_broadcaster();
-        let keypair = context.service_keypair.clone();
+        let keypair = context.service_keypair;
         let instance_id = context.instance.id;
         let is_validator = context.validator_id().is_some();
 
@@ -172,22 +171,25 @@ impl Service for Supervisor {
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
+            let keypair = context.service_keypair.clone();
+            let tx_sender = context.transaction_broadcaster();
+
             let mut extensions = context.supervisor_extensions().unwrap();
-            // FIXME: use IDs to track execution status of background tasks.
-            extensions.start_deploy(artifact, spec);
+            extensions.start_deploy(artifact, spec, move || {
+                if is_validator {
+                    log::trace!(
+                        "Sent confirmation for deployment request {:?}",
+                        unconfirmed_request
+                    );
 
-            if is_validator {
-                log::trace!(
-                    "Sent confirmation for deployment request {:?}",
-                    unconfirmed_request
-                );
-
-                let transaction = DeployConfirmation::from(unconfirmed_request);
-                tx_sender
-                    .broadcast_transaction(transaction.sign(instance_id, keypair.0, &keypair.1))
-                    .map_err(|e| log::error!("Couldn't broadcast transaction {}", e))
-                    .ok();
-            }
+                    let transaction = DeployConfirmation::from(unconfirmed_request);
+                    tx_sender
+                        .broadcast_transaction(transaction.sign(instance_id, keypair.0, &keypair.1))
+                        .map_err(|e| log::error!("Couldn't broadcast transaction {}", e))
+                        .ok();
+                }
+                Ok(())
+            });
         }
     }
 
