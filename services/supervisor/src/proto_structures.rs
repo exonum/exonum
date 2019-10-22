@@ -79,7 +79,7 @@ pub struct ServiceConfig {
     pub params: Vec<u8>,
 }
 
-/// This message contains one atomic configuration change.
+/// Atomic configuration change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "proto::ConfigChange")]
 pub enum ConfigChange {
@@ -89,7 +89,7 @@ pub enum ConfigChange {
     Service(ServiceConfig),
 }
 
-/// Request for the configuration change
+/// Request for the configuration change.
 #[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert)]
 #[exonum(pb = "proto::ConfigPropose")]
 pub struct ConfigPropose {
@@ -133,11 +133,13 @@ impl ConfigPropose {
         }
     }
 
+    /// Adds a change of consensus configuration to this proposal.
     pub fn consensus_config(mut self, config: ConsensusConfig) -> Self {
         self.changes.push(ConfigChange::Consensus(config));
         self
     }
 
+    /// Adds change of the configuration for the specified service instance.
     pub fn service_config(mut self, instance_id: InstanceId, config: impl BinaryValue) -> Self {
         self.changes.push(ConfigChange::Service(ServiceConfig {
             instance_id,

@@ -233,7 +233,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// Service instance name and method ID are provided in the `call_info` argument and
     /// interface name is provided as the corresponding field of the `context` argument.
     ///
-    /// # Notes for Runtime Developers.
+    /// # Notes for Runtime Developers
     ///
     /// * If service does not implement required interface, return `NoSuchInterface` error.
     /// * If interface does not have required method, return `NoSuchMethod` error.
@@ -253,7 +253,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// Gets the state hashes of the every available service.
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
 
-    /// Calls `before_commit` for all the services stored in the runtime.
+    /// Calls `before_commit` for a service stored in the runtime.
     ///
     /// # Guarantees
     ///
@@ -274,6 +274,11 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
+    // The different call pattern compared to `before_commit` stems from the fact
+    // that processing of `after_commit` can heavily depend on the runtime. Ideally, we would
+    // like for the Rust runtime to allow services to spawn async background tasks instead
+    // of using `after_commit`.
+    // TODO: implement the above and remove `after_commit` from Rust services.
     fn after_commit(
         &mut self,
         mailbox: &mut Mailbox,

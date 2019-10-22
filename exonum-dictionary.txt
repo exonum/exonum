@@ -127,6 +127,8 @@ pwbox
 quux
 readonly
 rebasing
+reborrow
+reborrowed
 reddit
 reimplement
 repr

@@ -20,7 +20,7 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     keys::Keys,
-    merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
+    merkledb::{BinaryValue, Snapshot, TemporaryDB},
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
