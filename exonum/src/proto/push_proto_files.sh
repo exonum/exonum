@@ -17,7 +17,7 @@ function header() {
     echo
 }
 
-PROTO_REPO_URI="https://github.com/exonum/exonum-proto.git"
+PROTO_REPO_URI="https://github.com/exonum/exonum-proto-sources.git"
 PROTO_REPO_TMP_DIR="/tmp/_proto_repo_tmp"
 
 BRANCH_RPEFIX="update-proto"
@@ -25,6 +25,7 @@ BRANCH_RPEFIX="update-proto"
 PROTO_ROOT_DIR=$(pwd)
 MAIN_PROTO_FILES_DIR=${PROTO_ROOT_DIR}/schema/exonum
 COMPONENTS_DIR=$(pwd)/../../../components
+DST_PROTO_FILES_DIR=${PROTO_REPO_TMP_DIR}/src
 
 # Clean temporary dir from the previous iteration if any
 rm -fR ${PROTO_REPO_TMP_DIR}
@@ -37,13 +38,13 @@ git clone ${PROTO_REPO_URI} ${PROTO_REPO_TMP_DIR}
 header "COPYING PROTO FILES"
 
 # Copy main files
-cp -v ${MAIN_PROTO_FILES_DIR}/blockchain.proto ${PROTO_REPO_TMP_DIR}
-cp -v ${MAIN_PROTO_FILES_DIR}/consensus.proto ${PROTO_REPO_TMP_DIR}
-cp -v ${MAIN_PROTO_FILES_DIR}/runtime.proto ${PROTO_REPO_TMP_DIR}
-# BitVec
-cp -v ${COMPONENTS_DIR}/proto/src/proto/common.proto ${PROTO_REPO_TMP_DIR}
+cp -v ${MAIN_PROTO_FILES_DIR}/blockchain.proto ${DST_PROTO_FILES_DIR}
+cp -v ${MAIN_PROTO_FILES_DIR}/consensus.proto ${DST_PROTO_FILES_DIR}
+cp -v ${MAIN_PROTO_FILES_DIR}/runtime.proto ${DST_PROTO_FILES_DIR}
+# Common
+cp -v ${COMPONENTS_DIR}/proto/src/proto/common.proto ${DST_PROTO_FILES_DIR}
 # Crypto stuff
-cp -v ${COMPONENTS_DIR}/crypto/src/proto/schema/types.proto ${PROTO_REPO_TMP_DIR}
+cp -v ${COMPONENTS_DIR}/crypto/src/proto/schema/types.proto ${DST_PROTO_FILES_DIR}
 
 header "ADDING PROTO FILES TO THE REPO"
 
