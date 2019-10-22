@@ -217,6 +217,16 @@ impl FromStr for ArtifactId {
 }
 
 /// Exhaustive service instance specification.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::ArtifactSpec", crate = "crate")]
+pub struct ArtifactSpec {
+    /// Information uniquely identifying the artifact.
+    pub artifact: ArtifactId,
+    /// Runtime-specific artifact payload.
+    pub payload: Vec<u8>,
+}
+
+/// Exhaustive service instance specification.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
 #[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
 pub struct InstanceSpec {
@@ -289,6 +299,34 @@ impl Display for InstanceSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}@{}:{}", self.artifact, self.id, self.name)
     }
+}
+
+/// Allows to query a service instance by either of the two identifiers.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InstanceQuery<'a> {
+    Id(InstanceId),
+    Name(&'a str),
+}
+
+impl From<InstanceId> for InstanceQuery<'_> {
+    fn from(value: InstanceId) -> Self {
+        InstanceQuery::Id(value)
+    }
+}
+
+impl<'a> From<&'a str> for InstanceQuery<'a> {
+    fn from(value: &'a str) -> Self {
+        InstanceQuery::Name(value)
+    }
+}
+
+/// Status of a service instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DeployStatus {
+    /// The service instance has been successfully deployed.
+    Active,
+    /// The service instance is pending deployment.
+    Pending,
 }
 
 #[test]

@@ -25,9 +25,8 @@ use crate::{
     merkledb::{BinaryValue, Database},
     node::ApiSender,
     runtime::{
-        dispatcher::Dispatcher,
         rust::{RustRuntime, ServiceFactory},
-        InstanceId, InstanceSpec, Runtime,
+        Dispatcher, InstanceId, InstanceSpec, Runtime,
     },
 };
 
@@ -44,7 +43,7 @@ pub struct BlockchainBuilder {
     /// Keypair, which  is used to sign service transactions on behalf of this node.
     pub service_keypair: (PublicKey, SecretKey),
     /// List of the supported runtimes.
-    pub runtimes: Vec<(u32, Arc<dyn Runtime>)>,
+    pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
     /// List of the privileged services with the configuration parameters that are created directly
     /// in the genesis block.
     pub builtin_instances: Vec<InstanceConfig>,
@@ -90,7 +89,7 @@ impl BlockchainBuilder {
 
     pub fn with_external_runtimes(
         mut self,
-        runtimes: impl IntoIterator<Item = impl Into<(u32, Arc<dyn Runtime>)>>,
+        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
     ) -> Self {
         for runtime in runtimes {
             self.runtimes.push(runtime.into());
@@ -100,7 +99,7 @@ impl BlockchainBuilder {
     }
 
     /// Add an additional runtime with the specified identifier.
-    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Arc<dyn Runtime>)>) -> Self {
+    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
     }
@@ -157,21 +156,7 @@ impl BlockchainBuilder {
                 internal_requests,
             );
             // Adds builtin services.
-            blockchain.merge({
-                let fork = blockchain.fork();
-                let mut dispatcher = blockchain.dispatcher();
-                for instance_config in self.builtin_instances {
-                    dispatcher.add_builtin_service(
-                        &fork,
-                        instance_config.instance_spec,
-                        instance_config.artifact_spec.unwrap_or_default(),
-                        instance_config.constructor,
-                    )?;
-                }
-                fork.into_patch()
-            })?;
-            // Commits genesis block.
-            blockchain.create_genesis_block(self.genesis_config)?;
+            blockchain.create_genesis_block(self.genesis_config, self.builtin_instances)?;
             blockchain
         };
         // Starts built-in APIs.
@@ -259,8 +244,7 @@ mod tests {
     fn finalize_without_genesis_block() {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
-
-        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![];
 
         let blockchain = Blockchain::new(
@@ -278,18 +262,10 @@ mod tests {
         // TODO check dispatcher schema.
     }
 
-    #[test]
-    #[should_panic(expected = "Specified service identifier is already used")]
-    fn finalize_duplicate_services() {
+    fn test_finalizing_services(services: Vec<InstanceCollection>) {
         let config = generate_testnet_config(1, 0)[0].clone();
         let service_keypair = config.service_keypair();
-
-        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
-        let services = vec![
-            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-        ];
-
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         Blockchain::new(
             TemporaryDB::new(),
             external_runtimes,
@@ -302,12 +278,38 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "already used")]
+    fn finalize_duplicate_services() {
+        test_finalizing_services(vec![
+            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(expected = "already used")]
+    fn finalize_services_with_duplicate_names() {
+        test_finalizing_services(vec![
+            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+            InstanceCollection::new(SampleService).with_instance(1, "sample", ()),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(expected = "already used")]
+    fn finalize_services_with_duplicate_ids() {
+        test_finalizing_services(vec![
+            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
+            InstanceCollection::new(SampleService).with_instance(0, "other-sample", ()),
+        ]);
+    }
+
+    #[test]
     #[should_panic(expected = "Consensus configuration must have at least one validator")]
     fn finalize_invalid_consensus_config() {
         let consensus = ConsensusConfig::default();
         let service_keypair = crypto::gen_keypair();
-
-        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![];
 
         Blockchain::new(

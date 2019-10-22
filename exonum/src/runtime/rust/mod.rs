@@ -32,7 +32,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt,
     str::FromStr,
-    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -42,7 +41,7 @@ use crate::{
 
 use super::{
     api::{ApiContext, ServiceApiBuilder},
-    dispatcher::{self, Dispatcher},
+    dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
@@ -55,31 +54,22 @@ mod tests;
 
 #[derive(Debug, Default)]
 pub struct RustRuntime {
-    inner: RwLock<Inner>,
-}
-
-#[derive(Debug, Default)]
-struct Inner {
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Instance {
     id: InstanceId,
     name: String,
-    service: Arc<dyn Service>,
+    service: Box<dyn Service>,
 }
 
 impl Instance {
     pub fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
-        Self {
-            id,
-            name,
-            service: Arc::from(service),
-        }
+        Self { id, name, service }
     }
 
     pub fn descriptor(&self) -> InstanceDescriptor {
@@ -115,11 +105,7 @@ impl RustRuntime {
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
-        self.inner
-            .write()
-            .unwrap()
-            .available_artifacts
-            .insert(artifact, service_factory);
+        self.available_artifacts.insert(artifact, service_factory);
     }
 
     pub fn with_available_service(
@@ -129,9 +115,7 @@ impl RustRuntime {
         self.add_service_factory(service_factory.into());
         self
     }
-}
 
-impl Inner {
     fn parse_artifact(artifact: &ArtifactId) -> Result<RustArtifactId, ExecutionError> {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return Err(Error::IncorrectArtifactId.into());
@@ -148,15 +132,6 @@ impl Inner {
         self.started_services.insert(instance.id, instance);
     }
 
-    fn remove_started_instance(&mut self, instance_id: InstanceId) -> Option<Instance> {
-        self.started_services
-            .remove(&instance_id)
-            .and_then(|instance| {
-                self.started_services_by_name.remove(&instance.name);
-                Some(instance)
-            })
-    }
-
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
         let artifact = Self::parse_artifact(&artifact)?;
         if self.deployed_artifacts.contains(&artifact) {
@@ -171,7 +146,7 @@ impl Inner {
         Ok(())
     }
 
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
+    fn start_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
         let artifact = Self::parse_artifact(&spec.artifact)?;
         if !self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactNotDeployed.into());
@@ -184,8 +159,7 @@ impl Inner {
         }
 
         let service = self.available_artifacts[&artifact].create_instance();
-        self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
-        Ok(self.started_services[&spec.id].clone())
+        Ok(Instance::new(spec.id, spec.name.clone(), service))
     }
 
     fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
@@ -197,15 +171,9 @@ impl Inner {
     }
 }
 
-impl From<RustRuntime> for (u32, Arc<dyn Runtime>) {
+impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
     fn from(r: RustRuntime) -> Self {
-        (RustRuntime::ID as u32, Arc::new(r))
-    }
-}
-
-impl From<RustRuntime> for Arc<dyn Runtime> {
-    fn from(value: RustRuntime) -> Self {
-        Arc::new(value)
+        (RustRuntime::ID as u32, Box::new(r))
     }
 }
 
@@ -259,63 +227,48 @@ impl FromStr for RustArtifactId {
 
 impl Runtime for RustRuntime {
     fn deploy_artifact(
-        &self,
+        &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
-            return Box::new(future::err(Error::IncorrectArtifactId.into()));
+            Box::new(future::err(Error::IncorrectArtifactId.into()))
+        } else {
+            Box::new(self.deploy(&artifact).into_future())
         }
-        let mut inner = self.inner.write().unwrap();
-        Box::new(inner.deploy(&artifact).into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        if let Ok(artifact) = Inner::parse_artifact(id) {
-            let inner = self.inner.read().unwrap();
-            inner.deployed_artifacts.contains(&artifact)
+        if let Ok(artifact) = Self::parse_artifact(id) {
+            self.deployed_artifacts.contains(&artifact)
         } else {
             false
         }
     }
 
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        let id = Inner::parse_artifact(id).ok()?;
-        let inner = self.inner.read().unwrap();
-        inner
-            .deployed_artifact(&id)
+        let id = Self::parse_artifact(id).ok()?;
+        self.deployed_artifact(&id)
             .map(ServiceFactory::artifact_protobuf_spec)
     }
 
-    fn restart_service(&self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        let mut inner = self.inner.write().unwrap();
-        inner.start_service(spec)?;
-        trace!("Started service {}", spec);
-        Ok(())
-    }
-
-    fn add_service(
+    fn start_adding_service(
         &self,
         fork: &Fork,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.inner.write().unwrap().start_service(spec)?;
+        let instance = self.start_service(spec)?;
         let service = instance.as_ref();
         let descriptor = instance.descriptor();
-        let result = catch_panic(|| service.initialize(descriptor, fork, parameters));
+        catch_panic(|| service.initialize(descriptor, fork, parameters))
+    }
 
-        match result {
-            Ok(()) => {
-                trace!("Added service instance {}", spec);
-            }
-            Err(_) => {
-                let mut inner = self.inner.write().unwrap();
-                inner.remove_started_instance(spec.id);
-            }
-        }
-        result
+    fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        let instance = self.start_service(spec)?;
+        self.add_started_service(instance);
+        Ok(())
     }
 
     fn execute(
@@ -325,13 +278,9 @@ impl Runtime for RustRuntime {
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let instance = self
-            .inner
-            .read()
-            .unwrap()
             .started_services
             .get(&call_info.instance_id)
-            .expect("BUG: an attempt to execute transaction of unknown service.")
-            .clone();
+            .expect("BUG: an attempt to execute transaction of unknown service.");
 
         instance.as_ref().call(
             context.interface_name,
@@ -345,9 +294,6 @@ impl Runtime for RustRuntime {
         StateHashAggregator {
             runtime: Vec::new(),
             instances: self
-                .inner
-                .read()
-                .unwrap()
                 .started_services
                 .values()
                 .map(|service| service.state_hash(snapshot))
@@ -364,12 +310,8 @@ impl Runtime for RustRuntime {
         // of the locked memory). Thus, we don't need to hold the lock for the duration
         // of the cycle below.
         let instance = self
-            .inner
-            .read()
-            .unwrap()
             .started_services
             .get(&instance_id)
-            .cloned()
             .expect("`before_commit` called with non-existing `instance_id`");
 
         let result = catch_panic(|| {
@@ -387,16 +329,15 @@ impl Runtime for RustRuntime {
     }
 
     fn after_commit(
-        &self,
-        dispatcher: &mut Dispatcher,
+        &mut self,
+        mailbox: &mut Mailbox,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
     ) {
-        let instances = self.inner.read().unwrap().started_services.clone();
-        for service in instances.values() {
+        for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
-                dispatcher,
+                mailbox,
                 service.descriptor(),
                 snapshot,
                 service_keypair,
@@ -406,10 +347,7 @@ impl Runtime for RustRuntime {
     }
 
     fn api_endpoints(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
-        self.inner
-            .read()
-            .unwrap()
-            .started_services
+        self.started_services
             .values()
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(

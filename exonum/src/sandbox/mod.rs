@@ -52,6 +52,7 @@ use crate::{
         ListenerConfig, NodeHandler, NodeSender, PeerAddress, ServiceConfig, State,
         SystemStateProvider,
     },
+    runtime::Runtime,
     sandbox::{
         config_updater::ConfigUpdaterService, sandbox_tests_helper::PROPOSE_TIMEOUT,
         timestamping::TimestampingService,
@@ -1134,7 +1135,7 @@ fn sandbox_with_services_uninitialized(
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
-    let external_runtimes: Vec<(u32, Arc<dyn crate::runtime::Runtime>)> = vec![];
+    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
     let api_channel = mpsc::channel(100);
     let blockchain = Blockchain::new(
         TemporaryDB::new(),

@@ -40,7 +40,8 @@ use exonum::{
     crypto::Hash,
     merkledb::{BinaryValue, Fork, Snapshot},
     runtime::{
-        api::ServiceApiBuilder, dispatcher, rust::Service, DispatcherError, InstanceDescriptor,
+        api::ServiceApiBuilder, rust::Service, DispatcherError, DispatcherSchema,
+        InstanceDescriptor,
     },
 };
 
@@ -73,9 +74,9 @@ impl Service for TimestampingService {
         let config =
             Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
-        if !dispatcher::Schema::new(fork)
-            .service_instances()
-            .contains(&config.time_service_name)
+        if DispatcherSchema::new(fork)
+            .get_instance(&*config.time_service_name)
+            .is_none()
         {
             return Err(Error::TimeServiceNotFound.into());
         }

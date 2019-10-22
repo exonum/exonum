@@ -26,7 +26,7 @@ use crate::{
     merkledb::{Fork, Snapshot},
     node::ApiSender,
     runtime::{
-        dispatcher::Dispatcher,
+        dispatcher::{Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
         ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
@@ -51,7 +51,7 @@ impl DispatcherBuilder {
         }
     }
 
-    fn with_runtime(mut self, id: u32, runtime: impl Into<Arc<dyn Runtime>>) -> Self {
+    fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
         self.dispatcher.runtimes.insert(id, runtime.into());
         self
     }
@@ -105,7 +105,7 @@ impl From<SampleRuntime> for Arc<dyn Runtime> {
 
 impl Runtime for SampleRuntime {
     fn deploy_artifact(
-        &self,
+        &mut self,
         artifact: ArtifactId,
         _spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
@@ -123,7 +123,7 @@ impl Runtime for SampleRuntime {
         id.runtime_id == self.runtime_type
     }
 
-    fn restart_service(&self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         if spec.artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
@@ -131,7 +131,7 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn add_service(
+    fn start_adding_service(
         &self,
         _fork: &Fork,
         _spec: &InstanceSpec,
@@ -166,8 +166,8 @@ impl Runtime for SampleRuntime {
     }
 
     fn after_commit(
-        &self,
-        _dispatcher: &mut Dispatcher,
+        &mut self,
+        _mailbox: &mut Mailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -235,11 +235,11 @@ fn test_dispatcher_simple() {
         .with_runtime(runtime_b.runtime_type, runtime_b.clone())
         .finalize();
 
-    let sample_rust_spec = ArtifactId {
+    let rust_artifact = ArtifactId {
         runtime_id: SampleRuntimes::First as u32,
         name: "first".into(),
     };
-    let sample_java_spec = ArtifactId {
+    let java_artifact = ArtifactId {
         runtime_id: SampleRuntimes::Second as u32,
         name: "second".into(),
     };
@@ -247,39 +247,70 @@ fn test_dispatcher_simple() {
     // Check if the services are ready for deploy.
     let mut fork = db.fork();
     dispatcher
-        .deploy_and_register_artifact(&fork, &sample_rust_spec, Vec::default())
+        .deploy_and_register_artifact(&fork, rust_artifact.clone(), vec![])
         .unwrap();
     dispatcher
-        .deploy_and_register_artifact(&fork, &sample_java_spec, Vec::default())
+        .deploy_and_register_artifact(&fork, java_artifact.clone(), vec![])
         .unwrap();
 
-    // Check if the services are ready for initiation.
+    // Check if the services are ready for initiation. Note that the artifacts are pending at this
+    // point.
+    let rust_service = InstanceSpec {
+        artifact: rust_artifact.clone(),
+        id: RUST_SERVICE_ID,
+        name: RUST_SERVICE_NAME.into(),
+    };
     dispatcher
-        .add_service(
-            &fork,
-            InstanceSpec {
-                artifact: sample_rust_spec.clone(),
-                id: RUST_SERVICE_ID,
-                name: RUST_SERVICE_NAME.into(),
-            },
-            Vec::default(),
-        )
-        .expect("add_service failed for rust");
+        .start_adding_service(&fork, rust_service, vec![])
+        .expect("`start_adding_service` failed for rust");
+
+    let java_service = InstanceSpec {
+        artifact: java_artifact.clone(),
+        id: JAVA_SERVICE_ID,
+        name: JAVA_SERVICE_NAME.into(),
+    };
     dispatcher
-        .add_service(
-            &fork,
-            InstanceSpec {
-                artifact: sample_java_spec.clone(),
-                id: JAVA_SERVICE_ID,
-                name: JAVA_SERVICE_NAME.into(),
-            },
-            Vec::default(),
+        .start_adding_service(&fork, java_service, vec![])
+        .expect("`start_adding_service` failed for java");
+
+    // Since services are not active yet, transactions to them should fail.
+    let tx_payload = [0x00_u8; 1];
+    dispatcher
+        .call(
+            &mut fork,
+            Caller::Service { instance_id: 1 },
+            &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
+            &tx_payload,
         )
-        .expect("add_service failed for java");
+        .expect_err("Rust service should not be active yet");
+
+    // Check that we cannot start adding a service with conflicting IDs.
+    let conflicting_rust_service = InstanceSpec {
+        artifact: rust_artifact.clone(),
+        id: RUST_SERVICE_ID,
+        name: "inconspicuous-name".to_owned(),
+    };
+    let err = dispatcher
+        .start_adding_service(&fork, conflicting_rust_service, vec![])
+        .unwrap_err();
+    assert_eq!(err, DispatcherError::ServiceIdExists.into());
+
+    let conflicting_rust_service = InstanceSpec {
+        artifact: rust_artifact.clone(),
+        id: RUST_SERVICE_ID + 1,
+        name: RUST_SERVICE_NAME.to_owned(),
+    };
+    let err = dispatcher
+        .start_adding_service(&fork, conflicting_rust_service, vec![])
+        .unwrap_err();
+    assert_eq!(err, DispatcherError::ServiceNameExists.into());
+
+    // Activate services / artifacts by calling `Dispatcher::after_commit()`.
+    let service_keypair = crypto::gen_keypair();
+    let api_sender = ApiSender::new(mpsc::channel(0).0);
+    dispatcher.after_commit(&fork, &service_keypair, &api_sender);
 
     // Check if transactions are ready for execution.
-    let tx_payload = [0x00_u8; 1];
-
     dispatcher
         .call(
             &mut fork,
@@ -288,7 +319,6 @@ fn test_dispatcher_simple() {
             &tx_payload,
         )
         .expect("Correct tx rust");
-
     dispatcher
         .call(
             &mut fork,
@@ -297,7 +327,6 @@ fn test_dispatcher_simple() {
             &tx_payload,
         )
         .expect_err("Incorrect tx rust");
-
     dispatcher
         .call(
             &mut fork,
@@ -306,7 +335,6 @@ fn test_dispatcher_simple() {
             &tx_payload,
         )
         .expect("Correct tx java");
-
     dispatcher
         .call(
             &mut fork,
@@ -317,11 +345,7 @@ fn test_dispatcher_simple() {
         .expect_err("Incorrect tx java");
 
     // Check that API changes in the dispatcher contain the started services.
-    let context = ApiContext::new(
-        db.clone(),
-        crypto::gen_keypair(),
-        ApiSender::new(mpsc::channel(0).0),
-    );
+    let context = ApiContext::new(db.clone(), service_keypair, api_sender);
     assert!(dispatcher.notify_api_changes(&context));
     let expected_api_changes = vec![
         (
@@ -372,38 +396,36 @@ fn test_dispatcher_rust_runtime_no_service() {
         .with_runtime(RuntimeIdentifier::Rust as u32, RustRuntime::default())
         .finalize();
 
-    let sample_rust_spec = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo:1.0.0").unwrap();
+    let rust_artifact = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo:1.0.0").unwrap();
 
-    // Check deploy.
     assert_eq!(
         dispatcher
-            .deploy_artifact(sample_rust_spec.clone(), Vec::default())
+            .deploy_artifact(rust_artifact.clone(), vec![])
             .wait()
             .expect_err("deploy artifact succeed"),
         RustRuntimeError::UnableToDeploy.into()
     );
 
-    // Check if the services are ready to start.
-    let mut fork = db.fork();
-
+    let fork = db.fork();
+    let rust_service = InstanceSpec {
+        artifact: rust_artifact.clone(),
+        id: RUST_SERVICE_ID,
+        name: RUST_SERVICE_NAME.into(),
+    };
     assert_eq!(
         dispatcher
-            .add_service(
-                &fork,
-                InstanceSpec {
-                    artifact: sample_rust_spec.clone(),
-                    id: RUST_SERVICE_ID,
-                    name: RUST_SERVICE_NAME.into()
-                },
-                Vec::default()
-            )
+            .start_adding_service(&fork, rust_service, vec![])
             .expect_err("start service succeed"),
         DispatcherError::ArtifactNotDeployed.into()
     );
 
-    // Check if transactions are ready for execution.
-    let tx_payload = [0x00_u8; 1];
+    let service_keypair = crypto::gen_keypair();
+    let api_sender = ApiSender::new(mpsc::channel(0).0);
+    dispatcher.after_commit(&fork, &service_keypair, &api_sender);
+    db.merge(fork.into_patch()).unwrap();
 
+    let mut fork = db.fork();
+    let tx_payload = [0x00_u8; 1];
     dispatcher
         .call(
             &mut fork,
@@ -433,7 +455,7 @@ impl From<ShutdownRuntime> for Arc<dyn Runtime> {
 
 impl Runtime for ShutdownRuntime {
     fn deploy_artifact(
-        &self,
+        &mut self,
         _artifact: ArtifactId,
         _spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
@@ -444,16 +466,16 @@ impl Runtime for ShutdownRuntime {
         false
     }
 
-    fn restart_service(&self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
-    fn add_service(
+    fn start_adding_service(
         &self,
         _fork: &Fork,
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn add_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -474,8 +496,8 @@ impl Runtime for ShutdownRuntime {
     }
 
     fn after_commit(
-        &self,
-        _dispatcher: &mut Dispatcher,
+        &mut self,
+        _mailbox: &mut Mailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,

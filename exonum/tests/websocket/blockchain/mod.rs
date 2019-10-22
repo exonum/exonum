@@ -28,7 +28,6 @@ use exonum_merkledb::{Snapshot, TemporaryDB};
 
 use std::{
     net::SocketAddr,
-    sync::Arc,
     thread::{self, JoinHandle},
 };
 
@@ -118,7 +117,7 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
-    let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
+    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
     let services =
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
 

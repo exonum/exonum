@@ -20,8 +20,6 @@ use exonum::{
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
-use std::sync::Arc;
-
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
@@ -66,7 +64,7 @@ fn node_config() -> NodeConfig {
 fn main() {
     exonum::helpers::init_logger().unwrap();
 
-    let external_runtimes: Vec<(u32, Arc<dyn exonum::runtime::Runtime>)> = vec![];
+    let external_runtimes: Vec<(u32, Box<dyn exonum::runtime::Runtime>)> = vec![];
     let services = vec![InstanceCollection::new(CryptocurrencyService)];
 
     println!("Creating database in temporary dir...");

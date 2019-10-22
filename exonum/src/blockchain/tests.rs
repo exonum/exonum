@@ -31,10 +31,10 @@ use crate::{
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
-        dispatcher,
         error::ErrorKind,
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ExecutionError, InstanceDescriptor,
+        InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -110,7 +110,7 @@ impl Service for TestDispatcherService {
 }
 
 impl TestDispatcherInterface for TestDispatcherService {
-    fn test_deploy(&self, mut context: CallContext, arg: TestDeploy) -> Result<(), ExecutionError> {
+    fn test_deploy(&self, context: CallContext, arg: TestDeploy) -> Result<(), ExecutionError> {
         {
             let mut index = Entry::new(context.instance().name, context.fork());
             index.set(arg.value);
@@ -124,15 +124,15 @@ impl TestDispatcherInterface for TestDispatcherService {
         context
             .supervisor_extensions()
             .unwrap()
-            .register_artifact(artifact, vec![])?;
+            .start_artifact_registration(artifact, vec![])?;
         if arg.value == 42 {
-            return Err(dispatcher::Error::UnknownArtifactId.into());
+            return Err(DispatcherError::UnknownArtifactId.into());
         }
 
         Ok(())
     }
 
-    fn test_add(&self, mut context: CallContext, arg: TestAdd) -> Result<(), ExecutionError> {
+    fn test_add(&self, context: CallContext, arg: TestAdd) -> Result<(), ExecutionError> {
         let mut index = Entry::new(context.instance().name, context.fork());
         index.set(arg.value);
         drop(index);
@@ -149,11 +149,10 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        context.supervisor_extensions().unwrap().add_service(
-            artifact,
-            format!("good-service-{}", arg.value),
-            config,
-        )?;
+        context
+            .supervisor_extensions()
+            .unwrap()
+            .start_adding_service(artifact, format!("good-service-{}", arg.value), config)?;
 
         Ok(())
     }
@@ -314,27 +313,22 @@ fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) -> Exec
     blockchain
         .merge({
             let fork = blockchain.fork();
-            {
-                let mut schema = Schema::new(&fork);
-                schema.add_transaction_into_pool(tx.clone());
-            }
+            let mut schema = Schema::new(&fork);
+            schema.add_transaction_into_pool(tx.clone());
             fork.into_patch()
         })
         .unwrap();
 
-    blockchain
-        .merge(
-            blockchain
-                .create_patch(
-                    ValidatorId::zero(),
-                    Height::zero(),
-                    &[tx.object_hash()],
-                    &mut BTreeMap::new(),
-                )
-                .1,
-        )
-        .unwrap();
+    let (block_hash, patch) = blockchain.create_patch(
+        ValidatorId::zero(),
+        Height::zero(),
+        &[tx.object_hash()],
+        &mut BTreeMap::new(),
+    );
 
+    blockchain
+        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
+        .unwrap();
     let snapshot = blockchain.snapshot();
     Schema::new(snapshot.as_ref())
         .transaction_results()
@@ -554,14 +548,14 @@ fn test_dispatcher_deploy_good() {
     assert!(!blockchain.dispatcher().is_artifact_deployed(&artifact_id));
     blockchain
         .dispatcher()
-        .deploy_artifact(artifact_id.clone(), ())
+        .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap();
     assert!(blockchain.dispatcher().is_artifact_deployed(&artifact_id));
 
     // Tests the register artifact action for the deployed artifact.
     let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .artifacts()
         .contains(&artifact_id.name));
     execute_transaction(
@@ -569,7 +563,7 @@ fn test_dispatcher_deploy_good() {
         TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(dispatcher::Schema::new(snapshot.as_ref())
+    assert!(DispatcherSchema::new(snapshot.as_ref())
         .artifacts()
         .contains(&artifact_id.name));
     assert_eq!(Entry::new(IDX_NAME, snapshot.as_ref()).get(), Some(1_u64));
@@ -589,10 +583,10 @@ fn test_dispatcher_already_deployed() {
     assert!(blockchain.dispatcher().is_artifact_deployed(&artifact_id));
     let err = blockchain
         .dispatcher()
-        .deploy_artifact(artifact_id.clone(), ())
+        .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap_err();
-    assert_eq!(err, dispatcher::Error::ArtifactAlreadyDeployed.into());
+    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.into());
     // Tests that we cannot register artifact twice.
     let result = execute_transaction(
         &mut blockchain,
@@ -600,7 +594,7 @@ fn test_dispatcher_already_deployed() {
     );
     assert_eq!(
         result.0,
-        Err(dispatcher::Error::ArtifactAlreadyDeployed.into())
+        Err(DispatcherError::ArtifactAlreadyDeployed.into())
     );
 }
 
@@ -615,7 +609,7 @@ fn test_dispatcher_register_unavailable() {
     let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id().into();
     blockchain
         .dispatcher()
-        .deploy_artifact(artifact_id.clone(), ())
+        .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap();
     // Tests ExecutionError during the register artifact execution.
@@ -624,7 +618,7 @@ fn test_dispatcher_register_unavailable() {
         TestDeploy { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .artifacts()
         .contains(&artifact_id.name));
     assert_eq!(
@@ -655,7 +649,7 @@ fn test_dispatcher_start_service_good() {
             .with_instance(TEST_SERVICE_ID, IDX_NAME, ())]);
     // Tests start service for the good service.
     let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-1".to_owned()));
     execute_transaction(
@@ -663,7 +657,7 @@ fn test_dispatcher_start_service_good() {
         TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(dispatcher::Schema::new(snapshot.as_ref())
+    assert!(DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-1".to_owned()));
     assert_eq!(Entry::new(IDX_NAME, snapshot.as_ref()).get(), Some(1_u64));
@@ -678,7 +672,7 @@ fn test_dispatcher_start_service_rollback() {
 
     // Tests that a service with an unregistered artifact will not be started.
     let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-24".to_owned()));
     execute_transaction(
@@ -686,7 +680,7 @@ fn test_dispatcher_start_service_rollback() {
         TestAdd { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-24".to_owned()));
     assert_eq!(
@@ -695,7 +689,7 @@ fn test_dispatcher_start_service_rollback() {
     );
 
     // Tests that a service with panic during the configure will not be started.
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-42".to_owned()));
     execute_transaction(
@@ -703,7 +697,7 @@ fn test_dispatcher_start_service_rollback() {
         TestAdd { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-42".to_owned()));
     assert_eq!(
@@ -712,7 +706,7 @@ fn test_dispatcher_start_service_rollback() {
     );
 
     // Tests that a service with execution error during the configure will not be started.
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-18".to_owned()));
     execute_transaction(
@@ -720,7 +714,7 @@ fn test_dispatcher_start_service_rollback() {
         TestAdd { value: 18 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!dispatcher::Schema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-18".to_owned()));
     assert_eq!(

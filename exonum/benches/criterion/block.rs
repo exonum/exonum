@@ -44,6 +44,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
+    runtime::Runtime,
 };
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
@@ -76,7 +77,7 @@ fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
     services: Vec<InstanceCollection>,
 ) -> Blockchain {
-    let external_runtimes: Vec<(u32, Arc<dyn exonum::runtime::Runtime>)> = vec![];
+    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
 
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
@@ -397,9 +398,8 @@ mod foreign_interface_call {
         merkledb::ObjectHash,
         messages::Verified,
         runtime::{
-            self, dispatcher,
             rust::{CallContext, Interface, Service, Transaction},
-            AnyTx, InstanceDescriptor, InstanceId, MethodId,
+            AnyTx, DispatcherError, InstanceDescriptor, InstanceId, MethodId,
         },
     };
     use exonum_merkledb::Snapshot;
@@ -451,10 +451,10 @@ mod foreign_interface_call {
                 0u32 => {
                     let bytes = payload.into();
                     let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(runtime::DispatcherError::malformed_arguments)?;
+                        .map_err(DispatcherError::malformed_arguments)?;
                     self.timestamp(ctx, arg)
                 }
-                _ => Err(dispatcher::Error::NoSuchMethod).map_err(From::from),
+                _ => Err(DispatcherError::NoSuchMethod).map_err(From::from),
             }
         }
     }

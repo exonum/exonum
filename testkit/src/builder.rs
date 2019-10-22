@@ -24,7 +24,7 @@ use exonum::{
     runtime::{rust::RustRuntime, Runtime},
 };
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{TestKit, TestNetwork};
 
@@ -115,7 +115,7 @@ pub struct TestKitBuilder {
     test_network: Option<TestNetwork>,
     logger: bool,
     rust_runtime: RustRuntime,
-    additional_runtimes: HashMap<u32, Arc<dyn Runtime>>,
+    additional_runtimes: HashMap<u32, Box<dyn Runtime>>,
     instances: Vec<InstanceConfig>,
 }
 
@@ -177,7 +177,7 @@ impl TestKitBuilder {
     /// # Panics
     ///
     /// - Panics if builder's instance already contains specified runtime.
-    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Arc<dyn Runtime>)>) -> Self {
+    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         let (id, runtime) = runtime.into();
         if id == RustRuntime::ID as u32 || self.additional_runtimes.contains_key(&id) {
             panic!("TestkitBuilder already contains runtime with id {}", id);

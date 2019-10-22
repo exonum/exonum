@@ -21,7 +21,7 @@ use crate::{
     blockchain::Schema,
     helpers::user_agent,
     proto::schema::PROTO_SOURCES as EXONUM_PROTO_SOURCES,
-    runtime::{dispatcher, ArtifactId, InstanceSpec},
+    runtime::{ArtifactId, DispatcherSchema, InstanceSpec},
 };
 
 /// Information about the current state of the node memory pool.
@@ -69,9 +69,13 @@ pub struct DispatcherInfo {
 impl DispatcherInfo {
     /// Loads dispatcher information from database.
     pub fn load(access: impl IndexAccess) -> Self {
-        let schema = dispatcher::Schema::new(access);
+        let schema = DispatcherSchema::new(access);
         Self {
-            artifacts: schema.artifacts().into_iter().map(From::from).collect(),
+            artifacts: schema
+                .artifacts()
+                .values()
+                .map(|spec| spec.artifact)
+                .collect(),
             services: schema.service_instances().values().collect(),
         }
     }

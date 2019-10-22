@@ -1,10 +1,10 @@
 use exonum_merkledb::{BinaryValue, Fork};
-use futures::Future;
 
 use super::super::{
-    dispatcher::Error as DispatcherError, error::catch_panic, ArtifactId, CallInfo, Caller,
-    ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec, MethodId,
-    SUPERVISOR_INSTANCE_ID,
+    dispatcher::{Dispatcher, Error as DispatcherError, Schema},
+    error::catch_panic,
+    ArtifactId, CallInfo, Caller, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
+    InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 use crate::{blockchain::Schema as CoreSchema, helpers::ValidatorId};
 
@@ -37,6 +37,11 @@ impl<'a> CallContext<'a> {
     /// Returns the initiator of the actual transaction execution.
     pub fn caller(&self) -> &Caller {
         &self.inner.caller
+    }
+
+    /// Accesses dispatcher information.
+    pub fn dispatcher(&self) -> Schema<&Fork> {
+        Schema::new(self.fork())
     }
 
     pub fn instance(&self) -> InstanceDescriptor {
@@ -117,11 +122,38 @@ impl<'a> CallContext<'a> {
         predicate(&self.inner.caller).map(|result| (result, &*self.inner.fork))
     }
 
+    /// Isolates execution of the provided closure.
+    ///
+    /// This method should be used with extreme care, since it subverts the usual rules
+    /// of transaction roll-back provided by Exonum. Namely:
+    ///
+    /// - If the execution of the closure is successful, all changes to the blockchain state
+    ///   preceding to the `isolate()` call are permanently committed. These changes **will not**
+    ///   be rolled back if the following transaction code exits with an error.
+    /// - If the execution of the closure errors, all changes to the blockchain state
+    ///   preceding to the `isolate()` call are rolled back right away. That is, they are not
+    ///   persisted even if the following transaction code executes successfully.
+    ///
+    /// For these reasons, it is strongly advised to propagate the `Result` returned by this method,
+    /// as a result of the transaction execution.
+    pub fn isolate(
+        &mut self,
+        f: impl FnOnce(CallContext) -> Result<(), ExecutionError>,
+    ) -> Result<(), ExecutionError> {
+        let result = catch_panic(|| f(self.reborrow()));
+        match result {
+            Ok(()) => self.inner.fork.flush(),
+            Err(_) => self.inner.fork.rollback(),
+        }
+        result
+    }
+
     #[doc(hidden)]
-    pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions> {
+    pub fn supervisor_extensions(&self) -> Option<SupervisorExtensions> {
         if self.instance().id == SUPERVISOR_INSTANCE_ID {
             Some(SupervisorExtensions {
-                inner: self.reborrow(),
+                dispatcher: self.inner.dispatcher,
+                fork: &*self.inner.fork,
             })
         } else {
             None
@@ -138,61 +170,31 @@ impl<'a> CallContext<'a> {
 
 #[derive(Debug)]
 pub struct SupervisorExtensions<'a> {
-    inner: CallContext<'a>,
+    dispatcher: &'a Dispatcher,
+    fork: &'a Fork,
 }
 
 impl<'a> SupervisorExtensions<'a> {
-    fn execution_context(&mut self) -> &mut ExecutionContext<'a> {
-        &mut self.inner.inner
-    }
-
-    pub fn start_deploy(
-        &mut self,
+    pub fn start_artifact_registration(
+        &self,
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        self.execution_context()
-            .dispatcher
-            .deploy_artifact(artifact, spec)
-            .wait()
+        Dispatcher::start_artifact_registration(self.fork, artifact, spec)
     }
 
-    pub fn register_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        let exec_context = self.execution_context();
-        exec_context
-            .dispatcher
-            .register_artifact(exec_context.fork, &artifact, spec)
-    }
-
-    pub fn add_service(
-        &mut self,
+    pub fn start_adding_service(
+        &self,
         artifact: ArtifactId,
         instance_name: String,
-        config: Vec<u8>,
+        constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
-        let ctx = self.execution_context();
         let instance_spec = InstanceSpec {
             artifact,
             name: instance_name,
-            id: ctx.dispatcher.assign_instance_id(ctx.fork),
+            id: self.dispatcher.assign_instance_id(self.fork),
         };
-        ctx.dispatcher
-            .add_service(ctx.fork, instance_spec.clone(), config)
-    }
-
-    pub fn isolate(
-        &mut self,
-        f: impl FnOnce(CallContext) -> Result<(), ExecutionError>,
-    ) -> Result<(), ExecutionError> {
-        let result = catch_panic(|| f(self.inner.reborrow()));
-        match result {
-            Ok(()) => self.inner.inner.fork.flush(),
-            Err(_) => self.inner.inner.fork.rollback(),
-        }
-        result
+        self.dispatcher
+            .start_adding_service(self.fork, instance_spec, constructor)
     }
 }

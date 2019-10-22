@@ -18,8 +18,8 @@ use exonum::{
     exonum_merkledb::{Fork, Snapshot},
     node::ApiSender,
     runtime::{
-        dispatcher::Dispatcher, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext,
-        ExecutionError, InstanceId, InstanceSpec, Runtime, StateHashAggregator,
+        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, Mailbox, Runtime, StateHashAggregator,
     },
 };
 use exonum_testkit::TestKitBuilder;
@@ -101,7 +101,7 @@ impl TestRuntime {
 
 impl Runtime for TestRuntime {
     fn deploy_artifact(
-        &self,
+        &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
@@ -117,11 +117,11 @@ impl Runtime for TestRuntime {
         Some(ArtifactProtobufSpec::default())
     }
 
-    fn restart_service(&self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn add_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn add_service(
+    fn start_adding_service(
         &self,
         _fork: &Fork,
         _spec: &InstanceSpec,
@@ -153,8 +153,8 @@ impl Runtime for TestRuntime {
     }
 
     fn after_commit(
-        &self,
-        _dispatcher: &mut Dispatcher,
+        &mut self,
+        _mailbox: &mut Mailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -162,9 +162,9 @@ impl Runtime for TestRuntime {
     }
 }
 
-impl From<TestRuntime> for (u32, Arc<dyn Runtime>) {
+impl From<TestRuntime> for (u32, Box<dyn Runtime>) {
     fn from(inner: TestRuntime) -> Self {
-        (TestRuntime::ID, Arc::new(inner))
+        (TestRuntime::ID, Box::new(inner))
     }
 }
 

@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::gen_keypair;
 use exonum_derive::exonum_service;
+use futures::sync::mpsc;
 
 use crate::{
     crypto::Hash,
     merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB},
+    node::ApiSender,
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, CallInfo, Caller, DispatcherError,
@@ -127,6 +130,9 @@ impl Service for TestServiceImpl {
 #[test]
 fn test_basic_rust_runtime() {
     let db = TemporaryDB::new();
+    let service_keypair = gen_keypair();
+    let tx_sender = ApiSender(mpsc::channel(0).0);
+
     // Create a runtime and a service.
     let mut runtime = RustRuntime::new();
     let service_factory = Box::new(TestServiceImpl);
@@ -139,7 +145,7 @@ fn test_basic_rust_runtime() {
     // Deploy service.
     let fork = db.fork();
     dispatcher
-        .deploy_and_register_artifact(&fork, &artifact, Vec::default())
+        .deploy_and_register_artifact(&fork, artifact.clone(), Vec::default())
         .unwrap();
     db.merge(fork.into_patch()).unwrap();
 
@@ -153,12 +159,15 @@ fn test_basic_rust_runtime() {
         msg: "constructor_message".to_owned(),
     };
     let fork = db.fork();
-    dispatcher.add_service(&fork, spec, constructor).unwrap();
+    dispatcher
+        .start_adding_service(&fork, spec, constructor)
+        .unwrap();
 
     {
         let entry = Entry::new("constructor_entry", &fork);
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
+    dispatcher.after_commit(&fork, &service_keypair, &tx_sender);
     db.merge(fork.into_patch()).unwrap();
 
     // Execute transaction method A.

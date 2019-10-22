@@ -58,7 +58,7 @@ fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
     assert!(response.is_err());
 }
 
-fn does_artifact_exist(api: &TestKitApi, name: &str) -> bool {
+fn artifact_exists(api: &TestKitApi, name: &str) -> bool {
     let artifacts = &api.exonum_api().services().artifacts;
     artifacts.iter().any(|a| a.name == name)
 }
@@ -168,7 +168,7 @@ fn deploy_default(testkit: &mut TestKit) {
     let artifact = artifact_default();
     let api = testkit.api();
 
-    assert!(!does_artifact_exist(&api, &artifact.name));
+    assert!(!artifact_exists(&api, &artifact.name));
 
     let request = deploy_request(artifact.clone(), testkit.height().next());
     let deploy_confirmation_hash = deploy_confirmation_hash_default(testkit, &request);
@@ -186,7 +186,7 @@ fn deploy_default(testkit: &mut TestKit) {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
     let api = testkit.api(); // update the API
-    assert!(does_artifact_exist(&api, &artifact.name));
+    assert!(artifact_exists(&api, &artifact.name));
 }
 
 fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
@@ -306,7 +306,7 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     let hash = deploy_artifact(&api, request);
     testkit.create_block();
 
-    assert!(!does_artifact_exist(&api, &artifact.name));
+    assert!(!artifact_exists(&api, &artifact.name));
 
     // No confirmation was generated
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
@@ -391,14 +391,13 @@ fn test_bad_artifact_name() {
     let api = testkit.api(); // update the API
 
     // .. and no artifact was deployed.
-    assert!(!does_artifact_exist(&api, &bad_artifact.name));
+    assert!(!artifact_exists(&api, &bad_artifact.name));
 }
 
 #[test]
 fn test_bad_runtime_id() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
-
     let bad_runtime_id = 10_000;
 
     let artifact = ArtifactId {
@@ -408,21 +407,17 @@ fn test_bad_runtime_id() {
     let request = deploy_request(artifact.clone(), testkit.height().next());
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);
-
     testkit.create_block();
 
     // The deploy request transaction was executed...
     api.exonum_api().assert_tx_success(hash);
-
     // ... but no confirmation was generated ...
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
     testkit.create_block();
-
     let api = testkit.api(); // update the API
-
-    // .. and no artifact was deployed.
-    assert!(!does_artifact_exist(&api, &artifact.name));
+                             // .. and no artifact was deployed.
+    assert!(!artifact_exists(&api, &artifact.name));
 }
 
 #[test]
@@ -527,7 +522,7 @@ fn test_restart_node_and_start_service_instance() {
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
-    assert!(does_artifact_exist(&api, &artifact_default().name));
+    assert!(artifact_exists(&api, &artifact_default().name));
 
     let instance_name = "test_basics";
     let (key_pub, key_priv) = crypto::gen_keypair();
@@ -574,7 +569,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let artifact = artifact_default();
     let api = testkit.api();
 
-    assert!(!does_artifact_exist(&api, &artifact.name));
+    assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next().next());
 
@@ -613,7 +608,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
 
     let api = testkit.api(); // update the API
-    assert!(does_artifact_exist(&api, &artifact.name));
+    assert!(artifact_exists(&api, &artifact.name));
 }
 
 /// This test emulates a normal workflow with two validators.
@@ -624,7 +619,7 @@ fn test_multiple_validators() {
     let artifact = artifact_default();
     let api = testkit.api();
 
-    assert!(!does_artifact_exist(&api, &artifact.name));
+    assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
@@ -656,7 +651,7 @@ fn test_multiple_validators() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
 
     let api = testkit.api(); // update the API
-    assert!(does_artifact_exist(&api, &artifact.name));
+    assert!(artifact_exists(&api, &artifact.name));
 
     let instance_name = "inc";
 
@@ -710,7 +705,7 @@ fn test_multiple_validators_no_confirmation() {
     let artifact = artifact_default();
     let api = testkit.api();
 
-    assert!(!does_artifact_exist(&api, &artifact.name));
+    assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
@@ -733,7 +728,7 @@ fn test_multiple_validators_no_confirmation() {
     testkit.create_block();
 
     // .. and no artifact was deployed.
-    assert!(!does_artifact_exist(&testkit.api(), &artifact.name));
+    assert!(!artifact_exists(&testkit.api(), &artifact.name));
 }
 
 // Test that auditor can't send any requests.
@@ -744,7 +739,7 @@ fn test_auditor_cant_send_requests() {
     let artifact = artifact_default();
     let api = testkit.api();
 
-    assert!(!does_artifact_exist(&api, &artifact.name));
+    assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
 
@@ -788,7 +783,7 @@ fn test_auditor_normal_workflow() {
     let artifact = artifact_default();
     let api = testkit.api();
 
-    assert!(!does_artifact_exist(&api, &artifact.name));
+    assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
     let deploy_confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
@@ -813,7 +808,7 @@ fn test_auditor_normal_workflow() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation.object_hash()));
 
     // The artifact is deployed.
-    assert!(does_artifact_exist(&testkit.api(), &artifact.name));
+    assert!(artifact_exists(&testkit.api(), &artifact.name));
 
     let instance_name = "inc";
 

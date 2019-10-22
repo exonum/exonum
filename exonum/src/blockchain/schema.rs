@@ -327,8 +327,6 @@ where
 pub enum IndexOwner {
     /// This index is part of core schema.
     Core,
-    /// This index is part of dispatcher schema.
-    Dispatcher,
     /// This index is a part of runtime schema.
     Runtime(u32),
     /// This index is a part of some service schema.
@@ -345,7 +343,6 @@ impl IndexOwner {
     fn tag(self) -> IndexTag {
         match self {
             IndexOwner::Core => IndexTag::Core,
-            IndexOwner::Dispatcher => IndexTag::Dispatcher,
             IndexOwner::Runtime { .. } => IndexTag::Runtime,
             IndexOwner::Service { .. } => IndexTag::Service,
         }
@@ -356,7 +353,7 @@ impl IndexOwner {
         match self {
             IndexOwner::Service(instance_id) => instance_id,
             IndexOwner::Runtime(runtime_id) => runtime_id,
-            IndexOwner::Core | IndexOwner::Dispatcher => 0,
+            IndexOwner::Core => 0,
         }
     }
 }
@@ -366,7 +363,6 @@ impl IndexOwner {
 #[repr(u16)]
 enum IndexTag {
     Core = 0,
-    Dispatcher = 1,
     Runtime = 2,
     Service = 3,
 }
@@ -401,7 +397,6 @@ impl IndexCoordinates {
     pub fn owner(self) -> IndexOwner {
         match self.tag {
             0 => IndexOwner::Core,
-            1 => IndexOwner::Dispatcher,
             2 => IndexOwner::Runtime(self.group_id),
             3 => IndexOwner::Service(self.group_id),
             other => panic!("Unknown index owner: {}!", other),
@@ -445,8 +440,6 @@ impl ObjectHash for IndexCoordinates {
 #[test]
 fn test_index_coordinates_binary_key_round_trip() {
     let index_owners = vec![
-        (IndexOwner::Dispatcher, 0),
-        (IndexOwner::Dispatcher, 1),
         (IndexOwner::Runtime(0), 0),
         (IndexOwner::Runtime(0), 5),
         (IndexOwner::Runtime(1), 0),

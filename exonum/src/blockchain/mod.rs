@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, error::catch_panic, Runtime},
+    runtime::{error::catch_panic, Dispatcher, Runtime},
 };
 
 mod block;
@@ -82,7 +82,7 @@ impl Blockchain {
     // TODO Write proper doc string. [ECR-3275]
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Arc<dyn Runtime>)>>,
+        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
         services: impl IntoIterator<Item = InstanceCollection>,
         genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
@@ -162,26 +162,39 @@ impl Blockchain {
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
-    fn create_genesis_block(&mut self, config: ConsensusConfig) -> Result<(), failure::Error> {
+    fn create_genesis_block(
+        &mut self,
+        config: ConsensusConfig,
+        initial_services: Vec<InstanceConfig>,
+    ) -> Result<(), failure::Error> {
         config.validate()?;
+        let fork = self.fork();
+        Schema::new(&fork).consensus_config_entry().set(config);
 
-        let patch = {
-            let fork = self.fork();
-            Schema::new(&fork).consensus_config_entry().set(config);
+        // Add service instances.
+        {
+            let mut dispatcher = self.dispatcher();
+            for instance_config in initial_services {
+                dispatcher.add_builtin_service(
+                    &fork,
+                    instance_config.instance_spec,
+                    instance_config.artifact_spec.unwrap_or_default(),
+                    instance_config.constructor,
+                )?;
+            }
+            dispatcher.after_commit(&fork, &self.service_keypair, &self.api_sender);
+        }
+        self.merge(fork.into_patch())?;
 
-            self.merge(fork.into_patch())?;
-            self.create_patch(
-                ValidatorId::zero(),
-                Height::zero(),
-                &[],
-                &mut BTreeMap::new(),
-            )
-            .1
-        };
+        let (_, patch) = self.create_patch(
+            ValidatorId::zero(),
+            Height::zero(),
+            &[],
+            &mut BTreeMap::new(),
+        );
         self.merge(patch)?;
 
         info!("GENESIS_BLOCK ====== hash={}", self.last_hash().to_hex());
-
         Ok(())
     }
 
@@ -374,15 +387,15 @@ impl Blockchain {
                     }
                 }
             }
+
+            let mut dispatcher = self.dispatcher();
+            dispatcher.after_commit(&fork, &self.service_keypair, &self.api_sender);
             fork.into_patch()
         };
         self.merge(patch)?;
-
-        // Invoke `after_commit` for each service in order of their identifiers
-        let mut dispatcher = self.dispatcher();
-        dispatcher.after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
-
-        let api_changes = dispatcher.notify_api_changes(&ApiContext::with_blockchain(self));
+        let api_changes = self
+            .dispatcher()
+            .notify_api_changes(&ApiContext::with_blockchain(self));
 
         // Send `RestartApi` request if the dispatcher state has been modified.
         if api_changes {

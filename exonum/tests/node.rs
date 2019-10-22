@@ -111,7 +111,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
 
-        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![
             InstanceCollection::new(CommitWatcherService(Mutex::new(Some(commit_tx))))
                 .with_instance(2, "commit-watcher", ()),
@@ -161,7 +161,7 @@ fn test_node_run() {
 #[test]
 fn test_node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, db, start_times| {
-        let external_runtimes: Vec<(u32, Arc<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![
             InstanceCollection::new(StartCheckerServiceFactory(start_times)).with_instance(
                 4,

@@ -24,10 +24,9 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        dispatcher::{self, Dispatcher, Error as DispatcherError},
-        rust::Transaction,
-        AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceId, InstanceSpec, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::Transaction, AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, DeployStatus,
+        DispatcherError, DispatcherSchema, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, Mailbox, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -121,7 +120,7 @@ impl Inner {
 
 impl Runtime for SampleRuntime {
     fn deploy_artifact(
-        &self,
+        &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
@@ -137,14 +136,14 @@ impl Runtime for SampleRuntime {
     }
 
     /// Starts an existing `SampleService` instance with the specified ID.
-    fn restart_service(&self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         let instance = self.inner.write().unwrap().start_service(spec)?;
         println!("Starting service {}: {:?}", spec, instance);
         Ok(())
     }
 
     /// Starts a new service instance and sets the counter value for this.
-    fn add_service(
+    fn start_adding_service(
         &self,
         _fork: &Fork,
         spec: &InstanceSpec,
@@ -234,8 +233,8 @@ impl Runtime for SampleRuntime {
     }
 
     fn after_commit(
-        &self,
-        _dispatcher: &mut Dispatcher,
+        &mut self,
+        _dispatcher: &mut Mailbox,
         _snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
@@ -243,9 +242,9 @@ impl Runtime for SampleRuntime {
     }
 }
 
-impl From<SampleRuntime> for (u32, Arc<dyn Runtime>) {
+impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
     fn from(inner: SampleRuntime) -> Self {
-        (SampleRuntime::ID, Arc::new(inner))
+        (SampleRuntime::ID, Box::new(inner))
     }
 }
 
@@ -358,11 +357,11 @@ fn main() {
 
         // Get an instance identifier.
         let snapshot = blockchain.snapshot();
-        let instance_id = dispatcher::Schema::new(snapshot.as_ref())
-            .service_instances()
-            .get(&instance_name)
-            .unwrap()
-            .id;
+        let (spec, status) = DispatcherSchema::new(snapshot.as_ref())
+            .get_instance(instance_name.as_str())
+            .unwrap();
+        assert_eq!(status, DeployStatus::Active);
+        let instance_id = spec.id;
         // Send an update counter transaction.
         api_sender
             .broadcast_transaction(Verified::from_value(

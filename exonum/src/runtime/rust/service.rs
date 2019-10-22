@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-use futures::Future;
 
 use std::fmt::{self, Debug};
 
@@ -24,8 +23,10 @@ use crate::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        api::ServiceApiBuilder, dispatcher::Dispatcher, AnyTx, ArtifactId, ArtifactProtobufSpec,
-        CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
+        api::ServiceApiBuilder,
+        dispatcher::{Action, Mailbox},
+        AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionError, InstanceDescriptor,
+        InstanceId, MethodId,
     },
 };
 
@@ -167,7 +168,8 @@ pub struct AfterCommitContext<'a> {
     pub snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
-    dispatcher: &'a mut Dispatcher,
+    /// Reference to the dispatcher mailbox.
+    mailbox: &'a mut Mailbox,
     /// Channel to send signed transactions to the transactions pool.
     tx_sender: &'a ApiSender,
 }
@@ -175,14 +177,14 @@ pub struct AfterCommitContext<'a> {
 impl<'a> AfterCommitContext<'a> {
     /// Creates a new `AfterCommit` context.
     pub(crate) fn new(
-        dispatcher: &'a mut Dispatcher,
+        mailbox: &'a mut Mailbox,
         instance: InstanceDescriptor<'a>,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            dispatcher,
+            mailbox,
             instance,
             snapshot,
             service_keypair,
@@ -236,23 +238,24 @@ impl<'a> AfterCommitContext<'a> {
             return None;
         }
         Some(SupervisorExtensions {
-            dispatcher: &mut *self.dispatcher,
+            mailbox: &mut *self.mailbox,
         })
     }
 }
 
 #[derive(Debug)]
 pub struct SupervisorExtensions<'a> {
-    dispatcher: &'a mut Dispatcher,
+    mailbox: &'a mut Mailbox,
 }
 
 impl SupervisorExtensions<'_> {
-    pub fn start_deploy(
-        &mut self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        self.dispatcher.deploy_artifact(artifact, spec).wait()
+    /// Starts the deployment of an artifact.
+    pub fn start_deploy(&mut self, artifact: ArtifactId, spec: impl BinaryValue) {
+        let action = Action::StartDeploy {
+            artifact,
+            spec: spec.into_bytes(),
+        };
+        self.mailbox.push(action);
     }
 }
 

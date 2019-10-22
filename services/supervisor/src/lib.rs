@@ -60,13 +60,12 @@ mod transactions;
 ///
 /// These restrictions are the result of `Fork` not having multi-layered checkpoints.
 fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
-    let mut extensions = context.supervisor_extensions().unwrap();
     // An error while configuring one of the service instances should not affect others.
     changes.into_iter().for_each(|change| match change {
         ConfigChange::Consensus(config) => {
             log::trace!("Updating consensus configuration {:?}", config);
 
-            let result = extensions.isolate(|context| {
+            let result = context.isolate(|context| {
                 blockchain::Schema::new(context.fork())
                     .consensus_config_entry()
                     .set(config);
@@ -81,7 +80,7 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
                 config.instance_id
             );
 
-            let configure_result = extensions.isolate(|mut context| {
+            let configure_result = context.isolate(|mut context| {
                 context
                     .interface::<ConfigureCall>(config.instance_id)?
                     .apply_config(config.params.clone())
@@ -157,7 +156,6 @@ impl Service for Supervisor {
     fn after_commit(&self, mut context: AfterCommitContext) {
         let schema = Schema::new(context.instance.name, context.snapshot);
         let pending_deployments = schema.pending_deployments();
-
         let tx_sender = context.transaction_broadcaster();
         let keypair = context.service_keypair.clone();
         let instance_id = context.instance.id;
@@ -174,13 +172,9 @@ impl Service for Supervisor {
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
-
             let mut extensions = context.supervisor_extensions().unwrap();
-            if extensions.start_deploy(artifact, spec).is_err() {
-                // FIXME: what should be the appropriate reaction here?
-                log::error!("Cannot deploy service");
-                continue;
-            }
+            // FIXME: use IDs to track execution status of background tasks.
+            extensions.start_deploy(artifact, spec);
 
             if is_validator {
                 log::trace!(

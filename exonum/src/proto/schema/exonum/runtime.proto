@@ -38,6 +38,11 @@ message ArtifactId {
   string name = 2;
 }
 
+message ArtifactSpec {
+  ArtifactId artifact = 1;
+  bytes payload = 2;
+}
+
 message InstanceSpec {
   uint32 id = 1;
   string name = 2;

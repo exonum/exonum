@@ -15,9 +15,7 @@
 use exonum::{
     blockchain,
     helpers::ValidateInput,
-    runtime::{
-        dispatcher, rust::CallContext, Caller, DispatcherError, ExecutionError, InstanceSpec,
-    },
+    runtime::{rust::CallContext, Caller, DispatcherError, ExecutionError, InstanceSpec},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
@@ -274,9 +272,10 @@ impl SupervisorInterface for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that the artifact is not deployed yet.
-        if dispatcher::Schema::new(context.fork())
-            .artifacts()
-            .contains(&deploy.artifact.name)
+        if context
+            .dispatcher()
+            .get_artifact(&deploy.artifact.name)
+            .is_some()
         {
             return Err(Error::AlreadyDeployed.into());
         }
@@ -284,7 +283,6 @@ impl SupervisorInterface for Supervisor {
         let confirmations = deploy_requests.confirm(&deploy, author);
         if confirmations == deploy_requests.validators_amount() {
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
-
             let artifact = deploy.artifact.clone();
             schema.pending_deployments().put(&artifact, deploy);
         }
@@ -293,7 +291,7 @@ impl SupervisorInterface for Supervisor {
 
     fn confirm_artifact_deploy(
         &self,
-        mut context: CallContext,
+        context: CallContext,
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
@@ -335,8 +333,8 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher,
             // if this action fails this transaction will be canceled.
-            let mut extensions = context.supervisor_extensions().unwrap();
-            extensions.register_artifact(confirmation.artifact, confirmation.spec)?;
+            let extensions = context.supervisor_extensions().unwrap();
+            extensions.start_artifact_registration(confirmation.artifact, confirmation.spec)?;
         }
 
         Ok(())
@@ -344,12 +342,11 @@ impl SupervisorInterface for Supervisor {
 
     fn start_service(
         &self,
-        mut context: CallContext,
+        context: CallContext,
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;
         let blockchain_schema = blockchain::Schema::new(context.fork());
-        let dispatcher_schema = dispatcher::Schema::new(context.fork());
 
         // Verifies that we doesn't reach deadline height.
         if service.deadline_height < blockchain_schema.height() {
@@ -368,9 +365,10 @@ impl SupervisorInterface for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that the instance name does not exist.
-        if dispatcher_schema
-            .service_instances()
-            .contains(&service.name)
+        if context
+            .dispatcher()
+            .get_instance(service.name.as_str())
+            .is_some()
         {
             return Err(Error::InstanceExists.into());
         }
@@ -384,8 +382,8 @@ impl SupervisorInterface for Supervisor {
             );
             // We have enough confirmations to add a new service instance;
             // if this action fails this transaction will be canceled.
-            let mut extensions = context.supervisor_extensions().unwrap();
-            extensions.add_service(service.artifact, service.name, service.config)?;
+            let extensions = context.supervisor_extensions().unwrap();
+            extensions.start_adding_service(service.artifact, service.name, service.config)?;
         }
 
         Ok(())

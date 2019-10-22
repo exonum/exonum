@@ -91,16 +91,19 @@
 //! [artifacts]: struct.ArtifactId.html
 //! [`Configure`]: rust/interfaces/trait.Configure.html
 
+pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
-    dispatcher::Error as DispatcherError,
+    dispatcher::{Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{ErrorKind, ExecutionError},
-    types::{AnyTx, ArtifactId, CallInfo, InstanceId, InstanceSpec, MethodId},
+    types::{
+        AnyTx, ArtifactId, ArtifactSpec, CallInfo, DeployStatus, InstanceId, InstanceQuery,
+        InstanceSpec, MethodId,
+    },
 };
 
 #[macro_use]
 pub mod rust;
 pub mod api;
-pub mod dispatcher;
 pub mod error;
 
 use futures::Future;
@@ -115,8 +118,9 @@ use crate::{
     node::ApiSender,
 };
 
-use self::{api::ServiceApiBuilder, dispatcher::Dispatcher};
+use self::api::ServiceApiBuilder;
 
+mod dispatcher;
 mod types;
 
 /// Persistent identifier of supervisor service instance.
@@ -169,7 +173,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// # Hints
 ///
 /// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics according to panic policy.
-pub trait Runtime: Send + Sync + Debug + 'static {
+pub trait Runtime: Send + Debug + 'static {
     /// Request to deploy artifact with the given identifier and additional deploy specification.
     ///
     /// # Policy on Panics
@@ -177,7 +181,7 @@ pub trait Runtime: Send + Sync + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     fn deploy_artifact(
-        &self,
+        &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
@@ -193,31 +197,29 @@ pub trait Runtime: Send + Sync + Debug + 'static {
     /// * Ensure that the deployed artifact has the following information, even if it is empty.
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec>;
 
-    /// Restart previously added service instance with the given specification.
+    /// Runs the constructor of a new service instance with the given specification
+    /// and initial configuration.
+    ///
+    /// The service is not guaranteed to be added to the runtime, so the runtime may freely
+    /// discard the instantiated service instance after completing this method. Instead,
+    /// the service is added to the runtime permanently via `add_service()`.
     ///
     /// # Policy on Panics
     ///
     /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
-    /// * If panic occurs, the runtime must ensure that it is in a consistent state.
-    fn restart_service(&self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
-
-    /// Add a new service instance with the given specification and initial configuration.
-    ///
-    /// The configuration parameters passed to the method are discarded immediately.
-    /// So the service instance should save them by itself if it is important for
-    /// the service business logic.
-    ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
-    fn add_service(
+    fn start_adding_service(
         &self,
         fork: &Fork,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
+
+    /// Permanently adds a service to the runtime.
+    ///
+    /// `start_adding_service()` is guaranteed to be called with the same `spec` and `parameters`
+    /// earlier.
+    fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
     /// Dispatch payload to the method of a specific service instance.
     /// Service instance name and method ID are provided in the `call_info` argument and
@@ -233,7 +235,6 @@ pub trait Runtime: Send + Sync + Debug + 'static {
     /// # Policy on Panics
     ///
     /// Do not process. Panic will be processed by the method caller.
-    ///
     fn execute(
         &self,
         context: ExecutionContext,
@@ -270,8 +271,8 @@ pub trait Runtime: Send + Sync + Debug + 'static {
     /// * Catch each kind of panics except for `FatalError` and write
     /// them into the log.
     fn after_commit(
-        &self,
-        dispatcher: &mut Dispatcher,
+        &mut self,
+        mailbox: &mut Mailbox,
         snapshot: &dyn Snapshot,
         service_keypair: &(PublicKey, SecretKey),
         tx_sender: &ApiSender,
@@ -304,6 +305,12 @@ pub trait Runtime: Send + Sync + Debug + 'static {
     /// Since this method is a part of shutdown process, runtimes can perform blocking and
     /// heavy operations here if needed.
     fn shutdown(&self) {}
+}
+
+impl<T: Runtime> From<T> for Box<dyn Runtime> {
+    fn from(value: T) -> Self {
+        Box::new(value)
+    }
 }
 
 /// Artifact Protobuf file sources.
@@ -428,8 +435,8 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field can only contains a core interfaces like `Configure` and
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
-    /// Reference to the communication channel.
-    pub dispatcher: &'a mut Dispatcher,
+    /// Reference to the dispatcher.
+    dispatcher: &'a Dispatcher,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -438,7 +445,7 @@ impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
-    pub(crate) fn new(dispatcher: &'a mut Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
         Self {
             dispatcher,
             fork,
@@ -450,7 +457,7 @@ impl<'a> ExecutionContext<'a> {
 
     pub(crate) fn child_context(&mut self, caller_service_id: InstanceId) -> ExecutionContext {
         ExecutionContext {
-            dispatcher: &mut *self.dispatcher,
+            dispatcher: self.dispatcher,
             fork: self.fork,
             caller: Caller::Service {
                 instance_id: caller_service_id,
@@ -475,12 +482,15 @@ impl<'a> ExecutionContext<'a> {
             return Err((kind, msg).into());
         }
 
-        let runtime = self.dispatcher.runtime_for_service(call_info.instance_id)?;
+        let runtime = self
+            .dispatcher
+            .runtime_for_service(call_info.instance_id)
+            .ok_or(DispatcherError::IncorrectRuntime)?;
         let reborrowed = ExecutionContext {
             fork: &mut *self.fork,
             caller: self.caller,
             interface_name,
-            dispatcher: &mut *self.dispatcher,
+            dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
         };
         runtime.execute(reborrowed, call_info, arguments)
@@ -491,7 +501,7 @@ impl<'a> ExecutionContext<'a> {
             fork: &mut *self.fork,
             caller: self.caller,
             interface_name: self.interface_name,
-            dispatcher: &mut *self.dispatcher,
+            dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
         }
     }
