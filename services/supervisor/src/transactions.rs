@@ -142,7 +142,10 @@ impl SupervisorInterface for Supervisor {
         }
 
         // Verifies that there are no pending config changes assigned to the same height.
-        if schema.pending_proposals().contains(&config_propose.actual_from) {
+        if schema
+            .pending_proposals()
+            .contains(&config_propose.actual_from)
+        {
             return Err(Error::ConfigProposeExists.into());
         }
 

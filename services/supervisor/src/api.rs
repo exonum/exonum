@@ -85,7 +85,8 @@ impl PrivateApi for ApiImpl<'_> {
         } else {
             Err(failure::format_err!(
                 "Config proposal with the same height has already been registered"
-            ).into())
+            )
+            .into())
         }
     }
 
