@@ -331,10 +331,9 @@ impl SupervisorInterface for Supervisor {
 
             // Removes artifact from pending deployments.
             schema.pending_deployments().remove(&confirmation.artifact);
-            // We have enough confirmations to register the deployed artifact in the dispatcher,
-            // if this action fails this transaction will be canceled.
-            let extensions = context.supervisor_extensions().unwrap();
-            extensions.start_artifact_registration(confirmation.artifact, confirmation.spec)?;
+            // We have enough confirmations to register the deployed artifact in the dispatcher;
+            // if this action fails, this transaction will be canceled.
+            context.start_artifact_registration(confirmation.artifact, confirmation.spec)?;
         }
 
         Ok(())
@@ -342,7 +341,7 @@ impl SupervisorInterface for Supervisor {
 
     fn start_service(
         &self,
-        context: CallContext,
+        mut context: CallContext,
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;
@@ -382,8 +381,7 @@ impl SupervisorInterface for Supervisor {
             );
             // We have enough confirmations to add a new service instance;
             // if this action fails this transaction will be canceled.
-            let extensions = context.supervisor_extensions().unwrap();
-            extensions.start_adding_service(service.artifact, service.name, service.config)?;
+            context.start_adding_service(service.artifact, service.name, service.config)?;
         }
 
         Ok(())

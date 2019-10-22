@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Snapshot};
 use futures::IntoFuture;
 
 use std::fmt::{self, Debug};
@@ -59,12 +59,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// The parameters passed to the method are not saved by the framework
     /// automatically, hence the user must do it manually, if needed.
-    fn initialize(
-        &self,
-        _instance: InstanceDescriptor,
-        _fork: &Fork,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
+    fn initialize(&self, _context: CallContext, _params: Vec<u8>) -> Result<(), ExecutionError> {
         Ok(())
     }
 

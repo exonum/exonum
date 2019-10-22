@@ -15,13 +15,13 @@
 use exonum::{
     blockchain::InstanceConfig,
     crypto::{PublicKey, SecretKey},
-    exonum_merkledb::{Fork, Snapshot},
     node::ApiSender,
     runtime::{
         ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceId,
         InstanceSpec, Mailbox, Runtime, StateHashAggregator,
     },
 };
+use exonum_merkledb::Snapshot;
 use exonum_testkit::TestKitBuilder;
 use futures::{Future, IntoFuture};
 use std::{sync::Arc, sync::RwLock};
@@ -123,7 +123,7 @@ impl Runtime for TestRuntime {
 
     fn start_adding_service(
         &self,
-        _fork: &Fork,
+        _context: ExecutionContext,
         _spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {

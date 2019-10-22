@@ -109,7 +109,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Adds information about a pending service instance to the schema.
-    pub(super) fn add_pending_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
+    pub(crate) fn add_pending_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
         let artifact_id = self
             .artifacts()
             .get(&spec.artifact.name)

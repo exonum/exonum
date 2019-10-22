@@ -128,7 +128,7 @@ impl Runtime for SampleRuntime {
     /// Starts a new service instance and sets the counter value for this.
     fn start_adding_service(
         &self,
-        _fork: &Fork,
+        _context: ExecutionContext,
         spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {

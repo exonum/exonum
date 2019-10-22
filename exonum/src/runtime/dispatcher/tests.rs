@@ -23,7 +23,7 @@ use std::sync::{
 
 use crate::{
     crypto::{self, PublicKey, SecretKey},
-    merkledb::{Fork, Snapshot},
+    merkledb::Snapshot,
     node::ApiSender,
     runtime::{
         dispatcher::{Dispatcher, Mailbox},
@@ -133,7 +133,7 @@ impl Runtime for SampleRuntime {
 
     fn start_adding_service(
         &self,
-        _fork: &Fork,
+        _context: ExecutionContext,
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -142,9 +142,9 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _: ExecutionContext,
+        _context: ExecutionContext,
         call_info: &CallInfo,
-        _: &[u8],
+        _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
         if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
             Ok(())
@@ -260,8 +260,9 @@ fn test_dispatcher_simple() {
         id: RUST_SERVICE_ID,
         name: RUST_SERVICE_NAME.into(),
     };
-    dispatcher
-        .start_adding_service(&fork, rust_service, vec![])
+    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit);
+    context
+        .start_adding_service(rust_service, vec![])
         .expect("`start_adding_service` failed for rust");
 
     let java_service = InstanceSpec {
@@ -269,8 +270,8 @@ fn test_dispatcher_simple() {
         id: JAVA_SERVICE_ID,
         name: JAVA_SERVICE_NAME.into(),
     };
-    dispatcher
-        .start_adding_service(&fork, java_service, vec![])
+    context
+        .start_adding_service(java_service, vec![])
         .expect("`start_adding_service` failed for java");
 
     // Since services are not active yet, transactions to them should fail.
@@ -290,8 +291,10 @@ fn test_dispatcher_simple() {
         id: RUST_SERVICE_ID,
         name: "inconspicuous-name".to_owned(),
     };
-    let err = dispatcher
-        .start_adding_service(&fork, conflicting_rust_service, vec![])
+
+    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit);
+    let err = context
+        .start_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
     assert_eq!(err, DispatcherError::ServiceIdExists.into());
 
@@ -300,8 +303,8 @@ fn test_dispatcher_simple() {
         id: RUST_SERVICE_ID + 1,
         name: RUST_SERVICE_NAME.to_owned(),
     };
-    let err = dispatcher
-        .start_adding_service(&fork, conflicting_rust_service, vec![])
+    let err = context
+        .start_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
     assert_eq!(err, DispatcherError::ServiceNameExists.into());
 
@@ -406,15 +409,15 @@ fn test_dispatcher_rust_runtime_no_service() {
         RustRuntimeError::UnableToDeploy.into()
     );
 
-    let fork = db.fork();
+    let mut fork = db.fork();
     let rust_service = InstanceSpec {
         artifact: rust_artifact.clone(),
         id: RUST_SERVICE_ID,
         name: RUST_SERVICE_NAME.into(),
     };
     assert_eq!(
-        dispatcher
-            .start_adding_service(&fork, rust_service, vec![])
+        ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit)
+            .start_adding_service(rust_service, vec![])
             .expect_err("start service succeed"),
         DispatcherError::ArtifactNotDeployed.into()
     );
@@ -447,12 +450,6 @@ impl ShutdownRuntime {
     }
 }
 
-impl From<ShutdownRuntime> for Arc<dyn Runtime> {
-    fn from(value: ShutdownRuntime) -> Self {
-        Arc::new(value)
-    }
-}
-
 impl Runtime for ShutdownRuntime {
     fn deploy_artifact(
         &mut self,
@@ -468,7 +465,7 @@ impl Runtime for ShutdownRuntime {
 
     fn start_adding_service(
         &self,
-        _fork: &Fork,
+        _context: ExecutionContext,
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -479,7 +476,12 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn execute(&self, _: ExecutionContext, _: &CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
+    fn execute(
+        &self,
+        _context: ExecutionContext,
+        _call_info: &CallInfo,
+        _parameters: &[u8],
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 

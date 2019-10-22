@@ -24,8 +24,8 @@ use crate::{
     crypto::{self, Hash},
     helpers::{generate_testnet_config, Height, ValidatorId},
     merkledb::{
-        BinaryValue, Database, Entry, Error as StorageError, Fork, IndexAccess, ListIndex,
-        ObjectHash, Snapshot, TemporaryDB,
+        BinaryValue, Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash,
+        Snapshot, TemporaryDB,
     },
     messages::Verified,
     node::ApiSender,
@@ -84,12 +84,7 @@ trait TestDispatcherInterface {
 struct TestDispatcherService;
 
 impl Service for TestDispatcherService {
-    fn initialize(
-        &self,
-        _instance: InstanceDescriptor,
-        _fork: &Fork,
-        params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
+    fn initialize(&self, _context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
         if !params.is_empty() {
             let v = TestExecute::from_bytes(params.into()).unwrap();
             if v.value == 42 {
@@ -121,10 +116,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         } else {
             ServiceGoodImpl.artifact_id().into()
         };
-        context
-            .supervisor_extensions()
-            .unwrap()
-            .start_artifact_registration(artifact, vec![])?;
+        context.start_artifact_registration(artifact, vec![])?;
         if arg.value == 42 {
             return Err(DispatcherError::UnknownArtifactId.into());
         }
@@ -132,7 +124,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         Ok(())
     }
 
-    fn test_add(&self, context: CallContext, arg: TestAdd) -> Result<(), ExecutionError> {
+    fn test_add(&self, mut context: CallContext, arg: TestAdd) -> Result<(), ExecutionError> {
         let mut index = Entry::new(context.instance().name, context.fork());
         index.set(arg.value);
         drop(index);
@@ -149,12 +141,7 @@ impl TestDispatcherInterface for TestDispatcherService {
             TestDispatcherService.artifact_id().into()
         };
 
-        context
-            .supervisor_extensions()
-            .unwrap()
-            .start_adding_service(artifact, format!("good-service-{}", arg.value), config)?;
-
-        Ok(())
+        context.start_adding_service(artifact, format!("good-service-{}", arg.value), config)
     }
 
     fn test_execute(&self, context: CallContext, arg: TestExecute) -> Result<(), ExecutionError> {

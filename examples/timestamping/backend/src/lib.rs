@@ -38,10 +38,11 @@ pub mod transactions;
 use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
-    merkledb::{BinaryValue, Fork, Snapshot},
+    merkledb::{BinaryValue, Snapshot},
     runtime::{
-        api::ServiceApiBuilder, rust::Service, DispatcherError, DispatcherSchema,
-        InstanceDescriptor,
+        api::ServiceApiBuilder,
+        rust::{CallContext, Service},
+        DispatcherError, InstanceDescriptor,
     },
 };
 
@@ -65,23 +66,21 @@ impl Service for TimestampingService {
         schema.state_hash()
     }
 
-    fn initialize(
-        &self,
-        instance: InstanceDescriptor,
-        fork: &Fork,
-        params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
+    fn initialize(&self, context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
         let config =
             Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
-        if DispatcherSchema::new(fork)
+        if context
+            .dispatcher()
             .get_instance(&*config.time_service_name)
             .is_none()
         {
             return Err(Error::TimeServiceNotFound.into());
         }
 
-        Schema::new(instance.name, fork).config().set(config);
+        Schema::new(context.instance().name, context.fork())
+            .config()
+            .set(config);
         Ok(())
     }
 }

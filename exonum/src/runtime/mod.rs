@@ -110,11 +110,12 @@ use futures::Future;
 
 use std::fmt::Debug;
 
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
 use crate::{
     api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
+    helpers::ValidateInput,
     node::ApiSender,
 };
 
@@ -146,7 +147,7 @@ impl From<RuntimeIdentifier> for u32 {
     }
 }
 
-/// This trait describes runtime environment for the Exonum services.
+/// Runtime environment for Exonum services.
 ///
 /// You can read more about the life cycle of services and transactions
 /// [above](index.html#service-life-cycle).
@@ -200,9 +201,9 @@ pub trait Runtime: Send + Debug + 'static {
     /// Runs the constructor of a new service instance with the given specification
     /// and initial configuration.
     ///
-    /// The service is not guaranteed to be added to the runtime, so the runtime may freely
-    /// discard the instantiated service instance after completing this method. Instead,
-    /// the service is added to the runtime permanently via `add_service()`.
+    /// The service is not guaranteed to be added to the runtime at this point, so the runtime
+    /// may freely discard the instantiated service instance after completing this method. To
+    /// add the service to the runtime permanently, `add_service()` is called.
     ///
     /// # Policy on Panics
     ///
@@ -210,15 +211,22 @@ pub trait Runtime: Send + Debug + 'static {
     /// them into `ExecutionError`.
     fn start_adding_service(
         &self,
-        fork: &Fork,
+        context: ExecutionContext,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
     /// Permanently adds a service to the runtime.
     ///
-    /// `start_adding_service()` is guaranteed to be called with the same `spec` and `parameters`
-    /// earlier.
+    /// It is guaranteed that `start_adding_service()` was called with the same `spec` earlier
+    /// and returned `Ok(())`. Note that this previous call may have happened indefinite time ago;
+    /// indeed, the method is called for all services on the node startup.
+    ///
+    /// # Policy on Panics
+    ///
+    /// Any error returned from this method should be considered to be fatal. There are edge
+    /// cases where the returned error does not lead to a panic, but as a rule of thumb, a
+    /// `Runtime` should not return an error here unless it wants the node to stop forever.
     fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
 
     /// Dispatch payload to the method of a specific service instance.
@@ -249,15 +257,11 @@ pub trait Runtime: Send + Debug + 'static {
     ///
     /// # Guarantees
     ///
-    /// - Calls are ordered by increasing `instance_id`.
     /// - Each `before_commit` call is isolated with a separate checkpoint. A call that returns
     ///   an error will be rolled back.
-    ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and write
-    /// them into the log.
-    /// * If panic occurs, the runtime rolls back the changes in the fork.
+    /// - Calls are globally ordered by increasing `instance_id`. This should be considered
+    ///   an implementation detail, though; the "public" invariant is that the ordering of calls
+    ///   is guaranteed to be the same for all nodes.
     fn before_commit(
         &self,
         context: ExecutionContext,
@@ -494,6 +498,29 @@ impl<'a> ExecutionContext<'a> {
             call_stack_depth: self.call_stack_depth,
         };
         runtime.execute(reborrowed, call_info, arguments)
+    }
+
+    /// Starts adding a new service instance to the blockchain. The created service is not active
+    /// (i.e., does not process transactions or the `before_commit` hook)
+    /// until the block built on top of the provided `fork` is committed.
+    ///
+    /// This method should be called for the exact context passed to the runtime.
+    pub(crate) fn start_adding_service(
+        &mut self,
+        spec: InstanceSpec,
+        constructor: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
+        let runtime = self
+            .dispatcher
+            .runtime_by_id(spec.artifact.runtime_id)
+            .ok_or(DispatcherError::IncorrectRuntime)?;
+        runtime.start_adding_service(self.reborrow(), &spec, constructor.into_bytes())?;
+
+        // Add service instance to the dispatcher schema.
+        DispatcherSchema::new(&*self.fork)
+            .add_pending_service(spec)
+            .map_err(From::from)
     }
 
     fn reborrow(&mut self) -> ExecutionContext {

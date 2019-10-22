@@ -4,7 +4,7 @@ use super::super::{
     dispatcher::{Dispatcher, Error as DispatcherError, Schema},
     error::catch_panic,
     ArtifactId, CallInfo, Caller, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
-    InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+    InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 use crate::{blockchain::Schema as CoreSchema, helpers::ValidatorId};
 
@@ -16,16 +16,16 @@ pub struct CallContext<'a> {
     /// Underlying execution context.
     inner: ExecutionContext<'a>,
     /// ID of the executing service.
-    instance_id: InstanceId,
+    instance: InstanceDescriptor<'a>,
 }
 
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
-    pub(crate) fn new(context: ExecutionContext<'a>, instance_id: InstanceId) -> Self {
+    pub(crate) fn new(context: ExecutionContext<'a>, instance: InstanceDescriptor<'a>) -> Self {
         Self {
             inner: context,
-            instance_id,
+            instance,
         }
     }
 
@@ -45,16 +45,7 @@ impl<'a> CallContext<'a> {
     }
 
     pub fn instance(&self) -> InstanceDescriptor {
-        InstanceDescriptor {
-            id: self.instance_id,
-            // Safety of `unwrap()` is guaranteed by construction of `CallContext` instances:
-            // we check that `instance_id` exists before creating the instance.
-            name: self
-                .inner
-                .dispatcher
-                .service_name(self.instance_id)
-                .unwrap(),
-        }
+        self.instance
     }
 
     /// Returns the validator ID if the transaction author is a validator.
@@ -75,7 +66,7 @@ impl<'a> CallContext<'a> {
         arguments: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         let call_info = CallInfo {
-            instance_id: self.instance_id,
+            instance_id: self.instance.id,
             method_id,
         };
         self.inner.call(
@@ -97,14 +88,18 @@ impl<'a> CallContext<'a> {
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
     #[doc(hidden)]
-    pub fn call_context(&mut self, called_id: InstanceId) -> Result<CallContext, ExecutionError> {
-        self.inner
+    pub fn call_context<'s>(
+        &'s mut self,
+        called_id: impl Into<InstanceQuery<'s>>,
+    ) -> Result<CallContext, ExecutionError> {
+        let descriptor = self
+            .inner
             .dispatcher
-            .service_name(called_id)
+            .get_service(self.fork(), called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         Ok(CallContext {
-            inner: self.inner.child_context(self.instance_id),
-            instance_id: called_id,
+            inner: self.inner.child_context(self.instance.id),
+            instance: descriptor,
         })
     }
 
@@ -148,53 +143,53 @@ impl<'a> CallContext<'a> {
         result
     }
 
-    #[doc(hidden)]
-    pub fn supervisor_extensions(&self) -> Option<SupervisorExtensions> {
-        if self.instance().id == SUPERVISOR_INSTANCE_ID {
-            Some(SupervisorExtensions {
-                dispatcher: self.inner.dispatcher,
-                fork: &*self.inner.fork,
-            })
-        } else {
-            None
-        }
-    }
-
     fn reborrow(&mut self) -> CallContext {
         CallContext {
             inner: self.inner.reborrow(),
-            instance_id: self.instance_id,
+            instance: self.instance,
         }
     }
-}
 
-#[derive(Debug)]
-pub struct SupervisorExtensions<'a> {
-    dispatcher: &'a Dispatcher,
-    fork: &'a Fork,
-}
-
-impl<'a> SupervisorExtensions<'a> {
+    /// Marks an artifact as *registered*, i.e., one which service instances can be deployed from.
+    ///
+    /// This method can only be called by the supervisor; the call will panic otherwise.
+    #[doc(hidden)]
     pub fn start_artifact_registration(
         &self,
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        Dispatcher::start_artifact_registration(self.fork, artifact, spec)
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`start_artifact_registration` called within a non-supervisor service");
+        }
+
+        Dispatcher::start_artifact_registration(self.fork(), artifact, spec)
     }
 
+    /// Starts adding a service instance to the blockchain.
+    ///
+    /// The service is not immediately activated; it activates if / when the block containing
+    /// the activation transaction is committed.
+    ///
+    /// This method can only be called by the supervisor; the call will panic otherwise.
+    #[doc(hidden)]
     pub fn start_adding_service(
-        &self,
+        &mut self,
         artifact: ArtifactId,
         instance_name: String,
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`start_artifact_registration` called within a non-supervisor service");
+        }
+
         let instance_spec = InstanceSpec {
             artifact,
             name: instance_name,
-            id: self.dispatcher.assign_instance_id(self.fork),
+            id: Dispatcher::assign_instance_id(self.fork()),
         };
-        self.dispatcher
-            .start_adding_service(self.fork, instance_spec, constructor)
+        self.inner
+            .child_context(self.instance.id)
+            .start_adding_service(instance_spec, constructor)
     }
 }

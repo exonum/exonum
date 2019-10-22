@@ -168,7 +168,7 @@ impl Blockchain {
         initial_services: Vec<InstanceConfig>,
     ) -> Result<(), failure::Error> {
         config.validate()?;
-        let fork = self.fork();
+        let mut fork = self.fork();
         Schema::new(&fork).consensus_config_entry().set(config);
 
         // Add service instances.
@@ -176,7 +176,7 @@ impl Blockchain {
             let mut dispatcher = self.dispatcher();
             for instance_config in initial_services {
                 dispatcher.add_builtin_service(
-                    &fork,
+                    &mut fork,
                     instance_config.instance_spec,
                     instance_config.artifact_spec.unwrap_or_default(),
                     instance_config.constructor,

@@ -18,12 +18,12 @@ use futures::sync::mpsc;
 
 use crate::{
     crypto::Hash,
-    merkledb::{BinaryValue, Database, Entry, Fork, Snapshot, TemporaryDB},
+    merkledb::{BinaryValue, Database, Entry, Snapshot, TemporaryDB},
     node::ApiSender,
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         dispatcher::Dispatcher, error::ExecutionError, CallInfo, Caller, DispatcherError,
-        InstanceDescriptor, InstanceId, InstanceSpec,
+        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -109,15 +109,9 @@ impl TestService for TestServiceImpl {
 }
 
 impl Service for TestServiceImpl {
-    fn initialize(
-        &self,
-        _instance: InstanceDescriptor,
-        fork: &Fork,
-        params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
+    fn initialize(&self, context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-
-        let mut entry = Entry::new("constructor_entry", fork);
+        let mut entry = Entry::new("constructor_entry", context.fork());
         entry.set(init.msg);
         Ok(())
     }
@@ -158,9 +152,9 @@ fn test_basic_rust_runtime() {
     let constructor = Init {
         msg: "constructor_message".to_owned(),
     };
-    let fork = db.fork();
-    dispatcher
-        .start_adding_service(&fork, spec, constructor)
+    let mut fork = db.fork();
+    ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit)
+        .start_adding_service(spec, constructor)
         .unwrap();
 
     {

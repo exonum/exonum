@@ -36,6 +36,7 @@ use super::{
     api::ApiContext, error::ExecutionError, ApiChange, ArtifactId, ArtifactProtobufSpec,
     ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
+use crate::runtime::{InstanceDescriptor, InstanceQuery};
 
 mod error;
 mod schema;
@@ -103,7 +104,7 @@ impl Dispatcher {
     /// [`MAX_BUILTIN_INSTANCE_ID`]: constant.MAX_BUILTIN_INSTANCE_ID.html
     pub(crate) fn add_builtin_service(
         &mut self,
-        fork: &Fork,
+        fork: &mut Fork,
         spec: InstanceSpec,
         artifact_spec: impl BinaryValue,
         constructor: Vec<u8>,
@@ -121,7 +122,8 @@ impl Dispatcher {
         }
 
         // Start the built-in service instance.
-        self.start_adding_service(fork, spec, constructor)?;
+        ExecutionContext::new(self, fork, Caller::BeforeCommit)
+            .start_adding_service(spec, constructor)?;
         Ok(())
     }
 
@@ -225,34 +227,6 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Starts adding a new service instance to the blockchain. The service is not active
-    /// (i.e., does not process transactions or the `before_commit` hook)
-    /// until the block built on top of the provided `fork` is committed.
-    pub(crate) fn start_adding_service(
-        &self,
-        fork: &Fork,
-        spec: InstanceSpec,
-        constructor: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
-
-        // Check that service doesn't use existing identifiers.
-        if self.service_infos.contains_key(&spec.id) {
-            return Err(Error::ServiceIdExists.into());
-        }
-        // Try to add the service instance.
-        let runtime = self
-            .runtimes
-            .get(&spec.artifact.runtime_id)
-            .ok_or(Error::IncorrectRuntime)?;
-        runtime.start_adding_service(fork, &spec, constructor.into_bytes())?;
-
-        // Add service instance to the dispatcher schema.
-        Schema::new(fork)
-            .add_pending_service(spec)
-            .map_err(From::from)
-    }
-
     // TODO documentation [ECR-3275]
     pub(crate) fn execute(
         &self,
@@ -270,6 +244,11 @@ impl Dispatcher {
             .ok_or(Error::IncorrectRuntime)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, &tx.as_ref().arguments)
+    }
+
+    /// Looks up a runtime by its identifier.
+    pub(crate) fn runtime_by_id(&self, id: u32) -> Option<&dyn Runtime> {
+        self.runtimes.get(&id).map(AsRef::as_ref)
     }
 
     /// Looks up the runtime for the specified service instance. Returns a reference to
@@ -364,11 +343,24 @@ impl Dispatcher {
         }
     }
 
-    /// Returns the name corresponding to the specified `instance_id`.
-    pub(crate) fn service_name(&self, instance_id: InstanceId) -> Option<&str> {
-        self.service_infos
-            .get(&instance_id)
-            .map(|info| info.name.as_str())
+    /// Returns the service by a query.
+    pub(crate) fn get_service<'s>(
+        &'s self,
+        fork: &Fork,
+        id: impl Into<InstanceQuery<'s>>,
+    ) -> Option<InstanceDescriptor<'s>> {
+        match id.into() {
+            InstanceQuery::Id(id) => {
+                let name = self.service_infos.get(&id)?.name.as_str();
+                Some(InstanceDescriptor { id, name })
+            }
+
+            InstanceQuery::Name(name) => {
+                // TODO: This may be slow.
+                let id = Schema::new(fork).service_instances().get(name)?.id;
+                Some(InstanceDescriptor { id, name })
+            }
+        }
     }
 
     /// Notify the runtime about API changes and return true if there are such changes.
@@ -423,7 +415,7 @@ impl Dispatcher {
     }
 
     /// Assigns an instance identifier to the new service instance.
-    pub(crate) fn assign_instance_id(&self, fork: &Fork) -> InstanceId {
+    pub(crate) fn assign_instance_id(fork: &Fork) -> InstanceId {
         Schema::new(fork).assign_instance_id()
     }
 }

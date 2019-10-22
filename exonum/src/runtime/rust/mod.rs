@@ -15,7 +15,7 @@
 //! Built-in Rust runtime module.
 
 pub use self::{
-    call_context::{CallContext, SupervisorExtensions},
+    call_context::CallContext,
     error::Error,
     service::{
         AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
@@ -24,7 +24,7 @@ pub use self::{
 
 pub mod error;
 
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::Snapshot;
 use futures::{future, Future, IntoFuture};
 use semver::Version;
 
@@ -146,7 +146,7 @@ impl RustRuntime {
         Ok(())
     }
 
-    fn start_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
+    fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
         let artifact = Self::parse_artifact(&spec.artifact)?;
         if !self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactNotDeployed.into());
@@ -255,18 +255,19 @@ impl Runtime for RustRuntime {
 
     fn start_adding_service(
         &self,
-        fork: &Fork,
+        context: ExecutionContext,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.start_service(spec)?;
+        let instance = self.new_service(spec)?;
         let service = instance.as_ref();
         let descriptor = instance.descriptor();
-        catch_panic(|| service.initialize(descriptor, fork, parameters))
+        let context = CallContext::new(context, descriptor);
+        catch_panic(|| service.initialize(context, parameters))
     }
 
     fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        let instance = self.start_service(spec)?;
+        let instance = self.new_service(spec)?;
         self.add_started_service(instance);
         Ok(())
     }
@@ -282,10 +283,11 @@ impl Runtime for RustRuntime {
             .get(&call_info.instance_id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
+        let descriptor = instance.descriptor();
         instance.as_ref().call(
             context.interface_name,
             call_info.method_id,
-            CallContext::new(context, instance.id),
+            CallContext::new(context, descriptor),
             payload,
         )
     }
@@ -314,8 +316,9 @@ impl Runtime for RustRuntime {
             .get(&instance_id)
             .expect("`before_commit` called with non-existing `instance_id`");
 
+        let descriptor = instance.descriptor();
         let result = catch_panic(|| {
-            let context = CallContext::new(context, instance.id);
+            let context = CallContext::new(context, descriptor);
             instance.as_ref().before_commit(context);
             Ok(())
         });
