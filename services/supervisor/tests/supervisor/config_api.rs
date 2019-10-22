@@ -164,7 +164,7 @@ fn test_send_two_proposals_with_api() {
 
     let first_proposal = consensus_config_propose_first_variant(&testkit);
     let first_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(first_proposal.clone())
+        .extend_consensus_config_propose(first_proposal)
         .config_propose();
 
     // Create first proposal through testkit tx mechanism
@@ -180,7 +180,7 @@ fn test_send_two_proposals_with_api() {
 
     let second_proposal = consensus_config_propose_second_variant(&testkit);
     let second_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(second_proposal.clone())
+        .extend_consensus_config_propose(second_proposal)
         .config_propose();
     // Try to create second proposal with api
     let error = testkit
@@ -203,7 +203,7 @@ fn test_pending_proposals_api() {
 
     let first_proposal = consensus_config_propose_first_variant(&testkit);
     let first_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(first_proposal.clone())
+        .extend_consensus_config_propose(first_proposal)
         .config_propose();
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
@@ -217,7 +217,7 @@ fn test_pending_proposals_api() {
 
     let second_proposal = consensus_config_propose_second_variant(&testkit);
     let second_config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT.next())
-        .extend_consensus_config_propose(second_proposal.clone())
+        .extend_consensus_config_propose(second_proposal)
         .config_propose();
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(

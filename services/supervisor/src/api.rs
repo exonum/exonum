@@ -48,7 +48,7 @@ pub trait PublicApi {
     type Error: Fail;
     /// Returns an actual consensus configuration of the blockchain.
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
-    /// Returns pending proposals config change.
+    /// Returns pending config change proposals.
     fn config_proposals(&self) -> Result<Vec<(Hash, ConfigPropose)>, Self::Error>;
 }
 
@@ -77,10 +77,10 @@ impl PrivateApi for ApiImpl<'_> {
     }
 
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
-        // Discard proposes whose `actual from` heights are same with already registered proposes
+        // Discard proposes whose `actual from` heights are the same with already registered proposes
         let schema = Schema::new(self.0.instance.name, self.0.snapshot());
         let proposals_by_height = schema.pending_proposals().get(&proposal.actual_from);
-        if let None = proposals_by_height {
+        if proposals_by_height.is_none() {
             self.broadcast_transaction(proposal).map_err(From::from)
         } else {
             Err(Self::Error::from(failure::format_err!(

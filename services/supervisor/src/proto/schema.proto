@@ -20,7 +20,7 @@ import "types.proto";
 import "service.proto";
 
 message ConfigProposalInfo {
-    exonum.PublicKey author = 1;
-    exonum.Hash propose_hash = 2;
+    exonum.crypto.PublicKey author = 1;
+    exonum.crypto.Hash propose_hash = 2;
     ConfigPropose config_propose = 3;
 }

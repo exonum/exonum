@@ -81,8 +81,8 @@ impl Service for Supervisor {
             trace!("Removed outdated deployment request {:?}", request);
         }
 
-        let entry = schema.pending_proposals().get(&height.next());
-        if let Some(proposal_info) = entry {
+        let proposal_info = schema.pending_proposals().get(&height.next());
+        if let Some(proposal_info) = proposal_info {
             let config_confirms = schema.config_confirms();
             let confirmations = config_confirms.confirmations(&proposal_info.propose_hash);
             let validators = config_confirms.validators_amount();

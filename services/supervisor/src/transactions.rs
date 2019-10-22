@@ -141,19 +141,19 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::ActualFromIsPast.into());
         }
 
-        // Verifies that there are no pending config changes assigned to same height.
+        // Verifies that there are no pending config changes assigned to the same height.
         if schema.pending_proposals().contains(&propose.actual_from) {
             return Err(Error::ConfigProposeExists.into());
         }
 
-        // Verify that the author doesn't has proposal in pending list
+        // Verify that the author doesn't has the proposal in pending list
         if schema
             .pending_proposals()
             .values()
             .find(|proposal_info| proposal_info.author == author)
             .is_some()
         {
-            return Err(Error::DiscardingSecondProposal.into());
+            return Err(Error::ValidatorAlreadyProposed.into());
         }
 
         // To prevent multiple consensus change proposition in one request
@@ -193,16 +193,14 @@ impl SupervisorInterface for Supervisor {
 
         let propose_hash = propose.object_hash();
         config_confirms.confirm(&propose_hash, author);
-
+        let actual_from = propose.actual_from;
         let config_info = ConfigProposalInfo {
             author,
             config_propose: propose.clone(),
             propose_hash,
         };
 
-        schema
-            .pending_proposals()
-            .put(&propose.actual_from, config_info);
+        schema.pending_proposals().put(&actual_from, config_info);
 
         Ok(())
     }
@@ -230,7 +228,7 @@ impl SupervisorInterface for Supervisor {
             .pending_proposals()
             .values()
             .find(|proposal| proposal.propose_hash == vote.propose_hash)
-            .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
+            .ok_or(Error::ConfigProposeNotRegistered)?;
         // Verifies that we didn't reach the deadline height.
         if proposal.config_propose.actual_from <= blockchain_height {
             return Err(Error::DeadlineExceeded.into());

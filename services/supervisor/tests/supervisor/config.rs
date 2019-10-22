@@ -700,7 +700,7 @@ fn test_apply_config_on_actual_from_height() {
     let params = "I am a new parameter".to_owned();
 
     let proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_service_config_propose(params.clone())
+        .extend_service_config_propose(params)
         .config_propose();
 
     let signed_proposal = sign_config_propose_transaction(&testkit, proposal, initiator_id);
@@ -781,7 +781,7 @@ fn test_two_config_from_author() {
 
     let block = testkit.create_block_with_transaction(signed_proposal);
     let status = block.transactions[0].status();
-    assert_eq!(status, Err(&Error::DiscardingSecondProposal.into()));
+    assert_eq!(status, Err(&Error::ValidatorAlreadyProposed.into()));
 
     assert_eq!(count_of_pending_config_proposals(&testkit), 1);
     assert_eq!(config_proposals(&testkit), vec![first_proposal]);

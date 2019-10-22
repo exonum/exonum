@@ -19,5 +19,5 @@ pub use self::service::*;
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::proto::schema::*;
+use exonum::proto::schema::runtime;
 use exonum_crypto::proto::*;

@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryKey, BinaryValue, ObjectHash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{borrow::Cow, fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
+use std::{borrow::Cow, fmt, mem, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
 use zeroize::Zeroize;
 
 use crate::crypto::Hash;
@@ -350,16 +350,16 @@ impl FromStr for Height {
 
 impl BinaryKey for Height {
     fn size(&self) -> usize {
-        8
+        mem::size_of_val(&self.0)
     }
 
     fn write(&self, buffer: &mut [u8]) -> usize {
-        self.0.write(&mut buffer[0..8]);
+        self.0.write(&mut buffer[0..self.size()]);
         self.size()
     }
 
     fn read(buffer: &[u8]) -> Self {
-        Self(u64::read(&buffer[0..8]))
+        Self(u64::read(&buffer))
     }
 }
 
