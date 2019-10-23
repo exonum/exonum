@@ -297,8 +297,12 @@ pub trait Runtime: Send + Debug + 'static {
 
     /// Notify the runtime that it has to shutdown.
     ///
-    /// This callback is invoked before the node shutdown, so runtimes can stop themselves
-    /// gracefully.
+    /// This callback is invoked sequentially for each runtime just before the node shutdown,
+    /// so runtimes can stop themselves gracefully.
+    ///
+    /// Invoking of this callback is guaranteed to be the last operation for the runtime.
+    /// Since this method is a part of shutdown process, runtimes can perform blocking and
+    /// heavy operations here if needed.
     fn shutdown(&self) {}
 }
 

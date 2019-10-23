@@ -19,7 +19,7 @@ use std::fmt::{self, Debug};
 use crate::{
     blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId},
+    helpers::Height,
     messages::Verified,
     node::ApiSender,
     runtime::{
@@ -191,16 +191,6 @@ impl<'a, 'b> TransactionContext<'a, 'b> {
         &self.inner.caller
     }
 
-    /// Returns the validator ID if the transaction author is a validator.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        // TODO Perhaps we should optimize this method [ECR-3222]
-        self.caller().author().and_then(|author| {
-            CoreSchema::new(self.fork())
-                .consensus_config()
-                .find_validator(|validator_keys| author == validator_keys.service_key)
-        })
-    }
-
     /// Enqueue dispatcher action.
     pub fn dispatch_action(&self, action: dispatcher::Action) {
         self.inner
@@ -329,14 +319,6 @@ impl<'a> AfterCommitContext<'a> {
             service_keypair,
             tx_sender,
         }
-    }
-
-    /// Returns the validator ID if the current node is a validator.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        // TODO Perhaps we should optimize this method [ECR-3222]
-        CoreSchema::new(self.snapshot)
-            .consensus_config()
-            .find_validator(|validator_keys| self.service_keypair.0 == validator_keys.service_key)
     }
 
     /// Returns a current blockchain height. This height is "height of the latest committed block".
