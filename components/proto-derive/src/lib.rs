@@ -51,7 +51,7 @@ use syn::{Attribute, NestedMeta};
 /// ```
 ///
 /// Corresponding proto file:
-/// ```text
+/// ```proto
 /// message Wallet {
 ///     // Public key of the wallet owner.
 ///     exonum.crypto.PublicKey pub_key = 1;
@@ -62,6 +62,8 @@ use syn::{Attribute, NestedMeta};
 ///
 /// This macro can also be applied to enums. In proto files enums are represented
 /// by `oneof` field. You can specify `oneof` field name, default is "message".
+/// Corresponding proto file must contain only this oneof field. Possible enum
+/// variants are zero-field and one-field variants.
 /// ```ignore
 /// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ProtobufConvert)]
 /// #[protobuf_convert(source = "schema::runtime::ConfigChange", oneof_field = "message")]
@@ -74,7 +76,7 @@ use syn::{Attribute, NestedMeta};
 /// ```
 ///
 /// Corresponding proto file:
-/// ```test
+/// ```proto
 /// message ConfigChange {
 ///     oneof message {
 ///         // New consensus config.
