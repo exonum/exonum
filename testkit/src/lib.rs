@@ -16,106 +16,87 @@
 //! and in the same process as the testkit.
 //!
 //! # Example
-//! ```ignore [ECR-3275]
-//! extern crate exonum;
-//! #[macro_use]
-//! extern crate exonum_derive;
-//! #[macro_use]
-//! extern crate exonum_testkit;
-//! extern crate serde_json;
-//! #[macro_use] extern crate serde_derive;
-//! extern crate failure;
-//!
-//! use serde_json::Value;
-//! use std::borrow::Cow;
-//!
-//! use exonum::api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery};
-//! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionContext,
-//! TransactionSet, ExecutionResult};
-//! use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey, CryptoHash};
-//! use exonum::explorer::TransactionInfo;
-//! use exonum::helpers::Height;
-//! use exonum::messages::{Signed, AnyTx, Message};
-//! use exonum_merkledb::{Snapshot, Fork};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! ```
+//! use exonum::{
+//!     runtime::{InstanceDescriptor, rust::{Transaction, TransactionContext, Service}},
+//!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
+//!     crypto::{gen_keypair, Hash},
+//!     explorer::TransactionInfo,
+//!     helpers::Height,
+//!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
+//! };
+//! use serde_derive::{Serialize, Deserialize};
+//! use exonum_derive::{exonum_service, ServiceFactory, ProtobufConvert};
+//! use exonum_merkledb::{ObjectHash, Snapshot};
+//! use exonum_testkit::{txvec, ApiKind, TestKitBuilder};
 //!
 //! // Simple service implementation.
 //!
-//! const SERVICE_ID: u16 = 1;
+//! const SERVICE_ID: u32 = 1;
 //!
 //! #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
 //! #[exonum(pb = "exonum_testkit::proto::examples::TxTimestamp")]
-//! struct TxTimestamp {
+//! pub struct TxTimestamp {
 //!     message: String,
 //! }
 //!
-//! #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-//! enum TimestampingTransactions {
-//!     TxTimestamp(TxTimestamp),
-//! }
-//!
-//! impl TxTimestamp {
-//!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Verified<AnyTx> {
-//!        let tx = TxTimestamp{ message: msg.to_owned() };
-//!        Message::sign_transaction(tx, SERVICE_ID, *author, key)
-//!    }
-//! }
-//!
+//! #[derive(Clone, Default, Debug, ServiceFactory)]
+//! #[exonum(
+//!     artifact_name = "timestamping",
+//!     artifact_version = "1.0.0",
+//!     proto_sources = "exonum_testkit::proto",
+//!     implements("TimestampingInterface")
+//! )]
 //! struct TimestampingService;
 //!
-//! impl Transaction for TxTimestamp {
-//!     fn execute(&self, _context: TransactionContext) -> ExecutionResult {
+//! impl Service for TimestampingService {
+//!     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
+//! }
+//!
+//! #[exonum_service]
+//! pub trait TimestampingInterface {
+//!     fn timestamp(&self, _: TransactionContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
+//! }
+//!
+//! impl TimestampingInterface for TimestampingService {
+//!     fn timestamp(&self, _: TransactionContext, arg: TxTimestamp) -> Result<(), ExecutionError> {
 //!         Ok(())
 //!     }
 //! }
 //!
-//! impl Service for TimestampingService {
-//!     fn service_name(&self) -> &str {
-//!         "timestamping"
-//!     }
-//!
-//!     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-//!         Vec::new()
-//!     }
-//!
-//!     fn service_id(&self) -> u16 {
-//!         SERVICE_ID
-//!     }
-//!
-//!     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
-//!         let tx = TimestampingTransactions::tx_from_raw(raw)?;
-//!         Ok(tx.into())
-//!     }
-//! }
-//!
 //! fn main() {
-//!     // Create testkit for network with four validators.
+//!     // Create testkit for network with four validators
+//!     // and add a builtin timestamping service with ID=1.
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
-//!         .with_rust_service(TimestampingService)
+//!         .with_rust_service(
+//!             InstanceCollection::new(TimestampingService)
+//!                 .with_instance(SERVICE_ID, "timestamping", ())
+//!         )
 //!         .create();
 //!
 //!     // Create few transactions.
-//!     let keypair = gen_keypair();
-//!     let tx1 = TxTimestamp::sign(&keypair.0, "Down To Earth", &keypair.1);
-//!     let tx2 = TxTimestamp::sign(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
-//!     let tx3 = TxTimestamp::sign(&keypair.0, "Dropping Like Flies", &keypair.1);
+//!     let keys = gen_keypair();
+//!     let id = SERVICE_ID;
+//!     let tx1 = TxTimestamp { message: "Down To Earth".into() }.sign(id, keys.0, &keys.1);
+//!     let tx2 = TxTimestamp { message: "Cry Over Spilt Milk".into() }.sign(id, keys.0, &keys.1);
+//!     let tx3 = TxTimestamp { message: "Dropping Like Flies".into() }.sign(id, keys.0, &keys.1);
 //!     // Commit them into blockchain.
 //!     testkit.create_block_with_transactions(txvec![
 //!         tx1.clone(), tx2.clone(), tx3.clone()
 //!     ]);
 //!
 //!     // Add a single transaction.
-//!     let tx4 = TxTimestamp::sign(&keypair.0, "Barking up the wrong tree", &keypair.1);
+//!     let tx4 = TxTimestamp { message: "Barking up the wrong tree".into() }.sign(id, keys.0, &keys.1);
 //!     testkit.create_block_with_transaction(tx4.clone());
 //!
 //!     // Check results with schema.
 //!     let snapshot = testkit.snapshot();
 //!     let schema = Schema::new(&snapshot);
-//!     assert!(schema.transactions().contains(&tx1.hash()));
-//!     assert!(schema.transactions().contains(&tx2.hash()));
-//!     assert!(schema.transactions().contains(&tx3.hash()));
-//!     assert!(schema.transactions().contains(&tx4.hash()));
+//!     assert!(schema.transactions().contains(&tx1.object_hash()));
+//!     assert!(schema.transactions().contains(&tx2.object_hash()));
+//!     assert!(schema.transactions().contains(&tx3.object_hash()));
+//!     assert!(schema.transactions().contains(&tx4.object_hash()));
 //!
 //!     // Check results with api.
 //!     let api = testkit.api();
@@ -133,7 +114,7 @@
 //!     assert_eq!(range.end, Height(3));
 //!
 //!     let info = explorer_api
-//!         .query(&TransactionQuery::new(tx1.hash()))
+//!         .query(&TransactionQuery::new(tx1.object_hash()))
 //!         .get::<TransactionInfo>("v1/transactions")
 //!         .unwrap();
 //! }
@@ -333,57 +314,47 @@ impl TestKit {
     /// Rollbacks are useful in testing alternative scenarios (e.g., transactions executed
     /// in different order and/or in different blocks) that require an expensive setup:
     ///
-    /// ```ignore [ECR-3275]
-    /// # extern crate exonum;
-    /// # #[macro_use] extern crate exonum_derive;
-    /// # #[macro_use] extern crate serde_derive;
-    /// # #[macro_use] extern crate exonum_testkit;
-    /// # extern crate failure;
-    /// use std::borrow::Cow;
-    ///
-    /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
-    /// # use exonum::messages::{Signed, AnyTx, Message};
-    /// # use exonum_testkit::{TestKit, TestKitBuilder};
-    /// # use exonum::crypto::{PublicKey, SecretKey};
+    /// ```
+    /// # use serde_derive::{Serialize, Deserialize};
+    /// # use exonum_derive::{exonum_service, ServiceFactory, ProtobufConvert};
+    /// # use exonum_testkit::{txvec, TestKit, TestKitBuilder};
+    /// # use exonum_merkledb::Snapshot;
+    /// # use exonum::{
+    /// #     blockchain::{ExecutionError, InstanceCollection},
+    /// #     crypto::{PublicKey, Hash, SecretKey},
+    /// #     runtime::{InstanceDescriptor, rust::{Transaction, TransactionContext, Service}},
+    /// # };
     /// #
-    /// # type FromRawResult = Result<Box<Transaction>, failure::Error>;
-    /// # const SERVICE_ID: u16 = 1;
-    /// # pub struct MyService;
-    /// # impl Service for MyService {
-    /// #    fn service_name(&self) -> &str {
-    /// #        "documentation"
-    /// #    }
-    /// #    fn state_hash(&self, _: &exonum_merkledb::Snapshot) -> Vec<exonum::crypto::Hash> {
-    /// #        Vec::new()
-    /// #    }
-    /// #    fn service_id(&self) -> u16 {
-    /// #        SERVICE_ID
-    /// #    }
-    /// #    fn tx_from_raw(&self, raw: AnyTx) -> FromRawResult {
-    /// #        let tx = MyServiceTransactions::tx_from_raw(raw)?;
-    /// #        Ok(tx.into())
-    /// #    }
+    /// # const SERVICE_ID: u32 = 1;
+    /// #
+    /// # #[derive(Clone, Default, Debug, ServiceFactory)]
+    /// # #[exonum(
+    /// #     artifact_name = "example",
+    /// #     artifact_version = "1.0.0",
+    /// #     proto_sources = "exonum_testkit::proto",
+    /// #     implements("ExampleInterface")
+    /// # )]
+    /// # pub struct ExampleService;
+    /// #
+    /// # impl Service for ExampleService {
+    /// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
+    /// # }
+    /// #
+    /// # #[exonum_service]
+    /// # pub trait ExampleInterface {
+    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError>;
+    /// # }
+    /// #
+    /// # impl ExampleInterface for ExampleService {
+    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError> {
+    /// #         Ok(())
+    /// #     }
     /// # }
     /// #
     /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
     /// # #[exonum(pb = "exonum_testkit::proto::examples::TxTimestamp")]
-    /// # struct MyTransaction {
+    /// # pub struct ExampleTx {
     /// #     message: String,
-    /// # }
-    ///
-    /// # #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-    /// # enum MyServiceTransactions {
-    /// #     MyTransaction(MyTransaction),
-    /// # }
-    ///
-    /// # impl MyTransaction {
-    /// #    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Verified<AnyTx> {
-    /// #        let tx = MyTransaction{ message: msg.to_owned() };
-    /// #        Message::sign_transaction(tx, SERVICE_ID, *author, key)
-    /// #    }
-    /// # }
-    /// # impl Transaction for MyTransaction {
-    /// #     fn execute(&self, _: exonum::blockchain::TransactionContext) -> ExecutionResult { Ok(()) }
     /// # }
     /// #
     /// # fn expensive_setup(_: &mut TestKit) {}
@@ -391,12 +362,15 @@ impl TestKit {
     /// #
     /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_rust_service(MyService)
+    ///     .with_rust_service(
+    ///         InstanceCollection::new(ExampleService)
+    ///            .with_instance(SERVICE_ID, "example", ())
+    ///     )
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
-    /// let tx_a = MyTransaction::sign(&pubkey, "foo", &key);
-    /// let tx_b = MyTransaction::sign(&pubkey, "bar", &key);
+    /// let tx_a = ExampleTx { message: "foo".into() }.sign(SERVICE_ID, pubkey, &key);
+    /// let tx_b = ExampleTx { message: "bar".into() }.sign(SERVICE_ID, pubkey, &key);
     ///
     /// testkit.checkpoint();
     /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
@@ -747,16 +721,26 @@ impl TestKit {
 ///
 /// # Examples
 ///
-/// ```ignore [ECR-3275]
+/// ```
+/// # use exonum_derive::{exonum_service, ServiceFactory};
 /// # use exonum::{
-/// #   blockchain::{Service, Transaction, ServiceContext},
-/// #   helpers::Height, messages::RawTransaction, crypto::Hash,
+/// #     crypto::{PublicKey, Hash},
+/// #     runtime::{InstanceDescriptor, rust::{AfterCommitContext, RustRuntime, Service}},
+/// #     helpers::Height,
 /// # };
 /// # use exonum_merkledb::{Fork, Snapshot};
-/// # use exonum_testkit::TestKit;
+/// # use exonum_testkit::{StoppedTestKit, TestKit};
 /// # use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+/// # const SERVICE_ID: u32 = 1;
 /// // Service with internal state modified by a custom `after_commit` hook.
-/// #[derive(Clone)]
+/// # #[derive(Clone, Default, Debug, ServiceFactory)]
+/// # #[exonum(
+/// #     artifact_name = "after_commit",
+/// #     artifact_version = "1.0.0",
+/// #     proto_sources = "exonum_testkit::proto",
+/// #     service_constructor = "Self::new_instance",
+/// #     implements("AfterCommitInterface")
+/// # )]
 /// struct AfterCommitService {
 ///     counter: Arc<AtomicUsize>,
 /// }
@@ -766,27 +750,29 @@ impl TestKit {
 ///         AfterCommitService { counter: Arc::new(AtomicUsize::default()) }
 ///     }
 ///
+/// #    pub fn new_instance(&self) -> Box<dyn Service> {
+/// #       Box::new(self.clone())
+/// #    }
+/// #
 ///     pub fn counter(&self) -> usize {
 ///         self.counter.load(Ordering::SeqCst)
 ///     }
 /// }
 ///
+/// # #[exonum_service]
+/// # trait AfterCommitInterface {}
+/// #
+/// # impl AfterCommitInterface for AfterCommitService {}
+/// #
 /// impl Service for AfterCommitService {
-/// #   fn service_name(&self) -> &str { "after_commit" }
-/// #   fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> { Vec::new() }
-/// #   fn service_id(&self) -> u16 { 100 }
-/// #   fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-/// #       unimplemented!()
-/// #   }
-///     // Other methods...
-///
-///     fn after_commit(&self, context: &ServiceContext) {
+/// #   fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
+///     fn after_commit(&self, _: AfterCommitContext) {
 ///         self.counter.fetch_add(1, Ordering::SeqCst);
 ///     }
 /// }
 ///
 /// let service = AfterCommitService::new();
-/// let mut testkit = TestKit::for_rust_service(service.clone());
+/// let mut testkit = TestKit::for_rust_service(service.clone(), "after_commit", SERVICE_ID, ());
 /// testkit.create_blocks_until(Height(5));
 /// assert_eq!(service.counter(), 5);
 ///
@@ -796,7 +782,9 @@ impl TestKit {
 ///
 /// // Resume with the same single service with a fresh state.
 /// let service = AfterCommitService::new();
-/// let mut testkit = stopped.resume(vec![service.clone().into()]);
+/// let mut testkit = stopped.resume(vec![
+///     RustRuntime::new().with_available_service(service.clone())
+/// ]);
 /// testkit.create_blocks_until(Height(8));
 /// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.
 /// ```
