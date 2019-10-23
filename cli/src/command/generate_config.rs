@@ -20,7 +20,7 @@ use exonum::{
     keys::{generate_keys, Keys},
 };
 use failure::{bail, Error};
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::{

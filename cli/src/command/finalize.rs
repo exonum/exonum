@@ -20,7 +20,7 @@ use exonum::{
     node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig},
 };
 use failure::{bail, format_err, Error};
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
