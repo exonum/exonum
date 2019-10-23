@@ -17,12 +17,12 @@
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
-use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use protoc_rust::Customize;
 use quote::{quote, ToTokens};
 use walkdir::WalkDir;
 
+use std::collections::HashSet;
 use std::{
     env,
     fs::File,
@@ -88,7 +88,7 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
 
 /// Includes all .proto files with their names into generated file as array of tuples,
 /// where tuple content is (file_name, file_content).
-fn include_proto_files(proto_files: &[PathBuf]) -> impl ToTokens {
+fn include_proto_files(proto_files: HashSet<PathBuf>) -> impl ToTokens {
     let proto_files_len = proto_files.len();
     // TODO Think about syn crate and token streams instead of dirty strings.
     let proto_files = proto_files.iter().map(|path| {
@@ -152,13 +152,9 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 
     // To avoid cases where input sources are also added as includes, use only
     // unique paths.
-    let proto_files: Vec<PathBuf> = [proto_files, includes]
-        .concat()
-        .into_iter()
-        .unique()
-        .collect();
+    let proto_files: HashSet<PathBuf> = [proto_files, includes].concat().into_iter().collect();
 
-    let proto_files = include_proto_files(&proto_files);
+    let proto_files = include_proto_files(proto_files);
 
     let content = quote! {
         #( #mod_files )*
