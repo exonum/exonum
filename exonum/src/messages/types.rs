@@ -27,7 +27,7 @@ use crate::{
     proto::schema::consensus,
 };
 
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 
 /// Protobuf based container for any signed messages.
 ///

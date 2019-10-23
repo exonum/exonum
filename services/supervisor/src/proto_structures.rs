@@ -22,7 +22,7 @@ use exonum::{
     runtime::{ArtifactId, ConfigChange},
 };
 
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 
 use super::proto;
 

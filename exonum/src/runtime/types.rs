@@ -16,6 +16,8 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
+use exonum_proto::ProtobufConvert;
+
 use crate::{
     blockchain::ConsensusConfig,
     helpers::ValidateInput,

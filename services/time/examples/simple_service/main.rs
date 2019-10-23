@@ -34,7 +34,7 @@ use exonum::{
         AnyTx, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
 use exonum_time::{
     schema::TimeSchema,

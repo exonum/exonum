@@ -15,7 +15,7 @@
 use chrono::{DateTime, Utc};
 use exonum::{blockchain::Schema, crypto::PublicKey, runtime::rust::TransactionContext};
 use exonum_merkledb::IndexAccess;
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 
 use crate::{proto, schema::TimeSchema, TimeService};
 

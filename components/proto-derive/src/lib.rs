@@ -53,10 +53,10 @@ use syn::{Attribute, NestedMeta};
 /// Corresponding proto file:
 /// ```text
 /// message Wallet {
-///  // Public key of the wallet owner.
-///  exonum.crypto.PublicKey pub_key = 1;
-///  // Current balance.
-///  uint64 balance = 2;
+///     // Public key of the wallet owner.
+///     exonum.crypto.PublicKey pub_key = 1;
+///     // Current balance.
+///     uint64 balance = 2;
 /// }
 /// ```
 ///
@@ -66,22 +66,22 @@ use syn::{Attribute, NestedMeta};
 /// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ProtobufConvert)]
 /// #[protobuf_convert(source = "schema::runtime::ConfigChange", oneof_field = "message")]
 /// pub enum ConfigChange {
-///    /// New consensus config.
-///    Consensus(ConsensusConfig),
-///    /// New service instance config.
-///    Service(ServiceConfig),
+///     /// New consensus config.
+///     Consensus(ConsensusConfig),
+///     /// New service instance config.
+///     Service(ServiceConfig),
 /// }
 /// ```
 ///
 /// Corresponding proto file:
 /// ```test
 /// message ConfigChange {
-///  oneof message {
-///    // New consensus config.
-///    exonum.Config consensus = 1;
-///    // New service instance config.
-///    ServiceConfig service = 2;
-///  }
+///     oneof message {
+///         // New consensus config.
+///         exonum.Config consensus = 1;
+///         // New service instance config.
+///         ServiceConfig service = 2;
+///     }
 /// }
 /// ```
 ///

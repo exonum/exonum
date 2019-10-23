@@ -16,6 +16,8 @@ use futures::{sync::mpsc, Future};
 
 use std::{collections::BTreeMap, panic, sync::Mutex};
 
+use exonum_proto::ProtobufConvert;
+
 use crate::{
     blockchain::{
         Blockchain, BlockchainBuilder, ExecutionErrorKind, ExecutionStatus, FatalError,

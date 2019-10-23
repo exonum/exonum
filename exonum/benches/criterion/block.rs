@@ -119,7 +119,7 @@ mod timestamping {
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
-    use exonum_proto_derive::ProtobufConvert;
+    use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -216,7 +216,7 @@ mod cryptocurrency {
         },
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
-    use exonum_proto_derive::ProtobufConvert;
+    use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
     use super::gen_keypair_from_rng;
@@ -405,7 +405,7 @@ mod foreign_interface_call {
         },
     };
     use exonum_merkledb::Snapshot;
-    use exonum_proto_derive::ProtobufConvert;
+    use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;

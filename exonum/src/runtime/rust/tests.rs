@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_derive::exonum_service;
+use exonum_proto::ProtobufConvert;
 
 use crate::{
     crypto::Hash,

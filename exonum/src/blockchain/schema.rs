@@ -17,6 +17,8 @@ use exonum_merkledb::{
     ProofMapIndex,
 };
 
+use exonum_proto::ProtobufConvert;
+
 use std::mem;
 
 use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
