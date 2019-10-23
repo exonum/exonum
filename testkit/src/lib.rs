@@ -53,12 +53,6 @@
 //!     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
 //! }
 //!
-//! impl From<TimestampingService> for InstanceCollection {
-//!     fn from(t: TimestampingService) -> Self {
-//!         Self::new(t).with_instance(SERVICE_ID, "timestamping", ())
-//!     }
-//! }
-//!
 //! #[exonum_service]
 //! pub trait TimestampingInterface {
 //!     fn timestamp(&self, _: TransactionContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
@@ -74,7 +68,10 @@
 //!     // Create testkit for network with four validators.
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
-//!         .with_rust_service(TimestampingService)
+//!         .with_rust_service(
+//!             InstanceCollection::new(TimestampingService)
+//!                 .with_instance(SERVICE_ID, "timestamping", ())
+//!         )
 //!         .create();
 //!
 //!     // Create few transactions.
@@ -342,12 +339,6 @@ impl TestKit {
     /// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
     /// # }
     /// #
-    /// # impl From<MyService> for InstanceCollection {
-    /// #     fn from(t: MyService) -> Self {
-    /// #         Self::new(t).with_instance(SERVICE_ID, "my", ())
-    /// #     }
-    /// # }
-    /// #
     /// # #[exonum_service]
     /// # pub trait MyInterface {
     /// #     fn my_tx(&self, _: TransactionContext, arg: MyTransaction) -> Result<(), ExecutionError>;
@@ -370,7 +361,10 @@ impl TestKit {
     /// #
     /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_rust_service(MyService)
+    ///     .with_rust_service(
+    ///         InstanceCollection::new(MyService)
+    ///            .with_instance(SERVICE_ID, "my", ())
+    ///     )
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
