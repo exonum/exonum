@@ -328,31 +328,31 @@ impl TestKit {
     /// #
     /// # #[derive(Clone, Default, Debug, ServiceFactory)]
     /// # #[exonum(
-    /// #     artifact_name = "my",
+    /// #     artifact_name = "example",
     /// #     artifact_version = "1.0.0",
     /// #     proto_sources = "exonum_testkit::proto",
-    /// #     implements("MyInterface")
+    /// #     implements("ExampleInterface")
     /// # )]
-    /// # pub struct MyService;
+    /// # pub struct ExampleService;
     /// #
-    /// # impl Service for MyService {
+    /// # impl Service for ExampleService {
     /// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
     /// # }
     /// #
     /// # #[exonum_service]
-    /// # pub trait MyInterface {
-    /// #     fn my_tx(&self, _: TransactionContext, arg: MyTransaction) -> Result<(), ExecutionError>;
+    /// # pub trait ExampleInterface {
+    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError>;
     /// # }
     /// #
-    /// # impl MyInterface for MyService {
-    /// #     fn my_tx(&self, _: TransactionContext, arg: MyTransaction) -> Result<(), ExecutionError> {
+    /// # impl ExampleInterface for ExampleService {
+    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError> {
     /// #         Ok(())
     /// #     }
     /// # }
     /// #
     /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
     /// # #[exonum(pb = "exonum_testkit::proto::examples::TxTimestamp")]
-    /// # pub struct MyTransaction {
+    /// # pub struct ExampleTx {
     /// #     message: String,
     /// # }
     /// #
@@ -362,14 +362,14 @@ impl TestKit {
     /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator()
     ///     .with_rust_service(
-    ///         InstanceCollection::new(MyService)
-    ///            .with_instance(SERVICE_ID, "my", ())
+    ///         InstanceCollection::new(ExampleService)
+    ///            .with_instance(SERVICE_ID, "example", ())
     ///     )
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
-    /// let tx_a = MyTransaction { message: "foo".into() }.sign(SERVICE_ID, pubkey, &key);
-    /// let tx_b = MyTransaction { message: "bar".into() }.sign(SERVICE_ID, pubkey, &key);
+    /// let tx_a = ExampleTx { message: "foo".into() }.sign(SERVICE_ID, pubkey, &key);
+    /// let tx_b = ExampleTx { message: "bar".into() }.sign(SERVICE_ID, pubkey, &key);
     ///
     /// testkit.checkpoint();
     /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
