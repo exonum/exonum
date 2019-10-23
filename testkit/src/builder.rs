@@ -92,31 +92,28 @@ use crate::{TestKit, TestNetwork};
 /// #
 /// # #[derive(Clone, Default, Debug, ServiceFactory)]
 /// # #[exonum(
-/// #     artifact_name = "documentation",
+/// #     artifact_name = "example",
 /// #     artifact_version = "1.0.0",
 /// #     proto_sources = "exonum_testkit::proto",
-/// #     implements("MyInterface")
+/// #     implements("ExampleInterface")
 /// # )]
-/// # pub struct MyService;
+/// # pub struct ExampleService;
 /// #
-/// # impl Service for MyService {
+/// # impl Service for ExampleService {
 /// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
 /// # }
 /// #
 /// # #[exonum_service]
-/// # pub trait MyInterface {}
+/// # pub trait ExampleInterface {}
 /// #
-/// # impl MyInterface for MyService {}
-/// #
-/// # impl From<MyService> for InstanceCollection {
-/// #     fn from(t: MyService) -> Self {
-/// #         Self::new(t).with_instance(SERVICE_ID, "my", ())
-/// #     }
-/// # }
+/// # impl ExampleInterface for ExampleService {}
 /// #
 /// # fn main() {
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_rust_service(MyService)
+///     .with_rust_service(
+///         InstanceCollection::new(ExampleService)
+///             .with_instance(SERVICE_ID, "example", ())
+///     )
 ///     .with_validators(4)
 ///     .create();
 /// testkit.create_block();
