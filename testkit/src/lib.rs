@@ -65,7 +65,8 @@
 //! }
 //!
 //! fn main() {
-//!     // Create testkit for network with four validators.
+//!     // Create testkit for network with four validators
+//!     // and add a builtin timestamping service with ID=1.
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
 //!         .with_rust_service(
