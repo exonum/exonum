@@ -26,7 +26,8 @@
 //!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
 //! };
 //! use serde_derive::{Serialize, Deserialize};
-//! use exonum_derive::{exonum_service, ServiceFactory, ProtobufConvert};
+//! use exonum_derive::{exonum_service, ServiceFactory, BinaryValue};
+//! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{txvec, ApiKind, TestKitBuilder};
 //!
@@ -34,8 +35,8 @@
 //!
 //! const SERVICE_ID: u32 = 1;
 //!
-//! #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-//! #[exonum(pb = "exonum_testkit::proto::examples::TxTimestamp")]
+//! #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
+//! #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
 //! pub struct TxTimestamp {
 //!     message: String,
 //! }
@@ -315,7 +316,8 @@ impl TestKit {
     ///
     /// ```
     /// # use serde_derive::{Serialize, Deserialize};
-    /// # use exonum_derive::{exonum_service, ServiceFactory, ProtobufConvert};
+    /// # use exonum_derive::{exonum_service, ServiceFactory, BinaryValue};
+    /// # use exonum_proto::ProtobufConvert;
     /// # use exonum_testkit::{txvec, TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{
@@ -350,8 +352,8 @@ impl TestKit {
     /// #     }
     /// # }
     /// #
-    /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-    /// # #[exonum(pb = "exonum_testkit::proto::examples::TxTimestamp")]
+    /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
+    /// # #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
     /// # pub struct ExampleTx {
     /// #     message: String,
     /// # }
