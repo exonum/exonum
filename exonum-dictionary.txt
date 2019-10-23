@@ -64,6 +64,7 @@ hasher
 healthcheck
 idempotence
 interlayer
+itertools
 kdfparams
 keepalive
 keypair

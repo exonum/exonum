@@ -17,6 +17,7 @@
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
+use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use protoc_rust::Customize;
 use quote::{quote, ToTokens};
@@ -125,6 +126,7 @@ fn include_proto_files(proto_files: &[PathBuf]) -> impl ToTokens {
 fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
     out_dir: P,
     proto_files: &[PathBuf],
+    includes: &[PathBuf],
     mod_file: Q,
 ) {
     let mod_files = {
@@ -147,7 +149,16 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
             }
         })
     };
-    let proto_files = include_proto_files(proto_files);
+
+    // To avoid cases where input sources are also added as includes, use only
+    // unique paths.
+    let proto_files: Vec<PathBuf> = [proto_files, includes]
+        .concat()
+        .into_iter()
+        .unique()
+        .collect();
+
+    let proto_files = include_proto_files(&proto_files);
 
     let content = quote! {
         #( #mod_files )*
@@ -277,9 +288,6 @@ where
         .map(PathBuf::from)
         .expect("Unable to get OUT_DIR");
 
-    let proto_files = get_proto_files(&input_dir);
-    generate_mod_rs(&out_dir, &proto_files, &mod_file_name.as_ref());
-
     // Converts paths to strings and adds input dir to includes.
     let mut includes: Vec<_> = includes.iter().map(ProtoSources::path).collect();
 
@@ -292,6 +300,16 @@ where
     );
 
     let includes: Vec<&str> = includes.iter().map(String::as_str).collect();
+
+    let proto_files = get_proto_files(&input_dir);
+    let included_files = get_included_files(&includes);
+
+    generate_mod_rs(
+        &out_dir,
+        &proto_files,
+        &included_files,
+        &mod_file_name.as_ref(),
+    );
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: out_dir
@@ -308,6 +326,13 @@ where
         },
     })
     .expect("protoc");
+}
+
+fn get_included_files(includes: &[&str]) -> Vec<PathBuf> {
+    includes
+        .iter()
+        .flat_map(|path| get_proto_files(path))
+        .collect()
 }
 
 /// Get path to the folder containing `exonum` protobuf files.
