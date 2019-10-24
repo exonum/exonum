@@ -336,8 +336,7 @@ impl From<&(&str, &str)> for ProtoSourceFile {
 /// Artifact Protobuf specification for the Exonum clients.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ArtifactProtobufSpec {
-    /// List of Protobuf files that make up the service interface. The first element in the tuple
-    /// is the file name, the second one is its content.
+    /// List of Protobuf files that make up the service interface.
     ///
     /// The common interface entry point is always in the `service.proto` file.
     pub sources: Vec<ProtoSourceFile>,
@@ -345,9 +344,10 @@ pub struct ArtifactProtobufSpec {
     pub includes: Vec<ProtoSourceFile>,
 }
 
-#[allow(clippy::type_complexity)]
-impl From<(&[(&str, &str)], &[(&str, &str)])> for ArtifactProtobufSpec {
-    fn from(sources_strings: (&[(&str, &str)], &[(&str, &str)])) -> Self {
+type ProtoSources<'a> = &'a [(&'a str, &'a str)];
+
+impl<'a> From<(ProtoSources<'a>, ProtoSources<'a>)> for ArtifactProtobufSpec {
+    fn from(sources_strings: (ProtoSources<'a>, ProtoSources<'a>)) -> Self {
         let sources = sources_strings.0.iter().map(From::from).collect();
         let includes = sources_strings.1.iter().map(From::from).collect();
 
