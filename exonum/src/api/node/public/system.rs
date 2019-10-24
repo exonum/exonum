@@ -86,12 +86,6 @@ pub struct ProtoSourcesQuery {
     pub artifact: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct ProtoSources {
-    pub sources: Vec<ProtoSourceFile>,
-    pub includes: Vec<ProtoSourceFile>,
-}
-
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
@@ -144,8 +138,9 @@ impl SystemApi {
         self
     }
 
-    fn handle_proto_source_service(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+    fn handle_proto_source(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let node_state = self.node_state.clone();
+        let exonum_sources = get_exonum_sources();
         api_scope.endpoint(name, {
             move |query: ProtoSourcesQuery| {
                 if let Some(artifact_id) = query.artifact {
@@ -158,33 +153,15 @@ impl SystemApi {
                             ))
                         })?;
 
-                    Ok(ProtoSources {
-                        sources: sources.sources,
-                        includes: filter_exonum_sources(sources.includes),
-                    })
+                    let mut proto = sources.sources.clone();
+                    proto.extend(filter_exonum_sources(
+                        sources.includes,
+                        exonum_sources.clone(),
+                    ));
+                    Ok(proto)
                 } else {
-                    Err(api::Error::BadRequest("artifact is not specified".into()))
+                    Ok(exonum_sources.clone())
                 }
-            }
-        });
-        self
-    }
-
-    fn handle_proto_source_core(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint(name, {
-            move |_: ()| {
-                Ok(ProtoSources {
-                    sources: EXONUM_PROTO_SOURCES
-                        .as_ref()
-                        .iter()
-                        .map(From::from)
-                        .collect::<Vec<_>>(),
-                    includes: EXONUM_INCLUDES
-                        .as_ref()
-                        .iter()
-                        .map(From::from)
-                        .collect::<Vec<_>>(),
-                })
             }
         });
         self
@@ -216,22 +193,33 @@ impl SystemApi {
             .handle_healthcheck_info("v1/healthcheck", api_scope)
             .handle_user_agent_info("v1/user_agent", api_scope)
             .handle_list_services_info("v1/services", api_scope)
-            .handle_proto_source_core("v1/proto-sources/core", api_scope)
-            .handle_proto_source_service("v1/proto-sources/service", api_scope);
+            .handle_proto_source("v1/proto-sources", api_scope);
         api_scope
     }
 }
 
-fn filter_exonum_sources(files: Vec<ProtoSourceFile>) -> Vec<ProtoSourceFile> {
-    let sources = EXONUM_PROTO_SOURCES
+fn get_exonum_sources() -> Vec<ProtoSourceFile> {
+    let proto = EXONUM_PROTO_SOURCES
         .as_ref()
         .iter()
         .map(From::from)
-        .collect::<Vec<ProtoSourceFile>>();
+        .collect::<Vec<_>>();
+    let includes = EXONUM_INCLUDES
+        .as_ref()
+        .iter()
+        .map(From::from)
+        .collect::<Vec<_>>();
 
+    proto.into_iter().chain(includes).collect()
+}
+
+fn filter_exonum_sources(
+    files: Vec<ProtoSourceFile>,
+    exonum_sources: Vec<ProtoSourceFile>,
+) -> Vec<ProtoSourceFile> {
     files
         .iter()
         .cloned()
-        .filter(|file| !sources.contains(file))
+        .filter(|file| !exonum_sources.contains(file))
         .collect()
 }
