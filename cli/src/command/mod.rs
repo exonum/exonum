@@ -22,7 +22,7 @@ pub mod run;
 pub mod run_dev;
 
 use failure::Error;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::path::PathBuf;
