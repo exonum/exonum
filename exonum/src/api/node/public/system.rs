@@ -136,8 +136,10 @@ impl SystemApi {
     }
 
     fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let node_state = self.node_state.clone();
-        api_scope.endpoint(name, move |_query: ()| Ok(node_state.dispatcher_info()));
+        let self_ = self.clone();
+        api_scope.endpoint(name, move |_query: ()| {
+            Ok(DispatcherInfo::load(&self_.context.snapshot()))
+        });
         self
     }
 

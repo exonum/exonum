@@ -286,7 +286,7 @@ impl TestKit {
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
         let api_aggregator = ApiAggregator::new(
             blockchain.as_ref(),
-            SharedNodeState::new(blockchain.as_ref(), 10_000),
+            SharedNodeState::new(&blockchain, 10_000),
         );
 
         let processing_lock = Arc::new(Mutex::new(()));
@@ -334,7 +334,7 @@ impl TestKit {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
             let mut aggregator = ApiAggregator::new(
                 self.blockchain.as_ref(),
-                SharedNodeState::new(self.blockchain.as_ref(), 10_000),
+                SharedNodeState::new(&self.blockchain, 10_000),
             );
             aggregator.extend(update.user_endpoints);
             self.api_aggregator = aggregator;

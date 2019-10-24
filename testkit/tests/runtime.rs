@@ -102,17 +102,13 @@ impl Runtime for TestRuntime {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
         self.tester.deploy_artifact(artifact, deploy_spec);
-        Box::new(Ok(()).into_future())
+        Box::new(Ok(ArtifactProtobufSpec::default()).into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         self.tester.is_artifact_deployed(id)
-    }
-
-    fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        Some(ArtifactProtobufSpec::default())
     }
 
     fn commit_service(

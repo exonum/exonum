@@ -232,8 +232,6 @@ impl NodeHandler {
     pub fn handle_update_api_state_timeout(&mut self) {
         self.api_state.update_node_state(&self.state);
         // FIXME Add special event to update state [ECR-3222]
-        self.api_state
-            .update_dispatcher_state(self.blockchain.as_ref());
         self.node_role = NodeRole::new(self.state.validator_id());
         self.add_update_api_state_timeout();
     }

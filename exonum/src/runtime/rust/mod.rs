@@ -268,16 +268,38 @@ impl Runtime for RustRuntime {
         self.api_context = Some(ApiContext::with_blockchain(blockchain));
     }
 
+    // We need to propagate changes in the services immediately after initialization.
+    fn on_resume(&mut self) {
+        if self.new_services_since_last_block {
+            let user_endpoints = self.api_endpoints();
+            // FIXME: this should either be made async, or an unbounded channel should be used.
+            if !self.api_notifier.is_closed() {
+                self.api_notifier
+                    .clone()
+                    .send(UpdateEndpoints { user_endpoints })
+                    .wait()
+                    .ok();
+            }
+        }
+        self.new_services_since_last_block = false;
+    }
+
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
         if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             Box::new(future::err(Error::IncorrectArtifactId.into()))
         } else {
-            Box::new(self.deploy(&artifact).into_future())
+            let res = self.deploy(&artifact).and_then(|()| {
+                let id = Self::parse_artifact(&artifact)?;
+                self.deployed_artifact(&id)
+                    .map(ServiceFactory::artifact_protobuf_spec)
+                    .ok_or_else(|| Error::UnableToDeploy.into())
+            });
+            Box::new(res.into_future())
         }
     }
 
@@ -287,12 +309,6 @@ impl Runtime for RustRuntime {
         } else {
             false
         }
-    }
-
-    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        let id = Self::parse_artifact(id).ok()?;
-        self.deployed_artifact(&id)
-            .map(ServiceFactory::artifact_protobuf_spec)
     }
 
     fn start_adding_service(
@@ -379,18 +395,7 @@ impl Runtime for RustRuntime {
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
-        if self.new_services_since_last_block {
-            let user_endpoints = self.api_endpoints();
-            // FIXME: this should either be made async, or an unbounded channel should be used.
-            if !self.api_notifier.is_closed() {
-                self.api_notifier
-                    .clone()
-                    .send(UpdateEndpoints { user_endpoints })
-                    .wait()
-                    .ok();
-            }
-        }
-        self.new_services_since_last_block = false;
+        self.on_resume();
 
         // By convention, services don't handle `after_commit()` on the genesis block.
         let is_genesis_block = CoreSchema::new(snapshot)

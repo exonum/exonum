@@ -15,11 +15,15 @@
 pub use self::{error::Error, schema::Schema};
 
 use exonum_merkledb::{Fork, Snapshot};
-use futures::{future, Future};
+use futures::{
+    future::{self, Either},
+    Future,
+};
 
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, panic,
+    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -55,10 +59,12 @@ struct ServiceInfo {
     name: String,
 }
 
+/// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     service_infos: BTreeMap<InstanceId, ServiceInfo>,
+    artifact_sources: Arc<RwLock<HashMap<ArtifactId, ArtifactProtobufSpec>>>,
 }
 
 impl Dispatcher {
@@ -70,6 +76,7 @@ impl Dispatcher {
         let mut this = Self {
             runtimes: runtimes.into_iter().collect(),
             service_infos: BTreeMap::new(),
+            artifact_sources: Default::default(),
         };
         for runtime in this.runtimes.values_mut() {
             runtime.initialize(blockchain);
@@ -88,6 +95,11 @@ impl Dispatcher {
         for instance in schema.service_instances().values() {
             self.start_service(snapshot, &instance)?;
         }
+        // Notify runtimes about the end of initialization process.
+        for runtime in self.runtimes.values_mut() {
+            runtime.on_resume();
+        }
+
         Ok(())
     }
 
@@ -150,7 +162,8 @@ impl Dispatcher {
         aggregator
     }
 
-    /// Initiate artifact deploy procedure in the corresponding runtime.
+    /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy
+    /// is successful, the artifact spec will be written into `artifact_sources`.
     ///
     /// # Panics
     ///
@@ -159,13 +172,21 @@ impl Dispatcher {
         &mut self,
         artifact: ArtifactId,
         payload: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> impl Future<Item = (), Error = ExecutionError> {
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            runtime.deploy_artifact(artifact, payload)
+            let future_sources = self.artifact_sources.clone();
+            let task =
+                runtime
+                    .deploy_artifact(artifact.clone(), payload)
+                    .and_then(move |sources| {
+                        future_sources.write().unwrap().insert(artifact, sources);
+                        Ok(())
+                    });
+            Either::A(task)
         } else {
-            Box::new(future::err(Error::IncorrectRuntime.into()))
+            Either::B(future::err(Error::IncorrectRuntime.into()))
         }
     }
 
@@ -186,7 +207,7 @@ impl Dispatcher {
 
     fn block_until_deployed(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
-            self.deploy_artifact(artifact, spec)
+            self.deploy_artifact(artifact.clone(), spec)
                 .wait()
                 .unwrap_or_else(|e| {
                     // In this case artifact deployment error is fatal because there are
@@ -207,8 +228,6 @@ impl Dispatcher {
         spec: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         let spec = spec.into_bytes();
-        self.deploy_artifact(artifact.clone(), spec.clone())
-            .wait()?;
         Self::commit_artifact(fork, artifact.clone(), spec.clone())?;
         self.block_until_deployed(artifact, spec);
         Ok(())
@@ -263,7 +282,7 @@ impl Dispatcher {
         }
     }
 
-    /// Calls `after_commit` for all runtimes.
+    /// Performs operations after processing a block.
     pub(crate) fn after_commit(&mut self, fork: &Fork) {
         // **NB.** Changes to the `fork` below MUST be the same for all nodes. This is not
         // checked by the consensus algorithm as usual.
@@ -297,11 +316,11 @@ impl Dispatcher {
         }
     }
 
-    /// Return additional information about the artifact if it is deployed.
-    pub(crate) fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.runtimes
-            .get(&id.runtime_id)?
-            .artifact_protobuf_spec(id)
+    /// Returns the handle tracking the state of this dispatcher.
+    pub(crate) fn state(&self) -> DispatcherState {
+        DispatcherState {
+            artifact_sources: Arc::clone(&self.artifact_sources),
+        }
     }
 
     /// Return true if the artifact with the given identifier is deployed.
@@ -435,5 +454,18 @@ impl Action {
                     });
             }
         }
+    }
+}
+
+/// Cloneable dispatcher state.
+#[derive(Debug, Clone)]
+pub struct DispatcherState {
+    artifact_sources: Arc<RwLock<HashMap<ArtifactId, ArtifactProtobufSpec>>>,
+}
+
+impl DispatcherState {
+    /// Returns the source files of the artifact with the specified identifier.
+    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+        self.artifact_sources.read().unwrap().get(id).cloned()
     }
 }

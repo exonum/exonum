@@ -92,7 +92,9 @@
 //! [`Configure`]: rust/interfaces/trait.Configure.html
 
 pub use self::{
-    dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
+    dispatcher::{
+        Dispatcher, DispatcherState, Error as DispatcherError, Mailbox, Schema as DispatcherSchema,
+    },
     error::{ErrorKind, ExecutionError},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, CallInfo, DeployStatus, InstanceId, InstanceQuery,
@@ -179,7 +181,23 @@ pub trait Runtime: Send + Debug + 'static {
     /// called only once during `Runtime` lifetime.
     fn initialize(&mut self, blockchain: &Blockchain) {}
 
+    /// Notifies the runtime that the dispatcher has completed re-initialization after
+    /// node restart, including restoring the deployed artifacts / started service instances
+    /// for all runtimes.
+    ///
+    /// This method is called *no more than once* during `Runtime` lifetime. It is called iff
+    /// the blockchain had genesis block at the start of the node. The blockchain state
+    /// does not change between `initialize` and `after_initialize` calls.
+    ///
+    /// The default implementation does nothing.
+    fn on_resume(&mut self) {}
+
     /// Request to deploy artifact with the given identifier and additional deploy specification.
+    ///
+    /// This method may be called multiple times with the same params; in particular, the method
+    /// is called for all deployed artifacts after node restart. The successive calls must return
+    /// the same spec as the first call. In most cases, it is prudent to cache the spec in the runtime,
+    /// so that the successive calls are effectively synchronous.
     ///
     /// # Policy on Panics
     ///
@@ -189,25 +207,19 @@ pub trait Runtime: Send + Debug + 'static {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>>;
 
     /// Return true if the specified artifact is deployed in this runtime.
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
-
-    /// Return Protobuf description of the deployed artifact with the specified identifier.
-    /// If the artifact is not deployed, return `None`.
-    ///
-    /// # Notes for Runtime Developers
-    ///
-    /// * Ensure that the deployed artifact has the following information, even if it is empty.
-    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec>;
 
     /// Runs the constructor of a new service instance with the given specification
     /// and initial configuration.
     ///
     /// The service is not guaranteed to be added to the runtime at this point, so the runtime
     /// may freely discard the instantiated service instance after completing this method. To
-    /// add the service to the runtime permanently, `add_service()` is called.
+    /// add the service to the runtime permanently, `add_service()` may be called afterwards,
+    /// but this call is not guaranteed (e.g., if there are several block candidates at
+    /// the same height).
     ///
     /// # Policy on Panics
     ///
@@ -226,7 +238,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// and returned `Ok(())`. The results of the call (i.e., changes to the blockchain state)
     /// are guaranteed to be persisted from the call.
     ///
-    /// Note that this a call to  `start_adding_service()` may have happened indefinite time ago;
+    /// Note that a call to `start_adding_service()` may have happened indefinite time ago;
     /// indeed, `commit_service()` is called for all services on the node startup.
     ///
     /// # Policy on Panics

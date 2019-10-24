@@ -54,6 +54,7 @@ impl DispatcherBuilder {
             dispatcher: Dispatcher {
                 runtimes: Default::default(),
                 service_infos: Default::default(),
+                artifact_sources: Default::default(),
             },
         }
     }
@@ -120,15 +121,13 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(
-            if artifact.runtime_id == self.runtime_type {
-                Ok(())
-            } else {
-                Err(DispatcherError::IncorrectRuntime.into())
-            }
-            .into_future(),
-        )
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+        let res = if artifact.runtime_id == self.runtime_type {
+            Ok(ArtifactProtobufSpec::default())
+        } else {
+            Err(DispatcherError::IncorrectRuntime.into())
+        };
+        Box::new(res.into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -187,10 +186,6 @@ impl Runtime for SampleRuntime {
         self.new_service_sender
             .send((self.runtime_type, changes))
             .unwrap();
-    }
-
-    fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        Some(ArtifactProtobufSpec::default())
     }
 }
 
@@ -460,8 +455,8 @@ impl Runtime for ShutdownRuntime {
         &mut self,
         _artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(Ok(()).into_future())
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+        Box::new(Ok(ArtifactProtobufSpec::default()).into_future())
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
@@ -507,10 +502,6 @@ impl Runtime for ShutdownRuntime {
     }
 
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
-
-    fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        None
-    }
 
     fn shutdown(&mut self) {
         self.turned_off.store(true, Ordering::Relaxed);

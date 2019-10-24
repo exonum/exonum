@@ -63,7 +63,7 @@ fn artifact_exists(api: &TestKitApi, name: &str) -> bool {
     artifacts.iter().any(|a| a.name == name)
 }
 
-fn does_service_instance_exist(api: &TestKitApi, name: &str) -> bool {
+fn service_instance_exists(api: &TestKitApi, name: &str) -> bool {
     let services = &api.exonum_api().services().services;
     services.iter().any(|s| s.name == name)
 }
@@ -191,17 +191,14 @@ fn deploy_default(testkit: &mut TestKit) {
 
 fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
     let api = testkit.api();
-
-    assert!(!does_service_instance_exist(&api, instance_name));
-
+    assert!(!service_instance_exists(&api, instance_name));
     let request = start_service_request(artifact_default(), instance_name, testkit.height().next());
     let hash = start_service(&api, request);
     testkit.create_block();
-
     api.exonum_api().assert_tx_success(hash);
 
     let api = testkit.api(); // Update the API
-    assert!(does_service_instance_exist(&api, instance_name));
+    assert!(service_instance_exists(&api, instance_name));
     find_instance_id(&api, instance_name)
 }
 
@@ -473,7 +470,7 @@ fn test_start_service_instance_twice() {
     // Start the first instance
     {
         let api = testkit.api();
-        assert!(!does_service_instance_exist(&api, instance_name));
+        assert!(!service_instance_exists(&api, instance_name));
 
         let deadline = testkit.height().next();
         let request = start_service_request(artifact_default(), instance_name, deadline);
@@ -483,7 +480,7 @@ fn test_start_service_instance_twice() {
         api.exonum_api().assert_tx_success(hash);
 
         let api = testkit.api(); // Update the API
-        assert!(does_service_instance_exist(&api, instance_name));
+        assert!(service_instance_exists(&api, instance_name));
     }
 
     // Try to start another instance with the same name
@@ -511,13 +508,11 @@ fn test_restart_node_and_start_service_instance() {
         .with_rust_service(Supervisor)
         .with_rust_service(InstanceCollection::new(IncService))
         .create();
-
     deploy_default(&mut testkit);
 
     // Stop the node.
     let stopped_testkit = testkit.stop();
-
-    // And start it again with the same service factory.
+    // ...and start it again with the same service factory.
     let runtime = add_available_services(stopped_testkit.rust_runtime());
     let mut testkit = stopped_testkit.resume(vec![runtime]);
     let api = testkit.api();
@@ -552,7 +547,7 @@ fn test_restart_node_and_start_service_instance() {
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
-    assert!(does_service_instance_exist(&api, instance_name));
+    assert!(service_instance_exists(&api, instance_name));
 
     // Check that the service instance still works.
     {
@@ -647,7 +642,7 @@ fn test_multiple_validators() {
 
     // Start the service now
     {
-        assert!(!does_service_instance_exist(&api, instance_name));
+        assert!(!service_instance_exists(&api, instance_name));
         let deadline = testkit.height().next();
         let request_start = start_service_request(artifact_default(), instance_name, deadline);
 
@@ -661,7 +656,7 @@ fn test_multiple_validators() {
         api.exonum_api()
             .assert_txs_success(&[start_service_0_tx_hash, start_service_1_tx_hash]);
         let api = testkit.api(); // Update the API
-        assert!(does_service_instance_exist(&api, instance_name));
+        assert!(service_instance_exists(&api, instance_name));
     }
 
     let api = testkit.api(); // Update the API
@@ -790,7 +785,7 @@ fn test_auditor_normal_workflow() {
     // Start the service now
     {
         let api = testkit.api();
-        assert!(!does_service_instance_exist(&api, instance_name));
+        assert!(!service_instance_exists(&api, instance_name));
         let deadline = testkit.height().next();
         let request_start = start_service_request(artifact_default(), instance_name, deadline);
 
@@ -800,7 +795,7 @@ fn test_auditor_normal_workflow() {
         testkit.create_block();
         api.exonum_api().assert_tx_success(start_service_tx_hash);
         let api = testkit.api(); // Update the API
-        assert!(does_service_instance_exist(&api, instance_name));
+        assert!(service_instance_exists(&api, instance_name));
     }
 
     let api = testkit.api(); // Update the API

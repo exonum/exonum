@@ -87,19 +87,15 @@ impl SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(
-            match self.deployed_artifacts.entry(artifact) {
-                Entry::Occupied(_) => Err(DispatcherError::ArtifactAlreadyDeployed),
-                Entry::Vacant(entry) => {
-                    println!("Deploying artifact: {}", entry.key());
-                    entry.insert(spec);
-                    Ok(())
-                }
+    ) -> Result<(), ExecutionError> {
+        match self.deployed_artifacts.entry(artifact) {
+            Entry::Occupied(_) => Err(DispatcherError::ArtifactAlreadyDeployed.into()),
+            Entry::Vacant(entry) => {
+                println!("Deploying artifact: {}", entry.key());
+                entry.insert(spec);
+                Ok(())
             }
-            .map_err(ExecutionError::from)
-            .into_future(),
-        )
+        }
     }
 }
 
@@ -108,8 +104,11 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        self.deploy_artifact(artifact, spec)
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+        let res = self
+            .deploy_artifact(artifact, spec)
+            .map(|()| ArtifactProtobufSpec::default());
+        Box::new(res.into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -194,12 +193,6 @@ impl Runtime for SampleRuntime {
                 Err(err.into())
             }
         }
-    }
-
-    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.deployed_artifacts
-            .get(id)
-            .map(|_| ArtifactProtobufSpec::default())
     }
 
     fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {

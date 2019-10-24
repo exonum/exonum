@@ -1186,7 +1186,7 @@ fn sandbox_with_services_uninitialized(
         internal_requests: internal_channel.0.clone().wait(),
         api_requests: api_channel.0.clone().wait(),
     };
-    let api_state = SharedNodeState::new(blockchain.as_ref(), 5000);
+    let api_state = SharedNodeState::new(&blockchain, 5000);
 
     let mut handler = NodeHandler::new(
         blockchain,

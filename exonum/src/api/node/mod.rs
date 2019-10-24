@@ -25,15 +25,13 @@ use std::{
 
 use crate::{
     api::websocket,
-    blockchain::{Blockchain, ValidatorKeys},
+    blockchain::{BlockchainMut, ValidatorKeys},
     crypto::Hash,
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
-    runtime::{ArtifactId, ProtoSourceFile},
+    runtime::{ArtifactId, DispatcherState, ProtoSourceFile},
 };
-
-use self::public::system::DispatcherInfo;
 
 pub mod private;
 pub mod public;
@@ -50,23 +48,6 @@ pub struct ApiNodeState {
     validators: Vec<ValidatorKeys>,
     broadcast_server_address: Option<Addr<websocket::Server>>,
     tx_cache_len: usize,
-}
-
-#[derive(Debug, Default)]
-pub struct DispatcherState {
-    info: DispatcherInfo,
-    artifact_sources: HashMap<ArtifactId, Vec<ProtoSourceFile>>,
-}
-
-impl DispatcherState {
-    fn load(blockchain: &Blockchain) -> Self {
-        let snapshot = blockchain.snapshot();
-        let info = DispatcherInfo::load(snapshot.as_ref());
-        Self {
-            info,
-            artifact_sources: HashMap::new(),
-        }
-    }
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -100,20 +81,21 @@ impl ApiNodeState {
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     node: Arc<RwLock<ApiNodeState>>,
-    dispatcher: Arc<RwLock<DispatcherState>>,
+    dispatcher: DispatcherState,
     /// Timeout to update API state.
     pub state_update_timeout: Milliseconds,
 }
 
 impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
-    pub fn new(blockchain: &Blockchain, state_update_timeout: Milliseconds) -> Self {
+    pub fn new(blockchain: &BlockchainMut, state_update_timeout: Milliseconds) -> Self {
         Self {
             node: Arc::new(RwLock::new(ApiNodeState::new())),
-            dispatcher: Arc::new(RwLock::new(DispatcherState::load(blockchain))),
+            dispatcher: blockchain.dispatcher_state(),
             state_update_timeout,
         }
     }
+
     /// Returns a list of connected addresses of other nodes.
     pub fn incoming_connections(&self) -> Vec<ConnectInfo> {
         self.node
@@ -181,23 +163,11 @@ impl SharedNodeState {
         state.is_enabled
     }
 
-    /// Returns actual summary information about dispatcher.
-    pub fn dispatcher_info(&self) -> DispatcherInfo {
-        self.dispatcher
-            .read()
-            .expect("Expected read lock")
-            .info
-            .clone()
-    }
-
     /// Returns the source files of the artifact with the specified identifier.
     pub fn artifact_sources(&self, id: &ArtifactId) -> Option<Vec<ProtoSourceFile>> {
         self.dispatcher
-            .read()
-            .expect("Expected read lock")
-            .artifact_sources
-            .get(id)
-            .cloned()
+            .artifact_sources(id)
+            .map(|spec| spec.sources)
     }
 
     /// Updates internal state, from `State` of a blockchain node.
@@ -229,12 +199,6 @@ impl SharedNodeState {
                 }
             }
         }
-    }
-
-    /// Updates dispatcher state, from `Dispatcher` of a blockchain node.
-    pub(crate) fn update_dispatcher_state(&self, blockchain: &Blockchain) {
-        let mut dispatcher_state = self.dispatcher.write().expect("Expected write lock");
-        *dispatcher_state = DispatcherState::load(blockchain);
     }
 
     /// Transfers information to the node that the consensus process on the node
