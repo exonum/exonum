@@ -128,7 +128,7 @@ impl Handler<StartServer> for ApiManager {
     }
 }
 
-/// Updates user-provided endpoints, restaring all HTTP service managed by the addressed
+/// Updates user-provided endpoints, restarting all HTTP service managed by the addressed
 /// `ApiManager`.
 #[derive(Debug, Clone)]
 pub struct UpdateEndpoints {
