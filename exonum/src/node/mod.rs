@@ -460,7 +460,7 @@ impl NodeHandler {
             (block.object_hash(), block.height().next())
         };
 
-        let snapshot = blockchain.as_ref().snapshot();
+        let snapshot = blockchain.snapshot();
         let consensus_config = Schema::new(&snapshot).consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
@@ -602,7 +602,7 @@ impl NodeHandler {
             info!("Trying to connect with peer {}", key);
         }
 
-        let snapshot = self.blockchain.as_ref().snapshot();
+        let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         // Recover previous saved round if any.
         let round = schema.consensus_round();
@@ -719,7 +719,7 @@ impl NodeHandler {
     }
 
     fn need_faster_propose(&self) -> bool {
-        let snapshot = self.blockchain.as_ref().snapshot();
+        let snapshot = self.blockchain.snapshot();
         let pending_tx_count =
             Schema::new(&snapshot).transactions_pool_len() + self.state.tx_cache_len() as u64;
         pending_tx_count >= u64::from(self.propose_timeout_threshold())

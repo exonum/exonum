@@ -6,7 +6,6 @@ use super::super::{
     ArtifactId, CallInfo, Caller, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
     InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
-use crate::{blockchain::Schema as CoreSchema, helpers::ValidatorId};
 
 /// Context for the executed call.
 ///
@@ -46,16 +45,6 @@ impl<'a> CallContext<'a> {
 
     pub fn instance(&self) -> InstanceDescriptor {
         self.instance
-    }
-
-    /// Returns the validator ID if the transaction author is a validator.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        // TODO Perhaps we should optimize this method [ECR-3222]
-        self.caller().author().and_then(|author| {
-            CoreSchema::new(self.fork())
-                .consensus_config()
-                .find_validator(|validator_keys| author == validator_keys.service_key)
-        })
     }
 
     #[doc(hidden)]
@@ -123,14 +112,30 @@ impl<'a> CallContext<'a> {
     /// of transaction roll-back provided by Exonum. Namely:
     ///
     /// - If the execution of the closure is successful, all changes to the blockchain state
-    ///   preceding to the `isolate()` call are permanently committed. These changes **will not**
+    ///   preceding the `isolate()` call are permanently committed. These changes **will not**
     ///   be rolled back if the following transaction code exits with an error.
     /// - If the execution of the closure errors, all changes to the blockchain state
-    ///   preceding to the `isolate()` call are rolled back right away. That is, they are not
+    ///   preceding the `isolate()` call are rolled back right away. That is, they are not
     ///   persisted even if the following transaction code executes successfully.
     ///
-    /// For these reasons, it is strongly advised to propagate the `Result` returned by this method,
-    /// as a result of the transaction execution.
+    /// If there are several `isolate()` calls within the same execution context,
+    /// commitment / rollback rules are applied to changes since the last call. For example:
+    ///
+    /// ```ignore
+    /// SchemaA::new(ctx.fork()).mutate_ok();
+    /// ctx.isolate(|ctx| SchemaB::new(ctx.fork()).mutate_ok())?;
+    /// SchemaC::new(ctx.fork()).mutate_ok();
+    /// ctx.isolate(|ctx| SchemaD::new(ctx.fork()).mutate_panic())?;
+    /// ```
+    ///
+    /// As a result, changes to `SchemaA` and `SchemaB` will be committed, and the changes
+    /// `SchemaC` and `SchemaD` will be rolled back.
+    ///
+    /// For these reasons, it is strongly advised to:
+    ///
+    /// - Make `isolate()` call(s) the last logic executed by a transaction, or at least
+    ///   not have failure cases after the call(s).
+    /// - Propagate errors returned by this method as a result of the transaction execution.
     pub fn isolate(
         &mut self,
         f: impl FnOnce(CallContext) -> Result<(), ExecutionError>,
