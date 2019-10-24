@@ -43,7 +43,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - `system/v1/proto-sources/service` - returns services specific proto files.
 
-  - Endpoint format is also has been changed and now it returns include files together
+  - Endpoint format has been changed and now it returns include files together
   with sources.
 
 #### exonum-proto
