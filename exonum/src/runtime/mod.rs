@@ -341,13 +341,16 @@ pub struct ArtifactProtobufSpec {
     ///
     /// The common interface entry point is always in the `service.proto` file.
     pub sources: Vec<ProtoSourceFile>,
+    /// List of service's proto include files.
+    pub includes: Vec<ProtoSourceFile>,
 }
 
-impl From<&[(&str, &str)]> for ArtifactProtobufSpec {
-    fn from(sources_strings: &[(&str, &str)]) -> Self {
-        let sources = sources_strings.iter().map(From::from).collect();
+impl From<(&[(&str, &str)], &[(&str, &str)])> for ArtifactProtobufSpec {
+    fn from(sources_strings: (&[(&str, &str)], &[(&str, &str)])) -> Self {
+        let sources = sources_strings.0.iter().map(From::from).collect();
+        let includes = sources_strings.1.iter().map(From::from).collect();
 
-        Self { sources }
+        Self { sources, includes }
     }
 }
 

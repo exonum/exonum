@@ -30,7 +30,7 @@ use crate::{
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
-    runtime::{ArtifactId, ProtoSourceFile},
+    runtime::{ArtifactId, ArtifactProtobufSpec},
 };
 
 use self::public::system::DispatcherInfo;
@@ -55,7 +55,7 @@ pub struct ApiNodeState {
 #[derive(Debug, Default)]
 pub struct DispatcherState {
     info: DispatcherInfo,
-    artifact_sources: HashMap<ArtifactId, Vec<ProtoSourceFile>>,
+    artifact_sources: HashMap<ArtifactId, ArtifactProtobufSpec>,
 }
 
 impl DispatcherState {
@@ -71,7 +71,7 @@ impl DispatcherState {
             .filter_map(|artifact_id| {
                 dispatcher
                     .artifact_protobuf_spec(&artifact_id)
-                    .map(|info| (artifact_id, info.sources.clone()))
+                    .map(|info| (artifact_id, info))
             })
             .collect();
 
@@ -204,7 +204,7 @@ impl SharedNodeState {
     }
 
     /// Returns the source files of the artifact with the specified identifier.
-    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<Vec<ProtoSourceFile>> {
+    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
         self.dispatcher
             .read()
             .expect("Expected read lock")

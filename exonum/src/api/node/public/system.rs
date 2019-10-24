@@ -16,11 +16,12 @@
 
 use exonum_merkledb::IndexAccess;
 
+use crate::runtime::ProtoSourceFile;
 use crate::{
     api::{self, node::SharedNodeState, ApiContext, ApiScope},
     blockchain::Schema,
     helpers::user_agent,
-    proto::schema::PROTO_SOURCES as EXONUM_PROTO_SOURCES,
+    proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
     runtime::{dispatcher, ArtifactId, InstanceSpec},
 };
 
@@ -85,6 +86,12 @@ pub struct ProtoSourcesQuery {
     pub artifact: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct ProtoSources {
+    pub sources: Vec<ProtoSourceFile>,
+    pub includes: Vec<ProtoSourceFile>,
+}
+
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
@@ -137,26 +144,47 @@ impl SystemApi {
         self
     }
 
-    fn handle_proto_source(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+    fn handle_proto_source_service(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let node_state = self.node_state.clone();
         api_scope.endpoint(name, {
             move |query: ProtoSourcesQuery| {
                 if let Some(artifact_id) = query.artifact {
-                    node_state
+                    let sources = node_state
                         .artifact_sources(&artifact_id.parse()?)
                         .ok_or_else(|| {
                             api::Error::NotFound(format!(
                                 "Unable to find sources for artifact {}",
                                 artifact_id
                             ))
-                        })
+                        })?;
+
+                    Ok(ProtoSources {
+                        sources: sources.sources,
+                        includes: filter_exonum_sources(sources.includes),
+                    })
                 } else {
-                    Ok(EXONUM_PROTO_SOURCES
+                    Err(api::Error::BadRequest("artifact is not specified".into()))
+                }
+            }
+        });
+        self
+    }
+
+    fn handle_proto_source_core(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        api_scope.endpoint(name, {
+            move |_: ()| {
+                Ok(ProtoSources {
+                    sources: EXONUM_PROTO_SOURCES
                         .as_ref()
                         .iter()
                         .map(From::from)
-                        .collect::<Vec<_>>())
-                }
+                        .collect::<Vec<_>>(),
+                    includes: EXONUM_INCLUDES
+                        .as_ref()
+                        .iter()
+                        .map(From::from)
+                        .collect::<Vec<_>>(),
+                })
             }
         });
         self
@@ -188,7 +216,22 @@ impl SystemApi {
             .handle_healthcheck_info("v1/healthcheck", api_scope)
             .handle_user_agent_info("v1/user_agent", api_scope)
             .handle_list_services_info("v1/services", api_scope)
-            .handle_proto_source("v1/proto-sources", api_scope);
+            .handle_proto_source_core("v1/proto-sources/core", api_scope)
+            .handle_proto_source_service("v1/proto-sources/service", api_scope);
         api_scope
     }
+}
+
+fn filter_exonum_sources(files: Vec<ProtoSourceFile>) -> Vec<ProtoSourceFile> {
+    let sources = EXONUM_PROTO_SOURCES
+        .as_ref()
+        .iter()
+        .map(From::from)
+        .collect::<Vec<ProtoSourceFile>>();
+
+    files
+        .iter()
+        .cloned()
+        .filter(|s| !sources.contains(s))
+        .collect()
 }

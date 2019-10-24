@@ -55,7 +55,6 @@ impl<'a> ProtoSources<'a> {
     }
 
     /// Most frequently used combination of proto dependencies.
-    /// TODO: maybe find a better name.
     pub fn frequently_used() -> Vec<Self> {
         vec![
             ProtoSources::Exonum,
@@ -88,7 +87,7 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
 
 /// Includes all .proto files with their names into generated file as array of tuples,
 /// where tuple content is (file_name, file_content).
-fn include_proto_files(proto_files: HashSet<&PathBuf>) -> impl ToTokens {
+fn include_proto_files(proto_files: HashSet<&PathBuf>, name: &str) -> impl ToTokens {
     let proto_files_len = proto_files.len();
     // TODO Think about syn crate and token streams instead of dirty strings.
     let proto_files = proto_files.iter().map(|path| {
@@ -109,11 +108,13 @@ fn include_proto_files(proto_files: HashSet<&PathBuf>) -> impl ToTokens {
         }
     });
 
+    let name = Ident::new(name, Span::call_site());
+
     quote! {
         /// Original proto files which were be used to generate this module.
         /// First element in tuple is file name, second is proto file content.
         #[allow(dead_code)]
-        pub const PROTO_SOURCES: [(&str, &str); #proto_files_len] = [
+        pub const #name: [(&str, &str); #proto_files_len] = [
             #( #proto_files )*
         ];
     }
@@ -152,12 +153,18 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 
     // To avoid cases where input sources are also added as includes, use only
     // unique paths.
-    let proto_files: HashSet<&PathBuf> = proto_files.iter().chain(includes).collect();
-    let proto_files = include_proto_files(proto_files);
+    let includes = includes
+        .iter()
+        .filter(|file| !proto_files.contains(file))
+        .collect();
+
+    let proto_files = include_proto_files(proto_files.iter().collect(), "PROTO_SOURCES");
+    let includes = include_proto_files(includes, "INCLUDES");
 
     let content = quote! {
         #( #mod_files )*
         #proto_files
+        #includes
     };
 
     let dest_path = out_dir.as_ref().join(mod_file);
