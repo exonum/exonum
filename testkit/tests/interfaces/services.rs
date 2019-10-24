@@ -23,8 +23,9 @@ use exonum::{
         CallInfo, Caller, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
+use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::Snapshot;
+use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::{
@@ -34,8 +35,8 @@ use crate::{
     schema::{Wallet, WalletSchema},
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::CreateWallet")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::CreateWallet")]
 pub struct TxCreateWallet {
     pub name: String,
 }
@@ -110,8 +111,8 @@ impl IssueReceiver for WalletService {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Issue")]
+#[protobuf_convert(source = "proto::Issue")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TxIssue {
     pub to: PublicKey,
     pub amount: u64,
@@ -151,16 +152,16 @@ impl DepositInterface for DepositService {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::AnyCall")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::AnyCall")]
 pub struct TxAnyCall {
     pub call_info: CallInfo,
     pub interface_name: String,
     pub args: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::RecursiveCall")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::RecursiveCall")]
 pub struct TxRecursiveCall {
     pub depth: u64,
 }

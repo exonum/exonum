@@ -22,8 +22,9 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ProtobufConvert, ServiceFactory};
+use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
+use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use super::proto;
@@ -38,8 +39,8 @@ pub const INIT_BALANCE: u64 = 0;
 
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Wallet")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Wallet")]
 pub struct Wallet {
     pub pub_key: PublicKey,
     pub name: String,
@@ -99,15 +100,15 @@ impl<T: IndexAccess> CurrencySchema<T> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 /// Create a new wallet.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::TxCreateWallet")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::TxCreateWallet")]
 pub struct TxCreateWallet {
     pub name: String,
 }
 
 /// Transfer coins between the wallets.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::TxTransfer")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::TxTransfer")]
 pub struct TxTransfer {
     pub to: PublicKey,
     pub amount: u64,

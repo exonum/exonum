@@ -22,12 +22,12 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, ConfigChange, InstanceId, ServiceConfig},
 };
-use exonum_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 
 use super::SimpleSupervisor;
 
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::service::ConfigPropose")]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::service::ConfigPropose")]
 pub struct ConfigPropose {
     pub changes: Vec<ConfigChange>,
     pub actual_from: Height,

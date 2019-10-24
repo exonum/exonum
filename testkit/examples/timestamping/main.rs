@@ -29,14 +29,15 @@ use exonum::{
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_proto::ProtobufConvert;
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
 
 mod proto;
 
 // Simple service implementation.
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::TxTimestamp")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::TxTimestamp")]
 struct TxTimestamp {
     message: String,
 }

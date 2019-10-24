@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_derive::exonum_service;
+use exonum_proto::ProtobufConvert;
 
 use crate::{
     crypto::Hash,
@@ -34,20 +35,20 @@ use super::{
 const SERVICE_INSTANCE_ID: InstanceId = 2;
 const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
-#[derive(Debug, ProtobufConvert)]
-#[exonum(pb = "TestServiceInit", crate = "crate")]
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceInit")]
 pub struct Init {
     msg: String,
 }
 
-#[derive(Debug, ProtobufConvert)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
 struct TxA {
     value: u64,
 }
 
-#[derive(Debug, ProtobufConvert)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
 struct TxB {
     value: u64,
 }

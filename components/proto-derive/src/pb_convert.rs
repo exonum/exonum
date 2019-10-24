@@ -21,22 +21,19 @@ use syn::{Attribute, Data, DataEnum, DataStruct, DeriveInput, Fields, Path, Type
 
 use std::convert::TryFrom;
 
-use super::{find_exonum_meta, CratePath};
+use super::find_protobuf_convert_meta;
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ProtobufConvertStructAttrs {
-    #[darling(rename = "crate")]
-    cr: CratePath,
-    pb: Option<Path>,
+    source: Option<Path>,
     serde_pb_convert: bool,
 }
 
 impl Default for ProtobufConvertStructAttrs {
     fn default() -> Self {
         Self {
-            cr: CratePath::default(),
-            pb: None,
+            source: None,
             serde_pb_convert: false,
         }
     }
@@ -46,7 +43,7 @@ impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_protobuf_convert_meta(args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
@@ -55,9 +52,7 @@ impl TryFrom<&[Attribute]> for ProtobufConvertStructAttrs {
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ProtobufConvertEnumAttrs {
-    #[darling(rename = "crate")]
-    cr: CratePath,
-    pb: Option<Path>,
+    source: Option<Path>,
     serde_pb_convert: bool,
     oneof_field: Ident,
 }
@@ -65,8 +60,7 @@ struct ProtobufConvertEnumAttrs {
 impl Default for ProtobufConvertEnumAttrs {
     fn default() -> Self {
         Self {
-            cr: CratePath::default(),
-            pb: None,
+            source: None,
             oneof_field: syn::parse_str("message").unwrap(),
             serde_pb_convert: false,
         }
@@ -77,7 +71,7 @@ impl TryFrom<&[Attribute]> for ProtobufConvertEnumAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_protobuf_convert_meta(args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
@@ -114,7 +108,7 @@ impl ProtobufConvertStruct {
 impl ToTokens for ProtobufConvertStruct {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = &self.name;
-        let pb_name = &self.attrs.pb;
+        let pb_name = &self.attrs.source;
         let from_pb_impl = {
             let getters = self
                 .fields
@@ -224,7 +218,7 @@ impl ProtobufConvertEnum {
 
     fn impl_protobuf_convert(&self) -> impl ToTokens {
         let pb_oneof_enum = {
-            let mut pb = self.attrs.pb.clone().unwrap();
+            let mut pb = self.attrs.source.clone().unwrap();
             let oneof = pb.segments.pop().unwrap().value().ident.clone();
             let oneof_enum = Ident::new(
                 &format!("{}_oneof_{}", oneof, &self.attrs.oneof_field),
@@ -233,7 +227,7 @@ impl ProtobufConvertEnum {
             quote! { #pb #oneof_enum }
         };
         let name = &self.name;
-        let pb_name = &self.attrs.pb;
+        let pb_name = &self.attrs.source;
         let oneof = &self.attrs.oneof_field;
 
         let from_pb_impl = {
@@ -381,47 +375,10 @@ impl ProtobufConvert {
         }
     }
 
-    fn cr(&self) -> &CratePath {
-        match self {
-            ProtobufConvert::Enum(inner) => &inner.attrs.cr,
-            ProtobufConvert::Struct(inner) => &inner.attrs.cr,
-        }
-    }
-
     fn serde_needed(&self) -> bool {
         match self {
             ProtobufConvert::Enum(inner) => inner.attrs.serde_pb_convert,
             ProtobufConvert::Struct(inner) => inner.attrs.serde_pb_convert,
-        }
-    }
-
-    fn implement_merkledb_traits(&self) -> impl ToTokens {
-        let name = self.name();
-        let cr = self.cr();
-
-        quote! {
-            impl exonum_merkledb::ObjectHash for #name {
-                fn object_hash(&self) -> #cr::crypto::Hash {
-                    use exonum_merkledb::BinaryValue;
-                    let v = self.to_bytes();
-                    #cr::crypto::hash(&v)
-                }
-            }
-
-            // This trait assumes that we work with trusted data so we can unwrap here.
-            impl exonum_merkledb::BinaryValue for #name {
-                fn to_bytes(&self) -> Vec<u8> {
-                    self.to_pb().write_to_bytes().expect(
-                        concat!("Failed to serialize in BinaryValue for ", stringify!(#name))
-                    )
-                }
-
-                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
-                    let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
-                    block.merge_from_bytes(value.as_ref())?;
-                    ProtobufConvert::from_pb(block)
-                }
-            }
         }
     }
 
@@ -464,7 +421,6 @@ impl ToTokens for ProtobufConvert {
             Span::call_site(),
         );
         let protobuf_convert = self.implement_protobuf_convert();
-        let merkledb_traits = self.implement_merkledb_traits();
         let serde_traits = if self.serde_needed() {
             let serde = self.implement_serde_protobuf_convert();
             quote! { #serde }
@@ -480,7 +436,6 @@ impl ToTokens for ProtobufConvert {
                 use exonum_proto::ProtobufConvert;
 
                 #protobuf_convert
-                #merkledb_traits
                 #serde_traits
             }
         };
