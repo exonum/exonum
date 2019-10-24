@@ -160,12 +160,12 @@ pub trait Transaction<Svc: ?Sized>: BinaryValue {
 pub struct AfterCommitContext<'a> {
     /// Service instance associated with the current context.
     pub instance: InstanceDescriptor<'a>,
+    /// Reference to the dispatcher mailbox.
+    mailbox: &'a mut Mailbox,
     /// Read-only snapshot of the current blockchain state.
     pub snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
-    /// Reference to the dispatcher mailbox.
-    mailbox: &'a mut Mailbox,
     /// Channel to send signed transactions to the transactions pool.
     tx_sender: &'a ApiSender,
 }
@@ -227,7 +227,7 @@ impl<'a> AfterCommitContext<'a> {
         self.tx_sender.clone()
     }
 
-    // Provides a supervisor interface to an authorized instance.
+    /// Provides a supervisor interface to an authorized instance.
     #[doc(hidden)]
     pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions> {
         if !is_supervisor(self.instance.id) {

@@ -23,18 +23,16 @@ use std::{
 };
 
 use crate::{
-    api::ApiBuilder,
-    blockchain::{FatalError, IndexCoordinates, IndexOwner},
-    crypto::{Hash, PublicKey, SecretKey},
+    blockchain::{Blockchain, FatalError, IndexCoordinates, IndexOwner},
+    crypto::Hash,
     helpers::ValidateInput,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    node::ApiSender,
 };
 
 use super::{
-    api::ApiContext, error::ExecutionError, ApiChange, ArtifactId, ArtifactProtobufSpec,
-    ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    error::ExecutionError, ArtifactId, ArtifactProtobufSpec, ArtifactSpec, Caller,
+    ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 use crate::runtime::{InstanceDescriptor, InstanceQuery};
 
@@ -57,23 +55,26 @@ struct ServiceInfo {
     name: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     service_infos: BTreeMap<InstanceId, ServiceInfo>,
-    api_changes: BTreeMap<u32, Vec<ApiChange>>,
 }
 
 impl Dispatcher {
-    /// Create a new dispatcher with the specified runtimes.
-    pub(crate) fn with_runtimes(
+    /// Creates a new dispatcher with the specified runtimes.
+    pub(crate) fn new(
+        blockchain: &Blockchain,
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
     ) -> Self {
-        Self {
+        let mut this = Self {
             runtimes: runtimes.into_iter().collect(),
             service_infos: BTreeMap::new(),
-            api_changes: BTreeMap::new(),
+        };
+        for runtime in this.runtimes.values_mut() {
+            runtime.initialize(blockchain);
         }
+        this
     }
 
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
@@ -85,7 +86,7 @@ impl Dispatcher {
         }
         // Restart active service instances.
         for instance in schema.service_instances().values() {
-            self.add_service(&instance)?;
+            self.start_service(snapshot, &instance)?;
         }
         Ok(())
     }
@@ -118,7 +119,7 @@ impl Dispatcher {
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
-            self.deploy_and_register_artifact(fork, spec.artifact.clone(), artifact_spec)?;
+            self.deploy_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
         }
 
         // Start the built-in service instance.
@@ -149,23 +150,6 @@ impl Dispatcher {
         aggregator
     }
 
-    // FIXME: remove in favor of "on node start" hook
-    pub(crate) fn api_endpoints(
-        &self,
-        context: &ApiContext,
-    ) -> impl IntoIterator<Item = (String, ApiBuilder)> {
-        self.runtimes
-            .values()
-            .map(|runtime| {
-                runtime
-                    .api_endpoints(context)
-                    .into_iter()
-                    .map(|(service_name, builder)| (service_name, ApiBuilder::from(builder)))
-            })
-            .flatten()
-            .collect::<Vec<_>>()
-    }
-
     /// Initiate artifact deploy procedure in the corresponding runtime.
     ///
     /// # Panics
@@ -185,10 +169,12 @@ impl Dispatcher {
         }
     }
 
-    /// Registers artifact to be deployed in the dispatcher's information schema.
-    /// The artifact is not guaranteed to be deployed until the block built on top of the
-    /// provided `Fork` is committed.
-    pub(crate) fn start_artifact_registration(
+    /// Commits to the artifact deployment. This means that the node will cease working
+    /// if the block with built on top of `fork` is committed until the artifact is deployed.
+    ///
+    /// Until the block built on top of `fork` is committed (or if `fork` is discarded in
+    /// favor of another block proposal), no blocking is performed.
+    pub(crate) fn commit_artifact(
         fork: &Fork,
         artifact: ArtifactId,
         spec: Vec<u8>,
@@ -198,7 +184,7 @@ impl Dispatcher {
         Ok(())
     }
 
-    fn register_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
+    fn block_until_deployed(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
             self.deploy_artifact(artifact, spec)
                 .wait()
@@ -213,7 +199,8 @@ impl Dispatcher {
         }
     }
 
-    pub(crate) fn deploy_and_register_artifact(
+    /// Deploys an artifact synchronously, i.e., blocking until the artifact is deployed.
+    pub(crate) fn deploy_artifact_sync(
         &mut self,
         fork: &Fork,
         artifact: ArtifactId,
@@ -222,8 +209,8 @@ impl Dispatcher {
         let spec = spec.into_bytes();
         self.deploy_artifact(artifact.clone(), spec.clone())
             .wait()?;
-        Self::start_artifact_registration(fork, artifact.clone(), spec.clone())?;
-        self.register_artifact(artifact, spec);
+        Self::commit_artifact(fork, artifact.clone(), spec.clone())?;
+        self.block_until_deployed(artifact, spec);
         Ok(())
     }
 
@@ -246,19 +233,6 @@ impl Dispatcher {
         runtime.execute(context, call_info, &tx.as_ref().arguments)
     }
 
-    /// Looks up a runtime by its identifier.
-    pub(crate) fn runtime_by_id(&self, id: u32) -> Option<&dyn Runtime> {
-        self.runtimes.get(&id).map(AsRef::as_ref)
-    }
-
-    /// Looks up the runtime for the specified service instance. Returns a reference to
-    /// the runtime, or an error if the service with the sepcified instance ID does not exist.
-    pub(crate) fn runtime_for_service(&self, instance_id: InstanceId) -> Option<&dyn Runtime> {
-        let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
-        let runtime = self.runtimes[&runtime_id].as_ref();
-        Some(runtime)
-    }
-
     #[cfg(test)]
     pub(crate) fn call(
         &self,
@@ -274,6 +248,7 @@ impl Dispatcher {
         runtime.execute(context, call_info, arguments)
     }
 
+    /// Calls `before_commit` for all currently active services, isolating each call.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::BeforeCommit);
@@ -288,43 +263,38 @@ impl Dispatcher {
         }
     }
 
-    pub(crate) fn after_commit(
-        &mut self,
-        fork: &Fork,
-        service_keypair: &(PublicKey, SecretKey),
-        tx_sender: &ApiSender,
-    ) {
-        // Run `after_commit` for runtimes.
-        let mut mailbox = Mailbox::default();
-        for runtime in self.runtimes.values_mut() {
-            runtime.after_commit(&mut mailbox, fork.as_ref(), &service_keypair, &tx_sender);
-        }
-        for action in mailbox.actions {
-            action.execute(self);
-        }
-
-        // **NB.** Changes to the `fork` below MUST be the same for all nodes.
+    /// Calls `after_commit` for all runtimes.
+    pub(crate) fn after_commit(&mut self, fork: &Fork) {
+        // **NB.** Changes to the `fork` below MUST be the same for all nodes. This is not
+        // checked by the consensus algorithm as usual.
         let mut schema = Schema::new(fork);
+        let snapshot = fork.as_ref();
 
         // Deploy pending artifacts.
         let mut artifacts = schema.pending_artifacts();
-        for ArtifactSpec {
-            artifact,
-            payload: spec,
-        } in artifacts.values()
-        {
-            self.register_artifact(artifact.clone(), spec.clone());
-            schema.add_artifact(artifact, spec);
+        for spec in artifacts.values() {
+            self.block_until_deployed(spec.artifact.clone(), spec.payload.clone());
+            schema.add_artifact(spec.artifact, spec.payload);
         }
-        artifacts.clear();
 
         // Start pending services.
         let mut services = schema.pending_service_instances();
         for spec in services.values() {
-            self.add_service(&spec).expect("Cannot add service");
+            self.start_service(snapshot, &spec)
+                .expect("Cannot add service");
             schema.add_service(spec);
         }
+        artifacts.clear();
         services.clear();
+
+        // Run `after_commit` for runtimes.
+        let mut mailbox = Mailbox::default();
+        for runtime in self.runtimes.values_mut() {
+            runtime.after_commit(fork.as_ref(), &mut mailbox);
+        }
+        for action in mailbox.actions {
+            action.execute(self);
+        }
     }
 
     /// Return additional information about the artifact if it is deployed.
@@ -343,7 +313,20 @@ impl Dispatcher {
         }
     }
 
-    /// Returns the service by a query.
+    /// Looks up a runtime by its identifier.
+    pub(crate) fn runtime_by_id(&self, id: u32) -> Option<&dyn Runtime> {
+        self.runtimes.get(&id).map(AsRef::as_ref)
+    }
+
+    /// Looks up the runtime for the specified service instance. Returns a reference to
+    /// the runtime, or an error if the service with the sepcified instance ID does not exist.
+    pub(crate) fn runtime_for_service(&self, instance_id: InstanceId) -> Option<&dyn Runtime> {
+        let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
+        let runtime = self.runtimes[&runtime_id].as_ref();
+        Some(runtime)
+    }
+
+    /// Returns the service matching the specified query.
     pub(crate) fn get_service<'s>(
         &'s self,
         fork: &Fork,
@@ -363,30 +346,26 @@ impl Dispatcher {
         }
     }
 
-    /// Notify the runtime about API changes and return true if there are such changes.
-    pub(crate) fn notify_api_changes(&mut self, context: &ApiContext) -> bool {
-        let api_changes = {
-            let mut api_changes = BTreeMap::default();
-            std::mem::swap(&mut api_changes, &mut self.api_changes);
-            api_changes
-        };
-
-        let has_changes = !api_changes.is_empty();
-        for (runtime_id, changes) in api_changes {
-            self.runtimes[&runtime_id].notify_api_changes(context, &changes)
-        }
-        has_changes
-    }
-
     /// Notify the runtimes that it has to shutdown.
-    pub(crate) fn shutdown(&self) {
-        for runtime in self.runtimes.values() {
+    pub(crate) fn shutdown(&mut self) {
+        for runtime in self.runtimes.values_mut() {
             runtime.shutdown();
         }
     }
 
-    /// Register the service instance in the runtime lookup table.
-    fn register_running_service(&mut self, instance: &InstanceSpec) {
+    /// Restart a previously committed service instance.
+    fn start_service(
+        &mut self,
+        snapshot: &dyn Snapshot,
+        instance: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
+        // Notify the runtime that the service has been committed.
+        let runtime = self
+            .runtimes
+            .get_mut(&instance.artifact.runtime_id)
+            .ok_or(Error::IncorrectRuntime)?;
+        runtime.commit_service(snapshot, instance)?;
+
         info!("Running service instance {:?}", instance);
         self.service_infos.insert(
             instance.id,
@@ -395,22 +374,6 @@ impl Dispatcher {
                 name: instance.name.to_owned(),
             },
         );
-        // Add service instance to the list of modified APIs.
-        let runtime_changes = self
-            .api_changes
-            .entry(instance.artifact.runtime_id)
-            .or_default();
-        runtime_changes.push(ApiChange::InstanceAdded(instance.id));
-    }
-
-    /// Restart a new previously added service instance.
-    fn add_service(&mut self, instance: &InstanceSpec) -> Result<(), ExecutionError> {
-        let runtime = self
-            .runtimes
-            .get_mut(&instance.artifact.runtime_id)
-            .ok_or(Error::IncorrectRuntime)?;
-        runtime.add_service(instance)?;
-        self.register_running_service(&instance);
         Ok(())
     }
 

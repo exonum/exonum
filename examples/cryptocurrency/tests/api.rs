@@ -314,7 +314,7 @@ impl CryptocurrencyApi {
 
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
-    let testkit =
+    let mut testkit =
         TestKit::for_rust_service(CryptocurrencyService, INSTANCE_NAME, INSTANCE_ID, Config);
     let api = CryptocurrencyApi {
         inner: testkit.api(),

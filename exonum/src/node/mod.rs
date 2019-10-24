@@ -47,17 +47,20 @@ use std::{
 use crate::{
     api::{
         backends::actix::{
-            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntime, SystemRuntimeConfig,
+            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig,
         },
+        manager::UpdateEndpoints,
         node::SharedNodeState,
         ApiAccess, ApiAggregator,
     },
-    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
+    blockchain::{
+        Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+    },
     crypto::{self, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
-        Event, EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest,
+        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest,
         NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
         TimeoutRequest,
     },
@@ -129,7 +132,7 @@ pub struct NodeHandler {
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
     /// Blockchain.
-    pub blockchain: Blockchain,
+    pub blockchain: BlockchainMut,
     /// Known peer addresses.
     pub peer_discovery: Vec<String>,
     /// Does this node participate in the consensus?
@@ -444,7 +447,7 @@ impl ConnectListConfig {
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
-        blockchain: Blockchain,
+        blockchain: BlockchainMut,
         external_address: &str,
         sender: NodeSender,
         system_state: Box<dyn SystemStateProvider>,
@@ -453,12 +456,11 @@ impl NodeHandler {
         config_file_path: Option<String>,
     ) -> Self {
         let (last_hash, last_height) = {
-            let block = blockchain.last_block();
+            let block = blockchain.as_ref().last_block();
             (block.object_hash(), block.height().next())
         };
 
-        let snapshot = blockchain.snapshot();
-
+        let snapshot = blockchain.as_ref().snapshot();
         let consensus_config = Schema::new(&snapshot).consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
@@ -484,7 +486,7 @@ impl NodeHandler {
             connect_list,
             consensus_config,
             connect,
-            blockchain.get_saved_peers(),
+            blockchain.as_ref().get_saved_peers(),
             last_hash,
             last_height,
             system_state.current_time(),
@@ -600,10 +602,9 @@ impl NodeHandler {
             info!("Trying to connect with peer {}", key);
         }
 
-        let snapshot = self.blockchain.snapshot();
+        let snapshot = self.blockchain.as_ref().snapshot();
         let schema = Schema::new(&snapshot);
-
-        // Recover previous saved round if any
+        // Recover previous saved round if any.
         let round = schema.consensus_round();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
@@ -718,7 +719,7 @@ impl NodeHandler {
     }
 
     fn need_faster_propose(&self) -> bool {
-        let snapshot = self.blockchain.snapshot();
+        let snapshot = self.blockchain.as_ref().snapshot();
         let pending_tx_count =
             Schema::new(&snapshot).transactions_pool_len() + self.state.tx_cache_len() as u64;
         pending_tx_count >= u64::from(self.propose_timeout_threshold())
@@ -754,12 +755,12 @@ impl NodeHandler {
 
     /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain.last_block().object_hash()
+        self.blockchain.as_ref().last_block().object_hash()
     }
 
     /// Returns the number of uncommitted transactions.
     pub fn uncommitted_txs_count(&self) -> u64 {
-        self.blockchain.pool_size() + self.state.tx_cache_len() as u64
+        self.blockchain.as_ref().pool_size() + self.state.tx_cache_len() as u64
     }
 
     /// Returns start time of the requested round.
@@ -791,6 +792,11 @@ impl ApiSender {
     /// Creates new `ApiSender` with given channel.
     pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
         ApiSender(inner)
+    }
+
+    /// Creates a dummy sender which cannot send messages.
+    pub fn closed() -> Self {
+        ApiSender(mpsc::channel(0).0)
     }
 
     /// Add peer to peer list
@@ -861,7 +867,13 @@ pub struct NodeChannel {
         mpsc::Sender<InternalRequest>,
         mpsc::Receiver<InternalRequest>,
     ),
-    /// Channel for api requests.
+    /// Channel for transferring API endpoints from producers (e.g., Rust runtime) to the
+    /// `ApiManager`.
+    pub endpoints: (
+        mpsc::Sender<UpdateEndpoints>,
+        mpsc::Receiver<UpdateEndpoints>,
+    ),
+    /// Channel for API requests.
     pub api_requests: (
         mpsc::Sender<ExternalMessage>,
         mpsc::Receiver<ExternalMessage>,
@@ -890,6 +902,7 @@ impl NodeChannel {
         Self {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
+            endpoints: mpsc::channel(buffer_sizes.internal_events_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
             internal_events: mpsc::channel(buffer_sizes.internal_events_capacity),
@@ -921,18 +934,20 @@ impl Node {
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let blockchain = Blockchain::new(
             database,
-            external_runtimes,
-            services,
-            node_cfg.consensus.clone(),
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
-            channel.internal_requests.0.clone(),
         );
+        let blockchain = blockchain
+            .into_mut(node_cfg.consensus.clone())
+            .with_rust_runtime(channel.endpoints.0.clone(), services)
+            .with_external_runtimes(external_runtimes)
+            .build()
+            .expect("Cannot create dispatcher");
         Self::with_blockchain(blockchain, channel, node_cfg, config_file_path)
     }
 
     pub fn with_blockchain(
-        blockchain: Blockchain,
+        blockchain: BlockchainMut,
         channel: NodeChannel,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
@@ -940,7 +955,6 @@ impl Node {
         crypto::init();
 
         let peers = node_cfg.connect_list.addresses();
-
         let config = Configuration {
             listener: ListenerConfig {
                 connect_list: ConnectList::from_config(node_cfg.connect_list),
@@ -956,7 +970,10 @@ impl Node {
             keys: node_cfg.keys,
         };
 
-        let api_state = SharedNodeState::new(&blockchain, node_cfg.api.state_update_timeout as u64);
+        let api_state = SharedNodeState::new(
+            blockchain.as_ref(),
+            node_cfg.api.state_update_timeout as u64,
+        );
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
 
@@ -992,7 +1009,7 @@ impl Node {
                     .chain(private_api_handler)
                     .collect::<Vec<_>>()
             },
-            api_aggregator: ApiAggregator::new(blockchain.clone(), api_state.clone()),
+            api_aggregator: ApiAggregator::new(blockchain.as_ref(), api_state.clone()),
         };
 
         let handler = NodeHandler::new(
@@ -1075,23 +1092,12 @@ impl Node {
     }
 
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
-        // TODO refactor node module to reduce complexity.
-        struct HandlerWithRuntime {
-            inner: NodeHandler,
-            system_runtime: SystemRuntime,
-        }
-
-        impl EventHandler for HandlerWithRuntime {
-            fn handle_event(&mut self, event: Event) {
-                match event {
-                    Event::Internal(InternalEvent::RestartApi) => self.system_runtime.restart(),
-                    event => self.inner.handle_event(event),
-                }
-            }
-        }
-
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list().clone();
+
+        self.api_runtime_config
+            .start(self.channel.endpoints.1)
+            .expect("Failed to start api_runtime.");
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {
@@ -1106,11 +1112,7 @@ impl Node {
 
         let (internal_tx, internal_rx) = self.channel.internal_events;
         let handler_part = HandlerPart {
-            handler: HandlerWithRuntime {
-                inner: self.handler,
-                system_runtime: SystemRuntime::new(self.api_runtime_config)
-                    .expect("Failed to start api_runtime."),
-            },
+            handler: self.handler,
             internal_rx,
             network_rx,
             api_rx: self.channel.api_requests.1,
@@ -1125,7 +1127,7 @@ impl Node {
 
     /// Returns `Blockchain` instance.
     pub fn blockchain(&self) -> Blockchain {
-        self.handler.blockchain.clone()
+        self.handler.blockchain.as_ref().clone()
     }
 
     /// Returns `State`.

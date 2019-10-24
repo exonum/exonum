@@ -91,9 +91,8 @@
 //! [artifacts]: struct.ArtifactId.html
 //! [`Configure`]: rust/interfaces/trait.Configure.html
 
-pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
-    dispatcher::{Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
+    dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{ErrorKind, ExecutionError},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, CallInfo, DeployStatus, InstanceId, InstanceQuery,
@@ -113,13 +112,10 @@ use std::fmt::Debug;
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
 use crate::{
-    api::ApiContext,
-    crypto::{Hash, PublicKey, SecretKey},
+    blockchain::Blockchain,
+    crypto::{Hash, PublicKey},
     helpers::ValidateInput,
-    node::ApiSender,
 };
-
-use self::api::ServiceApiBuilder;
 
 mod dispatcher;
 mod types;
@@ -174,7 +170,15 @@ impl From<RuntimeIdentifier> for u32 {
 /// # Hints
 ///
 /// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics according to panic policy.
+#[allow(unused_variables)]
 pub trait Runtime: Send + Debug + 'static {
+    /// Initializes the runtime, providing a `Blockchain` instance for further use. The default
+    /// implementation does nothing.
+    ///
+    /// This method is guaranteed to be called before any other `Runtime` methods. It is
+    /// called only once during `Runtime` lifetime.
+    fn initialize(&mut self, blockchain: &Blockchain) {}
+
     /// Request to deploy artifact with the given identifier and additional deploy specification.
     ///
     /// # Policy on Panics
@@ -219,15 +223,22 @@ pub trait Runtime: Send + Debug + 'static {
     /// Permanently adds a service to the runtime.
     ///
     /// It is guaranteed that `start_adding_service()` was called with the same `spec` earlier
-    /// and returned `Ok(())`. Note that this previous call may have happened indefinite time ago;
-    /// indeed, the method is called for all services on the node startup.
+    /// and returned `Ok(())`. The results of the call (i.e., changes to the blockchain state)
+    /// are guaranteed to be persisted from the call.
+    ///
+    /// Note that this a call to  `start_adding_service()` may have happened indefinite time ago;
+    /// indeed, `commit_service()` is called for all services on the node startup.
     ///
     /// # Policy on Panics
     ///
     /// Any error returned from this method should be considered to be fatal. There are edge
     /// cases where the returned error does not lead to a panic, but as a rule of thumb, a
     /// `Runtime` should not return an error here unless it wants the node to stop forever.
-    fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
+    fn commit_service(
+        &mut self,
+        snapshot: &dyn Snapshot,
+        spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError>;
 
     /// Dispatch payload to the method of a specific service instance.
     /// Service instance name and method ID are provided in the `call_info` argument and
@@ -268,42 +279,15 @@ pub trait Runtime: Send + Debug + 'static {
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError>;
 
-    /// Calls `after_commit` for all the services stored in the runtime.
+    /// Notifies the runtime about commitment of a new block.
+    ///
+    /// This method is guaranteed to be called *after* all `commit_service` calls related
+    /// to the same block.
     ///
     /// # Policy on Panics
     ///
-    /// * Catch each kind of panics except for `FatalError` and write
-    /// them into the log.
-    // The different call pattern compared to `before_commit` stems from the fact
-    // that processing of `after_commit` can heavily depend on the runtime. Ideally, we would
-    // like for the Rust runtime to allow services to spawn async background tasks instead
-    // of using `after_commit`.
-    // TODO: implement the above and remove `after_commit` from Rust services.
-    fn after_commit(
-        &mut self,
-        mailbox: &mut Mailbox,
-        snapshot: &dyn Snapshot,
-        service_keypair: &(PublicKey, SecretKey),
-        tx_sender: &ApiSender,
-    );
-
-    /// Collect the full list of API handlers from the runtime for the built-in Exonum API server.
-    ///
-    /// This method is called during the API server restart. Use this method if you do not plan to
-    /// use your own API processing mechanism.
-    ///
-    /// Warning! It is a temporary method which retains the existing `RustRuntime` code.
-    /// It will be removed in the future.
-    #[doc(hidden)]
-    fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
-        Vec::new()
-    }
-
-    /// Notify the runtime about the changes in the list of service instances.
-    ///
-    /// The purpose of this method is to provide building blocks to create your own
-    /// API processing mechanisms.
-    fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
+    /// - Catch each kind of panics except for `FatalError` and write them into the log.
+    fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox);
 
     /// Notify the runtime that it has to shutdown.
     ///
@@ -313,7 +297,7 @@ pub trait Runtime: Send + Debug + 'static {
     /// Invoking of this callback is guaranteed to be the last operation for the runtime.
     /// Since this method is a part of shutdown process, runtimes can perform blocking and
     /// heavy operations here if needed.
-    fn shutdown(&self) {}
+    fn shutdown(&mut self) {}
 }
 
 impl<T: Runtime> From<T> for Box<dyn Runtime> {
@@ -560,13 +544,4 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
     fn from(descriptor: InstanceDescriptor) -> Self {
         (descriptor.id, descriptor.name.to_owned())
     }
-}
-
-/// Change in the list of service instances.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum ApiChange {
-    /// New instance has been added.
-    InstanceAdded(InstanceId),
-    /// Instance has been removed.
-    InstanceRemoved(InstanceId),
 }

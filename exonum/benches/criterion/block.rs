@@ -39,12 +39,13 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
-    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
+    blockchain::{
+        Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+    },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::Runtime,
 };
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
@@ -76,9 +77,7 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
     services: Vec<InstanceCollection>,
-) -> Blockchain {
-    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-
+) -> BlockchainMut {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
     let genesis_config = ConsensusConfig {
@@ -89,18 +88,15 @@ fn create_blockchain(
         ..ConsensusConfig::default()
     };
 
-    Blockchain::new(
-        db,
-        external_runtimes,
-        services,
-        genesis_config,
-        service_keypair,
-        ApiSender::new(mpsc::channel(0).0),
-        mpsc::channel(0).0,
-    )
+    let api_sender = ApiSender::new(mpsc::channel(0).0);
+    Blockchain::new(db, service_keypair, api_sender)
+        .into_mut(genesis_config)
+        .with_rust_runtime(mpsc::channel(0).0, services)
+        .build()
+        .unwrap()
 }
 
-fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, Patch) {
+fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
     blockchain.create_patch(
         ValidatorId::zero(),
         Height(height),
@@ -569,24 +565,20 @@ mod foreign_interface_call {
 }
 
 /// Writes transactions to the pool and returns their hashes.
-fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
+fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
     let fork = blockchain.fork();
+    let mut schema = Schema::new(&fork);
 
-    let tx_hashes = {
-        let mut schema = Schema::new(&fork);
-
-        // In the case of the block within `Bencher::iter()`, some transactions
-        // may already be present in the pool. We don't particularly care about this.
-        transactions
-            .into_iter()
-            .map(|tx| {
-                let hash = tx.object_hash();
-                schema.add_transaction_into_pool(tx);
-                hash
-            })
-            .collect()
-    };
-
+    // In the case of the block within `Bencher::iter()`, some transactions
+    // may already be present in the pool. We don't particularly care about this.
+    let tx_hashes = transactions
+        .into_iter()
+        .map(|tx| {
+            let hash = tx.object_hash();
+            schema.add_transaction_into_pool(tx);
+            hash
+        })
+        .collect();
     blockchain.merge(fork.into_patch()).unwrap();
     tx_hashes
 }
@@ -607,7 +599,7 @@ fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
 }
 
 fn prepare_blockchain(
-    blockchain: &mut Blockchain,
+    blockchain: &mut BlockchainMut,
     generator: impl Iterator<Item = Verified<AnyTx>>,
     blockchain_height: usize,
     txs_in_block: usize,
@@ -618,7 +610,7 @@ fn prepare_blockchain(
         let start = txs_in_block * i;
         let end = txs_in_block * (i + 1);
         let tx_hashes = prepare_txs(blockchain, transactions[start..end].to_vec());
-        assert_transactions_in_pool(blockchain, &tx_hashes);
+        assert_transactions_in_pool(blockchain.as_ref(), &tx_hashes);
 
         let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
@@ -654,7 +646,7 @@ fn execute_block_rocksdb(
         .collect();
 
     let tx_hashes = prepare_txs(&mut blockchain, txs);
-    assert_transactions_in_pool(&blockchain, &tx_hashes);
+    assert_transactions_in_pool(blockchain.as_ref(), &tx_hashes);
 
     // Because execute_block is not really "micro benchmark"
     // executing it as regular benches, with 100 samples,
@@ -665,7 +657,7 @@ fn execute_block_rocksdb(
         ParameterizedBenchmark::new(
             "transactions",
             move |bencher, &&txs_in_block| {
-                let height: u64 = blockchain.last_block().height().next().into();
+                let height: u64 = blockchain.as_ref().last_block().height().next().into();
                 bencher.iter(|| {
                     execute_block(&blockchain, height, &tx_hashes[..txs_in_block]);
                 });

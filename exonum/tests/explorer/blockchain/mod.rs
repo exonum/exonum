@@ -15,17 +15,16 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, InstanceCollection, Schema},
+    blockchain::{Blockchain, BlockchainMut, InstanceCollection, Schema},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
-    node::ApiSender,
     runtime::{
         rust::{CallContext, Service},
-        AnyTx, InstanceDescriptor, InstanceId, Runtime,
+        AnyTx, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
+use exonum_merkledb::{ObjectHash, Snapshot};
 use futures::sync::mpsc;
 
 use std::collections::BTreeMap;
@@ -117,41 +116,34 @@ pub fn consensus_keys() -> (PublicKey, SecretKey) {
 }
 
 /// Creates a blockchain with no blocks.
-pub fn create_blockchain() -> Blockchain {
+pub fn create_blockchain() -> BlockchainMut {
+    let mut blockchain = Blockchain::for_tests();
     let config = generate_testnet_config(1, 0)[0].clone();
-    let service_keypair = config.service_keypair();
+    blockchain.service_keypair = config.service_keypair();
 
-    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
     let services =
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
-
-    Blockchain::new(
-        TemporaryDB::new(),
-        external_runtimes,
-        services,
-        config.consensus,
-        service_keypair,
-        ApiSender(mpsc::channel(0).0),
-        mpsc::channel(0).0,
-    )
+    blockchain
+        .into_mut(config.consensus)
+        .with_rust_runtime(mpsc::channel(0).0, services)
+        .build()
+        .unwrap()
 }
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
-pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyTx>>) {
+pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>>) {
     use exonum::helpers::{Round, ValidatorId};
     use exonum::messages::{Precommit, Propose};
     use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
-    let height = blockchain.last_block().height().next();
+    let height = blockchain.as_ref().last_block().height().next();
 
     let fork = blockchain.fork();
-    {
-        let mut schema = Schema::new(&fork);
-        for tx in transactions {
-            schema.add_transaction_into_pool(tx.clone())
-        }
+    let mut schema = Schema::new(&fork);
+    for tx in transactions {
+        schema.add_transaction_into_pool(tx.clone())
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
@@ -165,7 +157,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyT
             ValidatorId(0),
             height,
             Round::first(),
-            blockchain.last_hash(),
+            blockchain.as_ref().last_hash(),
             tx_hashes,
         ),
         consensus_public_key,

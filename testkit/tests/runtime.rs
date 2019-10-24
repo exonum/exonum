@@ -14,8 +14,6 @@
 
 use exonum::{
     blockchain::InstanceConfig,
-    crypto::{PublicKey, SecretKey},
-    node::ApiSender,
     runtime::{
         ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceId,
         InstanceSpec, Mailbox, Runtime, StateHashAggregator,
@@ -117,7 +115,11 @@ impl Runtime for TestRuntime {
         Some(ArtifactProtobufSpec::default())
     }
 
-    fn add_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        _spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -152,14 +154,7 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn after_commit(
-        &mut self,
-        _mailbox: &mut Mailbox,
-        _snapshot: &dyn Snapshot,
-        _service_keypair: &(PublicKey, SecretKey),
-        _tx_sender: &ApiSender,
-    ) {
-    }
+    fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
 impl From<TestRuntime> for (u32, Box<dyn Runtime>) {

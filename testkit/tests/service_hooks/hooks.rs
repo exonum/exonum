@@ -93,7 +93,6 @@ impl AfterCommitService {
 
 impl Service for AfterCommitService {
     fn after_commit(&self, context: AfterCommitContext) {
-        dbg!("after");
         self.counter.fetch_add(1, Ordering::SeqCst);
         let tx = TxAfterCommit::new(context.height());
         context.broadcast_transaction(tx);

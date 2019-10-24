@@ -25,10 +25,7 @@ use std::fmt::{self, Display};
 use exonum::{
     api::{
         self,
-        node::{
-            public::{explorer::TransactionQuery, system::DispatcherInfo},
-            SharedNodeState,
-        },
+        node::public::{explorer::TransactionQuery, system::DispatcherInfo},
         ApiAggregator,
     },
     blockchain::ExecutionStatus,
@@ -80,19 +77,11 @@ impl fmt::Debug for TestKitApi {
 
 impl TestKitApi {
     /// Creates a new instance of API.
-    pub fn new(testkit: &TestKit) -> Self {
-        Self::from_raw_parts(
-            ApiAggregator::new(
-                testkit.blockchain().clone(),
-                SharedNodeState::new(&testkit.blockchain(), 10_000),
-            ),
-            testkit.api_sender.clone(),
-        )
+    pub fn new(testkit: &mut TestKit) -> Self {
+        Self::from_raw_parts(testkit.update_aggregator(), testkit.api_sender.clone())
     }
 
     pub(crate) fn from_raw_parts(aggregator: ApiAggregator, api_sender: ApiSender) -> Self {
-        trace!("Created testkit api: {:#?}", aggregator);
-
         TestKitApi {
             test_server: create_test_server(aggregator),
             test_client: Client::new(),
@@ -332,7 +321,6 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     });
 
     info!("Test server created on {}", server.addr());
-
     server
 }
 

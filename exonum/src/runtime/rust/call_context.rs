@@ -163,7 +163,7 @@ impl<'a> CallContext<'a> {
             panic!("`start_artifact_registration` called within a non-supervisor service");
         }
 
-        Dispatcher::start_artifact_registration(self.fork(), artifact, spec)
+        Dispatcher::commit_artifact(self.fork(), artifact, spec)
     }
 
     /// Starts adding a service instance to the blockchain.
@@ -180,7 +180,7 @@ impl<'a> CallContext<'a> {
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`start_artifact_registration` called within a non-supervisor service");
+            panic!("`start_adding_service` called within a non-supervisor service");
         }
 
         let instance_spec = InstanceSpec {

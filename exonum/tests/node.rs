@@ -26,7 +26,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, ServiceFactory};
 use exonum_merkledb::{Database, Snapshot, TemporaryDB};
-use futures::{sync::oneshot, Future, IntoFuture};
+use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
@@ -39,7 +39,7 @@ use std::{
 #[exonum_service]
 trait CommitWatcherInterface {}
 
-#[derive(Debug, ServiceFactory)]
+#[derive(Debug, Clone, ServiceFactory)]
 #[exonum(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
@@ -47,11 +47,11 @@ trait CommitWatcherInterface {}
     implements("CommitWatcherInterface"),
     service_constructor = "CommitWatcherService::new_instance"
 )]
-struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
+struct CommitWatcherService(mpsc::UnboundedSender<()>);
 
 impl CommitWatcherService {
     fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(Self(Mutex::new(self.0.lock().unwrap().take())))
+        Box::new(self.clone())
     }
 }
 
@@ -59,9 +59,7 @@ impl CommitWatcherInterface for CommitWatcherService {}
 
 impl Service for CommitWatcherService {
     fn after_commit(&self, _context: AfterCommitContext) {
-        if let Some(oneshot) = self.0.lock().unwrap().take() {
-            oneshot.send(()).unwrap();
-        }
+        self.0.unbounded_send(()).ok();
     }
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
@@ -105,17 +103,15 @@ struct RunHandle {
     api_tx: ApiSender,
 }
 
-fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
+fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
-        let (commit_tx, commit_rx) = oneshot::channel();
+        let (commit_tx, commit_rx) = mpsc::unbounded();
 
         let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-        let services = vec![
-            InstanceCollection::new(CommitWatcherService(Mutex::new(Some(commit_tx))))
-                .with_instance(2, "commit-watcher", ()),
-        ];
+        let services = vec![InstanceCollection::new(CommitWatcherService(commit_tx))
+            .with_instance(2, "commit-watcher", ())];
 
         let node = Node::new(
             TemporaryDB::new(),
@@ -138,7 +134,6 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
 }
 
 #[test]
-#[ignore = "TODO: Research why node tests randomly fails. [ECR-2363]"]
 fn test_node_run() {
     let (nodes, commit_rxs) = run_nodes(4, 16_300);
 
@@ -171,7 +166,6 @@ fn test_node_restart_regression() {
         ];
 
         let node = Node::new(db, external_runtimes, services, node_cfg, None);
-
         let api_tx = node.channel();
         let node_thread = thread::spawn(move || {
             node.run().unwrap();
@@ -191,5 +185,8 @@ fn test_node_restart_regression() {
     start_node(node_cfg.clone(), db.clone(), Arc::clone(&start_times));
     // Second launch
     start_node(node_cfg, db, Arc::clone(&start_times));
-    assert_eq!(*start_times.lock().unwrap(), 2);
+
+    // The service is created two times on instantiation (for `start_adding_service`
+    // and `commit_service` methods), and then once on each new node startup.
+    assert_eq!(*start_times.lock().unwrap(), 3);
 }

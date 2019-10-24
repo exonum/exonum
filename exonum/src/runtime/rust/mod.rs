@@ -25,7 +25,7 @@ pub use self::{
 pub mod error;
 
 use exonum_merkledb::Snapshot;
-use futures::{future, Future, IntoFuture};
+use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
 use std::{
@@ -35,8 +35,9 @@ use std::{
 };
 
 use crate::{
-    crypto::{Hash, PublicKey, SecretKey},
-    node::ApiSender,
+    api::{manager::UpdateEndpoints, ApiBuilder},
+    blockchain::{Blockchain, Schema as CoreSchema},
+    crypto::Hash,
 };
 
 use super::{
@@ -52,12 +53,15 @@ mod service;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RustRuntime {
+    api_context: Option<ApiContext>,
+    api_notifier: mpsc::Sender<UpdateEndpoints>,
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
+    new_services_since_last_block: bool,
 }
 
 #[derive(Debug)]
@@ -98,8 +102,22 @@ impl RustRuntime {
     pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
 
     /// Creates a new Rust runtime instance.
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(api_notifier: mpsc::Sender<UpdateEndpoints>) -> Self {
+        Self {
+            api_context: None,
+            api_notifier,
+            available_artifacts: Default::default(),
+            deployed_artifacts: Default::default(),
+            started_services: Default::default(),
+            started_services_by_name: Default::default(),
+            new_services_since_last_block: false,
+        }
+    }
+
+    fn api_context(&self) -> &ApiContext {
+        self.api_context
+            .as_ref()
+            .expect("Method called before Rust runtime is initialized")
     }
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
@@ -169,6 +187,26 @@ impl RustRuntime {
             None
         }
     }
+
+    fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
+        self.started_services
+            .values()
+            .map(|instance| {
+                let mut builder = ServiceApiBuilder::new(
+                    self.api_context().clone(),
+                    InstanceDescriptor {
+                        id: instance.id,
+                        name: instance.name.as_ref(),
+                    },
+                );
+                instance.as_ref().wire_api(&mut builder);
+                (
+                    ["services/", &instance.name].concat(),
+                    ApiBuilder::from(builder),
+                )
+            })
+            .collect()
+    }
 }
 
 impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
@@ -226,6 +264,10 @@ impl FromStr for RustArtifactId {
 }
 
 impl Runtime for RustRuntime {
+    fn initialize(&mut self, blockchain: &Blockchain) {
+        self.api_context = Some(ApiContext::with_blockchain(blockchain));
+    }
+
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
@@ -266,9 +308,14 @@ impl Runtime for RustRuntime {
         catch_panic(|| service.initialize(context, parameters))
     }
 
-    fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         let instance = self.new_service(spec)?;
         self.add_started_service(instance);
+        self.new_services_since_last_block = true;
         Ok(())
     }
 
@@ -331,39 +378,38 @@ impl Runtime for RustRuntime {
         result
     }
 
-    fn after_commit(
-        &mut self,
-        mailbox: &mut Mailbox,
-        snapshot: &dyn Snapshot,
-        service_keypair: &(PublicKey, SecretKey),
-        tx_sender: &ApiSender,
-    ) {
+    fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
+        if self.new_services_since_last_block {
+            let user_endpoints = self.api_endpoints();
+            // FIXME: this should either be made async, or an unbounded channel should be used.
+            if !self.api_notifier.is_closed() {
+                self.api_notifier
+                    .clone()
+                    .send(UpdateEndpoints { user_endpoints })
+                    .wait()
+                    .ok();
+            }
+        }
+        self.new_services_since_last_block = false;
+
+        // By convention, services don't handle `after_commit()` on the genesis block.
+        let is_genesis_block = CoreSchema::new(snapshot)
+            .block_hashes_by_height()
+            .is_empty();
+        if is_genesis_block {
+            return;
+        }
+
+        let api_context = self.api_context();
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,
                 service.descriptor(),
                 snapshot,
-                service_keypair,
-                tx_sender,
+                api_context.service_keypair(),
+                api_context.sender(),
             ));
         }
-    }
-
-    fn api_endpoints(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
-        self.started_services
-            .values()
-            .map(|instance| {
-                let mut builder = ServiceApiBuilder::new(
-                    context.clone(),
-                    InstanceDescriptor {
-                        id: instance.id,
-                        name: instance.name.as_ref(),
-                    },
-                );
-                instance.as_ref().wire_api(&mut builder);
-                (["services/", &instance.name].concat(), builder)
-            })
-            .collect()
     }
 }
 

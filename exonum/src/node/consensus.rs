@@ -129,7 +129,6 @@ impl NodeHandler {
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        //TODO: Remove this match after errors refactor. (ECR-979)
         let has_unknown_txs = match self.state.add_propose(
             msg.clone(),
             &schema.transactions(),
@@ -143,14 +142,11 @@ impl NodeHandler {
         };
 
         let hash = msg.object_hash();
-
-        // Remove request info
         let known_nodes = self.remove_request(&RequestData::Propose(hash));
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS");
             self.request(RequestData::ProposeTransactions(hash), from);
-
             for node in known_nodes {
                 self.request(RequestData::ProposeTransactions(hash), node);
             }
@@ -509,7 +505,7 @@ impl NodeHandler {
             self.state
                 .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
             // Update state to new height.
-            let block_hash = self.blockchain.last_hash();
+            let block_hash = self.blockchain.as_ref().last_hash();
             self.state
                 .new_height(&block_hash, self.system_state.current_time());
             (committed_txs, proposer)

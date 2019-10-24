@@ -24,7 +24,7 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{Blockchain, Schema},
+    blockchain::{BlockchainMut, Schema},
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
@@ -57,7 +57,7 @@ pub fn mempool_transaction() -> Verified<AnyTx> {
 /// - A panicking transaction
 ///
 /// Additionally, a single transaction is placed into the pool.
-pub fn sample_blockchain() -> Blockchain {
+pub fn sample_blockchain() -> BlockchainMut {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
@@ -65,16 +65,12 @@ pub fn sample_blockchain() -> Blockchain {
     let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
     let tx_bob = CreateWallet::new(&pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);
-
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     let fork = blockchain.fork();
-    {
-        let mut schema = Schema::new(&fork);
-        schema.add_transaction_into_pool(mempool_transaction());
-    }
+    let mut schema = Schema::new(&fork);
+    schema.add_transaction_into_pool(mempool_transaction());
     blockchain.merge(fork.into_patch()).unwrap();
-
     blockchain
 }
 

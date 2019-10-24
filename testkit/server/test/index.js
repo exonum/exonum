@@ -16,14 +16,10 @@
  */
 /* eslint-env node,mocha */
 
-
 const exonum = require('exonum-client')
 const expect = require('chai').expect
 const testkit = require('./testkit')
-const {
-  service,
-  TxTranfer
-} = require('./service')
+const { service } = require('./service')
 
 describe('CurrencyService', function () {
   this.slow(500)

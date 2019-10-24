@@ -18,7 +18,7 @@ use std::{collections::BTreeMap, panic, sync::Mutex};
 
 use crate::{
     blockchain::{
-        Blockchain, BlockchainBuilder, ExecutionErrorKind, ExecutionStatus, FatalError,
+        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, FatalError,
         InstanceCollection, Schema,
     },
     crypto::{self, Hash},
@@ -276,26 +276,26 @@ fn create_entry<T: IndexAccess>(fork: T) -> Entry<T, u64> {
     Entry::new("transaction_status_test", fork)
 }
 
-fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
+fn assert_service_execute(blockchain: &mut BlockchainMut) {
     let (_, patch) =
         blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
-    db.merge(patch).unwrap();
-    let snapshot = db.snapshot();
+    blockchain.merge(patch).unwrap();
+    let snapshot = blockchain.snapshot();
     let index = ListIndex::new(IDX_NAME, &snapshot);
     assert_eq!(index.len(), 1);
     assert_eq!(index.get(0), Some(1));
 }
 
-fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) {
+fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
     let (_, patch) =
         blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
-    db.merge(patch).unwrap();
-    let snapshot = db.snapshot();
+    blockchain.merge(patch).unwrap();
+    let snapshot = blockchain.snapshot();
     let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
     assert!(index.is_empty());
 }
 
-fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) -> ExecutionStatus {
+fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> ExecutionStatus {
     let tx_hash = tx.object_hash();
     blockchain
         .merge({
@@ -323,15 +323,15 @@ fn execute_transaction(blockchain: &mut Blockchain, tx: Verified<AnyTx>) -> Exec
         .unwrap()
 }
 
-fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> Blockchain {
+fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> BlockchainMut {
     let config = generate_testnet_config(1, 0)[0].clone();
     let service_keypair = config.service_keypair();
-    let api_channel = mpsc::channel(1);
-    let internal_sender = mpsc::channel(1).0;
+    let api_notifier = mpsc::channel(0).0;
 
-    BlockchainBuilder::new(TemporaryDB::new(), config.consensus, service_keypair)
-        .with_rust_runtime(instances)
-        .finalize(ApiSender::new(api_channel.0), internal_sender)
+    Blockchain::new(TemporaryDB::new(), service_keypair, ApiSender::closed())
+        .into_mut(config.consensus)
+        .with_rust_runtime(api_notifier, instances)
+        .build()
         .unwrap()
 }
 
@@ -347,19 +347,13 @@ fn handling_tx_panic_error() {
     let tx_failed = TestExecute { value: 0 }.sign(TEST_SERVICE_ID, pk, &sec_key);
     let tx_storage_error = TestExecute { value: 42 }.sign(TEST_SERVICE_ID, pk, &sec_key);
 
-    let patch = {
-        let fork = blockchain.fork();
-        {
-            let mut schema = Schema::new(&fork);
-
-            schema.add_transaction_into_pool(tx_ok1.clone());
-            schema.add_transaction_into_pool(tx_ok2.clone());
-            schema.add_transaction_into_pool(tx_failed.clone());
-            schema.add_transaction_into_pool(tx_storage_error.clone());
-        }
-        fork.into_patch()
-    };
-    blockchain.merge(patch).unwrap();
+    let fork = blockchain.fork();
+    let mut schema = Schema::new(&fork);
+    schema.add_transaction_into_pool(tx_ok1.clone());
+    schema.add_transaction_into_pool(tx_ok2.clone());
+    schema.add_transaction_into_pool(tx_failed.clone());
+    schema.add_transaction_into_pool(tx_storage_error.clone());
+    blockchain.merge(fork.into_patch()).unwrap();
 
     let (_, patch) = blockchain.create_patch(
         ValidatorId::zero(),
@@ -371,10 +365,9 @@ fn handling_tx_panic_error() {
         ],
         &mut BTreeMap::new(),
     );
-
     blockchain.merge(patch).unwrap();
-    let snapshot = blockchain.snapshot();
 
+    let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     assert_eq!(
         schema.transactions().get(&tx_ok1.object_hash()),
@@ -390,7 +383,6 @@ fn handling_tx_panic_error() {
     );
 
     let index = ListIndex::new(IDX_NAME, &snapshot);
-
     assert_eq!(index.len(), 4);
     assert_eq!(index.get(0), Some(3));
     assert_eq!(index.get(1), Some(14));
@@ -411,18 +403,13 @@ fn handling_tx_panic_storage_error() {
     let tx_failed = TestExecute { value: 0 }.sign(TEST_SERVICE_ID, pk, &sec_key);
     let tx_storage_error = TestExecute { value: 42 }.sign(TEST_SERVICE_ID, pk, &sec_key);
 
-    let patch = {
-        let fork = blockchain.fork();
-        {
-            let mut schema = Schema::new(&fork);
-            schema.add_transaction_into_pool(tx_ok1.clone());
-            schema.add_transaction_into_pool(tx_ok2.clone());
-            schema.add_transaction_into_pool(tx_failed.clone());
-            schema.add_transaction_into_pool(tx_storage_error.clone());
-        }
-        fork.into_patch()
-    };
-    blockchain.merge(patch).unwrap();
+    let fork = blockchain.fork();
+    let mut schema = Schema::new(&fork);
+    schema.add_transaction_into_pool(tx_ok1.clone());
+    schema.add_transaction_into_pool(tx_ok2.clone());
+    schema.add_transaction_into_pool(tx_failed.clone());
+    schema.add_transaction_into_pool(tx_storage_error.clone());
+    blockchain.merge(fork.into_patch()).unwrap();
     blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
@@ -437,30 +424,27 @@ fn handling_tx_panic_storage_error() {
 
 #[test]
 fn service_execute_good() {
-    let blockchain = create_blockchain(vec![
+    let mut blockchain = create_blockchain(vec![
         InstanceCollection::new(ServiceGoodImpl).with_instance(3, "service_good", ())
     ]);
-    let mut db = TemporaryDB::new();
-    assert_service_execute(&blockchain, &mut db);
+    assert_service_execute(&mut blockchain);
 }
 
 #[test]
 fn service_execute_panic() {
-    let blockchain = create_blockchain(vec![
+    let mut blockchain = create_blockchain(vec![
         InstanceCollection::new(ServicePanicImpl).with_instance(4, "service_panic", ())
     ]);
-    let mut db = TemporaryDB::new();
-    assert_service_execute_panic(&blockchain, &mut db);
+    assert_service_execute_panic(&mut blockchain);
 }
 
 #[test]
 #[should_panic]
 fn service_execute_panic_storage_error() {
-    let blockchain =
+    let mut blockchain =
         create_blockchain(vec![InstanceCollection::new(ServicePanicStorageErrorImpl)
             .with_instance(5, "service_good", ())]);
-    let mut db = TemporaryDB::new();
-    assert_service_execute_panic(&blockchain, &mut db);
+    assert_service_execute_panic(&mut blockchain);
 }
 
 #[test]
@@ -480,19 +464,14 @@ fn error_discards_transaction_changes() {
 
     for (index, status) in statuses.iter().enumerate() {
         let index = index as u64;
-
         *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
         let transaction = TxResult { value: index }.sign(TX_CHECK_RESULT_SERVICE_ID, pk, &sec_key);
         let hash = transaction.object_hash();
-        {
-            let fork = blockchain.fork();
-            {
-                let mut schema = Schema::new(&fork);
-                schema.add_transaction_into_pool(transaction.clone());
-            }
-            blockchain.merge(fork.into_patch()).unwrap();
-        }
+        let fork = blockchain.fork();
+        let mut schema = Schema::new(&fork);
+        schema.add_transaction_into_pool(transaction.clone());
+        blockchain.merge(fork.into_patch()).unwrap();
 
         let (_, patch) = blockchain.create_patch(
             ValidatorId::zero(),
@@ -500,11 +479,10 @@ fn error_discards_transaction_changes() {
             &[hash],
             &mut BTreeMap::new(),
         );
-
         db.merge(patch).unwrap();
 
-        let fork = db.fork();
-        let entry = create_entry(&fork);
+        let snapshot = db.snapshot();
+        let entry = create_entry(&snapshot);
         if status.is_err() {
             assert_eq!(None, entry.get());
         } else {
@@ -532,13 +510,13 @@ fn test_dispatcher_deploy_good() {
     let artifact_id = ServiceGoodImpl.artifact_id().into();
 
     // Tests deployment procedure for the available artifact.
-    assert!(!blockchain.dispatcher().is_artifact_deployed(&artifact_id));
+    assert!(!blockchain.dispatcher.is_artifact_deployed(&artifact_id));
     blockchain
-        .dispatcher()
+        .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap();
-    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact_id));
+    assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
 
     // Tests the register artifact action for the deployed artifact.
     let snapshot = blockchain.snapshot();
@@ -563,13 +541,12 @@ fn test_dispatcher_already_deployed() {
         InstanceCollection::new(TestDispatcherService).with_instance(TEST_SERVICE_ID, IDX_NAME, ()),
         InstanceCollection::new(ServiceGoodImpl).with_instance(11, "good", ()),
     ]);
-
     let artifact_id = ServiceGoodImpl.artifact_id().into();
 
     // Tests that we get an error if we try to deploy already deployed artifact.
-    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact_id));
+    assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
     let err = blockchain
-        .dispatcher()
+        .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap_err();
@@ -595,7 +572,7 @@ fn test_dispatcher_register_unavailable() {
 
     let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id().into();
     blockchain
-        .dispatcher()
+        .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap();

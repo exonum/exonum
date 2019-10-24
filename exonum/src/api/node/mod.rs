@@ -61,23 +61,10 @@ pub struct DispatcherState {
 impl DispatcherState {
     fn load(blockchain: &Blockchain) -> Self {
         let snapshot = blockchain.snapshot();
-        let dispatcher = blockchain.dispatcher();
-
         let info = DispatcherInfo::load(snapshot.as_ref());
-        let artifact_sources = info
-            .artifacts
-            .clone()
-            .into_iter()
-            .filter_map(|artifact_id| {
-                dispatcher
-                    .artifact_protobuf_spec(&artifact_id)
-                    .map(|info| (artifact_id, info.sources.clone()))
-            })
-            .collect();
-
         Self {
             info,
-            artifact_sources,
+            artifact_sources: HashMap::new(),
         }
     }
 }

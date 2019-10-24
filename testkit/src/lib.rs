@@ -168,10 +168,11 @@ pub mod proto;
 use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
+        manager::UpdateEndpoints,
         ApiAccess,
     },
     blockchain::{
-        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
+        Blockchain, BlockchainMut, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
     },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
@@ -186,14 +187,19 @@ use tokio_core::reactor::Core;
 
 use std::{
     collections::BTreeMap,
-    sync::{Arc, Mutex, RwLock},
-    {fmt, net::SocketAddr},
+    fmt, mem,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
 };
 
+use crate::server::TestKitActor;
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
-    poll_events::poll_events,
+    poll_events::{poll_events, poll_latest},
 };
+use exonum::api::node::SharedNodeState;
+use exonum::api::ApiAggregator;
+use exonum::runtime::rust::RustRuntime;
 
 #[macro_use]
 mod macros;
@@ -204,15 +210,22 @@ mod network;
 mod poll_events;
 mod server;
 
+type ApiNotifierChannel = (
+    mpsc::Sender<UpdateEndpoints>,
+    mpsc::Receiver<UpdateEndpoints>,
+);
+
 /// Testkit for testing blockchain services. It offers simple network configuration emulation
 /// (with no real network setup).
 pub struct TestKit {
-    blockchain: Blockchain,
+    blockchain: BlockchainMut,
     db_handler: CheckpointDbHandler<TemporaryDB>,
     events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
+    api_notifier_channel: ApiNotifierChannel,
+    api_aggregator: ApiAggregator,
 }
 
 impl fmt::Debug for TestKit {
@@ -247,30 +260,42 @@ impl TestKit {
         genesis: ConsensusConfig,
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
         instances: impl IntoIterator<Item = InstanceConfig>,
+        api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
         let db = database.into();
         let db_handler = db.handler();
-        let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair());
+        let db = Arc::new(db);
+        let blockchain = Blockchain::new(
+            Arc::clone(&db) as Arc<dyn Database>,
+            network.us().service_keypair(),
+            api_sender.clone(),
+        );
 
+        let mut builder = blockchain.into_mut(genesis);
         for runtime in runtimes {
             builder = builder.with_additional_runtime(runtime);
         }
 
         let blockchain = builder
             .with_builtin_instances(instances)
-            .finalize(api_sender.clone(), mpsc::channel(0).0)
+            .build()
             .expect("Unable to create blockchain instance");
+        // Initial API aggregator does not contain service endpoints. We expect them to arrive
+        // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
+        let api_aggregator = ApiAggregator::new(
+            blockchain.as_ref(),
+            SharedNodeState::new(blockchain.as_ref(), 10_000),
+        );
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
 
-        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
-            let mut blockchain = blockchain.clone();
+        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
             Box::new(api_channel.1.and_then(move |event| {
-                let guard = processing_lock_.lock().unwrap();
-                let fork = blockchain.fork();
+                let _guard = processing_lock_.lock().unwrap();
+                let fork = db.fork();
                 let mut schema = CoreSchema::new(&fork);
                 match event {
                     ExternalMessage::Transaction(tx) => {
@@ -283,25 +308,38 @@ impl TestKit {
                     | ExternalMessage::Enable(_)
                     | ExternalMessage::Shutdown => { /* Ignored */ }
                 }
-                blockchain.merge(fork.into_patch()).unwrap();
-                drop(guard);
+                db.merge(fork.into_patch()).unwrap();
                 Ok(())
-            }))
-        };
+            }));
 
-        TestKit {
+        Self {
             blockchain,
             db_handler,
             api_sender,
             events_stream,
             processing_lock,
             network,
+            api_notifier_channel,
+            api_aggregator,
         }
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
-    pub fn api(&self) -> TestKitApi {
+    pub fn api(&mut self) -> TestKitApi {
         TestKitApi::new(self)
+    }
+
+    /// Updates API aggregator for the testkit and caches it for further use.
+    fn update_aggregator(&mut self) -> ApiAggregator {
+        if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
+            let mut aggregator = ApiAggregator::new(
+                self.blockchain.as_ref(),
+                SharedNodeState::new(self.blockchain.as_ref(), 10_000),
+            );
+            aggregator.extend(update.user_endpoints);
+            self.api_aggregator = aggregator;
+        }
+        self.api_aggregator.clone()
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
@@ -317,7 +355,7 @@ impl TestKit {
 
     /// Returns a blockchain used by the testkit.
     pub fn blockchain(&self) -> Blockchain {
-        self.blockchain.clone()
+        self.blockchain.as_ref().to_owned()
     }
 
     /// Sets a checkpoint for a future [`rollback`](#method.rollback).
@@ -637,12 +675,12 @@ impl TestKit {
 
     /// Returns the hash of latest committed block.
     pub fn last_block_hash(&self) -> crypto::Hash {
-        self.blockchain.last_hash()
+        self.blockchain.as_ref().last_hash()
     }
 
     /// Returns the height of latest committed block.
     pub fn height(&self) -> Height {
-        self.blockchain.last_block().height()
+        self.blockchain.as_ref().last_block().height()
     }
 
     /// Return an actual blockchain configuration.
@@ -681,23 +719,25 @@ impl TestKit {
 
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let events_stream = self.remove_events_stream();
-        // Creates complete actix web server with the testkit extensions.
-        let testkit_ref = Arc::new(RwLock::new(self));
+        let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
+
+        let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
         let system_runtime_config = SystemRuntimeConfig {
             api_runtimes: vec![
                 ApiRuntimeConfig::new(public_api_address, ApiAccess::Public),
                 ApiRuntimeConfig::new(private_api_address, ApiAccess::Private),
             ],
-            api_aggregator: server::create_testkit_api_aggregator(&testkit_ref),
+            api_aggregator,
         };
-        let system_runtime = system_runtime_config.start().unwrap();
+        let system_runtime = system_runtime_config.start(endpoints_rx).unwrap();
+
         // Run the event stream in a separate thread in order to put transactions to mempool
         // when they are received. Otherwise, a client would need to call a `poll_events` analogue
         // each time after a transaction is posted.
         let mut core = Core::new().unwrap();
         core.run(events_stream).unwrap();
-
         system_runtime.stop().unwrap();
+        actor_handle.join().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
@@ -708,9 +748,9 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    fn remove_events_stream(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
-        let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
-        Box::new(stream.for_each(|_| Ok(())))
+    pub(crate) fn remove_events_stream(&mut self) -> impl Future<Item = (), Error = ()> {
+        let stream = mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
+        stream.for_each(|_| Ok(()))
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
@@ -727,11 +767,16 @@ impl TestKit {
         let Self {
             db_handler,
             network,
+            api_notifier_channel,
             ..
         } = self;
 
         let db = db_handler.into_inner();
-        StoppedTestKit { network, db }
+        StoppedTestKit {
+            network,
+            db,
+            api_notifier_channel,
+        }
     }
 }
 
@@ -803,6 +848,7 @@ impl TestKit {
 pub struct StoppedTestKit {
     db: CheckpointDb<TemporaryDB>,
     network: TestNetwork,
+    api_notifier_channel: ApiNotifierChannel,
 }
 
 impl StoppedTestKit {
@@ -822,6 +868,11 @@ impl StoppedTestKit {
         &self.network
     }
 
+    /// Creates an empty Rust runtime.
+    pub fn rust_runtime(&self) -> RustRuntime {
+        RustRuntime::new(self.api_notifier_channel.0.clone())
+    }
+
     /// Resume the operation of the testkit.
     ///
     /// Note that `runtimes` may differ from the initially passed to the `TestKit`
@@ -839,7 +890,8 @@ impl StoppedTestKit {
             ConsensusConfig::default(),
             runtimes.into_iter().map(|x| x.into()),
             // In this context, it is not possible to add new service instances.
-            Vec::new(),
+            vec![],
+            self.api_notifier_channel,
         )
     }
 }

@@ -18,11 +18,7 @@ extern crate serde_derive;
 // HACK: Silent "dead_code" warning.
 pub use crate::hooks::{AfterCommitService, TxAfterCommit, SERVICE_ID, SERVICE_NAME};
 
-use exonum::{
-    explorer::BlockchainExplorer,
-    helpers::Height,
-    runtime::rust::{RustRuntime, Transaction},
-};
+use exonum::{explorer::BlockchainExplorer, helpers::Height, runtime::rust::Transaction};
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::{InstanceCollection, TestKitBuilder};
 
@@ -66,7 +62,6 @@ fn test_after_commit() {
 #[test]
 fn restart_testkit() {
     let service = AfterCommitService::new();
-
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_rust_service(after_commit_service_instances(service.clone()))
@@ -77,10 +72,10 @@ fn restart_testkit() {
     assert_eq!(stopped.height(), Height(5));
     assert_eq!(stopped.network().validators().len(), 3);
     let service = AfterCommitService::new();
-
-    let mut testkit = stopped.resume(vec![
-        RustRuntime::new().with_available_service(service.clone())
-    ]);
+    let runtime = stopped
+        .rust_runtime()
+        .with_available_service(service.clone());
+    let mut testkit = stopped.resume(vec![runtime]);
     for _ in 0..3 {
         testkit.create_block();
     }
@@ -126,9 +121,10 @@ fn tx_pool_is_retained_on_restart() {
         .collect();
 
     let stopped = testkit.stop();
-    let testkit = stopped.resume(vec![
-        RustRuntime::new().with_available_service(AfterCommitService::new())
-    ]);
+    let runtime = stopped
+        .rust_runtime()
+        .with_available_service(AfterCommitService::new());
+    let testkit = stopped.resume(vec![runtime]);
     assert!(tx_hashes
         .iter()
         .all(|tx_hash| testkit.is_tx_in_pool(tx_hash)));

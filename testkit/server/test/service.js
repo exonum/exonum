@@ -36,20 +36,15 @@ const SERVICE_URL = 'http://127.0.0.1:8000/api/explorer'
 const EXPLORER_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency'
 
 function haveTxBody (type, data, secretKey) {
-
-  // clone type
+  // Clone type.
   const typeCopy = exonum.newTransaction(type)
-
-  // sign transaction
+  // Sign transaction.
   typeCopy.signature = typeCopy.sign(secretKey, data)
-
-  // serialize transaction header and body
+  // Serialize transaction header and body.
   const buffer = typeCopy.serialize(data)
-
-  // convert buffer into hexadecimal string
+  // Convert buffer into hexadecimal string.
   const txBody = exonum.uint8ArrayToHexadecimal(new Uint8Array(buffer))
-
-  // get transaction hash
+  // Get transaction hash.
   const txHash = exonum.hash(buffer)
 
   return {
@@ -64,8 +59,8 @@ exports.service = {
       service_id: SERVICE_ID,
       message_id: TX_CREATE_WALLET_ID,
       author,
-      schema: proto.exonum.examples.cryptocurrency.TxCreateWallet 
-    }) 
+      schema: proto.exonum.examples.cryptocurrency.TxCreateWallet
+    })
 
     return tx
   },
@@ -76,19 +71,18 @@ exports.service = {
       message_id: TX_TRANSFER_ID,
       author,
       schema: proto.exonum.examples.cryptocurrency.TxTransfer
-    }) 
+    })
 
     return tx
   },
 
   async transactionSend (sk, tx, body) {
-
     const { tx_body, tx_hash } = haveTxBody(tx, body, sk)
 
     let response = await fetch(`${SERVICE_URL}/v1/transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_body: tx_body })
+      body: JSON.stringify({ tx_body })
     })
     response = await response.json()
     expect(response.tx_hash).to.equal(tx_hash)

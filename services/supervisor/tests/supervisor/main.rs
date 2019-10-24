@@ -241,8 +241,8 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
         .create()
 }
 
-fn runtime_with_available_services() -> RustRuntime {
-    RustRuntime::new()
+fn add_available_services(runtime: RustRuntime) -> RustRuntime {
+    runtime
         .with_available_service(IncService)
         .with_available_service(Supervisor)
 }
@@ -515,10 +515,11 @@ fn test_restart_node_and_start_service_instance() {
     deploy_default(&mut testkit);
 
     // Stop the node.
-    let testkit_stopped = testkit.stop();
+    let stopped_testkit = testkit.stop();
 
     // And start it again with the same service factory.
-    let mut testkit = testkit_stopped.resume(std::iter::once(runtime_with_available_services()));
+    let runtime = add_available_services(stopped_testkit.rust_runtime());
+    let mut testkit = stopped_testkit.resume(vec![runtime]);
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
@@ -545,8 +546,9 @@ fn test_restart_node_and_start_service_instance() {
     }
 
     // Restart the node again.
-    let testkit_stopped = testkit.stop();
-    let mut testkit = testkit_stopped.resume(std::iter::once(runtime_with_available_services()));
+    let stopped_testkit = testkit.stop();
+    let runtime = add_available_services(stopped_testkit.rust_runtime());
+    let mut testkit = stopped_testkit.resume(vec![runtime]);
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
@@ -565,26 +567,21 @@ fn test_restart_node_and_start_service_instance() {
 #[test]
 fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
-
     let artifact = artifact_default();
     let api = testkit.api();
-
     assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next().next());
-
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
     let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
 
     // Send an artifact deploy request from this validator.
     let deploy_artifact_0_tx_hash = deploy_artifact(&api, request_deploy.clone());
-
     // Emulate an artifact deploy request from the second validator.
     let deploy_artifact_1_tx_hash =
         deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
 
     testkit.create_block();
-
     api.exonum_api()
         .assert_txs_success(&[deploy_artifact_0_tx_hash, deploy_artifact_1_tx_hash]);
 
@@ -593,16 +590,14 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     testkit.create_block();
 
     // Restart the node again after the first block was created.
-    let mut testkit = testkit
-        .stop()
-        .resume(std::iter::once(runtime_with_available_services()));
+    let testkit = testkit.stop();
+    let runtime = add_available_services(testkit.rust_runtime());
+    let mut testkit = testkit.resume(vec![runtime]);
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
     assert!(testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
-
     testkit.create_block();
-
     // Both confirmations are gone now.
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
@@ -615,10 +610,8 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
 #[test]
 fn test_multiple_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
-
     let artifact = artifact_default();
     let api = testkit.api();
-
     assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
@@ -633,7 +626,6 @@ fn test_multiple_validators() {
         deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
 
     testkit.create_block();
-
     api.exonum_api()
         .assert_txs_success(&[deploy_artifact_0_tx_hash, deploy_artifact_1_tx_hash]);
 
@@ -643,7 +635,6 @@ fn test_multiple_validators() {
     // Both confirmations are ready.
     assert!(testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
     assert!(testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
-
     testkit.create_block();
 
     // Both confirmations are gone now.
@@ -652,41 +643,33 @@ fn test_multiple_validators() {
 
     let api = testkit.api(); // update the API
     assert!(artifact_exists(&api, &artifact.name));
-
     let instance_name = "inc";
 
     // Start the service now
     {
         assert!(!does_service_instance_exist(&api, instance_name));
-
         let deadline = testkit.height().next();
         let request_start = start_service_request(artifact_default(), instance_name, deadline);
 
         // Send a start instance request from this node.
         let start_service_0_tx_hash = start_service(&api, request_start.clone());
-
         // Emulate a start instance request from the second validator.
         let start_service_1_tx_hash =
             start_service_manually(&mut testkit, &request_start, ValidatorId(1));
 
         testkit.create_block();
-
         api.exonum_api()
             .assert_txs_success(&[start_service_0_tx_hash, start_service_1_tx_hash]);
-
         let api = testkit.api(); // Update the API
         assert!(does_service_instance_exist(&api, instance_name));
     }
 
     let api = testkit.api(); // Update the API
     let instance_id = find_instance_id(&api, instance_name);
-
     // Basic check that service works.
     {
         assert_count_is_not_set(&api, instance_name);
-
         let (key_pub, key_priv) = crypto::gen_keypair();
-
         api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
@@ -779,10 +762,8 @@ fn test_auditor_cant_send_requests() {
 #[test]
 fn test_auditor_normal_workflow() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
-
     let artifact = artifact_default();
     let api = testkit.api();
-
     assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
@@ -791,44 +772,33 @@ fn test_auditor_normal_workflow() {
     // Emulate an artifact deploy request from the validator.
     let deploy_artifact_tx_hash =
         deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(0));
-
     testkit.create_block();
-
     api.exonum_api().assert_tx_success(deploy_artifact_tx_hash);
 
     // Emulate a confirmation from the validator.
     testkit.add_tx(deploy_confirmation.clone());
-
     // The confirmation is in the pool.
     assert!(testkit.is_tx_in_pool(&deploy_confirmation.object_hash()));
-
     testkit.create_block();
 
     // The confirmation is gone.
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation.object_hash()));
-
     // The artifact is deployed.
     assert!(artifact_exists(&testkit.api(), &artifact.name));
 
     let instance_name = "inc";
-
     // Start the service now
     {
         let api = testkit.api();
-
         assert!(!does_service_instance_exist(&api, instance_name));
-
         let deadline = testkit.height().next();
         let request_start = start_service_request(artifact_default(), instance_name, deadline);
 
         // Emulate a start instance request from the validator.
         let start_service_tx_hash =
             start_service_manually(&mut testkit, &request_start, ValidatorId(0));
-
         testkit.create_block();
-
         api.exonum_api().assert_tx_success(start_service_tx_hash);
-
         let api = testkit.api(); // Update the API
         assert!(does_service_instance_exist(&api, instance_name));
     }
@@ -839,13 +809,10 @@ fn test_auditor_normal_workflow() {
     // Check that service still works.
     {
         assert_count_is_not_set(&api, instance_name);
-
         let (key_pub, key_priv) = crypto::gen_keypair();
-
         api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
-
         api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 2);

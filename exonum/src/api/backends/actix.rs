@@ -19,11 +19,12 @@
 
 pub use actix_web::middleware::cors::Cors;
 
-use actix::{Actor, Addr, System};
+use actix::{Actor, System};
 use actix_web::{
     error::ResponseError, AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
 };
-use futures::{Future, IntoFuture};
+use failure::Error;
+use futures::{sync::mpsc, Future, IntoFuture, Stream};
 use serde::{
     de::{self, DeserializeOwned},
     ser, Serialize,
@@ -34,15 +35,14 @@ use std::{
     net::SocketAddr,
     result,
     str::FromStr,
-    sync::{mpsc, Arc},
+    sync::Arc,
     thread::{self, JoinHandle},
 };
 
+use crate::api::manager::UpdateEndpoints;
 use crate::api::{
-    error::Error as ApiError,
-    manager::{ApiManager, RestartServer},
-    ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend, FutureResult, Immutable,
-    Mutable, NamedWith, Result,
+    self, manager::ApiManager, ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend,
+    FutureResult, Immutable, Mutable, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -121,28 +121,28 @@ impl ExtendApiBackend for actix_web::Scope<()> {
     }
 }
 
-impl ResponseError for ApiError {
+impl ResponseError for api::Error {
     fn error_response(&self) -> HttpResponse {
         match self {
-            ApiError::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
-            ApiError::InternalError(err) => {
+            api::Error::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
+            api::Error::InternalError(err) => {
                 HttpResponse::InternalServerError().body(err.to_string())
             }
-            ApiError::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
-            ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
+            api::Error::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            api::Error::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            api::Error::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
+            api::Error::Unauthorized => HttpResponse::Unauthorized().finish(),
         }
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F, Immutable>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F, Immutable>> for RequestHandler
 where
-    F: Fn(Q) -> Result<I> + 'static + Send + Sync + Clone,
+    F: Fn(Q) -> api::Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, Result<I>, F, Immutable>) -> Self {
+    fn from(f: NamedWith<Q, I, api::Result<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
             let future = Query::from_request(&request, &Default::default())
@@ -161,13 +161,13 @@ where
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F, Mutable>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F, Mutable>> for RequestHandler
 where
-    F: Fn(Q) -> Result<I> + 'static + Send + Sync + Clone,
+    F: Fn(Q) -> api::Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, Result<I>, F, Mutable>) -> Self {
+    fn from(f: NamedWith<Q, I, api::Result<I>, F, Mutable>) -> Self {
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
@@ -300,34 +300,25 @@ pub struct SystemRuntimeConfig {
 
 /// Actix system runtime handle.
 pub struct SystemRuntime {
-    system_thread: JoinHandle<result::Result<(), failure::Error>>,
+    system_thread: JoinHandle<result::Result<(), Error>>,
     system: System,
-    api_manager: Addr<ApiManager>,
 }
 
 impl SystemRuntimeConfig {
     /// Starts actix system runtime along with all web runtimes.
-    pub fn start(self) -> result::Result<SystemRuntime, failure::Error> {
-        SystemRuntime::new(self)
-    }
-}
-
-impl SystemRuntime {
-    pub(crate) fn new(config: SystemRuntimeConfig) -> result::Result<Self, failure::Error> {
+    pub fn start(
+        self,
+        endpoints_rx: mpsc::Receiver<UpdateEndpoints>,
+    ) -> result::Result<SystemRuntime, Error> {
         // Creates a system thread.
-        let (system_tx, system_rx) = mpsc::channel();
-        let (api_runtime_tx, api_runtime_rx) = mpsc::channel();
-        let system_thread = thread::spawn(move || -> result::Result<(), failure::Error> {
+        let (system_tx, system_rx) = mpsc::unbounded();
+        let system_thread = thread::spawn(move || -> result::Result<(), Error> {
             let system = System::new("http-server");
+            system_tx.unbounded_send(System::current())?;
+            ApiManager::new(self, endpoints_rx).start();
 
-            let api_manager = ApiManager::new(config).start();
-
-            // Sends addresses to the control thread.
-            system_tx.send(System::current())?;
-            api_runtime_tx.send(api_manager)?;
             // Starts actix-web runtime.
             let code = system.run();
-
             trace!("Actix runtime finished with code {}", code);
             ensure!(
                 code == 0,
@@ -336,23 +327,23 @@ impl SystemRuntime {
             );
             Ok(())
         });
+
         // Receives addresses of runtime items.
         let system = system_rx
-            .recv()
-            .map_err(|_| format_err!("Unable to receive actix system handle"))?;
-        let api_manager = api_runtime_rx
-            .recv()
-            .map_err(|e| format_err!("Unable to receive api manager address: {}", e))?;
-
-        Ok(Self {
+            .wait()
+            .next()
+            .ok_or_else(|| format_err!("Unable to receive actix system handle"))?
+            .map_err(|()| format_err!("Unable to receive actix system handle"))?;
+        Ok(SystemRuntime {
             system_thread,
             system,
-            api_manager,
         })
     }
+}
 
+impl SystemRuntime {
     /// Stops the actix system runtime along with all web runtimes.
-    pub fn stop(self) -> result::Result<(), failure::Error> {
+    pub fn stop(self) -> result::Result<(), Error> {
         // Stop actix system runtime.
         self.system.stop();
         self.system_thread.join().map_err(|e| {
@@ -361,11 +352,6 @@ impl SystemRuntime {
                 e
             )
         })?
-    }
-
-    /// Restart actix web-api servers.
-    pub fn restart(&self) {
-        self.api_manager.do_send(RestartServer);
     }
 }
 
@@ -441,7 +427,7 @@ impl<'de> de::Deserialize<'de> for AllowOrigin {
 }
 
 impl FromStr for AllowOrigin {
-    type Err = failure::Error;
+    type Err = Error;
 
     fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         if s == "*" {

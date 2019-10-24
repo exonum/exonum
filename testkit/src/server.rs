@@ -12,21 +12,78 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix::prelude::*;
 use exonum::{
-    api::{self, node::SharedNodeState, ApiAggregator, ApiBuilder, ApiScope},
+    api::{self, ApiAggregator, ApiBuilder, FutureResult},
     blockchain::ConsensusConfig,
     crypto::Hash,
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
 };
+use futures::{sync::oneshot, Future};
 
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::thread::{self, JoinHandle};
 
 use super::TestKit;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct CreateBlockQuery {
-    tx_hashes: Option<Vec<Hash>>,
+#[derive(Debug)]
+pub struct TestKitActor(TestKit);
+
+impl TestKitActor {
+    pub fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
+        let mut api_aggregator = testkit.update_aggregator();
+
+        // Spawn the testkit actor on the new `actix` system.
+        let (actor_tx, actor_rx) = oneshot::channel();
+        let join_handle = thread::spawn(|| {
+            let system = System::new("testkit");
+            let testkit = Self(testkit).start();
+            actor_tx.send(testkit).unwrap();
+            system.run()
+        });
+
+        let testkit = actor_rx.wait().expect("Failed spawning testkit server");
+        api_aggregator.insert("testkit", Self::api(testkit));
+        (api_aggregator, join_handle)
+    }
+
+    fn api(addr: Addr<Self>) -> ApiBuilder {
+        let mut builder = ApiBuilder::new();
+        let api_scope = builder.private_scope();
+
+        let addr_ = addr.clone();
+        api_scope.endpoint("v1/status", move |()| {
+            Box::new(addr_.send(GetStatus).then(flatten_err)) as FutureResult<_>
+        });
+        let addr_ = addr.clone();
+        api_scope.endpoint_mut("v1/blocks/rollback", move |height| {
+            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as FutureResult<_>
+        });
+        let addr_ = addr.clone();
+        api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
+            Box::new(addr_.send(query).then(flatten_err)) as FutureResult<_>
+        });
+        builder
+    }
+}
+
+impl Actor for TestKitActor {
+    type Context = Context<Self>;
+}
+
+fn flatten_err<T>(res: Result<Result<T, api::Error>, MailboxError>) -> Result<T, api::Error> {
+    match res {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(api::Error::InternalError(e.into())),
+    }
+}
+
+#[derive(Debug)]
+struct GetStatus;
+
+impl Message for GetStatus {
+    type Result = api::Result<TestKitStatus>;
 }
 
 /// Testkit status, returned by the corresponding API endpoint.
@@ -38,30 +95,33 @@ pub struct TestKitStatus {
     pub configuration: ConsensusConfig,
 }
 
-#[derive(Debug, Clone)]
-struct TestkitServerApi(Arc<RwLock<TestKit>>);
+impl Handler<GetStatus> for TestKitActor {
+    type Result = api::Result<TestKitStatus>;
 
-impl TestkitServerApi {
-    fn read(&self) -> RwLockReadGuard<TestKit> {
-        self.0.read().unwrap()
-    }
-
-    fn write(&self) -> RwLockWriteGuard<TestKit> {
-        self.0.write().unwrap()
-    }
-
-    fn status(&self) -> api::Result<TestKitStatus> {
-        let testkit = self.read();
+    fn handle(&mut self, _msg: GetStatus, _ctx: &mut Self::Context) -> Self::Result {
         Ok(TestKitStatus {
-            height: testkit.height(),
-            configuration: testkit.consensus_config(),
+            height: self.0.height(),
+            configuration: self.0.consensus_config(),
         })
     }
+}
 
-    fn create_block(&self, tx_hashes: Option<Vec<Hash>>) -> api::Result<BlockWithTransactions> {
-        let mut testkit = self.write();
-        let block_info = if let Some(tx_hashes) = tx_hashes {
-            let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CreateBlock {
+    #[serde(default)]
+    tx_hashes: Option<Vec<Hash>>,
+}
+
+impl Message for CreateBlock {
+    type Result = api::Result<BlockWithTransactions>;
+}
+
+impl Handler<CreateBlock> for TestKitActor {
+    type Result = api::Result<BlockWithTransactions>;
+
+    fn handle(&mut self, msg: CreateBlock, _ctx: &mut Self::Context) -> Self::Result {
+        let block_info = if let Some(tx_hashes) = msg.tx_hashes {
+            let maybe_missing_tx = tx_hashes.iter().find(|h| !self.0.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
                 return Err(api::Error::BadRequest(format!(
                     "Transaction not in mempool: {}",
@@ -70,79 +130,44 @@ impl TestkitServerApi {
             }
 
             // NB: checkpoints must correspond 1-to-1 to blocks.
-            testkit.checkpoint();
-            testkit.create_block_with_tx_hashes(&tx_hashes)
+            self.0.checkpoint();
+            self.0.create_block_with_tx_hashes(&tx_hashes)
         } else {
-            testkit.checkpoint();
-            testkit.create_block()
+            self.0.checkpoint();
+            self.0.create_block()
         };
         Ok(block_info)
     }
+}
 
-    fn rollback(&self, height: Height) -> api::Result<Option<BlockWithTransactions>> {
+#[derive(Debug)]
+struct RollBack(Height);
+
+impl Message for RollBack {
+    type Result = api::Result<Option<BlockWithTransactions>>;
+}
+
+impl Handler<RollBack> for TestKitActor {
+    type Result = api::Result<Option<BlockWithTransactions>>;
+
+    fn handle(&mut self, RollBack(height): RollBack, _ctx: &mut Self::Context) -> Self::Result {
         if height == Height(0) {
             return Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),
             ));
         }
 
-        let mut testkit = self.write();
-        if testkit.height() >= height {
-            let rollback_blocks = (testkit.height().0 - height.0 + 1) as usize;
+        if self.0.height() >= height {
+            let rollback_blocks = (self.0.height().0 - height.0 + 1) as usize;
             for _ in 0..rollback_blocks {
-                testkit.rollback();
+                self.0.rollback();
             }
         }
 
-        let snapshot = testkit.snapshot();
+        let snapshot = self.0.snapshot();
         let explorer = BlockchainExplorer::new(snapshot.as_ref());
-        Ok(explorer.block_with_txs(testkit.height()))
+        Ok(explorer.block_with_txs(self.0.height()))
     }
-
-    fn handle_status(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
-        api_scope.endpoint(name, move |_query: ()| self.status());
-        self_
-    }
-
-    fn handle_create_block(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
-        api_scope.endpoint_mut(name, move |query: Option<CreateBlockQuery>| {
-            self.create_block(query.and_then(|query| query.tx_hashes))
-        });
-        self_
-    }
-
-    fn handle_rollback(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
-        api_scope.endpoint_mut(name, move |height: Height| self.rollback(height));
-        self_
-    }
-
-    fn wire(self, builder: &mut ApiBuilder) {
-        let api_scope = builder.private_scope();
-        self.handle_status("v1/status", api_scope)
-            .handle_rollback("v1/blocks/rollback", api_scope)
-            .handle_create_block("v1/blocks/create", api_scope);
-    }
-}
-
-///  Create API handlers for processing testkit-specific HTTP requests.
-pub fn create_testkit_handlers(inner: &Arc<RwLock<TestKit>>) -> ApiBuilder {
-    let mut builder = ApiBuilder::new();
-    let server_api = TestkitServerApi(inner.clone());
-    server_api.wire(&mut builder);
-    builder
-}
-
-/// Creates an ApiAggregator with the testkit server specific handlers.
-pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggregator {
-    let blockchain = testkit.read().unwrap().blockchain().clone();
-    let node_state = SharedNodeState::new(&blockchain, 10_000);
-    let mut aggregator = ApiAggregator::new(blockchain, node_state);
-
-    aggregator.insert("testkit", create_testkit_handlers(&testkit));
-    aggregator
 }
 
 #[cfg(test)]
@@ -161,11 +186,10 @@ mod tests {
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
 
-    use crate::{InstanceCollection, TestKitApi, TestKitBuilder};
+    use std::time::Duration;
 
-    use super::{super::proto, *};
-
-    type DeBlock = BlockWithTransactions;
+    use super::*;
+    use crate::{proto, InstanceCollection, TestKitApi, TestKitBuilder};
 
     const TIMESTAMP_SERVICE_ID: u32 = 2;
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
@@ -217,42 +241,39 @@ mod tests {
 
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
-    fn init_handler(height: Height) -> (Arc<RwLock<TestKit>>, TestKitApi) {
-        let testkit = TestKitBuilder::validator()
+    fn init_handler(height: Height) -> TestKitApi {
+        let mut testkit = TestKitBuilder::validator()
             .with_rust_service(InstanceCollection::new(SampleService).with_instance(
                 TIMESTAMP_SERVICE_ID,
                 TIMESTAMP_SERVICE_NAME,
                 (),
             ))
             .create();
+        testkit.create_blocks_until(height);
+        // Process incoming events in background.
+        let events = testkit.remove_events_stream();
+        thread::spawn(|| events.wait().ok());
 
         let api_sender = testkit.api_sender.clone();
-        let testkit = Arc::new(RwLock::new(testkit));
-        let aggregator = create_testkit_api_aggregator(&testkit);
-        let (testkit, api) = (
-            Arc::clone(&testkit),
-            TestKitApi::from_raw_parts(aggregator, api_sender),
-        );
+        let (aggregator, _) = TestKitActor::spawn(testkit);
+        TestKitApi::from_raw_parts(aggregator, api_sender)
+    }
 
-        testkit.write().unwrap().create_blocks_until(height);
-        (testkit, api)
+    fn sleep() {
+        thread::sleep(Duration::from_millis(20));
     }
 
     #[test]
     fn test_create_block_with_empty_body() {
-        let (testkit, api) = init_handler(Height(0));
-
+        let api = init_handler(Height(0));
         let tx = TxTimestamp::for_str("foo");
-        {
-            let mut testkit = testkit.write().unwrap();
-            api.send(tx.clone());
-            testkit.poll_events();
-        }
+        api.send(tx.clone());
+        sleep();
 
         // Test a bodiless request
-        let block_info: DeBlock = api
+        let block_info: BlockWithTransactions = api
             .private("api/testkit")
-            .query(&CreateBlockQuery { tx_hashes: None })
+            .query(&CreateBlock { tx_hashes: None })
             .post("v1/blocks/create")
             .unwrap();
 
@@ -260,65 +281,54 @@ mod tests {
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx);
 
-        // Requests with a body that invoke `create_block`
-        let bodies = vec![None, Some(CreateBlockQuery { tx_hashes: None })];
+        let block_info: BlockWithTransactions = api
+            .private("api/testkit")
+            .query(&Height(1))
+            .post("v1/blocks/rollback")
+            .unwrap();
+        assert_eq!(block_info.header.height(), Height(0));
+        api.send(tx.clone());
+        sleep();
 
-        for body in &bodies {
-            {
-                let mut testkit = testkit.write().unwrap();
-                testkit.rollback();
-                assert_eq!(testkit.height(), Height(0));
-                api.send(tx.clone());
-                testkit.poll_events();
-            }
-
-            let block_info: DeBlock = api
-                .private("api/testkit")
-                .query(body)
-                .post("v1/blocks/create")
-                .unwrap();
-
-            assert_eq!(block_info.header.height(), Height(1));
-            assert_eq!(block_info.transactions.len(), 1);
-            assert_eq!(block_info.transactions[0].content(), &tx);
-        }
+        let block_info: BlockWithTransactions = api
+            .private("api/testkit")
+            .query(&CreateBlock { tx_hashes: None })
+            .post("v1/blocks/create")
+            .unwrap();
+        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.transactions.len(), 1);
+        assert_eq!(block_info.transactions[0].content(), &tx);
     }
 
     #[test]
     fn test_create_block_with_specified_transactions() {
-        let (testkit, api) = init_handler(Height(0));
-
+        let api = init_handler(Height(0));
         let tx_foo = TxTimestamp::for_str("foo");
         let tx_bar = TxTimestamp::for_str("bar");
-        {
-            let mut testkit = testkit.write().unwrap();
-            api.send(tx_foo.clone());
-            api.send(tx_bar.clone());
-            testkit.poll_events();
-        }
+        api.send(tx_foo.clone());
+        api.send(tx_bar.clone());
+        sleep();
 
-        let body = CreateBlockQuery {
+        let body = CreateBlock {
             tx_hashes: Some(vec![tx_foo.object_hash()]),
         };
-        let block_info: DeBlock = api
+        let block_info: BlockWithTransactions = api
             .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
-
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx_foo);
 
-        let body = CreateBlockQuery {
+        let body = CreateBlock {
             tx_hashes: Some(vec![tx_bar.object_hash()]),
         };
-        let block_info: DeBlock = api
+        let block_info: BlockWithTransactions = api
             .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
-
         assert_eq!(block_info.header.height(), Height(2));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx_bar);
@@ -326,17 +336,16 @@ mod tests {
 
     #[test]
     fn test_create_block_with_bogus_transaction() {
-        let (_, api) = init_handler(Height(0));
+        let api = init_handler(Height(0));
 
-        let body = CreateBlockQuery {
+        let body = CreateBlock {
             tx_hashes: Some(vec![Hash::zero()]),
         };
         let err = api
             .private("api/testkit")
             .query(&body)
-            .post::<DeBlock>("v1/blocks/create")
+            .post::<BlockWithTransactions>("v1/blocks/create")
             .unwrap_err();
-
         assert_matches!(
             err,
             api::Error::BadRequest(ref body) if body.starts_with("Transaction not in mempool")
@@ -345,18 +354,19 @@ mod tests {
 
     #[test]
     fn test_rollback_normal() {
-        let (testkit, api) = init_handler(Height(0));
+        let api = init_handler(Height(0));
 
-        for _ in 0..4 {
-            api.private("api/testkit")
-                .query(&CreateBlockQuery { tx_hashes: None })
-                .post::<DeBlock>("v1/blocks/create")
+        for i in 0..4 {
+            let block: BlockWithTransactions = api
+                .private("api/testkit")
+                .query(&CreateBlock { tx_hashes: None })
+                .post("v1/blocks/create")
                 .unwrap();
+            assert_eq!(block.height(), Height(i + 1));
         }
-        assert_eq!(testkit.read().unwrap().height(), Height(4));
 
         // Test that requests with "overflowing" heights do nothing
-        let block_info: DeBlock = api
+        let block_info: BlockWithTransactions = api
             .private("api/testkit")
             .query(&Height(10))
             .post("v1/blocks/rollback")
@@ -365,38 +375,31 @@ mod tests {
 
         // Test idempotence of the rollback endpoint
         for _ in 0..2 {
-            let block_info: DeBlock = api
+            let block_info: BlockWithTransactions = api
                 .private("api/testkit")
                 .query(&Height(4))
                 .post("v1/blocks/rollback")
                 .unwrap();
 
             assert_eq!(block_info.header.height(), Height(3));
-            {
-                let testkit = testkit.read().unwrap();
-                assert_eq!(testkit.height(), Height(3));
-            }
         }
 
         // Test roll-back to the genesis block
-        api.private("api/testkit")
+        let block = api
+            .private("api/testkit")
             .query(&Height(1))
-            .post::<DeBlock>("v1/blocks/rollback")
+            .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap();
-        {
-            let testkit = testkit.read().unwrap();
-            assert_eq!(testkit.height(), Height(0));
-        }
+        assert_eq!(block.header.height(), Height(0));
     }
 
     #[test]
     fn test_rollback_past_genesis() {
-        let (_, api) = init_handler(Height(4));
-
+        let api = init_handler(Height(4));
         let err = api
             .private("api/testkit")
             .query(&Height(0))
-            .post::<DeBlock>("v1/blocks/rollback")
+            .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap_err();
 
         assert_matches!(

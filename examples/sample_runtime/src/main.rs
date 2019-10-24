@@ -16,8 +16,7 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys},
-    crypto::{PublicKey, SecretKey},
+    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, ValidatorKeys},
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
@@ -118,7 +117,11 @@ impl Runtime for SampleRuntime {
     }
 
     /// Starts an existing `SampleService` instance with the specified ID.
-    fn add_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         let instance = self.start_service(spec)?;
         println!("Starting service {}: {:?}", spec, instance);
         self.started_services.insert(spec.id, instance);
@@ -211,14 +214,7 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    fn after_commit(
-        &mut self,
-        _dispatcher: &mut Mailbox,
-        _snapshot: &dyn Snapshot,
-        _service_keypair: &(PublicKey, SecretKey),
-        _tx_sender: &ApiSender,
-    ) {
-    }
+    fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
 impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
@@ -284,13 +280,18 @@ fn main() {
 
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
-    let blockchain = BlockchainBuilder::new(db, genesis, service_keypair.clone())
-        .with_rust_runtime(vec![InstanceCollection::from(Supervisor)])
+    let blockchain = Blockchain::new(db, service_keypair.clone(), api_sender.clone())
+        .into_mut(genesis)
+        .with_rust_runtime(
+            channel.endpoints.0.clone(),
+            vec![InstanceCollection::from(Supervisor)],
+        )
         .with_additional_runtime(SampleRuntime::default())
-        .finalize(api_sender.clone(), channel.internal_requests.0.clone())
+        .build()
         .unwrap();
 
-    let node = Node::with_blockchain(blockchain.clone(), channel, node_cfg, None);
+    let blockchain_ref = blockchain.as_ref().to_owned();
+    let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
     println!("Starting a single node...");
     println!("Blockchain is ready for transactions!");
 
@@ -335,7 +336,7 @@ fn main() {
         thread::sleep(Duration::from_secs(5));
 
         // Get an instance identifier.
-        let snapshot = blockchain.snapshot();
+        let snapshot = blockchain_ref.snapshot();
         let (spec, status) = DispatcherSchema::new(snapshot.as_ref())
             .get_instance(instance_name.as_str())
             .unwrap();

@@ -16,14 +16,10 @@
 
 use futures::sync::mpsc;
 
-use std::sync::Arc;
-
 use crate::{
-    blockchain::{Blockchain, ConsensusConfig, Schema},
-    crypto::{PublicKey, SecretKey},
-    events::InternalRequest,
-    merkledb::{BinaryValue, Database},
-    node::ApiSender,
+    api::manager::UpdateEndpoints,
+    blockchain::{Blockchain, BlockchainMut, ConsensusConfig, Schema},
+    merkledb::BinaryValue,
     runtime::{
         rust::{RustRuntime, ServiceFactory},
         Dispatcher, InstanceId, InstanceSpec, Runtime,
@@ -36,50 +32,34 @@ use crate::{
 /// is empty. Otherwise, it restores the state from the database.
 #[derive(Debug)]
 pub struct BlockchainBuilder {
-    /// The database which works under the hood.
-    pub database: Arc<dyn Database>,
-    /// Blockchain configuration used to create the genesis block.
-    pub genesis_config: ConsensusConfig,
-    /// Keypair, which  is used to sign service transactions on behalf of this node.
-    pub service_keypair: (PublicKey, SecretKey),
+    pub blockchain: Blockchain,
     /// List of the supported runtimes.
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    /// Blockchain configuration used to create the genesis block.
+    pub genesis_config: ConsensusConfig,
     /// List of the privileged services with the configuration parameters that are created directly
     /// in the genesis block.
     pub builtin_instances: Vec<InstanceConfig>,
 }
 
 impl BlockchainBuilder {
-    /// Creates a new builder instance for the specified database, the genesis configuration and
-    /// the service keypair without any runtimes. The user must add them by himself/herself.
-    pub fn new(
-        database: impl Into<Arc<dyn Database>>,
-        genesis_config: ConsensusConfig,
-        service_keypair: (PublicKey, SecretKey),
-    ) -> Self {
+    /// Creates a new builder instance based on the `Blockchain`.
+    pub fn new(blockchain: Blockchain, genesis_config: ConsensusConfig) -> Self {
         Self {
-            database: database.into(),
+            blockchain,
             genesis_config,
-            service_keypair,
-            runtimes: Vec::new(),
-            builtin_instances: Vec::new(),
+            runtimes: vec![],
+            builtin_instances: vec![],
         }
-    }
-
-    /// Add the built-in Rust runtime with the default built-in services.
-    pub fn with_default_runtime(
-        self,
-        services: impl IntoIterator<Item = InstanceCollection>,
-    ) -> Self {
-        self.with_rust_runtime(services)
     }
 
     /// Add the built-in Rust runtime with the specified built-in services.
     pub fn with_rust_runtime(
         mut self,
+        api_notifier: mpsc::Sender<UpdateEndpoints>,
         services: impl IntoIterator<Item = InstanceCollection>,
     ) -> Self {
-        let mut runtime = RustRuntime::new();
+        let mut runtime = RustRuntime::new(api_notifier);
         for service in services {
             runtime.add_service_factory(service.factory);
             self.builtin_instances.extend(service.instances);
@@ -87,6 +67,7 @@ impl BlockchainBuilder {
         self.with_additional_runtime(runtime)
     }
 
+    // FIXME remove
     pub fn with_external_runtimes(
         mut self,
         runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
@@ -94,7 +75,6 @@ impl BlockchainBuilder {
         for runtime in runtimes {
             self.runtimes.push(runtime.into());
         }
-
         self
     }
 
@@ -121,46 +101,23 @@ impl BlockchainBuilder {
     ///
     /// * If the genesis block was not committed.
     /// * If storage version is not specified or not supported.
-    pub fn finalize(
-        self,
-        api_sender: ApiSender,
-        internal_requests: mpsc::Sender<InternalRequest>,
-    ) -> Result<Blockchain, failure::Error> {
-        let mut dispatcher = Dispatcher::with_runtimes(self.runtimes);
-        // If genesis block had been already created just restores dispatcher state from database
-        // otherwise creates genesis block with the given specification.
-        let has_genesis_block = {
-            let snapshot = self.database.snapshot();
-            !Schema::new(snapshot.as_ref())
-                .block_hashes_by_height()
-                .is_empty()
+    pub fn build(self) -> Result<BlockchainMut, failure::Error> {
+        let mut blockchain = BlockchainMut {
+            dispatcher: Dispatcher::new(&self.blockchain, self.runtimes),
+            inner: self.blockchain,
         };
 
-        let blockchain = if has_genesis_block {
-            let snapshot = self.database.snapshot();
-            dispatcher.restore_state(&snapshot)?;
-            Blockchain::with_dispatcher(
-                self.database,
-                dispatcher,
-                self.service_keypair,
-                api_sender,
-                internal_requests,
-            )
+        // If genesis block had been already created just restores dispatcher state from database
+        // otherwise creates genesis block with the given specification.
+        let snapshot = blockchain.as_ref().snapshot();
+        let has_genesis_block = !Schema::new(&snapshot).block_hashes_by_height().is_empty();
+
+        if has_genesis_block {
+            blockchain.dispatcher.restore_state(&snapshot)?;
         } else {
-            // Creates blockchain with the new genesis block.
-            let mut blockchain = Blockchain::with_dispatcher(
-                self.database,
-                dispatcher,
-                self.service_keypair,
-                api_sender,
-                internal_requests,
-            );
             // Adds builtin services.
             blockchain.create_genesis_block(self.genesis_config, self.builtin_instances)?;
-            blockchain
         };
-        // Starts built-in APIs.
-        blockchain.notify_api_changes();
         Ok(blockchain)
     }
 }
@@ -228,53 +185,36 @@ impl InstanceCollection {
 
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::TemporaryDB;
-
-    use crate::{
-        crypto,
-        helpers::{generate_testnet_config, Height},
-    };
-
-    // Import service from tests, so we won't have implement other one.
-    use crate::blockchain::tests::ServiceGoodImpl as SampleService;
+    use futures::sync::mpsc;
 
     use super::*;
+    use crate::{
+        // Import service from tests, so we won't have implement other one.
+        blockchain::tests::ServiceGoodImpl as SampleService,
+        helpers::{generate_testnet_config, Height},
+    };
 
     #[test]
     fn finalize_without_genesis_block() {
         let config = generate_testnet_config(1, 0)[0].clone();
-        let service_keypair = config.service_keypair();
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-        let services = vec![];
+        let blockchain = Blockchain::for_tests()
+            .into_mut(config.consensus)
+            .with_rust_runtime(mpsc::channel(0).0, vec![])
+            .build()
+            .unwrap();
 
-        let blockchain = Blockchain::new(
-            TemporaryDB::new(),
-            external_runtimes,
-            services,
-            config.consensus,
-            service_keypair,
-            ApiSender::new(mpsc::channel(0).0),
-            mpsc::channel(0).0,
-        );
-
-        let access = blockchain.snapshot();
+        let access = blockchain.as_ref().snapshot();
         assert_eq!(Schema::new(access.as_ref()).height(), Height(0));
         // TODO check dispatcher schema.
     }
 
     fn test_finalizing_services(services: Vec<InstanceCollection>) {
         let config = generate_testnet_config(1, 0)[0].clone();
-        let service_keypair = config.service_keypair();
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-        Blockchain::new(
-            TemporaryDB::new(),
-            external_runtimes,
-            services,
-            config.consensus,
-            service_keypair,
-            ApiSender::new(mpsc::channel(0).0),
-            mpsc::channel(0).0,
-        );
+        Blockchain::for_tests()
+            .into_mut(config.consensus)
+            .with_rust_runtime(mpsc::channel(0).0, services)
+            .build()
+            .unwrap();
     }
 
     #[test]
@@ -307,19 +247,11 @@ mod tests {
     #[test]
     #[should_panic(expected = "Consensus configuration must have at least one validator")]
     fn finalize_invalid_consensus_config() {
-        let consensus = ConsensusConfig::default();
-        let service_keypair = crypto::gen_keypair();
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-        let services = vec![];
-
-        Blockchain::new(
-            TemporaryDB::new(),
-            external_runtimes,
-            services,
-            consensus,
-            service_keypair,
-            ApiSender::new(mpsc::channel(0).0),
-            mpsc::channel(0).0,
-        );
+        let consensus_config = ConsensusConfig::default();
+        Blockchain::for_tests()
+            .into_mut(consensus_config)
+            .with_rust_runtime(mpsc::channel(0).0, vec![])
+            .build()
+            .unwrap();
     }
 }

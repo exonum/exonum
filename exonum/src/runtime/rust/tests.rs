@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::gen_keypair;
 use exonum_derive::exonum_service;
 use futures::sync::mpsc;
 
 use crate::{
+    blockchain::Blockchain,
     crypto::Hash,
-    merkledb::{BinaryValue, Database, Entry, Snapshot, TemporaryDB},
-    node::ApiSender,
+    helpers::generate_testnet_config,
+    merkledb::{BinaryValue, Entry, Snapshot},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        dispatcher::Dispatcher, error::ExecutionError, CallInfo, Caller, DispatcherError,
-        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec,
+        error::ExecutionError, CallInfo, Caller, DispatcherError, ExecutionContext,
+        InstanceDescriptor, InstanceId, InstanceSpec,
     },
 };
 
@@ -123,25 +123,27 @@ impl Service for TestServiceImpl {
 
 #[test]
 fn test_basic_rust_runtime() {
-    let db = TemporaryDB::new();
-    let service_keypair = gen_keypair();
-    let tx_sender = ApiSender(mpsc::channel(0).0);
-
     // Create a runtime and a service.
-    let mut runtime = RustRuntime::new();
+    let mut runtime = RustRuntime::new(mpsc::channel(0).0);
     let service_factory = Box::new(TestServiceImpl);
     let artifact: ArtifactId = service_factory.artifact_id().into();
     runtime.add_service_factory(service_factory);
 
     // Create dummy dispatcher.
-    let mut dispatcher = Dispatcher::with_runtimes(vec![runtime.into()]);
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let mut blockchain = Blockchain::for_tests()
+        .into_mut(config.consensus)
+        .with_additional_runtime(runtime)
+        .build()
+        .unwrap();
 
     // Deploy service.
-    let fork = db.fork();
-    dispatcher
-        .deploy_and_register_artifact(&fork, artifact.clone(), Vec::default())
+    let fork = blockchain.fork();
+    blockchain
+        .dispatcher()
+        .deploy_artifact_sync(&fork, artifact.clone(), vec![])
         .unwrap();
-    db.merge(fork.into_patch()).unwrap();
+    blockchain.merge(fork.into_patch()).unwrap();
 
     // Add service
     let spec = InstanceSpec {
@@ -152,8 +154,8 @@ fn test_basic_rust_runtime() {
     let constructor = Init {
         msg: "constructor_message".to_owned(),
     };
-    let mut fork = db.fork();
-    ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit)
+    let mut fork = blockchain.fork();
+    ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::BeforeCommit)
         .start_adding_service(spec, constructor)
         .unwrap();
 
@@ -161,8 +163,8 @@ fn test_basic_rust_runtime() {
         let entry = Entry::new("constructor_entry", &fork);
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
-    dispatcher.after_commit(&fork, &service_keypair, &tx_sender);
-    db.merge(fork.into_patch()).unwrap();
+    blockchain.dispatcher().after_commit(&fork);
+    blockchain.merge(fork.into_patch()).unwrap();
 
     // Execute transaction method A.
     const ARG_A_VALUE: u64 = 11;
@@ -171,12 +173,12 @@ fn test_basic_rust_runtime() {
         method_id: 0,
     };
     let payload = TxA { value: ARG_A_VALUE }.into_bytes();
-    let mut fork = db.fork();
-
     let caller = Caller::Service {
         instance_id: SERVICE_INSTANCE_ID,
     };
-    dispatcher
+    let mut fork = blockchain.fork();
+    blockchain
+        .dispatcher()
         .call(&mut fork, caller, &call_info, &payload)
         .unwrap();
 
@@ -186,7 +188,7 @@ fn test_basic_rust_runtime() {
         let entry = Entry::new("method_b_entry", &fork);
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
-    db.merge(fork.into_patch()).unwrap();
+    blockchain.merge(fork.into_patch()).unwrap();
 
     // Execute transaction method B.
     const ARG_B_VALUE: u64 = 22;
@@ -195,12 +197,12 @@ fn test_basic_rust_runtime() {
         method_id: 1,
     };
     let payload = TxB { value: ARG_B_VALUE }.into_bytes();
-    let mut fork = db.fork();
-
     let caller = Caller::Service {
         instance_id: SERVICE_INSTANCE_ID,
     };
-    dispatcher
+    let mut fork = blockchain.fork();
+    blockchain
+        .dispatcher()
         .call(&mut fork, caller, &call_info, &payload)
         .unwrap();
 
@@ -208,5 +210,5 @@ fn test_basic_rust_runtime() {
         let entry = Entry::new("method_b_entry", &fork);
         assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
-    db.merge(fork.into_patch()).unwrap();
+    blockchain.merge(fork.into_patch()).unwrap();
 }

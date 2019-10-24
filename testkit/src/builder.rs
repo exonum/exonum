@@ -23,10 +23,11 @@ use exonum::{
     merkledb::TemporaryDB,
     runtime::{rust::RustRuntime, Runtime},
 };
+use futures::sync::mpsc;
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use crate::{TestKit, TestNetwork};
+use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 
 /// Builder for `TestKit`.
 ///
@@ -115,6 +116,7 @@ pub struct TestKitBuilder {
     test_network: Option<TestNetwork>,
     logger: bool,
     rust_runtime: RustRuntime,
+    api_notifier_channel: ApiNotifierChannel,
     additional_runtimes: HashMap<u32, Box<dyn Runtime>>,
     instances: Vec<InstanceConfig>,
 }
@@ -209,13 +211,13 @@ impl TestKitBuilder {
 
         let (id, runtime) = self.rust_runtime.into();
         self.additional_runtimes.insert(id, runtime);
-
         TestKit::assemble(
             TemporaryDB::new(),
             network,
             genesis,
             self.additional_runtimes.into_iter(),
             self.instances,
+            self.api_notifier_channel,
         )
     }
 
@@ -233,11 +235,13 @@ impl TestKitBuilder {
 
     // Creates testkit for validator or auditor node.
     fn new(validator_id: Option<ValidatorId>) -> Self {
+        let api_notifier_channel = mpsc::channel(16);
         Self {
             test_network: None,
             our_validator_id: validator_id,
             logger: false,
-            rust_runtime: RustRuntime::new(),
+            rust_runtime: RustRuntime::new(api_notifier_channel.0.clone()),
+            api_notifier_channel,
             additional_runtimes: HashMap::new(),
             instances: vec![],
         }
