@@ -23,8 +23,9 @@ use exonum::{
         Caller, DispatcherError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert, ServiceFactory};
+use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
+use exonum_proto::ProtobufConvert;
 
 use crate::proto;
 use exonum_supervisor::Configure;
@@ -66,8 +67,10 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq)]
-#[exonum(pb = "proto::TxInc")]
+#[derive(
+    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
+)]
+#[protobuf_convert(source = "proto::TxInc")]
 pub struct TxInc {
     pub seed: u64,
 }

@@ -27,11 +27,13 @@ use crate::{
     proto::schema::consensus,
 };
 
+use exonum_proto::ProtobufConvert;
+
 /// Protobuf based container for any signed messages.
 ///
 /// See module [documentation](index.html#examples) for examples.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::SignedMessage", crate = "crate")]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "consensus::SignedMessage")]
 pub struct SignedMessage {
     /// Message payload.
     pub payload: Vec<u8>,
@@ -55,7 +57,7 @@ pub struct SignedMessage {
 /// initialization. Additionally, the node responds by its own `Connect`
 /// message after receiving `node::Event::Connected`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::Connect", crate = "crate")]
+#[protobuf_convert(source = "consensus::Connect")]
 pub struct Connect {
     /// The node's public address.
     pub host: String,
@@ -110,7 +112,7 @@ impl Connect {
 /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
 /// after accepting a new block.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::Status", crate = "crate")]
+#[protobuf_convert(source = "consensus::Status")]
 pub struct Status {
     /// The height to which the message is related.
     pub height: Height,
@@ -163,8 +165,8 @@ impl Status {
 /// A node broadcasts `Propose` if it is a leader and is not locked for a
 /// different proposal. Also `Propose` can be sent as response to
 /// `ProposeRequest`.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::Propose", crate = "crate")]
+#[protobuf_convert(source = "consensus::Propose")]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct Propose {
     /// The validator id.
     pub validator: ValidatorId,
@@ -237,7 +239,7 @@ impl Propose {
 /// A node broadcasts `Prevote` in response to `Propose` when it has
 /// received all the transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::Prevote", crate = "crate")]
+#[protobuf_convert(source = "consensus::Prevote")]
 pub struct Prevote {
     /// The validator id.
     pub validator: ValidatorId,
@@ -310,7 +312,7 @@ impl Prevote {
 /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
 /// pre-votes and no unknown transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "consensus::Precommit", crate = "crate")]
+#[protobuf_convert(source = "consensus::Precommit")]
 pub struct Precommit {
     /// The validator id.
     pub validator: ValidatorId,
@@ -385,7 +387,7 @@ impl Precommit {
 /// ### Generation
 /// The message is sent as response to `BlockRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::BlockResponse", crate = "crate")]
+#[protobuf_convert(source = "consensus::BlockResponse")]
 pub struct BlockResponse {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -447,7 +449,7 @@ impl BlockResponse {
 /// ### Generation
 /// The message is sent as response to `TransactionsRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::TransactionsResponse", crate = "crate")]
+#[protobuf_convert(source = "consensus::TransactionsResponse")]
 pub struct TransactionsResponse {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -488,7 +490,7 @@ impl TransactionsResponse {
 /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::ProposeRequest", crate = "crate")]
+#[protobuf_convert(source = "consensus::ProposeRequest")]
 pub struct ProposeRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -531,7 +533,7 @@ impl ProposeRequest {
 /// This message can be sent during `Propose`, `Prevote` and `Precommit`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::TransactionsRequest", crate = "crate")]
+#[protobuf_convert(source = "consensus::TransactionsRequest")]
 pub struct TransactionsRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -568,7 +570,7 @@ impl TransactionsRequest {
 /// A node can send `PoolTransactionsRequest` during `Status` message
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::PoolTransactionsRequest", crate = "crate")]
+#[protobuf_convert(source = "consensus::PoolTransactionsRequest")]
 pub struct PoolTransactionsRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -593,7 +595,7 @@ impl PoolTransactionsRequest {
 /// ### Generation
 /// This message can be sent during `Prevote` and `Precommit` handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::PrevotesRequest", crate = "crate")]
+#[protobuf_convert(source = "consensus::PrevotesRequest")]
 pub struct PrevotesRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -660,7 +662,7 @@ impl PrevotesRequest {
 /// `PeersRequest` message is sent regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::peers_timeout`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::PeersRequest", crate = "crate")]
+#[protobuf_convert(source = "consensus::PeersRequest")]
 pub struct PeersRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -688,7 +690,7 @@ impl PeersRequest {
 /// ### Generation
 /// This message can be sent during `Status` processing.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::BlockRequest", crate = "crate")]
+#[protobuf_convert(source = "consensus::BlockRequest")]
 pub struct BlockRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
@@ -720,8 +722,8 @@ impl BlockResponse {
 
 /// This type describes all possible types of Exonum messages
 /// which are used in p2p communications.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "consensus::ExonumMessage", crate = "crate")]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "consensus::ExonumMessage")]
 pub enum ExonumMessage {
     /// Exonum transaction.
     AnyTx(AnyTx),

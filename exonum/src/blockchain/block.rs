@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use exonum_proto::ProtobufConvert;
 
 use crate::{
     crypto::Hash,
@@ -27,8 +28,20 @@ use crate::{
 ///
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "proto::Block", crate = "crate")]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Ord,
+    PartialOrd,
+    Debug,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "proto::Block")]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.
     pub proposer_id: ValidatorId,

@@ -17,8 +17,11 @@ use exonum_merkledb::{
     ProofMapIndex,
 };
 
+use exonum_proto::ProtobufConvert;
+
 use std::mem;
 
+use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 use crate::{
     crypto::{self, Hash, PublicKey},
     helpers::{Height, Round},
@@ -26,8 +29,6 @@ use crate::{
     proto,
     runtime::InstanceId,
 };
-
-use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -61,8 +62,8 @@ define_names!(
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
-#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::TxLocation", crate = "crate")]
+#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::TxLocation")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
     block_height: Height,

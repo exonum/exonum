@@ -79,31 +79,42 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 ///
 /// # Example
 ///
-/// ```ignore [ECR-3275]
-/// # extern crate exonum;
-/// # extern crate exonum_testkit;
-/// # extern crate failure;
-/// # use exonum::blockchain::{Service, Transaction};
-/// # use exonum::messages::AnyTx;
+/// ```
+/// # use exonum_derive::{exonum_service, ServiceFactory};
+/// # use exonum_merkledb::Snapshot;
 /// # use exonum_testkit::TestKitBuilder;
-/// # pub struct MyService;
-/// # impl Service for MyService {
-/// #    fn service_name(&self) -> &str {
-/// #        "documentation"
-/// #    }
-/// #    fn state_hash(&self, _: &exonum_merkledb::Snapshot) -> Vec<exonum::crypto::Hash> {
-/// #        Vec::new()
-/// #    }
-/// #    fn service_id(&self) -> u16 {
-/// #        0
-/// #    }
-/// #    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
-/// #        unimplemented!();
-/// #    }
+/// # use exonum::{
+/// #     blockchain::InstanceCollection,
+/// #     crypto::Hash,
+/// #     runtime::{InstanceDescriptor, rust::Service},
+/// # };
+/// #
+/// # const SERVICE_ID: u32 = 1;
+/// #
+/// # #[derive(Clone, Default, Debug, ServiceFactory)]
+/// # #[exonum(
+/// #     artifact_name = "example",
+/// #     artifact_version = "1.0.0",
+/// #     proto_sources = "exonum_testkit::proto",
+/// #     implements("ExampleInterface")
+/// # )]
+/// # pub struct ExampleService;
+/// #
+/// # impl Service for ExampleService {
+/// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
 /// # }
+/// #
+/// # #[exonum_service]
+/// # pub trait ExampleInterface {}
+/// #
+/// # impl ExampleInterface for ExampleService {}
+/// #
 /// # fn main() {
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_rust_service(MyService)
+///     .with_rust_service(
+///         InstanceCollection::new(ExampleService)
+///             .with_instance(SERVICE_ID, "example", ())
+///     )
 ///     .with_validators(4)
 ///     .create();
 /// testkit.create_block();

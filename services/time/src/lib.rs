@@ -44,6 +44,7 @@ pub mod transactions;
 
 use exonum::{
     crypto::Hash,
+    helpers::validator::validator_id,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, Service},
@@ -84,7 +85,7 @@ impl Service for TimeService {
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext) {
         // The transaction must be created by the validator.
-        if context.validator_id().is_some() {
+        if validator_id(context.snapshot, context.service_keypair.0).is_some() {
             context.broadcast_transaction(TxTime::new(self.time.current_time()));
         }
     }

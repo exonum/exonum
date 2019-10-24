@@ -134,16 +134,18 @@ impl ServiceFactory {
 
     fn artifact_protobuf_spec(&self) -> impl ToTokens {
         let cr = &self.cr;
-
         if let Some(ref proto_sources_mod) = self.proto_sources {
             quote! {
                 #cr::runtime::ArtifactProtobufSpec::from(
-                    #proto_sources_mod::PROTO_SOURCES.as_ref(),
+                    (#proto_sources_mod::PROTO_SOURCES.as_ref(), #proto_sources_mod::INCLUDES.as_ref())
                 )
             }
         } else {
             quote! {
-                #cr::runtime::ArtifactProtobufSpec { sources: vec![] }
+                #cr::runtime::ArtifactProtobufSpec {
+                    sources: vec![],
+                    includes: vec![],
+                }
             }
         }
     }

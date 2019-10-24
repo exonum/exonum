@@ -16,7 +16,7 @@
 //! for developing purposes.
 
 use failure::{Error, ResultExt};
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::{fs, path::PathBuf, str::FromStr};

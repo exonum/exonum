@@ -47,8 +47,8 @@ which must be executed no later than the specified time
 (this time is written in the transaction body in a separate field):
 
 ```rust
+#[protobuf_convert(source = "proto::TimeTx")]
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::TimeTx")]
 /// Transaction, which must be executed no later than the specified time (field `time`).
 struct TimeTx {
     time: DateTime<Utc>,

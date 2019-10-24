@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
+use super::InstanceDescriptor;
 use crate::{
     helpers::ValidateInput,
     merkledb::{
@@ -23,8 +25,6 @@ use crate::{
     },
     proto::schema,
 };
-
-use super::InstanceDescriptor;
 
 /// Unique service instance identifier.
 ///
@@ -40,7 +40,7 @@ pub type MethodId = u32;
 #[derive(
     Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
 )]
-#[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
+#[protobuf_convert(source = "schema::runtime::CallInfo")]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
     /// corresponding runtime to execute a transaction.
@@ -88,8 +88,8 @@ impl CallInfo {
 ///     &keypair.1
 /// );
 /// ```
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::AnyTx", crate = "crate")]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[protobuf_convert(source = "schema::runtime::AnyTx")]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
     pub call_info: CallInfo,
@@ -130,9 +130,20 @@ impl AnyTx {
 /// # }
 /// ```
 #[derive(
-    Debug, Clone, ProtobufConvert, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
 )]
-#[exonum(pb = "schema::runtime::ArtifactId", crate = "crate")]
+#[protobuf_convert(source = "schema::runtime::ArtifactId")]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
@@ -216,9 +227,9 @@ impl FromStr for ArtifactId {
     }
 }
 
-/// Exhaustive service instance specification.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
-#[exonum(pb = "schema::runtime::ArtifactSpec", crate = "crate")]
+/// Exhaustive artifact specification.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
 pub struct ArtifactSpec {
     /// Information uniquely identifying the artifact.
     pub artifact: ArtifactId,
@@ -227,8 +238,19 @@ pub struct ArtifactSpec {
 }
 
 /// Exhaustive service instance specification.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "schema::runtime::InstanceSpec", crate = "crate")]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "schema::runtime::InstanceSpec")]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///

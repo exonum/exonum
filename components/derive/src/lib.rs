@@ -20,9 +20,9 @@
 
 extern crate proc_macro;
 
+mod db_traits;
 mod execution_error;
 mod exonum_service;
-mod pb_convert;
 mod service_factory;
 
 use darling::FromMeta;
@@ -30,46 +30,48 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
-/// Derive `ProtobufConvert` trait.
+/// Derive `BinaryValue` trait.
+/// Target type must implement `ProtobufConvert` trait.
 ///
-/// Attributes:
-///
-/// ## Required
-///
-/// * `#[exonum(pb = "path")]`
-///
-/// Path is the name of the corresponding protobuf generated struct.
-///
-/// ## Optional
-///
-/// * `#[exonum(crate = "path")]`
-///
-/// Prefix of the `exonum` crate(usually "crate" or "exonum").
-///
-/// * `#[exonum(serde_pb_convert)]`
-///
-/// Implement `serde::{Serialize, Deserialize}` using structs that were generated with
-/// protobuf.
-/// For example, it should be used if you want json representation of your struct
-/// to be compatible with protobuf representation (including proper nesting of fields).
-/// ```text
-/// For example, struct with `exonum::crypto::Hash` with this
-/// (de)serializer will be represented as
-/// StructName {
-///     "hash": {
-///         data: [1, 2, ...]
-///     },
-///     // ...
+/// # Example
+/// ```ignore
+/// #[derive(Clone, Debug, BinaryValue)]
+/// #[protobuf_convert(source = "proto::Wallet")]
+/// pub struct Wallet {
+///     /// `PublicKey` of the wallet.
+///     pub pub_key: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
 /// }
-/// // With default (de)serializer.
-/// StructName {
-///     "hash": "12af..." // HEX
-///     // ...
-/// }
+///
+/// let wallet = Wallet::new();
+/// let bytes = wallet.to_bytes();
 /// ```
-#[proc_macro_derive(ProtobufConvert, attributes(exonum))]
-pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
-    pb_convert::implement_protobuf_convert(input)
+#[proc_macro_derive(BinaryValue)]
+pub fn binary_value(input: TokenStream) -> TokenStream {
+    db_traits::binary_value(input)
+}
+
+/// Derive `ObjectHash` trait.
+/// Target type must implement `BinaryValue` trait.
+///
+/// # Example
+/// ```ignore
+/// #[protobuf_convert(source = "proto::Wallet")]
+/// #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+/// pub struct Wallet {
+///     /// `PublicKey` of the wallet.
+///     pub pub_key: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
+/// }
+///
+/// let wallet = Wallet::new();
+/// let hash = wallet.object_hash();
+/// ```
+#[proc_macro_derive(ObjectHash)]
+pub fn object_hash(input: TokenStream) -> TokenStream {
+    db_traits::object_hash(input)
 }
 
 /// Derive `ServiceFactory` and `ServiceDispatcher` traits.

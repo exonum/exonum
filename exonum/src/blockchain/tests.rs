@@ -16,6 +16,8 @@ use futures::{sync::mpsc, Future};
 
 use std::{collections::BTreeMap, panic, sync::Mutex};
 
+use exonum_proto::ProtobufConvert;
+
 use crate::{
     blockchain::{
         Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, FatalError,
@@ -41,26 +43,26 @@ use crate::{
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
 struct TestExecute {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
 struct TestDeploy {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
 struct TestAdd {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
 struct TestCallInitialize {
     value: u64,
 }
@@ -237,8 +239,8 @@ lazy_static! {
     static ref EXECUTION_STATUS: Mutex<Result<(), ExecutionError>> = Mutex::new(Ok(()));
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "TestServiceTx", crate = "crate")]
+#[protobuf_convert(source = "TestServiceTx")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 struct TxResult {
     value: u64,
 }

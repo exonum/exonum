@@ -22,6 +22,7 @@ use protoc_rust::Customize;
 use quote::{quote, ToTokens};
 use walkdir::WalkDir;
 
+use std::collections::HashSet;
 use std::{
     env,
     fs::File,
@@ -54,7 +55,6 @@ impl<'a> ProtoSources<'a> {
     }
 
     /// Most frequently used combination of proto dependencies.
-    /// TODO: maybe find a better name.
     pub fn frequently_used() -> Vec<Self> {
         vec![
             ProtoSources::Exonum,
@@ -87,7 +87,7 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
 
 /// Includes all .proto files with their names into generated file as array of tuples,
 /// where tuple content is (file_name, file_content).
-fn include_proto_files(proto_files: &[PathBuf]) -> impl ToTokens {
+fn include_proto_files(proto_files: HashSet<&PathBuf>, name: &str) -> impl ToTokens {
     let proto_files_len = proto_files.len();
     // TODO Think about syn crate and token streams instead of dirty strings.
     let proto_files = proto_files.iter().map(|path| {
@@ -108,11 +108,13 @@ fn include_proto_files(proto_files: &[PathBuf]) -> impl ToTokens {
         }
     });
 
+    let name = Ident::new(name, Span::call_site());
+
     quote! {
         /// Original proto files which were be used to generate this module.
         /// First element in tuple is file name, second is proto file content.
         #[allow(dead_code)]
-        pub const PROTO_SOURCES: [(&str, &str); #proto_files_len] = [
+        pub const #name: [(&str, &str); #proto_files_len] = [
             #( #proto_files )*
         ];
     }
@@ -125,6 +127,7 @@ fn include_proto_files(proto_files: &[PathBuf]) -> impl ToTokens {
 fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
     out_dir: P,
     proto_files: &[PathBuf],
+    includes: &[PathBuf],
     mod_file: Q,
 ) {
     let mod_files = {
@@ -147,11 +150,21 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
             }
         })
     };
-    let proto_files = include_proto_files(proto_files);
+
+    // To avoid cases where input sources are also added as includes, use only
+    // unique paths.
+    let includes = includes
+        .iter()
+        .filter(|file| !proto_files.contains(file))
+        .collect();
+
+    let proto_files = include_proto_files(proto_files.iter().collect(), "PROTO_SOURCES");
+    let includes = include_proto_files(includes, "INCLUDES");
 
     let content = quote! {
         #( #mod_files )*
         #proto_files
+        #includes
     };
 
     let dest_path = out_dir.as_ref().join(mod_file);
@@ -277,9 +290,6 @@ where
         .map(PathBuf::from)
         .expect("Unable to get OUT_DIR");
 
-    let proto_files = get_proto_files(&input_dir);
-    generate_mod_rs(&out_dir, &proto_files, &mod_file_name.as_ref());
-
     // Converts paths to strings and adds input dir to includes.
     let mut includes: Vec<_> = includes.iter().map(ProtoSources::path).collect();
 
@@ -292,6 +302,16 @@ where
     );
 
     let includes: Vec<&str> = includes.iter().map(String::as_str).collect();
+
+    let proto_files = get_proto_files(&input_dir);
+    let included_files = get_included_files(&includes);
+
+    generate_mod_rs(
+        &out_dir,
+        &proto_files,
+        &included_files,
+        &mod_file_name.as_ref(),
+    );
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: out_dir
@@ -308,6 +328,13 @@ where
         },
     })
     .expect("protoc");
+}
+
+fn get_included_files(includes: &[&str]) -> Vec<PathBuf> {
+    includes
+        .iter()
+        .flat_map(|path| get_proto_files(path))
+        .collect()
 }
 
 /// Get path to the folder containing `exonum` protobuf files.

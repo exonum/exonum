@@ -21,13 +21,14 @@ use exonum::{
         ExecutionError,
     },
 };
-use exonum_derive::{exonum_service, ProtobufConvert};
+use exonum_derive::{exonum_service, BinaryValue, ObjectHash};
+use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Issue")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Issue")]
 pub struct Issue {
     pub to: PublicKey,
     pub amount: u64,

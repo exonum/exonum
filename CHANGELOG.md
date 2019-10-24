@@ -30,17 +30,25 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
     ```
 
-- Placeholder for changes due to dynamic services (#9999)
-
   - `StoppedTestKit::resume` accepts list of runtimes instead of a list of services.
 
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
 
+- Placeholder for changes due to dynamic services (#9999)
+
 #### exonum-proto
 
-- Introduced new crate `exonum-proto`. Trait `ProtobufConvert` is moved to
-  `exonum-proto` crate. (#1496)
+- Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` is moved
+  to this crate. (#1496)
+
+#### exonum-proto-derive
+
+- Introduced a new crate `exonum-proto-derive`. Derive macro `ProtobufConvert` is
+  moved to this crate. (#1501)
+
+- Derive macro `ProtobufConvert` now doesn't derive `BinaryValue` and `ObjectHash`
+  traits. There are separate derive macros for them in `exonum-derive` crate. (#1501)
 
 #### exonum-build
 

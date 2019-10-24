@@ -26,7 +26,7 @@ pub use self::{
 use exonum::{
     blockchain::{self, InstanceCollection},
     crypto::Hash,
-    helpers::byzantine_quorum,
+    helpers::{byzantine_quorum, validator::validator_id},
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
@@ -158,7 +158,7 @@ impl Service for Supervisor {
         let pending_deployments = schema.pending_deployments();
         let keypair = context.service_keypair;
         let instance_id = context.instance.id;
-        let is_validator = context.validator_id().is_some();
+        let is_validator = validator_id(context.snapshot, context.service_keypair.0).is_some();
 
         // Sends confirmation transaction for unconfirmed deployment requests.
         let deployments = pending_deployments.values().filter(|request| {

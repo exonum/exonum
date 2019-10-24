@@ -17,7 +17,7 @@
 
 use exonum::node::NodeConfig;
 use failure::Error;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::{net::SocketAddr, path::PathBuf};

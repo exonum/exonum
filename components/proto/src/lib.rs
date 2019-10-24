@@ -36,6 +36,8 @@
 //!
 //TODO: revert the example
 
+pub use exonum_proto_derive::*;
+
 use proto::common::BitVec;
 
 pub mod proto;

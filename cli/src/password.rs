@@ -16,7 +16,7 @@
 
 use failure::{bail, Error, ResultExt};
 use rpassword::read_password_from_tty;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use std::{env, str::FromStr};

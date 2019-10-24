@@ -26,14 +26,15 @@ use exonum::{
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
 use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
+use exonum_proto::ProtobufConvert;
 
 use super::{
     proto, simple::SupervisorInterface as SimpleInterface, transactions::SupervisorInterface,
 };
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::DeployRequest")]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::DeployRequest")]
 pub struct DeployRequest {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -44,8 +45,8 @@ pub struct DeployRequest {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::DeployConfirmation")]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::DeployConfirmation")]
 pub struct DeployConfirmation {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -56,8 +57,8 @@ pub struct DeployConfirmation {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::StartService")]
+#[protobuf_convert(source = "proto::StartService")]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -70,8 +71,19 @@ pub struct StartService {
 }
 
 /// Configuration parameters of the certain service instance.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "proto::ServiceConfig")]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "proto::ServiceConfig")]
 pub struct ServiceConfig {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -80,8 +92,19 @@ pub struct ServiceConfig {
 }
 
 /// Atomic configuration change.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "proto::ConfigChange")]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "proto::ConfigChange")]
 pub enum ConfigChange {
     /// New consensus config.
     Consensus(ConsensusConfig),
@@ -89,9 +112,9 @@ pub enum ConfigChange {
     Service(ServiceConfig),
 }
 
-/// Request for the configuration change.
-#[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::ConfigPropose")]
+/// Request for the configuration change
+#[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::ConfigPropose")]
 pub struct ConfigPropose {
     /// The height until which the update configuration procedure should be completed.
     pub actual_from: Height,
@@ -150,16 +173,18 @@ impl ConfigPropose {
 }
 
 /// Confirmation vote for the configuration change
-#[derive(Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::ConfigVote")]
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::ConfigVote")]
 pub struct ConfigVote {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,
 }
 
 /// Pending config change proposal entry
-#[derive(Clone, Debug, Eq, PartialEq, ProtobufConvert, Serialize, Deserialize)]
-#[exonum(pb = "proto::ConfigProposalWithHash")]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ProtobufConvert, BinaryValue, ObjectHash,
+)]
+#[protobuf_convert(source = "proto::ConfigProposalWithHash")]
 pub struct ConfigProposalWithHash {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,

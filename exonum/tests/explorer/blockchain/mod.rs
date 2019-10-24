@@ -25,6 +25,7 @@ use exonum::{
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
 
 use std::collections::BTreeMap;
@@ -33,8 +34,8 @@ pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::CreateWallet")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
     pub pubkey: PublicKey,
     pub name: String,
@@ -49,8 +50,8 @@ impl CreateWallet {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Transfer")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Transfer")]
 pub struct Transfer {
     pub from: PublicKey,
     pub to: PublicKey,

@@ -30,7 +30,7 @@ use crate::{
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
-    runtime::{ArtifactId, DispatcherState, ProtoSourceFile},
+    runtime::{ArtifactId, ArtifactProtobufSpec, DispatcherState},
 };
 
 pub mod private;
@@ -164,10 +164,8 @@ impl SharedNodeState {
     }
 
     /// Returns the source files of the artifact with the specified identifier.
-    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<Vec<ProtoSourceFile>> {
-        self.dispatcher
-            .artifact_sources(id)
-            .map(|spec| spec.sources)
+    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+        self.dispatcher.artifact_sources(id)
     }
 
     /// Updates internal state, from `State` of a blockchain node.
