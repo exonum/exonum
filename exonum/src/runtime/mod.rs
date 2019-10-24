@@ -174,11 +174,12 @@ impl From<RuntimeIdentifier> for u32 {
 /// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics according to panic policy.
 #[allow(unused_variables)]
 pub trait Runtime: Send + Debug + 'static {
-    /// Initializes the runtime, providing a `Blockchain` instance for further use. The default
-    /// implementation does nothing.
+    /// Initializes the runtime, providing a `Blockchain` instance for further use.
     ///
     /// This method is guaranteed to be called before any other `Runtime` methods. It is
-    /// called only once during `Runtime` lifetime.
+    /// called *exactly once* during `Runtime` lifetime.
+    ///
+    /// The default implementation does nothing.
     fn initialize(&mut self, blockchain: &Blockchain) {}
 
     /// Notifies the runtime that the dispatcher has completed re-initialization after
@@ -186,8 +187,8 @@ pub trait Runtime: Send + Debug + 'static {
     /// for all runtimes.
     ///
     /// This method is called *no more than once* during `Runtime` lifetime. It is called iff
-    /// the blockchain had genesis block at the start of the node. The blockchain state
-    /// does not change between `initialize` and `after_initialize` calls.
+    /// the blockchain had genesis block when the node was started. The blockchain state
+    /// is guaranteed to not change between `initialize` and `after_initialize` calls.
     ///
     /// The default implementation does nothing.
     fn on_resume(&mut self) {}
@@ -215,16 +216,30 @@ pub trait Runtime: Send + Debug + 'static {
     /// Runs the constructor of a new service instance with the given specification
     /// and initial configuration.
     ///
-    /// The service is not guaranteed to be added to the runtime at this point, so the runtime
-    /// may freely discard the instantiated service instance after completing this method. To
-    /// add the service to the runtime permanently, `add_service()` may be called afterwards,
-    /// but this call is not guaranteed (e.g., if there are several block candidates at
-    /// the same height).
+    /// The service is not guaranteed to be added to the blockchain at this point.
+    /// In particular, the dispatcher does not route transactions and `before_commit` events
+    /// until after `commit_service()` is called with the same instance spec. A call
+    /// to `commit_service()` is not guaranteed for each `start_adding_service()`; indeed,
+    /// committing the service will not follow if the alternative block proposal without
+    /// the service instantiation was accepted. If the call is performed, it is
+    /// guaranteed to be performed in the closest committed block, i.e., before the nearest
+    /// `Runtime::after_commit()`.
     ///
-    /// # Policy on Panics
+    /// The runtime can discard the instantiated service instance after completing this method.
+    /// (Alternatively, "garbage" services may be removed from `Runtime` in `after_commit`
+    /// because of the time dependence between `commit_service` and `after_commit` described above.)
+    /// The runtime should commit resources for the service after a `commit_service()` call.
+    /// Since discarded instances persist their state in a discarded fork, no further action
+    /// is required to remove this state.
     ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
+    /// # Return value
+    ///
+    /// The `Runtime` should catch all panics except for `FatalError`s and convert
+    /// them into an `ExecutionError`. A returned error or panic implies that service instantiation
+    /// has failed; as a rule of a thumb, changes made by the method will be rolled back
+    /// (the exact logic is determined by [the supervisor]).
+    ///
+    /// [the supervisor]: FIXME
     fn start_adding_service(
         &self,
         context: ExecutionContext,
@@ -239,13 +254,15 @@ pub trait Runtime: Send + Debug + 'static {
     /// are guaranteed to be persisted from the call.
     ///
     /// Note that a call to `start_adding_service()` may have happened indefinite time ago;
-    /// indeed, `commit_service()` is called for all services on the node startup.
+    /// indeed, `commit_service()` is called for all services on the node startup. Likewise,
+    /// `commit_service()` may be called an indefinite number of times for the same instance.
     ///
-    /// # Policy on Panics
+    /// # Return value
     ///
-    /// Any error returned from this method should be considered to be fatal. There are edge
-    /// cases where the returned error does not lead to a panic, but as a rule of thumb, a
-    /// `Runtime` should not return an error here unless it wants the node to stop forever.
+    /// Any error or panic returned from this method should be considered as fatal. There are edge
+    /// cases where the returned error does not stop the enclosing process (e.g.,
+    /// if several alternative initial service configurations are tried), but as a rule of thumb,
+    /// a `Runtime` should not return an error or panic here unless it wants the node to stop forever.
     fn commit_service(
         &mut self,
         snapshot: &dyn Snapshot,
@@ -278,13 +295,16 @@ pub trait Runtime: Send + Debug + 'static {
 
     /// Calls `before_commit` for a service stored in the runtime.
     ///
+    /// `before_commit` is called for all services active at the beginning of the block
+    /// (i.e., services instantiated within the block do **not** receive a call) exactly
+    /// once for each block.
+    ///
     /// # Guarantees
     ///
     /// - Each `before_commit` call is isolated with a separate checkpoint. A call that returns
     ///   an error will be rolled back.
-    /// - Calls are globally ordered by increasing `instance_id`. This should be considered
-    ///   an implementation detail, though; the "public" invariant is that the ordering of calls
-    ///   is guaranteed to be the same for all nodes.
+    /// - Ordering of calls among service instances is not specified, but is guaranteed
+    ///   to be the same for all nodes.
     fn before_commit(
         &self,
         context: ExecutionContext,
@@ -294,11 +314,13 @@ pub trait Runtime: Send + Debug + 'static {
     /// Notifies the runtime about commitment of a new block.
     ///
     /// This method is guaranteed to be called *after* all `commit_service` calls related
-    /// to the same block.
+    /// to the same block. The method is called exactly once for each block in the blockchain,
+    /// including the genesis block.
     ///
     /// # Policy on Panics
     ///
-    /// - Catch each kind of panics except for `FatalError` and write them into the log.
+    /// Catch each kind of panics except for `FatalError` and write them into the log. A panic
+    /// will bubble up, i.e., will lead to immediate node termination.
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox);
 
     /// Notify the runtime that it has to shutdown.

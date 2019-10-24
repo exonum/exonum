@@ -338,7 +338,7 @@ impl Dispatcher {
     }
 
     /// Looks up the runtime for the specified service instance. Returns a reference to
-    /// the runtime, or an error if the service with the sepcified instance ID does not exist.
+    /// the runtime, or an error if the service with the specified instance ID does not exist.
     pub(crate) fn runtime_for_service(&self, instance_id: InstanceId) -> Option<&dyn Runtime> {
         let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
