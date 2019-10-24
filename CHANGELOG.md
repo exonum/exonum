@@ -37,6 +37,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
 
+- `system/v1/proto-sources` endpoint has been divided into two endpoints. (#1511)
+
+  - `system/v1/proto-sources/core` - returns core proto files.
+
+  - `system/v1/proto-sources/service` - returns services specific proto files.
+
+  - Endpoint format is also has been changed and now it returns include files together
+  with sources.
+
 #### exonum-proto
 
 - Introduced new crate `exonum-proto`. Trait `ProtobufConvert` is moved to

@@ -345,6 +345,7 @@ pub struct ArtifactProtobufSpec {
     pub includes: Vec<ProtoSourceFile>,
 }
 
+#[allow(clippy::type_complexity)]
 impl From<(&[(&str, &str)], &[(&str, &str)])> for ArtifactProtobufSpec {
     fn from(sources_strings: (&[(&str, &str)], &[(&str, &str)])) -> Self {
         let sources = sources_strings.0.iter().map(From::from).collect();

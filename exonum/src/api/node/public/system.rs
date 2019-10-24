@@ -232,6 +232,6 @@ fn filter_exonum_sources(files: Vec<ProtoSourceFile>) -> Vec<ProtoSourceFile> {
     files
         .iter()
         .cloned()
-        .filter(|s| !sources.contains(s))
+        .filter(|file| !sources.contains(file))
         .collect()
 }
