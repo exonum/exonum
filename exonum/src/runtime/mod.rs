@@ -336,18 +336,22 @@ impl From<&(&str, &str)> for ProtoSourceFile {
 /// Artifact Protobuf specification for the Exonum clients.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ArtifactProtobufSpec {
-    /// List of Protobuf files that make up the service interface. The first element in the tuple
-    /// is the file name, the second one is its content.
+    /// List of Protobuf files that make up the service interface.
     ///
     /// The common interface entry point is always in the `service.proto` file.
     pub sources: Vec<ProtoSourceFile>,
+    /// List of service's proto include files.
+    pub includes: Vec<ProtoSourceFile>,
 }
 
-impl From<&[(&str, &str)]> for ArtifactProtobufSpec {
-    fn from(sources_strings: &[(&str, &str)]) -> Self {
-        let sources = sources_strings.iter().map(From::from).collect();
+type ProtoSources<'a> = &'a [(&'a str, &'a str)];
 
-        Self { sources }
+impl<'a> From<(ProtoSources<'a>, ProtoSources<'a>)> for ArtifactProtobufSpec {
+    fn from(sources_strings: (ProtoSources<'a>, ProtoSources<'a>)) -> Self {
+        let sources = sources_strings.0.iter().map(From::from).collect();
+        let includes = sources_strings.1.iter().map(From::from).collect();
+
+        Self { sources, includes }
     }
 }
 

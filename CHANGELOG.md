@@ -30,12 +30,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
     ```
 
-- Placeholder for changes due to dynamic services (#9999)
-
   - `StoppedTestKit::resume` accepts list of runtimes instead of a list of services.
 
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
+
+- Placeholder for changes due to dynamic services (#9999)
 
 #### exonum-proto
 
