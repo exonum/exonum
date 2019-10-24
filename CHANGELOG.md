@@ -30,17 +30,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
     ```
 
-- Placeholder for changes due to dynamic services (#9999)
-
   - `StoppedTestKit::resume` accepts list of runtimes instead of a list of services.
 
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
 
+- Placeholder for changes due to dynamic services (#9999)
+
 #### exonum-proto
 
 - Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` changed is moved
   to `exonum-proto` crate. (#1496)
+- Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` is moved
+  to this crate. (#1496)
 
 #### exonum-proto-derive
 
@@ -75,7 +77,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `HashTag::hash_list()` was extended to support values of any appropriate type,
   not only `Hash`. (#1455)
-  
+
+- `ProtobufConvert` has been implemented for `MapProof`. (#1512)
+
 ### Internal improvements
 
 #### exonum-merkledb

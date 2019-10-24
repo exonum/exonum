@@ -17,7 +17,7 @@ use exonum::{
     merkledb::{IndexAccess, MapIndex},
 };
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto;

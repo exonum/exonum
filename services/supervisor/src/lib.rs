@@ -31,7 +31,7 @@ pub use self::{
 use exonum::{
     blockchain::{self, InstanceCollection},
     crypto::Hash,
-    helpers::byzantine_quorum,
+    helpers::{byzantine_quorum, validator::validator_id},
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, BeforeCommitContext, Service, Transaction},
@@ -129,7 +129,8 @@ impl Service for Supervisor {
                     let tx_sender = context.transaction_broadcaster();
                     let keypair = context.service_keypair.clone();
                     let instance_id = context.instance.id;
-                    let is_validator = context.validator_id().is_some();
+                    let is_validator =
+                        validator_id(context.snapshot, context.service_keypair.0).is_some();
                     move || {
                         if is_validator {
                             trace!(

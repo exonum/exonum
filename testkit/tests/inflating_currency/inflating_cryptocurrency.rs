@@ -24,7 +24,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use super::proto;

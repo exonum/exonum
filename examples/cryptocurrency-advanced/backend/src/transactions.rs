@@ -15,7 +15,7 @@
 //! Cryptocurrency transactions.
 
 use exonum::{crypto::PublicKey, runtime::rust::TransactionContext};
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 
 use super::{proto, schema::Schema, CryptocurrencyService};
 
@@ -59,8 +59,8 @@ pub struct Transfer {
 }
 
 /// Issue `amount` of the currency to the `wallet`.
-#[protobuf_convert(source = "proto::Issue")]
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Issue")]
 pub struct Issue {
     /// Issued amount of currency.
     pub amount: u64,

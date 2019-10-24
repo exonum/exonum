@@ -26,7 +26,7 @@ use exonum::{
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
 
 use std::collections::BTreeMap;

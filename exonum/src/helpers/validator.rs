@@ -12,23 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_build::ProtobufGenerator;
-use std::env;
+use exonum_crypto::PublicKey;
+use exonum_merkledb::Snapshot;
 
-fn main() {
-    #[cfg(feature = "with-protobuf")]
-    gen_proto_files();
-}
+use crate::{blockchain::Schema as CoreSchema, helpers::ValidatorId};
 
-#[cfg(feature = "with-protobuf")]
-fn gen_proto_files() {
-    let current_dir = env::current_dir().expect("Failed to get current dir.");
-    let protos = current_dir.join("src/proto");
-    println!("cargo:protos={}", protos.to_str().unwrap());
-
-    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
-        .with_input_dir("src/proto")
-        .add_path("src/proto")
-        .with_crypto()
-        .generate();
+/// Attempts to find a `ValidatorId` by the provided service public key.
+pub fn validator_id(snapshot: &dyn Snapshot, service_public_key: PublicKey) -> Option<ValidatorId> {
+    CoreSchema::new(snapshot)
+        .consensus_config()
+        .find_validator(|validator_keys| service_public_key == validator_keys.service_key)
 }

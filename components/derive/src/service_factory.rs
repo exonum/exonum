@@ -141,7 +141,7 @@ impl ServiceFactory {
 
         quote! {
             #cr::runtime::ArtifactProtobufSpec::from(
-                #proto_sources_mod::PROTO_SOURCES.as_ref(),
+                (#proto_sources_mod::PROTO_SOURCES.as_ref(), #proto_sources_mod::INCLUDES.as_ref())
             )
         }
     }

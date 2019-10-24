@@ -23,7 +23,7 @@ use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
     node::BranchNode,
 };
-use crate::{BinaryValue, HashTag, ObjectHash, };
+use crate::{BinaryValue, HashTag, ObjectHash};
 
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 

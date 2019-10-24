@@ -30,6 +30,8 @@ use crate::{
     proto::schema::blockchain,
 };
 
+use exonum_proto::ProtobufConvert;
+
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
 /// while the `service_key` is used in services.

@@ -15,7 +15,7 @@
 //! Standard Exonum CLI command used to generate common configuration file.
 
 use failure::Error;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::path::PathBuf;

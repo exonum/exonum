@@ -17,23 +17,23 @@
 // For protobuf generated files.
 #![allow(bare_trait_objects)]
 
-use protobuf::{RepeatedField, well_known_types::Empty};
 use failure::Error;
-use std::{iter::FromIterator, borrow::Cow};
+use protobuf::{well_known_types::Empty, RepeatedField};
+use std::{borrow::Cow, iter::FromIterator};
 
+use crate::{proof_map_index::ProofPath, BinaryKey, BinaryValue};
 use exonum_crypto::proto::*;
 use exonum_proto::ProtobufConvert;
-use crate::{BinaryKey, BinaryValue, proof_map_index::ProofPath};
 
 pub use self::proof::*;
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
 impl<K, V> ProtobufConvert for crate::MapProof<K, V>
-    where
-        K: BinaryKey,
-        V: BinaryValue,
-        Vec<(K, Option<V>)>: FromIterator<(<K as ToOwned>::Owned, Option<V>)>,
+where
+    K: BinaryKey,
+    V: BinaryValue,
+    Vec<(K, Option<V>)>: FromIterator<(<K as ToOwned>::Owned, Option<V>)>,
 {
     type ProtoStruct = MapProof;
 
@@ -109,7 +109,7 @@ impl<K, V> ProtobufConvert for crate::MapProof<K, V>
                 Some(value) => map_proof.add_entry(entry.0, value),
                 None => map_proof.add_missing(entry.0),
             };
-        };
+        }
 
         Ok(map_proof)
     }
@@ -117,11 +117,13 @@ impl<K, V> ProtobufConvert for crate::MapProof<K, V>
 
 #[cfg(test)]
 mod tests {
-    use std::fmt;
+    use exonum_crypto::{proto::types, PublicKey};
     use exonum_proto::ProtobufConvert;
-    use exonum_crypto::{PublicKey, proto::types};
+    use std::fmt;
 
-    use crate::{TemporaryDB, ProofMapIndex,Database, BinaryKey, BinaryValue, ObjectHash, MapProof, proto};
+    use crate::{
+        proto, BinaryKey, BinaryValue, Database, MapProof, ObjectHash, ProofMapIndex, TemporaryDB,
+    };
     use protobuf::RepeatedField;
 
     #[test]
@@ -146,10 +148,10 @@ mod tests {
     }
 
     fn assert_proof_roundtrip<K, V>(proof: MapProof<K, V>)
-        where
-            K: BinaryKey + ObjectHash + fmt::Debug,
-            V: BinaryValue + ObjectHash + fmt::Debug,
-            MapProof<K, V>: ProtobufConvert + PartialEq,
+    where
+        K: BinaryKey + ObjectHash + fmt::Debug,
+        V: BinaryValue + ObjectHash + fmt::Debug,
+        MapProof<K, V>: ProtobufConvert + PartialEq,
     {
         let pb = proof.to_pb();
         let deserialized: MapProof<K, V> = MapProof::from_pb(pb).unwrap();

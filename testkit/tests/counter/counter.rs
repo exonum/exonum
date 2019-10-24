@@ -30,7 +30,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
-use exonum_proto_derive::ProtobufConvert;
+use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
