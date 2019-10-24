@@ -126,7 +126,7 @@ pub fn create_blockchain() -> BlockchainMut {
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
     blockchain
         .into_mut(config.consensus)
-        .with_rust_runtime(mpsc::channel(0).0, services)
+        .with_rust_runtime(mpsc::channel(1).0, services)
         .build()
         .unwrap()
 }

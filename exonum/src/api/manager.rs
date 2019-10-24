@@ -19,7 +19,7 @@ use actix_net::server::Server;
 use actix_web::server::{HttpServer, StopServer};
 use futures::{sync::mpsc, Future};
 
-use std::{collections::HashMap, fmt, io};
+use std::{collections::HashMap, fmt, io, time::Duration};
 
 use crate::api::{
     backends::actix::{create_app, ApiRuntimeConfig, SystemRuntimeConfig},
@@ -43,6 +43,9 @@ impl fmt::Debug for ApiManager {
 }
 
 impl ApiManager {
+    const RETRY_INTERVAL: Duration = Duration::from_millis(500);
+    const RETRY_ATTEMPTS: usize = 10;
+
     pub fn new(
         runtime_config: SystemRuntimeConfig,
         endpoints_rx: mpsc::Receiver<UpdateEndpoints>,
@@ -89,7 +92,7 @@ impl ApiManager {
             let manager = manager.clone();
             Arbiter::spawn(
                 addr.send(StopServer { graceful: true })
-                    .then(move |_| manager.send(StartServer { config }))
+                    .then(move |_| manager.send(StartServer { config, attempt: 0 }))
                     .map_err(|e| error!("Error while restarting API server: {}", e)),
             );
         }
@@ -112,6 +115,7 @@ impl Actor for ApiManager {
 #[derive(Debug)]
 struct StartServer {
     config: ApiRuntimeConfig,
+    attempt: usize,
 }
 
 impl Message for StartServer {
@@ -121,9 +125,26 @@ impl Message for StartServer {
 impl Handler<StartServer> for ApiManager {
     type Result = ();
 
-    fn handle(&mut self, msg: StartServer, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Handling server start: {:?}", msg.config);
-        let addr = self.start_server(msg.config.clone()).unwrap();
+    fn handle(&mut self, mut msg: StartServer, ctx: &mut Context<Self>) -> Self::Result {
+        info!(
+            "Handling server start: {:?} (attempt #{})",
+            msg.config,
+            msg.attempt + 1
+        );
+        let addr = match self.start_server(msg.config.clone()) {
+            Ok(addr) => addr,
+            Err(e) => {
+                warn!("Error handling service start {:?}: {}", msg.config, e);
+                if msg.attempt == Self::RETRY_ATTEMPTS {
+                    error!("Cannot spawn server with config {:?}", msg.config);
+                    ctx.terminate();
+                } else {
+                    msg.attempt += 1;
+                    ctx.notify_later(msg, Self::RETRY_INTERVAL);
+                }
+                return;
+            }
+        };
         self.api_runtime_addresses.insert(addr, msg.config);
     }
 }

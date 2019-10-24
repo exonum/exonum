@@ -30,6 +30,7 @@ use exonum_proto::ProtobufConvert;
 use std::{
     net::SocketAddr,
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 mod proto;
@@ -131,10 +132,13 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
     );
 
     let api_tx = node.channel();
-    RunHandle {
+    let handle = RunHandle {
         node_thread: thread::spawn(move || {
             node.run().unwrap();
         }),
         api_tx,
-    }
+    };
+    // Wait until the node has fully started.
+    thread::sleep(Duration::from_secs(1));
+    handle
 }
