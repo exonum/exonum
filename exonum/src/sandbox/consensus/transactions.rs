@@ -243,7 +243,7 @@ fn duplicate_tx_in_pool() {
 // in sandbox so this test is testing sandbox
 #[test]
 #[ignore]
-#[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
+#[should_panic(expected = "Sent unexpected message Request(TransactionsRequest")]
 fn incorrect_tx_in_request() {
     let sandbox = timestamping_sandbox();
 

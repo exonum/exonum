@@ -197,7 +197,7 @@ fn test_builder() {
     let dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime_a.runtime_type, runtime_a)
         .with_runtime(runtime_b.runtime_type, runtime_b)
-        .finalize(&Blockchain::for_tests());
+        .finalize(&Blockchain::build_for_tests());
 
     assert!(dispatcher
         .runtimes
@@ -518,7 +518,7 @@ fn test_shutdown() {
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(2, runtime_a)
         .with_runtime(3, runtime_b)
-        .finalize(&Blockchain::for_tests());
+        .finalize(&Blockchain::build_for_tests());
     dispatcher.shutdown();
 
     assert_eq!(turned_off_a.load(Ordering::Relaxed), true);

@@ -273,7 +273,7 @@ impl SupervisorInterface for Supervisor {
 
         // Verifies that the artifact is not deployed yet.
         if context
-            .dispatcher()
+            .dispatcher_info()
             .get_artifact(&deploy.artifact.name)
             .is_some()
         {
@@ -365,7 +365,7 @@ impl SupervisorInterface for Supervisor {
 
         // Verifies that the instance name does not exist.
         if context
-            .dispatcher()
+            .dispatcher_info()
             .get_instance(service.name.as_str())
             .is_some()
         {

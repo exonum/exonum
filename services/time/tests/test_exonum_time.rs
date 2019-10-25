@@ -28,7 +28,7 @@ use exonum::{
     runtime::{rust::Transaction, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_supervisor::{simple::Supervisor as SimpleSupervisor, ConfigPropose};
+use exonum_supervisor::{simple::SimpleSupervisor, ConfigPropose};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
     api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,

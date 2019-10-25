@@ -221,7 +221,7 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Provides a supervisor interface to an authorized instance.
     #[doc(hidden)]
-    pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions> {
+    pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions<'_>> {
         if !is_supervisor(self.instance.id) {
             return None;
         }
@@ -256,7 +256,7 @@ impl SupervisorExtensions<'_> {
     }
 }
 
-impl<'a> Debug for AfterCommitContext<'a> {
+impl Debug for AfterCommitContext<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
             .field("instance", &self.instance)

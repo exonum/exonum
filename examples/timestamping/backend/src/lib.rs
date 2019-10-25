@@ -71,7 +71,7 @@ impl Service for TimestampingService {
             Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
         if context
-            .dispatcher()
+            .dispatcher_info()
             .get_instance(&*config.time_service_name)
             .is_none()
         {

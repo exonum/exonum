@@ -134,16 +134,6 @@ impl RustRuntime {
         self
     }
 
-    fn parse_artifact(artifact: &ArtifactId) -> Result<RustArtifactId, ExecutionError> {
-        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
-            return Err(Error::IncorrectArtifactId.into());
-        }
-        artifact
-            .name
-            .parse()
-            .map_err(|inner| (Error::IncorrectArtifactId, inner).into())
-    }
-
     fn add_started_service(&mut self, instance: Instance) {
         self.started_services_by_name
             .insert(instance.name.clone(), instance.id);
@@ -151,7 +141,7 @@ impl RustRuntime {
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
-        let artifact = Self::parse_artifact(&artifact)?;
+        let artifact = RustArtifactId::parse(&artifact)?;
         if self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
@@ -165,7 +155,7 @@ impl RustRuntime {
     }
 
     fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
-        let artifact = Self::parse_artifact(&spec.artifact)?;
+        let artifact = RustArtifactId::parse(&spec.artifact)?;
         if !self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactNotDeployed.into());
         }
@@ -207,6 +197,21 @@ impl RustRuntime {
             })
             .collect()
     }
+
+    fn push_api_changes(&mut self) {
+        if self.new_services_since_last_block {
+            let user_endpoints = self.api_endpoints();
+            // FIXME: this should either be made async, or an unbounded channel should be used.
+            if !self.api_notifier.is_closed() {
+                self.api_notifier
+                    .clone()
+                    .send(UpdateEndpoints { user_endpoints })
+                    .wait()
+                    .ok();
+            }
+        }
+        self.new_services_since_last_block = false;
+    }
 }
 
 impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
@@ -227,6 +232,16 @@ impl RustArtifactId {
             name: name.to_owned(),
             version: Version::new(major, minor, patch),
         }
+    }
+
+    fn parse(artifact: &ArtifactId) -> Result<Self, ExecutionError> {
+        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
+            return Err(Error::IncorrectArtifactId.into());
+        }
+        artifact
+            .name
+            .parse()
+            .map_err(|inner| (Error::IncorrectArtifactId, inner).into())
     }
 }
 
@@ -270,18 +285,7 @@ impl Runtime for RustRuntime {
 
     // We need to propagate changes in the services immediately after initialization.
     fn on_resume(&mut self) {
-        if self.new_services_since_last_block {
-            let user_endpoints = self.api_endpoints();
-            // FIXME: this should either be made async, or an unbounded channel should be used.
-            if !self.api_notifier.is_closed() {
-                self.api_notifier
-                    .clone()
-                    .send(UpdateEndpoints { user_endpoints })
-                    .wait()
-                    .ok();
-            }
-        }
-        self.new_services_since_last_block = false;
+        self.push_api_changes();
     }
 
     fn deploy_artifact(
@@ -294,7 +298,7 @@ impl Runtime for RustRuntime {
             Box::new(future::err(Error::IncorrectArtifactId.into()))
         } else {
             let res = self.deploy(&artifact).and_then(|()| {
-                let id = Self::parse_artifact(&artifact)?;
+                let id = RustArtifactId::parse(&artifact)?;
                 self.deployed_artifact(&id)
                     .map(ServiceFactory::artifact_protobuf_spec)
                     .ok_or_else(|| Error::UnableToDeploy.into())
@@ -304,7 +308,7 @@ impl Runtime for RustRuntime {
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        if let Ok(artifact) = Self::parse_artifact(id) {
+        if let Ok(artifact) = RustArtifactId::parse(id) {
             self.deployed_artifacts.contains(&artifact)
         } else {
             false
@@ -395,7 +399,7 @@ impl Runtime for RustRuntime {
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
-        self.on_resume();
+        self.push_api_changes();
 
         // By convention, services don't handle `after_commit()` on the genesis block.
         let is_genesis_block = CoreSchema::new(snapshot)

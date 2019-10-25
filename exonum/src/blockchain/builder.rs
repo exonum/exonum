@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn finalize_without_genesis_block() {
         let config = generate_testnet_config(1, 0)[0].clone();
-        let blockchain = Blockchain::for_tests()
+        let blockchain = Blockchain::build_for_tests()
             .into_mut(config.consensus)
             .with_rust_runtime(mpsc::channel(0).0, vec![])
             .build()
@@ -210,7 +210,7 @@ mod tests {
 
     fn test_finalizing_services(services: Vec<InstanceCollection>) {
         let config = generate_testnet_config(1, 0)[0].clone();
-        Blockchain::for_tests()
+        Blockchain::build_for_tests()
             .into_mut(config.consensus)
             .with_rust_runtime(mpsc::channel(0).0, services)
             .build()
@@ -248,7 +248,7 @@ mod tests {
     #[should_panic(expected = "Consensus configuration must have at least one validator")]
     fn finalize_invalid_consensus_config() {
         let consensus_config = ConsensusConfig::default();
-        Blockchain::for_tests()
+        Blockchain::build_for_tests()
             .into_mut(consensus_config)
             .with_rust_runtime(mpsc::channel(0).0, vec![])
             .build()

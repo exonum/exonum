@@ -109,7 +109,7 @@ pub mod error;
 
 use futures::Future;
 
-use std::fmt::Debug;
+use std::fmt;
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
@@ -173,7 +173,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics according to panic policy.
 #[allow(unused_variables)]
-pub trait Runtime: Send + Debug + 'static {
+pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.
     ///
     /// This method is guaranteed to be called before any other `Runtime` methods. It is
@@ -505,7 +505,7 @@ impl<'a> ExecutionContext<'a> {
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         if self.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
-            let kind = crate::runtime::dispatcher::Error::StackOverflow;
+            let kind = DispatcherError::StackOverflow;
             let msg = format!(
                 "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
                 ExecutionContext::MAX_CALL_STACK_DEPTH
@@ -517,13 +517,7 @@ impl<'a> ExecutionContext<'a> {
             .dispatcher
             .runtime_for_service(call_info.instance_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
-        let reborrowed = ExecutionContext {
-            fork: &mut *self.fork,
-            caller: self.caller,
-            interface_name,
-            dispatcher: self.dispatcher,
-            call_stack_depth: self.call_stack_depth,
-        };
+        let reborrowed = self.reborrow_with_interface(interface_name);
         runtime.execute(reborrowed, call_info, arguments)
     }
 
@@ -550,11 +544,15 @@ impl<'a> ExecutionContext<'a> {
             .map_err(From::from)
     }
 
-    fn reborrow(&mut self) -> ExecutionContext {
+    fn reborrow(&mut self) -> ExecutionContext<'_> {
+        self.reborrow_with_interface(self.interface_name)
+    }
+
+    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s> {
         ExecutionContext {
             fork: &mut *self.fork,
             caller: self.caller,
-            interface_name: self.interface_name,
+            interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
         }
@@ -572,8 +570,8 @@ pub struct InstanceDescriptor<'a> {
     pub name: &'a str,
 }
 
-impl std::fmt::Display for InstanceDescriptor<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for InstanceDescriptor<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.id, self.name)
     }
 }

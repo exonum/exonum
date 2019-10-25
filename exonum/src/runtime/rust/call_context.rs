@@ -1,6 +1,6 @@
-use exonum_merkledb::{BinaryValue, Fork};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
-use super::super::{
+use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError, Schema},
     error::catch_panic,
     ArtifactId, CallInfo, Caller, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
@@ -39,8 +39,8 @@ impl<'a> CallContext<'a> {
     }
 
     /// Accesses dispatcher information.
-    pub fn dispatcher(&self) -> Schema<&Fork> {
-        Schema::new(self.fork())
+    pub fn dispatcher_info(&self) -> Schema<&dyn Snapshot> {
+        Schema::new(self.fork().as_ref())
     }
 
     pub fn instance(&self) -> InstanceDescriptor {
@@ -80,7 +80,7 @@ impl<'a> CallContext<'a> {
     pub fn call_context<'s>(
         &'s mut self,
         called_id: impl Into<InstanceQuery<'s>>,
-    ) -> Result<CallContext, ExecutionError> {
+    ) -> Result<CallContext<'s>, ExecutionError> {
         let descriptor = self
             .inner
             .dispatcher
@@ -148,7 +148,7 @@ impl<'a> CallContext<'a> {
         result
     }
 
-    fn reborrow(&mut self) -> CallContext {
+    fn reborrow(&mut self) -> CallContext<'_> {
         CallContext {
             inner: self.inner.reborrow(),
             instance: self.instance,

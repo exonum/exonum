@@ -85,6 +85,8 @@ impl SystemStateProvider for SandboxSystemStateProvider {
     }
 }
 
+/// Guarded queue for messages sent by the sandbox. If the queue is not empty when dropped,
+/// it panics.
 #[derive(Debug, Default)]
 pub struct GuardedQueue(VecDeque<(PublicKey, Message)>);
 
@@ -106,7 +108,7 @@ impl Drop for GuardedQueue {
     fn drop(&mut self) {
         if !std::thread::panicking() {
             if let Some((addr, msg)) = self.0.pop_front() {
-                panic!("Send unexpected message {:?} to {}", msg, addr);
+                panic!("Sent unexpected message {:?} to {}", msg, addr);
             }
         }
     }
@@ -233,7 +235,7 @@ impl Sandbox {
 
     fn check_unexpected_message(&self) {
         if let Some((addr, msg)) = self.pop_sent_message() {
-            panic!("Send unexpected message {:?} to {}", msg, addr);
+            panic!("Sent unexpected message {:?} to {}", msg, addr);
         }
     }
 
@@ -1425,7 +1427,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
@@ -1446,7 +1448,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
@@ -1475,7 +1477,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.

@@ -59,7 +59,7 @@ fn test_queue_message_from_future_round() {
 /// - handle queued Prevote
 /// - and observe `ProposeRequest` for queued `Prevote`
 #[test]
-#[should_panic(expected = "Send unexpected message Requests(ProposeRequest")]
+#[should_panic(expected = "Sent unexpected message Requests(ProposeRequest")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -87,7 +87,7 @@ fn test_queue_prevote_message_from_next_height() {
 /// check line from `NodeHandler.handle_consensus()`
 /// case `msg.height() == self.state.height() + 1`
 #[test]
-#[should_panic(expected = "Send unexpected message Consensus(Prevote")]
+#[should_panic(expected = "Sent unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();

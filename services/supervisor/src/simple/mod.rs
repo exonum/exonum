@@ -36,9 +36,9 @@ pub use self::schema::Schema;
 #[exonum(
     proto_sources = "crate::proto",
     artifact_name = "simple-supervisor",
-    implements("SupervisorInterface")
+    implements("SimpleSupervisorInterface")
 )]
-pub struct Supervisor;
+pub struct SimpleSupervisor;
 
 #[derive(Debug, Copy, Clone, IntoExecutionError)]
 pub enum Error {
@@ -53,12 +53,12 @@ pub enum Error {
 }
 
 #[exonum_service]
-pub trait SupervisorInterface {
+pub trait SimpleSupervisorInterface {
     fn change_config(&self, context: CallContext, arg: ConfigPropose)
         -> Result<(), ExecutionError>;
 }
 
-impl SupervisorInterface for Supervisor {
+impl SimpleSupervisorInterface for SimpleSupervisor {
     fn change_config(
         &self,
         mut context: CallContext,
@@ -104,7 +104,7 @@ impl SupervisorInterface for Supervisor {
     }
 }
 
-impl Service for Supervisor {
+impl Service for SimpleSupervisor {
     fn state_hash(&self, _instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
         Schema::new(snapshot).state_hash()
     }
@@ -129,15 +129,15 @@ impl Service for Supervisor {
     }
 }
 
-impl Supervisor {
+impl SimpleSupervisor {
     pub const BUILTIN_NAME: &'static str = "simple-supervisor";
 }
 
-impl From<Supervisor> for InstanceCollection {
-    fn from(inner: Supervisor) -> Self {
+impl From<SimpleSupervisor> for InstanceCollection {
+    fn from(inner: SimpleSupervisor) -> Self {
         Self::new(inner).with_instance(
             SUPERVISOR_INSTANCE_ID,
-            Supervisor::BUILTIN_NAME,
+            SimpleSupervisor::BUILTIN_NAME,
             Vec::default(),
         )
     }

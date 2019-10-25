@@ -132,7 +132,7 @@ fn test_basic_rust_runtime() {
 
     // Create dummy dispatcher.
     let config = generate_testnet_config(1, 0)[0].clone();
-    let mut blockchain = Blockchain::for_tests()
+    let mut blockchain = Blockchain::build_for_tests()
         .into_mut(config.consensus)
         .with_additional_runtime(runtime)
         .build()

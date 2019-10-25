@@ -28,9 +28,7 @@ use exonum_derive::*;
 use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
 use exonum_proto::ProtobufConvert;
 
-use super::{
-    proto, simple::SupervisorInterface as SimpleInterface, transactions::SupervisorInterface,
-};
+use super::{proto, simple::SimpleSupervisorInterface, transactions::SupervisorInterface};
 
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
@@ -140,7 +138,7 @@ impl ConfigPropose {
     /// Signs the proposal for a simple supervisor with a randomly generated keypair.
     pub fn sign_for_simple_supervisor(self) -> Verified<AnyTx> {
         let (public_key, secret_key) = exonum_crypto::gen_keypair();
-        Transaction::<dyn SimpleInterface>::sign(
+        Transaction::<dyn SimpleSupervisorInterface>::sign(
             self,
             SUPERVISOR_INSTANCE_ID,
             public_key,

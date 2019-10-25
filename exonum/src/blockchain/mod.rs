@@ -61,10 +61,13 @@ pub mod tests;
 // TODO It seems that this shortcut should be removed [ECR-3222]
 pub type TransactionMessage = Verified<AnyTx>;
 
-/// Exonum blockchain instance with a certain services set and data storage.
+/// Shared Exonum blockchain instance.
 ///
-/// Only nodes with an identical set of services and genesis block can be combined
-/// into a single network.
+/// This is essentially a smart pointer to shared blockchain resources (storage,
+/// cryptographic keys, and a sender of transactions). It can be converted into a [`BlockchainMut`]
+/// instance, which combines these resources with behavior (i.e., a set of services).
+///
+/// [`BlockchainMut`]: struct.BlockchainMut.html
 #[derive(Debug, Clone)]
 pub struct Blockchain {
     pub(crate) db: Arc<dyn Database>,
@@ -75,8 +78,7 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    /// Constructs a blockchain for the given `database` and list of `services`, also adds builtin services.
-    // TODO Write proper doc string. [ECR-3275]
+    /// Constructs a blockchain for the given `database`.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
         service_keypair: (PublicKey, SecretKey),
@@ -91,9 +93,9 @@ impl Blockchain {
 
     /// Creates a non-persisting blockchain, all data in which is irrevocably lost on drop.
     ///
-    /// The created blockchain cannot send transactions; any attempt to do so will result
+    /// The created blockchain cannot send transactions; an attempt to do so will result
     /// in an error.
-    pub fn for_tests() -> Self {
+    pub fn build_for_tests() -> Self {
         Self::new(TemporaryDB::new(), gen_keypair(), ApiSender::closed())
     }
 
@@ -141,6 +143,8 @@ impl Blockchain {
         Schema::new(&snapshot).peers_cache().iter().collect()
     }
 
+    /// Starts promotion into a mutable blockchain instance that can be used to process
+    /// transactions and create blocks.
     pub fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
         BlockchainBuilder::new(self, genesis_config)
     }
@@ -158,7 +162,13 @@ impl Blockchain {
     }
 }
 
-/// Blockchain together with a dispatcher.
+/// Mutable blockchain capable of processing transactions.
+///
+/// `BlockchainMut` combines [`Blockchain`] resources with a service dispatcher. The resulting
+/// combination cannot be cloned (unlike `Blockchain`), but can be sent across threads. It is
+/// possible to extract a `Blockchain` reference from `BlockchainMut` via `AsRef` trait.
+///
+/// [`Blockchain`]: struct.Blockchain.html
 #[derive(Debug)]
 pub struct BlockchainMut {
     inner: Blockchain,

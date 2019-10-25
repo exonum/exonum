@@ -118,7 +118,7 @@ pub fn consensus_keys() -> (PublicKey, SecretKey) {
 
 /// Creates a blockchain with no blocks.
 pub fn create_blockchain() -> BlockchainMut {
-    let mut blockchain = Blockchain::for_tests();
+    let mut blockchain = Blockchain::build_for_tests();
     let config = generate_testnet_config(1, 0)[0].clone();
     blockchain.service_keypair = config.service_keypair();
 

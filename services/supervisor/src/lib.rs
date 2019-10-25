@@ -45,14 +45,19 @@ mod schema;
 pub mod simple;
 mod transactions;
 
+/// Error message emitted when the `Supervisor` is installed as a non-privileged service.
+const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged service. \
+                                  For correct operation, `Supervisor` needs to have numeric ID 0.";
+
 /// Applies configuration changes, isolating each of them with by using `Fork` checkpoints.
 ///
 /// # Safety
 ///
 /// This function should be used with extreme care. It makes the following assumptions:
 ///
-/// - The function must be called at the end of the transaction execution. If the transaction
-///   errors / panics afterwards, the changes to the configs will not be rolled back.
+/// - The function must be called at the end of the transaction or `before_commit` execution.
+///   If the transaction errors / panics afterwards, the changes to the configs will not
+///   be rolled back.
 /// - No changes to the blockchain state should be introduced before the call to this function.
 ///   Any changes that are introduced will be committed regardless of the execution status,
 ///   or the status of application of any config change. This is if the execution wasn't interrupted
@@ -121,7 +126,6 @@ impl Service for Supervisor {
 
         for request in requests_to_remove {
             schema.pending_deployments().remove(&request.artifact);
-
             log::trace!("Removed outdated deployment request {:?}", request);
         }
 
@@ -144,8 +148,8 @@ impl Service for Supervisor {
                     );
                     // Perform the application of configs.
                     update_configs(&mut context, entry.config_propose.changes);
-
-                    // Remove config from proposals.
+                    // Remove config from proposals. Note that this step is performed even
+                    // if applying one or more configs has errored / panicked.
                     let schema = Schema::new(context.instance().name, context.fork());
                     schema.pending_proposal().remove();
                 }
@@ -174,11 +178,11 @@ impl Service for Supervisor {
             let keypair = context.service_keypair.clone();
             let tx_sender = context.transaction_broadcaster();
 
-            let mut extensions = context.supervisor_extensions().unwrap();
+            let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
             extensions.start_deploy(artifact, spec, move || {
                 if is_validator {
                     log::trace!(
-                        "Sent confirmation for deployment request {:?}",
+                        "Sending confirmation for deployment request {:?}",
                         unconfirmed_request
                     );
 
