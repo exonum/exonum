@@ -55,7 +55,7 @@ where
             .all_entries_unchecked()
             .map(|(key, value)| {
                 let mut entry = OptionalEntry::new();
-                let mut buf = vec![0u8; key.size()];
+                let mut buf = vec![0_u8; key.size()];
                 key.write(&mut buf);
                 entry.set_key(buf.to_vec());
 
@@ -134,20 +134,20 @@ mod tests {
         let mut table = ProofMapIndex::new("index", &storage);
 
         let proof = table.get_proof(0);
-        assert_proof_roundtrip(proof);
+        assert_proof_roundtrip(&proof);
 
         for i in 0..10 {
             table.put(&i, i);
         }
 
         let proof = table.get_proof(5);
-        assert_proof_roundtrip(proof);
+        assert_proof_roundtrip(&proof);
 
         let proof = table.get_multiproof(5..15);
-        assert_proof_roundtrip(proof);
+        assert_proof_roundtrip(&proof);
     }
 
-    fn assert_proof_roundtrip<K, V>(proof: MapProof<K, V>)
+    fn assert_proof_roundtrip<K, V>(proof: &MapProof<K, V>)
     where
         K: BinaryKey + ObjectHash + fmt::Debug,
         V: BinaryValue + ObjectHash + fmt::Debug,
@@ -159,7 +159,7 @@ mod tests {
             .check()
             .expect("deserialized proof is not valid");
 
-        assert_eq!(proof, deserialized);
+        assert_eq!(proof, &deserialized);
         assert_eq!(
             checked_proof.index_hash(),
             proof.check().unwrap().index_hash()
@@ -195,7 +195,7 @@ mod tests {
         proof.clear_proof();
         proof.set_entries(RepeatedField::from_vec(vec![entry]));
 
-        // TODO: will panic at runtime, should change BinaryKey::read signature
+        // TODO: will panic at runtime, should change BinaryKey::read signature (ECR-174)
         let _res = MapProof::<PublicKey, u8>::from_pb(proof.clone());
     }
 }

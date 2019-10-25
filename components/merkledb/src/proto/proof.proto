@@ -18,9 +18,15 @@ import "google/protobuf/empty.proto";
 
 package exonum.proof;
 
+// Subset of map elements coupled with a proof. MapProof can assert existence/absence of certain keys
+// from the underlying map.
 message MapProof {
-    repeated OptionalEntry entries = 1;
+    // Array of { path: ProofPath, hash: Hash } objects.
     repeated MapProofEntry proof = 2;
+    // Array with 2 kinds of objects: `{ key, no_value }` for keys missing from
+    // the underlying index, and `{ key, value }` for key-value pairs, existence of
+    // which is asserted by the proof.
+    repeated OptionalEntry entries = 1;
 }
 
 message OptionalEntry {
