@@ -35,20 +35,20 @@ mod tests {
         let mut table = ProofListIndex::new("index", &storage);
 
         let proof = table.get_proof(0);
-        assert_list_proof_roundtrip(proof);
+        assert_list_proof_roundtrip(&proof);
 
-        for i in 0..10 {
+        for i in 0..256 {
             table.push(i);
         }
 
         let proof = table.get_proof(5);
-        assert_list_proof_roundtrip(proof);
+        assert_list_proof_roundtrip(&proof);
 
-        let proof = table.get_range_proof(5..15);
-        assert_list_proof_roundtrip(proof);
+        let proof = table.get_range_proof(250..260);
+        assert_list_proof_roundtrip(&proof);
     }
 
-    fn assert_list_proof_roundtrip<V>(proof: ListProof<V>)
+    fn assert_list_proof_roundtrip<V>(proof: &ListProof<V>)
     where
         V: BinaryValue + ObjectHash + std::fmt::Debug,
         ListProof<V>: ProtobufConvert + PartialEq,
@@ -59,7 +59,7 @@ mod tests {
             .check()
             .expect("deserialized proof is not valid");
 
-        assert_eq!(proof, deserialized);
+        assert_eq!(proof, &deserialized);
         assert_eq!(
             checked_proof.index_hash(),
             proof.check().unwrap().index_hash()

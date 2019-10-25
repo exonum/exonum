@@ -855,7 +855,7 @@ pub mod proto {
             ensure!(index <= MAX_INDEX, "index is out of range");
             ensure!(height <= 58, "height is out of range");
 
-            Ok(ProofListKey::new(index as u8, height.into()))
+            Ok(ProofListKey::new(height as u8, index))
         }
     }
 
@@ -872,7 +872,12 @@ pub mod proto {
             let entries = self
                 .entries_unchecked()
                 .iter()
-                .map(|(index, value)| (*index, value.to_bytes()))
+                .map(|(index, value)| {
+                    let mut entry = ListProofEntry::new();
+                    entry.set_index(*index);
+                    entry.set_value(value.to_bytes());
+                    entry
+                })
                 .collect();
 
             let proof = self
@@ -882,7 +887,7 @@ pub mod proto {
                 .collect();
 
             list_proof.set_proof(RepeatedField::from_vec(proof));
-            list_proof.set_entries(entries);
+            list_proof.set_entries(RepeatedField::from_vec(entries));
 
             list_proof
         }
@@ -897,8 +902,13 @@ pub mod proto {
             let entries = pb
                 .get_entries()
                 .iter()
-                .map(|(index, value)| Ok((*index, V::from_bytes(Cow::Borrowed(value))?)))
-                .collect::<Result<_, Error>>()?;
+                .map(|entry| {
+                    Ok((
+                        entry.get_index(),
+                        V::from_bytes(Cow::Borrowed(entry.get_value()))?,
+                    ))
+                })
+                .collect::<Result<Vec<(u64, V)>, Error>>()?;
 
             Ok(ListProof::from_raw_parts(proof, entries, pb.get_length()))
         }

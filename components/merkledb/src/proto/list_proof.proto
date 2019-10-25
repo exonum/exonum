@@ -17,9 +17,14 @@ import "types.proto";
 
 package exonum.proof;
 
+// Subset of ProofList elements coupled with a proof. ListProof` can assert existence of
+// certain and that the list is shorter than the requested range of indexes.
 message ListProof {
+    // Array of { ProofListKey, Hash } objects.
     repeated HashedEntry proof = 1;
-    map<uint64, bytes> entries = 2;
+    // Array with list elements and their indexes.
+    repeated ListProofEntry entries = 2;
+    // Length of the underlying `ProofListIndex`.
     uint64 length = 3;
 }
 
@@ -28,6 +33,12 @@ message HashedEntry {
     exonum.crypto.Hash hash = 2;
 }
 
+message ListProofEntry {
+    uint64 index = 1;
+    bytes value = 2;
+}
+
+// Represents list node position in the merkle tree.
 message ProofListKey {
     uint64 index = 1;
     uint32 height = 2;

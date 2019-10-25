@@ -542,7 +542,7 @@ impl<V: BinaryValue> ListProof<V> {
         length: u64,
     ) -> Self {
         Self {
-            proof: proof.to_vec(),
+            proof,
             entries,
             length,
         }
