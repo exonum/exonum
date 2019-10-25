@@ -44,7 +44,7 @@ message InstanceSpec {
   ArtifactId artifact = 3;
 }
 
-/// The kind of ExecutionError.
+// The kind of ExecutionError.
 enum ErrorKind {
   PANIC = 0;
   DISPATCHER = 1;
@@ -52,18 +52,18 @@ enum ErrorKind {
   SERVICE = 3;
 }
 
-/// Result of unsuccessful runtime execution.
+// Result of unsuccessful runtime execution.
 message ExecutionError {
-  /// The kind of error that indicates in which module the error occurred.
+  // The kind of error that indicates in which module the error occurred.
   ErrorKind kind = 1;
-  /// User defined error code that can have different meanings for the different
-  /// error kinds.
+  // User defined error code that can have different meanings for the different
+  // error kinds.
   uint32 code = 2;
-  /// Optional description which doesn't affect `object_hash`.
+  // Optional description which doesn't affect `object_hash`.
   string description = 3;
 }
 
-/// Result of runtime execution.
+// Result of runtime execution.
 message ExecutionStatus {
   oneof result {
     google.protobuf.Empty ok = 1;
