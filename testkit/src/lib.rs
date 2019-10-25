@@ -18,7 +18,7 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{InstanceDescriptor, rust::{Transaction, TransactionContext, Service}},
+//!     runtime::{InstanceDescriptor, rust::{Transaction, CallContext, Service}},
 //!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
@@ -56,11 +56,11 @@
 //!
 //! #[exonum_service]
 //! pub trait TimestampingInterface {
-//!     fn timestamp(&self, _: TransactionContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
+//!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
 //! }
 //!
 //! impl TimestampingInterface for TimestampingService {
-//!     fn timestamp(&self, _: TransactionContext, arg: TxTimestamp) -> Result<(), ExecutionError> {
+//!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError> {
 //!         Ok(())
 //!     }
 //! }
@@ -361,7 +361,7 @@ impl TestKit {
     /// # use exonum::{
     /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{InstanceDescriptor, rust::{Transaction, TransactionContext, Service}},
+    /// #     runtime::{InstanceDescriptor, rust::{Transaction, CallContext, Service}},
     /// # };
     /// #
     /// # const SERVICE_ID: u32 = 1;
@@ -381,11 +381,11 @@ impl TestKit {
     /// #
     /// # #[exonum_service]
     /// # pub trait ExampleInterface {
-    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError>;
+    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError>;
     /// # }
     /// #
     /// # impl ExampleInterface for ExampleService {
-    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError> {
+    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError> {
     /// #         Ok(())
     /// #     }
     /// # }
