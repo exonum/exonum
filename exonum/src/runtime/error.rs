@@ -437,23 +437,6 @@ mod tests {
     }
 
     #[test]
-    fn execution_error_binary_value_wrong_kind() {
-        let bytes = {
-            let mut inner = runtime::ExecutionError::default();
-            inner.set_kind(117);
-            inner.set_code(2);
-            inner.write_to_bytes().unwrap()
-        };
-
-        assert_eq!(
-            ExecutionError::from_bytes(bytes.into())
-                .unwrap_err()
-                .to_string(),
-            "Unknown error kind"
-        )
-    }
-
-    #[test]
     fn execution_error_binary_value_panic_with_code() {
         let bytes = {
             let mut inner = runtime::ExecutionError::default();
