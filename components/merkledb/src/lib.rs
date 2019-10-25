@@ -183,5 +183,11 @@ pub mod proof_map_index;
 pub mod sparse_list_index;
 pub mod value_set_index;
 
+#[cfg(feature = "with-protobuf")]
+pub mod proto;
+
+#[cfg(feature = "with-protobuf")]
+use exonum_proto::ProtobufConvert;
+
 #[cfg(test)]
 mod tests;

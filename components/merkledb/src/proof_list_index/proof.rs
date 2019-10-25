@@ -22,15 +22,23 @@ use crate::{BinaryValue, HashTag};
 
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
+#[cfg(feature = "with-protobuf")]
+use crate::{proto, ProtobufConvert};
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-struct HashedEntry {
+#[cfg_attr(feature = "with-protobuf", derive(ProtobufConvert))]
+#[cfg_attr(
+    feature = "with-protobuf",
+    protobuf_convert(source = "proto::list_proof::HashedEntry")
+)]
+pub struct HashedEntry {
     #[serde(flatten)]
     key: ProofListKey,
     hash: Hash,
 }
 
 impl HashedEntry {
-    fn new(key: ProofListKey, hash: Hash) -> Self {
+    pub fn new(key: ProofListKey, hash: Hash) -> Self {
         Self { key, hash }
     }
 }
@@ -423,6 +431,11 @@ impl<V: BinaryValue> ListProof<V> {
         self.entries_unchecked().iter().map(|(index, _)| *index)
     }
 
+    /// Provides access to the proof part of the view. Used in serialization.
+    pub(crate) fn proof_unchecked(&self) -> &[HashedEntry] {
+        &self.proof
+    }
+
     /// Estimates the number of hash operations necessary to validate the proof.
     ///
     /// An error will be returned if the proof fails basic integrity checks. Not returning an error
@@ -519,6 +532,20 @@ impl<V: BinaryValue> ListProof<V> {
                     Err(ValidationError::UnmatchedRootHash)
                 }
             })
+    }
+
+    /// Creates `ListProof` from `proof` and `entries` vectors. Used to construct proof
+    /// after deserialization.
+    pub(crate) fn from_raw_parts(
+        proof: Vec<HashedEntry>,
+        entries: Vec<(u64, V)>,
+        length: u64,
+    ) -> Self {
+        Self {
+            proof: proof.to_vec(),
+            entries,
+            length,
+        }
     }
 }
 
