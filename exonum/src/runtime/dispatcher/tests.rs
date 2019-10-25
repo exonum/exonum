@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::gen_keypair;
-use exonum_merkledb::{Database, TemporaryDB};
+use exonum_crypto::{gen_keypair, Hash};
+use exonum_merkledb::{Database, Fork, ObjectHash, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, IntoFuture};
 
 use std::{
@@ -26,8 +26,8 @@ use std::{
 };
 
 use crate::{
-    blockchain::Blockchain,
-    merkledb::Snapshot,
+    blockchain::{Block, Blockchain, Schema as CoreSchema},
+    helpers::{Height, ValidatorId},
     node::ApiSender,
     runtime::{
         dispatcher::{Dispatcher, Mailbox},
@@ -37,6 +37,30 @@ use crate::{
         StateHashAggregator,
     },
 };
+
+/// We guarantee that the genesis block will be committed by the time
+/// `Runtime::after_commit()` is called. Thus, we need to perform this commitment
+/// manually here, emulating the relevant part of `BlockchainMut::create_genesis_block()`.
+fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
+    let schema = CoreSchema::new(&*fork);
+    let is_genesis_block = schema.block_hashes_by_height().is_empty();
+    assert!(is_genesis_block);
+    dispatcher.commit_block(fork);
+
+    let block = Block::new(
+        ValidatorId(0),
+        Height(0),
+        0,
+        Hash::zero(),
+        Hash::zero(),
+        Hash::zero(),
+    );
+    let block_hash = block.object_hash();
+    schema.block_hashes_by_height().push(block_hash);
+    schema.blocks().put(&block_hash, block);
+    fork.flush();
+    dispatcher.notify_runtimes_about_commit(fork.as_ref());
+}
 
 enum SampleRuntimes {
     First = 5,
@@ -117,6 +141,13 @@ impl From<SampleRuntime> for Arc<dyn Runtime> {
 }
 
 impl Runtime for SampleRuntime {
+    fn on_resume(&mut self) {
+        let changes = mem::replace(&mut self.new_services, vec![]);
+        self.new_service_sender
+            .send((self.runtime_type, changes))
+            .unwrap();
+    }
+
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
@@ -182,10 +213,7 @@ impl Runtime for SampleRuntime {
     }
 
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {
-        let changes = mem::replace(&mut self.new_services, vec![]);
-        self.new_service_sender
-            .send((self.runtime_type, changes))
-            .unwrap();
+        self.on_resume();
     }
 }
 
@@ -318,8 +346,8 @@ fn test_dispatcher_simple() {
         .unwrap_err();
     assert_eq!(err, DispatcherError::ServiceNameExists.into());
 
-    // Activate services / artifacts by calling `Dispatcher::after_commit()`.
-    dispatcher.after_commit(&fork);
+    // Activate services / artifacts.
+    create_genesis_block(&mut dispatcher, &mut fork);
 
     // Check if transactions are ready for execution.
     dispatcher
@@ -365,7 +393,7 @@ fn test_dispatcher_simple() {
         changes_rx.iter().take(2).collect::<Vec<_>>()
     );
 
-    // Check that API changes in the dispatcher contain the started services after restart.
+    // Check that dispatcher restarts service instances.
     db.merge(fork.into_patch()).unwrap();
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime_a.runtime_type, runtime_a)
@@ -373,7 +401,6 @@ fn test_dispatcher_simple() {
         .finalize(&blockchain);
     let fork = db.fork();
     dispatcher.restore_state(fork.as_ref()).unwrap();
-    dispatcher.after_commit(&fork);
 
     assert_eq!(
         expected_new_services,
@@ -424,7 +451,7 @@ fn test_dispatcher_rust_runtime_no_service() {
         DispatcherError::ArtifactNotDeployed.into()
     );
 
-    dispatcher.after_commit(&fork);
+    create_genesis_block(&mut dispatcher, &mut fork);
     db.merge(fork.into_patch()).unwrap();
 
     let mut fork = db.fork();

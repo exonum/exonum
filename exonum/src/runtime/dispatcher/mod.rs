@@ -282,10 +282,11 @@ impl Dispatcher {
         }
     }
 
-    /// Performs operations after processing a block.
-    pub(crate) fn after_commit(&mut self, fork: &Fork) {
-        // **NB.** Changes to the `fork` below MUST be the same for all nodes. This is not
-        // checked by the consensus algorithm as usual.
+    /// Commits to service instances and artifacts marked as pending in the provided `fork`.
+    ///
+    /// **NB.** Changes made to the `fork` in this method MUST be the same for all nodes.
+    /// This is not checked by the consensus algorithm as usual.
+    pub(crate) fn commit_block(&mut self, fork: &Fork) {
         let mut schema = Schema::new(fork);
         let snapshot = fork.as_ref();
 
@@ -305,15 +306,27 @@ impl Dispatcher {
         }
         artifacts.clear();
         services.clear();
+    }
 
-        // Run `after_commit` for runtimes.
+    /// Notifies runtimes about a committed block.
+    pub(crate) fn notify_runtimes_about_commit(&mut self, snapshot: &dyn Snapshot) {
         let mut mailbox = Mailbox::default();
         for runtime in self.runtimes.values_mut() {
-            runtime.after_commit(fork.as_ref(), &mut mailbox);
+            runtime.after_commit(snapshot, &mut mailbox);
         }
         for action in mailbox.actions {
             action.execute(self);
         }
+    }
+
+    /// Performs the complete set of operations after committing a block.
+    ///
+    /// This method should be called for all blocks except for the genesis block. For reasons
+    /// described in `BlockchainMut::create_genesis_block()`, the processing of the genesis
+    /// block is split into 2 parts.
+    pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: &Fork) {
+        self.commit_block(fork);
+        self.notify_runtimes_about_commit(fork.as_ref());
     }
 
     /// Returns the handle tracking the state of this dispatcher.
@@ -372,7 +385,7 @@ impl Dispatcher {
         }
     }
 
-    /// Restart a previously committed service instance.
+    /// Start a previously committed service instance.
     fn start_service(
         &mut self,
         snapshot: &dyn Snapshot,

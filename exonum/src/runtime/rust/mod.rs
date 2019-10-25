@@ -38,6 +38,7 @@ use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::Hash,
+    helpers::Height,
 };
 
 use super::{
@@ -402,10 +403,7 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
 
         // By convention, services don't handle `after_commit()` on the genesis block.
-        let is_genesis_block = CoreSchema::new(snapshot)
-            .block_hashes_by_height()
-            .is_empty();
-        if is_genesis_block {
+        if CoreSchema::new(snapshot).height() == Height(0) {
             return;
         }
 

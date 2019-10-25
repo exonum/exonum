@@ -164,7 +164,9 @@ fn test_basic_rust_runtime() {
         let entry = Entry::new("constructor_entry", &fork);
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
-    blockchain.dispatcher().after_commit(&fork);
+    blockchain
+        .dispatcher()
+        .commit_block_and_notify_runtimes(&fork);
     blockchain.merge(fork.into_patch()).unwrap();
 
     // Execute transaction method A.

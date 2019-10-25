@@ -234,7 +234,10 @@ impl BlockchainMut {
                 instance_config.constructor,
             )?;
         }
-        self.dispatcher.after_commit(&fork);
+        // We need to activate services before calling `create_patch()`; unlike all other blocks,
+        // initial services are considered immediately active in the genesis block, i.e.,
+        // their state should be included into `patch` created below.
+        self.dispatcher.commit_block(&fork);
         self.merge(fork.into_patch())?;
 
         let (_, patch) = self.create_patch(
@@ -243,7 +246,11 @@ impl BlockchainMut {
             &[],
             &mut BTreeMap::new(),
         );
-        self.merge(patch)?;
+        let fork = Fork::from(patch);
+        // On the other hand, we need to notify runtimes *after* the block has been created.
+        // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
+        self.dispatcher.notify_runtimes_about_commit(fork.as_ref());
+        self.merge(fork.into_patch())?;
 
         info!(
             "GENESIS_BLOCK ====== hash={}",
@@ -401,7 +408,7 @@ impl BlockchainMut {
             }
         }
 
-        self.dispatcher.after_commit(&fork);
+        self.dispatcher.commit_block_and_notify_runtimes(&fork);
         self.merge(fork.into_patch())?;
         Ok(())
     }

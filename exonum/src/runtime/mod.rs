@@ -253,9 +253,21 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// and returned `Ok(())`. The results of the call (i.e., changes to the blockchain state)
     /// are guaranteed to be persisted from the call.
     ///
-    /// Note that a call to `start_adding_service()` may have happened indefinite time ago;
+    /// A call to `start_adding_service()` may have happened indefinite time ago;
     /// indeed, `commit_service()` is called for all services on the node startup. Likewise,
     /// `commit_service()` may be called an indefinite number of times for the same instance.
+    ///
+    /// `snapshot` is the storage snapshot at the latest height when the method is called:
+    ///
+    /// - If the service is committed during node operation, `snapshot` is taken at the
+    ///   moment after applying the fork, for which the corresponding `start_adding_service`
+    ///   was performed.
+    /// - If the service is resumed after node restart, `snapshot` is the storage state
+    ///   at the node start.
+    ///
+    /// For builtin services on the first node start `snapshot` will not contain info
+    /// on the genesis block. Thus, using some core APIs (like requesting the current
+    /// blockchain height) will result in a panic.
     ///
     /// # Return value
     ///
@@ -269,7 +281,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         spec: &InstanceSpec,
     ) -> Result<(), ExecutionError>;
 
-    /// Dispatch payload to the method of a specific service instance.
+    /// Dispatches payload to the method of a specific service instance.
     /// Service instance name and method ID are provided in the `call_info` argument and
     /// interface name is provided as the corresponding field of the `context` argument.
     ///
@@ -316,6 +328,10 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// This method is guaranteed to be called *after* all `commit_service` calls related
     /// to the same block. The method is called exactly once for each block in the blockchain,
     /// including the genesis block.
+    ///
+    /// A block is not yet persisted when this method is called; the up to date block information
+    /// is provided in the `snapshot`. It corresponds exactly to the information
+    /// eventually persisted; i.e., no modifying operations are performed on the block.
     ///
     /// # Policy on Panics
     ///
