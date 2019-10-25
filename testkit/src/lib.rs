@@ -464,16 +464,15 @@ impl TestKit {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
         let saved_consensus_config = self.consensus_config();
+        let validator_id = self.leader().validator_id().unwrap();
 
-        let (block_hash, patch) = {
-            let validator_id = self.leader().validator_id().unwrap();
-            self.blockchain.create_patch(
-                validator_id,
-                new_block_height,
-                tx_hashes,
-                &mut BTreeMap::new(),
-            )
-        };
+        let guard = self.processing_lock.lock().unwrap();
+        let (block_hash, patch) = self.blockchain.create_patch(
+            validator_id,
+            new_block_height,
+            tx_hashes,
+            &mut BTreeMap::new(),
+        );
 
         let propose =
             self.leader()
@@ -485,7 +484,6 @@ impl TestKit {
             .map(|v| v.create_precommit(propose.as_ref(), block_hash))
             .collect();
 
-        let guard = self.processing_lock.lock().unwrap();
         self.blockchain
             .commit(
                 patch,
@@ -504,7 +502,6 @@ impl TestKit {
         }
 
         self.poll_events();
-
         let snapshot = self.snapshot();
         BlockchainExplorer::new(snapshot.as_ref())
             .block_with_txs(self.height())
@@ -525,32 +522,27 @@ impl TestKit {
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
     {
-        let tx_hashes: Vec<_> = {
-            let fork = self.blockchain.fork();
-            let hashes = {
-                let mut schema = CoreSchema::new(&fork);
+        let fork = self.blockchain.fork();
+        let mut schema = CoreSchema::new(&fork);
 
-                txs.into_iter()
-                    .map(|tx| {
-                        let tx_id = tx.object_hash();
-                        let tx_not_found = !schema.transactions().contains(&tx_id);
-                        let tx_in_pool = schema.transactions_pool().contains(&tx_id);
-                        assert!(
-                            tx_not_found || tx_in_pool,
-                            "Transaction is already committed: {:?}",
-                            tx
-                        );
-                        if tx_not_found {
-                            schema.add_transaction_into_pool(tx.clone());
-                        }
-                        tx_id
-                    })
-                    .collect()
-            };
-            self.blockchain.merge(fork.into_patch()).unwrap();
-            hashes
-        };
-
+        let tx_hashes: Vec<_> = txs
+            .into_iter()
+            .map(|tx| {
+                let tx_id = tx.object_hash();
+                let tx_not_found = !schema.transactions().contains(&tx_id);
+                let tx_in_pool = schema.transactions_pool().contains(&tx_id);
+                assert!(
+                    tx_not_found || tx_in_pool,
+                    "Transaction is already committed: {:?}",
+                    tx
+                );
+                if tx_not_found {
+                    schema.add_transaction_into_pool(tx.clone());
+                }
+                tx_id
+            })
+            .collect();
+        self.blockchain.merge(fork.into_patch()).unwrap();
         self.create_block_with_tx_hashes(&tx_hashes)
     }
 
@@ -584,14 +576,11 @@ impl TestKit {
     ) -> BlockWithTransactions {
         self.poll_events();
 
-        {
-            let snapshot = self.blockchain.snapshot();
-            let schema = CoreSchema::new(&snapshot);
-            for hash in tx_hashes {
-                assert!(schema.transactions_pool().contains(hash));
-            }
+        let snapshot = self.blockchain.snapshot();
+        let schema = CoreSchema::new(&snapshot);
+        for hash in tx_hashes {
+            assert!(schema.transactions_pool().contains(hash));
         }
-
         self.do_create_block(tx_hashes)
     }
 
@@ -613,10 +602,8 @@ impl TestKit {
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
         let fork = self.blockchain.fork();
-        {
-            let mut schema = CoreSchema::new(&fork);
-            schema.add_transaction_into_pool(transaction);
-        }
+        let mut schema = CoreSchema::new(&fork);
+        schema.add_transaction_into_pool(transaction);
         self.blockchain
             .merge(fork.into_patch())
             .expect("cannot update database");
@@ -920,8 +907,7 @@ fn test_number_of_validators_in_builder() {
 #[test]
 #[should_panic(expected = "validator should be present")]
 fn test_zero_validators_in_builder() {
-    let testkit = TestKitBuilder::auditor().with_validators(0).create();
-    drop(testkit);
+    TestKitBuilder::auditor().with_validators(0).create();
 }
 
 #[test]

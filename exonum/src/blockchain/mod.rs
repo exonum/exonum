@@ -326,13 +326,8 @@ impl BlockchainMut {
         let snapshot = fork_ref.snapshot();
         let schema = Schema::new(snapshot);
 
-        let transaction =
-            get_transaction(&tx_hash, &schema.transactions(), &tx_cache).ok_or_else(|| {
-                format_err!(
-                    "BUG: Cannot find transaction in database. tx: {:?}",
-                    tx_hash
-                )
-            })?;
+        let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
+            .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
         fork.flush();
 
         let tx_result = catch_panic(|| self.dispatcher.execute(fork, tx_hash, &transaction));
