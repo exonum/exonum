@@ -44,6 +44,7 @@ message InstanceSpec {
   ArtifactId artifact = 3;
 }
 
+/// The kind of ExecutionError.
 enum ErrorKind {
   PANIC = 0;
   DISPATCHER = 1;
