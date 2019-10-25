@@ -74,25 +74,24 @@ impl ErrorKind {
         ErrorKind::Service { code: code.into() }
     }
 
-    fn into_raw(self) -> (u8, u8) {
+    fn into_raw(self) -> (runtime::ErrorKind, u8) {
         match self {
-            ErrorKind::Panic => (0, 0),
-            ErrorKind::Dispatcher { code } => (1, code),
-            ErrorKind::Runtime { code } => (2, code),
-            ErrorKind::Service { code } => (3, code),
+            ErrorKind::Panic => (runtime::ErrorKind::PANIC, 0),
+            ErrorKind::Dispatcher { code } => (runtime::ErrorKind::DISPATCHER, code),
+            ErrorKind::Runtime { code } => (runtime::ErrorKind::RUNTIME, code),
+            ErrorKind::Service { code } => (runtime::ErrorKind::SERVICE, code),
         }
     }
 
-    fn from_raw(kind: u8, code: u8) -> Result<Self, failure::Error> {
+    fn from_raw(kind: runtime::ErrorKind, code: u8) -> Result<Self, failure::Error> {
         match kind {
-            0 => {
+            runtime::ErrorKind::PANIC => {
                 ensure!(code == 0, "Error code for panic should be zero");
                 Ok(ErrorKind::Panic)
             }
-            1 => Ok(ErrorKind::Dispatcher { code }),
-            2 => Ok(ErrorKind::Runtime { code }),
-            3 => Ok(ErrorKind::Service { code }),
-            _ => bail!("Unknown error kind"),
+            runtime::ErrorKind::DISPATCHER => Ok(ErrorKind::Dispatcher { code }),
+            runtime::ErrorKind::RUNTIME => Ok(ErrorKind::Runtime { code }),
+            runtime::ErrorKind::SERVICE => Ok(ErrorKind::Service { code }),
         }
     }
 }
@@ -215,14 +214,14 @@ impl ProtobufConvert for ExecutionError {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();
         let (kind, code) = self.kind.into_raw();
-        inner.set_kind(u32::from(kind));
+        inner.set_kind(kind);
         inner.set_code(u32::from(code));
         inner.set_description(self.description.clone());
         inner
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        let kind = u8::try_from(pb.get_kind())?;
+        let kind = pb.get_kind();
         let code = u8::try_from(pb.get_code())?;
         Ok(Self {
             kind: ErrorKind::from_raw(kind, code)?,
@@ -251,7 +250,7 @@ impl BinaryValue for ExecutionError {
 impl ObjectHash for ExecutionError {
     fn object_hash(&self) -> Hash {
         let (kind, code) = self.kind.into_raw();
-        crypto::hash(&[kind, code])
+        crypto::hash(&[kind as u8, code])
     }
 }
 

@@ -44,10 +44,17 @@ message InstanceSpec {
   ArtifactId artifact = 3;
 }
 
+enum ErrorKind {
+  PANIC = 0;
+  DISPATCHER = 1;
+  RUNTIME = 2;
+  SERVICE = 3;
+}
+
 /// Result of unsuccessful runtime execution.
 message ExecutionError {
   /// The kind of error that indicates in which module the error occurred.
-  uint32 kind = 1;
+  ErrorKind kind = 1;
   /// User defined error code that can have different meanings for the different
   /// error kinds.
   uint32 code = 2;
