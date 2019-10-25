@@ -125,6 +125,7 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     clippy::use_self,
+    clippy::default_trait_access,
 )]
 
 pub use self::{
