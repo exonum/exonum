@@ -53,9 +53,7 @@ pub trait Configure {
     /// # Execution policy
     ///
     /// At the moment, this method can only be called on behalf of the supervisor service instance.
-    /// In other words, only a method with the specified [identifier] can call this method.
-    ///
-    /// [identifier]: ../../constant.SUPERVISOR_INSTANCE_ID.html
+    /// In other words, only a method with numeric ID 0 can call this method.
     fn verify_config(
         &self,
         context: CallContext,
@@ -74,9 +72,7 @@ pub trait Configure {
     /// # Execution policy
     ///
     /// At the moment, this method can only be called on behalf of the supervisor service instance.
-    /// In other words, only a method with the specified [identifier] can call this method.
-    ///
-    /// [identifier]: ../../constant.SUPERVISOR_INSTANCE_ID.html
+    /// In other words, only a method with numeric ID 0 can call this method.
     fn apply_config(
         &self,
         context: CallContext,
