@@ -237,9 +237,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The `Runtime` should catch all panics except for `FatalError`s and convert
     /// them into an `ExecutionError`. A returned error or panic implies that service instantiation
     /// has failed; as a rule of a thumb, changes made by the method will be rolled back
-    /// (the exact logic is determined by [the supervisor]).
-    ///
-    /// [the supervisor]: FIXME
+    /// (the exact logic is determined by the supervisor).
     fn start_adding_service(
         &self,
         context: ExecutionContext,

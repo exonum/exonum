@@ -1,4 +1,4 @@
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork};
 
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError, Schema},
@@ -39,8 +39,8 @@ impl<'a> CallContext<'a> {
     }
 
     /// Accesses dispatcher information.
-    pub fn dispatcher_info(&self) -> Schema<&dyn Snapshot> {
-        Schema::new(self.fork().as_ref())
+    pub fn dispatcher_info(&self) -> Schema<&Fork> {
+        Schema::new(self.fork())
     }
 
     pub fn instance(&self) -> InstanceDescriptor {
