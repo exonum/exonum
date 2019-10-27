@@ -237,7 +237,7 @@ impl BlockchainMut {
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
-        self.dispatcher.commit_block(&fork);
+        self.dispatcher.commit_block(&mut fork);
         self.merge(fork.into_patch())?;
 
         let (_, patch) = self.create_patch(
@@ -390,7 +390,7 @@ impl BlockchainMut {
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {
-        let fork: Fork = patch.into();
+        let mut fork: Fork = patch.into();
         let mut schema = Schema::new(&fork);
         schema.precommits(&block_hash).extend(precommits);
         // Consensus messages cache is useful only during one height, so it should be
@@ -408,7 +408,7 @@ impl BlockchainMut {
             }
         }
 
-        self.dispatcher.commit_block_and_notify_runtimes(&fork);
+        self.dispatcher.commit_block_and_notify_runtimes(&mut fork);
         self.merge(fork.into_patch())?;
         Ok(())
     }

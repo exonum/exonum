@@ -42,8 +42,7 @@ use crate::{
 /// `Runtime::after_commit()` is called. Thus, we need to perform this commitment
 /// manually here, emulating the relevant part of `BlockchainMut::create_genesis_block()`.
 fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
-    let schema = CoreSchema::new(&*fork);
-    let is_genesis_block = schema.block_hashes_by_height().is_empty();
+    let is_genesis_block = CoreSchema::new(&*fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
     dispatcher.commit_block(fork);
 
@@ -56,6 +55,7 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
         Hash::zero(),
     );
     let block_hash = block.object_hash();
+    let schema = CoreSchema::new(&*fork);
     schema.block_hashes_by_height().push(block_hash);
     schema.blocks().put(&block_hash, block);
     fork.flush();

@@ -12,23 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::{self as crypto, Hash};
+use exonum_merkledb::{
+    BinaryValue, Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash,
+    Snapshot, TemporaryDB,
+};
+use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 
 use std::{collections::BTreeMap, panic, sync::Mutex};
-
-use exonum_proto::ProtobufConvert;
 
 use crate::{
     blockchain::{
         Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, FatalError,
         InstanceCollection, Schema,
     },
-    crypto::{self, Hash},
     helpers::{generate_testnet_config, Height, ValidatorId},
-    merkledb::{
-        BinaryValue, Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash,
-        Snapshot, TemporaryDB,
-    },
     messages::Verified,
     node::ApiSender,
     proto::schema::tests::*,
