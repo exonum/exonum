@@ -441,7 +441,7 @@ mod tests {
     fn execution_error_binary_value_panic_with_code() {
         let bytes = {
             let mut inner = runtime_proto::ExecutionError::default();
-            inner.set_kind(0);
+            inner.set_kind(runtime_proto::ErrorKind::PANIC);
             inner.set_code(2);
             inner.write_to_bytes().unwrap()
         };
