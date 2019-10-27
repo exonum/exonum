@@ -23,7 +23,7 @@ use std::{any::Any, convert::TryFrom, fmt::Display, panic};
 use crate::{
     blockchain::FatalError,
     crypto::{self, Hash},
-    proto::schema::runtime,
+    proto::schema::runtime as runtime_proto,
 };
 
 /// Kind of execution error, indicates in which module error occurred.
@@ -74,24 +74,24 @@ impl ErrorKind {
         ErrorKind::Service { code: code.into() }
     }
 
-    fn into_raw(self) -> (runtime::ErrorKind, u8) {
+    fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
-            ErrorKind::Panic => (runtime::ErrorKind::PANIC, 0),
-            ErrorKind::Dispatcher { code } => (runtime::ErrorKind::DISPATCHER, code),
-            ErrorKind::Runtime { code } => (runtime::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code } => (runtime::ErrorKind::SERVICE, code),
+            ErrorKind::Panic => (runtime_proto::ErrorKind::PANIC, 0),
+            ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
+            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
+            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
         }
     }
 
-    fn from_raw(kind: runtime::ErrorKind, code: u8) -> Result<Self, failure::Error> {
+    fn from_raw(kind: runtime_proto::ErrorKind, code: u8) -> Result<Self, failure::Error> {
         let kind = match kind {
-            runtime::ErrorKind::PANIC => {
+            runtime_proto::ErrorKind::PANIC => {
                 ensure!(code == 0, "Error code for panic should be zero");
                 ErrorKind::Panic
             }
-            runtime::ErrorKind::DISPATCHER => ErrorKind::Dispatcher { code },
-            runtime::ErrorKind::RUNTIME => ErrorKind::Runtime { code },
-            runtime::ErrorKind::SERVICE => ErrorKind::Service { code },
+            runtime_proto::ErrorKind::DISPATCHER => ErrorKind::Dispatcher { code },
+            runtime_proto::ErrorKind::RUNTIME => ErrorKind::Runtime { code },
+            runtime_proto::ErrorKind::SERVICE => ErrorKind::Service { code },
         };
         Ok(kind)
     }
@@ -210,7 +210,7 @@ where
 }
 
 impl ProtobufConvert for ExecutionError {
-    type ProtoStruct = runtime::ExecutionError;
+    type ProtoStruct = runtime_proto::ExecutionError;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();
@@ -281,7 +281,7 @@ impl From<Result<(), ExecutionError>> for ExecutionStatus {
 }
 
 impl ProtobufConvert for ExecutionStatus {
-    type ProtoStruct = runtime::ExecutionStatus;
+    type ProtoStruct = runtime_proto::ExecutionStatus;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();
@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn execution_error_binary_value_panic_with_code() {
         let bytes = {
-            let mut inner = runtime::ExecutionError::default();
+            let mut inner = runtime_proto::ExecutionError::default();
             inner.set_kind(0);
             inner.set_code(2);
             inner.write_to_bytes().unwrap()
