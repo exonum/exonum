@@ -84,15 +84,16 @@ impl ErrorKind {
     }
 
     fn from_raw(kind: runtime::ErrorKind, code: u8) -> Result<Self, failure::Error> {
-        match kind {
+        let kind = match kind {
             runtime::ErrorKind::PANIC => {
                 ensure!(code == 0, "Error code for panic should be zero");
-                Ok(ErrorKind::Panic)
+                ErrorKind::Panic
             }
-            runtime::ErrorKind::DISPATCHER => Ok(ErrorKind::Dispatcher { code }),
-            runtime::ErrorKind::RUNTIME => Ok(ErrorKind::Runtime { code }),
-            runtime::ErrorKind::SERVICE => Ok(ErrorKind::Service { code }),
-        }
+            runtime::ErrorKind::DISPATCHER => ErrorKind::Dispatcher { code },
+            runtime::ErrorKind::RUNTIME => ErrorKind::Runtime { code },
+            runtime::ErrorKind::SERVICE => ErrorKind::Service { code },
+        };
+        Ok(kind)
     }
 }
 
