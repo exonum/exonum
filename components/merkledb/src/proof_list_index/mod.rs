@@ -851,7 +851,7 @@ pub mod proto {
             let index = pb.get_index();
             let height = pb.get_height();
 
-            // ProtobufConvert is implemented manually to add this checks.
+            // ProtobufConvert is implemented manually to add these checks.
             ensure!(index <= MAX_INDEX, "index is out of range");
             ensure!(height <= 58, "height is out of range");
 
@@ -892,11 +892,11 @@ pub mod proto {
             list_proof
         }
 
-        fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
             let proof = pb
-                .get_proof()
-                .iter()
-                .map(|entry| HashedEntry::from_pb(entry.clone()))
+                .take_proof()
+                .into_iter()
+                .map(HashedEntry::from_pb)
                 .collect::<Result<_, Error>>()?;
 
             let entries = pb
