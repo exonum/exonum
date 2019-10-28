@@ -28,7 +28,7 @@ infrastructure providers.
 This is the main Exonum repository that includes
 
 * [Exonum core library](exonum/README.md).
-* [Exonum testing framework](test_suite/testkit/README.md).
+* [Exonum testing framework](test-suite/testkit/README.md).
 * Services:
   * [Configuration service](services/configuration/README.md).
   * [Time service](services/time/README.md).
