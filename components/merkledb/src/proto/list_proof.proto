@@ -18,7 +18,7 @@ import "types.proto";
 package exonum.proof;
 
 // Subset of ProofList elements coupled with a proof. ListProof` can assert existence of
-// certain and that the list is shorter than the requested range of indexes.
+// certain elements and that the list is shorter than the requested range of indexes.
 message ListProof {
     // Array of { ProofListKey, Hash } objects.
     repeated HashedEntry proof = 1;
@@ -28,11 +28,13 @@ message ListProof {
     uint64 length = 3;
 }
 
+// Represents list key and corresponding hash value.
 message HashedEntry {
     ProofListKey key = 1;
     exonum.crypto.Hash hash = 2;
 }
 
+// Index of the list element and its value.
 message ListProofEntry {
     uint64 index = 1;
     bytes value = 2;
