@@ -39,10 +39,11 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::api::manager::UpdateEndpoints;
 use crate::api::{
-    self, manager::ApiManager, ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend,
-    FutureResult, Immutable, Mutable, NamedWith,
+    self,
+    manager::{ApiManager, UpdateEndpoints},
+    ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend, FutureResult, Immutable,
+    Mutable, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.

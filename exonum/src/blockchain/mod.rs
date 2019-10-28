@@ -215,7 +215,7 @@ impl BlockchainMut {
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
-    // TODO: declare `GenesisBlock` struct
+    // TODO: extract genesis block into separate struct [ECR-3750]
     fn create_genesis_block(
         &mut self,
         config: ConsensusConfig,

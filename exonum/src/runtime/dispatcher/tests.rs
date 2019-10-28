@@ -25,6 +25,7 @@ use std::{
     },
 };
 
+use crate::runtime::DispatcherState;
 use crate::{
     blockchain::{Block, Blockchain, Schema as CoreSchema},
     helpers::{Height, ValidatorId},
@@ -62,6 +63,23 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
     dispatcher.notify_runtimes_about_commit(fork.as_ref());
 }
 
+impl Dispatcher {
+    /// Similar to `Dispatcher::execute()`, but accepts universal `caller` and `call_info`.
+    pub(crate) fn call(
+        &self,
+        fork: &mut Fork,
+        caller: Caller,
+        call_info: &CallInfo,
+        arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        let runtime = self
+            .runtime_for_service(call_info.instance_id)
+            .ok_or(DispatcherError::IncorrectRuntime)?;
+        let context = ExecutionContext::new(self, fork, caller);
+        runtime.execute(context, call_info, arguments)
+    }
+}
+
 enum SampleRuntimes {
     First = 5,
     Second = 6,
@@ -78,7 +96,7 @@ impl DispatcherBuilder {
             dispatcher: Dispatcher {
                 runtimes: Default::default(),
                 service_infos: Default::default(),
-                artifact_sources: Default::default(),
+                shared_state: DispatcherState::default(),
             },
         }
     }
@@ -298,7 +316,7 @@ fn test_dispatcher_simple() {
         id: RUST_SERVICE_ID,
         name: RUST_SERVICE_NAME.into(),
     };
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit);
+    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
     context
         .start_adding_service(rust_service, vec![])
         .expect("`start_adding_service` failed for rust");
@@ -330,7 +348,7 @@ fn test_dispatcher_simple() {
         name: "inconspicuous-name".to_owned(),
     };
 
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit);
+    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
     let err = context
         .start_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
@@ -445,7 +463,7 @@ fn test_dispatcher_rust_runtime_no_service() {
         name: RUST_SERVICE_NAME.into(),
     };
     assert_eq!(
-        ExecutionContext::new(&dispatcher, &mut fork, Caller::BeforeCommit)
+        ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
             .start_adding_service(rust_service, vec![])
             .expect_err("start service succeed"),
         DispatcherError::ArtifactNotDeployed.into()

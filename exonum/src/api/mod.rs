@@ -264,6 +264,7 @@ impl ApiAggregator {
 ///
 /// This context contains necessary parts for interaction with the blockchain
 /// and may be shared among any kind of handlers.
+// TODO: fold into `Blockchain` [ERC-3745]
 #[derive(Debug, Clone)]
 pub struct ApiContext {
     service_keypair: (PublicKey, SecretKey),

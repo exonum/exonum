@@ -30,6 +30,7 @@ use crate::{
 ///
 /// During the `Blockchain` creation it creates and commits a genesis block if the database
 /// is empty. Otherwise, it restores the state from the database.
+// TODO: refine interface [ECR-3744]
 #[derive(Debug)]
 pub struct BlockchainBuilder {
     pub blockchain: Blockchain,
@@ -67,7 +68,6 @@ impl BlockchainBuilder {
         self.with_additional_runtime(runtime)
     }
 
-    // FIXME remove
     pub fn with_external_runtimes(
         mut self,
         runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,

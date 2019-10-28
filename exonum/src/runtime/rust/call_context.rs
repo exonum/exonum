@@ -65,7 +65,7 @@ impl<'a> CallContext<'a> {
         )
     }
 
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
     /// Creates a client to call interface methods of the specified service instance.
     #[doc(hidden)]
     pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
@@ -75,7 +75,7 @@ impl<'a> CallContext<'a> {
         self.call_context(called).map(Into::into)
     }
 
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3493]
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
     #[doc(hidden)]
     pub fn call_context<'s>(
         &'s mut self,
@@ -136,6 +136,8 @@ impl<'a> CallContext<'a> {
     /// - Make `isolate()` call(s) the last logic executed by a transaction, or at least
     ///   not have failure cases after the call(s).
     /// - Propagate errors returned by this method as a result of the transaction execution.
+    // TODO: Finalize interface and test [ECR-3740]
+    #[doc(hidden)]
     pub fn isolate(
         &mut self,
         f: impl FnOnce(CallContext) -> Result<(), ExecutionError>,

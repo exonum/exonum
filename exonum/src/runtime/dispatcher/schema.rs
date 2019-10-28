@@ -21,6 +21,7 @@ use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
+// TODO: Add information about implemented interfaces [ECR-3747]
 #[derive(Debug, Clone)]
 pub struct Schema<T: IndexAccess> {
     access: T,
@@ -97,7 +98,10 @@ impl<T: IndexAccess> Schema<T> {
 
     /// Add artifact specification to the set of the deployed artifacts.
     pub(super) fn add_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
+        // We use an assertion here since `add_pending_artifact` should have been called
+        // with the same params before.
         debug_assert!(!self.artifacts().contains(&artifact.name));
+
         let name = artifact.name.clone();
         self.artifacts().put(
             &name,
@@ -128,6 +132,7 @@ impl<T: IndexAccess> Schema<T> {
             return Err(Error::ServiceNameExists);
         }
         // Checks that instance identifier doesn't exist.
+        // TODO: revise dispatcher integrity checks [ECR-3743]
         if self.service_instance_ids().contains(&spec.id)
             || self.pending_instance_ids().contains(&spec.id)
         {
@@ -142,6 +147,7 @@ impl<T: IndexAccess> Schema<T> {
     }
 
     /// Assign unique identifier for an instance.
+    // TODO: could be performed by supervisor [ECR-3746]
     pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
         let id = self
             .vacant_instance_id()

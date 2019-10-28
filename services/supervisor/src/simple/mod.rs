@@ -59,6 +59,7 @@ pub trait SimpleSupervisorInterface {
 }
 
 impl SimpleSupervisorInterface for SimpleSupervisor {
+    // TODO: check auth by one of validators [ECR-3742]
     fn change_config(
         &self,
         mut context: CallContext,

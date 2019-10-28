@@ -75,12 +75,6 @@
 //!
 //! TODO: Think about runtime agnostic interfaces description. [ECR-3531]
 //!
-//! ## Configure
-//!
-//! Describes a procedure for updating the configuration of a service instance.
-//!
-//! See explanation in the Rust runtime definition of the [`Configure`] interface.
-//!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
 //! [`Dispatcher`]: dispatcher/struct.Dispatcher.html
@@ -89,7 +83,6 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-//! [`Configure`]: rust/interfaces/trait.Configure.html
 
 pub use self::{
     dispatcher::{
@@ -421,8 +414,11 @@ pub enum Caller {
         instance_id: InstanceId,
     },
 
-    /// Method is invoked by the `before_commit` hook.
-    BeforeCommit,
+    /// Call is invoked by one of the blockchain lifecycle events.
+    ///
+    /// This kind of authorization is used for `before_commit` calls to the service instances,
+    /// and for initialization of builtin services.
+    Blockchain,
 }
 
 impl Caller {
@@ -545,6 +541,7 @@ impl<'a> ExecutionContext<'a> {
         spec: InstanceSpec,
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
+        // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
         let runtime = self
             .dispatcher

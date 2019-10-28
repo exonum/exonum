@@ -43,6 +43,7 @@ impl fmt::Debug for ApiManager {
 }
 
 impl ApiManager {
+    // TODO: extract into API configuration [ECR-3748]
     const RETRY_INTERVAL: Duration = Duration::from_millis(500);
     const RETRY_ATTEMPTS: usize = 10;
 

@@ -64,7 +64,7 @@ struct ServiceInfo {
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     service_infos: BTreeMap<InstanceId, ServiceInfo>,
-    artifact_sources: Arc<RwLock<HashMap<ArtifactId, ArtifactProtobufSpec>>>,
+    shared_state: DispatcherState,
 }
 
 impl Dispatcher {
@@ -76,7 +76,7 @@ impl Dispatcher {
         let mut this = Self {
             runtimes: runtimes.into_iter().collect(),
             service_infos: BTreeMap::new(),
-            artifact_sources: Default::default(),
+            shared_state: DispatcherState::default(),
         };
         for runtime in this.runtimes.values_mut() {
             runtime.initialize(blockchain);
@@ -135,7 +135,7 @@ impl Dispatcher {
         }
 
         // Start the built-in service instance.
-        ExecutionContext::new(self, fork, Caller::BeforeCommit)
+        ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec, constructor)?;
         Ok(())
     }
@@ -173,15 +173,20 @@ impl Dispatcher {
         artifact: ArtifactId,
         payload: Vec<u8>,
     ) -> impl Future<Item = (), Error = ExecutionError> {
+        // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            let future_sources = self.artifact_sources.clone();
+            let future_state = self.shared_state.clone();
             let task =
                 runtime
                     .deploy_artifact(artifact.clone(), payload)
                     .and_then(move |sources| {
-                        future_sources.write().unwrap().insert(artifact, sources);
+                        future_state
+                            .artifact_sources
+                            .write()
+                            .unwrap()
+                            .insert(artifact, sources);
                         Ok(())
                     });
             Either::A(task)
@@ -200,6 +205,7 @@ impl Dispatcher {
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         Schema::new(fork).add_pending_artifact(artifact, spec)?;
         Ok(())
@@ -252,25 +258,10 @@ impl Dispatcher {
         runtime.execute(context, call_info, &tx.as_ref().arguments)
     }
 
-    #[cfg(test)]
-    pub(crate) fn call(
-        &self,
-        fork: &mut Fork,
-        caller: Caller,
-        call_info: &super::CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        let runtime = self
-            .runtime_for_service(call_info.instance_id)
-            .ok_or(Error::IncorrectRuntime)?;
-        let context = ExecutionContext::new(self, fork, caller);
-        runtime.execute(context, call_info, arguments)
-    }
-
     /// Calls `before_commit` for all currently active services, isolating each call.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
-            let context = ExecutionContext::new(self, fork, Caller::BeforeCommit);
+            let context = ExecutionContext::new(self, fork, Caller::Blockchain);
             if self.runtimes[&info.runtime_id]
                 .before_commit(context, service_id)
                 .is_ok()
@@ -334,9 +325,7 @@ impl Dispatcher {
 
     /// Returns the handle tracking the state of this dispatcher.
     pub(crate) fn state(&self) -> DispatcherState {
-        DispatcherState {
-            artifact_sources: Arc::clone(&self.artifact_sources),
-        }
+        self.shared_state.clone()
     }
 
     /// Return true if the artifact with the given identifier is deployed.
@@ -431,13 +420,13 @@ impl Mailbox {
     }
 }
 
-type BoxedExecFuture = Box<dyn Future<Item = (), Error = ExecutionError>>;
+type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError>>;
 
 pub enum Action {
     StartDeploy {
         artifact: ArtifactId,
         spec: Vec<u8>,
-        and_then: Box<dyn FnOnce() -> BoxedExecFuture>,
+        and_then: Box<dyn FnOnce() -> ExecutionFuture>,
     },
 }
 
@@ -473,10 +462,12 @@ impl Action {
     }
 }
 
+type ArtifactSources = HashMap<ArtifactId, ArtifactProtobufSpec>;
+
 /// Cloneable dispatcher state.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DispatcherState {
-    artifact_sources: Arc<RwLock<HashMap<ArtifactId, ArtifactProtobufSpec>>>,
+    artifact_sources: Arc<RwLock<ArtifactSources>>,
 }
 
 impl DispatcherState {
