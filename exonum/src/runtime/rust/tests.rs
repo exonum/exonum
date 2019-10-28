@@ -29,7 +29,8 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        error::ExecutionError, ArtifactProtobufSpec, CallInfo, Caller, Dispatcher, DispatcherError,
+        error::{ErrorKind, ExecutionError},
+        ArtifactProtobufSpec, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
         DispatcherSchema, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Mailbox,
         Runtime, StateHashAggregator,
     },
@@ -223,8 +224,8 @@ struct TxB {
 
 #[exonum_service(crate = "crate")]
 trait TestService {
-    fn method_a(&self, context: CallContext, arg: TxA) -> Result<(), ExecutionError>;
-    fn method_b(&self, context: CallContext, arg: TxB) -> Result<(), ExecutionError>;
+    fn method_a(&self, context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError>;
+    fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -253,7 +254,7 @@ impl<'a> TestServiceClient<'a> {
 }
 
 impl TestService for TestServiceImpl {
-    fn method_a(&self, mut context: CallContext, arg: TxA) -> Result<(), ExecutionError> {
+    fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
         {
             let fork = context.fork();
             let mut entry = Entry::new("method_a_entry", fork);
@@ -268,7 +269,7 @@ impl TestService for TestServiceImpl {
         Ok(())
     }
 
-    fn method_b(&self, context: CallContext, arg: TxB) -> Result<(), ExecutionError> {
+    fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
         let fork = context.fork();
         let mut entry = Entry::new("method_b_entry", fork);
         entry.set(arg.value);
@@ -277,14 +278,14 @@ impl TestService for TestServiceImpl {
 }
 
 impl Service for TestServiceImpl {
-    fn initialize(&self, context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         let mut entry = Entry::new("constructor_entry", context.fork());
         entry.set(init.msg);
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -583,4 +584,201 @@ fn conflicting_service_instances() {
         .dispatcher()
         .call(&mut fork, caller, &call_info, &payload)
         .unwrap_err();
+}
+
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    crate = "crate",
+    artifact_name = "dependent_service",
+    artifact_version = "0.1.0",
+    proto_sources = "crate::proto::schema",
+    implements()
+)]
+pub struct DependentServiceImpl;
+
+impl Service for DependentServiceImpl {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+        assert_eq!(*context.caller(), Caller::BeforeCommit);
+        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        if context.dispatcher_info().get_instance(&*init.msg).is_none() {
+            return Err(ExecutionError::new(ErrorKind::service(0), "no dependency"));
+        }
+        Ok(())
+    }
+
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+}
+
+fn instance_configs() -> (InstanceConfig, InstanceConfig) {
+    let main_spec = InstanceSpec {
+        id: SERVICE_INSTANCE_ID,
+        name: SERVICE_INSTANCE_NAME.to_owned(),
+        artifact: TestServiceImpl.artifact_id().into(),
+    };
+    let dependent_spec = InstanceSpec {
+        id: SERVICE_INSTANCE_ID + 1,
+        name: "dependent-service".to_owned(),
+        artifact: DependentServiceImpl.artifact_id().into(),
+    };
+    let dependent_constructor = Init {
+        msg: SERVICE_INSTANCE_NAME.to_owned(),
+    };
+
+    (
+        InstanceConfig::new(main_spec, None, vec![]),
+        InstanceConfig::new(dependent_spec, None, dependent_constructor.into_bytes()),
+    )
+}
+
+#[test]
+fn dependent_builtin_service() {
+    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
+    runtime.add_service_factory(Box::new(TestServiceImpl));
+    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let (main_service, dep_service) = instance_configs();
+
+    // Create a blockchain with both main and dependent services initialized in the genesis block.
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let blockchain = Blockchain::build_for_tests()
+        .into_mut(config.consensus)
+        .with_additional_runtime(runtime)
+        .with_builtin_instances(vec![main_service, dep_service])
+        .build()
+        .unwrap();
+
+    let snapshot = blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert_eq!(
+        schema.get_instance(SERVICE_INSTANCE_ID).unwrap().1,
+        DeployStatus::Active
+    );
+    assert_eq!(
+        schema.get_instance("dependent-service").unwrap().1,
+        DeployStatus::Active
+    );
+}
+
+#[test]
+fn dependent_builtin_service_with_incorrect_order() {
+    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
+    runtime.add_service_factory(Box::new(TestServiceImpl));
+    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let (main_service, dep_service) = instance_configs();
+
+    let config = generate_testnet_config(1, 0)[0].clone();
+    // Error in the service instantiation in the genesis block bubbles up.
+    let err = Blockchain::build_for_tests()
+        .into_mut(config.consensus)
+        .with_additional_runtime(runtime)
+        .with_builtin_instances(vec![dep_service, main_service])
+        // ^-- Incorrect service ordering
+        .build()
+        .unwrap_err();
+    assert!(err.to_string().contains("no dependency"));
+}
+
+#[test]
+fn dependent_service_with_no_dependency() {
+    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
+    runtime.add_service_factory(Box::new(TestServiceImpl));
+    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let (_, dep_service) = instance_configs();
+
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let mut blockchain = Blockchain::build_for_tests()
+        .into_mut(config.consensus)
+        .with_additional_runtime(runtime)
+        .build()
+        .unwrap();
+
+    let fork = create_block(&blockchain);
+    Dispatcher::commit_artifact(&fork, dep_service.instance_spec.artifact.clone(), vec![]).unwrap();
+    commit_block(&mut blockchain, fork);
+
+    let mut fork = create_block(&blockchain);
+    let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::BeforeCommit);
+    let err = ctx
+        .start_adding_service(dep_service.instance_spec, dep_service.constructor)
+        .unwrap_err();
+    assert!(err.to_string().contains("no dependency"));
+
+    // Check that the information about the service hasn't persisted in the dispatcher schema.
+    commit_block(&mut blockchain, fork);
+    let snapshot = blockchain.snapshot();
+    assert!(DispatcherSchema::new(&snapshot)
+        .get_instance("dependent-service")
+        .is_none());
+}
+
+#[test]
+fn dependent_service_in_same_block() {
+    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
+    runtime.add_service_factory(Box::new(TestServiceImpl));
+    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let (main_service, dep_service) = instance_configs();
+
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let mut blockchain = Blockchain::build_for_tests()
+        .into_mut(config.consensus)
+        .with_additional_runtime(runtime)
+        .build()
+        .unwrap();
+
+    // Artifacts need to be deployed in a separate block due to checks in `RustRuntime`.
+    let fork = create_block(&blockchain);
+    Dispatcher::commit_artifact(&fork, main_service.instance_spec.artifact.clone(), vec![])
+        .unwrap();
+    Dispatcher::commit_artifact(&fork, dep_service.instance_spec.artifact.clone(), vec![]).unwrap();
+    commit_block(&mut blockchain, fork);
+
+    // Deploy both services in the same block after genesis.
+    let mut fork = create_block(&blockchain);
+    let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::BeforeCommit);
+    ctx.start_adding_service(main_service.instance_spec, main_service.constructor)
+        .unwrap();
+    ctx.start_adding_service(dep_service.instance_spec, dep_service.constructor)
+        .unwrap();
+    commit_block(&mut blockchain, fork);
+
+    let snapshot = blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert_eq!(
+        schema.get_instance("dependent-service").unwrap().1,
+        DeployStatus::Active
+    );
+}
+
+#[test]
+fn dependent_service_in_successive_block() {
+    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
+    runtime.add_service_factory(Box::new(TestServiceImpl));
+    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let (main_service, dep_service) = instance_configs();
+
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let mut blockchain = Blockchain::build_for_tests()
+        .into_mut(config.consensus)
+        .with_additional_runtime(runtime)
+        .with_builtin_instances(vec![main_service])
+        .build()
+        .unwrap();
+
+    let fork = create_block(&blockchain);
+    Dispatcher::commit_artifact(&fork, dep_service.instance_spec.artifact.clone(), vec![]).unwrap();
+    commit_block(&mut blockchain, fork);
+
+    let mut fork = create_block(&blockchain);
+    ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::BeforeCommit)
+        .start_adding_service(dep_service.instance_spec, dep_service.constructor)
+        .unwrap();
+    commit_block(&mut blockchain, fork);
+
+    let snapshot = blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert_eq!(
+        schema.get_instance("dependent-service").unwrap().1,
+        DeployStatus::Active
+    );
 }
