@@ -30,7 +30,7 @@ exonum-proto = { version = "0.12.0", path = "../../components/proto" }
 exonum-crypto = { version = "0.12.0", path = "../../components/crypto" }
 
 [dev-dependencies]
-exonum-testkit = { version = "0.12.0", path = "../../test_suite/testkit" }
+exonum-testkit = { version = "0.12.0", path = "../../test-suite/testkit" }
 
 [build-dependencies]
 exonum-build = { version = "0.12.0", path = "../../components/build" }
