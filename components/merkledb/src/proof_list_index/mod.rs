@@ -826,8 +826,7 @@ where
 }
 
 #[cfg(feature = "with-protobuf")]
-#[doc(hidden)]
-pub mod proto {
+mod proto {
     pub use crate::proto::{self, *};
     use failure::Error;
     use protobuf::RepeatedField;
