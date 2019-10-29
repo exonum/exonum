@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_build::ProtobufGenerator;
-use std::env;
-
 fn main() {
     #[cfg(feature = "with-protobuf")]
     gen_proto_files();
@@ -22,6 +19,9 @@ fn main() {
 
 #[cfg(feature = "with-protobuf")]
 fn gen_proto_files() {
+    use exonum_build::ProtobufGenerator;
+    use std::env;
+
     let current_dir = env::current_dir().expect("Failed to get current dir.");
     let protos = current_dir.join("src/proto");
     println!("cargo:protos={}", protos.to_str().unwrap());

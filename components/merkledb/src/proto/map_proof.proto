@@ -29,6 +29,7 @@ message MapProof {
     repeated OptionalEntry entries = 1;
 }
 
+// Key with corresponding value and empty value if key is missing.
 message OptionalEntry {
     bytes key = 1;
     oneof maybe_value {
@@ -37,6 +38,7 @@ message OptionalEntry {
     }
 }
 
+// Proof path and corresponding hash value.
 message MapProofEntry {
     bytes proof_path = 1;
     exonum.crypto.Hash hash = 2;
