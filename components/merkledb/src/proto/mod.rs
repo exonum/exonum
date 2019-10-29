@@ -25,7 +25,7 @@ use crate::{proof_map_index::ProofPath, BinaryKey, BinaryValue};
 use exonum_crypto::proto::*;
 use exonum_proto::ProtobufConvert;
 
-pub use self::map_proof::*;
+pub use self::{list_proof::*, map_proof::*};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
