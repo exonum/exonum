@@ -19,7 +19,7 @@
 
 use failure::Error;
 use protobuf::{well_known_types::Empty, RepeatedField};
-use std::{borrow::Cow, iter::FromIterator};
+use std::borrow::Cow;
 
 use crate::{proof_map_index::ProofPath, BinaryKey, BinaryValue};
 use exonum_crypto::proto::*;
@@ -31,9 +31,8 @@ include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
 impl<K, V> ProtobufConvert for crate::MapProof<K, V>
 where
-    K: BinaryKey,
+    K: BinaryKey + ToOwned<Owned = K>,
     V: BinaryValue,
-    Vec<(K, Option<V>)>: FromIterator<(<K as ToOwned>::Owned, Option<V>)>,
 {
     type ProtoStruct = MapProof;
 
