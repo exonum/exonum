@@ -12,7 +12,7 @@ class ApiTest(unittest.TestCase):
     """Tests for Exonum API."""
 
     def test_health_info(self):
-        """Tests the `health_info` endpoint."""
+        """Tests the `healthcheck` endpoint."""
         with run_4_nodes("exonum-cryptocurrency-advanced") as network:
             # Wait some time for nodes to start
             time.sleep(5)
