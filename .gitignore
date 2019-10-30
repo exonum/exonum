@@ -4,6 +4,11 @@
 # Python packages
 *.egg-info
 
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
 # vim files
 *.swp
 # macos files
