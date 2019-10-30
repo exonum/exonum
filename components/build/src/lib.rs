@@ -114,6 +114,7 @@ fn include_proto_files(proto_files: HashSet<&PathBuf>, name: &str) -> impl ToTok
         /// Original proto files which were be used to generate this module.
         /// First element in tuple is file name, second is proto file content.
         #[allow(dead_code)]
+        #[allow(clippy::unseparated_literal_suffix)]
         pub const #name: [(&str, &str); #proto_files_len] = [
             #( #proto_files )*
         ];

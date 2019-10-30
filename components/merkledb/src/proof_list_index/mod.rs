@@ -21,7 +21,8 @@ use std::{cmp, iter, marker::PhantomData, ops::RangeBounds};
 use exonum_crypto::Hash;
 
 use self::{
-    key::ProofListKey,
+    key::{ProofListKey, MAX_INDEX},
+    proof::HashedEntry,
     proof_builder::{BuildProof, MerkleTree},
 };
 use crate::views::IndexAddress;
@@ -821,5 +822,94 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
+    }
+}
+
+#[cfg(feature = "with-protobuf")]
+mod proto {
+    pub use crate::proto::{self, *};
+    use failure::Error;
+    use protobuf::RepeatedField;
+    use std::borrow::Cow;
+
+    use super::{HashedEntry, ListProof, ProofListKey};
+    use crate::{proof_list_index::MAX_INDEX, BinaryValue};
+    use exonum_proto::ProtobufConvert;
+
+    impl ProtobufConvert for ProofListKey {
+        type ProtoStruct = proto::ProofListKey;
+
+        fn to_pb(&self) -> Self::ProtoStruct {
+            let mut key = proto::ProofListKey::new();
+            key.set_index(self.index());
+            key.set_height(self.height().into());
+            key
+        }
+
+        fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+            let index = pb.get_index();
+            let height = pb.get_height();
+
+            // ProtobufConvert is implemented manually to add these checks.
+            ensure!(index <= MAX_INDEX, "index is out of range");
+            ensure!(height <= 58, "height is out of range");
+
+            Ok(ProofListKey::new(height as u8, index))
+        }
+    }
+
+    impl<V> ProtobufConvert for ListProof<V>
+    where
+        V: BinaryValue,
+    {
+        type ProtoStruct = proto::ListProof;
+
+        fn to_pb(&self) -> Self::ProtoStruct {
+            let mut list_proof = proto::ListProof::new();
+            list_proof.set_length(self.list_len());
+
+            let entries = self
+                .entries_unchecked()
+                .iter()
+                .map(|(index, value)| {
+                    let mut entry = ListProofEntry::new();
+                    entry.set_index(*index);
+                    entry.set_value(value.to_bytes());
+                    entry
+                })
+                .collect();
+
+            let proof = self
+                .proof_unchecked()
+                .iter()
+                .map(HashedEntry::to_pb)
+                .collect();
+
+            list_proof.set_proof(RepeatedField::from_vec(proof));
+            list_proof.set_entries(RepeatedField::from_vec(entries));
+
+            list_proof
+        }
+
+        fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
+            let proof = pb
+                .take_proof()
+                .into_iter()
+                .map(HashedEntry::from_pb)
+                .collect::<Result<_, Error>>()?;
+
+            let entries = pb
+                .get_entries()
+                .iter()
+                .map(|entry| {
+                    Ok((
+                        entry.get_index(),
+                        V::from_bytes(Cow::Borrowed(entry.get_value()))?,
+                    ))
+                })
+                .collect::<Result<Vec<(u64, V)>, Error>>()?;
+
+            Ok(ListProof::from_raw_parts(proof, entries, pb.get_length()))
+        }
     }
 }
