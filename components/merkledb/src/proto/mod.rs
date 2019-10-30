@@ -94,6 +94,10 @@ where
                 let value = if entry.has_value() {
                     Some(V::from_bytes(Cow::Borrowed(entry.get_value()))?)
                 } else {
+                    ensure!(
+                        entry.has_no_value(),
+                        "malformed message, no_value is absent"
+                    );
                     None
                 };
 
@@ -121,7 +125,8 @@ mod tests {
     use std::fmt;
 
     use crate::{
-        proto, BinaryKey, BinaryValue, Database, MapProof, ObjectHash, ProofMapIndex, TemporaryDB,
+        proto, BinaryKey, BinaryValue, Database, ListProof, MapProof, ObjectHash, ProofListIndex,
+        ProofMapIndex, TemporaryDB,
     };
     use protobuf::RepeatedField;
 
@@ -166,21 +171,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn map_proof_malformed_serialize() {
         let mut proof = proto::MapProof::new();
         let mut proof_entry = proto::MapProofEntry::new();
-        proof_entry.set_proof_path(vec![0_u8; 33]);
-        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
-
-        let res = MapProof::<u8, u8>::from_pb(proof.clone());
-        assert!(res
-            .unwrap_err()
-            .to_string()
-            .contains("Not valid proof path"));
-
-        let mut proof_entry = proto::MapProofEntry::new();
         let mut hash = types::Hash::new();
+
         hash.set_data(vec![0_u8; 31]);
         proof_entry.set_hash(hash);
         proof_entry.set_proof_path(vec![0_u8; 34]);
@@ -190,11 +185,62 @@ mod tests {
         assert!(res.unwrap_err().to_string().contains("Wrong Hash size"));
 
         let mut entry = proto::OptionalEntry::new();
-        entry.set_key(vec![0_u8; 31]);
+        entry.set_key(vec![0_u8; 32]);
         proof.clear_proof();
         proof.set_entries(RepeatedField::from_vec(vec![entry]));
 
+        let res = MapProof::<PublicKey, u8>::from_pb(proof.clone());
+        assert!(res.unwrap_err().to_string().contains("malformed message"));
+    }
+
+    #[test]
+    #[should_panic]
+    fn map_proof_malformed_key_serialize() {
+        let mut proof = proto::MapProof::new();
+        let mut proof_entry = proto::MapProofEntry::new();
+        proof_entry.set_proof_path(vec![0_u8; 33]);
+        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+
         // TODO: will panic at runtime, should change BinaryKey::read signature (ECR-174)
-        let _res = MapProof::<PublicKey, u8>::from_pb(proof.clone());
+        let _res = MapProof::<u8, u8>::from_pb(proof.clone());
+    }
+
+    #[test]
+    fn serialize_list_proof() {
+        let db = TemporaryDB::default();
+        let storage = db.fork();
+
+        let mut table = ProofListIndex::new("index", &storage);
+
+        let proof = table.get_proof(0);
+        assert_list_proof_roundtrip(&proof);
+
+        for i in 0..256 {
+            table.push(i);
+        }
+
+        let proof = table.get_proof(5);
+        assert_list_proof_roundtrip(&proof);
+
+        let proof = table.get_range_proof(250..260);
+        assert_list_proof_roundtrip(&proof);
+    }
+
+    fn assert_list_proof_roundtrip<V>(proof: &ListProof<V>)
+    where
+        V: BinaryValue + ObjectHash + std::fmt::Debug,
+        ListProof<V>: ProtobufConvert + PartialEq,
+    {
+        let pb = proof.to_pb();
+        let deserialized: ListProof<V> = ListProof::from_pb(pb).unwrap();
+        let checked_proof = deserialized
+            .check()
+            .expect("deserialized proof is not valid");
+
+        assert_eq!(proof, &deserialized);
+        assert_eq!(
+            checked_proof.index_hash(),
+            proof.check().unwrap().index_hash()
+        );
     }
 }
