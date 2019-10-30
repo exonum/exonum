@@ -74,6 +74,7 @@ librocksdb
 libsnappy
 libsodium
 libssl
+lifecycle
 maintainer's
 markdownlint
 memlimit
