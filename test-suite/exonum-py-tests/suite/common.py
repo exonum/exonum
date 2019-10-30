@@ -60,7 +60,7 @@ def run_4_nodes(application: str) -> ExonumNetwork:
 
     >>> network = run_4_nodes("exonum-cryptocurrency-advanced")
     >>> for i in range(1, network.validators_count()):
-    ...     print(network.api_address(i)
+    ...     print(network.api_address(i))
     ...
     '127.0.0.1', 8080, 8081
     '127.0.0.1', 8082, 8083
