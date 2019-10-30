@@ -9,7 +9,7 @@ from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
 
 def run_dev_node(application: str) -> ExonumNetwork:
     """Starts a single node in the run-dev mode and returns
-    `ExonumNetwork object with the running node.
+    `ExonumNetwork` object with the running node.
 
     Example:
 
