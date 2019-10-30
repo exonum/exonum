@@ -8,7 +8,8 @@ from suite.temp_dir import TempDir
 from suite.process_manager import ProcessManager, ProcessOutput
 
 # Time to wait for node to shutdown in seconds.
-NODE_SHUTDOWN_TIMEOUT = 5.0
+# Actix can be really slow while joining its threads.
+NODE_SHUTDOWN_TIMEOUT = 100.0
 
 
 class ExonumNetwork:
