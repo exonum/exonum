@@ -22,7 +22,7 @@ def run_dev_node(application: str) -> ExonumNetwork:
 
 
 def run_n_nodes(application: str, nodes_amount: int) -> ExonumNetwork:
-    """Creates and runs a network with 4 validators and return an
+    """Creates and runs a network with N validators and return an
     `ExonumNetwork` object with it."""
 
     address = "127.0.0.1:{}"
