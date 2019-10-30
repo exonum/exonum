@@ -202,7 +202,7 @@ mod tests {
         proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
 
         // TODO: will panic at runtime, should change BinaryKey::read signature (ECR-174)
-        let _res = MapProof::<u8, u8>::from_pb(proof.clone());
+        let _res = MapProof::<u8, u8>::from_pb(proof);
     }
 
     #[test]
