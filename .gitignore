@@ -1,3 +1,9 @@
+# Python virtual environment
+.venv
+
+# Python packages
+*.egg-info
+
 # vim files
 *.swp
 # macos files
