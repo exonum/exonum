@@ -55,7 +55,7 @@ class ProcessManager:
         assert self._process is not None
 
         self._killed = True
-        os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
+        os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
 
     def run_sync(self) -> ProcessOutput:
         """Runs the process in the current thread, blocking until it exits."""
