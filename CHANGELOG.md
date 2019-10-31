@@ -75,7 +75,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `HashTag::hash_list()` was extended to support values of any appropriate type,
   not only `Hash`. (#1455)
-  
+
+- `ProtobufConvert` has been implemented for `MapProof`. (#1512)
+
 ### Internal improvements
 
 #### exonum-merkledb

@@ -264,7 +264,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
@@ -398,7 +398,7 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Creates a new builder.
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             entries: vec![],
             proof: vec![],
@@ -406,20 +406,20 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Adds an existing entry into the builder.
-    pub(super) fn add_entry(mut self, key: K, value: V) -> Self {
+    pub(crate) fn add_entry(mut self, key: K, value: V) -> Self {
         self.entries.push(OptionalEntry::value(key, value));
         self
     }
 
     /// Adds a missing key into the builder.
-    pub(super) fn add_missing(mut self, key: K) -> Self {
+    pub(crate) fn add_missing(mut self, key: K) -> Self {
         self.entries.push(OptionalEntry::missing(key));
         self
     }
 
     /// Adds a proof entry into the builder. The `path` must be greater than keys of
     /// all proof entries previously added to the proof.
-    pub(super) fn add_proof_entry(mut self, path: ProofPath, hash: Hash) -> Self {
+    pub(crate) fn add_proof_entry(mut self, path: ProofPath, hash: Hash) -> Self {
         debug_assert!(self.proof.last().map_or(true, |last| last.path < path));
         self.proof.push(MapProofEntry { path, hash });
         self
@@ -427,7 +427,7 @@ impl<K, V> MapProof<K, V> {
 
     /// Adds several proof entries into the builder. The `paths` must be greater than keys of
     /// all proof entries previously added to the proof and sorted in increasing order.
-    pub(super) fn add_proof_entries<I>(mut self, paths: I) -> Self
+    pub(crate) fn add_proof_entries<I>(mut self, paths: I) -> Self
     where
         I: IntoIterator<Item = (ProofPath, Hash)>,
     {

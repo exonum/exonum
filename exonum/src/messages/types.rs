@@ -165,8 +165,8 @@ impl Status {
 /// A node broadcasts `Propose` if it is a leader and is not locked for a
 /// different proposal. Also `Propose` can be sent as response to
 /// `ProposeRequest`.
-#[protobuf_convert(source = "consensus::Propose")]
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "consensus::Propose")]
 pub struct Propose {
     /// The validator id.
     pub validator: ValidatorId,
