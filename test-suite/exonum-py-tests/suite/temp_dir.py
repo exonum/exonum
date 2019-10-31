@@ -4,7 +4,7 @@ import shutil
 
 
 class TempDir:
-    """Class creating and managing the temporary directorions."""
+    """Class creating and managing the temporary directories."""
 
     def __init__(self, directory: str):
         self.temp_dir = directory

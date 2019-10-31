@@ -26,8 +26,8 @@ class ProcessOutput(NamedTuple):
 
 
 class ProcessManager:
-    """ProcessManager is the entity capable of the running the process
-    in the separate thread, joining it and collectiong outputs."""
+    """ProcessManager is an entity capable of running a process
+    in a separate thread, joining it and collecting outputs."""
 
     def __init__(self, command: str):
         self._thread_handle = Thread(target=self._start_process)
