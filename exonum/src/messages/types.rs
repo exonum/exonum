@@ -37,9 +37,9 @@ use exonum_proto::ProtobufConvert;
 pub struct SignedMessage {
     /// Payload of the message.
     pub payload: Vec<u8>,
-    /// `PublicKey` of the author of this message.
+    /// `PublicKey` of the author of the message.
     pub author: PublicKey,
-    /// Digital signature of the `payload` which creates with a `SecretKey` of the author of this message.
+    /// Digital signature over `payload` created with `SecretKey` of the author of the message.
     pub signature: Signature,
 }
 

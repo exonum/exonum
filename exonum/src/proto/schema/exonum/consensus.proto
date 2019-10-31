@@ -31,7 +31,7 @@ import "google/protobuf/timestamp.proto";
 message SignedMessage {
   // Payload of the message.
   bytes payload = 1;
-  // Public key of the author of this message.
+  // Public key of the author of the message.
   exonum.crypto.PublicKey author = 2;
   // Digital signature of the payload which creates with a secret key of the author of this message.
   exonum.crypto.Signature signature = 3;
