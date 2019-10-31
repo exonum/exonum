@@ -30,13 +30,13 @@ class ProcessManager:
     in a separate thread, joining it and collecting outputs."""
 
     def __init__(self, command: str):
-        self._thread_handle = Thread(target=self._start_process)
+        self._thread_handle = Thread(target=self._start_subprocess)
         self._command = command
         self._process: Optional[subprocess.Popen] = None
         self._killed = False
         self._output: Optional[ProcessOutput] = None
 
-    def _start_process(self) -> None:
+    def _start_subprocess(self) -> None:
         # We specify "shell=True" to be able to safely kill the process if we'll have to.
         # With this argument process will start in separate shell, not related to the shell
         # in which script is executed.
@@ -59,7 +59,7 @@ class ProcessManager:
 
     def run_sync(self) -> ProcessOutput:
         """Runs the process in the current thread, blocking until it exits."""
-        self._start_process()
+        self._start_subprocess()
         assert self._output is not None
 
         return self._output
