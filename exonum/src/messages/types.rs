@@ -35,11 +35,11 @@ use exonum_proto::ProtobufConvert;
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "consensus::SignedMessage")]
 pub struct SignedMessage {
-    /// Message payload.
+    /// Payload of the message.
     pub payload: Vec<u8>,
-    /// Message author.
+    /// `PublicKey` of the author of this message.
     pub author: PublicKey,
-    /// Digital signature.
+    /// Digital signature of the `payload` which creates with a `SecretKey` of the author of this message.
     pub signature: Signature,
 }
 
