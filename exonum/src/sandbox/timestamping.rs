@@ -46,7 +46,11 @@ pub trait TimestampingInterface {
 pub struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, _context: CallContext<'_>, _arg: TimestampTx) -> Result<(), ExecutionError> {
+    fn timestamp(
+        &self,
+        _context: CallContext<'_>,
+        _arg: TimestampTx,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

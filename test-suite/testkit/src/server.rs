@@ -221,7 +221,11 @@ mod tests {
 
     #[exonum_service]
     trait SampleServiceInterface {
-        fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
+        fn timestamp(
+            &self,
+            context: CallContext<'_>,
+            arg: TxTimestamp,
+        ) -> Result<(), ExecutionError>;
     }
 
     impl SampleServiceInterface for SampleService {
@@ -235,7 +239,11 @@ mod tests {
     }
 
     impl Service for SampleService {
-        fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(
+            &self,
+            _instance: InstanceDescriptor<'_>,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
             vec![]
         }
     }

@@ -68,7 +68,11 @@ struct TestCallInitialize {
 
 #[exonum_service(crate = "crate")]
 trait TestDispatcherInterface {
-    fn test_execute(&self, context: CallContext<'_>, arg: TestExecute) -> Result<(), ExecutionError>;
+    fn test_execute(
+        &self,
+        context: CallContext<'_>,
+        arg: TestExecute,
+    ) -> Result<(), ExecutionError>;
 
     fn test_deploy(&self, context: CallContext<'_>, arg: TestDeploy) -> Result<(), ExecutionError>;
 
@@ -145,7 +149,11 @@ impl TestDispatcherInterface for TestDispatcherService {
         context.start_adding_service(artifact, format!("good-service-{}", arg.value), config)
     }
 
-    fn test_execute(&self, context: CallContext<'_>, arg: TestExecute) -> Result<(), ExecutionError> {
+    fn test_execute(
+        &self,
+        context: CallContext<'_>,
+        arg: TestExecute,
+    ) -> Result<(), ExecutionError> {
         if arg.value == 42 {
             panic!(StorageError::new("42"))
         }

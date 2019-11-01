@@ -54,8 +54,11 @@ pub enum Error {
 
 #[exonum_service]
 pub trait SimpleSupervisorInterface {
-    fn change_config(&self, context: CallContext<'_>, arg: ConfigPropose)
-        -> Result<(), ExecutionError>;
+    fn change_config(
+        &self,
+        context: CallContext<'_>,
+        arg: ConfigPropose,
+    ) -> Result<(), ExecutionError>;
 }
 
 impl SimpleSupervisorInterface for SimpleSupervisor {

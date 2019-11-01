@@ -58,7 +58,9 @@ pub struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
-    pub fn all_validators_times(state: &api::ServiceApiState<'_>) -> api::Result<Vec<ValidatorTime>> {
+    pub fn all_validators_times(
+        state: &api::ServiceApiState<'_>,
+    ) -> api::Result<Vec<ValidatorTime>> {
         let view = state.snapshot();
         let schema = TimeSchema::new(state.instance.name, view);
         let idx = schema.validators_times();
@@ -100,10 +102,14 @@ impl PrivateApi {
         builder
             .private_scope()
             .endpoint("v1/validators_times", {
-                move |state: &api::ServiceApiState<'_>, _query: ()| Self::current_validators_time(state)
+                move |state: &api::ServiceApiState<'_>, _query: ()| {
+                    Self::current_validators_time(state)
+                }
             })
             .endpoint("v1/validators_times/all", {
-                move |state: &api::ServiceApiState<'_>, _query: ()| Self::all_validators_times(state)
+                move |state: &api::ServiceApiState<'_>, _query: ()| {
+                    Self::all_validators_times(state)
+                }
             });
     }
 }

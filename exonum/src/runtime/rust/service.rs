@@ -59,7 +59,11 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// The parameters passed to the method are not saved by the framework
     /// automatically, hence the user must do it manually, if needed.
-    fn initialize(&self, _context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 

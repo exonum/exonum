@@ -229,7 +229,11 @@ pub mod contracts {
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {
-        fn create_wallet(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), Error> {
+        fn create_wallet(
+            &self,
+            context: CallContext<'_>,
+            arg: TxCreateWallet,
+        ) -> Result<(), Error> {
             let author = context
                 .caller()
                 .author()
@@ -291,7 +295,11 @@ pub mod contracts {
             CryptocurrencyApi.wire(builder);
         }
 
-        fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(
+            &self,
+            descriptor: InstanceDescriptor<'_>,
+            snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
             CurrencySchema::new(descriptor.name, snapshot).state_hash()
         }
     }

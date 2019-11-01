@@ -128,8 +128,7 @@ type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + 'b
 
 /// An HTTP requests builder. This type can be used to send requests to
 /// the appropriate `TestKitApi` handlers.
-pub struct RequestBuilder<'a, 'b, Q = ()>
-{
+pub struct RequestBuilder<'a, 'b, Q = ()> {
     test_server_url: String,
     test_client: &'a Client,
     access: ApiAccess,
