@@ -132,7 +132,7 @@ pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
         Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
-        Snapshot,
+        Readonly, Snapshot,
     },
     entry::Entry,
     error::Error,

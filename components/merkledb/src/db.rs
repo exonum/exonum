@@ -664,6 +664,13 @@ impl Fork {
     pub fn working_patch(&self) -> &WorkingPatch {
         &self.working_patch
     }
+
+    /// Returns a readonly wrapper around the fork. Indices created based on the readonly
+    /// version cannot be modified; on the other hand, it is possible to have multiple
+    /// copies of an index at the same time.
+    pub fn readonly(&self) -> Readonly<&'_ Self> {
+        Readonly(self)
+    }
 }
 
 impl From<Patch> for Fork {
@@ -709,7 +716,37 @@ impl IndexAccess for Rc<Fork> {
     }
 }
 
-// FIXME: add readonly versions of `Fork`
+/// Readonly wrapper for a `Fork`.
+#[derive(Debug, Clone, Copy)]
+pub struct Readonly<T>(pub T);
+
+impl IndexAccess for Readonly<&Fork> {
+    type Changes = ChangesRef;
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        &self.0.patch
+    }
+
+    fn changes(&self, address: &IndexAddress) -> Self::Changes {
+        ChangesRef {
+            inner: self.0.working_patch.clone_view_changes(address),
+        }
+    }
+}
+
+impl IndexAccess for Readonly<Rc<Fork>> {
+    type Changes = ChangesRef;
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        &self.0.patch
+    }
+
+    fn changes(&self, address: &IndexAddress) -> Self::Changes {
+        ChangesRef {
+            inner: self.0.working_patch.clone_view_changes(address),
+        }
+    }
+}
 
 impl AsRef<Fork> for Fork {
     fn as_ref(&self) -> &Fork {

@@ -20,7 +20,7 @@ use crate::{
     extensions::*,
     validation::is_valid_index_name,
     views::{IndexAccess, IndexAddress, IndexType, View, ViewWithMetadata},
-    Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
+    Database, DbOptions, Fork, ListIndex, MapIndex, Readonly, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -43,7 +43,11 @@ fn assert_initial_state<T: IndexAccess>(view: &View<T>) {
     assert_eq!(view.get_bytes(&[4]), None);
 }
 
-fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: &T, address: I) {
+fn test_changelog<T, I>(db: &T, address: I)
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
+{
     let mut fork = db.fork();
     {
         let mut view = View::new(&fork, address);
@@ -163,7 +167,7 @@ fn _views_in_same_family<T: Database>(db: &T) {
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
 }
 
-fn _two_mutable_borrows<T, I>(db: &T, address: I)
+fn test_two_mutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -176,7 +180,7 @@ where
     assert_eq!(view2.get_bytes(&[0]), None);
 }
 
-fn _mutable_and_immutable_borrows<T, I>(db: &T, address: I)
+fn test_mutable_and_immutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -184,12 +188,12 @@ where
     let fork = db.fork();
 
     let view1 = View::new(&fork, address);
-    let view2 = View::new(&fork, address);
+    let view2 = View::new(fork.readonly(), address);
     assert_eq!(view1.get_bytes(&[0]), None);
     assert_eq!(view2.get_bytes(&[0]), None);
 }
 
-fn _clear_view<T, I>(db: &T, address: I)
+fn test_clear_view<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -252,7 +256,7 @@ where
     assert_iter(&view, 4, &[(4, 0)]);
 }
 
-fn _fork_iter<T, I>(db: &T, address: I)
+fn test_fork_iter<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -378,22 +382,22 @@ fn test_database_check_incorrect_version() {
 
 #[test]
 fn fork_iter() {
-    _fork_iter(&TemporaryDB::new(), IDX_NAME);
+    test_fork_iter(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn fork_iter_prefixed() {
-    _fork_iter(&TemporaryDB::new(), PREFIXED_IDX);
+    test_fork_iter(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 fn changelog() {
-    _changelog(&TemporaryDB::new(), IDX_NAME);
+    test_changelog(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn changelog_prefixed() {
-    _changelog(&TemporaryDB::new(), PREFIXED_IDX);
+    test_changelog(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
@@ -588,12 +592,12 @@ fn rollbacks_for_indexes_in_same_family() {
 
 #[test]
 fn clear_view() {
-    _clear_view(&TemporaryDB::new(), IDX_NAME);
+    test_clear_view(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn clear_prefixed_view() {
-    _clear_view(&TemporaryDB::new(), PREFIXED_IDX);
+    test_clear_view(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
@@ -653,25 +657,124 @@ fn clear_sibling_views() {
 #[test]
 #[should_panic]
 fn two_mutable_borrows() {
-    _two_mutable_borrows(&TemporaryDB::new(), IDX_NAME);
+    test_two_mutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn two_mutable_prefixed_borrows() {
-    _two_mutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
+    test_two_mutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_borrows() {
-    _mutable_and_immutable_borrows(&TemporaryDB::new(), IDX_NAME);
+    test_mutable_and_immutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_prefixed_borrows() {
-    _mutable_and_immutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
+    test_mutable_and_immutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
+}
+
+#[test]
+fn multiple_immutable_borrows_from_fork() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let view1 = View::new(fork.readonly(), IDX_NAME);
+    let view2 = View::new(fork.readonly(), IDX_NAME);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+
+    let view1 = View::new(fork.readonly(), PREFIXED_IDX);
+    let view2 = View::new(fork.readonly(), PREFIXED_IDX);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+}
+
+#[test]
+fn multiple_immutable_borrows_from_rc_fork() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let fork = Readonly(Rc::new(fork));
+    let view1 = View::new(fork.clone(), IDX_NAME);
+    let view2 = View::new(fork.clone(), IDX_NAME);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+
+    let view1 = View::new(fork.clone(), PREFIXED_IDX);
+    let view2 = View::new(fork, PREFIXED_IDX);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+}
+
+#[test]
+fn immutable_view_from_fork_reflects_changes_in_fork() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut view = View::new(&fork, IDX_NAME);
+        view.put(&vec![1], vec![1, 2, 3, 4]);
+        view.put(&vec![2], vec![5, 6, 7]);
+    }
+    {
+        let view = View::new(fork.readonly(), IDX_NAME);
+        assert_eq!(view.get_bytes(&[1]), Some(vec![1, 2, 3, 4]));
+        let other_view = View::new(fork.readonly(), IDX_NAME);
+        assert_eq!(other_view.get_bytes(&[2]), Some(vec![5, 6, 7]));
+    }
+    View::new(&fork, IDX_NAME).clear();
+    let view = View::new(fork.readonly(), IDX_NAME);
+    assert_eq!(view.get_bytes(&[1]), None);
+}
+
+#[test]
+fn immutable_view_from_fork_reads_from_snapshot() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut view = View::new(&fork, IDX_NAME);
+        view.put(&vec![1], vec![1, 2, 3, 4]);
+        view.put(&vec![2], vec![5, 6, 7]);
+    }
+    db.merge_sync(fork.into_patch()).unwrap();
+
+    let mut fork = db.fork();
+    View::new(&fork, IDX_NAME).put(&vec![1], vec![100]);
+    fork.flush();
+    View::new(&fork, IDX_NAME).put(&vec![3], vec![200]);
+
+    let fork = fork.readonly();
+    // Read from unflushed fork.
+    let view = View::new(fork, IDX_NAME);
+    assert_eq!(view.get_bytes(&[3]), Some(vec![200]));
+    // Read from flushed fork.
+    let view = View::new(fork, IDX_NAME);
+    assert_eq!(view.get_bytes(&[1]), Some(vec![100]));
+    // Read from snapshot.
+    let other_view = View::new(fork, IDX_NAME);
+    assert_eq!(other_view.get_bytes(&[2]), Some(vec![5, 6, 7]));
+}
+
+#[test]
+fn mutable_and_immutable_borrows_for_different_views() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let readonly = fork.readonly();
+
+    let immutable_view1 = View::new(readonly, "first");
+    let immutable_view2 = View::new(readonly, "second");
+    View::new(&fork, "third").put(&vec![1], vec![1, 2, 3]);
+    assert_eq!(immutable_view1.get_bytes(&[1]), None);
+    let immutable_view3 = View::new(readonly, "third");
+    assert_eq!(immutable_view3.get_bytes(&[1]), Some(vec![1, 2, 3]));
+
+    drop(immutable_view1);
+    View::new(&fork, "first").put(&vec![1], vec![4, 5, 6]);
+    let immutable_view1 = View::new(readonly, "first");
+    assert_eq!(immutable_view1.get_bytes(&[1]), Some(vec![4, 5, 6]));
+    assert_eq!(immutable_view2.get_bytes(&[1]), None);
 }
 
 #[test]
