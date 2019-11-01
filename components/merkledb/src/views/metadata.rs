@@ -84,20 +84,18 @@ impl BinaryAttribute for u64 {
     }
 }
 
-// Used internally to deserialize generic attribute. `None` represents newly created indexes.
-impl BinaryAttribute for Option<Vec<u8>> {
+/// Used internally to deserialize generic attribute.
+impl BinaryAttribute for Vec<u8> {
     fn size(&self) -> usize {
-        self.as_ref().map_or(0, Vec::len)
+        self.len()
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        if let Some(bytes) = self {
-            buffer.extend_from_slice(bytes)
-        }
+        buffer.extend_from_slice(self)
     }
 
     fn read(buffer: &[u8]) -> Result<Self, Error> {
-        Ok(Some(buffer.to_vec()))
+        Ok(buffer.to_vec())
     }
 }
 
@@ -112,10 +110,14 @@ impl Default for IndexType {
 ///
 /// See also `BinaryAttribute`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct IndexMetadata<V = Option<Vec<u8>>> {
+pub struct IndexMetadata<V = Vec<u8>> {
     identifier: u64,
     index_type: IndexType,
-    state: V,
+    // `state` may be empty for any possible type. `None` option usually represents
+    // a "default" value; it is used on index initialization, or after the index
+    // calls `IndexState::unset()`. `None` option does not occupy space in the metadata
+    // and can therefore be preferable to explicit "default" option.
+    state: Option<V>,
 }
 
 impl<V> BinaryValue for IndexMetadata<V>
@@ -123,22 +125,21 @@ where
     V: BinaryAttribute,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        let state_len = self.state.size();
-        let mut buf = Vec::with_capacity(
-            mem::size_of_val(&self.identifier)
-                + mem::size_of_val(&self.index_type)
-                + mem::size_of_val(&INDEX_STATE_TAG)
-                + mem::size_of::<u32>()
-                + state_len,
-        );
+        let mut capacity = mem::size_of_val(&self.identifier) + mem::size_of_val(&self.index_type);
+        if let Some(ref state) = self.state {
+            capacity += mem::size_of_val(&INDEX_STATE_TAG) + mem::size_of::<u32>() + state.size();
+        }
+        let mut buf = Vec::with_capacity(capacity);
 
         buf.write_u64::<LittleEndian>(self.identifier).unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
-        // Writes index state in TLV (tag, length, value) form.
-        buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
-        buf.write_u32::<LittleEndian>(state_len as u32).unwrap();
-        self.state.write(&mut buf);
+        if let Some(ref state) = self.state {
+            // Writes index state in TLV (tag, length, value) form.
+            buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
+            buf.write_u32::<LittleEndian>(state.size() as u32).unwrap();
+            state.write(&mut buf);
+        }
         buf
     }
 
@@ -147,6 +148,18 @@ where
 
         let identifier = bytes.read_u64::<LittleEndian>()?;
         let index_type = bytes.read_u32::<LittleEndian>()?;
+        let index_type = IndexType::from_u32(index_type)
+            .ok_or_else(|| format_err!("Unknown index type: {}", index_type))?;
+
+        if bytes.is_empty() {
+            // There are no tags in the metadata, correspondingly, no index state.
+            return Ok(Self {
+                identifier,
+                index_type,
+                state: None,
+            });
+        }
+
         // Reads index state in TLV (tag, length, value) form.
         let state_tag = bytes.read_u32::<LittleEndian>()?;
         let state_len = bytes.read_u32::<LittleEndian>()? as usize;
@@ -161,9 +174,8 @@ where
         let state_bytes = &bytes[0..state_len];
         Ok(Self {
             identifier,
-            index_type: IndexType::from_u32(index_type)
-                .ok_or_else(|| format_err!("Unknown index type: {}", index_type))?,
-            state: V::read(state_bytes)?,
+            index_type,
+            state: Some(V::read(state_bytes)?),
         })
     }
 }
@@ -173,20 +185,20 @@ impl IndexMetadata {
         IndexAddress::new().append_bytes(&self.identifier)
     }
 
-    fn convert<V: BinaryAttribute + Default>(self) -> IndexMetadata<V> {
+    fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
+        let index_type = self.index_type;
         IndexMetadata {
             identifier: self.identifier,
-            index_type: self.index_type,
-            state: match self.state {
-                Some(ref state) => V::read(state).unwrap_or_else(|e| {
+            index_type,
+            state: self.state.map(|state| {
+                V::read(&state).unwrap_or_else(|e| {
                     panic!(
                         "Error while reading state for index with type {:?}: {}. \
                          This can be caused by database corruption",
-                        self.index_type, e
+                        index_type, e
                     );
-                }),
-                None => V::default(),
-            },
+                })
+            }),
         }
     }
 }
@@ -203,7 +215,7 @@ where
     T: IndexAccess,
     V: BinaryAttribute + Copy,
 {
-    pub fn get(&self) -> V {
+    pub fn get(&self) -> Option<V> {
         self.metadata.state
     }
 }
@@ -214,7 +226,13 @@ where
     V: BinaryAttribute,
 {
     pub fn set(&mut self, state: V) {
-        self.metadata.state = state;
+        self.metadata.state = Some(state);
+        View::new(self.index_access.clone(), INDEXES_POOL_NAME)
+            .put(&self.index_full_name, self.metadata.to_bytes());
+    }
+
+    pub fn unset(&mut self) {
+        self.metadata.state = None;
         View::new(self.index_access.clone(), INDEXES_POOL_NAME)
             .put(&self.index_full_name, self.metadata.to_bytes());
     }
@@ -249,13 +267,13 @@ impl<T: IndexAccessMut> IndexesPool<T> {
         index_type: IndexType,
     ) -> IndexMetadata<V>
     where
-        V: BinaryAttribute + Default,
+        V: BinaryAttribute,
     {
         let len = self.len();
         let metadata = IndexMetadata {
             identifier: len,
             index_type,
-            state: V::default(),
+            state: None,
         };
         self.0.put(index_name, metadata.to_bytes());
         self.set_len(len + 1);
@@ -307,7 +325,7 @@ where
 
     pub fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
     where
-        V: BinaryAttribute + Default,
+        V: BinaryAttribute,
     {
         let state = IndexState {
             metadata: self.metadata.convert(),
@@ -369,7 +387,16 @@ mod tests {
         let metadata = IndexMetadata {
             identifier: 12,
             index_type: IndexType::ProofList,
-            state: 16_u64,
+            state: Some(16_u64),
+        };
+
+        let bytes = metadata.to_bytes();
+        assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
+
+        let metadata = IndexMetadata {
+            identifier: 12,
+            index_type: IndexType::ProofList,
+            state: None::<u64>,
         };
 
         let bytes = metadata.to_bytes();
@@ -382,7 +409,7 @@ mod tests {
         let metadata = IndexMetadata {
             identifier: 12,
             index_type: IndexType::ProofList,
-            state: 16_u64,
+            state: Some(16_u64),
         };
 
         let mut bytes = metadata.to_bytes();

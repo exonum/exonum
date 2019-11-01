@@ -96,10 +96,6 @@ impl<T: AccessExt> Schema<T> {
             access,
         })
     }
-
-    fn wallets_history(&self, owner: &PublicKey) -> Option<ProofListIndex<T::Base, Hash>> {
-        self.access.proof_list(("wallets.history", owner))
-    }
 }
 
 impl<T> Schema<T>

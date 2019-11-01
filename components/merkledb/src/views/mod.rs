@@ -85,6 +85,7 @@ pub trait IndexAccess: Clone {
 
 /// Allows to mutate data in indexes.
 pub trait IndexAccessMut: IndexAccess {
+    /// Dereferences the changes into a mutable form.
     fn deref_mut(changes: &mut Self::Changes) -> &mut ViewChanges;
 }
 
@@ -172,7 +173,7 @@ impl IndexAddress {
     /// Appends a bytes part to `IndexAddress`.
     pub fn append_bytes<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
         let name = self.name;
-        let bytes = if let Some(bytes) = self.bytes {
+        let bytes = if let Some(ref bytes) = self.bytes {
             concat_keys!(bytes, suffix)
         } else {
             concat_keys!(suffix)

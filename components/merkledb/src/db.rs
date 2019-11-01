@@ -665,6 +665,11 @@ impl Fork {
         &self.working_patch
     }
 
+    /// Returns snapsot that also captures flushed changes in the fork.
+    pub fn snapshot_with_flushed_changes(&self) -> &dyn Snapshot {
+        &self.patch
+    }
+
     /// Returns a readonly wrapper around the fork. Indices created based on the readonly
     /// version cannot be modified; on the other hand, it is possible to have multiple
     /// copies of an index at the same time.

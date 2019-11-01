@@ -132,7 +132,7 @@ where
     }
 
     fn size(&self) -> SparseListSize {
-        self.state.get()
+        self.state.get().unwrap_or_default()
     }
 
     /// Returns an element at the indicated position or `None` if the indicated
@@ -479,8 +479,8 @@ where
     /// assert!(index.is_empty());
     /// ```
     pub fn clear(&mut self) {
-        self.state.set(SparseListSize::default());
-        self.base.clear()
+        self.base.clear();
+        self.state.unset();
     }
 
     /// Removes the first element from the 'SparseListIndex' and returns it, or
@@ -679,5 +679,14 @@ mod tests {
             vec![0_u64, 3, 4]
         );
         assert_eq!(list_index.values().collect::<Vec<u8>>(), vec![1_u8, 2, 3]);
+    }
+
+    #[test]
+    fn restore_after_no_op_initialization() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.as_ref().ensure_sparse_list::<_, u32>(IDX_NAME);
+        let list = fork.readonly().sparse_list::<_, u32>(IDX_NAME).unwrap();
+        assert!(list.is_empty());
     }
 }

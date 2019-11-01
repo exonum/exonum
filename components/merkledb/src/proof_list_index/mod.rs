@@ -213,7 +213,7 @@ where
     /// assert_eq!(1, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.state.get()
+        self.state.get().unwrap_or_default()
     }
 
     /// Returns the height of the Merkle tree built based on the list.
@@ -652,7 +652,7 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.set(0);
+        self.state.unset();
     }
 }
 

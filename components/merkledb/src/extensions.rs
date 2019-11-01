@@ -6,7 +6,10 @@ use crate::{
     ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
 };
 
+/// Extension trait allowing for easy access to indices from any type implementing
+/// `IndexAccess`.
 pub trait AccessExt {
+    /// Index access serving as the basis for created indices.
     type Base: IndexAccess;
 
     /// Gets an entry index with the specified address.
@@ -90,6 +93,17 @@ pub trait AccessExt {
     where
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash;
+
+    /// Gets or creates an entry index with the specified address.
+    ///
+    /// # Panics
+    ///
+    /// If the index exists, but is not an entry.
+    fn ensure_entry<I, V>(&self, addr: I) -> Entry<Self::Base, V>
+    where
+        I: Into<IndexAddress>,
+        V: BinaryValue,
+        Self::Base: IndexAccessMut;
 
     /// Gets or creates a list index with the specified address.
     ///
@@ -270,6 +284,16 @@ impl<T: IndexAccess> AccessExt for T {
     {
         let view = get_view(self, addr)?;
         Some(ValueSetIndex::new(view))
+    }
+
+    fn ensure_entry<I, V>(&self, addr: I) -> Entry<Self::Base, V>
+    where
+        I: Into<IndexAddress>,
+        V: BinaryValue,
+        Self: IndexAccessMut,
+    {
+        let view = get_or_create_view(self, addr, IndexType::Entry);
+        Entry::new(view)
     }
 
     fn ensure_list<I, V>(&self, addr: I) -> ListIndex<Self::Base, V>

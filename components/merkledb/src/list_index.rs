@@ -155,7 +155,7 @@ where
     /// assert_eq!(2, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.state.get()
+        self.state.get().unwrap_or_default()
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
@@ -378,7 +378,7 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.set(0);
+        self.state.unset();
     }
 
     fn set_len(&mut self, len: u64) {
@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_list_index_methods() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
         let mut list_index = fork.as_ref().ensure_list(IDX_NAME);
         list_index_methods(&mut list_index);
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_list_index_in_family_methods() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
         let mut list_index = fork.as_ref().ensure_list((IDX_NAME, &vec![1]));
         list_index_methods(&mut list_index);
@@ -553,7 +553,7 @@ mod tests {
 
     #[test]
     fn test_list_index_iter() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
         let mut list_index = fork.as_ref().ensure_list(IDX_NAME);
         list_index_iter(&mut list_index);
@@ -561,7 +561,7 @@ mod tests {
 
     #[test]
     fn test_list_index_in_family_iter() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
         let mut list_index = fork.as_ref().ensure_list((IDX_NAME, &vec![1]));
         list_index_iter(&mut list_index);
@@ -570,8 +570,17 @@ mod tests {
     #[test]
     fn test_list_index_clear_in_family() {
         for &(x, y, merge_before_clear) in FAMILY_CLEAR_PARAMS {
-            let db = TemporaryDB::default();
+            let db = TemporaryDB::new();
             list_index_clear_in_family(&db, x, y, merge_before_clear);
         }
+    }
+
+    #[test]
+    fn restore_after_no_op_initialization() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.as_ref().ensure_list::<_, u32>(IDX_NAME);
+        let list: ListIndex<_, u32> = fork.readonly().list(IDX_NAME).unwrap();
+        assert!(list.is_empty());
     }
 }
