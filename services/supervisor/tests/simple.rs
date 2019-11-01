@@ -660,3 +660,88 @@ fn several_service_config_changes() {
 
     assert_eq!(actual_params, "Change 4");
 }
+
+#[test]
+fn discard_config_propose_from_auditor() {
+    let mut testkit = TestKitBuilder::auditor()
+        .with_validators(2)
+        .with_rust_service(SimpleSupervisor)
+        .create();
+
+    let cfg_change_height = Height(5);
+    let old_consensus_config = testkit.consensus_config();
+    // Attempt to add ourselved into validators list.
+    let new_consensus_config = {
+        let mut cfg = testkit.consensus_config();
+        cfg.validator_keys.push(testkit.us().public_keys());
+        cfg
+    };
+
+    let old_validators = testkit.network().validators();
+
+    // Sign request by an auditor.
+    let keys = &testkit.network().us().service_keypair();
+    let config_propose = ConfigPropose::actual_from(cfg_change_height)
+        .consensus_config(new_consensus_config.clone())
+        .sign_for_simple_supervisor(keys.0, &keys.1);
+
+    testkit.create_block_with_transaction(config_propose);
+    testkit.create_blocks_until(cfg_change_height);
+
+    let new_validators = testkit.network().validators();
+
+    assert_eq!(testkit.consensus_config(), old_consensus_config);
+    assert_eq!(testkit.network().us().validator_id(), None);
+    assert_eq!(old_validators, new_validators);
+}
+
+#[test]
+fn test_send_proposal_with_api() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_rust_service(SimpleSupervisor)
+        .create();
+
+    let old_validators = testkit.network().validators();
+
+    let cfg_change_height = Height(5);
+    let new_consensus_config = {
+        let mut cfg = testkit.consensus_config();
+        // Remove us from validators
+        cfg.validator_keys.remove(0);
+        cfg
+    };
+
+    let config_propose = ConfigPropose::actual_from(cfg_change_height)
+        .consensus_config(new_consensus_config.clone());
+
+    // Create proposal
+    let hash = {
+        let hash: Hash = testkit
+            .api()
+            .private(exonum_testkit::ApiKind::Service("simple-supervisor"))
+            .query(&config_propose)
+            .post("propose-config")
+            .unwrap();
+        hash
+    };
+    testkit.create_block();
+    testkit.api().exonum_api().assert_tx_success(hash);
+
+    // Assert that config is now pending.
+    assert_eq!(
+        Schema::new(&testkit.snapshot())
+            .config_propose_entry()
+            .get()
+            .unwrap(),
+        config_propose
+    );
+
+    testkit.create_blocks_until(cfg_change_height);
+
+    // Assert that config sent through the api is applied.
+    assert_config_change_is_applied(&testkit);
+    assert_eq!(testkit.consensus_config(), new_consensus_config);
+    assert_eq!(testkit.network().us().validator_id(), None);
+    assert_ne!(old_validators, testkit.network().validators());
+}
