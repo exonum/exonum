@@ -22,7 +22,7 @@ pub use self::{
 
 use std::{
     fmt,
-    io::{Error, Read, Write},
+    io::{self, Read, Write},
     marker::PhantomData,
 };
 
@@ -32,10 +32,10 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
-use crate::views::{AnyObject, IndexAddress};
 use crate::{
     views::{
-        BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
+        BinaryAttribute, IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter,
+        View, ViewWithMetadata,
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
@@ -124,25 +124,6 @@ pub struct ProofMapIndexValues<'a, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
 }
 
-impl<T, K, V> AnyObject<T> for ProofMapIndex<T, K, V>
-where
-    T: IndexAccess,
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::ProofMap
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 /// TODO Clarify documentation. [ECR-2820]
 enum RemoveAction {
     KeyNotFound,
@@ -183,7 +164,7 @@ impl BinaryAttribute for Option<ProofPath> {
         }
     }
 
-    fn write<W: Write>(&self, buffer: &mut W) {
+    fn write(&self, buffer: &mut Vec<u8>) {
         if let Some(path) = self {
             let mut tmp = [0_u8; PROOF_PATH_SIZE];
             path.write(&mut tmp);
@@ -191,12 +172,15 @@ impl BinaryAttribute for Option<ProofPath> {
         }
     }
 
-    fn read<R: Read>(buffer: &mut R) -> Result<Self, Error> {
+    fn read(mut buffer: &[u8]) -> Result<Self, io::Error> {
         let mut tmp = [0_u8; PROOF_PATH_SIZE];
         let proof_path = match buffer.read(&mut tmp).unwrap() {
             0 => None,
             PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
-            other => panic!("Unexpected attribute length: {}", other),
+            other => {
+                let e = format!("Unexpected attribute length: {}", other);
+                return Err(io::Error::new(io::ErrorKind::Other, e));
+            }
         };
         Ok(proof_path)
     }
@@ -208,111 +192,9 @@ where
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &fork);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ProofMap)
-            .index_name(index_name)
-            .build();
-        Self {
-            base,
-            state,
-            _k: PhantomData,
-            _v: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, common prefix of its keys
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new_in_family(
-    ///     name,
-    ///     &index_id,
-    ///     &snapshot,
-    ///  );
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new_in_family(
-    ///     name,
-    ///     &index_id,
-    ///     &fork,
-    ///  );
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ProofMap)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-        Self {
-            base,
-            state,
-            _k: PhantomData,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofMap)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _k: PhantomData,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofMap)
-            .build();
-
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+        view.assert_type(IndexType::ProofMap);
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
@@ -593,7 +475,14 @@ where
                 .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
         }
     }
+}
 
+impl<T, K, V> ProofMapIndex<T, K, V>
+where
+    T: IndexAccessMut,
+    K: BinaryKey + ObjectHash,
+    V: BinaryValue,
+{
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
         let hash = HashTag::hash_leaf(&value.to_bytes());
@@ -891,7 +780,7 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
+        self.state.set(None);
     }
 }
 

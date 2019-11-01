@@ -17,20 +17,16 @@
 //! The given section contains methods related to `SparseListIndex` and iterators
 //! over the items of this index.
 
-use std::{
-    io::{Error, Read, Write},
-    marker::PhantomData,
-};
+use std::{io::Error, marker::PhantomData};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::views::IndexAddress;
 use crate::{
     views::{
-        AnyObject, BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType,
-        Iter as ViewIter, View,
+        BinaryAttribute, IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter,
+        View, ViewWithMetadata,
     },
-    BinaryKey, BinaryValue,
+    BinaryValue,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -46,12 +42,12 @@ impl BinaryAttribute for SparseListSize {
         16
     }
 
-    fn write<W: Write>(&self, buffer: &mut W) {
+    fn write(&self, buffer: &mut Vec<u8>) {
         buffer.write_u64::<LittleEndian>(self.capacity).unwrap();
         buffer.write_u64::<LittleEndian>(self.length).unwrap();
     }
 
-    fn read<R: Read>(buffer: &mut R) -> Result<Self, Error> {
+    fn read(mut buffer: &[u8]) -> Result<Self, Error> {
         Ok(Self {
             capacity: buffer.read_u64::<LittleEndian>()?,
             length: buffer.read_u64::<LittleEndian>()?,
@@ -120,120 +116,14 @@ pub struct SparseListIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
-impl<T, V> AnyObject<T> for SparseListIndex<T, V>
-where
-    T: IndexAccess,
-    V: BinaryValue,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::SparseList
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 impl<T, V> SparseListIndex<T, V>
 where
     T: IndexAccess,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::SparseList)
-            .index_name(index_name)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index_id = vec![123];
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::new_in_family(
-    ///     name,
-    ///     &index_id,
-    ///     &snapshot,
-    ///  );
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::SparseList)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::SparseList)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::SparseList)
-            .build();
-
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+        view.assert_type(IndexType::SparseList);
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
@@ -432,7 +322,13 @@ where
             base_iter: self.base.iter_from(&(), &from),
         }
     }
+}
 
+impl<T, V> SparseListIndex<T, V>
+where
+    T: IndexAccessMut,
+    V: BinaryValue,
+{
     /// Appends an element to the back of the 'SparseListIndex'.
     ///
     /// # Examples
@@ -666,8 +562,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::SparseListIndex;
-    use crate::{db::Database, TemporaryDB};
+    use crate::{db::Database, extensions::*, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
 
@@ -676,7 +571,7 @@ mod tests {
     fn test_list_index_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.as_ref().ensure_sparse_list(IDX_NAME);
 
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.capacity());
@@ -746,7 +641,7 @@ mod tests {
     fn test_list_index_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.as_ref().ensure_sparse_list(IDX_NAME);
 
         list_index.extend(vec![1_u8, 15, 25, 2, 3]);
         assert_eq!(

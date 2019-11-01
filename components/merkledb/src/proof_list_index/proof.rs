@@ -621,7 +621,7 @@ pub enum ListProofError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Database, ProofListIndex, TemporaryDB};
+    use crate::{extensions::*, Database, TemporaryDB};
 
     fn entry(height: u8, index: u64) -> HashedEntry {
         HashedEntry::new(
@@ -792,7 +792,7 @@ mod tests {
 
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list = ProofListIndex::new("test", &fork);
+        let mut list = fork.as_ref().ensure_proof_list("test");
         list.extend(0_u32..8);
 
         for len in 1..8 {

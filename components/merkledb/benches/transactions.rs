@@ -21,8 +21,8 @@ use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, ListIndex, MapIndex,
-    ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
+    impl_object_hash_for_binary_value, AccessExt, BinaryValue, Database, Fork, ListIndex, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 const SEED: [u8; 32] = [100; 32];
@@ -178,48 +178,55 @@ impl Transaction {
     fn execute(&self, fork: &Fork) {
         let tx_hash = self.object_hash();
 
-        let schema = RefSchema::new(fork);
-        schema.transactions().put(&self.object_hash(), *self);
+        let mut schema = Schema::get_or_create(fork);
+        schema.transactions.put(&self.object_hash(), *self);
 
-        let mut owner_wallet = schema.wallets().get(&self.sender).unwrap_or_default();
+        let mut owner_wallet = schema.wallets.get(&self.sender).unwrap_or_default();
         owner_wallet.outgoing += self.amount;
         owner_wallet.history_root = schema.add_transaction_to_history(&self.sender, tx_hash);
-        schema.wallets().put(&self.sender, owner_wallet);
+        schema.wallets.put(&self.sender, owner_wallet);
 
-        let mut receiver_wallet = schema.wallets().get(&self.receiver).unwrap_or_default();
+        let mut receiver_wallet = schema.wallets.get(&self.receiver).unwrap_or_default();
         receiver_wallet.incoming += self.amount;
         receiver_wallet.history_root = schema.add_transaction_to_history(&self.receiver, tx_hash);
-        schema.wallets().put(&self.receiver, receiver_wallet);
+        schema.wallets.put(&self.receiver, receiver_wallet);
     }
 }
 
-struct RefSchema<T: ObjectAccess>(T);
+struct Schema<T: AccessExt> {
+    pub transactions: MapIndex<T::Base, Hash, Transaction>,
+    pub blocks: ListIndex<T::Base, Hash>,
+    pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
+    access: T,
+}
 
-impl<T: ObjectAccess> RefSchema<T> {
-    fn new(object_access: T) -> Self {
-        Self(object_access)
-    }
-
-    fn transactions(&self) -> RefMut<MapIndex<T, Hash, Transaction>> {
-        self.0.get_object("transactions")
-    }
-
-    fn blocks(&self) -> RefMut<ListIndex<T, Hash>> {
-        self.0.get_object("blocks")
-    }
-
-    fn wallets(&self) -> RefMut<ProofMapIndex<T, PublicKey, Wallet>> {
-        self.0.get_object("wallets")
-    }
-
-    fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<T, Hash>> {
-        self.0.get_object(("wallets.history", owner))
+impl<T: AccessExt> Schema<T> {
+    fn new_unchecked(access: T) -> Self {
+        Self {
+            transactions: access.map("transactions").unwrap(),
+            blocks: access.list("blocks").unwrap(),
+            wallets: access.proof_map("wallets").unwrap(),
+            access,
+        }
     }
 }
 
-impl<T: ObjectAccess> RefSchema<T> {
+impl<'a> Schema<&'a Fork> {
+    fn get_or_create(access: &'a Fork) -> Self {
+        Self {
+            transactions: access.ensure_map("transactions"),
+            blocks: access.ensure_list("block"),
+            wallets: access.ensure_proof_map("wallets"),
+            access,
+        }
+    }
+
+    fn ensure_wallets_history(&self, owner: &PublicKey) -> ProofListIndex<&'a Fork, Hash> {
+        self.access.ensure_proof_list(("wallets.history", owner))
+    }
+
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
-        let mut history = self.wallets_history(owner);
+        let mut history = self.ensure_wallets_history(owner);
         history.push(tx_hash);
         history.object_hash()
     }
@@ -231,13 +238,13 @@ impl Block {
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        RefSchema::new(&fork).blocks().push(self.object_hash());
+        Schema::get_or_create(&fork).blocks.push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }
 
 fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> Vec<Block> {
-    let mut rng: StdRng = SeedableRng::from_seed(SEED);
+    let mut rng = StdRng::from_seed(SEED);
     let users = (0..wallets_count)
         .map(|idx| {
             let mut base = [0; PUBLIC_KEY_LENGTH];
@@ -281,8 +288,8 @@ pub fn bench_transactions(c: &mut Criterion) {
                     }
                     // Some fast assertions.
                     let snapshot = db.snapshot();
-                    let schema = RefSchema::new(&snapshot);
-                    assert_eq!(schema.blocks().len(), params.blocks as u64);
+                    let schema = Schema::new_unchecked(&snapshot);
+                    assert_eq!(schema.blocks.len(), params.blocks as u64);
                 })
             },
             item_counts,

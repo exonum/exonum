@@ -21,10 +21,10 @@ use std::marker::PhantomData;
 
 use crate::{
     views::{
-        AnyObject, IndexAccess, IndexAddress, IndexBuilder, IndexState, IndexType,
-        Iter as ViewIter, View,
+        IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter, View,
+        ViewWithMetadata,
     },
-    BinaryKey, BinaryValue,
+    BinaryValue,
 };
 
 /// A list of items where elements are added to the end of the list and are
@@ -56,121 +56,19 @@ pub struct ListIndexIter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
-impl<T, V> AnyObject<T> for ListIndex<T, V>
-where
-    T: IndexAccess,
-    V: BinaryValue,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::List
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 impl<T, V> ListIndex<T, V>
 where
     T: IndexAccess,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::List)
-            .index_name(index_name)
-            .build();
-
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+        view.assert_type(IndexType::List);
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
             _v: PhantomData,
         }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    /// let snapshot = db.snapshot();
-    /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::List)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::List)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::List)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
     }
 
     /// Returns an element at the indicated position or `None` if the indicated
@@ -308,7 +206,13 @@ where
             base_iter: self.base.iter_from(&(), &from),
         }
     }
+}
 
+impl<T, V> ListIndex<T, V>
+where
+    T: IndexAccessMut,
+    V: BinaryValue,
+{
     /// Appends an element to the back of the list.
     ///
     /// # Examples
@@ -474,7 +378,7 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
+        self.state.set(0);
     }
 
     fn set_len(&mut self, len: u64) {
@@ -508,9 +412,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{list_index::ListIndex, views::IndexAccess, Database, Fork, TemporaryDB};
-
-    use std::string::String;
+    use super::*;
+    use crate::{extensions::*, Database, Fork, TemporaryDB};
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {
         assert!(list_index.is_empty());
@@ -559,7 +462,6 @@ mod tests {
         list_index.extend(vec![1_u8, 2, 3]);
 
         assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
-
         assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
         assert_eq!(
@@ -569,15 +471,16 @@ mod tests {
     }
 
     fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {
+        #[allow(clippy::needless_pass_by_value)]
+        // ^-- better for type inference: we want `T == &Fork`, not `T == Fork`.
         fn list<T>(index: u32, view: T) -> ListIndex<T, String>
         where
-            T: IndexAccess,
+            T: IndexAccessMut,
         {
-            ListIndex::new_in_family("family", &index, view)
+            view.ensure_list(("family", &index))
         }
 
         assert_ne!(x, y);
-
         let mut fork = db.fork();
 
         // Write data to both indexes.
@@ -617,9 +520,9 @@ mod tests {
         // ...even after fork merge.
         db.merge_sync(fork.into_patch()).expect("merge");
         let snapshot = db.snapshot();
-        let index = list(x, &snapshot);
+        let index: ListIndex<_, String> = snapshot.as_ref().list(("family", &x)).unwrap();
         assert!(index.is_empty());
-        let index = list(y, &snapshot);
+        let index: ListIndex<_, String> = snapshot.as_ref().list(("family", &y)).unwrap();
         assert_eq!(
             index.iter().collect::<Vec<_>>(),
             vec!["baz".to_owned(), "qux".to_owned()]
@@ -636,7 +539,7 @@ mod tests {
     fn test_list_index_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = ListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.as_ref().ensure_list(IDX_NAME);
         list_index_methods(&mut list_index);
     }
 
@@ -644,7 +547,7 @@ mod tests {
     fn test_list_index_in_family_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &fork);
+        let mut list_index = fork.as_ref().ensure_list((IDX_NAME, &vec![1]));
         list_index_methods(&mut list_index);
     }
 
@@ -652,7 +555,7 @@ mod tests {
     fn test_list_index_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = ListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.as_ref().ensure_list(IDX_NAME);
         list_index_iter(&mut list_index);
     }
 
@@ -660,7 +563,7 @@ mod tests {
     fn test_list_index_in_family_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &fork);
+        let mut list_index = fork.as_ref().ensure_list((IDX_NAME, &vec![1]));
         list_index_iter(&mut list_index);
     }
 

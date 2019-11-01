@@ -337,6 +337,7 @@ impl BinaryKey for Decimal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::extensions::AccessExt;
 
     use std::{fmt::Debug, str::FromStr};
 
@@ -427,14 +428,14 @@ mod tests {
         let db: Box<dyn Database> = Box::new(TemporaryDB::default());
         let fork = db.fork();
         {
-            let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &fork);
+            let mut index: MapIndex<_, i32, u64> = (&fork).ensure_map("test_index");
             index.put(&5, 100);
             index.put(&-3, 200);
         }
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &snapshot);
+        let index: MapIndex<_, i32, u64> = snapshot.as_ref().map("test_index").unwrap();
         assert_eq!(index.get(&5), Some(100));
         assert_eq!(index.get(&-3), Some(200));
 
@@ -478,14 +479,14 @@ mod tests {
         let db: Box<dyn Database> = Box::new(TemporaryDB::default());
         let fork = db.fork();
         {
-            let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &fork);
+            let mut index: MapIndex<_, QuirkyI32Key, u64> = (&fork).ensure_map("test_index");
             index.put(&QuirkyI32Key(5), 100);
             index.put(&QuirkyI32Key(-3), 200);
         }
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &snapshot);
+        let index: MapIndex<_, QuirkyI32Key, u64> = snapshot.as_ref().map("test_index").unwrap();
         assert_eq!(index.get(&QuirkyI32Key(5)), Some(100));
         assert_eq!(index.get(&QuirkyI32Key(-3)), Some(200));
 
@@ -559,7 +560,7 @@ mod tests {
         let fork = db.fork();
         {
             let mut index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
-                MapIndex::new("test_index", &fork);
+                (&fork).ensure_map("test_index");
             index.put(&x1, y1);
             index.put(&x2, y2);
         }
@@ -567,7 +568,7 @@ mod tests {
 
         let snapshot = db.snapshot();
         let index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
-            MapIndex::new("test_index", &snapshot);
+            snapshot.as_ref().map("test_index").unwrap();
         assert_eq!(index.get(&x1), Some(y1));
         assert_eq!(index.get(&x2), Some(y2));
 

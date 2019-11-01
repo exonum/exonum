@@ -17,8 +17,10 @@ use std::{panic, rc::Rc};
 
 use crate::{
     db,
-    views::{is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
-    Database, DbOptions, Entry, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
+    extensions::*,
+    validation::is_valid_index_name,
+    views::{IndexAccess, IndexAddress, IndexType, View, ViewWithMetadata},
+    Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -445,13 +447,11 @@ fn multiple_views() {
 
 #[test]
 fn multiple_indexes() {
-    use crate::{ListIndex, MapIndex};
-
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &fork);
-        let mut map = MapIndex::new_in_family("idx", &3, &fork);
+        let mut list: ListIndex<_, u32> = fork.as_ref().ensure_list(IDX_NAME);
+        let mut map = fork.as_ref().ensure_map(("idx", &3));
 
         for i in 0..10 {
             list.push(i);
@@ -462,18 +462,15 @@ fn multiple_indexes() {
     }
     db.merge(fork.into_patch()).unwrap();
 
-    {
-        let snapshot = db.snapshot();
-        let list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
-        let map: MapIndex<_, u32, String> = MapIndex::new_in_family("idx", &3, &snapshot);
-
-        assert_eq!(list.len(), 10);
-        assert!(map.values().all(|val| val == "??"));
-    }
+    let snapshot = db.snapshot();
+    let list: ListIndex<_, u32> = snapshot.as_ref().list(IDX_NAME).unwrap();
+    let map: MapIndex<_, u32, String> = snapshot.as_ref().map(("idx", &3)).unwrap();
+    assert_eq!(list.len(), 10);
+    assert!(map.values().all(|val| val == "??"));
 
     let fork = db.fork();
-    let list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &fork);
-    let mut map = MapIndex::new_in_family("idx", &3, &fork);
+    let list: ListIndex<_, u32> = fork.as_ref().list(IDX_NAME).unwrap();
+    let mut map = fork.as_ref().map(("idx", &3)).unwrap();
     for item in &list {
         map.put(&item, item.to_string());
     }
@@ -545,14 +542,12 @@ fn rollbacks_for_indexes_in_same_family() {
     use crate::ProofListIndex;
 
     fn indexes(fork: &Fork) -> (ProofListIndex<&Fork, i64>, ProofListIndex<&Fork, i64>) {
-        let list1 = ProofListIndex::new_in_family("foo", &1, fork);
-        let list2 = ProofListIndex::new_in_family("foo", &2, fork);
-
+        let list1 = fork.ensure_proof_list(("foo", &1));
+        let list2 = fork.ensure_proof_list(("foo", &2));
         (list1, list2)
     }
 
     let db = TemporaryDB::new();
-
     let mut fork = db.fork();
     {
         let (mut list1, mut list2) = indexes(&fork);
@@ -730,38 +725,35 @@ fn views_based_on_rc_fork() {
     assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
 }
 
-#[test]
-fn test_metadata_index_usual_correct() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    IndexBuilder::new(&db.fork())
-        .index_name("simple")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_name("simple")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
-}
-
-#[test]
-fn test_metadata_index_family_correct() {
+fn test_metadata(addr: impl Into<IndexAddress>) {
+    let addr = addr.into();
     let db = TemporaryDB::new();
     // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::new(&fork)
-        .index_name("simple")
-        .family_id("family")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
+    ViewWithMetadata::get_or_create(&fork, &addr, IndexType::ProofMap)
+        .map_err(drop)
+        .unwrap();
+    assert!(ViewWithMetadata::get(&db.snapshot(), &addr).is_none());
     db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_name("simple")
-        .family_id("family")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
+
+    let snapshot = db.snapshot();
+    let view = ViewWithMetadata::get(&snapshot, &addr).unwrap();
+    assert_eq!(view.index_type(), IndexType::ProofMap);
+
+    let fork = db.fork();
+    ViewWithMetadata::get_or_create(&fork, &addr, IndexType::ProofMap)
+        .map_err(drop)
+        .unwrap();
+}
+
+#[test]
+fn test_metadata_simple() {
+    test_metadata("simple");
+}
+
+#[test]
+fn test_metadata_index_family() {
+    test_metadata(("family", "family_id"));
 }
 
 #[test]
@@ -769,189 +761,106 @@ fn test_metadata_index_identifiers() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     // Creates the first index metadata.
-    {
-        let (view, _state) = IndexBuilder::new(&fork)
-            .index_name("simple")
-            .family_id("family")
-            .index_type(IndexType::ProofMap)
-            .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::new()
-                .append_name("simple")
-                .append_bytes(&0_u64)
-        );
-    }
+    let (view, _) =
+        ViewWithMetadata::get_or_create(&fork, &("simple", "family_id").into(), IndexType::Map)
+            .map_err(drop)
+            .unwrap()
+            .into_parts::<()>();
+    assert_eq!(
+        view.address,
+        IndexAddress::new()
+            .append_name("simple")
+            .append_bytes(&0_u64)
+    );
+    drop(view); // Prevent "multiple mutable borrows" error later
 
     // Creates the second index metadata.
-    {
-        let (view, _state) = IndexBuilder::new(&fork)
-            .index_name("second")
-            .family_id("family")
-            .index_type(IndexType::ProofMap)
-            .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::new()
-                .append_name("second")
-                .append_bytes(&1_u64)
-        );
-    }
+    let (view, _) =
+        ViewWithMetadata::get_or_create(&fork, &("second", "family_id").into(), IndexType::Map)
+            .map_err(drop)
+            .unwrap()
+            .into_parts::<()>();
+    assert_eq!(
+        view.address,
+        IndexAddress::new()
+            .append_name("second")
+            .append_bytes(&1_u64)
+    );
 
-    // Tries to create the first index instance.
-    {
-        let (view, _state) = IndexBuilder::new(&fork)
-            .index_name("simple")
-            .family_id("family")
-            .index_type(IndexType::ProofMap)
-            .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::new()
-                .append_name("simple")
-                .append_bytes(&0_u64)
-        );
-    }
+    // Recreates the first index instance.
+    let (view, _) =
+        ViewWithMetadata::get_or_create(&fork, &("simple", "family_id").into(), IndexType::Map)
+            .map_err(drop)
+            .unwrap()
+            .into_parts::<()>();
+    assert_eq!(
+        view.address,
+        IndexAddress::new()
+            .append_name("simple")
+            .append_bytes(&0_u64)
+    );
 }
 
 #[test]
-fn test_index_builder_without_type() {
+fn test_metadata_incorrect_index_type() {
     let db = TemporaryDB::new();
-    // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::new(&fork).index_name("simple").build::<()>();
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_name("simple")
-        .index_type(IndexType::Unknown)
-        .build::<()>();
+
+    ViewWithMetadata::get_or_create(&fork, &"simple".into(), IndexType::Map)
+        .map_err(drop)
+        .unwrap();
+    ViewWithMetadata::get_or_create(&fork, &"simple".into(), IndexType::List)
+        .map(drop)
+        .unwrap_err();
 }
 
 #[test]
-#[should_panic(expected = "Index name must not be empty")]
-fn test_index_builder_without_name() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    IndexBuilder::new(&fork).build::<()>();
-}
-
-#[test]
-#[should_panic(expected = "Index type does not match specified one")]
-fn test_metadata_index_usual_incorrect() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    IndexBuilder::new(&fork)
-        .index_type(IndexType::ProofMap)
-        .index_name("simple")
-        .build::<()>();
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_type(IndexType::ProofList)
-        .index_name("simple")
-        .build::<()>();
-}
-
-#[test]
-#[should_panic(expected = "Index type does not match specified one")]
-fn test_metadata_index_family_incorrect() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    IndexBuilder::new(&fork)
-        .index_type(IndexType::ProofMap)
-        .index_name("simple")
-        .family_id("family")
-        .build::<()>();
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_type(IndexType::Map)
-        .index_name("simple")
-        .family_id("family")
-        .build::<()>();
-}
-
-#[test]
-#[should_panic(
-    expected = "Error while reading the index state. Possibly the index type does not match specified one"
-)]
-fn test_metadata_index_wrong_type_map_list() {
+#[should_panic(expected = "Unexpected index type")]
+fn test_metadata_index_wrong_type() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut map = MapIndex::new("simple", &fork);
+        let mut map = fork.as_ref().ensure_map("simple");
         map.put(&1, vec![1, 2, 3]);
     }
 
     db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
+    // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
-    let list: ListIndex<_, Vec<u8>> = ListIndex::new("simple", &snapshot);
-    list.get(1);
-}
-
-#[test]
-#[should_panic(
-    expected = "Error while reading the index state. Possibly the index type does not match specified one"
-)]
-fn test_metadata_index_wrong_type_entry_list() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    {
-        let mut entry = Entry::new("simple", &fork);
-        entry.set(vec![1, 2, 3]);
-    }
-
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    let snapshot = db.snapshot();
-    let list: ListIndex<_, Vec<u8>> = ListIndex::new("simple", &snapshot);
-    list.get(1);
+    snapshot.as_ref().list::<_, Vec<u8>>("simple");
 }
 
 #[test]
 #[ignore]
 //TODO: fix test [ECR-2869]
 fn multiple_patch() {
-    use crate::ListIndex;
-
-    fn list_index<View: IndexAccess>(view: View) -> ListIndex<View, u64> {
-        ListIndex::new("list_index", view)
+    fn list_index(view: &Fork) -> ListIndex<&Fork, u64> {
+        view.ensure_list("list_index")
     }
 
     let db = TemporaryDB::new();
     // create first patch
-    let patch1 = {
-        let fork = db.fork();
-        {
-            let mut index = list_index(&fork);
-            index.push(1);
-            index.push(3);
-            index.push(4);
-        }
-        fork.into_patch()
-    };
+    let fork = db.fork();
+    {
+        let mut index = list_index(&fork);
+        index.push(1);
+        index.push(3);
+        index.push(4);
+    }
+    let patch1 = fork.into_patch();
     // create second patch
-    let patch2 = {
-        let fork = db.fork();
-        {
-            let mut index = list_index(&fork);
-            index.push(10);
-        }
-        fork.into_patch()
-    };
+    let fork = db.fork();
+    {
+        let mut index = list_index(&fork);
+        index.push(10);
+    }
+    let patch2 = fork.into_patch();
 
     db.merge(patch1).unwrap();
     db.merge(patch2).unwrap();
     let snapshot = db.snapshot();
-    let index = list_index(&snapshot);
-    let iter = index.iter();
-    assert_eq!(index.len() as usize, iter.count());
+    let index: ListIndex<_, u64> = snapshot.as_ref().list("list_index").unwrap();
+    assert_eq!(index.len() as usize, index.iter().count());
 }
 
 #[test]
@@ -989,8 +898,8 @@ fn valid_name_for_url() {
 #[should_panic(expected = "Wrong characters using in name")]
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
-    let snapshot = db.snapshot();
-    let _: ListIndex<_, u8> = ListIndex::new("ind\u{435}x-name", &snapshot);
+    let fork = db.fork();
+    let _: ListIndex<_, u8> = fork.as_ref().ensure_list("ind\u{435}x-name");
 }
 
 fn assert_valid_name_url(name: &str) {
@@ -998,65 +907,42 @@ fn assert_valid_name_url(name: &str) {
     assert_eq!(is_valid_index_name(name), name == urlencoded)
 }
 
-fn check_valid_name<S: AsRef<str>>(name: S) -> bool {
-    check_index_name(name).is_ok()
-}
-
-fn check_index_name<S: AsRef<str>>(name: S) -> Result<(), ()> {
+fn check_valid_name(name: &str) -> bool {
     let db = TemporaryDB::new();
-    let snapshot = db.snapshot();
-
     let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        let _: ListIndex<_, u8> = ListIndex::new(name.as_ref(), &snapshot);
+        let fork = db.fork();
+        let _: ListIndex<_, u8> = fork.as_ref().ensure_list(name.as_ref());
     }));
-
-    catch_result.map_err(|_| ())
+    catch_result.is_ok()
 }
 
 #[test]
 fn fork_from_patch() {
-    use crate::ListIndex;
-
     let db = TemporaryDB::new();
     let fork = db.fork();
-
     {
-        let mut index = ListIndex::new("index", &fork);
+        let mut index = fork.as_ref().ensure_list("index");
         index.push(1);
         index.push(2);
         index.push(3);
-
         let last = index.pop();
         assert_eq!(last, Some(3));
-
         index.set(1, 5);
     }
 
     let patch = fork.into_patch();
     let fork: Fork = patch.into();
     {
-        let index = ListIndex::new("index", &fork);
-
+        let index = fork.as_ref().ensure_list("index");
         assert_eq!(index.get(0), Some(1));
         assert_eq!(index.get(1), Some(5));
         assert_eq!(index.get(2), None);
 
         let items: Vec<i32> = index.iter().collect();
-
         assert_eq!(items.len(), 2);
         assert_eq!(items, vec![1, 5]);
     }
 
     db.merge(fork.into_patch())
         .expect("Fork created from patch should be merged successfully");
-}
-
-#[test]
-fn test_index_builder_index_address() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    let (view, _) = IndexBuilder::new(&fork).index_name("test").build::<()>();
-
-    assert_eq!(view.address.name, "test");
 }

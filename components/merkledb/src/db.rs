@@ -139,9 +139,11 @@ impl IntoIterator for Changes {
     }
 }
 
+type ChangesCell = Option<Rc<ViewChanges>>;
+
 #[derive(Debug, Default)]
 pub struct WorkingPatch {
-    changes: RefCell<HashMap<IndexAddress, Option<ViewChanges>>>,
+    changes: RefCell<HashMap<IndexAddress, ChangesCell>>,
 }
 
 #[derive(Debug)]
@@ -159,15 +161,28 @@ impl WorkingPatchRef<'_> {
     }
 }
 
-/// `RefMut`, but dumber.
 #[derive(Debug)]
-pub struct ChangesRef<'a> {
-    parent: WorkingPatchRef<'a>,
-    key: IndexAddress,
-    changes: Option<ViewChanges>,
+pub struct ChangesRef {
+    inner: Rc<ViewChanges>,
 }
 
-impl Deref for ChangesRef<'_> {
+impl Deref for ChangesRef {
+    type Target = ViewChanges;
+
+    fn deref(&self) -> &ViewChanges {
+        &*self.inner
+    }
+}
+
+/// `RefMut`, but dumber.
+#[derive(Debug)]
+pub struct ChangesMut<'a> {
+    parent: WorkingPatchRef<'a>,
+    key: IndexAddress,
+    changes: Option<Rc<ViewChanges>>,
+}
+
+impl Deref for ChangesMut<'_> {
     type Target = ViewChanges;
 
     fn deref(&self) -> &ViewChanges {
@@ -177,15 +192,17 @@ impl Deref for ChangesRef<'_> {
     }
 }
 
-impl DerefMut for ChangesRef<'_> {
+impl DerefMut for ChangesMut<'_> {
     fn deref_mut(&mut self) -> &mut ViewChanges {
-        // `.unwrap()` is safe: `changes` can be equal to `None` only when
-        // the instance is being dropped.
-        self.changes.as_mut().unwrap()
+        // `.unwrap()`s are safe:
+        //
+        // - `changes` can be equal to `None` only when the instance is being dropped.
+        // - We know that `Rc` with the changes is unique.
+        Rc::get_mut(self.changes.as_mut().unwrap()).unwrap()
     }
 }
 
-impl Drop for ChangesRef<'_> {
+impl Drop for ChangesMut<'_> {
     fn drop(&mut self) {
         let mut change_map = self.parent.patch().changes.borrow_mut();
         let changes = change_map.get_mut(&self.key).unwrap_or_else(|| {
@@ -209,14 +226,14 @@ impl WorkingPatch {
         self.changes.borrow().is_empty()
     }
 
-    fn take_view_changes(&self, address: &IndexAddress) -> Option<ViewChanges> {
-        let view_changes = {
+    fn take_view_changes(&self, address: &IndexAddress) -> ChangesCell {
+        let mut view_changes = {
             let mut changes = self.changes.borrow_mut();
             let view_changes = changes.get_mut(address).map(Option::take);
             view_changes.unwrap_or_else(|| {
                 changes
                     .entry(address.clone())
-                    .or_insert_with(|| Some(ViewChanges::new()))
+                    .or_insert_with(|| Some(Rc::new(ViewChanges::new())))
                     .take()
             })
         };
@@ -226,16 +243,47 @@ impl WorkingPatch {
             "multiple mutable borrows of an index at {:?}",
             address
         );
+        assert!(
+            Rc::get_mut(view_changes.as_mut().unwrap()).is_some(),
+            "Attempting to borrow {:?} mutably while it's borrowed immutably",
+            address
+        );
         view_changes
+    }
+
+    fn clone_view_changes(&self, address: &IndexAddress) -> Rc<ViewChanges> {
+        let mut changes = self.changes.borrow_mut();
+        changes
+            .entry(address.clone())
+            .or_insert_with(|| Some(Rc::new(ViewChanges::new())))
+            .as_ref()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Attempting to borrow {:?} immutably while it's borrowed mutably",
+                    address
+                );
+            })
+            .clone()
+    }
+
+    /// Returns an immutable reference to the changes corresponding to a certain index.
+    ///
+    /// # Panics
+    ///
+    /// If an index with the `address` is already mutably borrowed.
+    pub fn changes(&self, address: &IndexAddress) -> ChangesRef {
+        ChangesRef {
+            inner: self.clone_view_changes(address),
+        }
     }
 
     /// Returns a mutable reference to the changes corresponding to a certain index.
     ///
     /// # Panics
     ///
-    /// If an index with the `address` already exists in `Fork` that uses this patch.
-    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
-        ChangesRef {
+    /// If an index with the `address` is already borrowed either immutably or mutably.
+    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesMut {
+        ChangesMut {
             changes: self.take_view_changes(address),
             key: address.clone(),
             parent: WorkingPatchRef::Borrowed(self),
@@ -245,7 +293,6 @@ impl WorkingPatch {
     pub fn clear(&self, address: &IndexAddress) {
         let mut changes = self.changes.borrow_mut();
         let change = changes.entry(address.clone());
-
         change.and_modify(|v| *v = None);
     }
 
@@ -253,6 +300,9 @@ impl WorkingPatch {
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
             let changes = changes.unwrap_or_else(|| {
+                panic!("changes are still borrowed at address {:?}", address);
+            });
+            let changes = Rc::try_unwrap(changes).unwrap_or_else(|_| {
                 panic!("changes are still borrowed at address {:?}", address);
             });
 
@@ -631,7 +681,7 @@ impl From<Patch> for Fork {
 }
 
 impl<'a> IndexAccess for &'a Fork {
-    type Changes = ChangesRef<'a>;
+    type Changes = ChangesMut<'a>;
 
     fn snapshot(&self) -> &dyn Snapshot {
         &self.patch
@@ -643,7 +693,7 @@ impl<'a> IndexAccess for &'a Fork {
 }
 
 impl IndexAccess for Rc<Fork> {
-    type Changes = ChangesRef<'static>;
+    type Changes = ChangesMut<'static>;
 
     fn snapshot(&self) -> &dyn Snapshot {
         &self.patch
@@ -651,7 +701,7 @@ impl IndexAccess for Rc<Fork> {
 
     fn changes(&self, address: &IndexAddress) -> Self::Changes {
         let changes = self.working_patch.take_view_changes(address);
-        ChangesRef {
+        ChangesMut {
             changes,
             key: address.clone(),
             parent: WorkingPatchRef::Owned(Self::clone(self)),
@@ -659,9 +709,11 @@ impl IndexAccess for Rc<Fork> {
     }
 }
 
-impl AsRef<dyn Snapshot> for Fork {
-    fn as_ref(&self) -> &dyn Snapshot {
-        &self.patch
+// FIXME: add readonly versions of `Fork`
+
+impl AsRef<Fork> for Fork {
+    fn as_ref(&self) -> &Fork {
+        self
     }
 }
 

@@ -21,7 +21,7 @@ use serde_json::{self, json};
 use std::cmp;
 
 use super::{key::ProofListKey, tree_height_by_length, ListProof, ListProofError, ProofListIndex};
-use crate::{BinaryValue, Database, HashTag, ObjectHash, TemporaryDB};
+use crate::{extensions::*, BinaryValue, Database, HashTag, ObjectHash, TemporaryDB};
 
 const IDX_NAME: &str = "idx_name";
 
@@ -47,7 +47,7 @@ fn random_values<R: Rng>(rng: &mut R, len: usize) -> Vec<Vec<u8>> {
 fn list_methods() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     assert!(index.is_empty());
     assert_eq!(index.len(), 0);
@@ -70,7 +70,7 @@ fn list_methods() {
 fn extend_is_equivalent_to_sequential_pushes() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     for _ in 0..10 {
         index.clear();
@@ -129,7 +129,7 @@ fn extend_is_equivalent_to_sequential_pushes() {
 fn tree_height() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     assert_eq!(index.height(), 0);
     index.push(vec![1]);
@@ -146,7 +146,7 @@ fn tree_height() {
 fn iter() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut list_index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut list_index = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     list_index.extend(vec![1_u8, 2, 3]);
 
@@ -163,7 +163,7 @@ fn iter() {
 fn simple_proof() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     let h0 = HashTag::hash_leaf(&2_u64.to_bytes());
     let h1 = HashTag::hash_leaf(&4_u64.to_bytes());
@@ -271,7 +271,7 @@ fn simple_proof() {
 fn proofs_in_empty_list() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let index: ProofListIndex<_, u32> = ProofListIndex::new(IDX_NAME, &fork);
+    let index: ProofListIndex<_, u32> = fork.as_ref().ensure_proof_list(IDX_NAME);
     let proof = index.get_range_proof(..);
     proof.check_against_hash(index.object_hash()).unwrap();
     assert!(proof.check_against_hash(index.object_hash()).is_ok());
@@ -283,7 +283,7 @@ fn proofs_in_empty_list() {
 fn empty_proof_ranges() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
     index.extend(vec![1_u32, 2, 3]);
     let proof = index.get_range_proof(1..1);
     assert!(proof
@@ -306,7 +306,7 @@ fn random_proofs() {
 
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     let mut rng = thread_rng();
     let values = random_values(&mut rng, LIST_SIZE);
@@ -336,7 +336,7 @@ fn random_proofs() {
 fn index_and_proof_roots() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
     assert_eq!(index.object_hash(), HashTag::empty_list_hash());
 
     let h1 = HashTag::hash_leaf(&[1, 2]);
@@ -472,7 +472,7 @@ fn index_and_proof_roots() {
 fn proof_illegal_range() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
     for i in 0_u8..4 {
         index.push(vec![i]);
     }
@@ -484,7 +484,7 @@ fn proof_illegal_range() {
 fn proof_illegal_inclusive_range() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
     for i in 0_u8..4 {
         index.push(vec![i]);
     }
@@ -513,7 +513,7 @@ fn ranges_work_similar_to_vec_slicing() {
         let slicing_res = panic::catch_unwind(|| v[slice_bounds_].to_vec());
         let proof_res = panic::catch_unwind(|| {
             let fork = TemporaryDB::new().fork();
-            let mut index = ProofListIndex::new(IDX_NAME, &fork);
+            let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
             index.extend(v.to_vec());
             (index.object_hash(), index.get_range_proof(index_bounds))
         });
@@ -570,7 +570,7 @@ fn ranges_work_similar_to_vec_slicing() {
 fn proof_with_range_start_exceeding_list_size() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
     for i in 0_u8..4 {
         index.push(vec![i]);
     }
@@ -594,7 +594,7 @@ fn proof_with_range_start_exceeding_list_size() {
 fn proof_with_range_end_exceeding_list_size() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut index = ProofListIndex::new(IDX_NAME, &fork);
+    let mut index = fork.as_ref().ensure_proof_list(IDX_NAME);
     for i in 0_u8..4 {
         index.push(vec![i]);
     }
@@ -615,7 +615,7 @@ fn setting_elements_leads_to_correct_list_hash() {
     let db = TemporaryDB::new();
     let hash1 = {
         let fork = db.fork();
-        let mut list = ProofListIndex::new(IDX_NAME, &fork);
+        let mut list = fork.as_ref().ensure_proof_list(IDX_NAME);
         list.push(vec![1]);
         list.push(vec![2]);
         list.push(vec![3]);
@@ -629,7 +629,7 @@ fn setting_elements_leads_to_correct_list_hash() {
     };
     let hash2 = {
         let fork = db.fork();
-        let mut list = ProofListIndex::new(IDX_NAME, &fork);
+        let mut list = fork.as_ref().ensure_proof_list(IDX_NAME);
         list.push(vec![4]);
         list.push(vec![7]);
         list.push(vec![5]);
@@ -646,7 +646,7 @@ fn setting_elements_leads_to_correct_list_hash_randomized() {
     let mut rng = thread_rng();
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    let mut list = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     for _ in 0..10 {
         // Prepare two copies of values with sufficient intersection.
@@ -696,7 +696,7 @@ fn setting_elements_leads_to_correct_list_hash_randomized() {
 fn truncating_list() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    let mut list = fork.as_ref().ensure_proof_list(IDX_NAME);
     list.extend(0_u32..30);
     list.truncate(5);
     assert_eq!(list.len(), 5);
@@ -733,7 +733,7 @@ fn truncating_list_leads_to_expected_hash() {
     let mut rng = thread_rng();
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    let mut list = fork.as_ref().ensure_proof_list(IDX_NAME);
 
     for _ in 0..10 {
         let values: [u32; 32] = rng.gen();
@@ -786,7 +786,7 @@ fn truncating_list_leads_to_expected_hash() {
 fn popping_element_from_list() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let mut list = ProofListIndex::new(IDX_NAME, &fork);
+    let mut list = fork.as_ref().ensure_proof_list(IDX_NAME);
     list.extend(0_i32..10);
 
     let mut count = 0;
@@ -991,10 +991,7 @@ fn invalid_proofs_with_no_values() {
 }
 
 mod root_hash {
-    use crate::{
-        hash::HashTag, proof_list_index::ProofListIndex, BinaryValue, Database, ObjectHash,
-        TemporaryDB,
-    };
+    use crate::{extensions::*, hash::HashTag, BinaryValue, Database, ObjectHash, TemporaryDB};
     use exonum_crypto::{self, Hash};
 
     /// Cross-verify `object_hash()` with `ProofListIndex` against expected root hash value.
@@ -1013,7 +1010,7 @@ mod root_hash {
     {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut index = ProofListIndex::new("merkle_root", &fork);
+        let mut index = fork.as_ref().ensure_proof_list("merkle_root");
         index.extend(hashes.iter().cloned());
         index.object_hash()
     }

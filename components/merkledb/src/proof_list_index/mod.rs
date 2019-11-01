@@ -25,11 +25,13 @@ use self::{
     proof::HashedEntry,
     proof_builder::{BuildProof, MerkleTree},
 };
-use crate::views::IndexAddress;
 use crate::{
     hash::HashTag,
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, ObjectHash,
+    views::{
+        IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter, View,
+        ViewWithMetadata,
+    },
+    BinaryValue, ObjectHash,
 };
 
 mod key;
@@ -37,8 +39,6 @@ mod proof;
 mod proof_builder;
 #[cfg(test)]
 mod tests;
-
-// TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
 fn tree_height_by_length(len: u64) -> u8 {
     if len == 0 {
@@ -74,24 +74,6 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
-impl<T, V> AnyObject<T> for ProofListIndex<T, V>
-where
-    T: IndexAccess,
-    V: BinaryValue,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::ProofList
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 impl<T, V> MerkleTree<V> for ProofListIndex<T, V>
 where
     T: IndexAccess,
@@ -119,106 +101,14 @@ where
     T: IndexAccess,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &fork);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::ProofList)
-            .index_name(index_name)
-            .build();
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+        view.assert_type(IndexType::ProofList);
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
             _v: PhantomData,
         }
-    }
-
-    /// Creates a new index representation based on the name, common prefix of its keys
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> =
-    ///     ProofListIndex::new_in_family(name, &index_id, &snapshot);
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index : ProofListIndex<_, u8> =
-    ///     ProofListIndex::new_in_family(name, &index_id, &fork);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::ProofList)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofList)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofList)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
     }
 
     fn has_branch(&self, key: ProofListKey) -> bool {
@@ -240,10 +130,6 @@ where
 
     fn root_key(&self) -> ProofListKey {
         ProofListKey::new(self.height(), 0)
-    }
-
-    fn set_len(&mut self, len: u64) {
-        self.state.set(len)
     }
 
     /// Returns the element at the indicated position or `None` if the indicated position
@@ -452,6 +338,16 @@ where
         ProofListIndexIter {
             base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }
+    }
+}
+
+impl<T, V> ProofListIndex<T, V>
+where
+    T: IndexAccessMut,
+    V: BinaryValue,
+{
+    fn set_len(&mut self, len: u64) {
+        self.state.set(len)
     }
 
     /// Updates levels of the tree with heights `2..` after the values in the range
@@ -756,7 +652,7 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
+        self.state.set(0);
     }
 }
 

@@ -23,8 +23,8 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::ProofPath, BinaryKey, Database, IndexAccess, MapProof, ProofMapIndex,
-    TemporaryDB,
+    proof_map_index::ProofPath, AccessExt, BinaryKey, Database, IndexAccess, MapProof,
+    ProofMapIndex, TemporaryDB,
 };
 use proptest::{
     prelude::prop::{
@@ -124,7 +124,7 @@ where
 fn write_data(db: &TemporaryDB, data: Data) {
     let fork = db.fork();
     {
-        let mut table = ProofMapIndex::new(INDEX_NAME, &fork);
+        let mut table = fork.as_ref().ensure_proof_map(INDEX_NAME);
         table.clear();
         for (key, value) in data {
             table.put(&key, value);
@@ -169,7 +169,7 @@ fn data_for_multiproof(
 
 fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
     let snapshot = db.snapshot();
-    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let table: ProofMapIndex<_, [u8; 32], u64> = snapshot.as_ref().proof_map(INDEX_NAME).unwrap();
     let proof = table.get_proof(key);
     let expected_key = if table.contains(&key) {
         Some(key)
@@ -181,7 +181,7 @@ fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
 
 fn test_multiproof(db: &TemporaryDB, keys: &[[u8; 32]]) -> TestCaseResult {
     let snapshot = db.snapshot();
-    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let table: ProofMapIndex<_, [u8; 32], u64> = snapshot.as_ref().proof_map(INDEX_NAME).unwrap();
     let proof = table.get_multiproof(keys.to_vec());
     let unique_keys: BTreeSet<_> = keys.iter().collect();
     check_map_multiproof(&proof, unique_keys, &table)

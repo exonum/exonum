@@ -136,6 +136,7 @@ pub use self::{
     },
     entry::Entry,
     error::Error,
+    extensions::AccessExt,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
     key_set_index::KeySetIndex,
     keys::BinaryKey,
@@ -145,10 +146,7 @@ pub use self::{
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{
-        is_allowed_latin1_char, is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder,
-        ObjectAccess, Ref, RefMut, View,
-    },
+    views::{IndexAccess, IndexAccessMut, IndexAddress, View},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'
@@ -170,6 +168,7 @@ mod backends;
 mod db;
 mod entry;
 mod error;
+mod extensions;
 mod hash;
 mod keys;
 mod options;
@@ -182,6 +181,7 @@ pub mod map_index;
 pub mod proof_list_index;
 pub mod proof_map_index;
 pub mod sparse_list_index;
+pub mod validation;
 pub mod value_set_index;
 
 #[cfg(feature = "with-protobuf")]
@@ -190,5 +190,5 @@ pub mod proto;
 #[cfg(feature = "with-protobuf")]
 use exonum_proto::ProtobufConvert;
 
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+//mod tests;

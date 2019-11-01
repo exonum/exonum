@@ -21,10 +21,9 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
+    views::{IndexAccess, IndexAccessMut, IndexType, Iter as ViewIter, View, ViewWithMetadata},
     BinaryKey, BinaryValue,
 };
-use crate::views::{IndexAddress, IndexState};
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -36,7 +35,6 @@ use crate::views::{IndexAddress, IndexState};
 #[derive(Debug)]
 pub struct MapIndex<T: IndexAccess, K, V> {
     base: View<T>,
-    state: IndexState<T, ()>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -80,127 +78,19 @@ pub struct MapIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
-impl<T, K, V> AnyObject<T> for MapIndex<T, K, V>
-where
-    T: IndexAccess,
-    K: BinaryKey,
-    V: BinaryValue,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::Map
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 impl<T, K, V> MapIndex<T, K, V>
 where
     T: IndexAccess,
     K: BinaryKey,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
-    ///
-    /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::Map)
-            .index_name(index_name)
-            .build();
-
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+        view.assert_type(IndexType::Map);
+        let (base, _) = view.into_parts::<()>();
         Self {
             base,
-            state,
             _v: PhantomData,
             _k: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
-    ///
-    /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::Map)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-            _k: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::Map)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _k: PhantomData,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::Map)
-            .build();
-
-        Self {
-            base,
-            state,
-            _k: PhantomData,
-            _v: PhantomData,
         }
     }
 
@@ -399,7 +289,14 @@ where
             base_iter: self.base.iter_from(&(), from),
         }
     }
+}
 
+impl<T, K, V> MapIndex<T, K, V>
+where
+    T: IndexAccessMut,
+    K: BinaryKey,
+    V: BinaryValue,
+{
     /// Inserts a key-value pair into a map.
     ///
     /// # Examples
@@ -467,7 +364,6 @@ where
     /// assert!(!index.contains(&1));
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
     }
 }
 
@@ -521,8 +417,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Database, TemporaryDB};
     use super::*;
+    use crate::{extensions::*, Database, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
 
@@ -532,12 +428,10 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, String, _> = MapIndex::new(IDX_NAME, &fork);
+        let mut index: MapIndex<_, String, _> = fork.as_ref().ensure_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
-
         index.put(&KEY.to_owned(), 0);
         assert_eq!(true, index.contains(KEY));
-
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
     }
@@ -548,7 +442,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, Vec<u8>, _> = MapIndex::new(IDX_NAME, &fork);
+        let mut index: MapIndex<_, Vec<u8>, _> = fork.as_ref().ensure_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
 
         index.put(&KEY.to_owned(), 0);
@@ -562,27 +456,23 @@ mod tests {
     fn test_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut map_index = MapIndex::new(IDX_NAME, &fork);
 
+        let mut map_index = fork.as_ref().ensure_map(IDX_NAME);
         assert_eq!(map_index.get(&1_u8), None);
         assert!(!map_index.contains(&1_u8));
 
         map_index.put(&1_u8, 1_u8);
-
         assert_eq!(map_index.get(&1_u8), Some(1_u8));
         assert!(map_index.contains(&1_u8));
 
         map_index.remove(&100_u8);
-
         map_index.remove(&1_u8);
-
         assert!(!map_index.contains(&1_u8));
         assert_eq!(map_index.get(&1_u8), None);
 
         map_index.put(&2_u8, 2_u8);
         map_index.put(&3_u8, 3_u8);
         map_index.clear();
-
         assert!(!map_index.contains(&2_u8));
         assert!(!map_index.contains(&3_u8));
     }
@@ -591,7 +481,7 @@ mod tests {
     fn test_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut map_index = MapIndex::new(IDX_NAME, &fork);
+        let mut map_index = fork.as_ref().ensure_map(IDX_NAME);
 
         map_index.put(&1_u8, 1_u8);
         map_index.put(&2_u8, 2_u8);
@@ -601,7 +491,6 @@ mod tests {
             map_index.iter().collect::<Vec<(u8, u8)>>(),
             vec![(1, 1), (2, 2), (3, 3)]
         );
-
         assert_eq!(
             map_index.iter_from(&0).collect::<Vec<(u8, u8)>>(),
             vec![(1, 1), (2, 2), (3, 3)]

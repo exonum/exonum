@@ -23,10 +23,9 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use super::{
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, ObjectHash,
+    views::{IndexAccess, IndexAccessMut, IndexType, Iter as ViewIter, View, ViewWithMetadata},
+    BinaryValue, ObjectHash,
 };
-use crate::views::IndexAddress;
 
 /// A set of value items.
 ///
@@ -37,7 +36,6 @@ use crate::views::IndexAddress;
 #[derive(Debug)]
 pub struct ValueSetIndex<T: IndexAccess, V> {
     base: View<T>,
-    state: IndexState<T, ()>,
     _v: PhantomData<V>,
 }
 
@@ -67,117 +65,16 @@ pub struct ValueSetIndexHashes<'a> {
     base_iter: ViewIter<'a, Hash, ()>,
 }
 
-impl<T, V> AnyObject<T> for ValueSetIndex<T, V>
-where
-    T: IndexAccess,
-    V: BinaryKey,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::ValueSet
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 impl<T, V> ValueSetIndex<T, V>
 where
     T: IndexAccess,
     V: BinaryValue + ObjectHash,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ValueSet)
-            .index_name(index_name)
-            .build();
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+        view.assert_type(IndexType::ValueSet);
+        let (base, _) = view.into_parts::<()>();
         Self {
             base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index_id = vec![123];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ValueSet)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build::<()>();
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ValueSet)
-            .build_existed::<()>()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ValueSet)
-            .build::<()>();
-
-        Self {
-            base,
-            state,
             _v: PhantomData,
         }
     }
@@ -321,7 +218,13 @@ where
             base_iter: self.base.iter_from(&(), from),
         }
     }
+}
 
+impl<T, V> ValueSetIndex<T, V>
+where
+    T: IndexAccessMut,
+    V: BinaryValue + ObjectHash,
+{
     /// Adds a value to the set.
     ///
     /// # Examples
@@ -449,13 +352,13 @@ impl<'a> Iterator for ValueSetIndexHashes<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Database, ObjectHash, TemporaryDB, ValueSetIndex};
+    use crate::{extensions::*, Database, ObjectHash, TemporaryDB};
 
     #[test]
     fn value_set_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut index = ValueSetIndex::new("index", &fork);
+        let mut index = fork.as_ref().ensure_value_set("index");
 
         assert!(!index.contains(&1_u8));
         assert!(!index.contains_by_hash(&1_u8.object_hash()));

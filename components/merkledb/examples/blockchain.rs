@@ -1,11 +1,12 @@
+use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, ListIndex, MapIndex,
-    ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
+    impl_object_hash_for_binary_value, AccessExt, BinaryValue, Database, Fork, IndexAccessMut,
+    ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -20,7 +21,7 @@ impl BinaryValue for Wallet {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -37,7 +38,7 @@ impl BinaryValue for Transaction {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -55,7 +56,7 @@ impl BinaryValue for Block {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -64,48 +65,63 @@ impl Transaction {
     fn execute(&self, fork: &Fork) {
         let tx_hash = self.object_hash();
 
-        let schema = Schema::new(fork);
-        schema.transactions().put(&self.object_hash(), *self);
+        let mut schema = Schema::new(fork).expect("Schema is not initialized");
+        schema.transactions.put(&self.object_hash(), *self);
 
-        let mut owner_wallet = schema.wallets().get(&self.sender).unwrap_or_default();
+        let mut owner_wallet = schema.wallets.get(&self.sender).unwrap_or_default();
         owner_wallet.outgoing += self.amount;
         owner_wallet.history_root = schema.add_transaction_to_history(&self.sender, tx_hash);
-        schema.wallets().put(&self.sender, owner_wallet);
+        schema.wallets.put(&self.sender, owner_wallet);
 
-        let mut receiver_wallet = schema.wallets().get(&self.receiver).unwrap_or_default();
+        let mut receiver_wallet = schema.wallets.get(&self.receiver).unwrap_or_default();
         receiver_wallet.incoming += self.amount;
         receiver_wallet.history_root = schema.add_transaction_to_history(&self.receiver, tx_hash);
-        schema.wallets().put(&self.receiver, receiver_wallet);
+        schema.wallets.put(&self.receiver, receiver_wallet);
     }
 }
 
-struct Schema<T: ObjectAccess>(T);
+struct Schema<T: AccessExt> {
+    pub transactions: MapIndex<T::Base, Hash, Transaction>,
+    pub blocks: ListIndex<T::Base, Hash>,
+    pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
+    access: T,
+}
 
-impl<T: ObjectAccess> Schema<T> {
-    fn new(object_access: T) -> Self {
-        Self(object_access)
+impl<T: AccessExt> Schema<T> {
+    fn new(access: T) -> Option<Self> {
+        Some(Self {
+            transactions: access.map("transactions")?,
+            blocks: access.list("blocks")?,
+            wallets: access.proof_map("wallets")?,
+            access,
+        })
     }
 
-    fn transactions(&self) -> RefMut<MapIndex<T, Hash, Transaction>> {
-        self.0.get_object("transactions")
-    }
-
-    fn blocks(&self) -> RefMut<ListIndex<T, Hash>> {
-        self.0.get_object("blocks")
-    }
-
-    fn wallets(&self) -> RefMut<ProofMapIndex<T, PublicKey, Wallet>> {
-        self.0.get_object("wallets")
-    }
-
-    fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<T, Hash>> {
-        self.0.get_object(("wallets.history", owner))
+    fn wallets_history(&self, owner: &PublicKey) -> Option<ProofListIndex<T::Base, Hash>> {
+        self.access.proof_list(("wallets.history", owner))
     }
 }
 
-impl<T: ObjectAccess> Schema<T> {
+impl<T> Schema<T>
+where
+    T: AccessExt,
+    T::Base: IndexAccessMut,
+{
+    fn get_or_create(access: T) -> Self {
+        Self {
+            transactions: access.ensure_map("transactions"),
+            blocks: access.ensure_list("blocks"),
+            wallets: access.ensure_proof_map("wallets"),
+            access,
+        }
+    }
+
+    fn ensure_wallets_history(&self, owner: &PublicKey) -> ProofListIndex<T::Base, Hash> {
+        self.access.ensure_proof_list(("wallets.history", owner))
+    }
+
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
-        let mut history = self.wallets_history(owner);
+        let mut history = self.ensure_wallets_history(owner);
         history.push(tx_hash);
         history.object_hash()
     }
@@ -117,7 +133,7 @@ impl Block {
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        Schema::new(&fork).blocks().push(self.object_hash());
+        Schema::get_or_create(&fork).blocks.push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }
@@ -159,18 +175,17 @@ fn main() {
 
     // Gets a snapshot of the current database state.
     let snapshot = db.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = Schema::new(&snapshot).expect("Schema not initialized");
 
     // Checks that our users have the specified amount of money.
-    let wallets = schema.wallets();
-    let alice_wallet = wallets.get(&alice).unwrap();
-    let bob_wallet = wallets.get(&bob).unwrap();
+    let alice_wallet = schema.wallets.get(&alice).unwrap();
+    let bob_wallet = schema.wallets.get(&bob).unwrap();
 
     assert_eq!(alice_wallet.outgoing, 100);
     assert_eq!(bob_wallet.incoming, 100);
 
     // Gets and checks a proof of existence of Alice's wallet in the blockchain.
-    let proof = wallets.get_proof(alice);
+    let proof = schema.wallets.get_proof(alice);
     let checked_proof = proof.check().unwrap();
     assert_eq!(
         checked_proof.entries().collect::<Vec<_>>(),

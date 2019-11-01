@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![warn(missing_docs)]
-
-pub use self::{
-    metadata::{BinaryAttribute, IndexState, IndexType},
-    refs::{AnyObject, ObjectAccess, Ref, RefMut},
-};
+pub use self::metadata::{BinaryAttribute, IndexState, IndexType, ViewWithMetadata};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
 use super::{
-    db::{Change, ChangesRef, ForkIter, ViewChanges},
+    db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
     BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
 mod metadata;
-mod refs;
 #[cfg(test)]
 mod tests;
 
@@ -54,7 +48,6 @@ impl<T: IndexAccess> fmt::Debug for View<T> {
 /// Utility trait to provide optional references to `ViewChanges`.
 pub trait ChangeSet {
     fn as_ref(&self) -> Option<&ViewChanges>;
-    fn as_mut(&mut self) -> Option<&mut ViewChanges>;
 }
 
 /// No-op implementation used in `Snapshot`.
@@ -62,189 +55,45 @@ impl ChangeSet for () {
     fn as_ref(&self) -> Option<&ViewChanges> {
         None
     }
-    fn as_mut(&mut self) -> Option<&mut ViewChanges> {
-        None
-    }
 }
 
-impl ChangeSet for ChangesRef<'_> {
+impl ChangeSet for ChangesRef {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(&*self)
     }
-    fn as_mut(&mut self) -> Option<&mut ViewChanges> {
-        Some(&mut *self)
+}
+
+impl ChangeSet for ChangesMut<'_> {
+    fn as_ref(&self) -> Option<&ViewChanges> {
+        Some(&*self)
     }
 }
 
-/// Base trait that allows to access and modify indexes.
+/// Allows to read data from indexes.
 pub trait IndexAccess: Clone {
     /// Type of the `changes` that will be applied to the database.
-    /// In case of `snapshot` changes is represented by the empty type,
+    ///
+    /// In case of `snapshot` changes are represented by the empty type `()`,
     /// because `snapshot` is read-only.
     type Changes: ChangeSet;
+
     /// Reference to `Snapshot` used in `View` implementation.
     fn snapshot(&self) -> &dyn Snapshot;
-    /// Returns changes related to specific `address`.
+    /// Returns changes related to specific `address` compared to the `snapshot()`.
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
-/// Struct responsible for creating `view` and `state` for index with
-/// specified `address`. `View` contains changes, `state` contains
-/// metadata.
-///
-/// # Example
-///
-/// ```
-/// use exonum_merkledb::{Database, TemporaryDB, IndexBuilder, ListIndex};
-///
-/// let db: Box<Database> = Box::new(TemporaryDB::new());
-/// let fork = db.fork();
-/// {
-///     let (view, _state) = IndexBuilder::new(&fork)
-///         .index_name("index")
-///         .build::<()>();
-/// }
-///
-/// ```
-#[derive(Debug)]
-pub struct IndexBuilder<T> {
-    index_access: T,
-    address: IndexAddress,
-    index_type: IndexType,
+/// Allows to mutate data in indexes.
+pub trait IndexAccessMut: IndexAccess {
+    fn deref_mut(changes: &mut Self::Changes) -> &mut ViewChanges;
 }
 
-impl<T> IndexBuilder<T>
+impl<'a, T> IndexAccessMut for T
 where
-    T: IndexAccess,
+    T: IndexAccess<Changes = ChangesMut<'a>>,
 {
-    /// Creates a new index based on provided `index_access'.
-    pub fn new(index_access: T) -> Self {
-        let address = IndexAddress::default();
-        Self {
-            index_access,
-            address,
-            index_type: IndexType::default(),
-        }
-    }
-
-    /// Creates a new index from provided `address`.
-    pub fn from_address<I: Into<IndexAddress>>(address: I, index_access: T) -> Self {
-        Self {
-            index_access,
-            address: address.into(),
-            index_type: IndexType::default(),
-        }
-    }
-
-    /// Provides first part of the index address.
-    pub fn index_name<S: Into<String>>(self, index_name: S) -> Self {
-        let address = self.address.append_name(index_name.into());
-        Self {
-            index_access: self.index_access,
-            address,
-            index_type: self.index_type,
-        }
-    }
-
-    /// Provides `family_id` for the index address.
-    pub fn family_id<I>(self, family_id: &I) -> Self
-    where
-        I: BinaryKey + ?Sized,
-    {
-        let address = self.address.append_bytes(family_id);
-        Self {
-            index_access: self.index_access,
-            address,
-            index_type: self.index_type,
-        }
-    }
-
-    /// Sets the type of the given index.
-    pub fn index_type(self, index_type: IndexType) -> Self {
-        Self {
-            index_access: self.index_access,
-            address: self.address,
-            index_type,
-        }
-    }
-
-    fn create_state<V>(self) -> (View<T>, IndexState<T, V>)
-    where
-        V: BinaryAttribute + Default + Copy,
-    {
-        // TODO Think about stricter restrictions for index names. [ECR-2834]
-        assert_valid_name(&self.address.name);
-
-        let (index_address, index_state) =
-            metadata::index_metadata(self.index_access.clone(), &self.address, self.index_type);
-
-        let index_view = View::new(self.index_access, index_address);
-
-        (index_view, index_state)
-    }
-
-    /// Returns index based on specified `view` and `address`.
-    /// Allowable characters in index name: ASCII characters,
-    /// digits, underscores and dashes.
-    ///
-    /// # Panics
-    ///
-    /// - If index name is empty or invalid.
-    /// - If index metadata doesn't match expected.
-    pub fn build<V>(self) -> (View<T>, IndexState<T, V>)
-    where
-        V: BinaryAttribute + Default + Copy,
-    {
-        self.create_state()
-    }
-
-    /// Similar to `build`, but returns `None` if index has not been created yet.
-    pub fn build_existed<V>(self) -> Option<(View<T>, IndexState<T, V>)>
-    where
-        V: BinaryAttribute + Default + Copy,
-    {
-        let (index_view, index_state) = self.create_state();
-        if index_state.is_new() {
-            return None;
-        }
-
-        Some((index_view, index_state))
-    }
-}
-
-/// Check that latin1 character is allowed in index name.
-/// Only these combination of symbols are allowed:
-///
-/// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`, `.`
-pub fn is_allowed_latin1_char(c: u8) -> bool {
-    match c {
-          48..=57   // 0..9
-        | 65..=90   // A..Z
-        | 97..=122  // a..z
-        | 45..=46   // -.
-        | 95        // _
-          => true,
-        _ => false,
-    }
-}
-
-/// Validate index name.
-pub fn is_valid_index_name<S: AsRef<str>>(name: S) -> bool {
-    name.as_ref()
-        .as_bytes()
-        .iter()
-        .copied()
-        .all(is_allowed_latin1_char)
-}
-
-/// Calls the `is_valid_name` function with the given name and panics if it returns `false`.
-fn assert_valid_name<S: AsRef<str>>(name: S) {
-    if name.as_ref().is_empty() {
-        panic!("Index name must not be empty")
-    }
-
-    if !is_valid_index_name(name) {
-        panic!("Wrong characters using in name. Use: a-zA-Z0-9 and one of _-.");
+    fn deref_mut(changes: &mut Self::Changes) -> &mut ViewChanges {
+        &mut *changes
     }
 }
 
@@ -390,8 +239,8 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 }
 
 impl<T: IndexAccess> View<T> {
-    ///TODO: add documentation
-    pub fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
+    /// Creates a new view for an index with the specified address.
+    pub(crate) fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
         let address = address.into();
         let changes = index_access.changes(&address);
         Self {
@@ -524,18 +373,18 @@ impl<T: IndexAccess> View<T> {
             _v: PhantomData,
         }
     }
+}
 
+impl<T: IndexAccessMut> View<T> {
     /// Inserts a key-value pair into the fork.
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        if let Some(changes) = self.changes.as_mut() {
-            changes
-                .data
-                .insert(concat_keys!(key), Change::Put(value.into_bytes()));
-        };
+        T::deref_mut(&mut self.changes)
+            .data
+            .insert(concat_keys!(key), Change::Put(value.into_bytes()));
     }
 
     /// Removes a key from the view.
@@ -543,16 +392,14 @@ impl<T: IndexAccess> View<T> {
     where
         K: BinaryKey + ?Sized,
     {
-        if let Some(changes) = self.changes.as_mut() {
-            changes.data.insert(concat_keys!(key), Change::Delete);
-        };
+        T::deref_mut(&mut self.changes)
+            .data
+            .insert(concat_keys!(key), Change::Delete);
     }
 
     /// Clears the view removing all its elements.
     pub fn clear(&mut self) {
-        if let Some(changes) = self.changes.as_mut() {
-            changes.clear()
-        }
+        T::deref_mut(&mut self.changes).clear();
     }
 }
 
@@ -584,7 +431,7 @@ impl<'a> SnapshotIter<'a> {
     }
 }
 
-impl<'a> BytesIterator for SnapshotIter<'a> {
+impl BytesIterator for SnapshotIter<'_> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         if self.ended {
             return None;
