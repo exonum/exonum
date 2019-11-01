@@ -52,7 +52,7 @@ impl TxTimestamp {
 
 #[exonum_service]
 trait TimestampingInterface {
-    fn timestamp(&self, context: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
+    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -65,13 +65,13 @@ trait TimestampingInterface {
 struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, _context: CallContext, _arg: TxTimestamp) -> Result<(), ExecutionError> {
+    fn timestamp(&self, _context: CallContext<'_>, _arg: TxTimestamp) -> Result<(), ExecutionError> {
         Ok(())
     }
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

@@ -75,8 +75,8 @@ pub enum Error {
 
 #[exonum_service]
 pub trait MyServiceInterface {
-    fn create_wallet(&self, context: CallContext, arg: CreateWallet) -> Result<(), Error>;
-    fn transfer(&self, context: CallContext, arg: Transfer) -> Result<(), Error>;
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -88,20 +88,20 @@ pub trait MyServiceInterface {
 struct MyService;
 
 impl MyServiceInterface for MyService {
-    fn create_wallet(&self, _context: CallContext, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
             Err(Error::NotAllowed)
         }
     }
-    fn transfer(&self, _context: CallContext, _arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), Error> {
         panic!("oops")
     }
 }
 
 impl Service for MyService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

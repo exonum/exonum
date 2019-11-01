@@ -56,7 +56,7 @@ pub trait Configure {
     /// In other words, only a method with numeric ID 0 can call this method.
     fn verify_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
 
@@ -75,7 +75,7 @@ pub trait Configure {
     /// In other words, only a method with numeric ID 0 can call this method.
     fn apply_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
 }
@@ -85,7 +85,7 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
 
     fn dispatch(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {

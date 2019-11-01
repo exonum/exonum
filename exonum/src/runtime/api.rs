@@ -76,7 +76,7 @@ pub struct ServiceApiScope {
 
 impl ServiceApiScope {
     /// Create a new service API scope for the specified service instance.
-    pub fn new(context: ApiContext, instance: InstanceDescriptor) -> Self {
+    pub fn new(context: ApiContext, instance: InstanceDescriptor<'_>) -> Self {
         Self {
             inner: ApiScope::new(),
             context,
@@ -92,7 +92,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
         R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
     {
         let context = self.context.clone();
@@ -120,7 +120,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
         R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
     {
         let context = self.context.clone();
@@ -259,7 +259,7 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Create a new service API builder for the specified service instance.
     #[doc(hidden)]
-    pub fn new(context: ApiContext, instance: InstanceDescriptor) -> Self {
+    pub fn new(context: ApiContext, instance: InstanceDescriptor<'_>) -> Self {
         Self {
             context: context.clone(),
             public_scope: ServiceApiScope::new(context.clone(), instance),

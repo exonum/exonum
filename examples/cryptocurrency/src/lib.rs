@@ -218,9 +218,9 @@ pub mod contracts {
     #[exonum_service]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
-        fn create_wallet(&self, ctx: CallContext, arg: TxCreateWallet) -> Result<(), Error>;
+        fn create_wallet(&self, ctx: CallContext<'_>, arg: TxCreateWallet) -> Result<(), Error>;
         /// Transfers `amount` of the currency from one wallet to another.
-        fn transfer(&self, ctx: CallContext, arg: TxTransfer) -> Result<(), Error>;
+        fn transfer(&self, ctx: CallContext<'_>, arg: TxTransfer) -> Result<(), Error>;
     }
 
     /// Cryptocurrency service implementation.
@@ -229,7 +229,7 @@ pub mod contracts {
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {
-        fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error> {
+        fn create_wallet(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), Error> {
             let author = context
                 .caller()
                 .author()
@@ -247,7 +247,7 @@ pub mod contracts {
             }
         }
 
-        fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error> {
+        fn transfer(&self, context: CallContext<'_>, arg: TxTransfer) -> Result<(), Error> {
             let author = context
                 .caller()
                 .author()
@@ -291,7 +291,7 @@ pub mod contracts {
             CryptocurrencyApi.wire(builder);
         }
 
-        fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
             CurrencySchema::new(descriptor.name, snapshot).state_hash()
         }
     }
@@ -321,7 +321,7 @@ pub mod api {
         /// Endpoint for getting a single wallet.
         pub fn get_wallet(
             self,
-            state: &ServiceApiState,
+            state: &ServiceApiState<'_>,
             pub_key: PublicKey,
         ) -> api::Result<Wallet> {
             let snapshot = state.snapshot();
@@ -332,7 +332,7 @@ pub mod api {
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(self, state: &ServiceApiState) -> api::Result<Vec<Wallet>> {
+        pub fn get_wallets(self, state: &ServiceApiState<'_>) -> api::Result<Vec<Wallet>> {
             let snapshot = state.snapshot();
             let schema = CurrencySchema::new(state.instance.name, snapshot);
             let idx = schema.wallets();
@@ -347,12 +347,12 @@ pub mod api {
             builder
                 .public_scope()
                 .endpoint("v1/wallet", {
-                    move |state: &ServiceApiState, query: WalletQuery| {
+                    move |state: &ServiceApiState<'_>, query: WalletQuery| {
                         self.get_wallet(state, query.pub_key)
                     }
                 })
                 .endpoint("v1/wallets", {
-                    move |state: &ServiceApiState, _query: ()| self.get_wallets(state)
+                    move |state: &ServiceApiState<'_>, _query: ()| self.get_wallets(state)
                 });
         }
     }

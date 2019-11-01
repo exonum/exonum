@@ -126,14 +126,14 @@ pub enum Error {
 #[exonum_service]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error>;
+    fn create_wallet(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), Error>;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext<'_>, arg: TxTransfer) -> Result<(), Error>;
 }
 
 impl CurrencyInterface for CurrencyService {
-    fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
         let height = CoreSchema::new(context.fork()).height();
@@ -145,7 +145,7 @@ impl CurrencyInterface for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext<'_>, arg: TxTransfer) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
         if author == arg.to {
@@ -182,7 +182,7 @@ struct BalanceQuery {
 /// Shortcut to get data on wallets.
 impl CryptocurrencyApi {
     /// Endpoint for retrieving a single wallet.
-    fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<u64> {
+    fn balance(state: &api::ServiceApiState<'_>, query: BalanceQuery) -> api::Result<u64> {
         let snapshot = state.snapshot();
         let schema = CurrencySchema::new(snapshot);
         schema
@@ -217,7 +217,7 @@ impl Service for CurrencyService {
         CryptocurrencyApi::wire(builder)
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

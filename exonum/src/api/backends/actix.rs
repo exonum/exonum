@@ -69,7 +69,7 @@ pub struct RequestHandler {
 }
 
 impl fmt::Debug for RequestHandler {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RequestHandler")
             .field("name", &self.name)
             .field("method", &self.method)
@@ -281,7 +281,7 @@ impl ApiRuntimeConfig {
 }
 
 impl fmt::Debug for ApiRuntimeConfig {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ApiRuntimeConfig")
             .field("listen_address", &self.listen_address)
             .field("access", &self.access)
@@ -357,7 +357,7 @@ impl SystemRuntime {
 }
 
 impl fmt::Debug for SystemRuntime {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SystemRuntime").finish()
     }
 }
@@ -399,7 +399,7 @@ impl<'de> de::Deserialize<'de> for AllowOrigin {
         impl<'de> de::Visitor<'de> for Visitor {
             type Value = AllowOrigin;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("a list of hosts or \"*\"")
             }
 

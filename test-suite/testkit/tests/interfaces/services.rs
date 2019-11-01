@@ -43,7 +43,7 @@ pub struct TxCreateWallet {
 
 #[exonum_service]
 pub trait WalletInterface {
-    fn create(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), ExecutionError>;
+    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -59,13 +59,13 @@ impl WalletService {
 }
 
 impl Service for WalletService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
 
 impl WalletInterface for WalletService {
-    fn create(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), ExecutionError> {
+    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError> {
         let (owner, fork) = context
             .verify_caller(Caller::author)
             .ok_or(Error::WrongInterfaceCaller)?;
@@ -86,7 +86,7 @@ impl WalletInterface for WalletService {
 }
 
 impl IssueReceiver for WalletService {
-    fn issue(&self, context: CallContext, arg: Issue) -> Result<(), ExecutionError> {
+    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError> {
         let (instance_id, fork) = context
             .verify_caller(Caller::as_service)
             .ok_or(Error::WrongInterfaceCaller)?;
@@ -112,7 +112,7 @@ pub struct TxIssue {
 
 #[exonum_service]
 pub trait DepositInterface {
-    fn issue(&self, context: CallContext, arg: TxIssue) -> Result<(), ExecutionError>;
+    fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -128,15 +128,15 @@ impl DepositService {
 }
 
 impl Service for DepositService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
 
 impl DepositInterface for DepositService {
-    fn issue(&self, mut context: CallContext, arg: TxIssue) -> Result<(), ExecutionError> {
+    fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
         context
-            .interface::<IssueReceiverClient>(WalletService::ID)?
+            .interface::<IssueReceiverClient<'_>>(WalletService::ID)?
             .issue(Issue {
                 to: arg.to,
                 amount: arg.amount,
@@ -160,11 +160,11 @@ pub struct TxRecursiveCall {
 
 #[exonum_service]
 pub trait AnyCall {
-    fn call_any(&self, context: CallContext, arg: TxAnyCall) -> Result<(), ExecutionError>;
+    fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
 
     fn call_recursive(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         arg: TxRecursiveCall,
     ) -> Result<(), ExecutionError>;
 }
@@ -182,7 +182,7 @@ impl AnyCallService {
 }
 
 impl AnyCall for AnyCallService {
-    fn call_any(&self, mut context: CallContext, tx: TxAnyCall) -> Result<(), ExecutionError> {
+    fn call_any(&self, mut context: CallContext<'_>, tx: TxAnyCall) -> Result<(), ExecutionError> {
         context.call_context(tx.call_info.instance_id)?.call(
             tx.interface_name,
             tx.call_info.method_id,
@@ -192,7 +192,7 @@ impl AnyCall for AnyCallService {
 
     fn call_recursive(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         arg: TxRecursiveCall,
     ) -> Result<(), ExecutionError> {
         if arg.depth == 1 {
@@ -210,7 +210,7 @@ impl AnyCall for AnyCallService {
 }
 
 impl Service for AnyCallService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

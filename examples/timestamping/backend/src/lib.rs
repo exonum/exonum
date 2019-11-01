@@ -61,12 +61,12 @@ impl Service for TimestampingService {
         TimestampingApi.wire(builder);
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(descriptor.name, snapshot);
         schema.state_hash()
     }
 
-    fn initialize(&self, context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         let config =
             Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 

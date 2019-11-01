@@ -243,7 +243,7 @@ impl BinaryValue for Round {
         self.0.into_bytes()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         Ok(Round(
             <u32 as BinaryValue>::from_bytes(value).expect("Error while deserializing value"),
         ))
@@ -273,7 +273,7 @@ impl ValidatorId {
 }
 
 impl fmt::Display for Height {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -285,7 +285,7 @@ impl From<Height> for u64 {
 }
 
 impl fmt::Display for Round {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -303,7 +303,7 @@ impl From<Round> for u64 {
 }
 
 impl fmt::Display for ValidatorId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }

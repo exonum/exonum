@@ -211,7 +211,7 @@ pub struct TestKit {
 }
 
 impl fmt::Debug for TestKit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("TestKit")
             .field("blockchain", &self.blockchain)
             .field("network", &self.network)
