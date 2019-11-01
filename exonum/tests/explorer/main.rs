@@ -42,82 +42,72 @@ mod blockchain;
 #[allow(clippy::cognitive_complexity)]
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
-
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
 
     let payload_alice = CreateWallet::new(&pk_alice, "Alice");
     let tx_alice = payload_alice.clone().sign(SERVICE_ID, pk_alice, &key_alice);
-
     let payload_bob = CreateWallet::new(&pk_bob, "Bob");
     let tx_bob = payload_bob.clone().sign(SERVICE_ID, pk_bob, &key_bob);
-
     let payload_transfer = Transfer::new(&pk_alice, &pk_bob, 2);
     let tx_transfer = payload_transfer
         .clone()
         .sign(SERVICE_ID, pk_alice, &key_alice);
 
-    {
-        let snapshot = blockchain.snapshot();
-        let explorer = BlockchainExplorer::new(snapshot.as_ref());
-        assert_eq!(explorer.height(), Height(0));
-        let block = explorer.block(Height(0)).unwrap();
-        assert_eq!(block.len(), 0);
-        assert!(block.transaction(0).is_none());
-        assert!(explorer.transaction(&tx_alice.object_hash()).is_none());
-    }
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
+    assert_eq!(explorer.height(), Height(0));
+    let block = explorer.block(Height(0)).unwrap();
+    assert_eq!(block.len(), 0);
+    assert!(block.transaction(0).is_none());
+    assert!(explorer.transaction(&tx_alice.object_hash()).is_none());
 
     // Block #1: Alice's transaction.
-
     create_block(&mut blockchain, vec![tx_alice.clone()]);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    assert_eq!(explorer.height(), Height(1));
+    assert_eq!(schema.transactions_len(), 1);
+    assert!(explorer.block(Height(2)).is_none());
 
-    {
-        let snapshot = blockchain.snapshot();
-        let explorer = BlockchainExplorer::new(snapshot.as_ref());
-        let snapshot = blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        assert_eq!(explorer.height(), Height(1));
-        assert_eq!(schema.transactions_len(), 1);
-        assert!(explorer.block(Height(2)).is_none());
+    let block = explorer.block(Height(1)).unwrap();
+    assert_eq!(block.len(), 1);
+    let tx_info = block.transaction(0).unwrap();
+    assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
+    assert_eq!(tx_info.status(), Ok(()));
+    assert_eq!(tx_info.content(), &tx_alice);
+    assert_eq!(
+        tx_info.content().object_hash(),
+        block.transaction_hashes()[0]
+    );
 
-        let block = explorer.block(Height(1)).unwrap();
-        assert_eq!(block.len(), 1);
-        let tx_info = block.transaction(0).unwrap();
-        assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
-        assert_eq!(tx_info.status(), Ok(()));
-        assert_eq!(tx_info.content(), &tx_alice);
-        assert_eq!(
-            tx_info.content().object_hash(),
-            block.transaction_hashes()[0]
-        );
+    let tx_info = explorer.transaction(&tx_alice.object_hash()).unwrap();
+    assert!(!tx_info.is_in_pool());
+    assert!(tx_info.is_committed());
+    assert_eq!(tx_info.content(), &tx_alice);
 
-        let tx_info = explorer.transaction(&tx_alice.object_hash()).unwrap();
-        assert!(!tx_info.is_in_pool());
-        assert!(tx_info.is_committed());
-        assert_eq!(tx_info.content(), &tx_alice);
-
-        let tx_info = match tx_info {
-            TransactionInfo::Committed(info) => info,
-            tx => panic!("{:?}", tx),
-        };
-        assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
-        assert_eq!(
-            serde_json::to_value(&tx_info).unwrap(),
-            json!({
-                "content": tx_alice,
-                "location": {
-                    "block_height": 1,
-                    "position_in_block": 0,
-                },
-                "location_proof": tx_info.location_proof(), // too complicated to check
-                "status": { "type": "success" },
-                "time": tx_info.time(),
-            })
-        );
-    }
+    let tx_info = match tx_info {
+        TransactionInfo::Committed(info) => info,
+        tx => panic!("{:?}", tx),
+    };
+    assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
+    assert_eq!(
+        serde_json::to_value(&tx_info).unwrap(),
+        json!({
+            "content": tx_alice,
+            "location": {
+                "block_height": 1,
+                "position_in_block": 0,
+            },
+            "location_proof": tx_info.location_proof(), // too complicated to check
+            "status": { "type": "success" },
+            "time": tx_info.time(),
+        })
+    );
 
     // Block #2: other transactions.
-
     create_block(&mut blockchain, vec![tx_bob.clone(), tx_transfer.clone()]);
 
     let snapshot = blockchain.snapshot();
@@ -176,22 +166,17 @@ fn test_explorer_basics() {
 #[test]
 fn test_explorer_pool_transaction() {
     let mut blockchain = create_blockchain();
-
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
     let tx_hash = tx_alice.object_hash();
 
-    {
-        let snapshot = blockchain.snapshot();
-        let explorer = BlockchainExplorer::new(snapshot.as_ref());
-        assert!(explorer.transaction(&tx_hash).is_none());
-    }
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
+    assert!(explorer.transaction(&tx_hash).is_none());
 
     let fork = blockchain.fork();
-    {
-        let mut schema = Schema::new(&fork);
-        schema.add_transaction_into_pool(tx_alice.clone());
-    }
+    let mut schema = Schema::new(&fork);
+    schema.add_transaction_into_pool(tx_alice.clone());
     blockchain.merge(fork.into_patch()).unwrap();
 
     let snapshot = blockchain.snapshot();
@@ -237,7 +222,7 @@ fn test_explorer_block_iter() {
     create_block(&mut blockchain, vec![]); // Height(7)
     create_block(&mut blockchain, vec![]); // Height(8)
     create_block(&mut blockchain, txs.take(5).collect()); // Height(9)
-    assert_eq!(blockchain.last_block().height(), Height(9));
+    assert_eq!(blockchain.as_ref().last_block().height(), Height(9));
 
     let snapshot = blockchain.snapshot();
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
@@ -342,25 +327,22 @@ fn test_transaction_iterator() {
     let txs = tx_generator();
     create_block(&mut blockchain, txs.take(5).collect());
 
-    {
-        let snapshot = blockchain.snapshot();
-        let explorer = BlockchainExplorer::new(snapshot.as_ref());
-        let block = explorer.block(Height(1)).unwrap();
-        for tx in &block {
-            assert_eq!(tx.status(), Ok(()));
-        }
-        for (i, tx) in block.iter().enumerate() {
-            let raw_tx = tx.content();
-            let parsed_tx = raw_tx
-                .payload()
-                .parse::<CreateWallet>()
-                .expect("Unable to parse transaction");
-            assert_eq!(parsed_tx.name, format!("Alice #{}", i))
-        }
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
+    let block = explorer.block(Height(1)).unwrap();
+    for tx in &block {
+        assert_eq!(tx.status(), Ok(()));
+    }
+    for (i, tx) in block.iter().enumerate() {
+        let raw_tx = tx.content();
+        let parsed_tx = raw_tx
+            .payload()
+            .parse::<CreateWallet>()
+            .expect("Unable to parse transaction");
+        assert_eq!(parsed_tx.name, format!("Alice #{}", i))
     }
 
     // Test filtering and other nice stuff.
-
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
     let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
@@ -374,7 +356,6 @@ fn test_transaction_iterator() {
 
     let snapshot = blockchain.snapshot();
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
-
     let block = explorer.block(Height(2)).unwrap();
     let failed_tx_hashes: Vec<_> = block
         .iter()

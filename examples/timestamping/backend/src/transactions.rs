@@ -14,7 +14,7 @@
 
 //! Timestamping transactions.
 
-use exonum::runtime::rust::TransactionContext;
+use exonum::runtime::rust::CallContext;
 use exonum_proto::ProtobufConvert;
 use exonum_time::schema::TimeSchema;
 
@@ -51,18 +51,18 @@ pub struct Config {
 
 #[exonum_service]
 pub trait TimestampingInterface {
-    fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> Result<(), Error>;
+    fn timestamp(&self, ctx: CallContext, arg: TxTimestamp) -> Result<(), Error>;
 }
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, context: TransactionContext, arg: TxTimestamp) -> Result<(), Error> {
+    fn timestamp(&self, context: CallContext, arg: TxTimestamp) -> Result<(), Error> {
         let tx_hash = context
             .caller()
             .as_transaction()
             .expect("Wrong `TxTimestamp` initiator")
             .0;
 
-        let schema = Schema::new(context.instance.name, context.fork());
+        let schema = Schema::new(context.instance().name, context.fork());
 
         let config = schema.config().get().expect("Can't read service config");
 

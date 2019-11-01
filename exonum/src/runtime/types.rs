@@ -12,22 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
-use exonum_proto::ProtobufConvert;
-
+use super::InstanceDescriptor;
 use crate::{
-    blockchain::ConsensusConfig,
     helpers::ValidateInput,
     merkledb::{
         impl_binary_key_for_binary_value, is_allowed_latin1_char, is_valid_index_name, BinaryValue,
     },
     proto::schema,
 };
-
-use super::InstanceDescriptor;
 
 /// Unique service instance identifier.
 ///
@@ -230,8 +227,17 @@ impl FromStr for ArtifactId {
     }
 }
 
+/// Exhaustive artifact specification.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
+pub struct ArtifactSpec {
+    /// Information uniquely identifying the artifact.
+    pub artifact: ArtifactId,
+    /// Runtime-specific artifact payload.
+    pub payload: Vec<u8>,
+}
+
 /// Exhaustive service instance specification.
-#[protobuf_convert(source = "schema::runtime::InstanceSpec")]
 #[derive(
     Debug,
     Clone,
@@ -244,6 +250,7 @@ impl FromStr for ArtifactId {
     BinaryValue,
     ObjectHash,
 )]
+#[protobuf_convert(source = "schema::runtime::InstanceSpec")]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///
@@ -316,24 +323,32 @@ impl Display for InstanceSpec {
     }
 }
 
-/// Configuration parameters of the certain service instance.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ProtobufConvert)]
-#[protobuf_convert(source = "schema::runtime::ServiceConfig")]
-pub struct ServiceConfig {
-    /// Corresponding service instance ID.
-    pub instance_id: InstanceId,
-    /// Raw bytes representation of service configuration parameters.
-    pub params: Vec<u8>,
+/// Allows to query a service instance by either of the two identifiers.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InstanceQuery<'a> {
+    Id(InstanceId),
+    Name(&'a str),
 }
 
-/// This message contains one atomic configuration change.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ProtobufConvert)]
-#[protobuf_convert(source = "schema::runtime::ConfigChange")]
-pub enum ConfigChange {
-    /// New consensus config.
-    Consensus(ConsensusConfig),
-    /// New service instance config.
-    Service(ServiceConfig),
+impl From<InstanceId> for InstanceQuery<'_> {
+    fn from(value: InstanceId) -> Self {
+        InstanceQuery::Id(value)
+    }
+}
+
+impl<'a> From<&'a str> for InstanceQuery<'a> {
+    fn from(value: &'a str) -> Self {
+        InstanceQuery::Name(value)
+    }
+}
+
+/// Status of a service instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DeployStatus {
+    /// The service instance has been successfully deployed.
+    Active,
+    /// The service instance is pending deployment.
+    Pending,
 }
 
 #[test]

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{executor, Async, Poll, Stream};
+use futures::{Async, Future, Poll, Stream};
 
 use std::fmt;
 
@@ -67,16 +67,21 @@ where
 
 /// Polls ready events from a stream of events. The stream is not closed.
 pub fn poll_events<S: Stream<Item = (), Error = ()>>(stream: &mut S) {
-    let events = TakeWhileReady::new(stream.by_ref()).for_each(|_| Ok(()));
-    let mut spawn = executor::spawn(events);
-    spawn.wait_future().expect("Error polling events");
+    TakeWhileReady::new(stream.by_ref())
+        .for_each(|_| Ok(()))
+        .wait()
+        .expect("Error polling events");
+}
+
+/// Polls ready items from the stream, returning the latest one.
+pub fn poll_latest<S: Stream>(stream: &mut S) -> Option<Result<S::Item, S::Error>> {
+    TakeWhileReady::new(stream).wait().last()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::executor;
-    use futures::sync::mpsc;
+    use futures::{executor, sync::mpsc};
 
     #[test]
     fn test_take_while_ready() {

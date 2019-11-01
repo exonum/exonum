@@ -51,9 +51,9 @@ impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
                 darling::Error::unexpected_type("Expected `&self` or `&mut self` as an argument")
             })?;
 
-        method_args_iter.next().ok_or_else(|| {
-            darling::Error::unexpected_type("Expected `TransactionContext` argument")
-        })?;
+        method_args_iter
+            .next()
+            .ok_or_else(|| darling::Error::unexpected_type("Expected `CallContext` argument"))?;
 
         let arg_type = method_args_iter
             .next()
@@ -151,9 +151,7 @@ impl ExonumService {
                 .iter()
                 .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
                     quote! {
-                        impl #cr::runtime::rust::Transaction for #arg_type {
-                            type Service = &'static dyn #trait_name;
-
+                        impl #cr::runtime::rust::Transaction<dyn #trait_name> for #arg_type {
                             const INTERFACE_NAME: &'static str = #interface_name;
                             const METHOD_ID: #cr::runtime::MethodId = #id;
                         }
@@ -195,17 +193,17 @@ impl ExonumService {
                 const INTERFACE_NAME: &'static str = #interface_name;
 
                 fn dispatch(
-                        &self,
-                        ctx: #cr::runtime::rust::TransactionContext,
-                        method: #cr::runtime::MethodId,
-                        payload: &[u8]
-                    ) -> Result<(), #cr::runtime::error::ExecutionError> {
+                    &self,
+                    ctx: #cr::runtime::rust::CallContext,
+                    method: #cr::runtime::MethodId,
+                    payload: &[u8],
+                ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match method {
                         #( #match_arms )*
                         other => {
                             let message = format!(
                                 "Method with ID {} is absent in the '{}' interface of the instance `{}`",
-                                other, stringify!(#trait_name), ctx.instance.name,
+                                other, stringify!(#trait_name), ctx.instance().name,
                             );
                             Err(#cr::runtime::DispatcherError::no_such_method(message))
                         }

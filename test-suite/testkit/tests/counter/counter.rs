@@ -24,7 +24,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
-        rust::{Service, TransactionContext},
+        rust::{CallContext, Service},
         InstanceDescriptor, InstanceId,
     },
 };
@@ -107,13 +107,13 @@ pub enum Error {
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> Result<(), Error>;
+    fn increment(&self, context: CallContext, arg: TxIncrement) -> Result<(), Error>;
 
-    fn reset(&self, context: TransactionContext, arg: TxReset) -> Result<(), Error>;
+    fn reset(&self, context: CallContext, arg: TxReset) -> Result<(), Error>;
 }
 
 impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: TransactionContext, arg: TxIncrement) -> Result<(), Error> {
+    fn increment(&self, context: CallContext, arg: TxIncrement) -> Result<(), Error> {
         if arg.by == 0 {
             return Err(Error::AddingZero);
         }
@@ -123,7 +123,7 @@ impl CounterServiceInterface for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: TransactionContext, _arg: TxReset) -> Result<(), Error> {
+    fn reset(&self, context: CallContext, _arg: TxReset) -> Result<(), Error> {
         let mut schema = CounterSchema::new(context.fork());
         schema.set_count(0);
         Ok(())

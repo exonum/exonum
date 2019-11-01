@@ -16,7 +16,7 @@ use exonum::{
     crypto,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{self, dispatcher, rust::Transaction, CallInfo, ExecutionError},
+    runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError},
 };
 use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
 
@@ -224,7 +224,7 @@ fn test_any_call_err_unknown_instance() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, dispatcher::Error::IncorrectInstanceId.into());
+    assert_eq!(err.kind, DispatcherError::IncorrectInstanceId.into());
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn test_any_call_err_unknown_interface() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, dispatcher::Error::NoSuchInterface.into());
+    assert_eq!(err.kind, DispatcherError::NoSuchInterface.into());
 }
 
 #[test]
@@ -272,7 +272,7 @@ fn test_any_call_err_unknown_method() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, dispatcher::Error::NoSuchMethod.into());
+    assert_eq!(err.kind, DispatcherError::NoSuchMethod.into());
 }
 
 #[test]
@@ -299,10 +299,7 @@ fn test_any_call_err_wrong_arg() {
     )
     .unwrap_err();
 
-    assert_eq!(
-        err.kind,
-        runtime::DispatcherError::MalformedArguments.into()
-    );
+    assert_eq!(err.kind, DispatcherError::MalformedArguments.into());
 }
 
 #[test]
@@ -322,5 +319,5 @@ fn test_any_call_panic_recursion_limit() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, runtime::dispatcher::Error::StackOverflow.into());
+    assert_eq!(err.kind, DispatcherError::StackOverflow.into());
 }

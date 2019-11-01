@@ -78,7 +78,7 @@ fn assert_status(api: &TestKitApi, tx: &Verified<AnyTx>, expected_status: &serde
 
 #[test]
 fn test_api_get_timestamp_nothing() {
-    let (testkit, _) = init_testkit();
+    let (mut testkit, _) = init_testkit();
     let api = testkit.api();
     let entry: Option<TimestampEntry> = api
         .public(ApiKind::Service(SERVICE_NAME))
@@ -91,8 +91,7 @@ fn test_api_get_timestamp_nothing() {
 
 #[test]
 fn test_api_post_timestamp() {
-    let (testkit, _) = init_testkit();
-
+    let (mut testkit, _) = init_testkit();
     let content = Timestamp::new(&Hash::zero(), "metadata");
     let keypair = gen_keypair();
     let tx = TxTimestamp { content }.sign(SERVICE_ID, keypair.0, &keypair.1);
@@ -110,7 +109,6 @@ fn test_api_post_timestamp() {
 #[test]
 fn test_api_get_timestamp_proof() {
     let (mut testkit, _) = init_testkit();
-
     let keypair = gen_keypair();
 
     // Create timestamp
@@ -118,7 +116,7 @@ fn test_api_get_timestamp_proof() {
     let tx = TxTimestamp { content }.sign(SERVICE_ID, keypair.0, &keypair.1);
     testkit.create_block_with_transactions(txvec![tx.clone()]);
 
-    // get proof
+    // Get proof.
     let api = testkit.api();
     let _: serde_json::Value = api
         .public(ApiKind::Service(SERVICE_NAME))
@@ -132,7 +130,6 @@ fn test_api_get_timestamp_proof() {
 #[test]
 fn test_api_get_timestamp_entry() {
     let (mut testkit, _) = init_testkit();
-
     let keypair = gen_keypair();
 
     // Create timestamp
@@ -159,7 +156,6 @@ fn test_api_get_timestamp_entry() {
 fn test_api_can_not_add_same_content_hash() {
     let (mut testkit, _) = init_testkit();
     let api = testkit.api();
-
     let keypair = gen_keypair();
     let content_hash = hash(&[1]);
     let timestamp1 = Timestamp::new(&content_hash, "metadata");

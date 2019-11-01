@@ -105,11 +105,6 @@ impl InternalPart {
                         let event = InternalEvent::Shutdown;
                         Either::B(future::ok(event))
                     }
-
-                    InternalRequest::RestartApi => {
-                        let event = InternalEvent::RestartApi;
-                        Either::B(future::ok(event))
-                    }
                 };
 
                 let send_event = Self::send_event(event, internal_tx.clone());

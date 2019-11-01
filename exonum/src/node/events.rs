@@ -116,11 +116,9 @@ impl NodeHandler {
     pub(crate) fn handle_shutdown(&mut self) {
         // Send `Shutdown` to stop event-loop.
         self.execute_later(InternalRequest::Shutdown);
-
         // Flush transactions stored in tx_cache to persistent pool.
         self.flush_txs_into_pool();
-
-        // Notify blockchain about the shutdown.
+        // Notify the blockchain about the shutdown.
         self.blockchain.shutdown();
     }
 

@@ -14,7 +14,7 @@
 
 //! Cryptocurrency transactions.
 
-use exonum::{crypto::PublicKey, runtime::rust::TransactionContext};
+use exonum::{crypto::PublicKey, runtime::rust::CallContext};
 use exonum_proto::ProtobufConvert;
 
 use super::{proto, schema::Schema, CryptocurrencyService};
@@ -82,21 +82,21 @@ pub struct CreateWallet {
 #[exonum_service]
 pub trait CryptocurrencyInterface {
     /// Transfers `amount` of the currency from one wallet to another.
-    fn transfer(&self, ctx: TransactionContext, arg: Transfer) -> Result<(), Error>;
+    fn transfer(&self, ctx: CallContext, arg: Transfer) -> Result<(), Error>;
     /// Issues `amount` of the currency to the `wallet`.
-    fn issue(&self, ctx: TransactionContext, arg: Issue) -> Result<(), Error>;
+    fn issue(&self, ctx: CallContext, arg: Issue) -> Result<(), Error>;
     /// Creates wallet with the given `name`.
-    fn create_wallet(&self, ctx: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
+    fn create_wallet(&self, ctx: CallContext, arg: CreateWallet) -> Result<(), Error>;
 }
 
 impl CryptocurrencyInterface for CryptocurrencyService {
-    fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext, arg: Transfer) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
             .expect("Wrong `Transfer` initiator");
 
-        let mut schema = Schema::new(context.instance.name, context.fork());
+        let mut schema = Schema::new(context.instance().name, context.fork());
 
         let to = arg.to;
         let amount = arg.amount;
@@ -118,13 +118,13 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn issue(&self, context: TransactionContext, arg: Issue) -> Result<(), Error> {
+    fn issue(&self, context: CallContext, arg: Issue) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
             .expect("Wrong `Issue` initiator");
 
-        let mut schema = Schema::new(context.instance.name, context.fork());
+        let mut schema = Schema::new(context.instance().name, context.fork());
 
         if let Some(wallet) = schema.wallet(&from) {
             let amount = arg.amount;
@@ -135,13 +135,13 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, context: CallContext, arg: CreateWallet) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
             .expect("Wrong `CreateWallet` initiator");
 
-        let mut schema = Schema::new(context.instance.name, context.fork());
+        let mut schema = Schema::new(context.instance().name, context.fork());
 
         if schema.wallet(&from).is_none() {
             let name = &arg.name;

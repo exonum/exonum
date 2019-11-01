@@ -19,7 +19,7 @@ pub use crate::interface::Issue;
 use exonum::{
     crypto::{Hash, PublicKey},
     runtime::{
-        rust::{Service, TransactionContext},
+        rust::{CallContext, Service},
         CallInfo, Caller, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
@@ -43,11 +43,7 @@ pub struct TxCreateWallet {
 
 #[exonum_service]
 pub trait WalletInterface {
-    fn create(
-        &self,
-        context: TransactionContext,
-        arg: TxCreateWallet,
-    ) -> Result<(), ExecutionError>;
+    fn create(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -69,11 +65,7 @@ impl Service for WalletService {
 }
 
 impl WalletInterface for WalletService {
-    fn create(
-        &self,
-        context: TransactionContext,
-        arg: TxCreateWallet,
-    ) -> Result<(), ExecutionError> {
+    fn create(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), ExecutionError> {
         let (owner, fork) = context
             .verify_caller(Caller::author)
             .ok_or(Error::WrongInterfaceCaller)?;
@@ -94,7 +86,7 @@ impl WalletInterface for WalletService {
 }
 
 impl IssueReceiver for WalletService {
-    fn issue(&self, context: TransactionContext, arg: Issue) -> Result<(), ExecutionError> {
+    fn issue(&self, context: CallContext, arg: Issue) -> Result<(), ExecutionError> {
         let (instance_id, fork) = context
             .verify_caller(Caller::as_service)
             .ok_or(Error::WrongInterfaceCaller)?;
@@ -120,7 +112,7 @@ pub struct TxIssue {
 
 #[exonum_service]
 pub trait DepositInterface {
-    fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError>;
+    fn issue(&self, context: CallContext, arg: TxIssue) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -142,9 +134,9 @@ impl Service for DepositService {
 }
 
 impl DepositInterface for DepositService {
-    fn issue(&self, context: TransactionContext, arg: TxIssue) -> Result<(), ExecutionError> {
+    fn issue(&self, mut context: CallContext, arg: TxIssue) -> Result<(), ExecutionError> {
         context
-            .interface::<IssueReceiverClient>(WalletService::ID)
+            .interface::<IssueReceiverClient>(WalletService::ID)?
             .issue(Issue {
                 to: arg.to,
                 amount: arg.amount,
@@ -168,11 +160,11 @@ pub struct TxRecursiveCall {
 
 #[exonum_service]
 pub trait AnyCall {
-    fn call_any(&self, context: TransactionContext, arg: TxAnyCall) -> Result<(), ExecutionError>;
+    fn call_any(&self, context: CallContext, arg: TxAnyCall) -> Result<(), ExecutionError>;
 
     fn call_recursive(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         arg: TxRecursiveCall,
     ) -> Result<(), ExecutionError>;
 }
@@ -190,8 +182,8 @@ impl AnyCallService {
 }
 
 impl AnyCall for AnyCallService {
-    fn call_any(&self, context: TransactionContext, tx: TxAnyCall) -> Result<(), ExecutionError> {
-        context.call_context(tx.call_info.instance_id).call(
+    fn call_any(&self, mut context: CallContext, tx: TxAnyCall) -> Result<(), ExecutionError> {
+        context.call_context(tx.call_info.instance_id)?.call(
             tx.interface_name,
             tx.call_info.method_id,
             tx.args,
@@ -200,14 +192,14 @@ impl AnyCall for AnyCallService {
 
     fn call_recursive(
         &self,
-        context: TransactionContext,
+        mut context: CallContext,
         arg: TxRecursiveCall,
     ) -> Result<(), ExecutionError> {
         if arg.depth == 1 {
             return Ok(());
         }
 
-        context.call_context(context.instance.id).call(
+        context.call_context(context.instance().id)?.call(
             "",
             1,
             TxRecursiveCall {

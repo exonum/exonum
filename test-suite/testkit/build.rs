@@ -22,15 +22,6 @@ fn main() {
             "testkit_protobuf_mod.rs",
         ),
         (
-            "src/simple_supervisor/proto",
-            vec![
-                "src/simple_supervisor/proto".into(),
-                ProtoSources::Exonum,
-                ProtoSources::Crypto,
-            ],
-            "simple_supervisor_mod.rs",
-        ),
-        (
             "tests/inflating_currency/proto",
             vec![
                 "tests/inflating_currency/proto".into(),

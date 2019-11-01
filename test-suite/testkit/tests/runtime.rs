@@ -14,15 +14,12 @@
 
 use exonum::{
     blockchain::InstanceConfig,
-    crypto::{PublicKey, SecretKey},
-    exonum_merkledb::{Fork, Snapshot},
-    node::ApiSender,
     runtime::{
-        dispatcher::{DispatcherRef, DispatcherSender},
-        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceSpec,
-        Runtime, StateHashAggregator,
+        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, Mailbox, Runtime, StateHashAggregator,
     },
 };
+use exonum_merkledb::Snapshot;
 use exonum_testkit::TestKitBuilder;
 use futures::{Future, IntoFuture};
 use std::{sync::Arc, sync::RwLock};
@@ -105,26 +102,26 @@ impl Runtime for TestRuntime {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
         self.tester.deploy_artifact(artifact, deploy_spec);
-        Box::new(Ok(()).into_future())
+        Box::new(Ok(ArtifactProtobufSpec::default()).into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         self.tester.is_artifact_deployed(id)
     }
 
-    fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        Some(ArtifactProtobufSpec::default())
-    }
-
-    fn restart_service(&mut self, _spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        _spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn add_service(
-        &mut self,
-        _fork: &mut Fork,
+    fn start_adding_service(
+        &self,
+        _context: ExecutionContext,
         _spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -134,7 +131,7 @@ impl Runtime for TestRuntime {
 
     fn execute(
         &self,
-        _context: &ExecutionContext,
+        _context: ExecutionContext,
         _call_info: &CallInfo,
         _arguments: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -145,16 +142,15 @@ impl Runtime for TestRuntime {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
-
-    fn after_commit(
+    fn before_commit(
         &self,
-        _dispatcher: &DispatcherSender,
-        _snapshot: &dyn Snapshot,
-        _service_keypair: &(PublicKey, SecretKey),
-        _tx_sender: &ApiSender,
-    ) {
+        _context: ExecutionContext,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
+
+    fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
 impl From<TestRuntime> for (u32, Box<dyn Runtime>) {

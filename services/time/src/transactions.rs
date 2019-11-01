@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::{blockchain::Schema, crypto::PublicKey, runtime::rust::TransactionContext};
+use exonum::{blockchain::Schema, crypto::PublicKey, runtime::rust::CallContext};
 use exonum_merkledb::IndexAccess;
 use exonum_proto::ProtobufConvert;
 
@@ -121,11 +121,11 @@ impl TxTime {
 #[exonum_service]
 pub trait TimeOracleInterface {
     /// Receives a new time from one of validators.
-    fn time(&self, ctx: TransactionContext, arg: TxTime) -> Result<(), Error>;
+    fn time(&self, ctx: CallContext, arg: TxTime) -> Result<(), Error>;
 }
 
 impl TimeOracleInterface for TimeService {
-    fn time(&self, context: TransactionContext, arg: TxTime) -> Result<(), Error> {
+    fn time(&self, context: CallContext, arg: TxTime) -> Result<(), Error> {
         let author = context
             .caller()
             .as_transaction()
@@ -133,8 +133,8 @@ impl TimeOracleInterface for TimeService {
             .1;
 
         arg.check_signed_by_validator(context.fork(), &author)?;
-        arg.update_validator_time(context.instance.name, context.fork(), &author)?;
-        TxTime::update_consolidated_time(context.instance.name, context.fork());
+        arg.update_validator_time(context.instance().name, context.fork(), &author)?;
+        TxTime::update_consolidated_time(context.instance().name, context.fork());
         Ok(())
     }
 }

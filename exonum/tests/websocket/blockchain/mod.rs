@@ -20,7 +20,7 @@ use exonum::{
     helpers,
     node::{ApiSender, Node},
     runtime::{
-        rust::{Service, TransactionContext},
+        rust::{CallContext, Service},
         InstanceDescriptor, InstanceId, Runtime,
     },
 };
@@ -30,6 +30,7 @@ use exonum_proto::ProtobufConvert;
 use std::{
     net::SocketAddr,
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 mod proto;
@@ -74,8 +75,8 @@ pub enum Error {
 
 #[exonum_service]
 pub trait MyServiceInterface {
-    fn create_wallet(&self, context: TransactionContext, arg: CreateWallet) -> Result<(), Error>;
-    fn transfer(&self, context: TransactionContext, arg: Transfer) -> Result<(), Error>;
+    fn create_wallet(&self, context: CallContext, arg: CreateWallet) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext, arg: Transfer) -> Result<(), Error>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -87,14 +88,14 @@ pub trait MyServiceInterface {
 struct MyService;
 
 impl MyServiceInterface for MyService {
-    fn create_wallet(&self, _context: TransactionContext, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, _context: CallContext, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
             Err(Error::NotAllowed)
         }
     }
-    fn transfer(&self, _context: TransactionContext, _arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, _context: CallContext, _arg: Transfer) -> Result<(), Error> {
         panic!("oops")
     }
 }
@@ -131,10 +132,13 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
     );
 
     let api_tx = node.channel();
-    RunHandle {
+    let handle = RunHandle {
         node_thread: thread::spawn(move || {
             node.run().unwrap();
         }),
         api_tx,
-    }
+    };
+    // Wait until the node has fully started.
+    thread::sleep(Duration::from_secs(1));
+    handle
 }

@@ -30,7 +30,7 @@ use exonum::{
     helpers::Height,
     messages::Verified,
     runtime::{
-        rust::{Service, Transaction, TransactionContext},
+        rust::{CallContext, Service, Transaction},
         AnyTx, InstanceDescriptor, InstanceId,
     },
 };
@@ -107,7 +107,7 @@ impl TxMarker {
 
 #[exonum_service]
 pub trait MarkerInterface {
-    fn mark(&self, context: TransactionContext, arg: TxMarker) -> Result<(), ExecutionError>;
+    fn mark(&self, context: CallContext, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -120,7 +120,7 @@ pub trait MarkerInterface {
 struct MarkerService;
 
 impl MarkerInterface for MarkerService {
-    fn mark(&self, context: TransactionContext, arg: TxMarker) -> Result<(), ExecutionError> {
+    fn mark(&self, context: CallContext, arg: TxMarker) -> Result<(), ExecutionError> {
         let author = context
             .caller()
             .as_transaction()
@@ -132,7 +132,7 @@ impl MarkerInterface for MarkerService {
             .get();
         match time {
             Some(current_time) if current_time <= arg.time => {
-                let schema = MarkerSchema::new(context.instance.name, context.fork());
+                let schema = MarkerSchema::new(context.instance().name, context.fork());
                 schema.marks().put(&author, arg.mark);
             }
             _ => {}

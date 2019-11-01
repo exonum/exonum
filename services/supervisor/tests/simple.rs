@@ -18,23 +18,20 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::{Entry, Snapshot},
     runtime::{
-        rust::{
-            interfaces::verify_caller_is_supervisor, Configure, Service, Transaction,
-            TransactionContext,
-        },
-        DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
+        rust::{CallContext, Service, Transaction},
+        Caller, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::ServiceFactory;
+use exonum_testkit::{TestKit, TestKitBuilder};
 
-use crate::{
-    simple_supervisor::{ConfigPropose, Schema, SimpleSupervisor},
-    TestKit, TestKitBuilder,
+use exonum_supervisor::{
+    simple::{Schema, SimpleSupervisor, SimpleSupervisorInterface},
+    ConfigPropose, Configure,
 };
 
 #[derive(Debug, ServiceFactory)]
 #[exonum(
-    proto_sources = "super::proto::schema",
     artifact_name = "config-change-test-service",
     implements("Configure<Params = String>")
 )]
@@ -66,11 +63,11 @@ impl Configure for ConfigChangeService {
 
     fn verify_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(verify_caller_is_supervisor)
+            .verify_caller(Caller::as_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {
@@ -82,14 +79,14 @@ impl Configure for ConfigChangeService {
 
     fn apply_config(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context
-            .verify_caller(verify_caller_is_supervisor)
+            .verify_caller(Caller::as_supervisor)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance.name), fork).set(params.clone());
+        Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());
 
         match params.as_ref() {
             "apply_error" => {
@@ -127,7 +124,7 @@ fn add_nodes_to_validators() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
 
     testkit.create_blocks_until(cfg_change_height.previous());
@@ -160,7 +157,7 @@ fn exclude_us_from_validators() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -189,7 +186,7 @@ fn exclude_other_from_validators() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -215,7 +212,7 @@ fn change_us_validator_id() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_consensus_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -238,7 +235,7 @@ fn service_config_change() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -274,7 +271,7 @@ fn discard_errored_service_config_change() {
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
             .service_config(ConfigChangeService::INSTANCE_ID, "error".to_owned())
             .consensus_config(new_consensus_config)
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -311,7 +308,7 @@ fn discard_panicked_service_config_change() {
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
             .service_config(ConfigChangeService::INSTANCE_ID, "panic".to_owned())
             .consensus_config(new_consensus_config)
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -342,7 +339,7 @@ fn incorrect_actual_from_field() {
         .create_block_with_transaction(
             ConfigPropose::actual_from(cfg_change_height)
                 .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-                .into_tx(),
+                .sign_for_simple_supervisor(),
         )
         .transactions[0]
         .status()
@@ -363,7 +360,7 @@ fn another_configuration_change_proposal() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     // Try to commit second config change propose.
     testkit
@@ -373,7 +370,7 @@ fn another_configuration_change_proposal() {
                     ConfigChangeService::INSTANCE_ID,
                     "I am an overridden parameter".to_owned(),
                 )
-                .into_tx(),
+                .sign_for_simple_supervisor(),
         )
         .transactions[0]
         .status()
@@ -410,13 +407,15 @@ fn service_config_discard_fake_supervisor() {
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
 
-    testkit
-        .create_block_with_transaction(
-            ConfigPropose::actual_from(cfg_change_height)
-                .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-                .sign(FAKE_SUPERVISOR_ID, keypair.0, &keypair.1),
-        )
-        .transactions[0]
+    let propose = ConfigPropose::actual_from(cfg_change_height)
+        .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
+    let tx = Transaction::<dyn SimpleSupervisorInterface>::sign(
+        propose,
+        FAKE_SUPERVISOR_ID,
+        keypair.0,
+        &keypair.1,
+    );
+    testkit.create_block_with_transaction(tx).transactions[0]
         .status()
         .unwrap_err();
 }
@@ -447,7 +446,7 @@ fn test_configuration_and_rollbacks() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_config.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
 
     testkit.create_blocks_until(cfg_change_height);
@@ -483,7 +482,7 @@ fn service_config_rollback_apply_error() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -511,7 +510,7 @@ fn service_config_rollback_apply_panic() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -541,7 +540,7 @@ fn service_config_apply_multiple_configs() {
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
             .service_config(ConfigChangeService::INSTANCE_ID, "apply_panic".to_owned())
             .service_config(ConfigChangeService::INSTANCE_ID, "apply_error".to_owned())
-            .into_tx(),
+            .sign_for_simple_supervisor(),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -570,7 +569,7 @@ fn several_service_config_changes() {
         testkit.create_block_with_transaction(
             ConfigPropose::actual_from(cfg_change_height)
                 .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
-                .into_tx(),
+                .sign_for_simple_supervisor(),
         )[0]
         .status()
         .unwrap();

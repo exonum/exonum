@@ -32,7 +32,10 @@ use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use self::{
     backends::actix,
-    node::{private::NodeInfo, public::ExplorerApi},
+    node::{
+        private::{NodeInfo, SystemApi as PrivateSystemApi},
+        public::{ExplorerApi, SystemApi},
+    },
 };
 use crate::{
     api::node::SharedNodeState,
@@ -203,86 +206,56 @@ pub trait ExtendApiBackend {
 /// operate simultaneously. Currently, only HTTP v1 backend is available.
 #[derive(Debug, Clone)]
 pub struct ApiAggregator {
-    blockchain: Blockchain,
-    node_state: SharedNodeState,
     endpoints: BTreeMap<String, ApiBuilder>,
 }
 
 impl ApiAggregator {
     /// Aggregate API for the given blockchain and node state.
-    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
+    pub fn new(blockchain: &Blockchain, node_state: SharedNodeState) -> Self {
         let mut endpoints = BTreeMap::new();
-        // Adds built-in APIs.
-        let context = ApiContext::with_blockchain(&blockchain);
+        let context = ApiContext::with_blockchain(blockchain);
         endpoints.insert(
             "system".to_owned(),
             Self::system_api(context.clone(), node_state.clone()),
         );
         endpoints.insert(
             "explorer".to_owned(),
-            Self::explorer_api(context.clone(), node_state.clone()),
+            Self::explorer_api(context, node_state),
         );
-        Self {
-            endpoints,
-            blockchain,
-            node_state,
-        }
+        Self { endpoints }
     }
 
-    /// Return a reference to the blockchain used by the aggregator.
-    pub fn blockchain(&self) -> &Blockchain {
-        &self.blockchain
+    pub fn insert(&mut self, name: &str, api: ApiBuilder) {
+        self.endpoints.insert(name.to_owned(), api);
+    }
+
+    pub fn extend(&mut self, endpoints: impl IntoIterator<Item = (String, ApiBuilder)>) {
+        self.endpoints.extend(endpoints);
     }
 
     /// Extend the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
-        let mut endpoints = self.endpoints.clone();
-
-        let blockchain = self.blockchain.clone();
-        let dispatcher = self.blockchain.dispatcher();
-        let context = ApiContext::with_blockchain(&blockchain);
-        endpoints.extend(dispatcher.api_endpoints(&context));
-
-        trace!("Create actix-web worker with api: {:#?}", endpoints);
-
+        let endpoints = self.endpoints.iter();
         match access {
-            ApiAccess::Public => backend.extend(
-                endpoints
-                    .iter()
-                    .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
-            ),
-            ApiAccess::Private => backend.extend(
-                endpoints
-                    .iter()
-                    .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
-            ),
+            ApiAccess::Public => backend
+                .extend(endpoints.map(|(name, builder)| (name.as_str(), &builder.public_scope))),
+            ApiAccess::Private => backend
+                .extend(endpoints.map(|(name, builder)| (name.as_str(), &builder.private_scope))),
         }
-    }
-
-    /// Add API factory with the given prefix to the aggregator.
-    pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ApiBuilder) {
-        self.endpoints.insert(prefix.into(), builder);
-    }
-
-    /// Refresh shared node state.
-    fn refresh(&self) {
-        self.node_state.update_dispatcher_state(&self.blockchain);
     }
 
     fn explorer_api(context: ApiContext, shared_node_state: SharedNodeState) -> ApiBuilder {
         let mut builder = ApiBuilder::new();
-
         ExplorerApi::new(context).wire(builder.public_scope(), shared_node_state);
         builder
     }
 
     fn system_api(context: ApiContext, shared_api_state: SharedNodeState) -> ApiBuilder {
         let mut builder = ApiBuilder::new();
-
         let sender = context.sender().clone();
-        self::node::private::SystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
+        PrivateSystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        self::node::public::SystemApi::new(context, shared_api_state).wire(builder.public_scope());
+        SystemApi::new(context, shared_api_state).wire(builder.public_scope());
         builder
     }
 }
@@ -291,6 +264,7 @@ impl ApiAggregator {
 ///
 /// This context contains necessary parts for interaction with the blockchain
 /// and may be shared among any kind of handlers.
+// TODO: fold into `Blockchain` [ERC-3745]
 #[derive(Debug, Clone)]
 pub struct ApiContext {
     service_keypair: (PublicKey, SecretKey),
@@ -313,8 +287,7 @@ impl ApiContext {
         }
     }
 
-    /// Create a new API context instance for the specified blockchain.
-    #[doc(hidden)]
+    /// Creates a new API context instance for the specified blockchain.
     pub fn with_blockchain(blockchain: &Blockchain) -> Self {
         Self {
             service_keypair: blockchain.service_keypair.clone(),

@@ -39,7 +39,7 @@ fn test_add_nodes_to_validators() {
 
     let new_config_propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(new_consensus_config.clone())
-        .config_propose();
+        .build();
     let signed_proposal =
         sign_config_propose_transaction(&testkit, new_config_propose, ValidatorId(0));
     testkit.create_block_with_transaction(signed_proposal);
@@ -67,7 +67,7 @@ fn test_exclude_us_from_validators() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(new_consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
     testkit.create_block_with_transaction(sign_config_propose_transaction(
         &testkit,
@@ -102,7 +102,7 @@ fn test_exclude_other_from_validators() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(new_consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
 
     testkit.create_block_with_transaction(sign_config_propose_transaction(
@@ -135,7 +135,7 @@ fn test_change_our_validator_id() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(new_consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
 
     testkit.create_block_with_transaction(sign_config_propose_transaction(

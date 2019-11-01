@@ -134,15 +134,19 @@ impl ServiceFactory {
 
     fn artifact_protobuf_spec(&self) -> impl ToTokens {
         let cr = &self.cr;
-        let proto_sources_mod = self
-            .proto_sources
-            .as_ref()
-            .expect("`proto_sources` attribute is not set properly");
-
-        quote! {
-            #cr::runtime::ArtifactProtobufSpec::from(
-                (#proto_sources_mod::PROTO_SOURCES.as_ref(), #proto_sources_mod::INCLUDES.as_ref())
-            )
+        if let Some(ref proto_sources_mod) = self.proto_sources {
+            quote! {
+                #cr::runtime::ArtifactProtobufSpec::from(
+                    (#proto_sources_mod::PROTO_SOURCES.as_ref(), #proto_sources_mod::INCLUDES.as_ref())
+                )
+            }
+        } else {
+            quote! {
+                #cr::runtime::ArtifactProtobufSpec {
+                    sources: vec![],
+                    includes: vec![],
+                }
+            }
         }
     }
 
@@ -168,7 +172,7 @@ impl ServiceFactory {
                     &self,
                     interface_name: &str,
                     method: #cr::runtime::MethodId,
-                    ctx: #cr::runtime::rust::TransactionContext,
+                    ctx: #cr::runtime::rust::CallContext,
                     payload: &[u8],
                 ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match interface_name {
@@ -176,7 +180,7 @@ impl ServiceFactory {
                         other => {
                             let message = format!(
                                 "Service instance `{}` does not implement a `{}` interface.",
-                                ctx.instance.name,
+                                ctx.instance().name,
                                 other
                             );
                             Err(#cr::runtime::DispatcherError::no_such_interface(message))

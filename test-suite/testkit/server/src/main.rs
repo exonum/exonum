@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// use exonum_cryptocurrency::service::CurrencyService;
+use exonum::blockchain::InstanceCollection;
+use exonum_cryptocurrency::contracts::CryptocurrencyService;
 use exonum_testkit::TestKitBuilder;
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
 
     // TODO Fix testkit work
-
+    let service =
+        InstanceCollection::new(CryptocurrencyService).with_instance(1, "cryptocurrency", ());
     TestKitBuilder::validator()
-        // .with_service(CurrencyService)
+        .with_rust_service(service)
         .serve(
             "0.0.0.0:8000".parse().unwrap(),
             "0.0.0.0:9000".parse().unwrap(),

@@ -18,7 +18,7 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{InstanceDescriptor, rust::{Transaction, TransactionContext, Service}},
+//!     runtime::{InstanceDescriptor, rust::{Transaction, CallContext, Service}},
 //!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
@@ -56,11 +56,11 @@
 //!
 //! #[exonum_service]
 //! pub trait TimestampingInterface {
-//!     fn timestamp(&self, _: TransactionContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
+//!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
 //! }
 //!
 //! impl TimestampingInterface for TimestampingService {
-//!     fn timestamp(&self, _: TransactionContext, arg: TxTimestamp) -> Result<(), ExecutionError> {
+//!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError> {
 //!         Ok(())
 //!     }
 //! }
@@ -133,7 +133,8 @@ extern crate failure;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
+#[cfg_attr(test, macro_use)]
+#[cfg(test)]
 extern crate exonum_derive;
 
 pub use crate::{
@@ -145,15 +146,15 @@ pub use crate::{
 };
 pub mod compare;
 pub mod proto;
-pub mod simple_supervisor;
 
 use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
+        manager::UpdateEndpoints,
         ApiAccess,
     },
     blockchain::{
-        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
+        Blockchain, BlockchainMut, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
     },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
@@ -168,14 +169,19 @@ use tokio_core::reactor::Core;
 
 use std::{
     collections::BTreeMap,
-    sync::{Arc, Mutex, RwLock},
-    {fmt, net::SocketAddr},
+    fmt, mem,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
 };
 
+use crate::server::TestKitActor;
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
-    poll_events::poll_events,
+    poll_events::{poll_events, poll_latest},
 };
+use exonum::api::node::SharedNodeState;
+use exonum::api::ApiAggregator;
+use exonum::runtime::rust::RustRuntime;
 
 #[macro_use]
 mod macros;
@@ -186,15 +192,22 @@ mod network;
 mod poll_events;
 mod server;
 
+type ApiNotifierChannel = (
+    mpsc::Sender<UpdateEndpoints>,
+    mpsc::Receiver<UpdateEndpoints>,
+);
+
 /// Testkit for testing blockchain services. It offers simple network configuration emulation
 /// (with no real network setup).
 pub struct TestKit {
-    blockchain: Blockchain,
+    blockchain: BlockchainMut,
     db_handler: CheckpointDbHandler<TemporaryDB>,
     events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
+    api_notifier_channel: ApiNotifierChannel,
+    api_aggregator: ApiAggregator,
 }
 
 impl fmt::Debug for TestKit {
@@ -229,30 +242,42 @@ impl TestKit {
         genesis: ConsensusConfig,
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
         instances: impl IntoIterator<Item = InstanceConfig>,
+        api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
         let db = database.into();
         let db_handler = db.handler();
-        let mut builder = BlockchainBuilder::new(db, genesis, network.us().service_keypair());
+        let db = Arc::new(db);
+        let blockchain = Blockchain::new(
+            Arc::clone(&db) as Arc<dyn Database>,
+            network.us().service_keypair(),
+            api_sender.clone(),
+        );
 
+        let mut builder = blockchain.into_mut(genesis);
         for runtime in runtimes {
             builder = builder.with_additional_runtime(runtime);
         }
 
         let blockchain = builder
             .with_builtin_instances(instances)
-            .finalize(api_sender.clone(), mpsc::channel(0).0)
+            .build()
             .expect("Unable to create blockchain instance");
+        // Initial API aggregator does not contain service endpoints. We expect them to arrive
+        // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
+        let api_aggregator = ApiAggregator::new(
+            blockchain.as_ref(),
+            SharedNodeState::new(&blockchain, 10_000),
+        );
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
 
-        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
-            let mut blockchain = blockchain.clone();
+        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
             Box::new(api_channel.1.and_then(move |event| {
-                let guard = processing_lock_.lock().unwrap();
-                let fork = blockchain.fork();
+                let _guard = processing_lock_.lock().unwrap();
+                let fork = db.fork();
                 let mut schema = CoreSchema::new(&fork);
                 match event {
                     ExternalMessage::Transaction(tx) => {
@@ -265,25 +290,38 @@ impl TestKit {
                     | ExternalMessage::Enable(_)
                     | ExternalMessage::Shutdown => { /* Ignored */ }
                 }
-                blockchain.merge(fork.into_patch()).unwrap();
-                drop(guard);
+                db.merge(fork.into_patch()).unwrap();
                 Ok(())
-            }))
-        };
+            }));
 
-        TestKit {
+        Self {
             blockchain,
             db_handler,
             api_sender,
             events_stream,
             processing_lock,
             network,
+            api_notifier_channel,
+            api_aggregator,
         }
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
-    pub fn api(&self) -> TestKitApi {
+    pub fn api(&mut self) -> TestKitApi {
         TestKitApi::new(self)
+    }
+
+    /// Updates API aggregator for the testkit and caches it for further use.
+    fn update_aggregator(&mut self) -> ApiAggregator {
+        if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
+            let mut aggregator = ApiAggregator::new(
+                self.blockchain.as_ref(),
+                SharedNodeState::new(&self.blockchain, 10_000),
+            );
+            aggregator.extend(update.user_endpoints);
+            self.api_aggregator = aggregator;
+        }
+        self.api_aggregator.clone()
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
@@ -299,7 +337,7 @@ impl TestKit {
 
     /// Returns a blockchain used by the testkit.
     pub fn blockchain(&self) -> Blockchain {
-        self.blockchain.clone()
+        self.blockchain.as_ref().to_owned()
     }
 
     /// Sets a checkpoint for a future [`rollback`](#method.rollback).
@@ -323,7 +361,7 @@ impl TestKit {
     /// # use exonum::{
     /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{InstanceDescriptor, rust::{Transaction, TransactionContext, Service}},
+    /// #     runtime::{InstanceDescriptor, rust::{Transaction, CallContext, Service}},
     /// # };
     /// #
     /// # const SERVICE_ID: u32 = 1;
@@ -343,11 +381,11 @@ impl TestKit {
     /// #
     /// # #[exonum_service]
     /// # pub trait ExampleInterface {
-    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError>;
+    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError>;
     /// # }
     /// #
     /// # impl ExampleInterface for ExampleService {
-    /// #     fn example_tx(&self, _: TransactionContext, arg: ExampleTx) -> Result<(), ExecutionError> {
+    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError> {
     /// #         Ok(())
     /// #     }
     /// # }
@@ -426,16 +464,15 @@ impl TestKit {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
         let saved_consensus_config = self.consensus_config();
+        let validator_id = self.leader().validator_id().unwrap();
 
-        let (block_hash, patch) = {
-            let validator_id = self.leader().validator_id().unwrap();
-            self.blockchain.create_patch(
-                validator_id,
-                new_block_height,
-                tx_hashes,
-                &mut BTreeMap::new(),
-            )
-        };
+        let guard = self.processing_lock.lock().unwrap();
+        let (block_hash, patch) = self.blockchain.create_patch(
+            validator_id,
+            new_block_height,
+            tx_hashes,
+            &mut BTreeMap::new(),
+        );
 
         let propose =
             self.leader()
@@ -447,7 +484,6 @@ impl TestKit {
             .map(|v| v.create_precommit(propose.as_ref(), block_hash))
             .collect();
 
-        let guard = self.processing_lock.lock().unwrap();
         self.blockchain
             .commit(
                 patch,
@@ -466,7 +502,6 @@ impl TestKit {
         }
 
         self.poll_events();
-
         let snapshot = self.snapshot();
         BlockchainExplorer::new(snapshot.as_ref())
             .block_with_txs(self.height())
@@ -487,32 +522,27 @@ impl TestKit {
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
     {
-        let tx_hashes: Vec<_> = {
-            let fork = self.blockchain.fork();
-            let hashes = {
-                let mut schema = CoreSchema::new(&fork);
+        let fork = self.blockchain.fork();
+        let mut schema = CoreSchema::new(&fork);
 
-                txs.into_iter()
-                    .map(|tx| {
-                        let tx_id = tx.object_hash();
-                        let tx_not_found = !schema.transactions().contains(&tx_id);
-                        let tx_in_pool = schema.transactions_pool().contains(&tx_id);
-                        assert!(
-                            tx_not_found || tx_in_pool,
-                            "Transaction is already committed: {:?}",
-                            tx
-                        );
-                        if tx_not_found {
-                            schema.add_transaction_into_pool(tx.clone());
-                        }
-                        tx_id
-                    })
-                    .collect()
-            };
-            self.blockchain.merge(fork.into_patch()).unwrap();
-            hashes
-        };
-
+        let tx_hashes: Vec<_> = txs
+            .into_iter()
+            .map(|tx| {
+                let tx_id = tx.object_hash();
+                let tx_not_found = !schema.transactions().contains(&tx_id);
+                let tx_in_pool = schema.transactions_pool().contains(&tx_id);
+                assert!(
+                    tx_not_found || tx_in_pool,
+                    "Transaction is already committed: {:?}",
+                    tx
+                );
+                if tx_not_found {
+                    schema.add_transaction_into_pool(tx.clone());
+                }
+                tx_id
+            })
+            .collect();
+        self.blockchain.merge(fork.into_patch()).unwrap();
         self.create_block_with_tx_hashes(&tx_hashes)
     }
 
@@ -546,14 +576,11 @@ impl TestKit {
     ) -> BlockWithTransactions {
         self.poll_events();
 
-        {
-            let snapshot = self.blockchain.snapshot();
-            let schema = CoreSchema::new(&snapshot);
-            for hash in tx_hashes {
-                assert!(schema.transactions_pool().contains(hash));
-            }
+        let snapshot = self.blockchain.snapshot();
+        let schema = CoreSchema::new(&snapshot);
+        for hash in tx_hashes {
+            assert!(schema.transactions_pool().contains(hash));
         }
-
         self.do_create_block(tx_hashes)
     }
 
@@ -575,10 +602,8 @@ impl TestKit {
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
         let fork = self.blockchain.fork();
-        {
-            let mut schema = CoreSchema::new(&fork);
-            schema.add_transaction_into_pool(transaction);
-        }
+        let mut schema = CoreSchema::new(&fork);
+        schema.add_transaction_into_pool(transaction);
         self.blockchain
             .merge(fork.into_patch())
             .expect("cannot update database");
@@ -613,12 +638,12 @@ impl TestKit {
 
     /// Returns the hash of latest committed block.
     pub fn last_block_hash(&self) -> crypto::Hash {
-        self.blockchain.last_hash()
+        self.blockchain.as_ref().last_hash()
     }
 
     /// Returns the height of latest committed block.
     pub fn height(&self) -> Height {
-        self.blockchain.last_block().height()
+        self.blockchain.as_ref().last_block().height()
     }
 
     /// Return an actual blockchain configuration.
@@ -657,23 +682,25 @@ impl TestKit {
 
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let events_stream = self.remove_events_stream();
-        // Creates complete actix web server with the testkit extensions.
-        let testkit_ref = Arc::new(RwLock::new(self));
+        let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
+
+        let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
         let system_runtime_config = SystemRuntimeConfig {
             api_runtimes: vec![
                 ApiRuntimeConfig::new(public_api_address, ApiAccess::Public),
                 ApiRuntimeConfig::new(private_api_address, ApiAccess::Private),
             ],
-            api_aggregator: server::create_testkit_api_aggregator(&testkit_ref),
+            api_aggregator,
         };
-        let system_runtime = system_runtime_config.start().unwrap();
+        let system_runtime = system_runtime_config.start(endpoints_rx).unwrap();
+
         // Run the event stream in a separate thread in order to put transactions to mempool
         // when they are received. Otherwise, a client would need to call a `poll_events` analogue
         // each time after a transaction is posted.
         let mut core = Core::new().unwrap();
         core.run(events_stream).unwrap();
-
         system_runtime.stop().unwrap();
+        actor_handle.join().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
@@ -684,9 +711,9 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    fn remove_events_stream(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
-        let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
-        Box::new(stream.for_each(|_| Ok(())))
+    pub(crate) fn remove_events_stream(&mut self) -> impl Future<Item = (), Error = ()> {
+        let stream = mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
+        stream.for_each(|_| Ok(()))
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
@@ -703,11 +730,16 @@ impl TestKit {
         let Self {
             db_handler,
             network,
+            api_notifier_channel,
             ..
         } = self;
 
         let db = db_handler.into_inner();
-        StoppedTestKit { network, db }
+        StoppedTestKit {
+            network,
+            db,
+            api_notifier_channel,
+        }
     }
 }
 
@@ -782,9 +814,10 @@ impl TestKit {
 /// assert_eq!(stopped.height(), Height(5));
 ///
 /// // Resume with the same single service with a fresh state.
+/// let runtime = stopped.rust_runtime();
 /// let service = AfterCommitService::new();
 /// let mut testkit = stopped.resume(vec![
-///     RustRuntime::new().with_available_service(service.clone())
+///     runtime.with_available_service(service.clone())
 /// ]);
 /// testkit.create_blocks_until(Height(8));
 /// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.
@@ -793,6 +826,7 @@ impl TestKit {
 pub struct StoppedTestKit {
     db: CheckpointDb<TemporaryDB>,
     network: TestNetwork,
+    api_notifier_channel: ApiNotifierChannel,
 }
 
 impl StoppedTestKit {
@@ -812,6 +846,11 @@ impl StoppedTestKit {
         &self.network
     }
 
+    /// Creates an empty Rust runtime.
+    pub fn rust_runtime(&self) -> RustRuntime {
+        RustRuntime::new(self.api_notifier_channel.0.clone())
+    }
+
     /// Resume the operation of the testkit.
     ///
     /// Note that `runtimes` may differ from the initially passed to the `TestKit`
@@ -829,7 +868,8 @@ impl StoppedTestKit {
             ConsensusConfig::default(),
             runtimes.into_iter().map(|x| x.into()),
             // In this context, it is not possible to add new service instances.
-            Vec::new(),
+            vec![],
+            self.api_notifier_channel,
         )
     }
 }
@@ -867,8 +907,7 @@ fn test_number_of_validators_in_builder() {
 #[test]
 #[should_panic(expected = "validator should be present")]
 fn test_zero_validators_in_builder() {
-    let testkit = TestKitBuilder::auditor().with_validators(0).create();
-    drop(testkit);
+    TestKitBuilder::auditor().with_validators(0).create();
 }
 
 #[test]

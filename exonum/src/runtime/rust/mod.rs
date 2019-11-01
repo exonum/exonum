@@ -15,19 +15,17 @@
 //! Built-in Rust runtime module.
 
 pub use self::{
+    call_context::CallContext,
     error::Error,
-    interfaces::Configure,
     service::{
-        AfterCommitContext, BeforeCommitContext, Interface, Service, ServiceDispatcher,
-        ServiceFactory, Transaction, TransactionContext,
+        AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
     },
 };
 
 pub mod error;
-pub mod interfaces;
 
-use exonum_merkledb::{Fork, Snapshot};
-use futures::{future, Future, IntoFuture};
+use exonum_merkledb::Snapshot;
+use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
 use std::{
@@ -37,28 +35,34 @@ use std::{
 };
 
 use crate::{
-    crypto::{Hash, PublicKey, SecretKey},
-    node::ApiSender,
+    api::{manager::UpdateEndpoints, ApiBuilder},
+    blockchain::{Blockchain, Schema as CoreSchema},
+    crypto::Hash,
+    helpers::Height,
 };
 
 use super::{
     api::{ApiContext, ServiceApiBuilder},
-    dispatcher::{self, DispatcherRef, DispatcherSender},
+    dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
+mod call_context;
 mod service;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RustRuntime {
+    api_context: Option<ApiContext>,
+    api_notifier: mpsc::Sender<UpdateEndpoints>,
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
+    new_services_since_last_block: bool,
 }
 
 #[derive(Debug)]
@@ -94,19 +98,27 @@ impl AsRef<dyn Service + 'static> for Instance {
     }
 }
 
-impl AsMut<dyn Service + 'static> for Instance {
-    fn as_mut(&mut self) -> &mut (dyn Service + 'static) {
-        self.service.as_mut()
-    }
-}
-
 impl RustRuntime {
     /// Rust runtime identifier.
     pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
 
     /// Creates a new Rust runtime instance.
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(api_notifier: mpsc::Sender<UpdateEndpoints>) -> Self {
+        Self {
+            api_context: None,
+            api_notifier,
+            available_artifacts: Default::default(),
+            deployed_artifacts: Default::default(),
+            started_services: Default::default(),
+            started_services_by_name: Default::default(),
+            new_services_since_last_block: false,
+        }
+    }
+
+    fn api_context(&self) -> &ApiContext {
+        self.api_context
+            .as_ref()
+            .expect("Method called before Rust runtime is initialized")
     }
 
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
@@ -123,38 +135,17 @@ impl RustRuntime {
         self
     }
 
-    fn parse_artifact(&self, artifact: &ArtifactId) -> Result<RustArtifactId, ExecutionError> {
-        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
-            return Err(Error::IncorrectArtifactId.into());
-        }
-        artifact
-            .name
-            .parse()
-            .map_err(|inner| (Error::IncorrectArtifactId, inner).into())
-    }
-
     fn add_started_service(&mut self, instance: Instance) {
         self.started_services_by_name
             .insert(instance.name.clone(), instance.id);
         self.started_services.insert(instance.id, instance);
     }
 
-    fn remove_started_instance(&mut self, instance_id: InstanceId) -> Option<Instance> {
-        self.started_services
-            .remove(&instance_id)
-            .and_then(|instance| {
-                self.started_services_by_name.remove(&instance.name);
-                Some(instance)
-            })
-    }
-
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
-        let artifact = self.parse_artifact(&artifact)?;
-
+        let artifact = RustArtifactId::parse(&artifact)?;
         if self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
-
         if !self.available_artifacts.contains_key(&artifact) {
             return Err(Error::UnableToDeploy.into());
         }
@@ -164,11 +155,8 @@ impl RustRuntime {
         Ok(())
     }
 
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<&Instance, ExecutionError> {
-        let artifact = self.parse_artifact(&spec.artifact)?;
-
-        // Implement ensure like macro to reduce amount of boiler-plate code. [ECR-3222]
-
+    fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
+        let artifact = RustArtifactId::parse(&spec.artifact)?;
         if !self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactNotDeployed.into());
         }
@@ -180,8 +168,7 @@ impl RustRuntime {
         }
 
         let service = self.available_artifacts[&artifact].create_instance();
-        self.add_started_service(Instance::new(spec.id, spec.name.clone(), service));
-        Ok(&self.started_services[&spec.id])
+        Ok(Instance::new(spec.id, spec.name.clone(), service))
     }
 
     fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
@@ -190,6 +177,41 @@ impl RustRuntime {
         } else {
             None
         }
+    }
+
+    fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
+        self.started_services
+            .values()
+            .map(|instance| {
+                let mut builder = ServiceApiBuilder::new(
+                    self.api_context().clone(),
+                    InstanceDescriptor {
+                        id: instance.id,
+                        name: instance.name.as_ref(),
+                    },
+                );
+                instance.as_ref().wire_api(&mut builder);
+                (
+                    ["services/", &instance.name].concat(),
+                    ApiBuilder::from(builder),
+                )
+            })
+            .collect()
+    }
+
+    fn push_api_changes(&mut self) {
+        if self.new_services_since_last_block {
+            let user_endpoints = self.api_endpoints();
+            // FIXME: this should either be made async, or an unbounded channel should be used.
+            if !self.api_notifier.is_closed() {
+                self.api_notifier
+                    .clone()
+                    .send(UpdateEndpoints { user_endpoints })
+                    .wait()
+                    .ok();
+            }
+        }
+        self.new_services_since_last_block = false;
     }
 }
 
@@ -211,6 +233,16 @@ impl RustArtifactId {
             name: name.to_owned(),
             version: Version::new(major, minor, patch),
         }
+    }
+
+    fn parse(artifact: &ArtifactId) -> Result<Self, ExecutionError> {
+        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
+            return Err(Error::IncorrectArtifactId.into());
+        }
+        artifact
+            .name
+            .parse()
+            .map_err(|inner| (Error::IncorrectArtifactId, inner).into())
     }
 }
 
@@ -248,72 +280,69 @@ impl FromStr for RustArtifactId {
 }
 
 impl Runtime for RustRuntime {
+    fn initialize(&mut self, blockchain: &Blockchain) {
+        self.api_context = Some(ApiContext::with_blockchain(blockchain));
+    }
+
+    // We need to propagate changes in the services immediately after initialization.
+    fn on_resume(&mut self) {
+        self.push_api_changes();
+    }
+
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
         if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
-            return Box::new(future::err(Error::IncorrectArtifactId.into()));
+            Box::new(future::err(Error::IncorrectArtifactId.into()))
+        } else {
+            let res = self.deploy(&artifact).and_then(|()| {
+                let id = RustArtifactId::parse(&artifact)?;
+                self.deployed_artifact(&id)
+                    .map(ServiceFactory::artifact_protobuf_spec)
+                    .ok_or_else(|| Error::UnableToDeploy.into())
+            });
+            Box::new(res.into_future())
         }
-        Box::new(self.deploy(&artifact).into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        if let Ok(artifact) = self.parse_artifact(id) {
+        if let Ok(artifact) = RustArtifactId::parse(id) {
             self.deployed_artifacts.contains(&artifact)
         } else {
             false
         }
     }
 
-    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        let id = self.parse_artifact(id).ok()?;
-        self.deployed_artifact(&id)
-            .map(ServiceFactory::artifact_protobuf_spec)
-    }
-
-    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        self.start_service(spec)?;
-
-        trace!("Started service {}", spec);
-
-        Ok(())
-    }
-
-    fn add_service(
-        &mut self,
-        fork: &mut Fork,
+    fn start_adding_service(
+        &self,
+        context: ExecutionContext,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let result = {
-            let instance = self.start_service(spec)?;
-            let service = instance.as_ref();
-            let descriptor = instance.descriptor();
-            catch_panic(|| service.initialize(descriptor, fork, parameters))
-        };
-        // We have to check edge cases of the initialize result.
-        match result {
-            Ok(_) => {
-                fork.flush();
-                trace!("Added service instance {}", spec);
-                Ok(())
-            }
-            // If initialize failed it have to rollback any changes in fork and in the list
-            // of started services.
-            Err(e) => {
-                fork.rollback();
-                self.remove_started_instance(spec.id);
-                Err(e)
-            }
-        }
+        let instance = self.new_service(spec)?;
+        let service = instance.as_ref();
+        let descriptor = instance.descriptor();
+        let context = CallContext::new(context, descriptor);
+        catch_panic(|| service.initialize(context, parameters))
+    }
+
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
+        let instance = self.new_service(spec)?;
+        self.add_started_service(instance);
+        self.new_services_since_last_block = true;
+        Ok(())
     }
 
     fn execute(
         &self,
-        context: &ExecutionContext,
+        context: ExecutionContext,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -322,10 +351,11 @@ impl Runtime for RustRuntime {
             .get(&call_info.instance_id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
+        let descriptor = instance.descriptor();
         instance.as_ref().call(
             context.interface_name,
             call_info.method_id,
-            TransactionContext::new(context, instance.descriptor()),
+            CallContext::new(context, descriptor),
             payload,
         )
     }
@@ -341,63 +371,52 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork) {
-        for instance in self.started_services.values() {
-            let result = catch_panic(|| {
-                instance.as_ref().before_commit(BeforeCommitContext::new(
-                    instance.descriptor(),
-                    fork,
-                    dispatcher,
-                ));
-                Ok(())
-            });
+    fn before_commit(
+        &self,
+        context: ExecutionContext,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        // We avoid a potential deadlock by cloning instances (i.e., copying them out
+        // of the locked memory). Thus, we don't need to hold the lock for the duration
+        // of the cycle below.
+        let instance = self
+            .started_services
+            .get(&instance_id)
+            .expect("`before_commit` called with non-existing `instance_id`");
 
-            match result {
-                Ok(..) => fork.flush(),
-                Err(e) => {
-                    fork.rollback();
-                    error!(
-                        "Service \"{}\" `before_commit` failed with error: {:?}",
-                        instance.name, e
-                    );
-                }
-            }
+        let descriptor = instance.descriptor();
+        let result = catch_panic(|| {
+            let context = CallContext::new(context, descriptor);
+            instance.as_ref().before_commit(context);
+            Ok(())
+        });
+        if let Err(ref e) = result {
+            error!(
+                "Service \"{}\" `before_commit` failed with error: {:?}",
+                instance.name, e
+            );
         }
+        result
     }
 
-    fn after_commit(
-        &self,
-        dispatcher: &DispatcherSender,
-        snapshot: &dyn Snapshot,
-        service_keypair: &(PublicKey, SecretKey),
-        tx_sender: &ApiSender,
-    ) {
+    fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
+        self.push_api_changes();
+
+        // By convention, services don't handle `after_commit()` on the genesis block.
+        if CoreSchema::new(snapshot).height() == Height(0) {
+            return;
+        }
+
+        let api_context = self.api_context();
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
+                mailbox,
                 service.descriptor(),
                 snapshot,
-                dispatcher,
-                service_keypair,
-                tx_sender,
+                api_context.service_keypair(),
+                api_context.sender(),
             ));
         }
-    }
-
-    fn api_endpoints(&self, context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
-        self.started_services
-            .values()
-            .map(|instance| {
-                let mut builder = ServiceApiBuilder::new(
-                    context.clone(),
-                    InstanceDescriptor {
-                        id: instance.id,
-                        name: instance.name.as_ref(),
-                    },
-                );
-                instance.as_ref().wire_api(&mut builder);
-                (["services/", &instance.name].concat(), builder)
-            })
-            .collect()
     }
 }
 

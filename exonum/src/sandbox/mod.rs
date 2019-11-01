@@ -25,7 +25,7 @@ use std::{
     fmt::Debug,
     iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::{AddAssign, Deref},
+    ops::{AddAssign, Deref, DerefMut},
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -33,8 +33,8 @@ use std::{
 use crate::{
     api::node::SharedNodeState,
     blockchain::{
-        contains_transaction, Block, BlockProof, Blockchain, ConsensusConfig, IndexCoordinates,
-        IndexOwner, InstanceCollection, Schema, ValidatorKeys,
+        contains_transaction, Block, BlockProof, Blockchain, BlockchainMut, ConsensusConfig,
+        IndexCoordinates, IndexOwner, InstanceCollection, Schema, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -85,11 +85,40 @@ impl SystemStateProvider for SandboxSystemStateProvider {
     }
 }
 
+/// Guarded queue for messages sent by the sandbox. If the queue is not empty when dropped,
+/// it panics.
+#[derive(Debug, Default)]
+pub struct GuardedQueue(VecDeque<(PublicKey, Message)>);
+
+impl Deref for GuardedQueue {
+    type Target = VecDeque<(PublicKey, Message)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for GuardedQueue {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Drop for GuardedQueue {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            if let Some((addr, msg)) = self.0.pop_front() {
+                panic!("Sent unexpected message {:?} to {}", msg, addr);
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
-    pub sent: VecDeque<(PublicKey, Message)>,
+    pub sent: GuardedQueue,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
@@ -146,7 +175,7 @@ impl SandboxInner {
                             .handle_event(InternalEvent::MessageVerified(Box::new(msg)).into())
                     }
 
-                    InternalRequest::Shutdown | InternalRequest::RestartApi => unreachable!(),
+                    InternalRequest::Shutdown => unreachable!(),
                 }
             }
             Ok(())
@@ -206,7 +235,7 @@ impl Sandbox {
 
     fn check_unexpected_message(&self) {
         if let Some((addr, msg)) = self.pop_sent_message() {
-            panic!("Send unexpected message {:?} to {}", msg, addr);
+            panic!("Sent unexpected message {:?} to {}", msg, addr);
         }
     }
 
@@ -465,7 +494,13 @@ impl Sandbox {
     }
 
     pub fn blockchain(&self) -> Blockchain {
-        self.inner.borrow().handler.blockchain.clone()
+        self.inner.borrow().handler.blockchain.as_ref().clone()
+    }
+
+    pub fn blockchain_mut<'s>(&'s self) -> impl DerefMut<Target = BlockchainMut> + 's {
+        RefMut::map(self.inner.borrow_mut(), |inner| {
+            &mut inner.handler.blockchain
+        })
     }
 
     /// Returns connect message used during initialization.
@@ -678,52 +713,42 @@ impl Sandbox {
     }
 
     /// Extracts state_hash from the fake block.
+    ///
+    /// **NB.** This method does not correctly process transactions that mutate the `Dispatcher`,
+    /// e.g., starting new services.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
         I: IntoIterator<Item = &'a Verified<AnyTx>>,
     {
         let height = self.current_height();
-        let mut blockchain = self.blockchain();
-        let (hashes, recover, patch) = {
-            let mut hashes = Vec::new();
-            let mut recover = BTreeSet::new();
-            let fork = blockchain.fork();
-            {
-                let mut schema = Schema::new(&fork);
-                for raw in txs {
-                    let hash = raw.object_hash();
-                    hashes.push(hash);
-                    if schema.transactions().get(&hash).is_none() {
-                        recover.insert(hash);
-                        schema.add_transaction_into_pool(raw.clone());
-                    }
-                }
+        let mut blockchain = self.blockchain_mut();
+
+        let mut hashes = vec![];
+        let mut recover = BTreeSet::new();
+        let fork = blockchain.fork();
+        let mut schema = Schema::new(&fork);
+        for raw in txs {
+            let hash = raw.object_hash();
+            hashes.push(hash);
+            if schema.transactions().get(&hash).is_none() {
+                recover.insert(hash);
+                schema.add_transaction_into_pool(raw.clone());
             }
+        }
+        blockchain.merge(fork.into_patch()).unwrap();
 
-            (hashes, recover, fork.into_patch())
-        };
-        blockchain.merge(patch).unwrap();
+        let mut fork_with_new_block = blockchain.fork();
+        let (_, patch) =
+            blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
+        fork_with_new_block.merge(patch);
 
-        let fork = {
-            let mut fork = blockchain.fork();
-            let (_, patch) =
-                blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
-            fork.merge(patch);
-            fork
-        };
-        let patch = {
-            let fork = blockchain.fork();
-            {
-                let mut schema = Schema::new(&fork);
-                for hash in recover {
-                    schema.reject_transaction(&hash).unwrap();
-                }
-            }
-            fork.into_patch()
-        };
-
-        blockchain.merge(patch).unwrap();
-        *Schema::new(&fork).last_block().state_hash()
+        let fork = blockchain.fork();
+        let mut schema = Schema::new(&fork);
+        for hash in recover {
+            schema.reject_transaction(&hash).unwrap();
+        }
+        blockchain.merge(fork.into_patch()).unwrap();
+        *Schema::new(&fork_with_new_block).last_block().state_hash()
     }
 
     pub fn get_proof_to_index(
@@ -863,20 +888,14 @@ impl Sandbox {
         let address: SocketAddr = self
             .address(ValidatorId(0))
             .parse()
-            .expect("Fail to parse socket address");
-        let inner = self.inner.borrow();
-
-        let blockchain = inner
-            .handler
-            .blockchain
-            .clone_with_api_sender(ApiSender::new(api_channel.0.clone()));
+            .expect("Failed to parse socket address");
+        let inner = self.inner.into_inner();
 
         let node_sender = NodeSender {
             network_requests: network_channel.0.clone().wait(),
             internal_requests: internal_channel.0.clone().wait(),
             api_requests: api_channel.0.clone().wait(),
         };
-
         let connect_list = ConnectList::from_peers(inner.handler.state.peers());
 
         let keys = Keys::from_keys(
@@ -906,6 +925,8 @@ impl Sandbox {
             shared_time: SharedTime::new(Mutex::new(time)),
         };
 
+        let mut blockchain = inner.handler.blockchain;
+        blockchain.inner().api_sender = ApiSender::new(api_channel.0.clone());
         let mut handler = NodeHandler::new(
             blockchain,
             &address.to_string(),
@@ -918,7 +939,7 @@ impl Sandbox {
         handler.initialize();
 
         let inner = SandboxInner {
-            sent: VecDeque::new(),
+            sent: GuardedQueue::default(),
             events: VecDeque::new(),
             timers: BinaryHeap::new(),
             internal_requests_rx: internal_channel.1,
@@ -929,9 +950,9 @@ impl Sandbox {
         };
         let sandbox = Sandbox {
             inner: RefCell::new(inner),
-            validators_map: self.validators_map.clone(),
-            services_map: self.services_map.clone(),
-            addresses: self.addresses.clone(),
+            validators_map: self.validators_map,
+            services_map: self.services_map,
+            addresses: self.addresses,
             connect: None,
         };
         sandbox.process_events();
@@ -969,14 +990,6 @@ impl Sandbox {
 
     fn update_config(&self, config: ConsensusConfig) {
         self.inner.borrow_mut().handler.state.update_config(config);
-    }
-}
-
-impl Drop for Sandbox {
-    fn drop(&mut self) {
-        if !std::thread::panicking() {
-            self.check_unexpected_message();
-        }
     }
 }
 
@@ -1052,7 +1065,6 @@ impl SandboxBuilder {
             let time = sandbox.time();
             sandbox.initialize(time, 1, self.validators_count as usize);
         }
-
         sandbox
     }
 }
@@ -1134,17 +1146,17 @@ fn sandbox_with_services_uninitialized(
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
-    let external_runtimes: Vec<(u32, Box<dyn crate::runtime::Runtime>)> = vec![];
     let api_channel = mpsc::channel(100);
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
-        external_runtimes,
-        services,
-        genesis,
         service_keys[0].clone(),
-        ApiSender::new(api_channel.0.clone()),
-        mpsc::channel(0).0,
+        ApiSender(api_channel.0.clone()),
     );
+    let blockchain = blockchain
+        .into_mut(genesis)
+        .with_rust_runtime(mpsc::channel(1).0, services)
+        .build()
+        .unwrap();
 
     let config = Configuration {
         listener: ListenerConfig {
@@ -1176,20 +1188,21 @@ fn sandbox_with_services_uninitialized(
         internal_requests: internal_channel.0.clone().wait(),
         api_requests: api_channel.0.clone().wait(),
     };
+    let api_state = SharedNodeState::new(&blockchain, 5000);
 
     let mut handler = NodeHandler::new(
-        blockchain.clone(),
+        blockchain,
         &str_addresses[0],
         node_sender,
         Box::new(system_state),
         config.clone(),
-        SharedNodeState::new(&blockchain, 5000),
+        api_state,
         None,
     );
     handler.initialize();
 
     let inner = SandboxInner {
-        sent: VecDeque::new(),
+        sent: GuardedQueue::default(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
         network_requests_rx: network_channel.1,
@@ -1251,7 +1264,7 @@ mod tests {
         crypto::{gen_keypair_from_seed, Hash, Seed},
         proto::schema::tests::TxAfterCommit,
         runtime::{
-            rust::{AfterCommitContext, Service, Transaction, TransactionContext},
+            rust::{AfterCommitContext, CallContext, Service, Transaction},
             AnyTx, InstanceDescriptor, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
@@ -1263,7 +1276,7 @@ mod tests {
     pub trait AfterCommitInterface {
         fn after_commit(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: TxAfterCommit,
         ) -> Result<(), ExecutionError>;
     }
@@ -1281,7 +1294,7 @@ mod tests {
     impl AfterCommitInterface for AfterCommitService {
         fn after_commit(
             &self,
-            _context: TransactionContext,
+            _context: CallContext,
             _arg: TxAfterCommit,
         ) -> Result<(), ExecutionError> {
             Ok(())
@@ -1414,7 +1427,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
@@ -1435,7 +1448,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
@@ -1464,7 +1477,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.

@@ -38,6 +38,11 @@ message ArtifactId {
   string name = 2;
 }
 
+message ArtifactSpec {
+  ArtifactId artifact = 1;
+  bytes payload = 2;
+}
+
 message InstanceSpec {
   uint32 id = 1;
   string name = 2;
@@ -68,23 +73,5 @@ message ExecutionStatus {
   oneof result {
     google.protobuf.Empty ok = 1;
     ExecutionError error = 2;
-  }
-}
-
-// Configuration parameters of the certain service instance.
-message ServiceConfig {
-  // Corresponding service instance ID.
-  uint32 instance_id = 1;
-  // Raw bytes representation of service configuration parameters.
-  bytes params = 2;
-}
-
-// This message contains one atomic configuration change.
-message ConfigChange {
-  oneof message {
-    // New consensus config.
-    exonum.Config consensus = 1;
-    // New service instance config.
-    ServiceConfig service = 2;
   }
 }

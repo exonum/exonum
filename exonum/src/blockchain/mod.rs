@@ -30,41 +30,44 @@ pub use self::{
 
 pub mod config;
 
+use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
     Database, Fork, IndexAccess, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot,
+    TemporaryDB,
 };
-use futures::{sync::mpsc, Future, Sink};
+use failure::{format_err, Error};
 
 use std::{
     collections::{BTreeMap, HashMap},
     iter,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::Arc,
 };
 
 use crate::{
-    api::ApiContext,
     crypto::{Hash, PublicKey, SecretKey},
-    events::InternalRequest,
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{dispatcher::Dispatcher, error::catch_panic, Runtime},
+    runtime::{error::catch_panic, Dispatcher, DispatcherState},
 };
 
 mod block;
 mod builder;
 mod schema;
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 /// Transaction message shortcut.
 // TODO It seems that this shortcut should be removed [ECR-3222]
 pub type TransactionMessage = Verified<AnyTx>;
 
-/// Exonum blockchain instance with a certain services set and data storage.
+/// Shared Exonum blockchain instance.
 ///
-/// Only nodes with an identical set of services and genesis block can be combined
-/// into a single network.
+/// This is essentially a smart pointer to shared blockchain resources (storage,
+/// cryptographic keys, and a sender of transactions). It can be converted into a [`BlockchainMut`]
+/// instance, which combines these resources with behavior (i.e., a set of services).
+///
+/// [`BlockchainMut`]: struct.BlockchainMut.html
 #[derive(Debug, Clone)]
 pub struct Blockchain {
     pub(crate) db: Arc<dyn Database>,
@@ -72,75 +75,33 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
-    dispatcher: Arc<Mutex<Dispatcher>>,
-    internal_requests: mpsc::Sender<InternalRequest>,
 }
 
 impl Blockchain {
-    /// Constructs a blockchain for the given `database` and list of `services`, also adds builtin services.
-    // TODO Write proper doc string. [ECR-3275]
+    /// Constructs a blockchain for the given `database`.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
-        services: impl IntoIterator<Item = InstanceCollection>,
-        genesis_config: ConsensusConfig,
         service_keypair: (PublicKey, SecretKey),
         api_sender: ApiSender,
-        internal_requests: mpsc::Sender<InternalRequest>,
-    ) -> Self {
-        BlockchainBuilder::new(database, genesis_config, service_keypair)
-            .with_default_runtime(services)
-            .with_external_runtimes(external_runtimes)
-            .finalize(api_sender, internal_requests)
-            .expect("Unable to create blockchain instance")
-    }
-
-    /// Creates the blockchain instance with the specified dispatcher.
-    pub(crate) fn with_dispatcher(
-        db: Arc<dyn Database>,
-        dispatcher: Dispatcher,
-        service_keypair: (PublicKey, SecretKey),
-        api_sender: ApiSender,
-        internal_requests: mpsc::Sender<InternalRequest>,
     ) -> Self {
         Self {
-            db,
+            db: database.into(),
             service_keypair,
             api_sender,
-            dispatcher: Arc::new(Mutex::new(dispatcher)),
-            internal_requests,
         }
     }
 
-    /// Recreates the blockchain to reuse with a sandbox.
-    #[doc(hidden)]
-    pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Self {
-        Self {
-            api_sender,
-            ..self.clone()
-        }
-    }
-
-    /// Returns reference to the underlying runtime dispatcher.
-    pub(crate) fn dispatcher(&self) -> MutexGuard<Dispatcher> {
-        self.dispatcher.lock().unwrap()
+    /// Creates a non-persisting blockchain, all data in which is irrevocably lost on drop.
+    ///
+    /// The created blockchain cannot send transactions; an attempt to do so will result
+    /// in an error.
+    pub fn build_for_tests() -> Self {
+        Self::new(TemporaryDB::new(), gen_keypair(), ApiSender::closed())
     }
 
     /// Creates a read-only snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()
-    }
-
-    /// Creates a snapshot of the current storage state that can be later committed into the storage
-    /// via the `merge` method.
-    pub fn fork(&self) -> Fork {
-        self.db.fork()
-    }
-
-    /// Commits changes from the patch to the blockchain storage.
-    /// See [`Fork`](../../exonum_merkledb/struct.Fork.html) for details.
-    pub fn merge(&mut self, patch: Patch) -> StorageResult<()> {
-        self.db.merge(patch)
     }
 
     /// Returns the hash of the latest committed block.
@@ -160,47 +121,142 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
-    /// Creates and commits the genesis block with the given genesis configuration.
-    fn create_genesis_block(&mut self, config: ConsensusConfig) -> Result<(), failure::Error> {
-        config.validate()?;
-
-        let patch = {
-            let fork = self.fork();
-            Schema::new(&fork).consensus_config_entry().set(config);
-
-            self.merge(fork.into_patch())?;
-            self.create_patch(
-                ValidatorId::zero(),
-                Height::zero(),
-                &[],
-                &mut BTreeMap::new(),
-            )
-            .1
-        };
-        self.merge(patch)?;
-
-        info!("GENESIS_BLOCK ====== hash={}", self.last_hash().to_hex());
-
-        Ok(())
-    }
-
+    // TODO: remove
     // This method is needed for EJB.
     #[doc(hidden)]
-    pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
-        // TODO check if service exists? [ECR-3222]
-
-        // if !self.dispatcher.services().contains_key(&service_id) {
-        //     return Err(format_err!(
-        //         "Unable to broadcast transaction: no service with ID={} found",
-        //         service_id
-        //     ));
-        // }
-
+    pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), Error> {
         self.api_sender.broadcast_transaction(Verified::from_value(
             tx,
             self.service_keypair.0,
             &self.service_keypair.1,
         ))
+    }
+
+    /// Returns the transactions pool size.
+    pub fn pool_size(&self) -> u64 {
+        Schema::new(&self.snapshot()).transactions_pool_len()
+    }
+
+    /// Returns `Connect` messages from peers saved in the cache, if any.
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
+        let snapshot = self.snapshot();
+        Schema::new(&snapshot).peers_cache().iter().collect()
+    }
+
+    /// Starts promotion into a mutable blockchain instance that can be used to process
+    /// transactions and create blocks.
+    pub fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
+        BlockchainBuilder::new(self, genesis_config)
+    }
+
+    /// Starts building a mutable blockchain with the genesis config, in which
+    /// this node is the only validator.
+    #[cfg(test)]
+    pub fn into_mut_with_dummy_config(self) -> BlockchainBuilder {
+        use crate::helpers::generate_testnet_config;
+        use exonum_crypto::KeyPair;
+
+        let mut config = generate_testnet_config(1, 0).pop().unwrap();
+        config.keys.service = KeyPair::from(self.service_keypair.clone());
+        self.into_mut(config.consensus)
+    }
+}
+
+/// Mutable blockchain capable of processing transactions.
+///
+/// `BlockchainMut` combines [`Blockchain`] resources with a service dispatcher. The resulting
+/// combination cannot be cloned (unlike `Blockchain`), but can be sent across threads. It is
+/// possible to extract a `Blockchain` reference from `BlockchainMut` via `AsRef` trait.
+///
+/// [`Blockchain`]: struct.Blockchain.html
+#[derive(Debug)]
+pub struct BlockchainMut {
+    inner: Blockchain,
+    dispatcher: Dispatcher,
+}
+
+impl AsRef<Blockchain> for BlockchainMut {
+    fn as_ref(&self) -> &Blockchain {
+        &self.inner
+    }
+}
+
+impl BlockchainMut {
+    #[cfg(test)]
+    pub(crate) fn inner(&mut self) -> &mut Blockchain {
+        &mut self.inner
+    }
+
+    #[cfg(test)]
+    pub(crate) fn dispatcher(&mut self) -> &mut Dispatcher {
+        &mut self.dispatcher
+    }
+
+    /// Creates a read-only snapshot of the current storage state.
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
+        self.inner.snapshot()
+    }
+
+    /// Returns the handle to the dispatcher state.
+    pub fn dispatcher_state(&self) -> DispatcherState {
+        self.dispatcher.state()
+    }
+
+    /// Creates a snapshot of the current storage state that can be later committed into the storage
+    /// via the `merge` method.
+    pub fn fork(&self) -> Fork {
+        self.inner.db.fork()
+    }
+
+    /// Commits changes from the patch to the blockchain storage.
+    /// See [`Fork`](../../exonum_merkledb/struct.Fork.html) for details.
+    pub fn merge(&mut self, patch: Patch) -> StorageResult<()> {
+        self.inner.db.merge(patch)
+    }
+
+    /// Creates and commits the genesis block with the given genesis configuration.
+    // TODO: extract genesis block into separate struct [ECR-3750]
+    fn create_genesis_block(
+        &mut self,
+        config: ConsensusConfig,
+        initial_services: Vec<InstanceConfig>,
+    ) -> Result<(), Error> {
+        config.validate()?;
+        let mut fork = self.fork();
+        Schema::new(&fork).consensus_config_entry().set(config);
+
+        // Add service instances.
+        for instance_config in initial_services {
+            self.dispatcher.add_builtin_service(
+                &mut fork,
+                instance_config.instance_spec,
+                instance_config.artifact_spec.unwrap_or_default(),
+                instance_config.constructor,
+            )?;
+        }
+        // We need to activate services before calling `create_patch()`; unlike all other blocks,
+        // initial services are considered immediately active in the genesis block, i.e.,
+        // their state should be included into `patch` created below.
+        self.dispatcher.commit_block(&mut fork);
+        self.merge(fork.into_patch())?;
+
+        let (_, patch) = self.create_patch(
+            ValidatorId::zero(),
+            Height::zero(),
+            &[],
+            &mut BTreeMap::new(),
+        );
+        let fork = Fork::from(patch);
+        // On the other hand, we need to notify runtimes *after* the block has been created.
+        // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
+        self.dispatcher.notify_runtimes_about_commit(fork.as_ref());
+        self.merge(fork.into_patch())?;
+
+        info!(
+            "GENESIS_BLOCK ====== hash={}",
+            self.inner.last_hash().to_hex()
+        );
+        Ok(())
     }
 
     /// Executes the given transactions from the pool.
@@ -213,111 +269,89 @@ impl Blockchain {
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> (Hash, Patch) {
-        let mut dispatcher = self.dispatcher();
         // Create fork
         let mut fork = self.fork();
-
-        let block_hash = {
-            // Get last hash.
-            let last_hash = self.last_hash();
-            // Save & execute transactions.
-            for (index, hash) in tx_hashes.iter().enumerate() {
-                Self::execute_transaction(
-                    &mut dispatcher,
-                    *hash,
-                    height,
-                    index,
-                    &mut fork,
-                    tx_cache,
-                )
+        // Get last hash.
+        let last_hash = self.inner.last_hash();
+        // Save & execute transactions.
+        for (index, hash) in tx_hashes.iter().enumerate() {
+            self.execute_transaction(*hash, height, index, &mut fork, tx_cache)
                 // Execution could fail if the transaction
                 // cannot be deserialized or it isn't in the pool.
-                .expect("Transaction execution error.");
+                .expect("Transaction execution error");
+        }
+
+        // Skip execution for genesis block.
+        if height > Height(0) {
+            self.dispatcher.before_commit(&mut fork);
+        }
+
+        // Get tx & state hash.
+        let schema = Schema::new(&fork);
+        let state_hash = {
+            let mut sum_table = schema.state_hash_aggregator();
+            // Clear old state hash.
+            sum_table.clear();
+            // Collect all state hashes.
+            let state_hashes = self
+                .dispatcher
+                .state_hash(fork.as_ref())
+                .into_iter()
+                // Add state hash of core table.
+                .chain(IndexCoordinates::locate(
+                    IndexOwner::Core,
+                    schema.state_hash(),
+                ));
+            // Insert state hashes into the aggregator table.
+            for (coordinate, hash) in state_hashes {
+                sum_table.put(&coordinate, hash);
             }
-
-            // Skip execution for genesis block.
-            if height > Height(0) {
-                dispatcher.before_commit(&mut fork);
-            }
-
-            // Get tx & state hash.
-            let (tx_hash, state_hash) = {
-                let schema = Schema::new(&fork);
-                let state_hash = {
-                    let mut sum_table = schema.state_hash_aggregator();
-                    // Clear old state hash.
-                    sum_table.clear();
-                    // Collect all state hashes.
-                    let state_hashes = dispatcher
-                        .state_hash(fork.as_ref())
-                        .into_iter()
-                        // Add state hash of core table.
-                        .chain(IndexCoordinates::locate(
-                            IndexOwner::Core,
-                            schema.state_hash(),
-                        ));
-                    // Insert state hashes into the aggregator table.
-                    for (coordinate, hash) in state_hashes {
-                        sum_table.put(&coordinate, hash);
-                    }
-                    sum_table.object_hash()
-                };
-
-                let tx_hash = schema.block_transactions(height).object_hash();
-
-                (tx_hash, state_hash)
-            };
-
-            // Create block.
-            let block = Block::new(
-                proposer_id,
-                height,
-                tx_hashes.len() as u32,
-                last_hash,
-                tx_hash,
-                state_hash,
-            );
-            trace!("execute block = {:?}", block);
-            // Calculate block hash.
-            let block_hash = block.object_hash();
-            // Update height.
-            let schema = Schema::new(&fork);
-            schema.block_hashes_by_height().push(block_hash);
-            // Save block.
-            schema.blocks().put(&block_hash, block);
-
-            block_hash
+            sum_table.object_hash()
         };
+        let tx_hash = schema.block_transactions(height).object_hash();
 
+        // Create block.
+        let block = Block::new(
+            proposer_id,
+            height,
+            tx_hashes.len() as u32,
+            last_hash,
+            tx_hash,
+            state_hash,
+        );
+        trace!("execute block = {:?}", block);
+
+        // Calculate block hash.
+        let block_hash = block.object_hash();
+        // Update height.
+        let schema = Schema::new(&fork);
+        schema.block_hashes_by_height().push(block_hash);
+        // Save block.
+        schema.blocks().put(&block_hash, block);
         (block_hash, fork.into_patch())
     }
 
     fn execute_transaction(
-        dispatcher: &mut MutexGuard<Dispatcher>,
+        &self,
         tx_hash: Hash,
         height: Height,
         index: usize,
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> Result<(), failure::Error> {
-        let transaction = {
-            let new_fork = &*fork;
-            let snapshot = new_fork.snapshot();
-            let schema = Schema::new(snapshot);
+    ) -> Result<(), Error> {
+        let fork_ref = &*fork;
+        let snapshot = fork_ref.snapshot();
+        let schema = Schema::new(snapshot);
 
-            get_transaction(&tx_hash, &schema.transactions(), &tx_cache).ok_or_else(|| {
-                failure::err_msg(format!(
-                    "BUG: Cannot find transaction in database. tx: {:?}",
-                    tx_hash
-                ))
-            })?
-        };
-
+        let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
+            .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
         fork.flush();
 
-        let tx_result = catch_panic(|| dispatcher.execute(fork, tx_hash, &transaction));
+        let tx_result = catch_panic(|| self.dispatcher.execute(fork, tx_hash, &transaction));
         match &tx_result {
-            Ok(_) => fork.flush(),
+            Ok(_) => {
+                fork.flush();
+            }
             Err(e) => {
                 if e.kind == ExecutionErrorKind::Panic {
                     error!("{:?} transaction execution panicked: {:?}", transaction, e);
@@ -352,63 +386,56 @@ impl Blockchain {
         block_hash: Hash,
         precommits: I,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> Result<(), failure::Error>
+    ) -> Result<(), Error>
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {
-        let patch = {
-            let fork: Fork = patch.into();
+        let mut fork: Fork = patch.into();
+        let mut schema = Schema::new(&fork);
+        schema.precommits(&block_hash).extend(precommits);
+        // Consensus messages cache is useful only during one height, so it should be
+        // cleared when a new height is achieved.
+        schema.consensus_messages_cache().clear();
+        let txs_in_block = schema.last_block().tx_count();
+        schema.update_transaction_count(u64::from(txs_in_block));
 
-            {
-                let mut schema = Schema::new(&fork);
-                schema.precommits(&block_hash).extend(precommits);
-
-                // Consensus messages cache is useful only during one height, so it should be
-                // cleared when a new height is achieved.
-                schema.consensus_messages_cache().clear();
-                let txs_in_block = schema.last_block().tx_count();
-
-                schema.update_transaction_count(u64::from(txs_in_block));
-
-                let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();
-                for tx_hash in tx_hashes {
-                    if let Some(tx) = tx_cache.remove(&tx_hash) {
-                        if !schema.transactions().contains(&tx_hash) {
-                            schema.add_transaction_into_pool(tx);
-                        }
-                    }
+        let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();
+        for tx_hash in tx_hashes {
+            if let Some(tx) = tx_cache.remove(&tx_hash) {
+                if !schema.transactions().contains(&tx_hash) {
+                    schema.add_transaction_into_pool(tx);
                 }
             }
-            fork.into_patch()
-        };
-        self.merge(patch)?;
-        // Invokes `after_commit` for each service in order of their identifiers
-        self.dispatcher()
-            .after_commit(self.snapshot(), &self.service_keypair, &self.api_sender);
-        // Send `RestartApi` request if the dispatcher state has been modified.
-        if self.notify_api_changes() {
-            self.internal_requests
-                .clone()
-                .send(InternalRequest::RestartApi)
-                .wait()
-                .map_err(|e| error!("Failed to make a request for API restart: {}", e))
-                .ok();
         }
+
+        self.dispatcher.commit_block_and_notify_runtimes(&mut fork);
+        self.merge(fork.into_patch())?;
         Ok(())
     }
 
-    /// Notify runtimes about changes in API.
-    pub(crate) fn notify_api_changes(&self) -> bool {
-        self.dispatcher()
-            .notify_api_changes(&ApiContext::with_blockchain(self))
+    /// Shuts down the dispatcher. This should be the last operation performed on this instance.
+    pub fn shutdown(&mut self) {
+        self.dispatcher.shutdown();
     }
 
-    /// Returns the transactions pool size.
-    pub fn pool_size(&self) -> u64 {
-        Schema::new(&self.snapshot()).transactions_pool_len()
+    /// Saves the given raw message to the consensus messages cache.
+    pub(crate) fn save_message<T: Into<Message>>(&mut self, round: Round, message: T) {
+        self.save_messages(round, iter::once(message.into()));
     }
 
-    // TODO move such methods into separate module. [ECR-3222]
+    /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
+    /// `Fork` instance.
+    pub(crate) fn save_messages<I>(&mut self, round: Round, iter: I)
+    where
+        I: IntoIterator<Item = Message>,
+    {
+        let fork = self.fork();
+        let mut schema = Schema::new(&fork);
+        schema.consensus_messages_cache().extend(iter);
+        schema.set_consensus_round(round);
+        self.merge(fork.into_patch())
+            .expect("Unable to save messages to the consensus cache");
+    }
 
     /// Saves the `Connect` message from a peer to the cache.
     pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Verified<Connect>) {
@@ -424,40 +451,6 @@ impl Blockchain {
         Schema::new(&fork).peers_cache().remove(key);
         self.merge(fork.into_patch())
             .expect("Unable to remove peer from the peers cache");
-    }
-
-    /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
-        let snapshot = self.snapshot();
-        Schema::new(&snapshot).peers_cache().iter().collect()
-    }
-
-    /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message<T: Into<Message>>(&mut self, round: Round, message: T) {
-        self.save_messages(round, iter::once(message.into()));
-    }
-
-    /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
-    /// `Fork` instance.
-    pub(crate) fn save_messages<I>(&mut self, round: Round, iter: I)
-    where
-        I: IntoIterator<Item = Message>,
-    {
-        let fork = self.fork();
-
-        {
-            let mut schema = Schema::new(&fork);
-            schema.consensus_messages_cache().extend(iter);
-            schema.set_consensus_round(round);
-        }
-
-        self.merge(fork.into_patch())
-            .expect("Unable to save messages to the consensus cache");
-    }
-
-    /// Callback to be called before the node shutdown.
-    pub(crate) fn shutdown(&self) {
-        self.dispatcher().shutdown();
     }
 }
 

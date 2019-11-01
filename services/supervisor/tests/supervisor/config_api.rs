@@ -57,28 +57,24 @@ fn confirm_config(api: &TestKitApi, confirm: ConfigVote) -> Hash {
 
 #[test]
 fn test_consensus_config_api() {
-    let testkit = testkit_with_supervisor(1);
-
+    let mut testkit = testkit_with_supervisor(1);
     let consensus_config = actual_consensus_config(&testkit.api());
     assert_eq!(testkit.consensus_config(), consensus_config);
 }
 
 #[test]
 fn test_config_proposal_api() {
-    let testkit = testkit_with_supervisor(1);
-
+    let mut testkit = testkit_with_supervisor(1);
     assert_eq!(current_config_proposal(&testkit.api()), None);
 }
 
 #[test]
 fn test_confirm_proposal_with_api() {
     let mut testkit = testkit_with_supervisor(2);
-
     let consensus_proposal = consensus_config_propose_first_variant(&testkit);
-
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_proposal.clone())
-        .config_propose();
+        .build();
 
     // Create proposal
     testkit
@@ -107,7 +103,6 @@ fn test_confirm_proposal_with_api() {
     );
     testkit.create_block();
     testkit.api().exonum_api().assert_tx_success(tx_hash);
-
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
     let consensus_config = actual_consensus_config(&testkit.api());
@@ -117,12 +112,10 @@ fn test_confirm_proposal_with_api() {
 #[test]
 fn test_send_proposal_with_api() {
     let mut testkit = testkit_with_supervisor(2);
-
     let consensus_proposal = consensus_config_propose_first_variant(&testkit);
-
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_proposal.clone())
-        .config_propose();
+        .build();
 
     // Create proposal
     let hash = create_proposal(&testkit.api(), config_proposal.clone());
@@ -150,7 +143,6 @@ fn test_send_proposal_with_api() {
         .expect("Transaction with confirmations discarded.");
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
-
     let consensus_config = actual_consensus_config(&testkit.api());
     assert_eq!(consensus_proposal, consensus_config);
 }

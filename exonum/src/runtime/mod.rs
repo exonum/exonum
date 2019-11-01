@@ -75,12 +75,6 @@
 //!
 //! TODO: Think about runtime agnostic interfaces description. [ECR-3531]
 //!
-//! ## Configure
-//!
-//! Describes a procedure for updating the configuration of a service instance.
-//!
-//! See explanation in the Rust runtime definition of the [`Configure`] interface.
-//!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
 //! [`Dispatcher`]: dispatcher/struct.Dispatcher.html
@@ -89,39 +83,36 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
-//! [`Configure`]: rust/interfaces/trait.Configure.html
 
 pub use self::{
-    dispatcher::Error as DispatcherError,
+    dispatcher::{
+        Dispatcher, DispatcherState, Error as DispatcherError, Mailbox, Schema as DispatcherSchema,
+    },
     error::{ErrorKind, ExecutionError},
     types::{
-        AnyTx, ArtifactId, CallInfo, ConfigChange, InstanceId, InstanceSpec, MethodId,
-        ServiceConfig,
+        AnyTx, ArtifactId, ArtifactSpec, CallInfo, DeployStatus, InstanceId, InstanceQuery,
+        InstanceSpec, MethodId,
     },
 };
 
 #[macro_use]
 pub mod rust;
 pub mod api;
-pub mod dispatcher;
 pub mod error;
 
 use futures::Future;
 
-use std::fmt::Debug;
+use std::fmt;
+
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
 use crate::{
-    api::ApiContext,
-    crypto::{Hash, PublicKey, SecretKey},
-    merkledb::{BinaryValue, Fork, Snapshot},
-    node::ApiSender,
+    blockchain::Blockchain,
+    crypto::{Hash, PublicKey},
+    helpers::ValidateInput,
 };
 
-use self::{
-    api::ServiceApiBuilder,
-    dispatcher::{DispatcherRef, DispatcherSender},
-};
-
+mod dispatcher;
 mod types;
 
 /// Persistent identifier of supervisor service instance.
@@ -147,7 +138,7 @@ impl From<RuntimeIdentifier> for u32 {
     }
 }
 
-/// This trait describes runtime environment for the Exonum services.
+/// Runtime environment for Exonum services.
 ///
 /// You can read more about the life cycle of services and transactions
 /// [above](index.html#service-life-cycle).
@@ -174,8 +165,33 @@ impl From<RuntimeIdentifier> for u32 {
 /// # Hints
 ///
 /// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics according to panic policy.
-pub trait Runtime: Send + Debug + 'static {
+#[allow(unused_variables)]
+pub trait Runtime: Send + fmt::Debug + 'static {
+    /// Initializes the runtime, providing a `Blockchain` instance for further use.
+    ///
+    /// This method is guaranteed to be called before any other `Runtime` methods. It is
+    /// called *exactly once* during `Runtime` lifetime.
+    ///
+    /// The default implementation does nothing.
+    fn initialize(&mut self, blockchain: &Blockchain) {}
+
+    /// Notifies the runtime that the dispatcher has completed re-initialization after
+    /// node restart, including restoring the deployed artifacts / started service instances
+    /// for all runtimes.
+    ///
+    /// This method is called *no more than once* during `Runtime` lifetime. It is called iff
+    /// the blockchain had genesis block when the node was started. The blockchain state
+    /// is guaranteed to not change between `initialize` and `after_initialize` calls.
+    ///
+    /// The default implementation does nothing.
+    fn on_resume(&mut self) {}
+
     /// Request to deploy artifact with the given identifier and additional deploy specification.
+    ///
+    /// This method may be called multiple times with the same params; in particular, the method
+    /// is called for all deployed artifacts after node restart. The successive calls must return
+    /// the same spec as the first call. In most cases, it is prudent to cache the spec in the runtime,
+    /// so that the successive calls are effectively synchronous.
     ///
     /// # Policy on Panics
     ///
@@ -185,50 +201,82 @@ pub trait Runtime: Send + Debug + 'static {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>>;
 
     /// Return true if the specified artifact is deployed in this runtime.
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
 
-    /// Return Protobuf description of the deployed artifact with the specified identifier.
-    /// If the artifact is not deployed, return `None`.
+    /// Runs the constructor of a new service instance with the given specification
+    /// and initial configuration.
     ///
-    /// # Notes for Runtime Developers
+    /// The service is not guaranteed to be added to the blockchain at this point.
+    /// In particular, the dispatcher does not route transactions and `before_commit` events
+    /// until after `commit_service()` is called with the same instance spec. A call
+    /// to `commit_service()` is not guaranteed for each `start_adding_service()`; indeed,
+    /// committing the service will not follow if the alternative block proposal without
+    /// the service instantiation was accepted. If the call is performed, it is
+    /// guaranteed to be performed in the closest committed block, i.e., before the nearest
+    /// `Runtime::after_commit()`.
     ///
-    /// * Ensure that the deployed artifact has the following information, even if it is empty.
-    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec>;
-
-    /// Restart previously added service instance with the given specification.
+    /// The runtime can discard the instantiated service instance after completing this method.
+    /// (Alternatively, "garbage" services may be removed from `Runtime` in `after_commit`
+    /// because of the time dependence between `commit_service` and `after_commit` described above.)
+    /// The runtime should commit resources for the service after a `commit_service()` call.
+    /// Since discarded instances persist their state in a discarded fork, no further action
+    /// is required to remove this state.
     ///
-    /// # Policy on Panics
+    /// # Return value
     ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
-    /// * If panic occurs, the runtime must ensure that it is in a consistent state.
-    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError>;
-
-    /// Add a new service instance with the given specification and initial configuration.
-    ///
-    /// The configuration parameters passed to the method are discarded immediately.
-    /// So the service instance should save them by itself if it is important for
-    /// the service business logic.
-    ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
-    fn add_service(
-        &mut self,
-        fork: &mut Fork,
+    /// The `Runtime` should catch all panics except for `FatalError`s and convert
+    /// them into an `ExecutionError`. A returned error or panic implies that service instantiation
+    /// has failed; as a rule of a thumb, changes made by the method will be rolled back
+    /// (the exact logic is determined by the supervisor).
+    fn start_adding_service(
+        &self,
+        context: ExecutionContext,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
-    /// Dispatch payload to the method of a specific service instance.
+    /// Permanently adds a service to the runtime.
+    ///
+    /// It is guaranteed that `start_adding_service()` was called with the same `spec` earlier
+    /// and returned `Ok(())`. The results of the call (i.e., changes to the blockchain state)
+    /// are guaranteed to be persisted from the call.
+    ///
+    /// A call to `start_adding_service()` may have happened indefinite time ago;
+    /// indeed, `commit_service()` is called for all services on the node startup. Likewise,
+    /// `commit_service()` may be called an indefinite number of times for the same instance.
+    ///
+    /// `snapshot` is the storage snapshot at the latest height when the method is called:
+    ///
+    /// - If the service is committed during node operation, `snapshot` is taken at the
+    ///   moment after applying the fork, for which the corresponding `start_adding_service`
+    ///   was performed.
+    /// - If the service is resumed after node restart, `snapshot` is the storage state
+    ///   at the node start.
+    ///
+    /// For builtin services on the first node start `snapshot` will not contain info
+    /// on the genesis block. Thus, using some core APIs (like requesting the current
+    /// blockchain height) will result in a panic.
+    ///
+    /// # Return value
+    ///
+    /// Any error or panic returned from this method should be considered as fatal. There are edge
+    /// cases where the returned error does not stop the enclosing process (e.g.,
+    /// if several alternative initial service configurations are tried), but as a rule of thumb,
+    /// a `Runtime` should not return an error or panic here unless it wants the node to stop forever.
+    fn commit_service(
+        &mut self,
+        snapshot: &dyn Snapshot,
+        spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError>;
+
+    /// Dispatches payload to the method of a specific service instance.
     /// Service instance name and method ID are provided in the `call_info` argument and
     /// interface name is provided as the corresponding field of the `context` argument.
     ///
-    /// # Notes for Runtime Developers.
+    /// # Notes for Runtime Developers
     ///
     /// * If service does not implement required interface, return `NoSuchInterface` error.
     /// * If interface does not have required method, return `NoSuchMethod` error.
@@ -238,10 +286,9 @@ pub trait Runtime: Send + Debug + 'static {
     /// # Policy on Panics
     ///
     /// Do not process. Panic will be processed by the method caller.
-    ///
     fn execute(
         &self,
-        context: &ExecutionContext,
+        context: ExecutionContext,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -249,51 +296,39 @@ pub trait Runtime: Send + Debug + 'static {
     /// Gets the state hashes of the every available service.
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
 
-    /// Calls `before_commit` for all the services stored in the runtime.
+    /// Calls `before_commit` for a service stored in the runtime.
     ///
-    /// # Notes for Runtime Developers.
+    /// `before_commit` is called for all services active at the beginning of the block
+    /// (i.e., services instantiated within the block do **not** receive a call) exactly
+    /// once for each block.
     ///
-    /// * The order of services during invocation of this method must be the same for each node.
-    /// In other words, the order of the runtime services must be the same for each node.
+    /// # Guarantees
     ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and write
-    /// them into the log.
-    /// * If panic occurs, the runtime rolls back the changes in the fork.
-    fn before_commit(&self, dispatcher: &DispatcherRef, fork: &mut Fork);
-
-    /// Calls `after_commit` for all the services stored in the runtime.
-    ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and write
-    /// them into the log.
-    fn after_commit(
+    /// - Each `before_commit` call is isolated with a separate checkpoint. A call that returns
+    ///   an error will be rolled back.
+    /// - Ordering of calls among service instances is not specified, but is guaranteed
+    ///   to be the same for all nodes.
+    fn before_commit(
         &self,
-        dispatcher: &DispatcherSender,
-        snapshot: &dyn Snapshot,
-        service_keypair: &(PublicKey, SecretKey),
-        tx_sender: &ApiSender,
-    );
+        context: ExecutionContext,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError>;
 
-    /// Collect the full list of API handlers from the runtime for the built-in Exonum API server.
+    /// Notifies the runtime about commitment of a new block.
     ///
-    /// This method is called during the API server restart. Use this method if you do not plan to
-    /// use your own API processing mechanism.
+    /// This method is guaranteed to be called *after* all `commit_service` calls related
+    /// to the same block. The method is called exactly once for each block in the blockchain,
+    /// including the genesis block.
     ///
-    /// Warning! It is a temporary method which retains the existing `RustRuntime` code.
-    /// It will be removed in the future.
-    #[doc(hidden)]
-    fn api_endpoints(&self, _context: &ApiContext) -> Vec<(String, ServiceApiBuilder)> {
-        Vec::new()
-    }
-
-    /// Notify the runtime about the changes in the list of service instances.
+    /// A block is not yet persisted when this method is called; the up to date block information
+    /// is provided in the `snapshot`. It corresponds exactly to the information
+    /// eventually persisted; i.e., no modifying operations are performed on the block.
     ///
-    /// The purpose of this method is to provide building blocks to create your own
-    /// API processing mechanisms.
-    fn notify_api_changes(&self, _context: &ApiContext, _changes: &[ApiChange]) {}
+    /// # Policy on Panics
+    ///
+    /// Catch each kind of panics except for `FatalError` and write them into the log. A panic
+    /// will bubble up, i.e., will lead to immediate node termination.
+    fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox);
 
     /// Notify the runtime that it has to shutdown.
     ///
@@ -303,15 +338,12 @@ pub trait Runtime: Send + Debug + 'static {
     /// Invoking of this callback is guaranteed to be the last operation for the runtime.
     /// Since this method is a part of shutdown process, runtimes can perform blocking and
     /// heavy operations here if needed.
-    fn shutdown(&self) {}
+    fn shutdown(&mut self) {}
 }
 
-impl<T> From<T> for Box<dyn Runtime>
-where
-    T: Runtime,
-{
-    fn from(runtime: T) -> Self {
-        Box::new(runtime) as Self
+impl<T: Runtime> From<T> for Box<dyn Runtime> {
+    fn from(value: T) -> Self {
+        Box::new(value)
     }
 }
 
@@ -375,11 +407,18 @@ pub enum Caller {
         /// Public key of the user who signed this transaction.
         author: PublicKey,
     },
+
     /// Method is invoked during the method execution of a different service.
     Service {
         /// Identifier of the service instance which invoked this method.
         instance_id: InstanceId,
     },
+
+    /// Call is invoked by one of the blockchain lifecycle events.
+    ///
+    /// This kind of authorization is used for `before_commit` calls to the service instances,
+    /// and for initialization of builtin services.
+    Blockchain,
 }
 
 impl Caller {
@@ -410,6 +449,17 @@ impl Caller {
             None
         }
     }
+
+    /// Verify that the caller of this method is supervisor service.
+    pub fn as_supervisor(&self) -> Option<()> {
+        self.as_service().and_then(|instance_id| {
+            if instance_id == SUPERVISOR_INSTANCE_ID {
+                Some(())
+            } else {
+                None
+            }
+        })
+    }
 }
 
 /// Provide the current state of the blockchain and the caller information in respect of the transaction
@@ -418,7 +468,7 @@ impl Caller {
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a Fork,
+    pub fork: &'a mut Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
     /// Identifier of the service interface required for the call. Keep in mind that this field in
@@ -426,8 +476,8 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field can only contains a core interfaces like `Configure` and
     /// always empty for the common the service interfaces.
     pub interface_name: &'a str,
-    /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a DispatcherRef<'a>,
+    /// Reference to the dispatcher.
+    dispatcher: &'a Dispatcher,
     /// Depth of call stack.
     call_stack_depth: usize,
 }
@@ -436,13 +486,86 @@ impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
-    pub(crate) fn new(dispatcher: &'a DispatcherRef<'a>, fork: &'a Fork, caller: Caller) -> Self {
+    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
         Self {
+            dispatcher,
             fork,
             caller,
-            dispatcher,
             interface_name: "",
             call_stack_depth: 0,
+        }
+    }
+
+    pub(crate) fn child_context(&mut self, caller_service_id: InstanceId) -> ExecutionContext {
+        ExecutionContext {
+            dispatcher: self.dispatcher,
+            fork: self.fork,
+            caller: Caller::Service {
+                instance_id: caller_service_id,
+            },
+            interface_name: "",
+            call_stack_depth: self.call_stack_depth + 1,
+        }
+    }
+
+    pub(crate) fn call(
+        &mut self,
+        interface_name: &str,
+        call_info: &CallInfo,
+        arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        if self.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
+            let kind = DispatcherError::StackOverflow;
+            let msg = format!(
+                "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
+                ExecutionContext::MAX_CALL_STACK_DEPTH
+            );
+            return Err((kind, msg).into());
+        }
+
+        let runtime = self
+            .dispatcher
+            .runtime_for_service(call_info.instance_id)
+            .ok_or(DispatcherError::IncorrectRuntime)?;
+        let reborrowed = self.reborrow_with_interface(interface_name);
+        runtime.execute(reborrowed, call_info, arguments)
+    }
+
+    /// Starts adding a new service instance to the blockchain. The created service is not active
+    /// (i.e., does not process transactions or the `before_commit` hook)
+    /// until the block built on top of the provided `fork` is committed.
+    ///
+    /// This method should be called for the exact context passed to the runtime.
+    pub(crate) fn start_adding_service(
+        &mut self,
+        spec: InstanceSpec,
+        constructor: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        // TODO: revise dispatcher integrity checks [ECR-3743]
+        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
+        let runtime = self
+            .dispatcher
+            .runtime_by_id(spec.artifact.runtime_id)
+            .ok_or(DispatcherError::IncorrectRuntime)?;
+        runtime.start_adding_service(self.reborrow(), &spec, constructor.into_bytes())?;
+
+        // Add service instance to the dispatcher schema.
+        DispatcherSchema::new(&*self.fork)
+            .add_pending_service(spec)
+            .map_err(From::from)
+    }
+
+    fn reborrow(&mut self) -> ExecutionContext<'_> {
+        self.reborrow_with_interface(self.interface_name)
+    }
+
+    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s> {
+        ExecutionContext {
+            fork: &mut *self.fork,
+            caller: self.caller,
+            interface_name,
+            dispatcher: self.dispatcher,
+            call_stack_depth: self.call_stack_depth,
         }
     }
 }
@@ -458,8 +581,8 @@ pub struct InstanceDescriptor<'a> {
     pub name: &'a str,
 }
 
-impl std::fmt::Display for InstanceDescriptor<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for InstanceDescriptor<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.id, self.name)
     }
 }
@@ -467,98 +590,5 @@ impl std::fmt::Display for InstanceDescriptor<'_> {
 impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
     fn from(descriptor: InstanceDescriptor) -> Self {
         (descriptor.id, descriptor.name.to_owned())
-    }
-}
-
-/// Change in the list of service instances.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum ApiChange {
-    /// New instance has been added.
-    InstanceAdded(InstanceId),
-    /// Instance has been removed.
-    InstanceRemoved(InstanceId),
-}
-
-// TODO Write a full documentation when the interservice communications are fully implemented. [ECR-3493]
-/// Provide a low level context for the call of methods of a different service instance.
-#[derive(Debug)]
-pub struct CallContext<'a> {
-    /// Identifier of the caller service instance.
-    caller: InstanceId,
-    /// Identifier of the called service instance.
-    called: InstanceId,
-    /// The current state of the blockchain.
-    fork: &'a Fork,
-    /// Reference to the underlying runtime dispatcher.
-    dispatcher: &'a DispatcherRef<'a>,
-    /// Depth of call stack.
-    call_stack_depth: usize,
-}
-
-impl<'a> CallContext<'a> {
-    /// Create a new call context.
-    pub fn new(
-        fork: &'a Fork,
-        dispatcher: &'a DispatcherRef<'a>,
-        caller: InstanceId,
-        called: InstanceId,
-    ) -> Self {
-        Self {
-            caller,
-            called,
-            fork,
-            dispatcher,
-            call_stack_depth: 0,
-        }
-    }
-
-    /// Create a new call context for the given execution context.
-    pub fn from_execution_context(
-        inner: &'a ExecutionContext<'a>,
-        caller: InstanceId,
-        called: InstanceId,
-    ) -> Self {
-        Self {
-            caller,
-            called,
-            fork: inner.fork,
-            dispatcher: inner.dispatcher,
-            call_stack_depth: inner.call_stack_depth,
-        }
-    }
-
-    /// Perform the method call of the specified service interface.
-    pub fn call(
-        &self,
-        interface_name: impl AsRef<str>,
-        method_id: MethodId,
-        arguments: impl BinaryValue,
-        // TODO ExecutionError here mislead about the true cause of an occurred error. [ECR-3222]
-    ) -> Result<(), ExecutionError> {
-        let context = ExecutionContext {
-            fork: self.fork,
-            dispatcher: self.dispatcher,
-            caller: Caller::Service {
-                instance_id: self.caller,
-            },
-            interface_name: interface_name.as_ref(),
-            call_stack_depth: self.call_stack_depth + 1,
-        };
-        let call_info = CallInfo {
-            method_id,
-            instance_id: self.called,
-        };
-
-        if context.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
-            let kind = dispatcher::Error::StackOverflow;
-            let msg = format!(
-                "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
-                ExecutionContext::MAX_CALL_STACK_DEPTH
-            );
-            return Err((kind, msg).into());
-        }
-
-        self.dispatcher
-            .call(&context, &call_info, arguments.into_bytes().as_ref())
     }
 }

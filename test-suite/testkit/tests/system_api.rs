@@ -27,11 +27,11 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 #[test]
 fn healthcheck() {
     // This test checks whether the endpoint returns expected result and correctness of
-    // serialize.
-    // Expected:
-    // consensus - enabled
-    // connectivity - not connected, due to testkit unable to emulate nodes properly.
-    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    // serialize. Expected results:
+    //
+    // - consensus - enabled
+    // - connectivity - not connected, due to testkit unable to emulate nodes properly.
+    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
     let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
@@ -44,9 +44,8 @@ fn healthcheck() {
 
 #[test]
 fn stats() {
-    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-
     let info: StatsInfo = api.public(ApiKind::System).get("v1/stats").unwrap();
     let expected = StatsInfo {
         tx_pool_size: 0,
@@ -58,9 +57,8 @@ fn stats() {
 
 #[test]
 fn user_agent_info() {
-    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-
     let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
     let expected = user_agent::get();
     assert_eq!(info, expected);
@@ -68,18 +66,16 @@ fn user_agent_info() {
 
 #[test]
 fn network() {
-    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-
     let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
     assert!(info.core_version.is_some());
 }
 
 #[test]
 fn shutdown() {
-    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-
     assert_eq!(
         api.private(ApiKind::System)
             .post::<()>("v1/shutdown")

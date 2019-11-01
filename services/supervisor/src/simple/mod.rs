@@ -14,31 +14,29 @@
 
 //! A simple supervisor service that does actions without any confirmations.
 
-pub use proto::ConfigPropose;
-pub use schema::Schema;
-
 use exonum::{
     blockchain::{self, InstanceCollection},
     crypto::Hash,
     helpers::ValidateInput,
     merkledb::Snapshot,
     runtime::{
-        rust::{interfaces::ConfigureCall, BeforeCommitContext, Service, TransactionContext},
-        Caller, ConfigChange, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
+        rust::{CallContext, Service},
+        Caller, DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
 
-mod proto;
-mod schema;
-#[cfg(test)]
-pub mod tests;
+use crate::{update_configs, ConfigChange, ConfigPropose, ConfigureCall};
 
+mod schema;
+pub use self::schema::Schema;
+
+/// Simple supervisor for testing purposes. **This supervisor is not fit for real-world use cases.**
 #[derive(Debug, ServiceFactory)]
 #[exonum(
-    proto_sources = "proto::schema",
-    artifact_name = "exonum-testkit-supervisor",
-    implements("Transactions")
+    proto_sources = "crate::proto",
+    artifact_name = "simple-supervisor",
+    implements("SimpleSupervisorInterface")
 )]
 pub struct SimpleSupervisor;
 
@@ -55,34 +53,33 @@ pub enum Error {
 }
 
 #[exonum_service]
-pub trait Transactions {
-    fn change_config(
-        &self,
-        context: TransactionContext,
-        arg: ConfigPropose,
-    ) -> Result<(), ExecutionError>;
+pub trait SimpleSupervisorInterface {
+    fn change_config(&self, context: CallContext, arg: ConfigPropose)
+        -> Result<(), ExecutionError>;
 }
 
-impl Transactions for SimpleSupervisor {
+impl SimpleSupervisorInterface for SimpleSupervisor {
+    // TODO: check auth by one of validators [ECR-3742]
     fn change_config(
         &self,
-        context: TransactionContext,
+        mut context: CallContext,
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        let (_, fork) = context
+        context
             .verify_caller(Caller::as_transaction)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Check that the `actual_from` height is in the future.
-        if blockchain::Schema::new(fork).height() >= arg.actual_from {
+        if blockchain::Schema::new(context.fork()).height() >= arg.actual_from {
             return Err(Error::ActualFromIsPast).map_err(From::from);
         }
 
-        let schema = Schema::new(fork);
+        let schema = Schema::new(context.fork());
         // Check that there are no pending config changes.
         if schema.config_propose_entry().exists() {
             return Err(Error::ConfigProposeExists).map_err(From::from);
         }
+
         // Perform config verification.
         for change in &arg.changes {
             match change {
@@ -94,13 +91,15 @@ impl Transactions for SimpleSupervisor {
 
                 ConfigChange::Service(config) => {
                     context
-                        .interface::<ConfigureCall>(config.instance_id)
+                        .interface::<ConfigureCall>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
             }
         }
+
         // Add verified config proposal to the pending config changes.
+        let schema = Schema::new(context.fork());
         schema.config_propose_entry().set(arg);
         Ok(())
     }
@@ -111,32 +110,34 @@ impl Service for SimpleSupervisor {
         Schema::new(snapshot).state_hash()
     }
 
-    fn before_commit(&self, context: BeforeCommitContext) {
-        let schema = Schema::new(context.fork);
+    fn before_commit(&self, mut context: CallContext) {
+        let schema = Schema::new(context.fork());
         let proposal = if let Some(proposal) =
             schema.config_propose_entry().get().filter(|proposal| {
-                proposal.actual_from == blockchain::Schema::new(context.fork).height().next()
+                proposal.actual_from == blockchain::Schema::new(context.fork()).height().next()
             }) {
             proposal
         } else {
             return;
         };
+
         // Perform the application of configs.
-        context.update_config(proposal.changes);
+        update_configs(&mut context, proposal.changes);
+
         // Remove config from proposals.
+        let schema = Schema::new(context.fork());
         schema.config_propose_entry().remove();
     }
 }
 
 impl SimpleSupervisor {
-    pub const BUILTIN_ID: InstanceId = 0;
-    pub const BUILTIN_NAME: &'static str = "supervisor-sample";
+    pub const BUILTIN_NAME: &'static str = "simple-supervisor";
 }
 
 impl From<SimpleSupervisor> for InstanceCollection {
     fn from(inner: SimpleSupervisor) -> Self {
         Self::new(inner).with_instance(
-            SimpleSupervisor::BUILTIN_ID,
+            SUPERVISOR_INSTANCE_ID,
             SimpleSupervisor::BUILTIN_NAME,
             Vec::default(),
         )

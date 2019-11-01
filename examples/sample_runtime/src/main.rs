@@ -16,18 +16,16 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys},
-    crypto::{PublicKey, SecretKey},
+    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, ValidatorKeys},
     helpers::Height,
     keys::Keys,
-    merkledb::{BinaryValue, Fork, Snapshot, TemporaryDB},
+    merkledb::{BinaryValue, Snapshot, TemporaryDB},
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        dispatcher::{self, DispatcherRef, DispatcherSender, Error as DispatcherError},
-        rust::Transaction,
-        AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceId, InstanceSpec, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::Transaction, AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, DeployStatus,
+        DispatcherError, DispatcherSchema, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, Mailbox, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -70,7 +68,7 @@ impl SampleRuntime {
     const ID: u32 = 255;
 
     /// Create a new service instance with the given specification.
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<&SampleService, ExecutionError> {
+    fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
             return Err(DispatcherError::ArtifactNotDeployed.into());
         }
@@ -78,36 +76,39 @@ impl SampleRuntime {
             return Err(DispatcherError::ServiceIdExists.into());
         }
 
-        self.started_services.insert(
-            spec.id,
-            SampleService {
-                name: spec.name.clone(),
-                ..SampleService::default()
-            },
-        );
-        Ok(&self.started_services[&spec.id])
+        Ok(SampleService {
+            name: spec.name.clone(),
+            ..SampleService::default()
+        })
     }
-}
 
-impl Runtime for SampleRuntime {
     /// In the present simplest case, the artifact is added into the deployed artifacts table.
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(
-            match self.deployed_artifacts.entry(artifact) {
-                Entry::Occupied(_) => Err(DispatcherError::ArtifactAlreadyDeployed),
-                Entry::Vacant(entry) => {
-                    println!("Deploying artifact: {}", entry.key());
-                    entry.insert(spec);
-                    Ok(())
-                }
+    ) -> Result<(), ExecutionError> {
+        match self.deployed_artifacts.entry(artifact) {
+            Entry::Occupied(_) => Err(DispatcherError::ArtifactAlreadyDeployed.into()),
+            Entry::Vacant(entry) => {
+                println!("Deploying artifact: {}", entry.key());
+                entry.insert(spec);
+                Ok(())
             }
-            .map_err(ExecutionError::from)
-            .into_future(),
-        )
+        }
+    }
+}
+
+impl Runtime for SampleRuntime {
+    fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+        spec: Vec<u8>,
+    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+        let res = self
+            .deploy_artifact(artifact, spec)
+            .map(|()| ArtifactProtobufSpec::default());
+        Box::new(res.into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -115,16 +116,21 @@ impl Runtime for SampleRuntime {
     }
 
     /// Starts an existing `SampleService` instance with the specified ID.
-    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         let instance = self.start_service(spec)?;
         println!("Starting service {}: {:?}", spec, instance);
+        self.started_services.insert(spec.id, instance);
         Ok(())
     }
 
     /// Starts a new service instance and sets the counter value for this.
-    fn add_service(
-        &mut self,
-        _fork: &mut Fork,
+    fn start_adding_service(
+        &self,
+        _context: ExecutionContext,
         spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -138,7 +144,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        context: &ExecutionContext,
+        context: ExecutionContext,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -176,37 +182,32 @@ impl Runtime for SampleRuntime {
             }
 
             // Unknown transaction.
-            (interface, method) => Err((
-                SampleRuntimeError::IncorrectCallInfo,
-                format!(
-                    "Incorrect information to call transaction. {}#{}",
-                    interface, method
-                ),
-            )
-                .into()),
+            (interface, method) => {
+                let err = (
+                    SampleRuntimeError::IncorrectCallInfo,
+                    format!(
+                        "Incorrect information to call transaction. {}#{}",
+                        interface, method
+                    ),
+                );
+                Err(err.into())
+            }
         }
-    }
-
-    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.deployed_artifacts
-            .get(id)
-            .map(|_| ArtifactProtobufSpec::default())
     }
 
     fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
         StateHashAggregator::default()
     }
 
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {}
-
-    fn after_commit(
+    fn before_commit(
         &self,
-        _dispatcher: &DispatcherSender,
-        _snapshot: &dyn Snapshot,
-        _service_keypair: &(PublicKey, SecretKey),
-        _tx_sender: &ApiSender,
-    ) {
+        _context: ExecutionContext,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
+
+    fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
 impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
@@ -272,13 +273,18 @@ fn main() {
 
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
-    let blockchain = BlockchainBuilder::new(db, genesis, service_keypair.clone())
-        .with_rust_runtime(vec![InstanceCollection::from(Supervisor)])
+    let blockchain = Blockchain::new(db, service_keypair.clone(), api_sender.clone())
+        .into_mut(genesis)
+        .with_rust_runtime(
+            channel.endpoints.0.clone(),
+            vec![InstanceCollection::from(Supervisor)],
+        )
         .with_additional_runtime(SampleRuntime::default())
-        .finalize(api_sender.clone(), channel.internal_requests.0.clone())
+        .build()
         .unwrap();
 
-    let node = Node::with_blockchain(blockchain.clone(), channel, node_cfg, None);
+    let blockchain_ref = blockchain.as_ref().to_owned();
+    let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
     println!("Starting a single node...");
     println!("Blockchain is ready for transactions!");
 
@@ -323,12 +329,12 @@ fn main() {
         thread::sleep(Duration::from_secs(5));
 
         // Get an instance identifier.
-        let snapshot = blockchain.snapshot();
-        let instance_id = dispatcher::Schema::new(snapshot.as_ref())
-            .service_instances()
-            .get(&instance_name)
-            .unwrap()
-            .id;
+        let snapshot = blockchain_ref.snapshot();
+        let (spec, status) = DispatcherSchema::new(snapshot.as_ref())
+            .get_instance(instance_name.as_str())
+            .unwrap();
+        assert_eq!(status, DeployStatus::Active);
+        let instance_id = spec.id;
         // Send an update counter transaction.
         api_sender
             .broadcast_transaction(Verified::from_value(

@@ -19,7 +19,7 @@ use exonum::{
     crypto::Hash,
     helpers::Height,
     runtime::{
-        rust::{AfterCommitContext, Service, TransactionContext},
+        rust::{AfterCommitContext, CallContext, Service},
         InstanceDescriptor, InstanceId,
     },
 };
@@ -47,7 +47,7 @@ pub struct TxAfterCommit {
 pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,
-        context: TransactionContext,
+        context: CallContext,
         arg: TxAfterCommit,
     ) -> Result<(), ExecutionError>;
 }
@@ -73,7 +73,7 @@ pub struct AfterCommitService {
 impl AfterCommitInterface for AfterCommitService {
     fn handle_after_commit(
         &self,
-        _context: TransactionContext,
+        _context: CallContext,
         _arg: TxAfterCommit,
     ) -> Result<(), ExecutionError> {
         Ok(())

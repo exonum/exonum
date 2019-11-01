@@ -39,7 +39,9 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
-    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys},
+    blockchain::{
+        Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+    },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
@@ -75,9 +77,7 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
     services: Vec<InstanceCollection>,
-) -> Blockchain {
-    let external_runtimes: Vec<(u32, Box<dyn exonum::runtime::Runtime>)> = vec![];
-
+) -> BlockchainMut {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
     let genesis_config = ConsensusConfig {
@@ -88,18 +88,15 @@ fn create_blockchain(
         ..ConsensusConfig::default()
     };
 
-    Blockchain::new(
-        db,
-        external_runtimes,
-        services,
-        genesis_config,
-        service_keypair,
-        ApiSender::new(mpsc::channel(0).0),
-        mpsc::channel(0).0,
-    )
+    let api_sender = ApiSender::new(mpsc::channel(0).0);
+    Blockchain::new(db, service_keypair, api_sender)
+        .into_mut(genesis_config)
+        .with_rust_runtime(mpsc::channel(0).0, services)
+        .build()
+        .unwrap()
 }
 
-fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, Patch) {
+fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
     blockchain.create_patch(
         ValidatorId::zero(),
         Height(height),
@@ -114,7 +111,7 @@ mod timestamping {
         crypto::Hash,
         messages::Verified,
         runtime::{
-            rust::{Service, Transaction, TransactionContext},
+            rust::{CallContext, Service, Transaction},
             AnyTx, InstanceDescriptor, InstanceId,
         },
     };
@@ -129,11 +126,11 @@ mod timestamping {
 
     #[exonum_service]
     pub trait TimestampingInterface {
-        fn timestamp(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
+        fn timestamp(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError>;
 
         fn timestamp_panic(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: PanickingTx,
         ) -> Result<(), ExecutionError>;
     }
@@ -147,13 +144,13 @@ mod timestamping {
     pub struct Timestamping;
 
     impl TimestampingInterface for Timestamping {
-        fn timestamp(&self, _context: TransactionContext, _arg: Tx) -> Result<(), ExecutionError> {
+        fn timestamp(&self, _context: CallContext, _arg: Tx) -> Result<(), ExecutionError> {
             Ok(())
         }
 
         fn timestamp_panic(
             &self,
-            _context: TransactionContext,
+            _context: CallContext,
             _arg: PanickingTx,
         ) -> Result<(), ExecutionError> {
             panic!("panic text");
@@ -211,7 +208,7 @@ mod cryptocurrency {
         crypto::{Hash, PublicKey},
         messages::Verified,
         runtime::{
-            rust::{Service, Transaction, TransactionContext},
+            rust::{CallContext, Service, Transaction},
             AnyTx, ErrorKind, InstanceDescriptor, InstanceId,
         },
     };
@@ -232,17 +229,17 @@ mod cryptocurrency {
     #[exonum_service]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
-        fn transfer(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError>;
+        fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError>;
         /// Same as `Tx`, but without cryptographic proofs in `execute`.
         fn transfer_without_proof(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: SimpleTx,
         ) -> Result<(), ExecutionError>;
         /// Same as `SimpleTx`, but signals an error 50% of the time.
         fn transfer_error_sometimes(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: RollbackTx,
         ) -> Result<(), ExecutionError>;
     }
@@ -256,7 +253,7 @@ mod cryptocurrency {
     pub struct Cryptocurrency;
 
     impl CryptocurrencyInterface for Cryptocurrency {
-        fn transfer(&self, context: TransactionContext, arg: Tx) -> Result<(), ExecutionError> {
+        fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
 
             let mut index = ProofMapIndex::new("provable_balances", context.fork());
@@ -271,7 +268,7 @@ mod cryptocurrency {
 
         fn transfer_without_proof(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: SimpleTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
@@ -288,7 +285,7 @@ mod cryptocurrency {
 
         fn transfer_error_sometimes(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: RollbackTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
@@ -399,9 +396,8 @@ mod foreign_interface_call {
         merkledb::ObjectHash,
         messages::Verified,
         runtime::{
-            self, dispatcher,
-            rust::{Interface, Service, Transaction, TransactionContext},
-            AnyTx, CallContext, InstanceDescriptor, InstanceId, MethodId,
+            rust::{CallContext, Interface, Service, Transaction},
+            AnyTx, DispatcherError, InstanceDescriptor, InstanceId, MethodId,
         },
     };
     use exonum_merkledb::Snapshot;
@@ -428,19 +424,17 @@ mod foreign_interface_call {
 
     #[exonum_service]
     pub trait SelfInterface {
-        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
-            -> Result<(), ExecutionError>;
+        fn timestamp(&self, context: CallContext, arg: SelfTx) -> Result<(), ExecutionError>;
 
         fn timestamp_foreign(
             &self,
-            context: TransactionContext,
+            context: CallContext,
             arg: ForeignTx,
         ) -> Result<(), ExecutionError>;
     }
 
     pub trait ForeignInterface {
-        fn timestamp(&self, context: TransactionContext, arg: SelfTx)
-            -> Result<(), ExecutionError>;
+        fn timestamp(&self, context: CallContext, arg: SelfTx) -> Result<(), ExecutionError>;
     }
 
     impl Interface for dyn ForeignInterface {
@@ -448,7 +442,7 @@ mod foreign_interface_call {
 
         fn dispatch(
             &self,
-            ctx: TransactionContext,
+            ctx: CallContext,
             method: MethodId,
             payload: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -456,10 +450,10 @@ mod foreign_interface_call {
                 0u32 => {
                     let bytes = payload.into();
                     let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(runtime::DispatcherError::malformed_arguments)?;
+                        .map_err(DispatcherError::malformed_arguments)?;
                     self.timestamp(ctx, arg)
                 }
-                _ => Err(dispatcher::Error::NoSuchMethod).map_err(From::from),
+                _ => Err(DispatcherError::NoSuchMethod).map_err(From::from),
             }
         }
     }
@@ -468,7 +462,7 @@ mod foreign_interface_call {
     pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
 
     impl<'a> ForeignInterfaceClient<'a> {
-        fn timestamp(&self, arg: SelfTx) -> Result<(), ExecutionError> {
+        fn timestamp(&mut self, arg: SelfTx) -> Result<(), ExecutionError> {
             self.0.call(ForeignInterface::INTERFACE_NAME, 0, arg)
         }
     }
@@ -503,31 +497,23 @@ mod foreign_interface_call {
     pub struct Timestamping;
 
     impl SelfInterface for Timestamping {
-        fn timestamp(
-            &self,
-            _context: TransactionContext,
-            _arg: SelfTx,
-        ) -> Result<(), ExecutionError> {
+        fn timestamp(&self, _context: CallContext, _arg: SelfTx) -> Result<(), ExecutionError> {
             Ok(())
         }
 
         fn timestamp_foreign(
             &self,
-            context: TransactionContext,
+            mut context: CallContext,
             arg: ForeignTx,
         ) -> Result<(), ExecutionError> {
             context
-                .interface::<ForeignInterfaceClient>(FOREIGN_INTERFACE_SERVICE_ID)
+                .interface::<ForeignInterfaceClient>(FOREIGN_INTERFACE_SERVICE_ID)?
                 .timestamp(SelfTx { data: arg.data })
         }
     }
 
     impl ForeignInterface for Timestamping {
-        fn timestamp(
-            &self,
-            context: TransactionContext,
-            _arg: SelfTx,
-        ) -> Result<(), ExecutionError> {
+        fn timestamp(&self, context: CallContext, _arg: SelfTx) -> Result<(), ExecutionError> {
             assert_eq!(
                 context.caller().as_service().unwrap(),
                 SELF_INTERFACE_SERVICE_ID
@@ -582,24 +568,20 @@ mod foreign_interface_call {
 }
 
 /// Writes transactions to the pool and returns their hashes.
-fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
+fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
     let fork = blockchain.fork();
+    let mut schema = Schema::new(&fork);
 
-    let tx_hashes = {
-        let mut schema = Schema::new(&fork);
-
-        // In the case of the block within `Bencher::iter()`, some transactions
-        // may already be present in the pool. We don't particularly care about this.
-        transactions
-            .into_iter()
-            .map(|tx| {
-                let hash = tx.object_hash();
-                schema.add_transaction_into_pool(tx);
-                hash
-            })
-            .collect()
-    };
-
+    // In the case of the block within `Bencher::iter()`, some transactions
+    // may already be present in the pool. We don't particularly care about this.
+    let tx_hashes = transactions
+        .into_iter()
+        .map(|tx| {
+            let hash = tx.object_hash();
+            schema.add_transaction_into_pool(tx);
+            hash
+        })
+        .collect();
     blockchain.merge(fork.into_patch()).unwrap();
     tx_hashes
 }
@@ -620,7 +602,7 @@ fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
 }
 
 fn prepare_blockchain(
-    blockchain: &mut Blockchain,
+    blockchain: &mut BlockchainMut,
     generator: impl Iterator<Item = Verified<AnyTx>>,
     blockchain_height: usize,
     txs_in_block: usize,
@@ -631,7 +613,7 @@ fn prepare_blockchain(
         let start = txs_in_block * i;
         let end = txs_in_block * (i + 1);
         let tx_hashes = prepare_txs(blockchain, transactions[start..end].to_vec());
-        assert_transactions_in_pool(blockchain, &tx_hashes);
+        assert_transactions_in_pool(blockchain.as_ref(), &tx_hashes);
 
         let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
@@ -667,7 +649,7 @@ fn execute_block_rocksdb(
         .collect();
 
     let tx_hashes = prepare_txs(&mut blockchain, txs);
-    assert_transactions_in_pool(&blockchain, &tx_hashes);
+    assert_transactions_in_pool(blockchain.as_ref(), &tx_hashes);
 
     // Because execute_block is not really "micro benchmark"
     // executing it as regular benches, with 100 samples,
@@ -678,7 +660,7 @@ fn execute_block_rocksdb(
         ParameterizedBenchmark::new(
             "transactions",
             move |bencher, &&txs_in_block| {
-                let height: u64 = blockchain.last_block().height().next().into();
+                let height: u64 = blockchain.as_ref().last_block().height().next().into();
                 bencher.iter(|| {
                     execute_block(&blockchain, height, &tx_hashes[..txs_in_block]);
                 });

@@ -23,7 +23,7 @@ use exonum::{
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
-use exonum_supervisor::{ConfigVote, Error, Supervisor};
+use exonum_supervisor::{ConfigVote, Error, Supervisor, SupervisorInterface};
 
 #[test]
 fn test_multiple_consensus_change_proposes() {
@@ -32,14 +32,13 @@ fn test_multiple_consensus_change_proposes() {
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_config_propose_first_variant(&testkit))
         .extend_consensus_config_propose(consensus_config_propose_second_variant(&testkit))
-        .config_propose();
+        .build();
 
     let signed_proposal =
         sign_config_propose_transaction(&testkit, config_proposal, ValidatorId(0));
     let block = testkit.create_block_with_transaction(signed_proposal);
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
-
     assert_eq!(config_propose_entry(&testkit), None);
 }
 
@@ -52,7 +51,7 @@ fn test_deadline_config_exceeded() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(new_consensus_config.clone())
-        .config_propose();
+        .build();
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
             &testkit,
@@ -77,7 +76,7 @@ fn test_sent_new_config_after_expired_one() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(first_consensus_config.clone())
-        .config_propose();
+        .build();
 
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
@@ -97,7 +96,7 @@ fn test_sent_new_config_after_expired_one() {
 
     let config_proposal = ConfigProposeBuilder::new(cfg_change_height)
         .extend_consensus_config_propose(second_consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
@@ -133,7 +132,7 @@ fn test_discard_config_with_not_enough_confirms() {
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(cfg_change_height)
         .extend_consensus_config_propose(consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
 
     testkit
@@ -172,7 +171,7 @@ fn test_apply_config_by_min_required_majority() {
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(cfg_change_height)
         .extend_consensus_config_propose(consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
 
     testkit
@@ -220,7 +219,7 @@ fn test_send_confirmation_by_initiator() {
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
 
     testkit
@@ -252,10 +251,10 @@ fn test_propose_config_change_by_incorrect_validator() {
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_config.clone())
-        .config_propose();
+        .build();
 
     let keys = crypto::gen_keypair();
-    let signed_confirm = config_proposal.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    let signed_confirm = config_proposal.sign_for_supervisor(keys.0, &keys.1);
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let status = block.transactions[0].status();
@@ -270,7 +269,7 @@ fn test_confirm_config_by_incorrect_validator() {
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_config.clone())
-        .config_propose();
+        .build();
     let proposal_hash = config_proposal.object_hash();
 
     testkit
@@ -302,7 +301,7 @@ fn test_try_confirm_non_existing_proposal() {
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_config.clone())
-        .config_propose();
+        .build();
 
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
@@ -331,7 +330,7 @@ fn test_service_config_change() {
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
-        .config_propose();
+        .build();
     let proposal_hash = propose.object_hash();
 
     testkit
@@ -367,7 +366,7 @@ fn test_discard_errored_service_config_change() {
         .extend_service_config_propose(params.clone())
         .extend_service_config_propose("error".to_string())
         .extend_consensus_config_propose(new_consensus_config)
-        .config_propose();
+        .build();
 
     let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
 
@@ -381,7 +380,6 @@ fn test_discard_errored_service_config_change() {
 #[test]
 fn test_discard_panicked_service_config_change() {
     let mut testkit = testkit_with_supervisor_and_service(4);
-
     let params = "I am a discarded parameter".to_owned();
     let new_consensus_config = consensus_config_propose_first_variant(&testkit);
 
@@ -389,31 +387,25 @@ fn test_discard_panicked_service_config_change() {
         .extend_service_config_propose(params.clone())
         .extend_service_config_propose("panic".to_string())
         .extend_consensus_config_propose(new_consensus_config)
-        .config_propose();
+        .build();
 
     let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
-
     let block = testkit.create_block_with_transaction(signed_proposal);
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::MalformedConfigPropose.into()));
-
     assert_eq!(config_propose_entry(&testkit), None);
 }
 
 #[test]
 fn test_incorrect_actual_from_field() {
     let mut testkit = testkit_with_supervisor_and_service(1);
-
     let params = "I am a new parameter".to_owned();
-
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
-        .config_propose();
+        .build();
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
-
     let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
-
     let block = testkit.create_block_with_transaction(signed_proposal);
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::ActualFromIsPast.into()));
@@ -428,7 +420,7 @@ fn test_another_configuration_change_proposal() {
     let cfg_change_height = Height(4);
     let propose = ConfigProposeBuilder::new(cfg_change_height)
         .extend_service_config_propose(params.clone())
-        .config_propose();
+        .build();
 
     let proposal_hash = propose.object_hash();
     testkit
@@ -444,7 +436,7 @@ fn test_another_configuration_change_proposal() {
     // Try to commit second config change propose.
     let second_propose = ConfigProposeBuilder::new(cfg_change_height)
         .extend_service_config_propose("I am an overridden parameter".to_string())
-        .config_propose();
+        .build();
 
     let signed_proposal = sign_config_propose_transaction(&testkit, second_propose, initiator_id);
     let block = testkit.create_block_with_transaction(signed_proposal);
@@ -479,16 +471,17 @@ fn test_service_config_discard_fake_supervisor() {
         .create();
 
     let params = "I am a new parameter".to_owned();
-
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_service_config_propose(params.clone())
-        .config_propose();
+        .extend_service_config_propose(params)
+        .build();
 
-    let block = testkit.create_block_with_transaction(propose.sign(
+    let tx = Transaction::<dyn SupervisorInterface>::sign(
+        propose,
         FAKE_SUPERVISOR_ID,
         keypair.0,
         &keypair.1,
-    ));
+    );
+    let block = testkit.create_block_with_transaction(tx);
     let status = block.transactions[0].status();
     assert_eq!(status, Err(&Error::UnknownAuthor.into()));
 }
@@ -496,19 +489,16 @@ fn test_service_config_discard_fake_supervisor() {
 #[test]
 fn test_test_configuration_and_rollbacks() {
     let mut testkit = testkit_with_supervisor(4);
-
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
 
     let cfg_change_height = Height(4);
     let old_config = testkit.consensus_config();
-
     testkit.checkpoint();
 
     let new_config = consensus_config_propose_first_variant(&testkit);
-
     let propose = ConfigProposeBuilder::new(cfg_change_height)
         .extend_consensus_config_propose(new_config.clone())
-        .config_propose();
+        .build();
 
     let proposal_hash = propose.object_hash();
     testkit
@@ -538,7 +528,6 @@ fn test_test_configuration_and_rollbacks() {
     assert_eq!(config_propose_entry(&testkit), None);
 
     testkit.rollback();
-
     // As rollback is behind the time a proposal entered the blockchain,
     // the proposal is effectively forgotten.
     testkit.create_blocks_until(Height(4));
@@ -549,12 +538,11 @@ fn test_test_configuration_and_rollbacks() {
 #[test]
 fn test_service_config_discard_single_apply_error() {
     let mut testkit = testkit_with_supervisor_and_service(1);
-
     let params = "apply_error".to_owned();
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
-        .config_propose();
+        .build();
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
             &testkit,
@@ -565,9 +553,8 @@ fn test_service_config_discard_single_apply_error() {
         .status()
         .expect("Transaction with change propose discarded.");
 
-    testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
+    testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
     assert_eq!(config_propose_entry(&testkit), None);
-
     check_service_actual_param(&testkit, None);
 }
 
@@ -575,12 +562,11 @@ fn test_service_config_discard_single_apply_error() {
 fn test_service_config_discard_single_apply_panic() {
     let mut testkit = testkit_with_supervisor_and_service(1);
     let initiator_id = testkit.network().us().validator_id().unwrap();
-
     let params = "apply_panic".to_owned();
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
-        .config_propose();
+        .build();
 
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
@@ -591,8 +577,7 @@ fn test_service_config_discard_single_apply_panic() {
         .transactions[0]
         .status()
         .expect("Transaction with change propose discarded.");
-    testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
-
+    testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
     assert_eq!(config_propose_entry(&testkit), None);
     check_service_actual_param(&testkit, None);
 }
@@ -601,13 +586,12 @@ fn test_service_config_discard_single_apply_panic() {
 fn test_services_config_apply_multiple_configs() {
     let mut testkit = testkit_with_supervisor_and_2_services(4);
     let initiator_id = testkit.network().us().validator_id().unwrap();
-
     let params = "I am a new parameter".to_owned();
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
         .extend_second_service_config_propose(params.clone())
-        .config_propose();
+        .build();
     let proposal_hash = propose.object_hash();
 
     testkit
@@ -636,14 +620,13 @@ fn test_services_config_apply_multiple_configs() {
 fn test_services_config_discard_multiple_configs() {
     let mut testkit = testkit_with_supervisor_and_2_services(1);
     let initiator_id = testkit.network().us().validator_id().unwrap();
-
     let params = "I am a new parameter".to_owned();
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
         .extend_second_service_config_propose(params.clone())
         .extend_second_service_config_propose("I am a extra proposal".to_owned())
-        .config_propose();
+        .build();
 
     let signed_proposal = sign_config_propose_transaction(&testkit, propose, initiator_id);
 
@@ -665,7 +648,7 @@ fn test_several_service_config_changes() {
 
         let propose = ConfigProposeBuilder::new(cfg_change_height)
             .extend_service_config_propose(params.clone())
-            .config_propose();
+            .build();
         let proposal_hash = propose.object_hash();
 
         testkit

@@ -8,7 +8,7 @@
   },
   "private": true,
   "scripts": {
-    "proto": "pbjs -t static-module ../../exonum/src/proto/schema/exonum/protocol.proto  ../../examples/cryptocurrency/src/proto/cryptocurrency.proto -o ./test/stubs.js",
+    "proto": "pbjs -t static-module ../../components/crypto/src/proto/schema/types.proto  ../../examples/cryptocurrency/src/proto/service.proto -o ./test/stubs.js",
     "lint": "standard",
     "pretest:unix": "npm run posttest:unix && cargo build; (cargo run > /dev/null 2>&1) & sleep 5",
     "test": "mocha test/index.js",

@@ -74,7 +74,7 @@ fn test_send_transaction() {
         create_ws_client("ws://localhost:8079/api/explorer/v1/ws").expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(30)))
+        .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
 
     // Check that no messages on start.
@@ -352,7 +352,7 @@ fn test_subscribe() {
         create_ws_client("ws://localhost:8085/api/explorer/v1/ws").expect("Cannot connect to node");
     client
         .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(30)))
+        .set_read_timeout(Some(Duration::from_secs(10)))
         .unwrap();
 
     // Check that no messages on start.
