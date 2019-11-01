@@ -16,13 +16,14 @@
 // TODO move out from helpers [ECR-3222]
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use exonum_merkledb::{BinaryKey, BinaryValue, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{
+    AccessExt, BinaryKey, BinaryValue, IndexAccess, IndexAccessMut, ObjectHash, ProofMapIndex,
+};
 
 use std::{
     borrow::Cow,
     collections::BTreeSet,
     io::{Cursor, Write},
-    marker::PhantomData,
 };
 
 use crate::{
@@ -83,30 +84,27 @@ impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
 #[derive(Debug)]
 pub struct ValidatorMultisig<I, V>
 where
-    I: IndexAccess,
+    I: AccessExt,
+    V: BinaryKey + ObjectHash,
 {
-    index_name: String,
-    // List of validators' public keys.
+    index: ProofMapIndex<I::Base, V, BinarySet<PublicKey>>,
     validator_keys: Vec<ValidatorKeys>,
-    access: I,
-    _v: PhantomData<V>,
 }
 
 impl<I, V> ValidatorMultisig<I, V>
 where
-    I: IndexAccess,
+    I: AccessExt,
     V: BinaryKey + ObjectHash,
 {
-    pub fn new(index_name: impl Into<String>, access: I) -> Self {
-        let validator_keys = blockchain::Schema::new(access.clone())
+    pub fn get(index_name: &str, access: I) -> Option<Self> {
+        let index = access.proof_map(index_name)?;
+        let validator_keys = blockchain::Schema::get(access)?
             .consensus_config()
             .validator_keys;
-        Self {
-            index_name: index_name.into(),
-            access,
+        Some(Self {
+            index,
             validator_keys,
-            _v: PhantomData,
-        }
+        })
     }
 
     pub fn validators_amount(&self) -> usize {
@@ -114,7 +112,7 @@ where
     }
 
     pub fn confirmed_by(&self, id: &V, author: &PublicKey) -> bool {
-        self.multisig_index()
+        self.index
             .get(id)
             .and_then(|set| {
                 if set.0.contains(&author) {
@@ -133,23 +131,34 @@ where
             .map(|id| ValidatorId(id as u16))
     }
 
+    pub fn confirmations(&self, id: &V) -> usize {
+        self.index.get(id).map_or(0, |confirms| confirms.0.len())
+    }
+}
+
+impl<I, V> ValidatorMultisig<I, V>
+where
+    I: AccessExt,
+    I::Base: IndexAccessMut,
+    V: BinaryKey + ObjectHash,
+{
+    pub fn get_or_create(index_name: &str, access: I) -> Self {
+        let index = access.ensure_proof_map(index_name);
+        let validator_keys = blockchain::Schema::new(access)
+            .consensus_config()
+            .validator_keys;
+        Self {
+            index,
+            validator_keys,
+        }
+    }
+
     pub fn confirm(&mut self, id: &V, author: PublicKey) -> usize {
-        let mut multisig_index = self.multisig_index();
-        let mut confirmations = multisig_index.get(id).unwrap_or_default();
+        let mut confirmations = self.index.get(id).unwrap_or_default();
         confirmations.0.insert(author);
         let len = confirmations.0.len();
-        multisig_index.put(id, confirmations);
+        self.index.put(id, confirmations);
         len
-    }
-
-    pub fn confirmations(&self, id: &V) -> usize {
-        self.multisig_index()
-            .get(id)
-            .map_or(0, |confirms| confirms.0.len())
-    }
-
-    fn multisig_index(&self) -> ProofMapIndex<I, V, BinarySet<PublicKey>> {
-        ProofMapIndex::new(self.index_name.clone(), self.access.clone())
     }
 }
 
@@ -159,7 +168,7 @@ where
     V: BinaryKey + ObjectHash,
 {
     fn object_hash(&self) -> Hash {
-        self.multisig_index().object_hash()
+        self.index.object_hash()
     }
 }
 

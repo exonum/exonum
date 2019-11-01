@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, Dispatcher, DispatcherState},
+    runtime::{error::catch_panic, Dispatcher, DispatcherSchema, DispatcherState},
 };
 
 mod block;
@@ -134,13 +134,15 @@ impl Blockchain {
 
     /// Returns the transactions pool size.
     pub fn pool_size(&self) -> u64 {
-        Schema::new(&self.snapshot()).transactions_pool_len()
+        Schema::get(&self.snapshot()).map_or(0, |schema| schema.transactions_pool_len())
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
         let snapshot = self.snapshot();
-        Schema::new(&snapshot).peers_cache().iter().collect()
+        Schema::get(&snapshot).map_or(HashMap::new(), |schema| {
+            schema.peers_cache().iter().collect()
+        })
     }
 
     /// Starts promotion into a mutable blockchain instance that can be used to process
@@ -223,7 +225,10 @@ impl BlockchainMut {
     ) -> Result<(), Error> {
         config.validate()?;
         let mut fork = self.fork();
-        Schema::new(&fork).consensus_config_entry().set(config);
+        Schema::get_or_create(&fork)
+            .consensus_config_entry()
+            .set(config);
+        DispatcherSchema::initialize(&fork);
 
         // Add service instances.
         for instance_config in initial_services {
@@ -249,7 +254,8 @@ impl BlockchainMut {
         let fork = Fork::from(patch);
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
-        self.dispatcher.notify_runtimes_about_commit(fork.as_ref());
+        self.dispatcher
+            .notify_runtimes_about_commit(fork.snapshot_with_flushed_changes());
         self.merge(fork.into_patch())?;
 
         info!(
@@ -287,7 +293,7 @@ impl BlockchainMut {
         }
 
         // Get tx & state hash.
-        let schema = Schema::new(&fork);
+        let schema = Schema::get_or_create(&fork);
         let state_hash = {
             let mut sum_table = schema.state_hash_aggregator();
             // Clear old state hash.
@@ -295,7 +301,7 @@ impl BlockchainMut {
             // Collect all state hashes.
             let state_hashes = self
                 .dispatcher
-                .state_hash(fork.as_ref())
+                .state_hash(fork.snapshot_with_flushed_changes())
                 .into_iter()
                 // Add state hash of core table.
                 .chain(IndexCoordinates::locate(
@@ -308,7 +314,7 @@ impl BlockchainMut {
             }
             sum_table.object_hash()
         };
-        let tx_hash = schema.block_transactions(height).object_hash();
+        let tx_hash = schema.ensure_block_transactions(height).object_hash();
 
         // Create block.
         let block = Block::new(
@@ -324,7 +330,7 @@ impl BlockchainMut {
         // Calculate block hash.
         let block_hash = block.object_hash();
         // Update height.
-        let schema = Schema::new(&fork);
+        let schema = Schema::get_or_create(&fork);
         schema.block_hashes_by_height().push(block_hash);
         // Save block.
         schema.blocks().put(&block_hash, block);
@@ -339,10 +345,7 @@ impl BlockchainMut {
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> Result<(), Error> {
-        let fork_ref = &*fork;
-        let snapshot = fork_ref.snapshot();
-        let schema = Schema::new(snapshot);
-
+        let schema = Schema::get_or_create(&*fork);
         let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
             .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
         fork.flush();
@@ -364,13 +367,12 @@ impl BlockchainMut {
             }
         }
 
-        let mut schema = Schema::new(&*fork);
+        let mut schema = Schema::get_or_create(&*fork);
         schema
             .transaction_results()
             .put(&tx_hash, ExecutionStatus(tx_result));
-        schema.commit_transaction(&tx_hash, transaction);
+        schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
-        schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
@@ -391,8 +393,8 @@ impl BlockchainMut {
         I: IntoIterator<Item = Verified<Precommit>>,
     {
         let mut fork: Fork = patch.into();
-        let mut schema = Schema::new(&fork);
-        schema.precommits(&block_hash).extend(precommits);
+        let mut schema = Schema::get_or_create(&fork);
+        schema.ensure_precommits(&block_hash).extend(precommits);
         // Consensus messages cache is useful only during one height, so it should be
         // cleared when a new height is achieved.
         schema.consensus_messages_cache().clear();
@@ -430,7 +432,7 @@ impl BlockchainMut {
         I: IntoIterator<Item = Message>,
     {
         let fork = self.fork();
-        let mut schema = Schema::new(&fork);
+        let mut schema = Schema::get_or_create(&fork);
         schema.consensus_messages_cache().extend(iter);
         schema.set_consensus_round(round);
         self.merge(fork.into_patch())
@@ -440,7 +442,7 @@ impl BlockchainMut {
     /// Saves the `Connect` message from a peer to the cache.
     pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Verified<Connect>) {
         let fork = self.fork();
-        Schema::new(&fork).peers_cache().put(pubkey, peer);
+        Schema::get_or_create(&fork).peers_cache().put(pubkey, peer);
         self.merge(fork.into_patch())
             .expect("Unable to save peer to the peers cache");
     }
@@ -448,7 +450,7 @@ impl BlockchainMut {
     /// Removes from the cache the `Connect` message from a peer.
     pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
         let fork = self.fork();
-        Schema::new(&fork).peers_cache().remove(key);
+        Schema::get_or_create(&fork).peers_cache().remove(key);
         self.merge(fork.into_patch())
             .expect("Unable to remove peer from the peers cache");
     }

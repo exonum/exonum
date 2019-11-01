@@ -14,7 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, HashTag, IndexAccess, MapProof, ObjectHash, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, TemporaryDB};
 use exonum_proto::impl_binary_value_for_pb_message;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -1069,7 +1069,7 @@ impl SandboxBuilder {
     }
 }
 
-impl<T: IndexAccess> Schema<T> {
+impl Schema<&Fork> {
     /// Removes transaction from the persistent pool.
     fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool().contains(hash);

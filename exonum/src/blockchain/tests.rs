@@ -14,8 +14,7 @@
 
 use exonum_crypto::{self as crypto, Hash};
 use exonum_merkledb::{
-    BinaryValue, Database, Entry, Error as StorageError, IndexAccess, ListIndex, ObjectHash,
-    Snapshot, TemporaryDB,
+    AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, Snapshot, TemporaryDB,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
@@ -108,7 +107,7 @@ impl Service for TestDispatcherService {
 impl TestDispatcherInterface for TestDispatcherService {
     fn test_deploy(&self, context: CallContext, arg: TestDeploy) -> Result<(), ExecutionError> {
         {
-            let mut index = Entry::new(context.instance().name, context.fork());
+            let mut index = context.fork().ensure_entry(context.instance().name);
             index.set(arg.value);
         }
 
@@ -126,7 +125,7 @@ impl TestDispatcherInterface for TestDispatcherService {
     }
 
     fn test_add(&self, mut context: CallContext, arg: TestAdd) -> Result<(), ExecutionError> {
-        let mut index = Entry::new(context.instance().name, context.fork());
+        let mut index = context.fork().ensure_entry(context.instance().name);
         index.set(arg.value);
         drop(index);
 
@@ -149,7 +148,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         if arg.value == 42 {
             panic!(StorageError::new("42"))
         }
-        let mut index = ListIndex::new(context.instance().name, context.fork());
+        let mut index = context.fork().ensure_list(context.instance().name);
         index.push(arg.value);
         index.push(42 / arg.value);
         Ok(())
@@ -177,7 +176,7 @@ impl Service for ServiceGoodImpl {
     }
 
     fn before_commit(&self, context: CallContext) {
-        let mut index = ListIndex::new(IDX_NAME, context.fork());
+        let mut index = context.fork().ensure_list(IDX_NAME);
         index.push(1);
     }
 }
@@ -261,7 +260,7 @@ struct TxResultCheckService;
 
 impl TxResultCheckInterface for TxResultCheckService {
     fn tx_result(&self, context: CallContext, arg: TxResult) -> Result<(), ExecutionError> {
-        let mut entry = create_entry(context.fork());
+        let mut entry = context.fork().ensure_entry("transaction_status_test");
         entry.set(arg.value);
         EXECUTION_STATUS.lock().unwrap().clone()
     }
@@ -273,16 +272,12 @@ impl Service for TxResultCheckService {
     }
 }
 
-fn create_entry<T: IndexAccess>(fork: T) -> Entry<T, u64> {
-    Entry::new("transaction_status_test", fork)
-}
-
 fn assert_service_execute(blockchain: &mut BlockchainMut) {
     let (_, patch) =
         blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
-    let index = ListIndex::new(IDX_NAME, &snapshot);
+    let index = snapshot.as_ref().list(IDX_NAME).unwrap();
     assert_eq!(index.len(), 1);
     assert_eq!(index.get(0), Some(1));
 }
@@ -292,8 +287,7 @@ fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
         blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
-    let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
-    assert!(index.is_empty());
+    assert!(snapshot.as_ref().list::<_, u32>(IDX_NAME).is_none());
 }
 
 fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> ExecutionStatus {
@@ -383,7 +377,7 @@ fn handling_tx_panic_error() {
         Some(tx_failed.clone())
     );
 
-    let index = ListIndex::new(IDX_NAME, &snapshot);
+    let index = snapshot.as_ref().list(IDX_NAME).unwrap();
     assert_eq!(index.len(), 4);
     assert_eq!(index.get(0), Some(3));
     assert_eq!(index.get(1), Some(14));
@@ -483,11 +477,11 @@ fn error_discards_transaction_changes() {
         db.merge(patch).unwrap();
 
         let snapshot = db.snapshot();
-        let entry = create_entry(&snapshot);
+        let entry = snapshot.as_ref().entry::<_, u64>("transaction_status_test");
         if status.is_err() {
-            assert_eq!(None, entry.get());
+            assert!(entry.is_none());
         } else {
-            assert_eq!(Some(index), entry.get());
+            assert_eq!(Some(index), entry.unwrap().get());
         }
     }
 }
@@ -532,7 +526,10 @@ fn test_dispatcher_deploy_good() {
     assert!(DispatcherSchema::new(snapshot.as_ref())
         .artifacts()
         .contains(&artifact_id.name));
-    assert_eq!(Entry::new(IDX_NAME, snapshot.as_ref()).get(), Some(1_u64));
+    assert_eq!(
+        snapshot.as_ref().entry(IDX_NAME).unwrap().get(),
+        Some(1_u64)
+    );
 }
 
 #[test]
@@ -586,10 +583,7 @@ fn test_dispatcher_register_unavailable() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .artifacts()
         .contains(&artifact_id.name));
-    assert_eq!(
-        Entry::<_, u64>::new(IDX_NAME, snapshot.as_ref()).get(),
-        None
-    );
+    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
     // Tests that an unavailable artifact will not be registered.
     let error_string = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         execute_transaction(
@@ -625,7 +619,10 @@ fn test_dispatcher_start_service_good() {
     assert!(DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-1".to_owned()));
-    assert_eq!(Entry::new(IDX_NAME, snapshot.as_ref()).get(), Some(1_u64));
+    assert_eq!(
+        snapshot.as_ref().entry(IDX_NAME).unwrap().get(),
+        Some(1_u64)
+    );
 }
 
 #[test]
@@ -648,10 +645,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-24".to_owned()));
-    assert_eq!(
-        Entry::<_, u64>::new(IDX_NAME, snapshot.as_ref()).get(),
-        None
-    );
+    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
 
     // Tests that a service with panic during the configure will not be started.
     assert!(!DispatcherSchema::new(snapshot.as_ref())
@@ -665,10 +659,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-42".to_owned()));
-    assert_eq!(
-        Entry::<_, u64>::new(IDX_NAME, snapshot.as_ref()).get(),
-        None
-    );
+    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
 
     // Tests that a service with execution error during the configure will not be started.
     assert!(!DispatcherSchema::new(snapshot.as_ref())
@@ -682,8 +673,5 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-18".to_owned()));
-    assert_eq!(
-        Entry::<_, u64>::new(IDX_NAME, snapshot.as_ref()).get(),
-        None
-    );
+    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
 }

@@ -15,6 +15,7 @@
 //! Public system API.
 
 use exonum_merkledb::IndexAccess;
+use failure::format_err;
 
 use crate::runtime::ProtoSourceFile;
 use crate::{
@@ -110,7 +111,10 @@ impl SystemApi {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_query: ()| {
             let snapshot = self.context.snapshot();
-            let schema = Schema::new(&snapshot);
+            let schema = Schema::get(&snapshot).ok_or_else(|| {
+                let e = format_err!("Blockchain is not initialized");
+                api::Error::InternalError(e)
+            })?;
             Ok(StatsInfo {
                 tx_pool_size: schema.transactions_pool_len(),
                 tx_count: schema.transactions_len(),

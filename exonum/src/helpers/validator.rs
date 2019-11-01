@@ -19,7 +19,8 @@ use crate::{blockchain::Schema as CoreSchema, helpers::ValidatorId};
 
 /// Attempts to find a `ValidatorId` by the provided service public key.
 pub fn validator_id(snapshot: &dyn Snapshot, service_public_key: PublicKey) -> Option<ValidatorId> {
-    CoreSchema::new(snapshot)
+    CoreSchema::get(snapshot)
+        .expect("Core schema is not initialized")
         .consensus_config()
         .find_validator(|validator_keys| service_public_key == validator_keys.service_key)
 }

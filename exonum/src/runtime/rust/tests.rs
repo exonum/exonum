@@ -14,7 +14,7 @@
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::exonum_service;
-use exonum_merkledb::{BinaryValue, Entry, Fork, Snapshot};
+use exonum_merkledb::{AccessExt, BinaryValue, Fork, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 
@@ -257,7 +257,7 @@ impl TestService for TestServiceImpl {
     fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
         {
             let fork = context.fork();
-            let mut entry = Entry::new("method_a_entry", fork);
+            let mut entry = fork.ensure_entry("method_a_entry");
             entry.set(arg.value);
         }
 
@@ -271,7 +271,7 @@ impl TestService for TestServiceImpl {
 
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
         let fork = context.fork();
-        let mut entry = Entry::new("method_b_entry", fork);
+        let mut entry = fork.ensure_entry("method_b_entry");
         entry.set(arg.value);
         Ok(())
     }
@@ -280,7 +280,7 @@ impl TestService for TestServiceImpl {
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-        let mut entry = Entry::new("constructor_entry", context.fork());
+        let mut entry = context.fork().ensure_entry("constructor_entry");
         entry.set(init.msg);
         Ok(())
     }
@@ -346,7 +346,7 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = Entry::new("constructor_entry", &fork);
+        let entry = fork.as_ref().entry("constructor_entry").unwrap();
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
     commit_block(&mut blockchain, fork);
@@ -379,9 +379,9 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = Entry::new("method_a_entry", &fork);
+        let entry = fork.as_ref().entry("method_a_entry").unwrap();
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
-        let entry = Entry::new("method_b_entry", &fork);
+        let entry = fork.as_ref().entry("method_b_entry").unwrap();
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -411,7 +411,7 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = Entry::new("method_b_entry", &fork);
+        let entry = fork.as_ref().entry("method_b_entry").unwrap();
         assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
     commit_block(&mut blockchain, fork);

@@ -281,7 +281,7 @@ impl Dispatcher {
         // If the fork is dirty, `snapshot` will be outdated, which can trip
         // `Runtime::start_service()` calls.
         fork.flush();
-        let snapshot = fork.as_ref();
+        let snapshot = fork.snapshot_with_flushed_changes();
         let mut schema = Schema::new(&*fork);
 
         // Deploy pending artifacts.
@@ -320,7 +320,7 @@ impl Dispatcher {
     /// block is split into 2 parts.
     pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: &mut Fork) {
         self.commit_block(fork);
-        self.notify_runtimes_about_commit(fork.as_ref());
+        self.notify_runtimes_about_commit(fork.snapshot_with_flushed_changes());
     }
 
     /// Returns the handle tracking the state of this dispatcher.

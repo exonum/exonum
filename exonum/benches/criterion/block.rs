@@ -212,7 +212,7 @@ mod cryptocurrency {
             AnyTx, ErrorKind, InstanceDescriptor, InstanceId,
         },
     };
-    use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
+    use exonum_merkledb::{AccessExt, Snapshot};
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
@@ -256,7 +256,7 @@ mod cryptocurrency {
         fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
 
-            let mut index = ProofMapIndex::new("provable_balances", context.fork());
+            let mut index = context.fork().ensure_proof_map("provable_balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -273,7 +273,7 @@ mod cryptocurrency {
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
 
-            let mut index = MapIndex::new("balances", context.fork());
+            let mut index = context.fork().ensure_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -289,8 +289,7 @@ mod cryptocurrency {
             arg: RollbackTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-
-            let mut index = MapIndex::new("balances", context.fork());
+            let mut index = context.fork().ensure_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
