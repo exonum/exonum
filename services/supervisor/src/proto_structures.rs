@@ -48,10 +48,6 @@ pub struct DeployRequest {
 pub struct DeployConfirmation {
     /// Artifact identifier.
     pub artifact: ArtifactId,
-    /// Additional information for Runtime to deploy.
-    pub spec: Vec<u8>,
-    /// The height until which the deployment procedure should be completed.
-    pub deadline_height: Height,
 }
 
 /// Request for the artifact deployment.
@@ -206,8 +202,6 @@ impl From<DeployRequest> for DeployConfirmation {
     fn from(v: DeployRequest) -> Self {
         Self {
             artifact: v.artifact,
-            deadline_height: v.deadline_height,
-            spec: v.spec,
         }
     }
 }
