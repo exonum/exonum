@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package exonum.consensus;
 
-option java_package = "com.exonum.binding.messages";
+option java_package = "com.exonum.core.messages";
 
 import "types.proto";
 import "common.proto";
