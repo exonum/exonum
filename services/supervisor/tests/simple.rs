@@ -36,8 +36,8 @@ pub fn sign_config_propose_transaction(
     config: ConfigPropose,
     initiator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let keys = &testkit.validator(initiator_id).service_keypair();
-    config.sign_for_simple_supervisor(keys.0, &keys.1)
+    let (pub_key, sec_key) = &testkit.validator(initiator_id).service_keypair();
+    config.sign_for_simple_supervisor(*pub_key, sec_key)
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -299,7 +299,7 @@ fn discard_errored_service_config_change() {
 
     let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
-        .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
+        .service_config(ConfigChangeService::INSTANCE_ID, params)
         .service_config(ConfigChangeService::INSTANCE_ID, "error".to_owned())
         .consensus_config(new_consensus_config);
 
@@ -444,7 +444,7 @@ fn another_configuration_change_proposal() {
 fn service_config_discard_fake_supervisor() {
     const FAKE_SUPERVISOR_ID: InstanceId = 5;
 
-    let keypair = crypto::gen_keypair();
+    let (pub_key, sec_key) = crypto::gen_keypair();
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
@@ -464,8 +464,8 @@ fn service_config_discard_fake_supervisor() {
     let tx = Transaction::<dyn SimpleSupervisorInterface>::sign(
         propose,
         FAKE_SUPERVISOR_ID,
-        keypair.0,
-        &keypair.1,
+        pub_key,
+        &sec_key,
     );
     testkit.create_block_with_transaction(tx).transactions[0]
         .status()
@@ -670,7 +670,7 @@ fn discard_config_propose_from_auditor() {
 
     let cfg_change_height = Height(5);
     let old_consensus_config = testkit.consensus_config();
-    // Attempt to add ourselved into validators list.
+    // Attempt to add ourselves into validators list.
     let new_consensus_config = {
         let mut cfg = testkit.consensus_config();
         cfg.validator_keys.push(testkit.us().public_keys());

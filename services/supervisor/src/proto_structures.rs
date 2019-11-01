@@ -145,7 +145,7 @@ impl ConfigPropose {
             self,
             SUPERVISOR_INSTANCE_ID,
             public_key,
-            &secret_key,
+            secret_key,
         )
     }
 
