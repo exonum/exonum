@@ -86,7 +86,7 @@ impl NodeHandler {
     pub fn handle_request_pool_txs(&mut self, msg: &Verified<PoolTransactionsRequest>) {
         trace!("HANDLE POOL TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
 
         let mut hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
         hashes.extend(self.state.tx_cache().keys().cloned());
@@ -96,7 +96,7 @@ impl NodeHandler {
 
     fn send_transactions_by_hash(&mut self, author: PublicKey, hashes: &[Hash]) {
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         let mut txs = Vec::new();
         let mut txs_size = 0;
         let unoccupied_message_size =
@@ -159,7 +159,7 @@ impl NodeHandler {
         }
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
 
         let height = msg.payload().height();
         let block_hash = schema.block_hash_by_height(height).unwrap();

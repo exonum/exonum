@@ -205,7 +205,7 @@ mod tests {
             .unwrap();
 
         let access = blockchain.snapshot();
-        assert_eq!(Schema::new(access.as_ref()).height(), Height(0));
+        assert_eq!(Schema::get_unchecked(access.as_ref()).height(), Height(0));
         // TODO check dispatcher schema.
     }
 

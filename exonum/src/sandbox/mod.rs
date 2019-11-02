@@ -690,7 +690,7 @@ impl Sandbox {
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
             .filter(|elem| {
@@ -726,7 +726,7 @@ impl Sandbox {
         let mut hashes = vec![];
         let mut recover = BTreeSet::new();
         let fork = blockchain.fork();
-        let mut schema = Schema::new(&fork);
+        let mut schema = Schema::get_unchecked(&fork);
         for raw in txs {
             let hash = raw.object_hash();
             hashes.push(hash);
@@ -743,12 +743,14 @@ impl Sandbox {
         fork_with_new_block.merge(patch);
 
         let fork = blockchain.fork();
-        let mut schema = Schema::new(&fork);
+        let mut schema = Schema::get_unchecked(&fork);
         for hash in recover {
             schema.reject_transaction(&hash).unwrap();
         }
         blockchain.merge(fork.into_patch()).unwrap();
-        *Schema::new(&fork_with_new_block).last_block().state_hash()
+        *Schema::get_unchecked(&fork_with_new_block)
+            .last_block()
+            .state_hash()
     }
 
     pub fn get_proof_to_index(
@@ -757,7 +759,7 @@ impl Sandbox {
         id: u16,
     ) -> MapProof<IndexCoordinates, Hash> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         schema
             .state_hash_aggregator()
             .get_proof(IndexCoordinates::new(kind, id))
@@ -765,13 +767,13 @@ impl Sandbox {
 
     pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         schema.consensus_config().object_hash()
     }
 
     pub fn cfg(&self) -> ConsensusConfig {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         schema.consensus_config()
     }
 
@@ -794,7 +796,7 @@ impl Sandbox {
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         let idx = schema.transactions_pool();
 
         let mut vec: Vec<Hash> = idx.iter().collect();
@@ -808,7 +810,7 @@ impl Sandbox {
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         schema.block_and_precommits(height)
     }
 
@@ -831,7 +833,7 @@ impl Sandbox {
 
     pub fn assert_pool_len(&self, expected: u64) {
         let view = self.blockchain().snapshot();
-        let schema = Schema::new(&view);
+        let schema = Schema::get_unchecked(&view);
         assert_eq!(expected, schema.transactions_pool_len());
     }
 

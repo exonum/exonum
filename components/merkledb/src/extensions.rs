@@ -183,6 +183,17 @@ pub trait AccessExt {
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
         Self::Base: IndexAccessMut;
+
+    /// Ensures that the given address corresponds to an index with the specified type
+    /// creating the index if necessary.
+    ///
+    /// # Panics
+    ///
+    /// If the index already exists and has a different type.
+    fn ensure_type<I>(&self, addr: I, index_type: IndexType) -> &Self
+    where
+        I: Into<IndexAddress>,
+        Self::Base: IndexAccessMut;
 }
 
 fn get_view<T>(base: &T, addr: impl Into<IndexAddress>) -> Option<ViewWithMetadata<T>>
@@ -366,5 +377,14 @@ impl<T: IndexAccess> AccessExt for T {
     {
         let view = get_or_create_view(self, addr, IndexType::ValueSet);
         ValueSetIndex::new(view)
+    }
+
+    fn ensure_type<I>(&self, addr: I, index_type: IndexType) -> &Self
+    where
+        I: Into<IndexAddress>,
+        Self::Base: IndexAccessMut,
+    {
+        get_or_create_view(self, addr, index_type);
+        self
     }
 }

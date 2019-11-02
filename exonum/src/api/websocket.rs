@@ -302,7 +302,7 @@ impl Handler<Broadcast> for Server {
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
         let snapshot = self.context.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::get_unchecked(&snapshot);
         let block = schema.blocks().get(&block_hash).unwrap();
         let height = block.height();
         let block_header = Notification::Block(block);

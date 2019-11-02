@@ -191,7 +191,7 @@ impl<'a> AfterCommitContext<'a> {
     /// Returns a current blockchain height. This height is "height of the latest committed block".
     pub fn height(&self) -> Height {
         // TODO Perhaps we should optimize this method [ECR-3222]
-        CoreSchema::new(self.snapshot).height()
+        CoreSchema::get_unchecked(self.snapshot).height()
     }
 
     /// Signs and broadcasts a transaction to the other nodes in the network.

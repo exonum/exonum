@@ -142,7 +142,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     let height = blockchain.as_ref().last_block().height().next();
 
     let fork = blockchain.fork();
-    let mut schema = Schema::new(&fork);
+    let mut schema = Schema::get_unchecked(&fork);
     for tx in transactions {
         schema.add_transaction_into_pool(tx.clone())
     }

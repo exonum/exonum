@@ -57,7 +57,7 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
         Hash::zero(),
     );
     let block_hash = block.object_hash();
-    let schema = CoreSchema::get_or_create(&*fork);
+    let schema = CoreSchema::initialize(&*fork);
     schema.block_hashes_by_height().push(block_hash);
     schema.blocks().put(&block_hash, block);
     fork.flush();

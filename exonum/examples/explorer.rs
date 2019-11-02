@@ -68,7 +68,7 @@ pub fn sample_blockchain() -> BlockchainMut {
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     let fork = blockchain.fork();
-    let mut schema = Schema::new(&fork);
+    let mut schema = Schema::get_unchecked(&fork);
     schema.add_transaction_into_pool(mempool_transaction());
     blockchain.merge(fork.into_patch()).unwrap();
     blockchain

@@ -295,7 +295,7 @@ fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> E
     blockchain
         .merge({
             let fork = blockchain.fork();
-            let mut schema = Schema::new(&fork);
+            let mut schema = Schema::get_unchecked(&fork);
             schema.add_transaction_into_pool(tx.clone());
             fork.into_patch()
         })
@@ -312,7 +312,7 @@ fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> E
         .commit(patch, block_hash, vec![], &mut BTreeMap::new())
         .unwrap();
     let snapshot = blockchain.snapshot();
-    Schema::new(snapshot.as_ref())
+    Schema::get_unchecked(snapshot.as_ref())
         .transaction_results()
         .get(&tx_hash)
         .unwrap()
@@ -343,7 +343,7 @@ fn handling_tx_panic_error() {
     let tx_storage_error = TestExecute { value: 42 }.sign(TEST_SERVICE_ID, pk, &sec_key);
 
     let fork = blockchain.fork();
-    let mut schema = Schema::new(&fork);
+    let mut schema = Schema::get_unchecked(&fork);
     schema.add_transaction_into_pool(tx_ok1.clone());
     schema.add_transaction_into_pool(tx_ok2.clone());
     schema.add_transaction_into_pool(tx_failed.clone());
@@ -363,7 +363,7 @@ fn handling_tx_panic_error() {
     blockchain.merge(patch).unwrap();
 
     let snapshot = blockchain.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = Schema::get_unchecked(&snapshot);
     assert_eq!(
         schema.transactions().get(&tx_ok1.object_hash()),
         Some(tx_ok1.clone())
@@ -399,7 +399,7 @@ fn handling_tx_panic_storage_error() {
     let tx_storage_error = TestExecute { value: 42 }.sign(TEST_SERVICE_ID, pk, &sec_key);
 
     let fork = blockchain.fork();
-    let mut schema = Schema::new(&fork);
+    let mut schema = Schema::get_unchecked(&fork);
     schema.add_transaction_into_pool(tx_ok1.clone());
     schema.add_transaction_into_pool(tx_ok2.clone());
     schema.add_transaction_into_pool(tx_failed.clone());
@@ -464,7 +464,7 @@ fn error_discards_transaction_changes() {
         let transaction = TxResult { value: index }.sign(TX_CHECK_RESULT_SERVICE_ID, pk, &sec_key);
         let hash = transaction.object_hash();
         let fork = blockchain.fork();
-        let mut schema = Schema::new(&fork);
+        let mut schema = Schema::get_unchecked(&fork);
         schema.add_transaction_into_pool(transaction.clone());
         blockchain.merge(fork.into_patch()).unwrap();
 

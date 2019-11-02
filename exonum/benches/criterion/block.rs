@@ -569,7 +569,7 @@ mod foreign_interface_call {
 /// Writes transactions to the pool and returns their hashes.
 fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
     let fork = blockchain.fork();
-    let mut schema = Schema::new(&fork);
+    let mut schema = Schema::get_unchecked(&fork);
 
     // In the case of the block within `Bencher::iter()`, some transactions
     // may already be present in the pool. We don't particularly care about this.
@@ -591,7 +591,7 @@ fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>
 /// the benchmark and do not influence its timings.
 fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
     let snapshot = blockchain.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = Schema::get_unchecked(&snapshot);
 
     assert!(tx_hashes
         .iter()

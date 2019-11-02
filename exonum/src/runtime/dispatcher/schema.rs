@@ -14,7 +14,7 @@
 
 //! Information schema for the runtime dispatcher.
 
-use exonum_merkledb::{AccessExt, Entry, Fork, MapIndex};
+use exonum_merkledb::{AccessExt, Entry, Fork, IndexType, MapIndex};
 
 use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
 use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
@@ -123,12 +123,13 @@ impl<T: AccessExt> Schema<T> {
 
 impl Schema<&Fork> {
     pub(crate) fn initialize(access: &Fork) {
-        access.ensure_map::<_, String, ArtifactSpec>(ARTIFACTS);
-        access.ensure_map::<_, String, ArtifactSpec>(PENDING_ARTIFACTS);
-        access.ensure_map::<_, String, InstanceSpec>(SERVICE_INSTANCES);
-        access.ensure_map::<_, String, InstanceSpec>(PENDING_INSTANCES);
-        access.ensure_map::<_, InstanceId, String>(INSTANCE_IDS);
-        access.ensure_map::<_, InstanceId, String>(PENDING_INSTANCE_IDS);
+        access
+            .ensure_type(ARTIFACTS, IndexType::Map)
+            .ensure_type(PENDING_ARTIFACTS, IndexType::Map)
+            .ensure_type(SERVICE_INSTANCES, IndexType::Map)
+            .ensure_type(PENDING_INSTANCES, IndexType::Map)
+            .ensure_type(INSTANCE_IDS, IndexType::Map)
+            .ensure_type(PENDING_INSTANCE_IDS, IndexType::Map);
     }
 
     /// Adds artifact specification to the set of the pending artifacts.

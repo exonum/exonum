@@ -144,7 +144,7 @@ where
 {
     pub fn get_or_create(index_name: &str, access: I) -> Self {
         let index = access.ensure_proof_map(index_name);
-        let validator_keys = blockchain::Schema::new(access)
+        let validator_keys = blockchain::Schema::get_unchecked(access)
             .consensus_config()
             .validator_keys;
         Self {

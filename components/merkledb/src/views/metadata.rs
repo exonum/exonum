@@ -28,19 +28,31 @@ use crate::validation::assert_valid_name;
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
-/// Type of the index stored in `IndexMetadata`.
+/// Type of an index supported by Exonum.
+///
 /// `IndexType` is used for type checking indexes when they are created/accessed.
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum IndexType {
+    /// Non-merkelized map index.
     Map = 1,
+    /// Non-merkelized list index.
     List = 2,
+    /// Singleton entry.
     Entry = 3,
+    /// Set index with elements stored in a hash table.
     ValueSet = 4,
+    /// Set index with elements stored as keys in the underlying KV storage.
     KeySet = 5,
+    /// Sparse list index.
     SparseList = 6,
+    /// Merkelzied list index.
     ProofList = 7,
+    /// Merkelized map index.
     ProofMap = 8,
+
+    /// Unknown index type.
+    #[doc(hidden)]
     Unknown = 255,
 }
 

@@ -67,7 +67,7 @@ fn test_explorer_basics() {
     let snapshot = blockchain.snapshot();
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let snapshot = blockchain.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = Schema::get_unchecked(&snapshot);
     assert_eq!(explorer.height(), Height(1));
     assert_eq!(schema.transactions_len(), 1);
     assert!(explorer.block(Height(2)).is_none());
@@ -113,7 +113,7 @@ fn test_explorer_basics() {
     let snapshot = blockchain.snapshot();
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let snapshot = blockchain.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = Schema::get_unchecked(&snapshot);
     assert_eq!(explorer.height(), Height(2));
     assert_eq!(schema.transactions_len(), 3);
     let block = explorer.block(Height(2)).unwrap();
@@ -175,7 +175,7 @@ fn test_explorer_pool_transaction() {
     assert!(explorer.transaction(&tx_hash).is_none());
 
     let fork = blockchain.fork();
-    let mut schema = Schema::new(&fork);
+    let mut schema = Schema::get_unchecked(&fork);
     schema.add_transaction_into_pool(tx_alice.clone());
     blockchain.merge(fork.into_patch()).unwrap();
 
@@ -427,7 +427,7 @@ fn test_transaction_info_roundtrip() {
 
     let fork = blockchain.fork();
     {
-        let mut schema = Schema::new(&fork);
+        let mut schema = Schema::get_unchecked(&fork);
         schema.add_transaction_into_pool(tx.clone());
     }
     blockchain.merge(fork.into_patch()).unwrap();

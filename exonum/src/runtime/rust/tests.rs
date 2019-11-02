@@ -45,7 +45,7 @@ const SERVICE_INSTANCE_ID: InstanceId = 2;
 const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
 fn create_block(blockchain: &BlockchainMut) -> Fork {
-    let height = CoreSchema::new(&blockchain.snapshot()).height();
+    let height = CoreSchema::get_unchecked(&blockchain.snapshot()).height();
     let (_, patch) =
         blockchain.create_patch(ValidatorId(0), height.next(), &[], &mut BTreeMap::new());
     Fork::from(patch)
@@ -143,7 +143,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         DispatcherSchema::new(snapshot)
             .get_instance(spec.id)
             .unwrap();
-        let core_schema = CoreSchema::new(snapshot);
+        let core_schema = CoreSchema::get_unchecked(snapshot);
         let height = if core_schema.block_hashes_by_height().is_empty() {
             None
         } else {
@@ -175,7 +175,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         context: ExecutionContext<'_>,
         instance_id: u32,
     ) -> Result<(), ExecutionError> {
-        let height = CoreSchema::new(&*context.fork).height();
+        let height = CoreSchema::get_unchecked(&*context.fork).height();
         self.events
             .lock()
             .unwrap()
@@ -184,7 +184,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
-        let height = CoreSchema::new(snapshot).height();
+        let height = CoreSchema::get_unchecked(snapshot).height();
         self.events
             .lock()
             .unwrap()

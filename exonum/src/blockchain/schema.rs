@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    AccessExt, BinaryKey, Entry, IndexAccessMut, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofListIndex, ProofMapIndex,
+    AccessExt, BinaryKey, Entry, IndexAccessMut, IndexType, KeySetIndex, ListIndex, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
 use exonum_proto::ProtobufConvert;
@@ -101,13 +101,20 @@ pub struct Schema<T> {
 }
 
 impl<T: AccessExt> Schema<T> {
-    /// Constructs information schema for the given `snapshot`.
+    /// Constructs information schema for the given `access` to blockchain data.
+    ///
+    /// # Return value
+    ///
+    /// The method will return `None` if the core schema is not initialized. This can only
+    /// happen if the blockchain does not have a genesis block.
     pub fn get(access: T) -> Option<Self> {
         access.entry::<_, u64>(TRANSACTIONS_LEN)?;
         Some(Self { access })
     }
 
-    pub fn new(access: T) -> Self {
+    /// Constructs information schema based on the given `access`. Panics if the schema
+    /// is not initialized.
+    pub fn get_unchecked(access: T) -> Self {
         Self::get(access).expect("Core schema is not initialized")
     }
 
@@ -313,22 +320,22 @@ impl<T: AccessExt> Schema<T>
 where
     T::Base: IndexAccessMut,
 {
-    pub(crate) fn get_or_create(access: T) -> Self {
-        if access.entry::<_, u64>(TRANSACTIONS_LEN).is_none() {
-            access.ensure_map::<_, Hash, Verified<AnyTx>>(TRANSACTIONS);
-            access.ensure_proof_map::<_, Hash, ExecutionStatus>(TRANSACTION_RESULTS);
-            access.ensure_entry::<_, u64>(TRANSACTIONS_LEN);
-            access.ensure_key_set::<_, Hash>(TRANSACTIONS_POOL);
-            access.ensure_entry::<_, u64>(TRANSACTIONS_POOL_LEN);
-            access.ensure_map::<_, Hash, TxLocation>(TRANSACTIONS_LOCATIONS);
-            access.ensure_map::<_, Hash, Block>(BLOCKS);
-            access.ensure_list::<_, Hash>(BLOCK_HASHES_BY_HEIGHT);
-            access.ensure_proof_map::<_, IndexCoordinates, Hash>(STATE_HASH_AGGREGATOR);
-            access.ensure_map::<_, PublicKey, Verified<Connect>>(PEERS_CACHE);
-            access.ensure_list::<_, Message>(CONSENSUS_MESSAGES_CACHE);
-            access.ensure_entry::<_, Round>(CONSENSUS_ROUND);
-            access.ensure_entry::<_, ConsensusConfig>(CONSENSUS_CONFIG);
-        }
+    pub(crate) fn initialize(access: T) -> Self {
+        access
+            .ensure_type(TRANSACTIONS, IndexType::Map)
+            .ensure_type(TRANSACTION_RESULTS, IndexType::ProofMap)
+            .ensure_type(TRANSACTIONS_LEN, IndexType::Entry)
+            .ensure_type(TRANSACTIONS_POOL, IndexType::KeySet)
+            .ensure_type(TRANSACTIONS_POOL_LEN, IndexType::Entry)
+            .ensure_type(TRANSACTIONS_LOCATIONS, IndexType::Map)
+            .ensure_type(BLOCKS, IndexType::Map)
+            .ensure_type(BLOCK_HASHES_BY_HEIGHT, IndexType::List)
+            .ensure_type(STATE_HASH_AGGREGATOR, IndexType::ProofMap)
+            .ensure_type(PEERS_CACHE, IndexType::Map)
+            .ensure_type(CONSENSUS_MESSAGES_CACHE, IndexType::List)
+            .ensure_type(CONSENSUS_ROUND, IndexType::Entry)
+            .ensure_type(CONSENSUS_CONFIG, IndexType::Entry);
+
         Self { access }
     }
 
