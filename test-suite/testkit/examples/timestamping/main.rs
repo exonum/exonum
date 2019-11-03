@@ -101,7 +101,7 @@ fn main() {
 
     // Check results with schema.
     let snapshot = testkit.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = Schema::get_unchecked(&snapshot);
     assert!(schema.transactions().contains(&tx1.object_hash()));
     assert!(schema.transactions().contains(&tx2.object_hash()));
     assert!(schema.transactions().contains(&tx3.object_hash()));

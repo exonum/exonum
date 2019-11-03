@@ -136,7 +136,7 @@ impl CurrencyInterface for CurrencyService {
     fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
-        let height = CoreSchema::new(context.fork()).height();
+        let height = CoreSchema::get_unchecked(context.fork()).height();
         let schema = CurrencySchema::new(context.fork());
         if schema.wallet(&author).is_none() {
             let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE, height.0);
@@ -152,7 +152,7 @@ impl CurrencyInterface for CurrencyService {
             return Err(Error::Foo);
         }
         let view = context.fork();
-        let height = CoreSchema::new(view).height();
+        let height = CoreSchema::get_unchecked(view).height();
         let schema = CurrencySchema { view };
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&arg.to);
@@ -188,7 +188,7 @@ impl CryptocurrencyApi {
         schema
             .wallet(&query.pub_key)
             .map(|wallet| {
-                let height = CoreSchema::new(snapshot).height();
+                let height = CoreSchema::get_unchecked(snapshot).height();
                 wallet.actual_balance(height)
             })
             .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))

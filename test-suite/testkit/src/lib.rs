@@ -93,7 +93,7 @@
 //!
 //!     // Check results with schema.
 //!     let snapshot = testkit.snapshot();
-//!     let schema = Schema::new(&snapshot);
+//!     let schema = Schema::get_unchecked(&snapshot);
 //!     assert!(schema.transactions().contains(&tx1.object_hash()));
 //!     assert!(schema.transactions().contains(&tx2.object_hash()));
 //!     assert!(schema.transactions().contains(&tx3.object_hash()));
@@ -278,7 +278,7 @@ impl TestKit {
             Box::new(api_channel.1.and_then(move |event| {
                 let _guard = processing_lock_.lock().unwrap();
                 let fork = db.fork();
-                let mut schema = CoreSchema::new(&fork);
+                let mut schema = CoreSchema::get_unchecked(&fork);
                 match event {
                     ExternalMessage::Transaction(tx) => {
                         let hash = tx.object_hash();
@@ -439,7 +439,7 @@ impl TestKit {
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
         let snapshot = self.snapshot();
-        let schema = CoreSchema::new(&snapshot);
+        let schema = CoreSchema::get_unchecked(&snapshot);
         let uncommitted_txs = transactions.into_iter().filter(|tx| {
             !schema.transactions().contains(&tx.object_hash())
                 || schema.transactions_pool().contains(&tx.object_hash())
@@ -523,7 +523,7 @@ impl TestKit {
         I: IntoIterator<Item = Verified<AnyTx>>,
     {
         let fork = self.blockchain.fork();
-        let mut schema = CoreSchema::new(&fork);
+        let mut schema = CoreSchema::get_unchecked(&fork);
 
         let tx_hashes: Vec<_> = txs
             .into_iter()
@@ -577,7 +577,7 @@ impl TestKit {
         self.poll_events();
 
         let snapshot = self.blockchain.snapshot();
-        let schema = CoreSchema::new(&snapshot);
+        let schema = CoreSchema::get_unchecked(&snapshot);
         for hash in tx_hashes {
             assert!(schema.transactions_pool().contains(hash));
         }
@@ -593,7 +593,7 @@ impl TestKit {
         self.poll_events();
 
         let snapshot = self.blockchain.snapshot();
-        let schema = CoreSchema::new(&snapshot);
+        let schema = CoreSchema::get_unchecked(&snapshot);
         let txs = schema.transactions_pool();
         let tx_hashes: Vec<_> = txs.iter().collect();
         self.do_create_block(&tx_hashes)
@@ -602,7 +602,7 @@ impl TestKit {
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
         let fork = self.blockchain.fork();
-        let mut schema = CoreSchema::new(&fork);
+        let mut schema = CoreSchema::get_unchecked(&fork);
         schema.add_transaction_into_pool(transaction);
         self.blockchain
             .merge(fork.into_patch())
@@ -612,7 +612,7 @@ impl TestKit {
     /// Checks if transaction can be found in pool
     pub fn is_tx_in_pool(&self, tx_hash: &Hash) -> bool {
         let snapshot = self.blockchain.snapshot();
-        let schema = CoreSchema::new(&snapshot);
+        let schema = CoreSchema::get_unchecked(&snapshot);
         schema.transactions_pool().contains(tx_hash)
     }
 
@@ -648,7 +648,7 @@ impl TestKit {
 
     /// Return an actual blockchain configuration.
     pub fn consensus_config(&self) -> ConsensusConfig {
-        CoreSchema::new(&self.snapshot()).consensus_config()
+        CoreSchema::get_unchecked(&self.snapshot()).consensus_config()
     }
 
     /// Returns reference to validator with the given identifier.
@@ -838,7 +838,7 @@ impl StoppedTestKit {
     /// Return the height of latest committed block.
     pub fn height(&self) -> Height {
         let snapshot = self.snapshot();
-        CoreSchema::new(&snapshot).height()
+        CoreSchema::get_unchecked(&snapshot).height()
     }
 
     /// Return the reference to test network.

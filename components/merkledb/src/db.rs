@@ -29,7 +29,7 @@ use std::{
 };
 
 use crate::{
-    views::{IndexAccess, IndexAddress, View},
+    views::{IndexAccess, IndexAddress, ToReadonly, View},
     Error, Result,
 };
 
@@ -673,8 +673,8 @@ impl Fork {
     /// Returns a readonly wrapper around the fork. Indices created based on the readonly
     /// version cannot be modified; on the other hand, it is possible to have multiple
     /// copies of an index at the same time.
-    pub fn readonly(&self) -> Readonly<&'_ Self> {
-        Readonly(self)
+    pub fn readonly(&self) -> ReadonlyFork<'_> {
+        ReadonlyFork(self)
     }
 }
 
@@ -723,23 +723,17 @@ impl IndexAccess for Rc<Fork> {
 
 /// Readonly wrapper for a `Fork`.
 #[derive(Debug, Clone, Copy)]
-pub struct Readonly<T>(pub T);
+pub struct ReadonlyFork<'a>(&'a Fork);
 
-impl IndexAccess for Readonly<&Fork> {
-    type Changes = ChangesRef;
+impl<'a> ToReadonly for &'a Fork {
+    type Readonly = ReadonlyFork<'a>;
 
-    fn snapshot(&self) -> &dyn Snapshot {
-        &self.0.patch
-    }
-
-    fn changes(&self, address: &IndexAddress) -> Self::Changes {
-        ChangesRef {
-            inner: self.0.working_patch.clone_view_changes(address),
-        }
+    fn to_readonly(&self) -> Self::Readonly {
+        ReadonlyFork(*self)
     }
 }
 
-impl IndexAccess for Readonly<Rc<Fork>> {
+impl<'a> IndexAccess for ReadonlyFork<'a> {
     type Changes = ChangesRef;
 
     fn snapshot(&self) -> &dyn Snapshot {

@@ -15,7 +15,7 @@
 //! Built-in Rust runtime module.
 
 pub use self::{
-    call_context::CallContext,
+    call_context::{BlockchainData, CallContext},
     error::Error,
     service::{
         AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,

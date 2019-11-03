@@ -77,9 +77,9 @@ impl<T: AccessExt> Schema<T> {
     }
 
     /// Returns the information about a service instance by its identifier.
-    pub fn get_instance<'s>(
-        &'s self,
-        query: impl Into<InstanceQuery<'s>>,
+    pub fn get_instance<'q>(
+        &self,
+        query: impl Into<InstanceQuery<'q>>,
     ) -> Option<(InstanceSpec, DeployStatus)> {
         match query.into() {
             InstanceQuery::Id(id) => {

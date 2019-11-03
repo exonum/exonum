@@ -255,12 +255,10 @@ impl<'a> TestServiceClient<'a> {
 
 impl TestService for TestServiceImpl {
     fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
-        {
-            let fork = context.fork();
-            let mut entry = fork.ensure_entry("method_a_entry");
-            entry.set(arg.value);
-        }
-
+        context
+            .service_data()
+            .ensure_entry("method_a_entry")
+            .set(arg.value);
         // Test calling one service from another.
         context
             .interface::<TestServiceClient>(SERVICE_INSTANCE_ID)?
@@ -270,9 +268,10 @@ impl TestService for TestServiceImpl {
     }
 
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
-        let fork = context.fork();
-        let mut entry = fork.ensure_entry("method_b_entry");
-        entry.set(arg.value);
+        context
+            .service_data()
+            .ensure_entry("method_b_entry")
+            .set(arg.value);
         Ok(())
     }
 }
@@ -280,8 +279,10 @@ impl TestService for TestServiceImpl {
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-        let mut entry = context.fork().ensure_entry("constructor_entry");
-        entry.set(init.msg);
+        context
+            .service_data()
+            .ensure_entry("constructor_entry")
+            .set(init.msg);
         Ok(())
     }
 
@@ -346,7 +347,8 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = fork.as_ref().entry("constructor_entry").unwrap();
+        let idx_name = format!("{}.constructor_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
     commit_block(&mut blockchain, fork);
@@ -379,9 +381,11 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = fork.as_ref().entry("method_a_entry").unwrap();
+        let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
-        let entry = fork.as_ref().entry("method_b_entry").unwrap();
+        let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -411,7 +415,8 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = fork.as_ref().entry("method_b_entry").unwrap();
+        let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
         assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -600,7 +605,12 @@ impl Service for DependentServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         assert_eq!(*context.caller(), Caller::Blockchain);
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-        if context.dispatcher_info().get_instance(&*init.msg).is_none() {
+        if context
+            .data()
+            .for_dispatcher()
+            .get_instance(&*init.msg)
+            .is_none()
+        {
             return Err(ExecutionError::new(ErrorKind::service(0), "no dependency"));
         }
         Ok(())

@@ -99,7 +99,7 @@ impl PublicApi for ApiImpl<'_> {
     type Error = api::Error;
 
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
-        Ok(CoreSchema::new(self.0.snapshot()).consensus_config())
+        Ok(CoreSchema::get_unchecked(self.0.snapshot()).consensus_config())
     }
 
     fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {

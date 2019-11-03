@@ -31,7 +31,7 @@ use crate::{
     },
 };
 
-use super::{CallContext, RustArtifactId};
+use super::{BlockchainData, CallContext, RustArtifactId};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -163,7 +163,7 @@ pub struct AfterCommitContext<'a> {
     /// Reference to the dispatcher mailbox.
     mailbox: &'a mut Mailbox,
     /// Read-only snapshot of the current blockchain state.
-    pub snapshot: &'a dyn Snapshot,
+    snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
     /// Channel to send signed transactions to the transactions pool.
@@ -188,10 +188,22 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
+    /// Returns blockchain data for the snapshot associated with this context.
+    pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
+        BlockchainData::new(self.snapshot, self.instance)
+    }
+
+    /// Returns core schema for the snapshot associated with this context.
+    ///
+    /// This is a shortcut for `self.data().core_schema()`.
+    pub fn core_schema(&self) -> CoreSchema<&'a dyn Snapshot> {
+        CoreSchema::get_unchecked(self.snapshot)
+    }
+
     /// Returns a current blockchain height. This height is "height of the latest committed block".
     pub fn height(&self) -> Height {
         // TODO Perhaps we should optimize this method [ECR-3222]
-        CoreSchema::get_unchecked(self.snapshot).height()
+        self.core_schema().height()
     }
 
     /// Signs and broadcasts a transaction to the other nodes in the network.

@@ -78,7 +78,7 @@ fn assert_transaction_result<S: IndexAccess>(
     transaction: &Verified<AnyTx>,
     expected_code: u8,
 ) -> String {
-    let result = Schema::new(snapshot)
+    let result = Schema::get_unchecked(snapshot)
         .transaction_results()
         .get(&transaction.object_hash());
     match result {
@@ -298,7 +298,7 @@ fn test_exonum_time_service_with_7_validators() {
         };
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
-            Schema::new(&testkit.snapshot())
+            Schema::get_unchecked(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.object_hash()),
             Some(ExecutionStatus::ok())
@@ -406,7 +406,7 @@ fn test_selected_time_less_than_time_in_storage() {
         let tx = TxTime { time: time_tx }.sign(INSTANCE_ID, pub_key_1, &sec_key_1);
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
-            Schema::new(&testkit.snapshot())
+            Schema::get_unchecked(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.object_hash()),
             Some(ExecutionStatus::ok())
@@ -457,7 +457,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
 
     testkit.create_block_with_transactions(txvec![tx0.clone()]);
     assert_eq!(
-        Schema::new(&testkit.snapshot())
+        Schema::get_unchecked(&testkit.snapshot())
             .transaction_results()
             .get(&tx0.object_hash()),
         Some(ExecutionStatus::ok())

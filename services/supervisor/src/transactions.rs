@@ -135,7 +135,7 @@ impl SupervisorInterface for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that the `actual_from` height is in the future.
-        if blockchain::Schema::new(fork).height() >= propose.actual_from {
+        if blockchain::Schema::get_unchecked(fork).height() >= propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
 
@@ -203,7 +203,7 @@ impl SupervisorInterface for Supervisor {
             .verify_caller(Caller::as_transaction)
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let blockchain_height = blockchain::Schema::new(fork).height();
+        let blockchain_height = blockchain::Schema::get_unchecked(fork).height();
         let schema = Schema::new(context.instance().name, fork);
 
         // Verifies that transaction author is validator.
@@ -248,7 +248,7 @@ impl SupervisorInterface for Supervisor {
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
         deploy.validate()?;
-        let blockchain_schema = blockchain::Schema::new(context.fork());
+        let blockchain_schema = blockchain::Schema::get_unchecked(context.fork());
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
             return Err(Error::DeadlineExceeded.into());
@@ -295,7 +295,7 @@ impl SupervisorInterface for Supervisor {
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
-        let blockchain_schema = blockchain::Schema::new(context.fork());
+        let blockchain_schema = blockchain::Schema::get_unchecked(context.fork());
 
         // Verifies that we doesn't reach deadline height.
         if confirmation.deadline_height < blockchain_schema.height() {
@@ -345,7 +345,7 @@ impl SupervisorInterface for Supervisor {
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;
-        let blockchain_schema = blockchain::Schema::new(context.fork());
+        let blockchain_schema = blockchain::Schema::get_unchecked(context.fork());
 
         // Verifies that we doesn't reach deadline height.
         if service.deadline_height < blockchain_schema.height() {

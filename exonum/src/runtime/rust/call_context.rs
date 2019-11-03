@@ -1,10 +1,11 @@
-use exonum_merkledb::{BinaryValue, Fork};
+use exonum_merkledb::{BinaryValue, Fork, IndexAccess, Prefixed, ToReadonly};
 
+use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
-    dispatcher::{Dispatcher, Error as DispatcherError, Schema},
+    dispatcher::{Dispatcher, Error as DispatcherError},
     error::catch_panic,
-    ArtifactId, CallInfo, Caller, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
-    InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+    ArtifactId, CallInfo, Caller, DeployStatus, DispatcherSchema, ExecutionContext, ExecutionError,
+    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 
 /// Context for the executed call.
@@ -28,19 +29,19 @@ impl<'a> CallContext<'a> {
         }
     }
 
-    /// Returns a writable snapshot of the current blockchain state.
-    pub fn fork(&self) -> &Fork {
-        self.inner.fork
+    /// Provides access to blockchain data.
+    pub fn data(&self) -> BlockchainData<&'_ Fork> {
+        BlockchainData::new(self.inner.fork, self.instance)
+    }
+
+    /// Provides access to the data of the executing service.
+    pub fn service_data(&self) -> Prefixed<&'_ Fork> {
+        self.data().for_executing_service()
     }
 
     /// Returns the initiator of the actual transaction execution.
     pub fn caller(&self) -> &Caller {
         &self.inner.caller
-    }
-
-    /// Accesses dispatcher information.
-    pub fn dispatcher_info(&self) -> Schema<&Fork> {
-        Schema::new(self.fork())
     }
 
     pub fn instance(&self) -> InstanceDescriptor {
@@ -84,7 +85,7 @@ impl<'a> CallContext<'a> {
         let descriptor = self
             .inner
             .dispatcher
-            .get_service(self.fork(), called_id)
+            .get_service(self.inner.fork, called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         Ok(CallContext {
             inner: self.inner.child_context(self.instance.id),
@@ -119,17 +120,7 @@ impl<'a> CallContext<'a> {
     ///   persisted even if the following transaction code executes successfully.
     ///
     /// If there are several `isolate()` calls within the same execution context,
-    /// commitment / rollback rules are applied to changes since the last call. For example:
-    ///
-    /// ```ignore
-    /// SchemaA::new(ctx.fork()).mutate_ok();
-    /// ctx.isolate(|ctx| SchemaB::new(ctx.fork()).mutate_ok())?;
-    /// SchemaC::new(ctx.fork()).mutate_ok();
-    /// ctx.isolate(|ctx| SchemaD::new(ctx.fork()).mutate_panic())?;
-    /// ```
-    ///
-    /// As a result, changes to `SchemaA` and `SchemaB` will be committed, and the changes
-    /// `SchemaC` and `SchemaD` will be rolled back.
+    /// commitment / rollback rules are applied to changes since the last call.
     ///
     /// For these reasons, it is strongly advised to:
     ///
@@ -170,7 +161,7 @@ impl<'a> CallContext<'a> {
             panic!("`start_artifact_registration` called within a non-supervisor service");
         }
 
-        Dispatcher::commit_artifact(self.fork(), artifact, spec)
+        Dispatcher::commit_artifact(self.inner.fork, artifact, spec)
     }
 
     /// Starts adding a service instance to the blockchain.
@@ -193,10 +184,63 @@ impl<'a> CallContext<'a> {
         let instance_spec = InstanceSpec {
             artifact,
             name: instance_name,
-            id: Dispatcher::assign_instance_id(self.fork()),
+            id: Dispatcher::assign_instance_id(self.inner.fork),
         };
         self.inner
             .child_context(self.instance.id)
             .start_adding_service(instance_spec, constructor)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BlockchainData<'a, T> {
+    access: T,
+    service_instance: InstanceDescriptor<'a>,
+}
+
+impl<'a, T: IndexAccess + ToReadonly> BlockchainData<'a, T> {
+    pub(super) fn new(access: T, service_instance: InstanceDescriptor<'a>) -> Self {
+        Self {
+            access,
+            service_instance,
+        }
+    }
+
+    /// Provides full access to entire storage. This is currently use by the sandbox.
+    #[cfg(test)]
+    pub fn full_access_to_everything(&self) -> T {
+        self.access.clone()
+    }
+
+    /// Returns core schema.
+    pub fn core_schema(&self) -> CoreSchema<T::Readonly> {
+        CoreSchema::get_unchecked(self.access.to_readonly())
+    }
+
+    /// Returns dispatcher schema.
+    pub fn for_dispatcher(&self) -> DispatcherSchema<T::Readonly> {
+        DispatcherSchema::new(self.access.to_readonly())
+    }
+
+    /// Returns a mount point for another service.
+    pub fn for_service<'q>(
+        &self,
+        id: impl Into<InstanceQuery<'q>>,
+    ) -> Option<Prefixed<'_, T::Readonly>> {
+        let (spec, status) = DispatcherSchema::new(self.access.to_readonly()).get_instance(id)?;
+        if status != DeployStatus::Active {
+            return None;
+        }
+
+        // The returned value is `Prefixed<'static, _>`, but we coerce it to a shorter lifetime
+        // for future compatibility.
+        Some(Prefixed::new(spec.name, self.access.to_readonly()))
+    }
+
+    /// Returns a mount point for the data of the executing service instance.
+    /// Unlike other data, this one may be writeable provided that this `BlockchainData`
+    /// wraps a `Fork`.
+    pub fn for_executing_service(&self) -> Prefixed<'a, T> {
+        Prefixed::new(self.service_instance.name, self.access.clone())
     }
 }

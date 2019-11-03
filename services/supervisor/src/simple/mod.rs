@@ -70,7 +70,7 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Check that the `actual_from` height is in the future.
-        if blockchain::Schema::new(context.fork()).height() >= arg.actual_from {
+        if blockchain::Schema::get_unchecked(context.fork()).height() >= arg.actual_from {
             return Err(Error::ActualFromIsPast).map_err(From::from);
         }
 
@@ -114,7 +114,10 @@ impl Service for SimpleSupervisor {
         let schema = Schema::new(context.fork());
         let proposal = if let Some(proposal) =
             schema.config_propose_entry().get().filter(|proposal| {
-                proposal.actual_from == blockchain::Schema::new(context.fork()).height().next()
+                proposal.actual_from
+                    == blockchain::Schema::get_unchecked(context.fork())
+                        .height()
+                        .next()
             }) {
             proposal
         } else {

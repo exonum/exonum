@@ -98,6 +98,15 @@ where
     }
 }
 
+/// Converts index access to a readonly presentation.
+pub trait ToReadonly: IndexAccess {
+    /// Readonly version of the access.
+    type Readonly: IndexAccess;
+
+    /// Performs the conversion.
+    fn to_readonly(&self) -> Self::Readonly;
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 /// Represents address of the index in the database.
 ///
@@ -155,15 +164,15 @@ impl IndexAddress {
         )
     }
 
-    /// Appends a name part to `IndexAddress`.
-    pub fn append_name<'a, S: Into<Cow<'a, str>>>(self, suffix: S) -> Self {
-        let suffix = suffix.into();
+    /// Prepends a name part to `IndexAddress`.
+    pub fn prepend_name<'a>(self, prefix: impl Into<Cow<'a, str>>) -> Self {
+        let prefix = prefix.into();
         Self {
             name: if self.name.is_empty() {
-                suffix.into_owned()
+                prefix.into_owned()
             } else {
                 // Because `concat` is faster than `format!("...")` in all cases.
-                [self.name(), ".", suffix.as_ref()].concat()
+                [prefix.as_ref(), ".", self.name()].concat()
             },
 
             bytes: self.bytes,
@@ -227,6 +236,14 @@ macro_rules! impl_snapshot_access {
             }
 
             fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
+        }
+
+        impl ToReadonly for $typ {
+            type Readonly = Self;
+
+            fn to_readonly(&self) -> Self::Readonly {
+                self.clone()
+            }
         }
     };
 }

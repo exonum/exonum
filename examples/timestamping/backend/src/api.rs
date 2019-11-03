@@ -72,7 +72,7 @@ impl PublicApi {
     ) -> api::Result<TimestampProof> {
         let snapshot = state.snapshot();
         let (state_proof, block_info) = {
-            let blockchain_schema = blockchain::Schema::new(snapshot);
+            let blockchain_schema = blockchain::Schema::get_unchecked(snapshot);
             let last_block_height = blockchain_schema.last_block().height();
             let block_proof = blockchain_schema
                 .block_and_precommits(last_block_height)

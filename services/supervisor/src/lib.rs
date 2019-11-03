@@ -71,7 +71,7 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
             log::trace!("Updating consensus configuration {:?}", config);
 
             let result = context.isolate(|context| {
-                blockchain::Schema::new(context.fork())
+                blockchain::Schema::get_unchecked(context.fork())
                     .consensus_config_entry()
                     .set(config);
                 Ok(())
@@ -115,7 +115,7 @@ impl Service for Supervisor {
 
     fn before_commit(&self, mut context: CallContext) {
         let schema = Schema::new(context.instance().name, context.fork());
-        let height = blockchain::Schema::new(context.fork()).height();
+        let height = blockchain::Schema::get_unchecked(context.fork()).height();
 
         // Removes pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema

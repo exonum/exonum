@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 use url::form_urlencoded::byte_serialize;
 
 use std::{panic, rc::Rc};
@@ -20,7 +21,7 @@ use crate::{
     extensions::*,
     validation::is_valid_index_name,
     views::{IndexAccess, IndexAddress, IndexType, View, ViewWithMetadata},
-    Database, DbOptions, Fork, ListIndex, MapIndex, Readonly, RocksDB, TemporaryDB,
+    Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -694,22 +695,6 @@ fn multiple_immutable_borrows_from_fork() {
 }
 
 #[test]
-fn multiple_immutable_borrows_from_rc_fork() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let fork = Readonly(Rc::new(fork));
-    let view1 = View::new(fork.clone(), IDX_NAME);
-    let view2 = View::new(fork.clone(), IDX_NAME);
-    assert_eq!(view1.get_bytes(&[0]), None);
-    assert_eq!(view2.get_bytes(&[0]), None);
-
-    let view1 = View::new(fork.clone(), PREFIXED_IDX);
-    let view2 = View::new(fork, PREFIXED_IDX);
-    assert_eq!(view1.get_bytes(&[0]), None);
-    assert_eq!(view2.get_bytes(&[0]), None);
-}
-
-#[test]
 fn immutable_view_from_fork_reflects_changes_in_fork() {
     let db = TemporaryDB::new();
     let fork = db.fork();
@@ -871,9 +856,10 @@ fn test_metadata_index_identifiers() {
             .into_parts::<()>();
     assert_eq!(
         view.address,
-        IndexAddress::new()
-            .append_name("simple")
-            .append_bytes(&0_u64)
+        IndexAddress {
+            name: "simple".to_owned(),
+            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+        }
     );
     drop(view); // Prevent "multiple mutable borrows" error later
 
@@ -885,9 +871,10 @@ fn test_metadata_index_identifiers() {
             .into_parts::<()>();
     assert_eq!(
         view.address,
-        IndexAddress::new()
-            .append_name("second")
-            .append_bytes(&1_u64)
+        IndexAddress {
+            name: "second".to_owned(),
+            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 1]),
+        }
     );
 
     // Recreates the first index instance.
@@ -898,9 +885,10 @@ fn test_metadata_index_identifiers() {
             .into_parts::<()>();
     assert_eq!(
         view.address,
-        IndexAddress::new()
-            .append_name("simple")
-            .append_bytes(&0_u64)
+        IndexAddress {
+            name: "simple".to_owned(),
+            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+        }
     );
 }
 

@@ -74,7 +74,7 @@ impl PublicApi {
         pub_key: PublicKey,
     ) -> api::Result<WalletInfo> {
         let snapshot = state.snapshot();
-        let blockchain_schema = blockchain::Schema::new(snapshot);
+        let blockchain_schema = blockchain::Schema::get_unchecked(snapshot);
         let currency_schema = Schema::new(state.instance.name, snapshot);
 
         let max_height = blockchain_schema.block_hashes_by_height().len() - 1;

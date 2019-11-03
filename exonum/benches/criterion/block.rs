@@ -255,8 +255,7 @@ mod cryptocurrency {
     impl CryptocurrencyInterface for Cryptocurrency {
         fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-
-            let mut index = context.fork().ensure_proof_map("provable_balances");
+            let mut index = context.service_data().ensure_proof_map("provable_balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -272,8 +271,7 @@ mod cryptocurrency {
             arg: SimpleTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-
-            let mut index = context.fork().ensure_map("balances");
+            let mut index = context.service_data().ensure_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -289,7 +287,7 @@ mod cryptocurrency {
             arg: RollbackTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-            let mut index = context.fork().ensure_map("balances");
+            let mut index = context.service_data().ensure_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);

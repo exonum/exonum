@@ -45,8 +45,8 @@ pub trait ConfigUpdaterInterface {
 pub struct ConfigUpdaterService;
 
 impl ConfigUpdaterInterface for ConfigUpdaterService {
-    fn update_config(&self, context: CallContext, arg: TxConfig) -> Result<(), ExecutionError> {
-        Schema::get_unchecked(context.fork())
+    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
+        Schema::get_unchecked(context.data().full_access_to_everything())
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())

@@ -20,10 +20,8 @@ use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::BinaryValue;
-
 use super::{IndexAccess, IndexAccessMut, IndexAddress, View};
-use crate::validation::assert_valid_name;
+use crate::{validation::assert_valid_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
