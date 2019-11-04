@@ -4,19 +4,33 @@ use std::borrow::Cow;
 
 use crate::{
     validation::assert_valid_name,
-    views::{IndexType, ViewWithMetadata},
+    views::{FromView, IndexType, ViewWithMetadata},
     BinaryKey, BinaryValue, Entry, IndexAddress, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofListIndex, ProofMapIndex, RawAccess, RawAccessMut, SparseListIndex, ValueSetIndex,
 };
 
 /// Extension trait allowing for easy access to indices from any type implementing
 /// `IndexAccess`.
-pub trait Access {
+pub trait Access: Clone {
     /// Index access serving as the basis for created indices.
     type Base: RawAccess;
 
     /// Gets a generic `View` with the specified address.
     fn get_view(&self, addr: IndexAddress) -> Option<ViewWithMetadata<Self::Base>>;
+
+    /// Returns a group of indexes. All indexes in the group have the same type.
+    /// Indexes are initialized lazily; i.e., no initialization is performed when the group
+    /// is created.
+    ///
+    /// Note that unlike other methods, this one requires address to be a string.
+    /// This is to prevent collisions among groups.
+    fn group<K, I>(&self, name: impl Into<String>) -> Group<Self, K, I>
+    where
+        K: BinaryKey + ?Sized,
+        I: FromView<Self::Base>,
+    {
+        Group::new(self.clone(), name)
+    }
 
     /// Gets or creates a generic `View` with the specified address.
     fn get_or_create_view(
@@ -77,7 +91,7 @@ pub trait Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        self.get_view(addr.into()).map(ProofListIndex::new)
+        self.get_view(addr.into()).map(ProofListIndex::from_view)
     }
 
     /// Gets a Merkelized list index with the specified address.
@@ -191,7 +205,7 @@ pub trait Access {
         Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::ProofList);
-        ProofListIndex::new(view)
+        ProofListIndex::from_view(view)
     }
 
     /// Gets or creates a Merkelized list index with the specified address.
@@ -294,6 +308,60 @@ impl<T: RawAccess> Access for T {
                 e.index_type()
             );
         })
+    }
+}
+
+use std::marker::PhantomData;
+
+/// Group of indexes distinguished by a prefix.
+#[derive(Debug)]
+pub struct Group<T, K: ?Sized, I> {
+    access: T,
+    prefix: IndexAddress,
+    _key: PhantomData<K>,
+    _index: PhantomData<I>,
+}
+
+impl<T, K, I> Group<T, K, I>
+where
+    T: Access,
+    K: BinaryKey + ?Sized,
+    I: FromView<T::Base>,
+{
+    fn new(access: T, prefix: impl Into<String>) -> Self {
+        Self {
+            access,
+            prefix: IndexAddress::with_root(prefix),
+            _key: PhantomData,
+            _index: PhantomData,
+        }
+    }
+
+    /// Gets an index corresponding to the specified key. If the index is not present in
+    /// the storage, returns `None`.
+    pub fn get(&self, key: &K) -> Option<I> {
+        let addr = self.prefix.clone().append_bytes(key);
+        self.access.get_view(addr).map(I::from_view)
+    }
+
+    /// Checks if the index with the specified key is present in the storage.
+    pub fn contains_key(&self, key: &K) -> bool {
+        let addr = self.prefix.clone().append_bytes(key);
+        self.access.get_view(addr).is_some()
+    }
+}
+
+impl<T, K, I> Group<T, K, I>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    K: BinaryKey + ?Sized,
+    I: FromView<T::Base>,
+{
+    /// Gets or creates an index corresponding to the specified key.
+    pub fn ensure(&self, key: &K) -> I {
+        let addr = self.prefix.clone().append_bytes(key);
+        I::from_view(self.access.get_or_create_view(addr, I::TYPE))
     }
 }
 
@@ -414,5 +482,42 @@ mod tests {
             .get_view(("bar.fam", &1_u32).into())
             .unwrap();
         assert_eq!(view.index_type(), IndexType::ProofMap);
+    }
+
+    #[test]
+    fn group() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        {
+            let group: Group<_, u32, ProofListIndex<_, String>> = Group::new(&fork, "group");
+            let mut list = group.ensure(&1);
+            list.push("foo".to_owned());
+            list.push("bar".to_owned());
+            group.ensure(&2).push("baz".to_owned());
+        }
+
+        {
+            let list = fork
+                .as_ref()
+                .proof_list::<_, String>(("group", &1_u32))
+                .unwrap();
+            assert_eq!(list.len(), 2);
+            assert_eq!(list.get(1), Some("bar".to_owned()));
+            let other_list = fork
+                .as_ref()
+                .proof_list::<_, String>(("group", &2_u32))
+                .unwrap();
+            assert_eq!(other_list.len(), 1);
+        }
+
+        db.merge_sync(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        let group: Group<_, u32, ProofListIndex<_, String>> = Group::new(&snapshot, "group");
+        assert_eq!(group.get(&1).unwrap().len(), 2);
+        assert_eq!(group.get(&2).unwrap().len(), 1);
+        assert!(group.get(&0).is_none());
+        assert!(group.contains_key(&1));
+        assert!(!group.contains_key(&4));
     }
 }

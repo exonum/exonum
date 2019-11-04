@@ -388,6 +388,16 @@ where
     }
 }
 
+/// Denotes index types that can be converted from a `View`.
+pub trait FromView<T: RawAccess> {
+    /// Type of the index.
+    const TYPE: IndexType;
+
+    /// Converts a generic view into an index. This method should panic if the view has
+    /// incorrect type.
+    fn from_view(view: ViewWithMetadata<T>) -> Self;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

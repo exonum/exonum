@@ -136,7 +136,7 @@ pub use self::{
     },
     entry::Entry,
     error::Error,
-    extensions::{Access, Prefixed},
+    extensions::{Access, Group, Prefixed},
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
     key_set_index::KeySetIndex,
     keys::BinaryKey,

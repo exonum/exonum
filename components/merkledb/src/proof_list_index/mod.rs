@@ -28,7 +28,8 @@ use self::{
 use crate::{
     hash::HashTag,
     views::{
-        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+        FromView, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
+        ViewWithMetadata,
     },
     BinaryValue, ObjectHash,
 };
@@ -95,12 +96,14 @@ where
     }
 }
 
-impl<T, V> ProofListIndex<T, V>
+impl<T, V> FromView<T> for ProofListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+    const TYPE: IndexType = IndexType::ProofList;
+
+    fn from_view(view: ViewWithMetadata<T>) -> Self {
         view.assert_type(IndexType::ProofList);
         let (base, state) = view.into_parts();
         Self {
@@ -109,7 +112,13 @@ where
             _v: PhantomData,
         }
     }
+}
 
+impl<T, V> ProofListIndex<T, V>
+where
+    T: RawAccess,
+    V: BinaryValue,
+{
     fn has_branch(&self, key: ProofListKey) -> bool {
         key.first_left_leaf_index() < self.len()
     }

@@ -5,8 +5,8 @@ use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, Access, BinaryValue, Database, Fork, ListIndex, MapIndex,
-    ObjectHash, ProofListIndex, ProofMapIndex, RawAccessMut, TemporaryDB,
+    impl_object_hash_for_binary_value, Access, BinaryValue, Database, Fork, Group, ListIndex,
+    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, RawAccessMut, TemporaryDB,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -84,7 +84,7 @@ struct Schema<T: Access> {
     pub transactions: MapIndex<T::Base, Hash, Transaction>,
     pub blocks: ListIndex<T::Base, Hash>,
     pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
-    access: T,
+    pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
 }
 
 impl<T: Access> Schema<T> {
@@ -93,7 +93,7 @@ impl<T: Access> Schema<T> {
             transactions: access.map("transactions")?,
             blocks: access.list("blocks")?,
             wallets: access.proof_map("wallets")?,
-            access,
+            wallet_history: access.group("wallet_history"),
         })
     }
 }
@@ -108,16 +108,12 @@ where
             transactions: access.ensure_map("transactions"),
             blocks: access.ensure_list("blocks"),
             wallets: access.ensure_proof_map("wallets"),
-            access,
+            wallet_history: access.group("wallet_history"),
         }
     }
 
-    fn ensure_wallets_history(&self, owner: &PublicKey) -> ProofListIndex<T::Base, Hash> {
-        self.access.ensure_proof_list(("wallets.history", owner))
-    }
-
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
-        let mut history = self.ensure_wallets_history(owner);
+        let mut history = self.wallet_history.ensure(owner);
         history.push(tx_hash);
         history.object_hash()
     }
@@ -161,6 +157,7 @@ fn main() {
         receiver: bob,
         amount: 100,
     };
+    let tx_hash = transaction.object_hash();
     let block = Block {
         prev_block: genesis.object_hash(),
         transactions: vec![transaction],
@@ -187,4 +184,12 @@ fn main() {
         checked_proof.entries().collect::<Vec<_>>(),
         vec![(&alice, &alice_wallet)]
     );
+
+    // Checks that transaction is recorded in wallet history.
+    let history = schema.wallet_history.get(&alice).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history.get(0), Some(tx_hash));
+    let history = schema.wallet_history.get(&bob).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history.get(0), Some(tx_hash));
 }

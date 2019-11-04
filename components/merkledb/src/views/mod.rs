@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::metadata::{BinaryAttribute, IndexState, IndexType, ViewWithMetadata};
+pub use self::metadata::{BinaryAttribute, FromView, IndexState, IndexType, ViewWithMetadata};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
