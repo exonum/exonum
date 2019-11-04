@@ -687,7 +687,7 @@ impl Fork {
         &self.working_patch
     }
 
-    /// Returns snapsot that also captures flushed changes in the fork.
+    /// Returns snapshot that also captures flushed changes in the fork.
     pub fn snapshot_with_flushed_changes(&self) -> &dyn Snapshot {
         &self.patch
     }

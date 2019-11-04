@@ -610,7 +610,7 @@ impl<'a> BlockchainExplorer<'a> {
             header: proof.block,
             precommits: proof.precommits,
             transactions: txs_table
-                .expect("Missing transactions for comitted block")
+                .expect("Missing transactions for committed block")
                 .iter()
                 .map(|tx_hash| self.committed_transaction(&tx_hash, None))
                 .collect(),

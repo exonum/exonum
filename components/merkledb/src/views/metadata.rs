@@ -44,7 +44,7 @@ pub enum IndexType {
     KeySet = 5,
     /// Sparse list index.
     SparseList = 6,
-    /// Merkelzied list index.
+    /// Merkelized list index.
     ProofList = 7,
     /// Merkelized map index.
     ProofMap = 8,
