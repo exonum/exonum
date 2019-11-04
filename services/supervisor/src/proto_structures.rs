@@ -132,13 +132,16 @@ impl ConfigPropose {
     }
 
     /// Signs the proposal for a simple supervisor with a randomly generated keypair.
-    pub fn sign_for_simple_supervisor(self) -> Verified<AnyTx> {
-        let (public_key, secret_key) = exonum_crypto::gen_keypair();
+    pub fn sign_for_simple_supervisor(
+        self,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Verified<AnyTx> {
         Transaction::<dyn SimpleSupervisorInterface>::sign(
             self,
             SUPERVISOR_INSTANCE_ID,
             public_key,
-            &secret_key,
+            secret_key,
         )
     }
 
