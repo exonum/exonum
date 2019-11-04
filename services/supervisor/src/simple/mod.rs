@@ -22,7 +22,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{CallContext, Service},
-        Caller, DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
+        DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
@@ -68,12 +68,11 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
         mut context: CallContext,
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        context
-            .verify_caller(Caller::as_transaction)
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
-
         // Verify that transaction author is validator.
-        let author = context.caller().author().unwrap();
+        let author = context
+            .caller()
+            .author()
+            .ok_or(DispatcherError::UnauthorizedCaller)?;;
         find_validator_id(context.fork().as_ref(), author).ok_or(Error::UnknownAuthor)?;
 
         // Check that the `actual_from` height is in the future.
