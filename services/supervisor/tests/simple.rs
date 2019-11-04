@@ -40,6 +40,15 @@ pub fn sign_config_propose_transaction(
     config.sign_for_simple_supervisor(*pub_key, sec_key)
 }
 
+pub fn sign_config_propose_transaction_by_us(
+    testkit: &TestKit,
+    config: ConfigPropose,
+) -> Verified<AnyTx> {
+    let initiator_id = testkit.network().us().validator_id().unwrap();
+
+    sign_config_propose_transaction(&testkit, config, initiator_id)
+}
+
 #[derive(Debug, ServiceFactory)]
 #[exonum(
     artifact_name = "config-change-test-service",
@@ -169,14 +178,12 @@ fn exclude_us_from_validators() {
 
     let old_validators = testkit.network().validators();
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .consensus_config(new_consensus_config.clone());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
 
@@ -202,14 +209,12 @@ fn exclude_other_from_validators() {
         cfg
     };
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .consensus_config(new_consensus_config.clone());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
 
@@ -232,14 +237,12 @@ fn change_us_validator_id() {
         cfg
     };
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .consensus_config(new_consensus_config.clone());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
 
@@ -259,14 +262,12 @@ fn service_config_change() {
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
 
@@ -297,16 +298,14 @@ fn discard_errored_service_config_change() {
         cfg
     };
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params)
         .service_config(ConfigChangeService::INSTANCE_ID, "error".to_owned())
         .consensus_config(new_consensus_config);
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -338,16 +337,14 @@ fn discard_panicked_service_config_change() {
         cfg
     };
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
         .service_config(ConfigChangeService::INSTANCE_ID, "panic".to_owned())
         .consensus_config(new_consensus_config);
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -375,15 +372,13 @@ fn incorrect_actual_from_field() {
 
     testkit.create_blocks_until(cfg_change_height);
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
     testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
+        .create_block_with_transaction(sign_config_propose_transaction_by_us(
             &testkit,
             config_propose,
-            initiator_id,
         ))
         .transactions[0]
         .status()
@@ -401,17 +396,14 @@ fn another_configuration_change_proposal() {
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height).service_config(
         ConfigChangeService::INSTANCE_ID,
         "I am an overridden parameter".to_owned(),
@@ -419,10 +411,9 @@ fn another_configuration_change_proposal() {
 
     // Try to commit second config change propose.
     testkit
-        .create_block_with_transaction(sign_config_propose_transaction(
+        .create_block_with_transaction(sign_config_propose_transaction_by_us(
             &testkit,
             config_propose,
-            initiator_id,
         ))
         .transactions[0]
         .status()
@@ -536,14 +527,12 @@ fn service_config_rollback_apply_error() {
     let cfg_change_height = Height(5);
     let params = "apply_error".to_owned();
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -568,14 +557,12 @@ fn service_config_rollback_apply_panic() {
     let cfg_change_height = Height(5);
     let params = "apply_panic".to_owned();
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
@@ -600,16 +587,14 @@ fn service_config_apply_multiple_configs() {
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
     let config_propose = ConfigPropose::actual_from(cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone())
         .service_config(ConfigChangeService::INSTANCE_ID, "apply_panic".to_owned())
         .service_config(ConfigChangeService::INSTANCE_ID, "apply_error".to_owned());
 
-    testkit.create_block_with_transaction(sign_config_propose_transaction(
+    testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
         config_propose,
-        initiator_id,
     ));
     testkit.create_blocks_until(cfg_change_height);
 
@@ -630,7 +615,6 @@ fn several_service_config_changes() {
         .with_rust_service(SimpleSupervisor)
         .with_rust_service(ConfigChangeService)
         .create();
-    let initiator_id = testkit.network().us().validator_id().unwrap();
 
     for i in 1..5 {
         let cfg_change_height = Height(5 * i);
@@ -639,11 +623,9 @@ fn several_service_config_changes() {
         let config_propose = ConfigPropose::actual_from(cfg_change_height)
             .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
-        testkit.create_block_with_transaction(sign_config_propose_transaction(
-            &testkit,
-            config_propose,
-            initiator_id,
-        ))[0]
+        let tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+
+        testkit.create_block_with_transaction(tx)[0]
             .status()
             .unwrap();
 
