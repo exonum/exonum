@@ -16,7 +16,7 @@ use exonum::{
     blockchain::InstanceCollection,
     crypto::{self, Hash},
     helpers::{Height, ValidatorId},
-    merkledb::{Entry, Snapshot},
+    merkledb::{Entry, ObjectHash, Snapshot},
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, Transaction},
@@ -685,9 +685,21 @@ fn discard_config_propose_from_auditor() {
         .consensus_config(new_consensus_config.clone())
         .sign_for_simple_supervisor(keys.0, &keys.1);
 
+    let tx_hash = config_propose.object_hash();
+
     testkit.create_block_with_transaction(config_propose);
     testkit.create_blocks_until(cfg_change_height);
 
+    // Verify that transaction failed.
+    let api = testkit.api();
+    let system_api = api.exonum_api();
+    let expected_status = Err(exonum::blockchain::ExecutionError {
+        kind: exonum::blockchain::ExecutionErrorKind::Service { code: 5 },
+        description: "Transaction author is not a validator.".into(),
+    });
+    system_api.assert_tx_status(tx_hash, &expected_status.into());
+
+    // Verify that no changes have been applied.
     let new_validators = testkit.network().validators();
 
     assert_eq!(testkit.consensus_config(), old_consensus_config);
