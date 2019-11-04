@@ -161,12 +161,12 @@ impl Blockchain {
         self.into_mut(config.consensus)
     }
 
-    /// Return reference to the transactions sender.
+    /// Returns reference to the transactions sender.
     pub fn sender(&self) -> &ApiSender {
         &self.api_sender
     }
 
-    /// Return reference to the service key pair of the current node.
+    /// Returns reference to the service key pair of the current node.
     pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
         &self.service_keypair
     }
