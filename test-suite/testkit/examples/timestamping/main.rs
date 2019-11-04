@@ -21,11 +21,11 @@ extern crate exonum_derive;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::{ExecutionError, Schema},
+    blockchain::ExecutionError,
     crypto::{gen_keypair, Hash},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        InstanceDescriptor,
+        BlockchainData, SnapshotExt,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
@@ -79,7 +79,7 @@ impl Service for TimestampingService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -109,7 +109,7 @@ fn main() {
 
     // Check results with schema.
     let snapshot = testkit.snapshot();
-    let schema = Schema::get_unchecked(&snapshot);
+    let schema = snapshot.for_core();
     assert!(schema.transactions().contains(&tx1.object_hash()));
     assert!(schema.transactions().contains(&tx2.object_hash()));
     assert!(schema.transactions().contains(&tx3.object_hash()));

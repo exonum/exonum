@@ -18,7 +18,7 @@ use exonum::{
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{CallContext, Service},
-        ExecutionError, InstanceDescriptor, InstanceId,
+        BlockchainData, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
@@ -144,7 +144,7 @@ impl CurrencyInterface for CurrencyService {
     fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
-        let height = context.data().core_schema().height();
+        let height = context.data().for_core().height();
         let mut schema = CurrencySchema::new(context.service_data());
         if schema.wallet(&author).is_none() {
             let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE, height.0);
@@ -160,7 +160,7 @@ impl CurrencyInterface for CurrencyService {
             return Err(Error::Foo);
         }
 
-        let height = context.data().core_schema().height();
+        let height = context.data().for_core().height();
         let mut schema = CurrencySchema::new(context.service_data());
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&arg.to);
@@ -195,7 +195,7 @@ impl CryptocurrencyApi {
         schema
             .wallet(&query.pub_key)
             .map(|wallet| {
-                let height = snapshot.core_schema().height();
+                let height = snapshot.for_core().height();
                 wallet.actual_balance(height)
             })
             .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
@@ -225,7 +225,7 @@ impl Service for CurrencyService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 

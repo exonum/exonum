@@ -1158,7 +1158,7 @@ mod tests {
         proto::schema::tests::TxSimple,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            ExecutionError, InstanceDescriptor, InstanceId,
+            BlockchainData, ExecutionError, InstanceId,
         },
     };
 
@@ -1198,7 +1198,7 @@ mod tests {
             Ok(())
         }
 
-        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }

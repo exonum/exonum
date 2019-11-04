@@ -209,7 +209,7 @@ pub mod contracts {
         runtime::{
             api::ServiceApiBuilder,
             rust::{CallContext, Service},
-            InstanceDescriptor, SnapshotExt,
+            BlockchainData,
         },
     };
 
@@ -293,9 +293,8 @@ pub mod contracts {
             Ok(())
         }
 
-        fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-            let snapshot = snapshot.for_service(descriptor.name).unwrap();
-            CurrencySchema::new(snapshot).state_hash()
+        fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+            CurrencySchema::new(data.for_executing_service()).state_hash()
         }
 
         fn wire_api(&self, builder: &mut ServiceApiBuilder) {

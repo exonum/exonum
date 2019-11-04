@@ -24,8 +24,8 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         rust::Transaction, AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, DeployStatus,
-        DispatcherError, DispatcherSchema, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, Mailbox, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        DispatcherError, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
+        Runtime, SnapshotExt, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -330,7 +330,8 @@ fn main() {
 
         // Get an instance identifier.
         let snapshot = blockchain_ref.snapshot();
-        let (spec, status) = DispatcherSchema::new(snapshot.as_ref())
+        let (spec, status) = snapshot
+            .for_dispatcher()
             .get_instance(instance_name.as_str())
             .unwrap();
         assert_eq!(status, DeployStatus::Active);

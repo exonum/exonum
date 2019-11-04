@@ -35,7 +35,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{CallContext, Service},
-        ExecutionError, InstanceDescriptor, SnapshotExt,
+        BlockchainData, ExecutionError,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -56,9 +56,8 @@ impl Service for CryptocurrencyService {
         Ok(())
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let snapshot = snapshot.for_service(descriptor.name).unwrap();
-        Schema::new(snapshot).state_hash()
+    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

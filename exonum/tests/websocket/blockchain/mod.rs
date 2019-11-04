@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, Node},
     runtime::{
         rust::{CallContext, Service},
-        InstanceDescriptor, InstanceId, Runtime,
+        BlockchainData, InstanceId, Runtime,
     },
 };
 use exonum_merkledb::{Snapshot, TemporaryDB};
@@ -110,7 +110,7 @@ impl Service for MyService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

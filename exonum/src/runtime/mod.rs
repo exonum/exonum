@@ -475,8 +475,7 @@ pub struct ExecutionContext<'a> {
     pub caller: Caller,
     /// Identifier of the service interface required for the call. Keep in mind that this field in
     /// fact is a part of unfinished "interfaces feature" and will be replaced in future releases.
-    /// At the moment this field can only contains a core interfaces like `Configure` and
-    /// always empty for the common the service interfaces.
+    /// At the moment this field is always empty for the primary the service interface.
     pub interface_name: &'a str,
     /// Reference to the dispatcher.
     dispatcher: &'a Dispatcher,

@@ -20,7 +20,7 @@ use exonum::{
     helpers::Height,
     runtime::{
         rust::{AfterCommitContext, CallContext, Service},
-        InstanceDescriptor, InstanceId,
+        BlockchainData, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
@@ -103,7 +103,7 @@ impl Service for AfterCommitService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 

@@ -32,14 +32,8 @@ impl<'a, T: IndexAccess + ToReadonly> BlockchainData<'a, T> {
         }
     }
 
-    /// Provides full access to entire storage. This is currently used by the sandbox.
-    #[cfg(test)]
-    pub(crate) fn full_access_to_everything(&self) -> T {
-        self.access.clone()
-    }
-
     /// Returns core schema.
-    pub fn core_schema(&self) -> CoreSchema<T::Readonly> {
+    pub fn for_core(&self) -> CoreSchema<T::Readonly> {
         CoreSchema::get_unchecked(self.access.to_readonly())
     }
 
@@ -77,10 +71,10 @@ fn mount_point_for_service<'q, T: IndexAccess>(
     Some(Prefixed::new(spec.name, access))
 }
 
-/// Extension trait for `Snapshot` allowing to access core and service schemas.
+/// Extension trait for `Snapshot` allowing to access blockchain data in a more structured way.
 pub trait SnapshotExt {
     /// Returns core schema.
-    fn core_schema(&self) -> CoreSchema<&'_ dyn Snapshot>;
+    fn for_core(&self) -> CoreSchema<&'_ dyn Snapshot>;
     /// Returns dispatcher schema.
     fn for_dispatcher(&self) -> DispatcherSchema<&'_ dyn Snapshot>;
     /// Returns a mount point for a service. If the service does not exist, returns `None`.
@@ -91,7 +85,7 @@ pub trait SnapshotExt {
 }
 
 impl SnapshotExt for dyn Snapshot {
-    fn core_schema(&self) -> CoreSchema<&'_ dyn Snapshot> {
+    fn for_core(&self) -> CoreSchema<&'_ dyn Snapshot> {
         CoreSchema::get_unchecked(self)
     }
 

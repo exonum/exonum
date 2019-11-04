@@ -25,7 +25,7 @@ use exonum::{
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
         rust::{CallContext, Service},
-        ExecutionError, InstanceDescriptor, InstanceId,
+        BlockchainData, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
@@ -34,6 +34,7 @@ use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
+
 use std::sync::Arc;
 
 use super::proto;
@@ -236,7 +237,7 @@ impl Service for CounterService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 

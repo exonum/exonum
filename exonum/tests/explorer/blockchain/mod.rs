@@ -15,20 +15,19 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, BlockchainMut, InstanceCollection, Schema},
+    blockchain::{Blockchain, BlockchainMut, InstanceCollection},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
     runtime::{
         rust::{CallContext, Service},
-        AnyTx, InstanceDescriptor, InstanceId,
+        AnyTx, BlockchainData, ExecutionError, InstanceId,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
 
-use exonum::runtime::ExecutionError;
 use std::collections::BTreeMap;
 
 pub const SERVICE_ID: InstanceId = 4;
@@ -113,7 +112,7 @@ impl Service for MyService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -149,13 +148,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
     let height = blockchain.as_ref().last_block().height().next();
-
-    let fork = blockchain.fork();
-    let mut schema = Schema::get_unchecked(&fork);
-    for tx in transactions {
-        schema.add_transaction_into_pool(tx.clone())
-    }
-    blockchain.merge(fork.into_patch()).unwrap();
+    blockchain.add_transactions_into_pool(transactions);
 
     let mut tx_cache = BTreeMap::new();
     let (block_hash, patch) =

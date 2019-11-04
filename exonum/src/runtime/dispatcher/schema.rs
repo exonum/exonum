@@ -39,7 +39,7 @@ pub struct Schema<T: AccessExt> {
 
 impl<T: AccessExt> Schema<T> {
     /// Constructs information schema for the given `access`.
-    pub fn new(access: T) -> Self {
+    pub(crate) fn new(access: T) -> Self {
         Self { access }
     }
 

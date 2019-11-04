@@ -33,7 +33,7 @@ use crate::{
     runtime::{
         error::ErrorKind,
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ExecutionError, InstanceDescriptor,
+        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
         InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -104,7 +104,7 @@ impl Service for TestDispatcherService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -184,7 +184,7 @@ impl Service for ServiceGoodImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 
@@ -218,7 +218,7 @@ impl Service for ServicePanicImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 
@@ -251,7 +251,7 @@ impl Service for ServicePanicStorageErrorImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 
@@ -304,7 +304,7 @@ impl Service for TxResultCheckService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

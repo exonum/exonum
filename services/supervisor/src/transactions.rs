@@ -130,12 +130,12 @@ impl SupervisorInterface for Supervisor {
         // Verifies that transaction author is validator.
         context
             .data()
-            .core_schema()
+            .for_core()
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that the `actual_from` height is in the future.
-        if context.data().core_schema().height() >= propose.actual_from {
+        if context.data().for_core().height() >= propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
 
@@ -208,7 +208,7 @@ impl SupervisorInterface for Supervisor {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Verify that transaction author is a validator.
-        let core_schema = context.data().core_schema();
+        let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
@@ -252,7 +252,7 @@ impl SupervisorInterface for Supervisor {
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
         deploy.validate()?;
-        let core_schema = context.data().core_schema();
+        let core_schema = context.data().for_core();
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < core_schema.height() {
             return Err(Error::DeadlineExceeded.into());
@@ -296,7 +296,7 @@ impl SupervisorInterface for Supervisor {
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
-        let core_schema = context.data().core_schema();
+        let core_schema = context.data().for_core();
 
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
@@ -339,8 +339,8 @@ impl SupervisorInterface for Supervisor {
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;
-        let core_schema = context.data().core_schema();
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;

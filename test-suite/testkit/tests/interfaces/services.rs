@@ -20,7 +20,7 @@ use exonum::{
     crypto::{Hash, PublicKey},
     runtime::{
         rust::{CallContext, Service},
-        CallInfo, ExecutionError, InstanceDescriptor, InstanceId, SnapshotExt,
+        BlockchainData, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
@@ -68,7 +68,7 @@ impl Service for WalletService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -146,7 +146,7 @@ impl Service for DepositService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -236,7 +236,7 @@ impl Service for AnyCallService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

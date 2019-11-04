@@ -18,20 +18,20 @@ use exonum_merkledb::BinaryValue;
 use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
 use crate::{
-    blockchain::{ConsensusConfig, ExecutionError, Schema},
+    blockchain::{ConsensusConfig, ExecutionError},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
     merkledb::Snapshot,
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        InstanceDescriptor, InstanceId,
+        BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
 #[exonum_service(crate = "crate")]
 pub trait ConfigUpdaterInterface {
-    fn update_config(&self, context: CallContext, arg: TxConfig) -> Result<(), ExecutionError>;
+    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -46,7 +46,8 @@ pub struct ConfigUpdaterService;
 
 impl ConfigUpdaterInterface for ConfigUpdaterService {
     fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
-        Schema::get_unchecked(context.data().full_access_to_everything())
+        context
+            .writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
@@ -62,13 +63,13 @@ impl Service for ConfigUpdaterService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
 
 impl ConfigUpdaterService {
-    pub const ID: InstanceId = 2;
+    pub const ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 }
 
 impl TxConfig {

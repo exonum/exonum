@@ -93,21 +93,6 @@ impl<'a> CallContext<'a> {
         })
     }
 
-    /// Checks the caller of this method with the specified closure.
-    ///
-    /// If the closure returns `Some(value)`, then the method returns `Some((value, fork))` thus you
-    /// get a write access to the blockchain state. Otherwise this method returns
-    /// an occurred error.
-    // TODO: remove?
-    pub fn verify_caller<F, T>(&self, predicate: F) -> Option<(T, &Fork)>
-    where
-        F: Fn(&Caller) -> Option<T>,
-    {
-        // TODO Think about returning structure with the named fields instead of unnamed tuple
-        // to make code more clear. [ECR-3222]
-        predicate(&self.inner.caller).map(|result| (result, &*self.inner.fork))
-    }
-
     /// Isolates execution of the provided closure.
     ///
     /// This method should be used with extreme care, since it subverts the usual rules

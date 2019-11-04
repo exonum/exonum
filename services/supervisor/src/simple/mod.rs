@@ -21,8 +21,7 @@ use exonum::{
     merkledb::Snapshot,
     runtime::{
         rust::{CallContext, Service},
-        Caller, DispatcherError, ExecutionError, InstanceDescriptor, SnapshotExt,
-        SUPERVISOR_INSTANCE_ID,
+        BlockchainData, DispatcherError, ExecutionError, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
@@ -67,11 +66,12 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(Caller::as_transaction)
+            .caller()
+            .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Check that the `actual_from` height is in the future.
-        if context.data().core_schema().height() >= arg.actual_from {
+        if context.data().for_core().height() >= arg.actual_from {
             Err(Error::ActualFromIsPast)?;
         }
 
@@ -111,9 +111,8 @@ impl Service for SimpleSupervisor {
         Ok(())
     }
 
-    fn state_hash(&self, instance: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let snapshot = snapshot.for_service(instance.name).unwrap();
-        Schema::new(snapshot).state_hash()
+    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn before_commit(&self, mut context: CallContext<'_>) {
@@ -121,7 +120,7 @@ impl Service for SimpleSupervisor {
             .config_propose
             .get()
             .filter(|proposal| {
-                let height = context.data().core_schema().height();
+                let height = context.data().for_core().height();
                 proposal.actual_from == height.next()
             });
         let proposal = if let Some(proposal) = proposal {

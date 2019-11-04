@@ -42,7 +42,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{CallContext, Service},
-        DispatcherError, InstanceDescriptor, SnapshotExt,
+        BlockchainData, DispatcherError,
     },
 };
 
@@ -76,9 +76,8 @@ impl Service for TimestampingService {
         Ok(())
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let snapshot = snapshot.for_service(descriptor.name).unwrap();
-        Schema::new(snapshot).state_hash()
+    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

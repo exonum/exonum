@@ -19,12 +19,12 @@ extern crate pretty_assertions;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::{ExecutionErrorKind, ExecutionStatus, Schema},
+    blockchain::ExecutionErrorKind,
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
     runtime::{rust::Transaction, InstanceId, SnapshotExt},
 };
-use exonum_merkledb::{AccessExt, ObjectHash, Snapshot};
+use exonum_merkledb::{AccessExt, Snapshot};
 use exonum_supervisor::{simple::SimpleSupervisor, ConfigPropose};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 
@@ -274,13 +274,8 @@ fn test_exonum_time_service_with_7_validators() {
     for (i, validator) in validators.iter().enumerate() {
         let (pub_key, sec_key) = validator.service_keypair();
         let tx = TxTime { time: times[i] }.sign(INSTANCE_ID, pub_key, &sec_key);
-        testkit.create_block_with_transactions(txvec![tx.clone()]);
-        assert_eq!(
-            Schema::get_unchecked(&testkit.snapshot())
-                .transaction_results()
-                .get(&tx.object_hash()),
-            Some(ExecutionStatus::ok())
-        );
+        let block = testkit.create_block_with_transaction(tx);
+        assert!(block[0].status().is_ok(), "{:?}", block);
 
         validators_times[i] = Some(times[i]);
 

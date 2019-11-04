@@ -31,7 +31,7 @@ use exonum::{
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, Transaction},
-        AnyTx, InstanceDescriptor, InstanceId, SnapshotExt,
+        AnyTx, BlockchainData, InstanceId, SnapshotExt,
     },
 };
 use exonum_proto::ProtobufConvert;
@@ -148,9 +148,8 @@ impl Service for MarkerService {
         Ok(())
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let snapshot = snapshot.for_service(descriptor.name).unwrap();
-        MarkerSchema::new(snapshot).state_hash()
+    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        MarkerSchema::new(data.for_executing_service()).state_hash()
     }
 }
 

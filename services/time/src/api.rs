@@ -73,7 +73,7 @@ impl PrivateApi {
     pub fn current_validators_time(
         state: &api::ServiceApiState,
     ) -> api::Result<Vec<ValidatorTime>> {
-        let validator_keys = state.data().core_schema().consensus_config().validator_keys;
+        let validator_keys = state.data().for_core().consensus_config().validator_keys;
         let schema = TimeSchema::new(state.service_data());
 
         // Times of the current validators.

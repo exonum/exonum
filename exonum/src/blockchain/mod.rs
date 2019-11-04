@@ -415,6 +415,40 @@ impl BlockchainMut {
         Ok(())
     }
 
+    /// Adds a transaction into pool of uncommitted transactions.
+    ///
+    /// Unlike the corresponding method in the core schema, this method checks if the
+    /// added transactions are already known to the node and does nothing if it is.
+    /// Thus, it is safe to call this method without verifying that the transactions
+    /// are not in the pool and are not committed.
+    #[doc(hidden)] // used by testkit, should not be used anywhere else
+    pub fn add_transactions_into_pool(
+        &mut self,
+        // ^-- mutable reference taken for future compatibility.
+        transactions: impl IntoIterator<Item = Verified<AnyTx>>,
+    ) {
+        Self::add_transactions_into_db_pool(self.inner.db.as_ref(), transactions);
+    }
+
+    /// Same as `add_transactions_into_pool()`, but accepting a database handle instead
+    /// of the `BlockchainMut` instance. Beware that accesses to database need to be synchronized
+    /// across threads.
+    #[doc(hidden)] // used by testkit, should not be used anywhere else
+    pub fn add_transactions_into_db_pool<Db: Database + ?Sized>(
+        db: &Db,
+        transactions: impl IntoIterator<Item = Verified<AnyTx>>,
+    ) {
+        let fork = db.fork();
+        let mut schema = Schema::get_unchecked(&fork);
+        for transaction in transactions {
+            if !schema.transactions().contains(&transaction.object_hash()) {
+                schema.add_transaction_into_pool(transaction);
+            }
+        }
+        db.merge(fork.into_patch())
+            .expect("Cannot update transaction pool");
+    }
+
     /// Shuts down the dispatcher. This should be the last operation performed on this instance.
     pub fn shutdown(&mut self) {
         self.dispatcher.shutdown();

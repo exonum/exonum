@@ -24,7 +24,7 @@ use crate::{
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, Transaction},
-        AnyTx, InstanceDescriptor, InstanceId,
+        AnyTx, BlockchainData, InstanceId,
     },
 };
 
@@ -60,7 +60,7 @@ impl Service for TimestampingService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 }

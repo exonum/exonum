@@ -56,7 +56,7 @@ impl TimeOracleInterface for TimeService {
             .as_transaction()
             .ok_or(Error::UnknownSender)?;
         // Check that the transaction is signed by a validator.
-        let core_schema = context.data().core_schema();
+        let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
             .ok_or(Error::UnknownSender)?;

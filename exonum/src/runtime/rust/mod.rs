@@ -85,10 +85,8 @@ impl Instance {
     }
 
     pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
-        (
-            self.id,
-            self.service.state_hash(self.descriptor(), snapshot),
-        )
+        let blockchain_data = BlockchainData::new(snapshot, self.descriptor());
+        (self.id, self.service.state_hash(blockchain_data))
     }
 }
 
@@ -376,9 +374,6 @@ impl Runtime for RustRuntime {
         context: ExecutionContext,
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
-        // We avoid a potential deadlock by cloning instances (i.e., copying them out
-        // of the locked memory). Thus, we don't need to hold the lock for the duration
-        // of the cycle below.
         let instance = self
             .started_services
             .get(&instance_id)

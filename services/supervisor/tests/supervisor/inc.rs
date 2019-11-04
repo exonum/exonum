@@ -20,7 +20,7 @@ use exonum::{
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{CallContext, Service},
-        Caller, DispatcherError, InstanceDescriptor, InstanceId,
+        BlockchainData, DispatcherError, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
@@ -127,7 +127,7 @@ impl Service for IncService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 
@@ -151,7 +151,8 @@ impl Configure for IncService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(Caller::as_supervisor)
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {

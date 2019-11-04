@@ -38,21 +38,21 @@
 //!   Accounts are stored in a `MapIndex`. Transactions are rolled back 50% of the time.
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
-use exonum::{
-    blockchain::{
-        Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
-    },
-    crypto::{self, Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId},
-    messages::{AnyTx, Verified},
-    node::ApiSender,
-};
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempdir::TempDir;
 
 use std::{collections::BTreeMap, iter, sync::Arc};
+
+use exonum::{
+    blockchain::{Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, ValidatorKeys},
+    crypto::{self, Hash, PublicKey, SecretKey},
+    helpers::{Height, ValidatorId},
+    messages::{AnyTx, Verified},
+    node::ApiSender,
+    runtime::SnapshotExt,
+};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -112,7 +112,7 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, InstanceDescriptor, InstanceId,
+            AnyTx, BlockchainData, InstanceId,
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
@@ -166,7 +166,7 @@ mod timestamping {
             Ok(())
         }
 
-        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }
@@ -217,7 +217,7 @@ mod cryptocurrency {
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, ErrorKind, InstanceDescriptor, InstanceId,
+            AnyTx, BlockchainData, ErrorKind, InstanceId,
         },
     };
     use exonum_merkledb::{AccessExt, Snapshot};
@@ -321,7 +321,7 @@ mod cryptocurrency {
             Ok(())
         }
 
-        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }
@@ -410,7 +410,7 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             rust::{CallContext, Interface, Service, Transaction},
-            AnyTx, DispatcherError, InstanceDescriptor, InstanceId, MethodId,
+            AnyTx, BlockchainData, DispatcherError, InstanceId, MethodId,
         },
     };
     use exonum_merkledb::Snapshot;
@@ -550,7 +550,7 @@ mod foreign_interface_call {
             Ok(())
         }
 
-        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }
@@ -590,20 +590,10 @@ mod foreign_interface_call {
 
 /// Writes transactions to the pool and returns their hashes.
 fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
-    let fork = blockchain.fork();
-    let mut schema = Schema::get_unchecked(&fork);
-
     // In the case of the block within `Bencher::iter()`, some transactions
     // may already be present in the pool. We don't particularly care about this.
-    let tx_hashes = transactions
-        .into_iter()
-        .map(|tx| {
-            let hash = tx.object_hash();
-            schema.add_transaction_into_pool(tx);
-            hash
-        })
-        .collect();
-    blockchain.merge(fork.into_patch()).unwrap();
+    let tx_hashes = transactions.iter().map(|tx| tx.object_hash()).collect();
+    blockchain.add_transactions_into_pool(transactions);
     tx_hashes
 }
 
@@ -613,7 +603,7 @@ fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>
 /// the benchmark and do not influence its timings.
 fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
     let snapshot = blockchain.snapshot();
-    let schema = Schema::get_unchecked(&snapshot);
+    let schema = snapshot.for_core();
 
     assert!(tx_hashes
         .iter()

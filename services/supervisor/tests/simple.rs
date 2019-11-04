@@ -18,7 +18,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        DispatcherError, ExecutionError, InstanceDescriptor, InstanceId, SnapshotExt,
+        BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -48,7 +48,7 @@ impl From<ConfigChangeService> for InstanceCollection {
         InstanceCollection::new(instance).with_instance(
             ConfigChangeService::INSTANCE_ID,
             ConfigChangeService::INSTANCE_NAME,
-            Vec::default(),
+            vec![],
         )
     }
 }
@@ -62,8 +62,8 @@ impl Service for ConfigChangeService {
         Ok(())
     }
 
-    fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -418,7 +418,7 @@ fn service_config_discard_fake_supervisor() {
         .with_rust_service(InstanceCollection::new(SimpleSupervisor).with_instance(
             FAKE_SUPERVISOR_ID,
             "fake-supervisor",
-            Vec::default(),
+            vec![],
         ))
         .with_rust_service(ConfigChangeService)
         .create();

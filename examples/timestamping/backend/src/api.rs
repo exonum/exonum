@@ -69,7 +69,7 @@ impl PublicApi {
         state: &ServiceApiState,
         hash: Hash,
     ) -> api::Result<TimestampProof> {
-        let blockchain_schema = state.data().core_schema();
+        let blockchain_schema = state.data().for_core();
         let last_block_height = blockchain_schema.height();
         let block_info = blockchain_schema
             .block_and_precommits(last_block_height)

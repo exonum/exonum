@@ -46,8 +46,8 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, Service},
-        InstanceDescriptor, SnapshotExt,
+        rust::{AfterCommitContext, CallContext, Service},
+        BlockchainData, ExecutionError,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -59,8 +59,6 @@ use crate::{
     time_provider::{SystemTimeProvider, TimeProvider},
     transactions::{TimeOracleInterface, TxTime},
 };
-use exonum::runtime::rust::CallContext;
-use exonum::runtime::ExecutionError;
 
 // TODO there is no way to provide provider for now.
 // It should be configurable through the configuration service.
@@ -78,16 +76,16 @@ impl Service for TimeService {
         Ok(())
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let snapshot = snapshot.for_service(descriptor.name).unwrap();
-        TimeSchema::new(snapshot).state_hash()
+    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        TimeSchema::new(data.for_executing_service()).state_hash()
     }
 
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext) {
         // The transaction must be created by the validator.
         if context
-            .core_schema()
+            .data()
+            .for_core()
             .validator_id(context.service_keypair.0)
             .is_some()
         {

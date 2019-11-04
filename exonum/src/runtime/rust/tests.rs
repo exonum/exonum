@@ -30,8 +30,8 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         error::{ErrorKind, ExecutionError},
-        ArtifactProtobufSpec, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
-        DispatcherSchema, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Mailbox,
+        ArtifactProtobufSpec, BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher,
+        DispatcherError, DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox,
         Runtime, StateHashAggregator,
     },
 };
@@ -286,7 +286,7 @@ impl Service for TestServiceImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -616,7 +616,7 @@ impl Service for DependentServiceImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

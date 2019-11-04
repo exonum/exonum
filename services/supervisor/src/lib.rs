@@ -31,7 +31,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
-        InstanceDescriptor, SnapshotExt, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
+        BlockchainData, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
 use exonum_derive::*;
@@ -116,14 +116,13 @@ impl Service for Supervisor {
         Ok(())
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let service_data = snapshot.for_service(descriptor.name).unwrap();
-        Schema::new(service_data).state_hash()
+    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn before_commit(&self, mut context: CallContext<'_>) {
         let mut schema = Schema::new(context.service_data());
-        let core_schema = context.data().core_schema();
+        let core_schema = context.data().for_core();
         let height = core_schema.height();
 
         // Removes pending deploy requests for which deadline was exceeded.
@@ -170,7 +169,7 @@ impl Service for Supervisor {
         let schema = Schema::new(context.service_data());
         let keypair = context.service_keypair;
         let instance_id = context.instance.id;
-        let core_schema = context.core_schema();
+        let core_schema = context.data().for_core();
         let is_validator = core_schema
             .validator_id(context.service_keypair.0)
             .is_some();

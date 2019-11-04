@@ -24,7 +24,7 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{BlockchainMut, Schema},
+    blockchain::BlockchainMut,
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
@@ -32,6 +32,8 @@ use exonum::{
     runtime::rust::Transaction as _,
 };
 use exonum_merkledb::ObjectHash;
+
+use std::iter;
 
 use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
@@ -67,10 +69,7 @@ pub fn sample_blockchain() -> BlockchainMut {
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
-    let fork = blockchain.fork();
-    let mut schema = Schema::get_unchecked(&fork);
-    schema.add_transaction_into_pool(mempool_transaction());
-    blockchain.merge(fork.into_patch()).unwrap();
+    blockchain.add_transactions_into_pool(iter::once(mempool_transaction()));
     blockchain
 }
 

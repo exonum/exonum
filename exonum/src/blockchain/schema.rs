@@ -107,14 +107,14 @@ impl<T: AccessExt> Schema<T> {
     ///
     /// The method will return `None` if the core schema is not initialized. This can only
     /// happen if the blockchain does not have a genesis block.
-    pub fn get(access: T) -> Option<Self> {
+    pub(crate) fn get(access: T) -> Option<Self> {
         access.entry::<_, u64>(TRANSACTIONS_LEN)?;
         Some(Self { access })
     }
 
     /// Constructs information schema based on the given `access`. Panics if the schema
     /// is not initialized.
-    pub fn get_unchecked(access: T) -> Self {
+    pub(crate) fn get_unchecked(access: T) -> Self {
         Self::get(access).expect("Core schema is not initialized")
     }
 
@@ -365,9 +365,11 @@ where
         entry.set(round);
     }
 
-    /// Adds transaction into the persistent pool.
-    /// This method increment `transactions_pool_len_index`,
-    /// be sure to decrement it when transaction committed.
+    /// Adds a transaction into the persistent pool. The caller must ensure that the transaction
+    /// is not already in the pool.
+    ///
+    /// This method increments the number of transactions in the pool,
+    /// be sure to decrement it when the transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: Verified<AnyTx>) {
         self.transactions_pool().insert(tx.object_hash());
@@ -392,7 +394,7 @@ where
     }
 
     /// Updates transaction count of the blockchain.
-    pub fn update_transaction_count(&mut self, count: u64) {
+    pub(crate) fn update_transaction_count(&mut self, count: u64) {
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);

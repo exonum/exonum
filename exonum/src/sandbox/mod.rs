@@ -1267,7 +1267,7 @@ mod tests {
         proto::schema::tests::TxAfterCommit,
         runtime::{
             rust::{AfterCommitContext, CallContext, Service, Transaction},
-            AnyTx, InstanceDescriptor, InstanceId,
+            AnyTx, BlockchainData, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1312,7 +1312,7 @@ mod tests {
             Ok(())
         }
 
-        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
 

@@ -71,7 +71,7 @@ impl PublicApi {
         state: &ServiceApiState,
         pub_key: PublicKey,
     ) -> api::Result<WalletInfo> {
-        let blockchain_schema = state.data().core_schema();
+        let blockchain_schema = state.data().for_core();
         let currency_schema = Schema::new(state.service_data());
         let current_height = blockchain_schema.height();
 

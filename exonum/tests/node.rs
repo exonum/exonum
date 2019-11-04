@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, Service},
-        InstanceDescriptor, Runtime,
+        BlockchainData, Runtime,
     },
 };
 use exonum_derive::{exonum_service, ServiceFactory};
@@ -68,7 +68,7 @@ impl Service for CommitWatcherService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 
@@ -94,7 +94,7 @@ impl Service for StartCheckerService {
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

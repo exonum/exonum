@@ -18,7 +18,6 @@ use futures::IntoFuture;
 use std::fmt::{self, Debug};
 
 use crate::{
-    blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::Verified,
@@ -75,8 +74,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// [1]: ../struct.StateHashAggregator.html
     /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
     /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
-    // FIXME: use `Prefixed`!
-    fn state_hash(&self, instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash>;
 
     /// Performs storage operations on behalf of the service before committing the block.
     ///
@@ -87,7 +85,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// The order of invoking the `before_commit` method is an implementation detail. Effectively,
     /// this means that services must not rely on a particular ordering of `Service::before_commit`
     /// invocations.
-    fn before_commit(&self, _context: CallContext) {}
+    fn before_commit(&self, _context: CallContext<'_>) {}
 
     /// Handles block commit event.
     ///
@@ -96,7 +94,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// if a specific condition has occurred.
     ///
     /// *Try not to perform long operations in this handler*.
-    fn after_commit(&self, _context: AfterCommitContext) {}
+    fn after_commit(&self, _context: AfterCommitContext<'_>) {}
 
     /// Attaches the request handlers of the service API to the Exonum API schema.
     ///
@@ -198,17 +196,10 @@ impl<'a> AfterCommitContext<'a> {
         self.data().for_executing_service()
     }
 
-    /// Returns core schema for the snapshot associated with this context.
-    ///
-    /// This is a shortcut for `self.data().core_schema()`.
-    pub fn core_schema(&self) -> CoreSchema<&'a dyn Snapshot> {
-        CoreSchema::get_unchecked(self.snapshot)
-    }
-
     /// Returns a current blockchain height. This height is "height of the latest committed block".
     pub fn height(&self) -> Height {
         // TODO Perhaps we should optimize this method [ECR-3222]
-        self.core_schema().height()
+        self.data().for_core().height()
     }
 
     /// Signs and broadcasts a transaction to the other nodes in the network.

@@ -18,7 +18,7 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{InstanceDescriptor, rust::{Transaction, CallContext, Service}},
+//!     runtime::{BlockchainData, SnapshotExt, rust::{Transaction, CallContext, Service}},
 //!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
@@ -51,16 +51,16 @@
 //! struct TimestampingService;
 //!
 //! impl Service for TimestampingService {
-//!     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
+//!     fn state_hash(&self, _: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> { vec![] }
 //! }
 //!
 //! #[exonum_service]
 //! pub trait TimestampingInterface {
-//!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
+//!     fn timestamp(&self, _: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
 //! }
 //!
 //! impl TimestampingInterface for TimestampingService {
-//!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError> {
+//!     fn timestamp(&self, _: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError> {
 //!         Ok(())
 //!     }
 //! }
@@ -93,7 +93,7 @@
 //!
 //!     // Check results with schema.
 //!     let snapshot = testkit.snapshot();
-//!     let schema = Schema::get_unchecked(&snapshot);
+//!     let schema = snapshot.for_core();
 //!     assert!(schema.transactions().contains(&tx1.object_hash()));
 //!     assert!(schema.transactions().contains(&tx2.object_hash()));
 //!     assert!(schema.transactions().contains(&tx3.object_hash()));
@@ -153,23 +153,21 @@ use exonum::{
         manager::UpdateEndpoints,
         ApiAccess,
     },
-    blockchain::{
-        Blockchain, BlockchainMut, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
-    },
+    blockchain::{Blockchain, BlockchainMut, ConsensusConfig, InstanceConfig},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{rust::ServiceFactory, InstanceId, Runtime},
+    runtime::{rust::ServiceFactory, InstanceId, Runtime, SnapshotExt},
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
 use std::{
     collections::BTreeMap,
-    fmt, mem,
+    fmt, iter, mem,
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
@@ -277,20 +275,14 @@ impl TestKit {
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
             Box::new(api_channel.1.and_then(move |event| {
                 let _guard = processing_lock_.lock().unwrap();
-                let fork = db.fork();
-                let mut schema = CoreSchema::get_unchecked(&fork);
                 match event {
                     ExternalMessage::Transaction(tx) => {
-                        let hash = tx.object_hash();
-                        if !schema.transactions().contains(&hash) {
-                            schema.add_transaction_into_pool(tx.clone());
-                        }
+                        BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(tx));
                     }
                     ExternalMessage::PeerAdd(_)
                     | ExternalMessage::Enable(_)
                     | ExternalMessage::Shutdown => { /* Ignored */ }
                 }
-                db.merge(fork.into_patch()).unwrap();
                 Ok(())
             }));
 
@@ -439,7 +431,7 @@ impl TestKit {
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
         let snapshot = self.snapshot();
-        let schema = CoreSchema::get_unchecked(&snapshot);
+        let schema = snapshot.for_core();
         let uncommitted_txs = transactions.into_iter().filter(|tx| {
             !schema.transactions().contains(&tx.object_hash())
                 || schema.transactions_pool().contains(&tx.object_hash())
@@ -522,9 +514,9 @@ impl TestKit {
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
     {
-        let fork = self.blockchain.fork();
-        let mut schema = CoreSchema::get_unchecked(&fork);
-
+        let snapshot = self.snapshot();
+        let schema = snapshot.for_core();
+        let mut unknown_transactions = vec![];
         let tx_hashes: Vec<_> = txs
             .into_iter()
             .map(|tx| {
@@ -537,12 +529,13 @@ impl TestKit {
                     tx
                 );
                 if tx_not_found {
-                    schema.add_transaction_into_pool(tx.clone());
+                    unknown_transactions.push(tx);
                 }
                 tx_id
             })
             .collect();
-        self.blockchain.merge(fork.into_patch()).unwrap();
+        self.blockchain
+            .add_transactions_into_pool(unknown_transactions);
         self.create_block_with_tx_hashes(&tx_hashes)
     }
 
@@ -577,7 +570,7 @@ impl TestKit {
         self.poll_events();
 
         let snapshot = self.blockchain.snapshot();
-        let schema = CoreSchema::get_unchecked(&snapshot);
+        let schema = snapshot.for_core();
         for hash in tx_hashes {
             assert!(schema.transactions_pool().contains(hash));
         }
@@ -591,29 +584,27 @@ impl TestKit {
     /// Returns information about the created block.
     pub fn create_block(&mut self) -> BlockWithTransactions {
         self.poll_events();
-
-        let snapshot = self.blockchain.snapshot();
-        let schema = CoreSchema::get_unchecked(&snapshot);
-        let txs = schema.transactions_pool();
-        let tx_hashes: Vec<_> = txs.iter().collect();
+        let tx_hashes: Vec<_> = self
+            .snapshot()
+            .for_core()
+            .transactions_pool()
+            .iter()
+            .collect();
         self.do_create_block(&tx_hashes)
     }
 
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
-        let fork = self.blockchain.fork();
-        let mut schema = CoreSchema::get_unchecked(&fork);
-        schema.add_transaction_into_pool(transaction);
         self.blockchain
-            .merge(fork.into_patch())
-            .expect("cannot update database");
+            .add_transactions_into_pool(iter::once(transaction));
     }
 
     /// Checks if transaction can be found in pool
     pub fn is_tx_in_pool(&self, tx_hash: &Hash) -> bool {
-        let snapshot = self.blockchain.snapshot();
-        let schema = CoreSchema::get_unchecked(&snapshot);
-        schema.transactions_pool().contains(tx_hash)
+        self.snapshot()
+            .for_core()
+            .transactions_pool()
+            .contains(tx_hash)
     }
 
     /// Creates a chain of blocks until a given height.
@@ -648,7 +639,7 @@ impl TestKit {
 
     /// Return an actual blockchain configuration.
     pub fn consensus_config(&self) -> ConsensusConfig {
-        CoreSchema::get_unchecked(&self.snapshot()).consensus_config()
+        self.snapshot().for_core().consensus_config()
     }
 
     /// Returns reference to validator with the given identifier.
@@ -837,8 +828,7 @@ impl StoppedTestKit {
 
     /// Return the height of latest committed block.
     pub fn height(&self) -> Height {
-        let snapshot = self.snapshot();
-        CoreSchema::get_unchecked(&snapshot).height()
+        self.snapshot().for_core().height()
     }
 
     /// Return the reference to test network.

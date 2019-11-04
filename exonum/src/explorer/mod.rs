@@ -534,8 +534,10 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     fn precommits(&self, block: &Block) -> Vec<Verified<Precommit>> {
-        let precommits_table = self.schema.precommits(&block.object_hash()).unwrap();
-        precommits_table.iter().collect()
+        self.schema
+            .precommits(&block.object_hash())
+            .map(|index| index.iter().collect())
+            .unwrap_or_default()
     }
 
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
