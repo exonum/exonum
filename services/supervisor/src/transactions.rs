@@ -311,10 +311,10 @@ impl SupervisorInterface for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that this deployment is registered.
-        let deploy_request = match schema.pending_deployments().get(&confirmation.artifact) {
-            Some(request) => request,
-            None => return Err(Error::DeployRequestNotRegistered.into()),
-        };
+        let deploy_request = schema
+            .pending_deployments()
+            .get(&confirmation.artifact)
+            .ok_or(Error::DeployRequestNotRegistered)?;
 
         // Verifies that we didn't reach deadline height.
         if deploy_request.deadline_height < blockchain_schema.height() {
