@@ -27,6 +27,7 @@ use exonum::{
 use exonum_merkledb::{Snapshot, TemporaryDB};
 use exonum_proto::ProtobufConvert;
 
+use exonum::runtime::ExecutionError;
 use std::{
     net::SocketAddr,
     thread::{self, JoinHandle},
@@ -101,6 +102,14 @@ impl MyServiceInterface for MyService {
 }
 
 impl Service for MyService {
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }

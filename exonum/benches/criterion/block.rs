@@ -158,6 +158,14 @@ mod timestamping {
     }
 
     impl Service for Timestamping {
+        fn initialize(
+            &self,
+            _context: CallContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+
         fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
@@ -305,6 +313,14 @@ mod cryptocurrency {
     }
 
     impl Service for Cryptocurrency {
+        fn initialize(
+            &self,
+            _context: CallContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+
         fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
@@ -526,6 +542,14 @@ mod foreign_interface_call {
     impl ERC30Tokens for Timestamping {}
 
     impl Service for Timestamping {
+        fn initialize(
+            &self,
+            _context: CallContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+
         fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }

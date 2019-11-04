@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain,
     helpers::ValidateInput,
-    runtime::{rust::CallContext, Caller, DispatcherError, ExecutionError, InstanceSpec},
+    runtime::{rust::CallContext, DispatcherError, ExecutionError, InstanceSpec},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
@@ -123,24 +122,28 @@ impl SupervisorInterface for Supervisor {
         mut context: CallContext,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        let ((_, author), fork) = context
-            .verify_caller(Caller::as_transaction)
+        let (_, author) = context
+            .caller()
+            .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
-        let schema = Schema::new(context.instance().name, fork);
 
         // Verifies that transaction author is validator.
-        let config_confirms = schema.config_confirms();
-        config_confirms
+        context
+            .data()
+            .core_schema()
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that the `actual_from` height is in the future.
-        if blockchain::Schema::get_unchecked(fork).height() >= propose.actual_from {
+        if context.data().core_schema().height() >= propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
 
         // Verifies that there are no pending config changes.
-        if schema.pending_proposal().exists() {
+        if Schema::new(context.service_data())
+            .pending_proposal
+            .exists()
+        {
             return Err(Error::ConfigProposeExists.into());
         }
 
@@ -181,15 +184,15 @@ impl SupervisorInterface for Supervisor {
             }
         }
 
-        let schema = Schema::new(context.instance().name, context.fork());
+        let mut schema = Schema::new(context.service_data());
         let propose_hash = propose.object_hash();
-        schema.config_confirms().confirm(&propose_hash, author);
+        schema.config_confirms.confirm(&propose_hash, author);
 
         let config_entry = ConfigProposalWithHash {
             config_propose: propose,
             propose_hash,
         };
-        schema.pending_proposal().set(config_entry);
+        schema.pending_proposal.set(config_entry);
 
         Ok(())
     }
@@ -199,21 +202,20 @@ impl SupervisorInterface for Supervisor {
         context: CallContext,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError> {
-        let ((_, author), fork) = context
-            .verify_caller(Caller::as_transaction)
+        let (_, author) = context
+            .caller()
+            .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let blockchain_height = blockchain::Schema::get_unchecked(fork).height();
-        let schema = Schema::new(context.instance().name, fork);
-
-        // Verifies that transaction author is validator.
-        let mut config_confirms = schema.config_confirms();
-        config_confirms
+        // Verify that transaction author is a validator.
+        let core_schema = context.data().core_schema();
+        core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
+        let mut schema = Schema::new(context.service_data());
         let entry = schema
-            .pending_proposal()
+            .pending_proposal
             .get()
             .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
 
@@ -224,15 +226,17 @@ impl SupervisorInterface for Supervisor {
 
         let config_propose = entry.config_propose;
         // Verifies that we didn't reach the deadline height.
-        if config_propose.actual_from <= blockchain_height {
+        if config_propose.actual_from <= core_schema.height() {
             return Err(Error::DeadlineExceeded.into());
         }
-
-        if config_confirms.confirmed_by(&entry.propose_hash, &author) {
+        if schema
+            .config_confirms
+            .confirmed_by(&entry.propose_hash, &author)
+        {
             return Err(Error::AttemptToVoteTwice.into());
         }
 
-        config_confirms.confirm(&vote.propose_hash, author);
+        schema.config_confirms.confirm(&vote.propose_hash, author);
         log::trace!(
             "Propose config {:?} has been confirmed by {:?}",
             vote.propose_hash,
@@ -248,43 +252,40 @@ impl SupervisorInterface for Supervisor {
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
         deploy.validate()?;
-        let blockchain_schema = blockchain::Schema::get_unchecked(context.fork());
+        let core_schema = context.data().core_schema();
         // Verifies that we doesn't reach deadline height.
-        if deploy.deadline_height < blockchain_schema.height() {
+        if deploy.deadline_height < core_schema.height() {
             return Err(Error::DeadlineExceeded.into());
         }
-        let schema = Schema::new(context.instance().name, context.fork());
+        let mut schema = Schema::new(context.service_data());
 
         // Verifies that the deployment request is not yet registered.
-        if schema.pending_deployments().contains(&deploy.artifact) {
+        if schema.pending_deployments.contains(&deploy.artifact) {
             return Err(Error::DeployRequestAlreadyRegistered.into());
         }
 
         // Verifies that transaction author is validator.
-        let mut deploy_requests = schema.deploy_requests();
-        let author = context
-            .caller()
-            .author()
-            .expect("Wrong `DeployRequest` initiator");
-
-        deploy_requests
+        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that the artifact is not deployed yet.
         if context
-            .dispatcher_info()
+            .data()
+            .for_dispatcher()
             .get_artifact(&deploy.artifact.name)
             .is_some()
         {
             return Err(Error::AlreadyDeployed.into());
         }
 
-        let confirmations = deploy_requests.confirm(&deploy, author);
-        if confirmations == deploy_requests.validators_amount() {
+        let confirmations = schema.deploy_requests.confirm(&deploy, author);
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        if confirmations == validator_count {
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
-            schema.pending_deployments().put(&artifact, deploy);
+            schema.pending_deployments.put(&artifact, deploy);
         }
         Ok(())
     }
@@ -295,42 +296,35 @@ impl SupervisorInterface for Supervisor {
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
-        let blockchain_schema = blockchain::Schema::get_unchecked(context.fork());
-
-        // Verifies that we doesn't reach deadline height.
-        if confirmation.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
-        }
-        let schema = Schema::new(context.instance().name, context.fork());
+        let core_schema = context.data().core_schema();
 
         // Verifies that transaction author is validator.
-        let mut deploy_confirmations = schema.deploy_confirmations();
-        let author = context
-            .caller()
-            .author()
-            .expect("Wrong `DeployConfirmation` initiator");
-
-        deploy_confirmations
+        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
+        // Verifies that we doesn't reach deadline height.
+        if confirmation.deadline_height < core_schema.height() {
+            return Err(Error::DeadlineExceeded.into());
+        }
+
+        let mut schema = Schema::new(context.service_data());
         // Verifies that this deployment is registered.
-        if !schema
-            .pending_deployments()
-            .contains(&confirmation.artifact)
-        {
+        if !schema.pending_deployments.contains(&confirmation.artifact) {
             return Err(Error::DeployRequestNotRegistered.into());
         }
 
-        let confirmations = deploy_confirmations.confirm(&confirmation, author);
-        if confirmations == deploy_confirmations.validators_amount() {
+        let confirmations = schema.deploy_confirmations.confirm(&confirmation, author);
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        if confirmations == validator_count {
             log::trace!(
                 "Registering deployed artifact in dispatcher {:?}",
                 confirmation.artifact
             );
 
             // Removes artifact from pending deployments.
-            schema.pending_deployments().remove(&confirmation.artifact);
+            schema.pending_deployments.remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
             context.start_artifact_registration(confirmation.artifact, confirmation.spec)?;
@@ -345,35 +339,32 @@ impl SupervisorInterface for Supervisor {
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;
-        let blockchain_schema = blockchain::Schema::get_unchecked(context.fork());
-
-        // Verifies that we doesn't reach deadline height.
-        if service.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
-        }
-        let mut pending_instances =
-            Schema::new(context.instance().name, context.fork()).pending_instances();
-        let author = context
-            .caller()
-            .author()
-            .expect("Wrong `StartService` initiator");
-
-        // Verifies that transaction author is validator.
-        pending_instances
+        let core_schema = context.data().core_schema();
+        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
+        // Verifies that we doesn't reach deadline height.
+        if service.deadline_height < core_schema.height() {
+            return Err(Error::DeadlineExceeded.into());
+        }
+
         // Verifies that the instance name does not exist.
         if context
-            .dispatcher_info()
+            .data()
+            .for_dispatcher()
             .get_instance(service.name.as_str())
             .is_some()
         {
             return Err(Error::InstanceExists.into());
         }
 
-        let confirmations = pending_instances.confirm(&service, author);
-        if confirmations == pending_instances.validators_amount() {
+        let confirmations = Schema::new(context.service_data())
+            .pending_instances
+            .confirm(&service, author);
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        if confirmations == validator_count {
             log::trace!(
                 "Request add service with name {:?} from artifact {:?}",
                 service.name,

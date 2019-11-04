@@ -95,13 +95,21 @@ impl AfterCommitService {
 }
 
 impl Service for AfterCommitService {
-    fn after_commit(&self, context: AfterCommitContext) {
-        self.counter.fetch_add(1, Ordering::SeqCst);
-        let tx = TxAfterCommit::new(context.height());
-        context.broadcast_transaction(tx);
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
+    }
+
+    fn after_commit(&self, context: AfterCommitContext) {
+        self.counter.fetch_add(1, Ordering::SeqCst);
+        let tx = TxAfterCommit::new(context.height());
+        context.broadcast_transaction(tx);
     }
 }

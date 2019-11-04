@@ -14,44 +14,98 @@
 
 use chrono::{DateTime, Utc};
 
-use exonum::crypto::{Hash, PublicKey};
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum::{
+    blockchain::ValidatorKeys,
+    crypto::{Hash, PublicKey},
+};
+use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash, ProofMapIndex};
+
+const NOT_INITIALIZED: &str = "Time service schema is not initialized";
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
-pub struct TimeSchema<'a, T> {
-    access: T,
-    service_name: &'a str,
+pub struct TimeSchema<T: AccessExt> {
+    /// `DateTime` for every validator. May contain keys corresponding to past validators.
+    pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
+    /// Consolidated time.
+    pub time: Entry<T::Base, DateTime<Utc>>,
 }
 
-impl<'a, T: IndexAccess> TimeSchema<'a, T> {
-    /// Constructs schema for the given `snapshot`.
-    pub fn new(service_name: &'a str, access: T) -> Self {
+impl<T: AccessExt> TimeSchema<T> {
+    /// Constructs schema for the given `access`.
+    pub fn new(access: T) -> Self {
         TimeSchema {
-            service_name,
-            access,
+            validators_times: access.proof_map("validators_times").expect(NOT_INITIALIZED),
+            time: access.entry("time").expect(NOT_INITIALIZED),
         }
-    }
-
-    fn index_name(&self, name: &str) -> String {
-        [self.service_name, ".", name].concat()
-    }
-
-    /// Returns the table that stores `DateTime` for every validator.
-    pub fn validators_times(&self) -> ProofMapIndex<T, PublicKey, DateTime<Utc>> {
-        ProofMapIndex::new(self.index_name("validators_times"), self.access.clone())
-    }
-
-    /// Returns stored time.
-    pub fn time(&self) -> Entry<T, DateTime<Utc>> {
-        Entry::new(self.index_name("time"), self.access.clone())
     }
 
     /// Returns hashes for stored tables.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.validators_times().object_hash(),
-            self.time().object_hash(),
-        ]
+        vec![self.validators_times.object_hash(), self.time.object_hash()]
+    }
+}
+
+impl<T> TimeSchema<T>
+where
+    T: AccessExt,
+    T::Base: IndexAccessMut,
+{
+    pub(crate) fn initialize(access: T) -> Self {
+        Self {
+            validators_times: access.ensure_proof_map("validators_times"),
+            time: access.ensure_entry("time"),
+        }
+    }
+
+    /// Returns an error if the currently registered validator time is greater than `time`.
+    pub(crate) fn update_validator_time(
+        &mut self,
+        author: PublicKey,
+        time: DateTime<Utc>,
+    ) -> Result<(), ()> {
+        match self.validators_times.get(&author) {
+            // The validator time in the storage should be less than in the transaction.
+            Some(val_time) if val_time >= time => Err(()),
+            // Write the time for the validator.
+            _ => {
+                self.validators_times.put(&author, time);
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) fn update_consolidated_time(&mut self, validator_keys: &[ValidatorKeys]) {
+        // Find all known times for the validators.
+        let validator_times = {
+            let mut times = self
+                .validators_times
+                .iter()
+                .filter_map(|(public_key, time)| {
+                    validator_keys
+                        .iter()
+                        .find(|validator| validator.service_key == public_key)
+                        .map(|_| time)
+                })
+                .collect::<Vec<_>>();
+            // Ordering time from highest to lowest.
+            times.sort_by(|a, b| b.cmp(a));
+            times
+        };
+
+        // The largest number of Byzantine nodes.
+        let max_byzantine_nodes = (validator_keys.len() - 1) / 3;
+        if validator_times.len() <= 2 * max_byzantine_nodes {
+            return;
+        }
+
+        match self.time.get() {
+            // Selected time should be greater than the time in the storage.
+            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {}
+            _ => {
+                // Change the time in the storage.
+                self.time.set(validator_times[max_byzantine_nodes]);
+            }
+        }
     }
 }

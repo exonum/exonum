@@ -85,6 +85,7 @@
 //! [artifacts]: struct.ArtifactId.html
 
 pub use self::{
+    blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{
         Dispatcher, DispatcherState, Error as DispatcherError, Mailbox, Schema as DispatcherSchema,
     },
@@ -112,6 +113,7 @@ use crate::{
     helpers::ValidateInput,
 };
 
+mod blockchain_data;
 mod dispatcher;
 mod types;
 

@@ -1304,13 +1304,21 @@ mod tests {
     }
 
     impl Service for AfterCommitService {
-        fn after_commit(&self, context: AfterCommitContext) {
-            let tx = TxAfterCommit::new_with_height(context.height());
-            context.broadcast_signed_transaction(tx);
+        fn initialize(
+            &self,
+            _context: CallContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
         }
 
         fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
             vec![]
+        }
+
+        fn after_commit(&self, context: AfterCommitContext) {
+            let tx = TxAfterCommit::new_with_height(context.height());
+            context.broadcast_signed_transaction(tx);
         }
     }
 

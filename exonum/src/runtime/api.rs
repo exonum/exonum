@@ -14,9 +14,11 @@
 
 //! Building blocks for creating API of services.
 
+// FIXME: move to Rust runtime.
+
 pub use crate::api::{ApiContext, Error, FutureResult, Result};
 
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{Prefixed, Snapshot};
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -24,7 +26,7 @@ use crate::{
     api::{ApiBuilder, ApiScope},
     crypto::{PublicKey, SecretKey},
     node::ApiSender,
-    runtime::{InstanceDescriptor, InstanceId},
+    runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
 
 /// Provide the current blockchain state snapshot to API handlers.
@@ -53,9 +55,14 @@ impl<'a> ServiceApiState<'a> {
         }
     }
 
-    /// Return a read-only snapshot of the current blockchain state.
-    pub fn snapshot(&'a self) -> &dyn Snapshot {
-        self.snapshot.as_ref()
+    /// Returns readonly access to blockchain data.
+    pub fn data(&'a self) -> BlockchainData<&dyn Snapshot> {
+        BlockchainData::new(&self.snapshot, self.instance)
+    }
+
+    /// Returns readonly access to the data of the executing service.
+    pub fn service_data(&'a self) -> Prefixed<&dyn Snapshot> {
+        self.data().for_executing_service()
     }
 
     /// Return a reference to the transactions sender.

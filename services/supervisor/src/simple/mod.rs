@@ -15,13 +15,14 @@
 //! A simple supervisor service that does actions without any confirmations.
 
 use exonum::{
-    blockchain::{self, InstanceCollection},
+    blockchain::InstanceCollection,
     crypto::Hash,
     helpers::ValidateInput,
     merkledb::Snapshot,
     runtime::{
         rust::{CallContext, Service},
-        Caller, DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
+        Caller, DispatcherError, ExecutionError, InstanceDescriptor, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
@@ -70,14 +71,13 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Check that the `actual_from` height is in the future.
-        if blockchain::Schema::get_unchecked(context.fork()).height() >= arg.actual_from {
-            return Err(Error::ActualFromIsPast).map_err(From::from);
+        if context.data().core_schema().height() >= arg.actual_from {
+            Err(Error::ActualFromIsPast)?;
         }
 
-        let schema = Schema::new(context.fork());
         // Check that there are no pending config changes.
-        if schema.config_propose_entry().exists() {
-            return Err(Error::ConfigProposeExists).map_err(From::from);
+        if Schema::new(context.service_data()).config_propose.exists() {
+            Err(Error::ConfigProposeExists)?;
         }
 
         // Perform config verification.
@@ -99,26 +99,32 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
         }
 
         // Add verified config proposal to the pending config changes.
-        let schema = Schema::new(context.fork());
-        schema.config_propose_entry().set(arg);
+        let mut schema = Schema::new(context.service_data());
+        schema.config_propose.set(arg);
         Ok(())
     }
 }
 
 impl Service for SimpleSupervisor {
-    fn state_hash(&self, _instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        Schema::initialize(context.service_data());
+        Ok(())
+    }
+
+    fn state_hash(&self, instance: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let snapshot = snapshot.for_service(instance.name).unwrap();
         Schema::new(snapshot).state_hash()
     }
 
-    fn before_commit(&self, mut context: CallContext) {
-        let schema = Schema::new(context.fork());
-        let proposal = if let Some(proposal) =
-            schema.config_propose_entry().get().filter(|proposal| {
-                proposal.actual_from
-                    == blockchain::Schema::get_unchecked(context.fork())
-                        .height()
-                        .next()
-            }) {
+    fn before_commit(&self, mut context: CallContext<'_>) {
+        let proposal = Schema::new(context.service_data())
+            .config_propose
+            .get()
+            .filter(|proposal| {
+                let height = context.data().core_schema().height();
+                proposal.actual_from == height.next()
+            });
+        let proposal = if let Some(proposal) = proposal {
             proposal
         } else {
             return;
@@ -126,10 +132,9 @@ impl Service for SimpleSupervisor {
 
         // Perform the application of configs.
         update_configs(&mut context, proposal.changes);
-
         // Remove config from proposals.
-        let schema = Schema::new(context.fork());
-        schema.config_propose_entry().remove();
+        let mut schema = Schema::new(context.service_data());
+        schema.config_propose.remove();
     }
 }
 

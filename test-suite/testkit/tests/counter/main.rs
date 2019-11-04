@@ -24,9 +24,9 @@ use exonum::{
     explorer::BlockchainExplorer,
     helpers::Height,
     messages::{AnyTx, Verified},
-    runtime::rust::Transaction,
+    runtime::{rust::Transaction, SnapshotExt},
 };
-use exonum_merkledb::{HashTag, ObjectHash};
+use exonum_merkledb::{AccessExt, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{
     txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
 };
@@ -34,8 +34,8 @@ use hex::FromHex;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY,
-    SERVICE_ID, SERVICE_NAME,
+    CounterSchema, CounterService, Increment, Reset, TransactionResponse, ADMIN_KEY, SERVICE_ID,
+    SERVICE_NAME,
 };
 
 mod counter;
@@ -50,7 +50,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
 fn inc_count(api: &TestKitApi, by: u64) -> Verified<AnyTx> {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    let tx = TxIncrement::new(by).sign(SERVICE_ID, pubkey, &key);
+    let tx = Increment::new(by).sign(SERVICE_ID, pubkey, &key);
 
     let tx_info: TransactionResponse = api
         .public(ApiKind::Service("counter"))
@@ -61,13 +61,17 @@ fn inc_count(api: &TestKitApi, by: u64) -> Verified<AnyTx> {
     tx
 }
 
+fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl AccessExt + 'a> {
+    CounterSchema::new(snapshot.for_service(SERVICE_NAME).unwrap())
+}
+
 #[test]
 fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
 
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api
@@ -77,8 +81,8 @@ fn test_inc_count_create_block() {
     assert_eq!(counter, 5);
 
     testkit.create_block_with_transactions(txvec![
-        TxIncrement::new(4).sign(SERVICE_ID, pubkey, &key),
-        TxIncrement::new(1).sign(SERVICE_ID, pubkey, &key),
+        Increment::new(4).sign(SERVICE_ID, pubkey, &key),
+        Increment::new(1).sign(SERVICE_ID, pubkey, &key),
     ]);
 
     let counter: u64 = api
@@ -94,9 +98,9 @@ fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
     // Create another block with the same transaction
-    testkit.create_block_with_transaction(TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
 }
 
 #[test]
@@ -181,7 +185,7 @@ fn test_private_api() {
     );
     assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
 
-    let tx = TxReset.sign(SERVICE_ID, pubkey, &key);
+    let tx = Reset.sign(SERVICE_ID, pubkey, &key);
     let tx_info: TransactionResponse = api
         .private(ApiKind::Service("counter"))
         .query(&tx)
@@ -203,12 +207,12 @@ fn test_probe() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
     };
 
     let snapshot = testkit.probe(tx.clone());
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(5));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(5));
     // Verify that the patch has not been applied to the blockchain
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
@@ -218,12 +222,12 @@ fn test_probe() {
 
     let other_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(3).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(3).sign(SERVICE_ID, pubkey, &key)
     };
 
     let snapshot = testkit.probe_all(txvec![tx.clone(), other_tx.clone()]);
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(8));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(8));
 
     // Posting a transaction is not enough to change the blockchain!
     let _: TransactionResponse = api
@@ -232,12 +236,12 @@ fn test_probe() {
         .post("count")
         .unwrap();
     let snapshot = testkit.probe(other_tx.clone());
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(3));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(3));
     testkit.create_block();
     let snapshot = testkit.probe(other_tx.clone());
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(8));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(8));
 }
 
 #[test]
@@ -270,65 +274,65 @@ fn test_probe_advanced() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(6).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(6).sign(SERVICE_ID, pubkey, &key)
     };
     let other_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(10).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(10).sign(SERVICE_ID, pubkey, &key)
     };
     let admin_tx = {
         let (pubkey, key) = crypto::gen_keypair_from_seed(
             &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
         );
         assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-        TxReset.sign(SERVICE_ID, pubkey, &key)
+        Reset.sign(SERVICE_ID, pubkey, &key)
     };
 
     let snapshot = testkit.probe(tx.clone());
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(6));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(6));
     // Check that data is not persisted
     let snapshot = testkit.snapshot();
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), None);
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), None);
 
     // Check dependency of the resulting snapshot on tx ordering
     let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(0));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(0));
     let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(6));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(6));
     // Check that data is (still) not persisted
     let snapshot = testkit.snapshot();
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), None);
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), None);
 
     api.send(other_tx);
     testkit.create_block();
     let snapshot = testkit.snapshot();
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(10));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(10));
 
     let snapshot = testkit.probe(tx.clone());
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(16));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(16));
     // Check that data is not persisted
     let snapshot = testkit.snapshot();
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(10));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(10));
 
     // Check dependency of the resulting snapshot on tx ordering
     let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(0));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(0));
     let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(6));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(6));
     // Check that data is (still) not persisted
     let snapshot = testkit.snapshot();
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(10));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(10));
 }
 
 #[test]
@@ -339,20 +343,20 @@ fn test_probe_duplicate_tx() {
     let tx = inc_count(&api, 5);
 
     let snapshot = testkit.probe(tx.clone());
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(5));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(5));
 
     testkit.create_block();
 
     let snapshot = testkit.probe(tx.clone());
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(5));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(5));
 
     // Check the mixed case, when some probed transactions are committed and some are not
     let other_tx = inc_count(&api, 7);
     let snapshot = testkit.probe_all(txvec![tx, other_tx]);
-    let schema = CounterSchema::new(&snapshot);
-    assert_eq!(schema.count(), Some(12));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(12));
 }
 
 #[test]
@@ -361,13 +365,13 @@ fn test_snapshot_comparison() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
     };
     testkit
         .probe(tx.clone())
         .compare(testkit.snapshot())
-        .map(CounterSchema::new)
-        .map(CounterSchema::count)
+        .map(|snapshot| get_schema(snapshot))
+        .map(|schema| schema.counter.get())
         .assert_before("Counter does not exist", Option::is_none)
         .assert_after("Counter has been set", |&c| c == Some(5));
 
@@ -376,13 +380,13 @@ fn test_snapshot_comparison() {
 
     let other_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(3).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(3).sign(SERVICE_ID, pubkey, &key)
     };
     testkit
         .probe(other_tx.clone())
         .compare(testkit.snapshot())
-        .map(CounterSchema::new)
-        .map(CounterSchema::count)
+        .map(|snapshot| get_schema(snapshot))
+        .map(|schema| schema.counter.get())
         .map(|&c| c.unwrap())
         .assert("Counter has increased", |&old, &new| new == old + 3);
 }
@@ -394,18 +398,18 @@ fn test_snapshot_comparison_panic() {
     let increment_by = 5;
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(increment_by).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(increment_by).sign(SERVICE_ID, pubkey, &key)
     };
 
     api.send(tx.clone());
     testkit.create_block();
 
-    // The assertion fails because the transaction is already committed by now
+    // The assertion fails because the transaction is already committed by now.
     testkit
         .probe(tx.clone())
         .compare(testkit.snapshot())
-        .map(CounterSchema::new)
-        .map(CounterSchema::count)
+        .map(|snapshot| get_schema(snapshot))
+        .map(|schema| schema.counter.get())
         .map(|&c| c.unwrap())
         .assert("Counter has increased", |&old, &new| {
             new == old + increment_by
@@ -417,7 +421,7 @@ fn create_sample_block(testkit: &mut TestKit) {
     if height == 2 || height == 5 {
         let tx = {
             let (pubkey, key) = crypto::gen_keypair();
-            TxIncrement::new(height as u64).sign(SERVICE_ID, pubkey, &key)
+            Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key)
         };
         testkit.api().send(tx.clone());
     }
@@ -756,7 +760,7 @@ fn test_explorer_single_block() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
     };
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
@@ -798,7 +802,7 @@ fn test_explorer_transaction_info() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
     };
 
     let info = api
@@ -862,15 +866,15 @@ fn test_explorer_transaction_statuses() {
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(5).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
     };
     let error_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(0).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(0).sign(SERVICE_ID, pubkey, &key)
     };
     let panicking_tx = {
         let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key)
+        Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key)
     };
 
     let block = testkit.create_block_with_transactions(txvec![

@@ -28,6 +28,7 @@ use exonum_merkledb::{ObjectHash, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
 
+use exonum::runtime::ExecutionError;
 use std::collections::BTreeMap;
 
 pub const SERVICE_ID: InstanceId = 4;
@@ -104,6 +105,14 @@ impl ExplorerTransactions for MyService {
 }
 
 impl Service for MyService {
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }

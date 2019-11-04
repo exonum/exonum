@@ -30,6 +30,8 @@ use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
+use exonum::runtime::rust::CallContext;
+use exonum::runtime::ExecutionError;
 use std::{
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
@@ -58,11 +60,20 @@ impl CommitWatcherService {
 impl CommitWatcherInterface for CommitWatcherService {}
 
 impl Service for CommitWatcherService {
-    fn after_commit(&self, _context: AfterCommitContext) {
-        self.0.unbounded_send(()).ok();
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
+
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
+    }
+
+    fn after_commit(&self, _context: AfterCommitContext) {
+        self.0.unbounded_send(()).ok();
     }
 }
 
@@ -75,6 +86,14 @@ struct StartCheckerService;
 impl StartCheckerInterface for StartCheckerService {}
 
 impl Service for StartCheckerService {
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }

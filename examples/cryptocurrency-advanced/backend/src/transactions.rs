@@ -90,25 +90,22 @@ pub trait CryptocurrencyInterface {
 }
 
 impl CryptocurrencyInterface for CryptocurrencyService {
-    fn transfer(&self, context: CallContext, arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
             .expect("Wrong `Transfer` initiator");
 
-        let mut schema = Schema::new(context.instance().name, context.fork());
+        let mut schema = Schema::new(context.service_data());
 
         let to = arg.to;
         let amount = arg.amount;
-
         if from == to {
             return Err(Error::SenderSameAsReceiver);
         }
 
         let sender = schema.wallet(&from).ok_or(Error::SenderNotFound)?;
-
         let receiver = schema.wallet(&to).ok_or(Error::ReceiverNotFound)?;
-
         if sender.balance < amount {
             Err(Error::InsufficientCurrencyAmount)
         } else {
@@ -118,13 +115,13 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn issue(&self, context: CallContext, arg: Issue) -> Result<(), Error> {
+    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
             .expect("Wrong `Issue` initiator");
 
-        let mut schema = Schema::new(context.instance().name, context.fork());
+        let mut schema = Schema::new(context.service_data());
 
         if let Some(wallet) = schema.wallet(&from) {
             let amount = arg.amount;
@@ -135,14 +132,13 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn create_wallet(&self, context: CallContext, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
             .expect("Wrong `CreateWallet` initiator");
 
-        let mut schema = Schema::new(context.instance().name, context.fork());
-
+        let mut schema = Schema::new(context.service_data());
         if schema.wallet(&from).is_none() {
             let name = &arg.name;
             schema.create_wallet(&from, name, tx_hash);

@@ -68,11 +68,15 @@ struct TestCallInitialize {
 
 #[exonum_service(crate = "crate")]
 trait TestDispatcherInterface {
-    fn test_execute(&self, context: CallContext, arg: TestExecute) -> Result<(), ExecutionError>;
+    fn test_execute(
+        &self,
+        context: CallContext<'_>,
+        arg: TestExecute,
+    ) -> Result<(), ExecutionError>;
 
-    fn test_deploy(&self, context: CallContext, arg: TestDeploy) -> Result<(), ExecutionError>;
+    fn test_deploy(&self, context: CallContext<'_>, arg: TestDeploy) -> Result<(), ExecutionError>;
 
-    fn test_add(&self, context: CallContext, arg: TestAdd) -> Result<(), ExecutionError>;
+    fn test_add(&self, context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -85,7 +89,7 @@ trait TestDispatcherInterface {
 struct TestDispatcherService;
 
 impl Service for TestDispatcherService {
-    fn initialize(&self, _context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(&self, _context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         if !params.is_empty() {
             let v = TestExecute::from_bytes(params.into()).unwrap();
             if v.value == 42 {
@@ -106,7 +110,21 @@ impl Service for TestDispatcherService {
 }
 
 impl TestDispatcherInterface for TestDispatcherService {
-    fn test_deploy(&self, context: CallContext, arg: TestDeploy) -> Result<(), ExecutionError> {
+    fn test_execute(
+        &self,
+        context: CallContext<'_>,
+        arg: TestExecute,
+    ) -> Result<(), ExecutionError> {
+        if arg.value == 42 {
+            panic!(StorageError::new("42"))
+        }
+        let mut index = context.service_data().ensure_list("val");
+        index.push(arg.value);
+        index.push(42 / arg.value);
+        Ok(())
+    }
+
+    fn test_deploy(&self, context: CallContext<'_>, arg: TestDeploy) -> Result<(), ExecutionError> {
         context.service_data().ensure_entry("val").set(arg.value);
 
         let artifact = if arg.value == 24 {
@@ -122,7 +140,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         Ok(())
     }
 
-    fn test_add(&self, mut context: CallContext, arg: TestAdd) -> Result<(), ExecutionError> {
+    fn test_add(&self, mut context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError> {
         let mut index = context.service_data().ensure_entry("val");
         index.set(arg.value);
         drop(index);
@@ -138,18 +156,7 @@ impl TestDispatcherInterface for TestDispatcherService {
         } else {
             TestDispatcherService.artifact_id().into()
         };
-
         context.start_adding_service(artifact, format!("good-service-{}", arg.value), config)
-    }
-
-    fn test_execute(&self, context: CallContext, arg: TestExecute) -> Result<(), ExecutionError> {
-        if arg.value == 42 {
-            panic!(StorageError::new("42"))
-        }
-        let mut index = context.service_data().ensure_list("val");
-        index.push(arg.value);
-        index.push(42 / arg.value);
-        Ok(())
     }
 }
 
@@ -169,6 +176,14 @@ pub struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
@@ -195,12 +210,20 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn before_commit(&self, _context: CallContext) {
-        panic!("42");
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
+    }
+
+    fn before_commit(&self, _context: CallContext) {
+        panic!("42");
     }
 }
 
@@ -220,12 +243,20 @@ struct ServicePanicStorageErrorImpl;
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn before_commit(&self, _context: CallContext) {
-        panic!(StorageError::new("42"));
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
+    }
+
+    fn before_commit(&self, _context: CallContext) {
+        panic!(StorageError::new("42"));
     }
 }
 
@@ -243,7 +274,7 @@ struct TxResult {
 
 #[exonum_service(crate = "crate")]
 trait TxResultCheckInterface {
-    fn tx_result(&self, context: CallContext, arg: TxResult) -> Result<(), ExecutionError>;
+    fn tx_result(&self, context: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -257,7 +288,7 @@ trait TxResultCheckInterface {
 struct TxResultCheckService;
 
 impl TxResultCheckInterface for TxResultCheckService {
-    fn tx_result(&self, context: CallContext, arg: TxResult) -> Result<(), ExecutionError> {
+    fn tx_result(&self, context: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError> {
         let mut entry = context.service_data().ensure_entry("status");
         entry.set(arg.value);
         EXECUTION_STATUS.lock().unwrap().clone()
@@ -265,6 +296,14 @@ impl TxResultCheckInterface for TxResultCheckService {
 }
 
 impl Service for TxResultCheckService {
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }

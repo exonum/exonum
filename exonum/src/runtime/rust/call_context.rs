@@ -1,10 +1,10 @@
-use exonum_merkledb::{BinaryValue, Fork, IndexAccess, Prefixed, ToReadonly};
+use exonum_merkledb::{BinaryValue, Fork, Prefixed};
 
 use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError},
     error::catch_panic,
-    ArtifactId, CallInfo, Caller, DeployStatus, DispatcherSchema, ExecutionContext, ExecutionError,
+    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
     InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 
@@ -98,6 +98,7 @@ impl<'a> CallContext<'a> {
     /// If the closure returns `Some(value)`, then the method returns `Some((value, fork))` thus you
     /// get a write access to the blockchain state. Otherwise this method returns
     /// an occurred error.
+    // TODO: remove?
     pub fn verify_caller<F, T>(&self, predicate: F) -> Option<(T, &Fork)>
     where
         F: Fn(&Caller) -> Option<T>,
@@ -148,6 +149,17 @@ impl<'a> CallContext<'a> {
         }
     }
 
+    /// Provides writeable access to core schema.
+    ///
+    /// This method can only be called by the supervisor; the call will panic otherwise.
+    #[doc(hidden)]
+    pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`writeable_core_schema` called within a non-supervisor service");
+        }
+        CoreSchema::get_unchecked(self.inner.fork)
+    }
+
     /// Marks an artifact as *registered*, i.e., one which service instances can be deployed from.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
@@ -189,58 +201,5 @@ impl<'a> CallContext<'a> {
         self.inner
             .child_context(self.instance.id)
             .start_adding_service(instance_spec, constructor)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct BlockchainData<'a, T> {
-    access: T,
-    service_instance: InstanceDescriptor<'a>,
-}
-
-impl<'a, T: IndexAccess + ToReadonly> BlockchainData<'a, T> {
-    pub(super) fn new(access: T, service_instance: InstanceDescriptor<'a>) -> Self {
-        Self {
-            access,
-            service_instance,
-        }
-    }
-
-    /// Provides full access to entire storage. This is currently use by the sandbox.
-    #[cfg(test)]
-    pub fn full_access_to_everything(&self) -> T {
-        self.access.clone()
-    }
-
-    /// Returns core schema.
-    pub fn core_schema(&self) -> CoreSchema<T::Readonly> {
-        CoreSchema::get_unchecked(self.access.to_readonly())
-    }
-
-    /// Returns dispatcher schema.
-    pub fn for_dispatcher(&self) -> DispatcherSchema<T::Readonly> {
-        DispatcherSchema::new(self.access.to_readonly())
-    }
-
-    /// Returns a mount point for another service.
-    pub fn for_service<'q>(
-        &self,
-        id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<Prefixed<'_, T::Readonly>> {
-        let (spec, status) = DispatcherSchema::new(self.access.to_readonly()).get_instance(id)?;
-        if status != DeployStatus::Active {
-            return None;
-        }
-
-        // The returned value is `Prefixed<'static, _>`, but we coerce it to a shorter lifetime
-        // for future compatibility.
-        Some(Prefixed::new(spec.name, self.access.to_readonly()))
-    }
-
-    /// Returns a mount point for the data of the executing service instance.
-    /// Unlike other data, this one may be writeable provided that this `BlockchainData`
-    /// wraps a `Fork`.
-    pub fn for_executing_service(&self) -> Prefixed<'a, T> {
-        Prefixed::new(self.service_instance.name, self.access.clone())
     }
 }

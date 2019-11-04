@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::{BinaryValue, Prefixed, Snapshot};
 use futures::IntoFuture;
 
 use std::fmt::{self, Debug};
@@ -59,9 +59,8 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// The parameters passed to the method are not saved by the framework
     /// automatically, hence the user must do it manually, if needed.
-    fn initialize(&self, _context: CallContext, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        Ok(())
-    }
+    fn initialize(&self, _context: CallContext<'_>, _params: Vec<u8>)
+        -> Result<(), ExecutionError>;
 
     /// Returns a list of root hashes of the Merkelized tables defined by the provided instance,
     /// based on the given snapshot of the blockchain state.
@@ -76,6 +75,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// [1]: ../struct.StateHashAggregator.html
     /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
     /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
+    // FIXME: use `Prefixed`!
     fn state_hash(&self, instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     /// Performs storage operations on behalf of the service before committing the block.
@@ -191,6 +191,11 @@ impl<'a> AfterCommitContext<'a> {
     /// Returns blockchain data for the snapshot associated with this context.
     pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
         BlockchainData::new(self.snapshot, self.instance)
+    }
+
+    /// Returns snapshot of the data for the executing service.
+    pub fn service_data(&self) -> Prefixed<&'a dyn Snapshot> {
+        self.data().for_executing_service()
     }
 
     /// Returns core schema for the snapshot associated with this context.

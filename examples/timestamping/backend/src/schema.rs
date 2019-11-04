@@ -16,10 +16,12 @@
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash, ProofMapIndex};
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, transactions::Config};
+
+const NOT_INITIALIZED: &str = "Timestamping schema is not initialized";
 
 /// Stores content's hash and some metadata about it.
 #[derive(
@@ -68,54 +70,48 @@ impl TimestampEntry {
 
 /// Timestamping database schema.
 #[derive(Debug)]
-pub struct Schema<'a, T> {
-    service_name: &'a str,
-    access: T,
+pub struct Schema<T: AccessExt> {
+    pub config: Entry<T::Base, Config>,
+    pub timestamps: ProofMapIndex<T::Base, Hash, TimestampEntry>,
 }
 
-impl<'a, T> Schema<'a, T> {
+impl<T: AccessExt> Schema<T> {
     /// Creates a new schema from the database view.
-    pub fn new(service_name: &'a str, access: T) -> Self {
-        Schema {
-            service_name,
-            access,
+    pub fn new(access: T) -> Self {
+        Self {
+            config: access.entry("config").expect(NOT_INITIALIZED),
+            timestamps: access.proof_map("timestamps").expect(NOT_INITIALIZED),
         }
-    }
-}
-
-impl<'a, T> Schema<'a, T>
-where
-    T: IndexAccess,
-{
-    /// Returns the `ProofMapIndex` of timestamps.
-    pub fn timestamps(&self) -> ProofMapIndex<T, Hash, TimestampEntry> {
-        ProofMapIndex::new(
-            [self.service_name, ".timestamps"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    /// Returns the actual timestamping configuration
-    pub fn config(&self) -> Entry<T, Config> {
-        Entry::new([self.service_name, ".config"].concat(), self.access.clone())
     }
 
     /// Returns the state hash of the timestamping service.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.timestamps().object_hash()]
+        vec![self.timestamps.object_hash()]
+    }
+}
+
+impl<T> Schema<T>
+where
+    T: AccessExt,
+    T::Base: IndexAccessMut,
+{
+    pub fn initialize(access: T) -> Self {
+        Self {
+            config: access.ensure_entry("config"),
+            timestamps: access.ensure_proof_map("timestamps"),
+        }
     }
 
     /// Adds the timestamp entry to the database.
-    pub fn add_timestamp(&self, timestamp_entry: TimestampEntry) {
+    pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp.clone();
         let content_hash = &timestamp.content_hash;
 
         // Check that timestamp with given content_hash does not exist.
-        if self.timestamps().contains(content_hash) {
+        if self.timestamps.contains(content_hash) {
             return;
         }
-
-        // Add timestamp
-        self.timestamps().put(content_hash, timestamp_entry);
+        // Add the timestamp.
+        self.timestamps.put(content_hash, timestamp_entry);
     }
 }

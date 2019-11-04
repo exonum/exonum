@@ -13,76 +13,70 @@
 // limitations under the License.
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash, ProofMapIndex};
 
 use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
 
+const NOT_INITIALIZED: &str = "Supervisor schema is not initialized";
+
 /// Service information schema.
 #[derive(Debug)]
-pub struct Schema<'a, T> {
-    access: T,
-    instance_name: &'a str,
+pub struct Schema<T: AccessExt> {
+    pub deploy_requests: ValidatorMultisig<T, DeployRequest>,
+    pub deploy_confirmations: ValidatorMultisig<T, DeployConfirmation>,
+    pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
+    pub pending_instances: ValidatorMultisig<T, StartService>,
+    pub config_confirms: ValidatorMultisig<T, Hash>,
+    pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
 }
 
-impl<'a, T: IndexAccess> Schema<'a, T> {
+impl<T: AccessExt + Clone> Schema<T> {
     /// Constructs schema for the given `access`.
-    pub fn new(instance_name: &'a str, access: T) -> Self {
+    pub fn new(access: T) -> Self {
         Self {
-            instance_name,
-            access,
+            deploy_requests: ValidatorMultisig::get("deploy_requests", access.clone())
+                .expect(NOT_INITIALIZED),
+            deploy_confirmations: ValidatorMultisig::get("deploy_confirmations", access.clone())
+                .expect(NOT_INITIALIZED),
+            pending_deployments: access
+                .proof_map("pending_deployments")
+                .expect(NOT_INITIALIZED),
+            pending_instances: ValidatorMultisig::get("pending_instances", access.clone())
+                .expect(NOT_INITIALIZED),
+            config_confirms: ValidatorMultisig::get("config_confirms", access.clone())
+                .expect(NOT_INITIALIZED),
+            pending_proposal: access.entry("pending_proposal").expect(NOT_INITIALIZED),
         }
-    }
-
-    pub fn deploy_requests(&self) -> ValidatorMultisig<T, DeployRequest> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".deploy_requests"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn deploy_confirmations(&self) -> ValidatorMultisig<T, DeployConfirmation> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".deploy_confirmations"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn pending_deployments(&self) -> ProofMapIndex<T, ArtifactId, DeployRequest> {
-        ProofMapIndex::new(
-            [self.instance_name, ".pending_deployments"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn pending_instances(&self) -> ValidatorMultisig<T, StartService> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".pending_instances"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn config_confirms(&self) -> ValidatorMultisig<T, Hash> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".config_confirms"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn pending_proposal(&self) -> Entry<T, ConfigProposalWithHash> {
-        Entry::new(
-            [self.instance_name, ".pending_proposal"].concat(),
-            self.access.clone(),
-        )
     }
 
     /// Returns hashes for tables with proofs.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.deploy_requests().object_hash(),
-            self.deploy_confirmations().object_hash(),
-            self.pending_deployments().object_hash(),
-            self.pending_instances().object_hash(),
-            self.config_confirms().object_hash(),
+            self.deploy_requests.object_hash(),
+            self.deploy_confirmations.object_hash(),
+            self.pending_deployments.object_hash(),
+            self.pending_instances.object_hash(),
+            self.config_confirms.object_hash(),
         ]
+    }
+}
+
+impl<T> Schema<T>
+where
+    T: AccessExt + Clone,
+    T::Base: IndexAccessMut,
+{
+    pub(crate) fn initialize(access: T) -> Self {
+        Self {
+            deploy_requests: ValidatorMultisig::initialize("deploy_requests", access.clone()),
+            deploy_confirmations: ValidatorMultisig::initialize(
+                "deploy_confirmations",
+                access.clone(),
+            ),
+            pending_deployments: access.ensure_proof_map("pending_deployments"),
+            pending_instances: ValidatorMultisig::initialize("pending_instances", access.clone()),
+            config_confirms: ValidatorMultisig::initialize("config_confirms", access.clone()),
+            pending_proposal: access.ensure_entry("pending_proposal"),
+        }
     }
 }

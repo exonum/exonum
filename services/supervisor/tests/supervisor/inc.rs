@@ -24,7 +24,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
-use exonum_merkledb::{Entry, IndexAccess, Snapshot};
+use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, Snapshot};
 use exonum_proto::ProtobufConvert;
 
 use crate::proto;
@@ -34,36 +34,44 @@ pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
 #[derive(Debug)]
-pub struct Schema<'a, T> {
-    name: &'a str,
-    access: T,
+pub struct Schema<T: AccessExt> {
+    count: Entry<T::Base, u64>,
+    params: Entry<T::Base, String>,
 }
 
-impl<'a, T: IndexAccess> Schema<'a, T> {
-    pub fn new(name: &'a str, access: T) -> Self {
-        Schema { name, access }
-    }
-
-    fn index_name(&self, name: &str) -> String {
-        [SERVICE_NAME, ".", name].concat()
-    }
-
-    fn entry(&self) -> Entry<T, u64> {
-        Entry::new(self.index_name("count"), self.access.clone())
+impl<T: AccessExt> Schema<T> {
+    pub fn new(access: T) -> Self {
+        Self {
+            count: access.entry("count").unwrap(),
+            params: access.entry("params").unwrap(),
+        }
     }
 
     pub fn count(&self) -> Option<u64> {
-        self.entry().get()
+        self.count.get()
+    }
+}
+
+impl<T> Schema<T>
+where
+    T: AccessExt,
+    T::Base: IndexAccessMut,
+{
+    fn initialize(access: T) -> Self {
+        Self {
+            count: access.ensure_entry("count"),
+            params: access.ensure_entry("params"),
+        }
     }
 
     fn inc(&mut self) -> u64 {
-        let count = self
+        let new_count = self
             .count()
             .unwrap_or(0)
             .checked_add(1)
             .expect("attempt to add with overflow");
-        self.entry().set(count);
-        count
+        self.count.set(new_count);
+        new_count
     }
 }
 
@@ -71,13 +79,13 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
     Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
 )]
 #[protobuf_convert(source = "proto::TxInc")]
-pub struct TxInc {
+pub struct Inc {
     pub seed: u64,
 }
 
 #[exonum_service]
 pub trait IncInterface {
-    fn inc(&self, context: CallContext, arg: TxInc) -> Result<(), ExecutionError>;
+    fn inc(&self, context: CallContext, arg: Inc) -> Result<(), ExecutionError>;
 }
 
 /// Very simple test service that has one tx and one endpoint.
@@ -92,9 +100,8 @@ pub trait IncInterface {
 pub struct IncService;
 
 impl IncInterface for IncService {
-    fn inc(&self, context: CallContext, _arg: TxInc) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.instance().name, context.fork());
-        schema.inc();
+    fn inc(&self, context: CallContext<'_>, _arg: Inc) -> Result<(), ExecutionError> {
+        Schema::new(context.service_data()).inc();
         Ok(())
     }
 }
@@ -104,9 +111,7 @@ pub struct PublicApi;
 
 impl PublicApi {
     fn counter(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
-        let snapshot = state.snapshot();
-        let schema = Schema::new(&state.instance.name, snapshot);
-        schema
+        Schema::new(state.service_data())
             .count()
             .ok_or_else(|| api::Error::NotFound("Counter is not set yet".to_owned()))
     }
@@ -117,12 +122,17 @@ impl PublicApi {
 }
 
 impl Service for IncService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        PublicApi::wire(builder);
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        Schema::initialize(context.service_data());
+        Ok(())
     }
 
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        PublicApi::wire(builder);
     }
 }
 
@@ -153,16 +163,19 @@ impl Configure for IncService {
 
     fn apply_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        let (_, fork) = context
-            .verify_caller(Caller::as_supervisor)
+        context
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());
+        Schema::new(context.service_data())
+            .params
+            .set(params.clone());
 
-        match params.as_ref() {
+        match params.as_str() {
             "apply_error" => {
                 Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
             }

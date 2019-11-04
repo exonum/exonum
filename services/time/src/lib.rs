@@ -44,11 +44,10 @@ pub mod transactions;
 
 use exonum::{
     crypto::Hash,
-    helpers::validator::validator_id,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, Service},
-        InstanceDescriptor,
+        InstanceDescriptor, SnapshotExt,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -60,6 +59,8 @@ use crate::{
     time_provider::{SystemTimeProvider, TimeProvider},
     transactions::{TimeOracleInterface, TxTime},
 };
+use exonum::runtime::rust::CallContext;
+use exonum::runtime::ExecutionError;
 
 // TODO there is no way to provide provider for now.
 // It should be configurable through the configuration service.
@@ -72,22 +73,31 @@ pub struct TimeService {
 }
 
 impl Service for TimeService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi.wire(builder);
-        api::PrivateApi.wire(builder);
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        TimeSchema::initialize(context.service_data());
+        Ok(())
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = TimeSchema::new(descriptor.name, snapshot);
-        schema.state_hash()
+    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let snapshot = snapshot.for_service(descriptor.name).unwrap();
+        TimeSchema::new(snapshot).state_hash()
     }
 
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext) {
         // The transaction must be created by the validator.
-        if validator_id(context.snapshot, context.service_keypair.0).is_some() {
+        if context
+            .core_schema()
+            .validator_id(context.service_keypair.0)
+            .is_some()
+        {
             context.broadcast_transaction(TxTime::new(self.time.current_time()));
         }
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi.wire(builder);
+        api::PrivateApi.wire(builder);
     }
 }
 

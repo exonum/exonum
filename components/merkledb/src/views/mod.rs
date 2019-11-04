@@ -258,7 +258,9 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 
 impl<T: IndexAccess> View<T> {
     /// Creates a new view for an index with the specified address.
-    pub(crate) fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
+    #[doc(hidden)]
+    // ^-- This should be `pub(crate)`, but is currently used by the testkit to revert blocks.
+    pub fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
         let address = address.into();
         let changes = index_access.changes(&address);
         Self {

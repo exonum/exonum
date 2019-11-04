@@ -15,7 +15,7 @@
 //! Built-in Rust runtime module.
 
 pub use self::{
-    call_context::{BlockchainData, CallContext},
+    call_context::CallContext,
     error::Error,
     service::{
         AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
@@ -45,8 +45,8 @@ use super::{
     api::{ApiContext, ServiceApiBuilder},
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, BlockchainData, CallInfo, ExecutionContext,
+    InstanceDescriptor, InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 mod call_context;

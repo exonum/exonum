@@ -14,25 +14,37 @@
 
 use exonum::{
     crypto::Hash,
-    merkledb::{Entry, IndexAccess, ObjectHash},
+    merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash},
 };
 
 use super::ConfigPropose;
 
-pub struct Schema<T: IndexAccess> {
-    access: T,
+const NOT_INITIALIZED: &str = "Supervisor schema is not initialized";
+
+pub struct Schema<T: AccessExt> {
+    pub config_propose: Entry<T::Base, ConfigPropose>,
 }
 
-impl<T: IndexAccess> Schema<T> {
+impl<T: AccessExt> Schema<T> {
     pub fn new(access: T) -> Self {
-        Self { access }
-    }
-
-    pub fn config_propose_entry(&self) -> Entry<T, ConfigPropose> {
-        Entry::new("config.propose", self.access.clone())
+        Self {
+            config_propose: access.entry("config_propose").expect(NOT_INITIALIZED),
+        }
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.config_propose_entry().object_hash()]
+        vec![self.config_propose.object_hash()]
+    }
+}
+
+impl<T> Schema<T>
+where
+    T: AccessExt,
+    T::Base: IndexAccessMut,
+{
+    pub(super) fn initialize(access: T) -> Self {
+        Self {
+            config_propose: access.ensure_entry("config_propose"),
+        }
     }
 }

@@ -24,7 +24,7 @@ use std::mem;
 use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 use crate::{
     crypto::{self, Hash, PublicKey},
-    helpers::{Height, Round},
+    helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     proto,
     runtime::InstanceId,
@@ -264,8 +264,10 @@ impl<T: AccessExt> Schema<T> {
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
         let block_hash = self.block_hash_by_height(height)?;
         let block = self.blocks().get(&block_hash).unwrap();
-        let precommits_table = self.precommits(&block_hash)?;
-        let precommits = precommits_table.iter().collect();
+        let precommits = self
+            .precommits(&block_hash)
+            .map(|precommits| precommits.iter().collect())
+            .unwrap_or_default();
         Some(BlockProof { block, precommits })
     }
 
@@ -313,6 +315,12 @@ impl<T: AccessExt> Schema<T> {
             self.consensus_config_entry().object_hash(),
             self.transaction_results().object_hash(),
         ]
+    }
+
+    /// Attempts to find a `ValidatorId` by the provided service public key.
+    pub fn validator_id(&self, service_public_key: PublicKey) -> Option<ValidatorId> {
+        self.consensus_config()
+            .find_validator(|validator_keys| service_public_key == validator_keys.service_key)
     }
 }
 

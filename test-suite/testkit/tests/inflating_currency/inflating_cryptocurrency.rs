@@ -13,17 +13,16 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey},
     helpers::Height,
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{CallContext, Service},
-        InstanceDescriptor, InstanceId,
+        ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
-use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
+use exonum_merkledb::{AccessExt, IndexAccessMut, MapIndex, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -76,24 +75,33 @@ impl Wallet {
 
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
-pub struct CurrencySchema<S: IndexAccess> {
-    view: S,
+pub struct CurrencySchema<T: AccessExt> {
+    pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
 }
 
-impl<T: IndexAccess> CurrencySchema<T> {
+impl<T: AccessExt> CurrencySchema<T> {
     /// Creates a new schema instance.
-    pub fn new(view: T) -> Self {
-        CurrencySchema { view }
-    }
-
-    /// Returns an immutable version of the wallets table.
-    pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
-        MapIndex::new("cryptocurrency.wallets", self.view.clone())
+    pub fn new(access: T) -> Self {
+        Self {
+            wallets: access.map("wallets").unwrap(),
+        }
     }
 
     /// Gets a specific wallet from the storage.
     pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-        self.wallets().get(pub_key)
+        self.wallets.get(pub_key)
+    }
+}
+
+impl<T> CurrencySchema<T>
+where
+    T: AccessExt,
+    T::Base: IndexAccessMut,
+{
+    pub fn initialize(access: T) -> Self {
+        Self {
+            wallets: access.ensure_map("wallets"),
+        }
     }
 }
 
@@ -102,14 +110,14 @@ impl<T: IndexAccess> CurrencySchema<T> {
 /// Create a new wallet.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxCreateWallet")]
-pub struct TxCreateWallet {
+pub struct CreateWallet {
     pub name: String,
 }
 
 /// Transfer coins between the wallets.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTransfer")]
-pub struct TxTransfer {
+pub struct Transfer {
     pub to: PublicKey,
     pub amount: u64,
     pub seed: u64,
@@ -126,34 +134,34 @@ pub enum Error {
 #[exonum_service]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error>;
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
 }
 
 impl CurrencyInterface for CurrencyService {
-    fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
-        let height = CoreSchema::get_unchecked(context.fork()).height();
-        let schema = CurrencySchema::new(context.fork());
+        let height = context.data().core_schema().height();
+        let mut schema = CurrencySchema::new(context.service_data());
         if schema.wallet(&author).is_none() {
             let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE, height.0);
-            schema.wallets().put(&author, wallet);
+            schema.wallets.put(&author, wallet);
         }
         Ok(())
     }
 
-    fn transfer(&self, context: CallContext, arg: TxTransfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error> {
         let author = context.caller().author().unwrap();
 
         if author == arg.to {
             return Err(Error::Foo);
         }
-        let view = context.fork();
-        let height = CoreSchema::get_unchecked(view).height();
-        let schema = CurrencySchema { view };
+
+        let height = context.data().core_schema().height();
+        let mut schema = CurrencySchema::new(context.service_data());
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&arg.to);
         if let (Some(sender), Some(receiver)) = (sender, receiver) {
@@ -161,9 +169,8 @@ impl CurrencyInterface for CurrencyService {
             if sender.actual_balance(height) >= amount {
                 let sender = sender.decrease(amount, height);
                 let receiver = receiver.increase(amount, height);
-                let mut wallets = schema.wallets();
-                wallets.put(&author, sender);
-                wallets.put(&arg.to, receiver);
+                schema.wallets.put(&author, sender);
+                schema.wallets.put(&arg.to, receiver);
             }
         }
         Ok(())
@@ -183,12 +190,12 @@ struct BalanceQuery {
 impl CryptocurrencyApi {
     /// Endpoint for retrieving a single wallet.
     fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<u64> {
-        let snapshot = state.snapshot();
-        let schema = CurrencySchema::new(snapshot);
+        let snapshot = state.data();
+        let schema = CurrencySchema::new(snapshot.for_executing_service());
         schema
             .wallet(&query.pub_key)
             .map(|wallet| {
-                let height = CoreSchema::get_unchecked(snapshot).height();
+                let height = snapshot.core_schema().height();
                 wallet.actual_balance(height)
             })
             .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
@@ -213,11 +220,16 @@ pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        CryptocurrencyApi::wire(builder)
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        CurrencySchema::initialize(context.service_data());
+        Ok(())
     }
 
     fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        CryptocurrencyApi::wire(builder)
     }
 }

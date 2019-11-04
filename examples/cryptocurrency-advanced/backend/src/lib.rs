@@ -32,7 +32,11 @@ pub mod wallet;
 
 use exonum::{
     crypto::Hash,
-    runtime::{api::ServiceApiBuilder, rust::Service, InstanceDescriptor},
+    runtime::{
+        api::ServiceApiBuilder,
+        rust::{CallContext, Service},
+        ExecutionError, InstanceDescriptor, SnapshotExt,
+    },
 };
 use exonum_merkledb::Snapshot;
 
@@ -47,11 +51,17 @@ pub const INITIAL_BALANCE: u64 = 100;
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        CryptocurrencyApi.wire(builder);
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        Schema::initialize(context.service_data());
+        Ok(())
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        Schema::new(descriptor.name, snapshot).state_hash()
+    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let snapshot = snapshot.for_service(descriptor.name).unwrap();
+        Schema::new(snapshot).state_hash()
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        CryptocurrencyApi.wire(builder);
     }
 }

@@ -42,7 +42,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{CallContext, Service},
-        DispatcherError, InstanceDescriptor,
+        DispatcherError, InstanceDescriptor, SnapshotExt,
     },
 };
 
@@ -57,30 +57,31 @@ use crate::{
 pub struct TimestampingService;
 
 impl Service for TimestampingService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        TimestampingApi.wire(builder);
-    }
-
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(descriptor.name, snapshot);
-        schema.state_hash()
-    }
-
     fn initialize(&self, context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
         let config =
             Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
         if context
-            .dispatcher_info()
+            .data()
+            .for_dispatcher()
             .get_instance(&*config.time_service_name)
             .is_none()
         {
             return Err(Error::TimeServiceNotFound.into());
         }
 
-        Schema::new(context.instance().name, context.fork())
-            .config()
+        Schema::initialize(context.service_data())
+            .config
             .set(config);
         Ok(())
+    }
+
+    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let snapshot = snapshot.for_service(descriptor.name).unwrap();
+        Schema::new(snapshot).state_hash()
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        TimestampingApi.wire(builder);
     }
 }

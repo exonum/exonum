@@ -40,7 +40,7 @@ pub mod proto;
 /// Persistent data.
 pub mod schema {
     use exonum::crypto::{Hash, PublicKey};
-    use exonum_merkledb::{IndexAccess, MapIndex};
+    use exonum_merkledb::{AccessExt, IndexAccessMut, MapIndex};
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -88,9 +88,9 @@ pub mod schema {
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
     #[derive(Debug)]
-    pub struct CurrencySchema<'a, T> {
-        name: &'a str,
-        access: T,
+    pub struct CurrencySchema<T: AccessExt> {
+        /// Correspondence of public keys of users to account information.
+        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
 
     /// Declare the layout of data managed by the service. An instance of [`MapIndex`] is used
@@ -98,26 +98,35 @@ pub mod schema {
     ///
     /// [`MapIndex`]: https://exonum.com/doc/version/latest/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<'a, T: IndexAccess> CurrencySchema<'a, T> {
+    impl<T: AccessExt> CurrencySchema<T> {
         /// Creates a new schema instance.
-        pub fn new(name: &'a str, access: T) -> Self {
-            CurrencySchema { name, access }
-        }
-
-        /// Returns an immutable version of the wallets table.
-        pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
-            MapIndex::new([self.name, ".wallets"].concat(), self.access.clone())
+        pub fn new(access: T) -> Self {
+            Self {
+                wallets: access.map("wallets").unwrap(),
+            }
         }
 
         /// Gets a specific wallet from the storage.
         pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-            self.wallets().get(pub_key)
+            self.wallets.get(pub_key)
         }
 
         /// Returns the state hash of cryptocurrency service.
         pub fn state_hash(&self) -> Vec<Hash> {
             // Since wallets are stored in MapIndex, there is no state hash.
             vec![]
+        }
+    }
+
+    impl<T> CurrencySchema<T>
+    where
+        T: AccessExt,
+        T::Base: IndexAccessMut,
+    {
+        pub(crate) fn initialize(access: T) -> Self {
+            Self {
+                wallets: access.ensure_map("wallets"),
+            }
         }
     }
 }
@@ -140,7 +149,7 @@ pub mod transactions {
     /// `TxCreateWallet` transactions are processed.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TxCreateWallet")]
-    pub struct TxCreateWallet {
+    pub struct CreateWallet {
         /// UTF-8 string with the owner's name.
         pub name: String,
     }
@@ -200,7 +209,7 @@ pub mod contracts {
         runtime::{
             api::ServiceApiBuilder,
             rust::{CallContext, Service},
-            InstanceDescriptor,
+            InstanceDescriptor, SnapshotExt,
         },
     };
 
@@ -208,8 +217,9 @@ pub mod contracts {
         api::CryptocurrencyApi,
         errors::Error,
         schema::{CurrencySchema, Wallet},
-        transactions::{TxCreateWallet, TxTransfer},
+        transactions::{CreateWallet, TxTransfer},
     };
+    use exonum::runtime::ExecutionError;
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
@@ -218,7 +228,7 @@ pub mod contracts {
     #[exonum_service]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
-        fn create_wallet(&self, ctx: CallContext, arg: TxCreateWallet) -> Result<(), Error>;
+        fn create_wallet(&self, ctx: CallContext, arg: CreateWallet) -> Result<(), Error>;
         /// Transfers `amount` of the currency from one wallet to another.
         fn transfer(&self, ctx: CallContext, arg: TxTransfer) -> Result<(), Error>;
     }
@@ -229,18 +239,17 @@ pub mod contracts {
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {
-        fn create_wallet(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), Error> {
+        fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
             let author = context
                 .caller()
                 .author()
                 .expect("Wrong 'TxCreateWallet' initiator");
 
-            let view = context.fork();
-            let schema = CurrencySchema::new(context.instance().name, view);
+            let mut schema = CurrencySchema::new(context.service_data());
             if schema.wallet(&author).is_none() {
                 let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
-                schema.wallets().put(&author, wallet);
+                schema.wallets.put(&author, wallet);
                 Ok(())
             } else {
                 Err(Error::WalletAlreadyExists)
@@ -252,33 +261,21 @@ pub mod contracts {
                 .caller()
                 .author()
                 .expect("Wrong 'TxTransfer' initiator");
-
-            let view = context.fork();
-
             if author == arg.to {
                 return Err(Error::SenderSameAsReceiver);
             }
 
-            let schema = CurrencySchema::new(context.instance().name, view);
-
-            let sender = match schema.wallet(&author) {
-                Some(val) => val,
-                None => return Err(Error::SenderNotFound),
-            };
-
-            let receiver = match schema.wallet(&arg.to) {
-                Some(val) => val,
-                None => return Err(Error::ReceiverNotFound),
-            };
+            let mut schema = CurrencySchema::new(context.service_data());
+            let sender = schema.wallet(&author).ok_or(Error::SenderNotFound)?;
+            let receiver = schema.wallet(&arg.to).ok_or(Error::ReceiverNotFound)?;
 
             let amount = arg.amount;
             if sender.balance >= amount {
                 let sender = sender.decrease(amount);
                 let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
-                let mut wallets = schema.wallets();
-                wallets.put(&author, sender);
-                wallets.put(&arg.to, receiver);
+                schema.wallets.put(&author, sender);
+                schema.wallets.put(&arg.to, receiver);
                 Ok(())
             } else {
                 Err(Error::InsufficientCurrencyAmount)
@@ -287,12 +284,22 @@ pub mod contracts {
     }
 
     impl Service for CryptocurrencyService {
-        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-            CryptocurrencyApi.wire(builder);
+        fn initialize(
+            &self,
+            context: CallContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            CurrencySchema::initialize(context.service_data());
+            Ok(())
         }
 
         fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
-            CurrencySchema::new(descriptor.name, snapshot).state_hash()
+            let snapshot = snapshot.for_service(descriptor.name).unwrap();
+            CurrencySchema::new(snapshot).state_hash()
+        }
+
+        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+            CryptocurrencyApi.wire(builder);
         }
     }
 }
@@ -324,8 +331,7 @@ pub mod api {
             state: &ServiceApiState,
             pub_key: PublicKey,
         ) -> api::Result<Wallet> {
-            let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(state.instance.name, snapshot);
+            let schema = CurrencySchema::new(state.service_data());
             schema
                 .wallet(&pub_key)
                 .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
@@ -333,11 +339,8 @@ pub mod api {
 
         /// Endpoint for dumping all wallets from the storage.
         pub fn get_wallets(self, state: &ServiceApiState) -> api::Result<Vec<Wallet>> {
-            let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(state.instance.name, snapshot);
-            let idx = schema.wallets();
-            let wallets = idx.values().collect();
-            Ok(wallets)
+            let schema = CurrencySchema::new(state.service_data());
+            Ok(schema.wallets.values().collect())
         }
 
         /// 'ServiceApiBuilder' facilitates conversion between read requests and REST

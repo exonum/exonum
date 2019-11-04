@@ -16,7 +16,7 @@
 use exonum_merkledb::MapProof;
 
 use exonum::{
-    blockchain::{self, BlockProof, IndexCoordinates, IndexOwner},
+    blockchain::{BlockProof, IndexCoordinates, IndexOwner},
     crypto::Hash,
     runtime::api::{self, ServiceApiBuilder, ServiceApiState},
 };
@@ -59,9 +59,8 @@ impl PublicApi {
         state: &ServiceApiState,
         hash: &Hash,
     ) -> api::Result<Option<TimestampEntry>> {
-        let snapshot = state.snapshot();
-        let schema = Schema::new(state.instance.name, snapshot);
-        Ok(schema.timestamps().get(hash))
+        let schema = Schema::new(state.service_data());
+        Ok(schema.timestamps.get(hash))
     }
 
     /// Endpoint for getting the proof of a single timestamp.
@@ -70,20 +69,17 @@ impl PublicApi {
         state: &ServiceApiState,
         hash: Hash,
     ) -> api::Result<TimestampProof> {
-        let snapshot = state.snapshot();
-        let (state_proof, block_info) = {
-            let blockchain_schema = blockchain::Schema::get_unchecked(snapshot);
-            let last_block_height = blockchain_schema.last_block().height();
-            let block_proof = blockchain_schema
-                .block_and_precommits(last_block_height)
-                .unwrap();
-            let state_proof = blockchain_schema
-                .state_hash_aggregator()
-                .get_proof(IndexOwner::Service(state.instance.id).coordinate_for(0));
-            (state_proof, block_proof)
-        };
-        let schema = Schema::new(state.instance.name, snapshot);
-        let timestamp_proof = schema.timestamps().get_proof(hash);
+        let blockchain_schema = state.data().core_schema();
+        let last_block_height = blockchain_schema.height();
+        let block_info = blockchain_schema
+            .block_and_precommits(last_block_height)
+            .unwrap();
+        let state_proof = blockchain_schema
+            .state_hash_aggregator()
+            .get_proof(IndexOwner::Service(state.instance.id).coordinate_for(0));
+
+        let schema = Schema::new(state.service_data());
+        let timestamp_proof = schema.timestamps.get_proof(hash);
         Ok(TimestampProof {
             block_info,
             state_proof,

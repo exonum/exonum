@@ -28,7 +28,7 @@ use exonum::{
 };
 use exonum_supervisor::{DeployConfirmation, DeployRequest, StartService, Supervisor};
 
-use crate::inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME};
+use crate::inc::{Inc, IncService, SERVICE_ID, SERVICE_NAME};
 
 mod config;
 mod config_api;
@@ -254,11 +254,11 @@ fn test_static_service() {
 
     let (key_pub, key_priv) = crypto::gen_keypair();
 
-    api.send(TxInc { seed: 0 }.sign(SERVICE_ID, key_pub, &key_priv));
+    api.send(Inc { seed: 0 }.sign(SERVICE_ID, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, SERVICE_NAME, 1);
 
-    api.send(TxInc { seed: 1 }.sign(SERVICE_ID, key_pub, &key_priv));
+    api.send(Inc { seed: 1 }.sign(SERVICE_ID, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, SERVICE_NAME, 2);
 }
@@ -276,11 +276,11 @@ fn test_dynamic_service_normal_workflow() {
 
     let (key_pub, key_priv) = crypto::gen_keypair();
 
-    api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+    api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, instance_name, 1);
 
-    api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+    api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, instance_name, 2);
 }
@@ -531,11 +531,11 @@ fn test_restart_node_and_start_service_instance() {
     {
         assert_count_is_not_set(&api, instance_name);
 
-        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
 
-        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
@@ -553,7 +553,7 @@ fn test_restart_node_and_start_service_instance() {
     {
         assert_count(&api, instance_name, 2);
 
-        api.send(TxInc { seed: 2 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 2 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 3);
     }
@@ -665,11 +665,11 @@ fn test_multiple_validators() {
     {
         assert_count_is_not_set(&api, instance_name);
         let (key_pub, key_priv) = crypto::gen_keypair();
-        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
 
-        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
@@ -805,10 +805,10 @@ fn test_auditor_normal_workflow() {
     {
         assert_count_is_not_set(&api, instance_name);
         let (key_pub, key_priv) = crypto::gen_keypair();
-        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
-        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
