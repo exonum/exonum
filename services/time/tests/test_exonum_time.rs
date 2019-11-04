@@ -344,7 +344,7 @@ fn test_selected_time_less_than_time_in_storage() {
 
     let validators = testkit.network().validators().to_vec();
 
-    let (pub_key_0, _) = validators[0].service_keypair();
+    let (pub_key_0, sec_key_0) = validators[0].service_keypair();
 
     let cfg_change_height = Height(5);
     let new_cfg = {
@@ -356,7 +356,7 @@ fn test_selected_time_less_than_time_in_storage() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_cfg)
-            .sign_for_simple_supervisor(),
+            .sign_for_simple_supervisor(pub_key_0, &sec_key_0),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -552,7 +552,7 @@ fn test_endpoint_api() {
     assert_current_validators_times_eq(&mut api, &current_validators_times);
     assert_all_validators_times_eq(&mut api, &all_validators_times);
 
-    let public_key_0 = validators[0].service_keypair().0;
+    let (public_key_0, secret_key_0) = validators[0].service_keypair();
     let cfg_change_height = Height(10);
     let new_cfg = {
         let mut cfg = testkit.consensus_config();
@@ -566,7 +566,7 @@ fn test_endpoint_api() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_cfg)
-            .sign_for_simple_supervisor(),
+            .sign_for_simple_supervisor(public_key_0, &secret_key_0),
     );
     testkit.create_blocks_until(cfg_change_height);
 

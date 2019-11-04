@@ -66,8 +66,8 @@ impl<'a> ApiImpl<'a> {
         &self,
         transaction: impl Transaction<dyn SupervisorInterface>,
     ) -> Result<Hash, failure::Error> {
-        let keypair = self.0.service_keypair;
-        let signed = transaction.sign(self.0.instance.id, keypair.0, &keypair.1);
+        let (pub_key, sec_key) = self.0.service_keypair;
+        let signed = transaction.sign(self.0.instance.id, *pub_key, &sec_key);
 
         let hash = signed.object_hash();
         self.0.sender().broadcast_transaction(signed)?;

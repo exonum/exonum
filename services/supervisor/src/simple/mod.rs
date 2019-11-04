@@ -20,6 +20,7 @@ use exonum::{
     helpers::ValidateInput,
     merkledb::Snapshot,
     runtime::{
+        api::ServiceApiBuilder,
         rust::{CallContext, Service},
         BlockchainData, DispatcherError, ExecutionError, SUPERVISOR_INSTANCE_ID,
     },
@@ -28,6 +29,7 @@ use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
 
 use crate::{update_configs, ConfigChange, ConfigPropose, ConfigureCall};
 
+mod api;
 mod schema;
 pub use self::schema::Schema;
 
@@ -50,6 +52,8 @@ pub enum Error {
     ConsensusConfigInvalid = 3,
     /// Actual height for config proposal is in the past.
     ActualFromIsPast = 4,
+    /// Transaction author is not a validator.
+    UnknownAuthor = 5,
 }
 
 #[exonum_service]
@@ -59,16 +63,21 @@ pub trait SimpleSupervisorInterface {
 }
 
 impl SimpleSupervisorInterface for SimpleSupervisor {
-    // TODO: check auth by one of validators [ECR-3742]
     fn change_config(
         &self,
         mut context: CallContext,
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        context
+        // Verify that transaction author is validator.
+        let author = context
             .caller()
-            .as_transaction()
+            .author()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
+        context
+            .data()
+            .for_core()
+            .validator_id(author)
+            .ok_or(Error::UnknownAuthor)?;
 
         // Check that the `actual_from` height is in the future.
         if context.data().for_core().height() >= arg.actual_from {
@@ -134,6 +143,10 @@ impl Service for SimpleSupervisor {
         // Remove config from proposals.
         let mut schema = Schema::new(context.service_data());
         schema.config_propose.remove();
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::wire(builder)
     }
 }
 
