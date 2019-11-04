@@ -25,10 +25,9 @@ pub mod manager;
 pub mod node;
 pub mod websocket;
 
-use exonum_merkledb::{Database, Snapshot};
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{collections::BTreeMap, fmt, sync::Arc};
+use std::{collections::BTreeMap, fmt};
 
 use self::{
     backends::actix,
@@ -37,12 +36,7 @@ use self::{
         public::{ExplorerApi, SystemApi},
     },
 };
-use crate::{
-    api::node::SharedNodeState,
-    blockchain::Blockchain,
-    crypto::{PublicKey, SecretKey},
-    node::ApiSender,
-};
+use crate::{api::node::SharedNodeState, blockchain::Blockchain};
 
 mod with;
 
@@ -211,16 +205,15 @@ pub struct ApiAggregator {
 
 impl ApiAggregator {
     /// Aggregate API for the given blockchain and node state.
-    pub fn new(blockchain: &Blockchain, node_state: SharedNodeState) -> Self {
+    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
         let mut endpoints = BTreeMap::new();
-        let context = ApiContext::with_blockchain(blockchain);
         endpoints.insert(
             "system".to_owned(),
-            Self::system_api(context.clone(), node_state.clone()),
+            Self::system_api(blockchain.clone(), node_state.clone()),
         );
         endpoints.insert(
             "explorer".to_owned(),
-            Self::explorer_api(context, node_state),
+            Self::explorer_api(blockchain, node_state),
         );
         Self { endpoints }
     }
@@ -244,76 +237,18 @@ impl ApiAggregator {
         }
     }
 
-    fn explorer_api(context: ApiContext, shared_node_state: SharedNodeState) -> ApiBuilder {
+    fn explorer_api(blockchain: Blockchain, shared_node_state: SharedNodeState) -> ApiBuilder {
         let mut builder = ApiBuilder::new();
-        ExplorerApi::new(context).wire(builder.public_scope(), shared_node_state);
+        ExplorerApi::new(blockchain).wire(builder.public_scope(), shared_node_state);
         builder
     }
 
-    fn system_api(context: ApiContext, shared_api_state: SharedNodeState) -> ApiBuilder {
+    fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
         let mut builder = ApiBuilder::new();
-        let sender = context.sender().clone();
+        let sender = blockchain.sender().clone();
         PrivateSystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        SystemApi::new(context, shared_api_state).wire(builder.public_scope());
+        SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
         builder
-    }
-}
-
-/// This entity provides the current state of the blockchain to the API handlers.
-///
-/// This context contains necessary parts for interaction with the blockchain
-/// and may be shared among any kind of handlers.
-// TODO: fold into `Blockchain` [ERC-3745]
-#[derive(Debug, Clone)]
-pub struct ApiContext {
-    service_keypair: (PublicKey, SecretKey),
-    api_sender: ApiSender,
-    database: Arc<dyn Database>,
-}
-
-impl ApiContext {
-    /// Create a new API context instance from the specified blockchain parts.
-    #[doc(hidden)]
-    pub fn new(
-        database: Arc<dyn Database>,
-        service_keypair: (PublicKey, SecretKey),
-        sender: ApiSender,
-    ) -> Self {
-        Self {
-            database,
-            service_keypair,
-            api_sender: sender,
-        }
-    }
-
-    /// Creates a new API context instance for the specified blockchain.
-    pub fn with_blockchain(blockchain: &Blockchain) -> Self {
-        Self {
-            service_keypair: blockchain.service_keypair.clone(),
-            api_sender: blockchain.api_sender.clone(),
-            database: blockchain.db.clone(),
-        }
-    }
-
-    /// Create a new blockchain database state snapshot.
-    ///
-    /// Be careful with this method! It is recommended to get a snapshot only once per request
-    /// to ensure all the database accesses see the same state. When a snapshot is requested
-    /// from a different thread than the one where changes are made to the blockchain,
-    /// each invocation might get a snapshot corresponding to a different blockchain state,
-    /// likely leading to a race condition.
-    pub fn snapshot(&self) -> Box<dyn Snapshot> {
-        self.database.snapshot()
-    }
-
-    /// Return reference to the transactions sender.
-    pub fn sender(&self) -> &ApiSender {
-        &self.api_sender
-    }
-
-    /// Return reference to the service key pair of the current node.
-    pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
-        &self.service_keypair
     }
 }

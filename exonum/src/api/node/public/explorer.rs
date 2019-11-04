@@ -33,9 +33,9 @@ use crate::{
         },
         node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
-        ApiBackend, ApiContext, ApiScope, Error as ApiError, FutureResult,
+        ApiBackend, ApiScope, Error as ApiError, FutureResult,
     },
-    blockchain::Block,
+    blockchain::{Block, Blockchain},
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
@@ -174,13 +174,13 @@ impl AsRef<[u8]> for TransactionHex {
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone)]
 pub struct ExplorerApi {
-    context: ApiContext,
+    blockchain: Blockchain,
 }
 
 impl ExplorerApi {
     /// Create a new `ExplorerApi` instance.
-    pub fn new(context: ApiContext) -> Self {
-        Self { context }
+    pub fn new(blockchain: Blockchain) -> Self {
+        Self { blockchain }
     }
 
     /// Return the explored range and the corresponding headers. The range specifies the smallest
@@ -311,7 +311,7 @@ impl ExplorerApi {
     pub fn handle_ws<Q>(
         name: &'static str,
         backend: &mut actix_backend::ApiBuilder,
-        context: ApiContext,
+        blockchain: Blockchain,
         shared_node_state: SharedNodeState,
         extract_query: Q,
     ) where
@@ -321,10 +321,10 @@ impl ExplorerApi {
 
         let index = move |request: HttpRequest| -> FutureResponse {
             let server = server.clone();
-            let context = context.clone();
+            let blockchain = blockchain.clone();
             let mut address = server.lock().expect("Expected mutex lock");
             if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::new(context)));
+                *address = Some(Arbiter::start(|_| Server::new(blockchain)));
 
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
@@ -356,7 +356,7 @@ impl ExplorerApi {
         Self::handle_ws(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
-            self.context.clone(),
+            self.blockchain.clone(),
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::Blocks),
         );
@@ -364,7 +364,7 @@ impl ExplorerApi {
         Self::handle_ws(
             "v1/transactions/subscribe",
             api_scope.web_backend(),
-            self.context.clone(),
+            self.blockchain.clone(),
             shared_node_state.clone(),
             |request| {
                 if request.query().is_empty() {
@@ -384,26 +384,26 @@ impl ExplorerApi {
         Self::handle_ws(
             "v1/ws",
             api_scope.web_backend(),
-            self.context.clone(),
+            self.blockchain.clone(),
             shared_node_state,
             |_| Ok(SubscriptionType::None),
         );
         api_scope
             .endpoint("v1/blocks", {
-                let context = self.context.clone();
-                move |query| Self::blocks(context.snapshot().as_ref(), query)
+                let blockchain = self.blockchain.clone();
+                move |query| Self::blocks(blockchain.snapshot().as_ref(), query)
             })
             .endpoint("v1/block", {
-                let context = self.context.clone();
-                move |query| Self::block(context.snapshot().as_ref(), query)
+                let blockchain = self.blockchain.clone();
+                move |query| Self::block(blockchain.snapshot().as_ref(), query)
             })
             .endpoint("v1/transactions", {
-                let context = self.context.clone();
-                move |query| Self::transaction_info(context.snapshot().as_ref(), query)
+                let blockchain = self.blockchain.clone();
+                move |query| Self::transaction_info(blockchain.snapshot().as_ref(), query)
             })
             .endpoint_mut("v1/transactions", {
-                let context = self.context.clone();
-                move |query| Self::add_transaction(context.sender(), query)
+                let blockchain = self.blockchain.clone();
+                move |query| Self::add_transaction(blockchain.sender(), query)
             })
     }
 }

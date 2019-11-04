@@ -40,7 +40,8 @@
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{
-        Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection, Schema,
+        ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
@@ -89,8 +90,8 @@ fn create_blockchain(
     };
 
     let api_sender = ApiSender::new(mpsc::channel(0).0);
-    Blockchain::new(db, service_keypair, api_sender)
-        .into_mut(genesis_config)
+    let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
+    BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_rust_runtime(mpsc::channel(0).0, services)
         .build()
         .unwrap()

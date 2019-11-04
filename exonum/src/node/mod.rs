@@ -1006,7 +1006,7 @@ impl Node {
                     .chain(private_api_handler)
                     .collect::<Vec<_>>()
             },
-            api_aggregator: ApiAggregator::new(blockchain.as_ref(), api_state.clone()),
+            api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
         };
 
         let handler = NodeHandler::new(

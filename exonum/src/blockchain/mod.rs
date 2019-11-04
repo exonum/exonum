@@ -145,7 +145,7 @@ impl Blockchain {
 
     /// Starts promotion into a mutable blockchain instance that can be used to process
     /// transactions and create blocks.
-    pub fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
+    pub(crate) fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
         BlockchainBuilder::new(self, genesis_config)
     }
 
@@ -159,6 +159,16 @@ impl Blockchain {
         let mut config = generate_testnet_config(1, 0).pop().unwrap();
         config.keys.service = KeyPair::from(self.service_keypair.clone());
         self.into_mut(config.consensus)
+    }
+
+    /// Return reference to the transactions sender.
+    pub fn sender(&self) -> &ApiSender {
+        &self.api_sender
+    }
+
+    /// Return reference to the service key pair of the current node.
+    pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
+        &self.service_keypair
     }
 }
 
@@ -190,6 +200,11 @@ impl BlockchainMut {
     #[cfg(test)]
     pub(crate) fn dispatcher(&mut self) -> &mut Dispatcher {
         &mut self.dispatcher
+    }
+
+    /// Returns a copy of immutable blockchain view.
+    pub fn immutable_view(&self) -> Blockchain {
+        self.inner.clone()
     }
 
     /// Creates a read-only snapshot of the current storage state.

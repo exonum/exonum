@@ -31,11 +31,8 @@ use std::{
 };
 
 use crate::{
-    api::{
-        node::public::explorer::{TransactionHex, TransactionResponse},
-        ApiContext,
-    },
-    blockchain::{Block, ExecutionStatus, Schema, TxLocation},
+    api::node::public::explorer::{TransactionHex, TransactionResponse},
+    blockchain::{Block, Blockchain, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
     explorer::median_precommits_time,
     messages::SignedMessage,
@@ -192,15 +189,15 @@ pub(crate) struct Transaction {
 
 pub(crate) struct Server {
     pub subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
-    context: ApiContext,
+    blockchain: Blockchain,
     rng: RefCell<ThreadRng>,
 }
 
 impl Server {
-    pub fn new(context: ApiContext) -> Self {
+    pub fn new(blockchain: Blockchain) -> Self {
         Self {
             subscribers: BTreeMap::new(),
-            context,
+            blockchain,
             rng: RefCell::new(rand::thread_rng()),
         }
     }
@@ -301,7 +298,7 @@ impl Handler<Broadcast> for Server {
     type Result = ();
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
-        let snapshot = self.context.snapshot();
+        let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let block = schema.blocks().get(&block_hash).unwrap();
         let height = block.height();
@@ -359,7 +356,7 @@ impl Handler<Transaction> for Server {
         let tx_hash = msg.object_hash();
         // FIXME Don't ignore message error.
         let _ = self
-            .context
+            .blockchain
             .sender()
             .broadcast_transaction(msg.into_verified()?);
         Ok(TransactionResponse { tx_hash })

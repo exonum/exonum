@@ -16,7 +16,9 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, ValidatorKeys},
+    blockchain::{
+        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys,
+    },
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
@@ -273,8 +275,8 @@ fn main() {
 
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
-    let blockchain = Blockchain::new(db, service_keypair.clone(), api_sender.clone())
-        .into_mut(genesis)
+    let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
+    let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
         .with_rust_runtime(
             channel.endpoints.0.clone(),
             vec![InstanceCollection::from(Supervisor)],
