@@ -297,29 +297,28 @@ impl SupervisorInterface for Supervisor {
         confirmation.validate()?;
         let blockchain_schema = blockchain::Schema::new(context.fork());
 
-        // Verifies that we doesn't reach deadline height.
-        if confirmation.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
-        }
         let schema = Schema::new(context.instance().name, context.fork());
 
         // Verifies that transaction author is validator.
-        let mut deploy_confirmations = schema.deploy_confirmations();
         let author = context
             .caller()
             .author()
             .expect("Wrong `DeployConfirmation` initiator");
 
+        let mut deploy_confirmations = schema.deploy_confirmations();
         deploy_confirmations
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that this deployment is registered.
-        if !schema
+        let deploy_request = schema
             .pending_deployments()
-            .contains(&confirmation.artifact)
-        {
-            return Err(Error::DeployRequestNotRegistered.into());
+            .get(&confirmation.artifact)
+            .ok_or(Error::DeployRequestNotRegistered)?;
+
+        // Verifies that we didn't reach deadline height.
+        if deploy_request.deadline_height < blockchain_schema.height() {
+            return Err(Error::DeadlineExceeded.into());
         }
 
         let confirmations = deploy_confirmations.confirm(&confirmation, author);
@@ -333,7 +332,7 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
-            context.start_artifact_registration(confirmation.artifact, confirmation.spec)?;
+            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
         }
 
         Ok(())

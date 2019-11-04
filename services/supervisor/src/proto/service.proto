@@ -36,10 +36,6 @@ message DeployRequest {
 message DeployConfirmation {
   // Artifact identifier.
   exonum.runtime.ArtifactId artifact = 1;
-  // Additional information for Runtime to deploy.
-  bytes spec = 2;
-  // The height until which the deployment procedure should be completed.
-  uint64 deadline_height = 3;
 }
 
 // Request for the start service instance
