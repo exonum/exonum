@@ -77,12 +77,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -97,12 +96,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     /// assert_eq!(None, index.last());
     ///
     /// index.push(42);
@@ -120,12 +118,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -140,12 +137,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -163,12 +159,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -188,12 +183,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -218,12 +212,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -240,11 +233,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new("list", &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
+    ///
     /// assert_eq!(None, index.pop());
     /// index.push(1);
     /// assert_eq!(Some(1), index.pop());
@@ -266,12 +260,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -298,12 +291,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
@@ -327,12 +319,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -363,12 +354,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());

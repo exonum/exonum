@@ -84,12 +84,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_value_set("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -104,13 +103,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_value_set("name");
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -118,6 +116,7 @@ where
     ///
     /// index.insert(data);
     /// assert!(index.contains_by_hash(&data_hash));
+    /// ```
     pub fn contains_by_hash(&self, hash: &Hash) -> bool {
         self.base.contains(hash)
     }
@@ -127,12 +126,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -150,13 +148,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
     ///
     /// let hash = Hash::default();
     ///
@@ -176,12 +173,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
     ///
     /// for val in index.hashes() {
     ///     println!("{:?}", val);
@@ -199,13 +195,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
     ///
     /// let hash = Hash::default();
     ///
@@ -230,12 +225,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -249,12 +243,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -271,13 +264,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_value_set("name");
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -286,6 +278,7 @@ where
     ///
     /// index.remove_by_hash(&data_hash);
     /// assert!(!index.contains_by_hash(&data_hash));
+    /// ```
     pub fn remove_by_hash(&mut self, hash: &Hash) {
         self.base.remove(hash)
     }
@@ -300,12 +293,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));

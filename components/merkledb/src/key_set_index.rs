@@ -69,12 +69,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_key_set("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -93,12 +92,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.as_ref().ensure_key_set::<_, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -116,12 +114,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.as_ref().ensure_key_set::<_, u8>("name");
     ///
     /// for val in index.iter_from(&2) {
     ///     println!("{}", val);
@@ -144,12 +141,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -164,12 +160,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -195,12 +190,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));

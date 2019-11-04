@@ -394,21 +394,44 @@ pub enum Change {
 /// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
 /// to a full key (a string column family name + key as an array of bytes within the family).
 ///
-/// **Note.** It is possible to create only one instance of index with the specified name based on a
-/// single fork. This restriction is due to impossibility to obtain multiple mutable references to
-/// the same change set inside the fork.
+/// # Borrow checking
+///
+/// It is possible to create only one instance of index with the specified name based on a
+/// single fork. If an additional instance is requested, the code will panic in runtime.
+/// Hence, obtaining indexes from a `Fork` functions similarly to [`RefCell::borrow_mut()`].
 ///
 /// For example the code below will panic at runtime.
 ///
-/// ```rust, no_run
-/// use exonum_merkledb::{TemporaryDB, ListIndex, Database};
+/// ```rust,should_panic
+/// use exonum_merkledb::{AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 ///
-/// let index1: ListIndex<_, u8> = ListIndex::new("index", &fork);
+/// let index = fork.as_ref().ensure_list::<_, u8>("index");
 /// // This code will panic at runtime.
-/// let index2: ListIndex<_, u8> = ListIndex::new("index", &fork);
+/// let index2 = fork.as_ref().ensure_list::<_, u8>("index");
 /// ```
+///
+/// To enable immutable / shared references to indexes, you may use [`readonly`] method:
+///
+/// ```
+/// use exonum_merkledb::{AccessExt, TemporaryDB, ListIndex, Database};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// fork.as_ref().ensure_list::<_, u8>("index").extend(vec![1, 2, 3]);
+///
+/// let readonly = fork.readonly();
+/// let index = readonly.list::<_, u8>("index").unwrap();
+/// // Works fine.
+/// let index2 = readonly.list::<_, u8>("index").unwrap();
+/// ```
+///
+/// It is impossible to mutate index contents having a readonly access to the fork; this is
+/// checked by the Rust type system.
+///
+/// Shared references work like `RefCell::borrow`; it is a runtime error to try to obtain
+/// a shared reference to an index if there is an exclusive reference to the same index,
+/// and vice versa.
 ///
 /// [`Snapshot`]: trait.Snapshot.html
 /// [`put`]: #method.put
@@ -419,6 +442,8 @@ pub enum Change {
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
+/// [`readonly`]: #method.readonly
+/// [`RefCell::borrow_mut()`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html#method.borrow_mut
 #[derive(Debug)]
 pub struct Fork {
     patch: Patch,
@@ -465,18 +490,15 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use exonum_merkledb::{Database, TemporaryDB, IndexBuilder};
+/// use exonum_merkledb::{AccessExt, Database, IndexType, TemporaryDB};
 ///
 /// // not declared as `mut db`!
-/// let db: Box<Database> = Box::new(TemporaryDB::new());
+/// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
 /// let fork = db.fork();
 /// {
-///     let (mut view, _state) = IndexBuilder::new(&fork)
-///         .index_name("index_name")
-///         .build::<()>();
-///     view.put(&vec![1, 2, 3], vec![123]);
+///     let mut list = fork.as_ref().ensure_proof_list("list");
+///     list.push(42_u64);
 /// }
-///
 /// db.merge(fork.into_patch()).unwrap();
 /// ```
 ///

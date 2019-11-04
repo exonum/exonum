@@ -141,11 +141,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -164,11 +164,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -184,11 +184,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
@@ -209,11 +209,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -233,11 +233,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -256,11 +256,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -280,11 +280,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -304,11 +304,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// index.remove(3);
@@ -334,11 +334,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -357,11 +357,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
@@ -394,11 +394,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -427,11 +427,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -466,11 +466,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -489,11 +489,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.as_ref().ensure_sparse_list("name");
     /// assert_eq!(None, index.pop());
     ///
     /// index.push(1);

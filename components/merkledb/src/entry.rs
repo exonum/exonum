@@ -58,12 +58,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_entry("name");
     /// assert_eq!(None, index.get());
     ///
     /// index.set(10);
@@ -78,12 +77,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_entry("name");
     /// assert!(!index.exists());
     ///
     /// index.set(10);
@@ -104,12 +102,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -123,12 +120,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -145,12 +141,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -172,12 +167,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -203,13 +197,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry, ObjectHash};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry, ObjectHash};
     /// use exonum_crypto::{self, Hash};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_entry("name");
     /// assert_eq!(Hash::default(), index.object_hash());
     ///
     /// let value = 10;

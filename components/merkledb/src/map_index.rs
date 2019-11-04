@@ -99,12 +99,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_map("name");
     /// assert!(index.get(&1).is_none());
     ///
     /// index.put(&1, 2);
@@ -123,16 +122,16 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_map("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
+    /// ```
     pub fn contains<Q>(&self, key: &Q) -> bool
     where
         K: Borrow<Q>,
@@ -147,12 +146,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.as_ref().ensure_map("name");
     ///
     /// for v in index.iter() {
     ///     println!("{:?}", v);
@@ -170,12 +168,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.as_ref().ensure_map("name");
     ///
     /// for key in index.keys() {
     ///     println!("{}", key);
@@ -193,12 +190,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.as_ref().ensure_map("name");
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
@@ -216,12 +212,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.as_ref().ensure_map("name");
     ///
     /// for v in index.iter_from(&2) {
     ///     println!("{:?}", v);
@@ -243,12 +238,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.as_ref().ensure_map("name");
     ///
     /// for key in index.keys_from(&2) {
     ///     println!("{}", key);
@@ -270,12 +264,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.as_ref().ensure_map("name");
     /// for val in index.values_from(&2) {
     ///     println!("{}", val);
     /// }
@@ -302,15 +295,15 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
+    /// ```
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value);
     }
@@ -320,18 +313,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
+    /// ```
     pub fn remove<Q>(&mut self, key: &Q)
     where
         K: Borrow<Q>,
@@ -350,18 +343,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.as_ref().ensure_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     ///
     /// index.clear();
     /// assert!(!index.contains(&1));
+    /// ```
     pub fn clear(&mut self) {
         self.base.clear();
     }

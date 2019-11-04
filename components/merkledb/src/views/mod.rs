@@ -107,19 +107,28 @@ pub trait ToReadonly: IndexAccess {
     fn to_readonly(&self) -> Self::Readonly;
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 /// Represents address of the index in the database.
 ///
 /// # Examples
 ///
+/// `IndexAddress` can be used implicitly, since `&str` and `(&str, &impl BinaryKey)` can both
+/// be converted into an address.
+///
 /// ```
-/// use exonum_merkledb::{TemporaryDB, Database, IndexAddress, ListIndex, RefMut};
+/// use exonum_merkledb::{AccessExt, IndexAddress, TemporaryDB, Database};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// let address = ("index", &3);
-/// let index: RefMut<ListIndex<_, u32>> = fork.get_object(address);
+///
+/// // Using a string address:
+/// let map = fork.as_ref().ensure_map::<_, String, u8>("map");
+/// // Using an address within an index family:
+/// let list = fork.as_ref().ensure_list::<_, String>(("index", &3_u32));
+/// // Using `IndexAddress` explicitly:
+/// let addr = IndexAddress::with_root("data").append_bytes(&vec![1, 2, 3]);
+/// let set = fork.as_ref().ensure_value_set::<_, u64>(addr);
 /// ```
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub struct IndexAddress {
     pub(super) name: String,
     pub(super) bytes: Option<Vec<u8>>,

@@ -191,7 +191,7 @@ impl ServiceApiScope {
 /// impl MyApi {
 ///     // Immutable handler which returns a hash of the block at the given height.
 ///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
-///         let schema = Schema::get_unchecked(state.snapshot());
+///         let schema = state.data().for_core();
 ///         Ok(schema
 ///             .block_hashes_by_height()
 ///             .get(query.block_height)
