@@ -23,8 +23,8 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
     views::{
-        BinaryAttribute, IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter,
-        View, ViewWithMetadata,
+        BinaryAttribute, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
+        ViewWithMetadata,
     },
     BinaryValue,
 };
@@ -74,7 +74,7 @@ impl BinaryAttribute for SparseListSize {
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
-pub struct SparseListIndex<T: IndexAccess, V> {
+pub struct SparseListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, SparseListSize>,
     _v: PhantomData<V>,
@@ -118,7 +118,7 @@ pub struct SparseListIndexValues<'a, V> {
 
 impl<T, V> SparseListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
@@ -141,7 +141,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -164,7 +164,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -184,7 +184,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -209,7 +209,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -233,7 +233,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -256,7 +256,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -280,7 +280,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -304,7 +304,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -326,7 +326,7 @@ where
 
 impl<T, V> SparseListIndex<T, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     V: BinaryValue,
 {
     /// Appends an element to the back of the 'SparseListIndex'.
@@ -334,7 +334,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -394,7 +394,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -427,7 +427,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -466,7 +466,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -489,7 +489,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -519,7 +519,7 @@ where
 
 impl<'a, T, V> std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     type Item = (u64, V);

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    AccessExt, BinaryKey, Entry, IndexAccessMut, IndexType, KeySetIndex, ListIndex, MapIndex,
-    ObjectHash, ProofListIndex, ProofMapIndex,
+    Access, BinaryKey, Entry, IndexType, KeySetIndex, ListIndex, MapIndex, ObjectHash,
+    ProofListIndex, ProofMapIndex, RawAccessMut,
 };
 
 use exonum_proto::ProtobufConvert;
@@ -100,7 +100,7 @@ pub struct Schema<T> {
     access: T,
 }
 
-impl<T: AccessExt> Schema<T> {
+impl<T: Access> Schema<T> {
     /// Constructs information schema for the given `access` to blockchain data.
     ///
     /// # Return value
@@ -324,9 +324,9 @@ impl<T: AccessExt> Schema<T> {
     }
 }
 
-impl<T: AccessExt> Schema<T>
+impl<T: Access> Schema<T>
 where
-    T::Base: IndexAccessMut,
+    T::Base: RawAccessMut,
 {
     pub(crate) fn initialize(access: T) -> Self {
         access

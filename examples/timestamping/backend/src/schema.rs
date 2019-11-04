@@ -16,7 +16,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
-use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Access, Entry, ObjectHash, ProofMapIndex, RawAccessMut};
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, transactions::Config};
@@ -70,12 +70,12 @@ impl TimestampEntry {
 
 /// Timestamping database schema.
 #[derive(Debug)]
-pub struct Schema<T: AccessExt> {
+pub struct Schema<T: Access> {
     pub config: Entry<T::Base, Config>,
     pub timestamps: ProofMapIndex<T::Base, Hash, TimestampEntry>,
 }
 
-impl<T: AccessExt> Schema<T> {
+impl<T: Access> Schema<T> {
     /// Creates a new schema from the database view.
     pub fn new(access: T) -> Self {
         Self {
@@ -92,8 +92,8 @@ impl<T: AccessExt> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     pub fn initialize(access: T) -> Self {
         Self {

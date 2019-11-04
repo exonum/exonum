@@ -14,7 +14,7 @@
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::exonum_service;
-use exonum_merkledb::{AccessExt, BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{Access, BinaryValue, Fork, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 

@@ -20,14 +20,14 @@ use crate::{
     db,
     extensions::*,
     validation::is_valid_index_name,
-    views::{IndexAccess, IndexAddress, IndexType, View, ViewWithMetadata},
+    views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
     Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
 const PREFIXED_IDX: (&str, &[u8]) = ("idx", &[1_u8, 2, 3] as &[u8]);
 
-fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
+fn assert_iter<T: RawAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     let mut iter = view.iter_bytes(&[from]);
     let mut values = Vec::new();
     while let Some((k, v)) = iter.next() {
@@ -37,7 +37,7 @@ fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     assert_eq!(values, assumed);
 }
 
-fn assert_initial_state<T: IndexAccess>(view: &View<T>) {
+fn assert_initial_state<T: RawAccess>(view: &View<T>) {
     assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
     assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
     assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
@@ -606,7 +606,7 @@ fn clear_sibling_views() {
     const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
     const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
 
-    fn assert_view_states<I: IndexAccess + Copy>(db_view: I) {
+    fn assert_view_states<I: RawAccess + Copy>(db_view: I) {
         let view1 = View::new(db_view, IDX_1);
         let view2 = View::new(db_view, IDX_2);
 

@@ -23,8 +23,8 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::ProofPath, AccessExt, BinaryKey, Database, IndexAccess, MapProof,
-    ProofMapIndex, TemporaryDB,
+    proof_map_index::ProofPath, Access, BinaryKey, Database, MapProof, ProofMapIndex, RawAccess,
+    TemporaryDB,
 };
 use proptest::{
     prelude::prop::{
@@ -53,7 +53,7 @@ fn check_map_proof<T, K, V>(
     table: &ProofMapIndex<T, K, V>,
 ) -> TestCaseResult
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + PartialEq + Debug,
 {
@@ -74,7 +74,7 @@ fn check_map_multiproof<T, K, V>(
     table: &ProofMapIndex<T, K, V>,
 ) -> TestCaseResult
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + PartialEq + Debug,
 {

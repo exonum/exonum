@@ -26,7 +26,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, SnapshotExt},
 };
-use exonum_merkledb::{AccessExt, Snapshot};
+use exonum_merkledb::{Access, Snapshot};
 use exonum_testkit::TestKit;
 
 // Import data types used in tests from the crate where the service is defined.
@@ -41,7 +41,7 @@ use crate::constants::{ALICE_NAME, BOB_NAME, INSTANCE_ID, INSTANCE_NAME};
 
 mod constants;
 
-pub fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CurrencySchema<impl AccessExt + 'a> {
+pub fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CurrencySchema<impl Access + 'a> {
     CurrencySchema::new(snapshot.for_service(INSTANCE_NAME).unwrap())
 }
 

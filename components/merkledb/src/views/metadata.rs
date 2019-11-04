@@ -20,7 +20,7 @@ use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use super::{IndexAccess, IndexAccessMut, IndexAddress, View};
+use super::{IndexAddress, RawAccess, RawAccessMut, View};
 use crate::{validation::assert_valid_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
@@ -222,7 +222,7 @@ pub struct IndexState<T, V> {
 
 impl<T, V> IndexState<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryAttribute + Copy,
 {
     pub fn get(&self) -> Option<V> {
@@ -232,7 +232,7 @@ where
 
 impl<T, V> IndexState<T, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     V: BinaryAttribute,
 {
     pub fn set(&mut self, state: V) {
@@ -250,9 +250,9 @@ where
 
 /// Persistent pool used to store indexes metadata in the database.
 /// Pool size is used as an identifier of newly created indexes.
-struct IndexesPool<T: IndexAccess>(View<T>);
+struct IndexesPool<T: RawAccess>(View<T>);
 
-impl<T: IndexAccess> IndexesPool<T> {
+impl<T: RawAccess> IndexesPool<T> {
     fn new(index_access: T) -> Self {
         Self(View::new(index_access, INDEXES_POOL_NAME))
     }
@@ -266,7 +266,7 @@ impl<T: IndexAccess> IndexesPool<T> {
     }
 }
 
-impl<T: IndexAccessMut> IndexesPool<T> {
+impl<T: RawAccessMut> IndexesPool<T> {
     fn set_len(&mut self, len: u64) {
         self.0.put(&(), len)
     }
@@ -293,7 +293,7 @@ impl<T: IndexAccessMut> IndexesPool<T> {
 
 /// Wrapper struct to manipulate `IndexMetadata` for an index with provided `index_name`.
 #[derive(Debug)]
-pub struct ViewWithMetadata<T: IndexAccess> {
+pub struct ViewWithMetadata<T: RawAccess> {
     view: View<T>,
     metadata: IndexMetadata,
     index_full_name: Vec<u8>,
@@ -301,7 +301,7 @@ pub struct ViewWithMetadata<T: IndexAccess> {
 
 impl<T> ViewWithMetadata<T>
 where
-    T: IndexAccess,
+    T: RawAccess,
 {
     pub(crate) fn get(index_access: T, index_address: &IndexAddress) -> Option<Self> {
         // Actual name.
@@ -348,7 +348,7 @@ where
 
 impl<T> ViewWithMetadata<T>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
 {
     /// # Return value
     ///

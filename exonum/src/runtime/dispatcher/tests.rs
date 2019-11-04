@@ -61,7 +61,7 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
     schema.block_hashes_by_height().push(block_hash);
     schema.blocks().put(&block_hash, block);
     fork.flush();
-    dispatcher.notify_runtimes_about_commit(fork.snapshot_with_flushed_changes());
+    dispatcher.notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
 }
 
 impl Dispatcher {
@@ -421,7 +421,7 @@ fn test_dispatcher_simple() {
         .finalize(&blockchain);
     let fork = db.fork();
     dispatcher
-        .restore_state(fork.snapshot_with_flushed_changes())
+        .restore_state(fork.snapshot_without_unflushed_changes())
         .unwrap();
 
     assert_eq!(

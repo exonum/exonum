@@ -31,13 +31,13 @@ const INDEX_NAME_SEPARATOR: &[u8] = &[0];
 /// Represents current view of the database by specified `address` and
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
-pub struct View<T: IndexAccess> {
+pub struct View<T: RawAccess> {
     address: IndexAddress,
     index_access: T,
     changes: T::Changes,
 }
 
-impl<T: IndexAccess> fmt::Debug for View<T> {
+impl<T: RawAccess> fmt::Debug for View<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("View")
             .field("address", &self.address)
@@ -70,7 +70,11 @@ impl ChangeSet for ChangesMut<'_> {
 }
 
 /// Allows to read data from indexes.
-pub trait IndexAccess: Clone {
+///
+/// You rarely need to use `RawAccess` methods directly; instead, use more high-level [`Access`].
+///
+/// [`Access`]: trait.Access.html
+pub trait RawAccess: Clone {
     /// Type of the `changes` that will be applied to the database.
     ///
     /// In case of `snapshot` changes are represented by the empty type `()`,
@@ -84,14 +88,14 @@ pub trait IndexAccess: Clone {
 }
 
 /// Allows to mutate data in indexes.
-pub trait IndexAccessMut: IndexAccess {
+pub trait RawAccessMut: RawAccess {
     /// Dereferences the changes into a mutable form.
     fn deref_mut(changes: &mut Self::Changes) -> &mut ViewChanges;
 }
 
-impl<'a, T> IndexAccessMut for T
+impl<'a, T> RawAccessMut for T
 where
-    T: IndexAccess<Changes = ChangesMut<'a>>,
+    T: RawAccess<Changes = ChangesMut<'a>>,
 {
     fn deref_mut(changes: &mut Self::Changes) -> &mut ViewChanges {
         &mut *changes
@@ -99,9 +103,9 @@ where
 }
 
 /// Converts index access to a readonly presentation.
-pub trait ToReadonly: IndexAccess {
+pub trait ToReadonly: RawAccess {
     /// Readonly version of the access.
-    type Readonly: IndexAccess;
+    type Readonly: RawAccess;
 
     /// Performs the conversion.
     fn to_readonly(&self) -> Self::Readonly;
@@ -115,7 +119,7 @@ pub trait ToReadonly: IndexAccess {
 /// be converted into an address.
 ///
 /// ```
-/// use exonum_merkledb::{AccessExt, IndexAddress, TemporaryDB, Database};
+/// use exonum_merkledb::{Access, IndexAddress, TemporaryDB, Database};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
@@ -237,7 +241,7 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
 
 macro_rules! impl_snapshot_access {
     ($typ:ty) => {
-        impl IndexAccess for $typ {
+        impl RawAccess for $typ {
             type Changes = ();
 
             fn snapshot(&self) -> &dyn Snapshot {
@@ -265,7 +269,7 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     concat_keys!(key)
 }
 
-impl<T: IndexAccess> View<T> {
+impl<T: RawAccess> View<T> {
     /// Creates a new view for an index with the specified address.
     #[doc(hidden)]
     // ^-- This should be `pub(crate)`, but is currently used by the testkit to revert blocks.
@@ -404,7 +408,7 @@ impl<T: IndexAccess> View<T> {
     }
 }
 
-impl<T: IndexAccessMut> View<T> {
+impl<T: RawAccessMut> View<T> {
     /// Inserts a key-value pair into the fork.
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where

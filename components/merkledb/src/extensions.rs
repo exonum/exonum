@@ -5,15 +5,15 @@ use std::borrow::Cow;
 use crate::{
     validation::assert_valid_name,
     views::{IndexType, ViewWithMetadata},
-    BinaryKey, BinaryValue, Entry, IndexAccess, IndexAccessMut, IndexAddress, KeySetIndex,
-    ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
+    BinaryKey, BinaryValue, Entry, IndexAddress, KeySetIndex, ListIndex, MapIndex, ObjectHash,
+    ProofListIndex, ProofMapIndex, RawAccess, RawAccessMut, SparseListIndex, ValueSetIndex,
 };
 
 /// Extension trait allowing for easy access to indices from any type implementing
 /// `IndexAccess`.
-pub trait AccessExt {
+pub trait Access {
     /// Index access serving as the basis for created indices.
-    type Base: IndexAccess;
+    type Base: RawAccess;
 
     /// Gets a generic `View` with the specified address.
     fn get_view(&self, addr: IndexAddress) -> Option<ViewWithMetadata<Self::Base>>;
@@ -25,7 +25,7 @@ pub trait AccessExt {
         index_type: IndexType,
     ) -> ViewWithMetadata<Self::Base>
     where
-        Self::Base: IndexAccessMut;
+        Self::Base: RawAccessMut;
 
     /// Gets an entry index with the specified address.
     ///
@@ -142,7 +142,7 @@ pub trait AccessExt {
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::Entry);
         Entry::new(view)
@@ -157,7 +157,7 @@ pub trait AccessExt {
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::List);
         ListIndex::new(view)
@@ -173,7 +173,7 @@ pub trait AccessExt {
         I: Into<IndexAddress>,
         K: BinaryKey,
         V: BinaryValue,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::Map);
         MapIndex::new(view)
@@ -188,7 +188,7 @@ pub trait AccessExt {
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::ProofList);
         ProofListIndex::new(view)
@@ -204,7 +204,7 @@ pub trait AccessExt {
         I: Into<IndexAddress>,
         K: BinaryKey + ObjectHash,
         V: BinaryValue,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::ProofMap);
         ProofMapIndex::new(view)
@@ -219,7 +219,7 @@ pub trait AccessExt {
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::SparseList);
         SparseListIndex::new(view)
@@ -234,7 +234,7 @@ pub trait AccessExt {
     where
         I: Into<IndexAddress>,
         V: BinaryKey,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::KeySet);
         KeySetIndex::new(view)
@@ -249,7 +249,7 @@ pub trait AccessExt {
     where
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let view = self.get_or_create_view(addr.into(), IndexType::ValueSet);
         ValueSetIndex::new(view)
@@ -264,14 +264,14 @@ pub trait AccessExt {
     fn ensure_type<I>(&self, addr: I, index_type: IndexType) -> &Self
     where
         I: Into<IndexAddress>,
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         self.get_or_create_view(addr.into(), index_type);
         self
     }
 }
 
-impl<T: IndexAccess> AccessExt for T {
+impl<T: RawAccess> Access for T {
     type Base = Self;
 
     fn get_view(&self, addr: IndexAddress) -> Option<ViewWithMetadata<Self::Base>> {
@@ -284,7 +284,7 @@ impl<T: IndexAccess> AccessExt for T {
         index_type: IndexType,
     ) -> ViewWithMetadata<Self::Base>
     where
-        Self: IndexAccessMut,
+        Self: RawAccessMut,
     {
         ViewWithMetadata::get_or_create(self.clone(), &addr, index_type).unwrap_or_else(|e| {
             panic!(
@@ -304,7 +304,7 @@ pub struct Prefixed<'a, T> {
     prefix: Cow<'a, str>,
 }
 
-impl<'a, T: IndexAccess> Prefixed<'a, T> {
+impl<'a, T: RawAccess> Prefixed<'a, T> {
     /// Creates new prefixed access.
     ///
     /// # Panics
@@ -317,7 +317,7 @@ impl<'a, T: IndexAccess> Prefixed<'a, T> {
     }
 }
 
-impl<T: IndexAccess> AccessExt for Prefixed<'_, T> {
+impl<T: RawAccess> Access for Prefixed<'_, T> {
     type Base = T;
 
     fn get_view(&self, addr: IndexAddress) -> Option<ViewWithMetadata<Self::Base>> {
@@ -331,7 +331,7 @@ impl<T: IndexAccess> AccessExt for Prefixed<'_, T> {
         index_type: IndexType,
     ) -> ViewWithMetadata<Self::Base>
     where
-        Self::Base: IndexAccessMut,
+        Self::Base: RawAccessMut,
     {
         let prefixed_addr = addr.prepend_name(self.prefix.as_ref());
         self.access.get_or_create_view(prefixed_addr, index_type)

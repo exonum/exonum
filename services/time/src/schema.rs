@@ -18,20 +18,20 @@ use exonum::{
     blockchain::ValidatorKeys,
     crypto::{Hash, PublicKey},
 };
-use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Access, Entry, ObjectHash, ProofMapIndex, RawAccessMut};
 
 const NOT_INITIALIZED: &str = "Time service schema is not initialized";
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
-pub struct TimeSchema<T: AccessExt> {
+pub struct TimeSchema<T: Access> {
     /// `DateTime` for every validator. May contain keys corresponding to past validators.
     pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
     /// Consolidated time.
     pub time: Entry<T::Base, DateTime<Utc>>,
 }
 
-impl<T: AccessExt> TimeSchema<T> {
+impl<T: Access> TimeSchema<T> {
     /// Constructs schema for the given `access`.
     pub fn new(access: T) -> Self {
         TimeSchema {
@@ -48,8 +48,8 @@ impl<T: AccessExt> TimeSchema<T> {
 
 impl<T> TimeSchema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     pub(crate) fn initialize(access: T) -> Self {
         Self {

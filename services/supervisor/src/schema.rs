@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Access, Entry, ObjectHash, ProofMapIndex, RawAccessMut};
 
 use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
 
@@ -21,7 +21,7 @@ const NOT_INITIALIZED: &str = "Supervisor schema is not initialized";
 
 /// Service information schema.
 #[derive(Debug)]
-pub struct Schema<T: AccessExt> {
+pub struct Schema<T: Access> {
     pub deploy_requests: ValidatorMultisig<T, DeployRequest>,
     pub deploy_confirmations: ValidatorMultisig<T, DeployConfirmation>,
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
@@ -30,7 +30,7 @@ pub struct Schema<T: AccessExt> {
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
 }
 
-impl<T: AccessExt + Clone> Schema<T> {
+impl<T: Access + Clone> Schema<T> {
     /// Constructs schema for the given `access`.
     pub fn new(access: T) -> Self {
         Self {
@@ -63,8 +63,8 @@ impl<T: AccessExt + Clone> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AccessExt + Clone,
-    T::Base: IndexAccessMut,
+    T: Access + Clone,
+    T::Base: RawAccessMut,
 {
     pub(crate) fn initialize(access: T) -> Self {
         Self {

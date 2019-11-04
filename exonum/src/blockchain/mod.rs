@@ -32,7 +32,7 @@ pub mod config;
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
-    Database, Fork, IndexAccess, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot,
+    Database, Fork, MapIndex, ObjectHash, Patch, RawAccess, Result as StorageResult, Snapshot,
     TemporaryDB,
 };
 use failure::{format_err, Error};
@@ -255,7 +255,7 @@ impl BlockchainMut {
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher
-            .notify_runtimes_about_commit(fork.snapshot_with_flushed_changes());
+            .notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
         self.merge(fork.into_patch())?;
 
         info!(
@@ -301,7 +301,7 @@ impl BlockchainMut {
             // Collect all state hashes.
             let state_hashes = self
                 .dispatcher
-                .state_hash(fork.snapshot_with_flushed_changes())
+                .state_hash(fork.snapshot_without_unflushed_changes())
                 .into_iter()
                 // Add state hash of core table.
                 .chain(IndexCoordinates::locate(
@@ -492,7 +492,7 @@ impl BlockchainMut {
 
 /// Return transaction from persistent pool. If transaction is not present in pool, try
 /// to return it from transactions cache.
-pub(crate) fn get_transaction<T: IndexAccess>(
+pub(crate) fn get_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
@@ -501,7 +501,7 @@ pub(crate) fn get_transaction<T: IndexAccess>(
 }
 
 /// Check that transaction exists in the persistent pool or in the transaction cache.
-pub(crate) fn contains_transaction<T: IndexAccess>(
+pub(crate) fn contains_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,

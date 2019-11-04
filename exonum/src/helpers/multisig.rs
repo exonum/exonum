@@ -16,9 +16,7 @@
 // TODO move out from helpers [ECR-3222]
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use exonum_merkledb::{
-    AccessExt, BinaryKey, BinaryValue, IndexAccessMut, ObjectHash, ProofMapIndex,
-};
+use exonum_merkledb::{Access, BinaryKey, BinaryValue, ObjectHash, ProofMapIndex, RawAccessMut};
 
 use std::{
     borrow::Cow,
@@ -78,13 +76,13 @@ impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
     }
 }
 
-pub struct ValidatorMultisig<T: AccessExt, V> {
+pub struct ValidatorMultisig<T: Access, V> {
     index: ProofMapIndex<T::Base, V, BinarySet<PublicKey>>,
 }
 
 impl<T, V> fmt::Debug for ValidatorMultisig<T, V>
 where
-    T: AccessExt,
+    T: Access,
     V: BinaryKey + ObjectHash,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -97,7 +95,7 @@ where
 
 impl<T, V> ValidatorMultisig<T, V>
 where
-    T: AccessExt,
+    T: Access,
     V: BinaryKey + ObjectHash,
 {
     pub fn get(index_name: &str, access: T) -> Option<Self> {
@@ -125,8 +123,8 @@ where
 
 impl<T, V> ValidatorMultisig<T, V>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
     V: BinaryKey + ObjectHash,
 {
     pub fn initialize(index_name: &str, access: T) -> Self {
@@ -146,7 +144,7 @@ where
 
 impl<T, V> ObjectHash for ValidatorMultisig<T, V>
 where
-    T: AccessExt,
+    T: Access,
     V: BinaryKey + ObjectHash,
 {
     fn object_hash(&self) -> Hash {

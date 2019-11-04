@@ -24,7 +24,7 @@ use exonum::{
     },
 };
 use exonum_derive::ServiceFactory;
-use exonum_merkledb::{AccessExt, ObjectHash, Snapshot};
+use exonum_merkledb::{Access, ObjectHash, Snapshot};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{

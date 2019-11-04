@@ -19,7 +19,7 @@
 use actix::*;
 use actix_web::ws;
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{IndexAccess, ListProof, ObjectHash, Snapshot};
+use exonum_merkledb::{ListProof, ObjectHash, RawAccess, Snapshot};
 use futures::Future;
 use hex::FromHex;
 use log::error;
@@ -108,7 +108,7 @@ pub struct CommittedTransactionSummary {
 impl CommittedTransactionSummary {
     fn new<T>(schema: &Schema<T>, tx_hash: &Hash) -> Option<Self>
     where
-        T: AsRef<dyn Snapshot> + IndexAccess,
+        T: AsRef<dyn Snapshot> + RawAccess,
     {
         let tx = schema.transactions().get(tx_hash)?;
         let tx = tx.as_ref();

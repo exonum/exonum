@@ -21,7 +21,7 @@ use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, AccessExt, BinaryValue, Database, Fork, ListIndex, MapIndex,
+    impl_object_hash_for_binary_value, Access, BinaryValue, Database, Fork, ListIndex, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
@@ -193,14 +193,14 @@ impl Transaction {
     }
 }
 
-struct Schema<T: AccessExt> {
+struct Schema<T: Access> {
     pub transactions: MapIndex<T::Base, Hash, Transaction>,
     pub blocks: ListIndex<T::Base, Hash>,
     pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
     access: T,
 }
 
-impl<T: AccessExt> Schema<T> {
+impl<T: Access> Schema<T> {
     fn new_unchecked(access: T) -> Self {
         Self {
             transactions: access.map("transactions").unwrap(),

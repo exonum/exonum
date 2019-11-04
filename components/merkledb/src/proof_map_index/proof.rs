@@ -191,7 +191,7 @@ impl<K, V> OptionalEntry<K, V> {
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     AccessExt, Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, ObjectHash,
+/// #     Access, Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, ObjectHash,
 /// # };
 /// # use exonum_crypto::hash;
 /// # use failure::Error;
@@ -230,7 +230,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// ```
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
-/// #    AccessExt, Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, HashTag,
+/// #    Access, Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, HashTag,
 /// #    proof_map_index::ProofPath,
 /// # };
 /// # use exonum_crypto::hash;
@@ -520,7 +520,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use exonum_merkledb::{AccessExt, Database, TemporaryDB, ProofMapIndex, ObjectHash};
+    /// # use exonum_merkledb::{Access, Database, TemporaryDB, ProofMapIndex, ObjectHash};
     /// # use exonum_crypto::hash;
     /// let fork = { let db = TemporaryDB::new(); db.fork() };
     /// let mut map = fork.as_ref().ensure_proof_map("index");

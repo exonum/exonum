@@ -14,7 +14,7 @@
 
 //! Information schema for the runtime dispatcher.
 
-use exonum_merkledb::{AccessExt, Entry, Fork, IndexType, MapIndex};
+use exonum_merkledb::{Access, Entry, Fork, IndexType, MapIndex};
 
 use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
 use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
@@ -33,11 +33,11 @@ const NOT_INITIALIZED: &str = "Dispatcher schema is not initialized";
 /// instances, and to reload artifacts / instances on node restart.
 // TODO: Add information about implemented interfaces [ECR-3747]
 #[derive(Debug, Clone)]
-pub struct Schema<T: AccessExt> {
+pub struct Schema<T: Access> {
     access: T,
 }
 
-impl<T: AccessExt> Schema<T> {
+impl<T: Access> Schema<T> {
     /// Constructs information schema for the given `access`.
     pub(crate) fn new(access: T) -> Self {
         Self { access }

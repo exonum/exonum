@@ -24,7 +24,7 @@ use exonum::{
     helpers::Height,
     runtime::{rust::Transaction, InstanceId, SnapshotExt},
 };
-use exonum_merkledb::{AccessExt, Snapshot};
+use exonum_merkledb::{Access, Snapshot};
 use exonum_supervisor::{simple::SimpleSupervisor, ConfigPropose};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 
@@ -50,7 +50,7 @@ impl From<TimeServiceInstance> for InstanceCollection {
     }
 }
 
-fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> TimeSchema<impl AccessExt + 'a> {
+fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> TimeSchema<impl Access + 'a> {
     TimeSchema::new(snapshot.for_service(INSTANCE_NAME).unwrap())
 }
 

@@ -26,7 +26,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, SnapshotExt},
 };
-use exonum_merkledb::{AccessExt, HashTag, ObjectHash, Snapshot};
+use exonum_merkledb::{Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{
     txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
 };
@@ -61,7 +61,7 @@ fn inc_count(api: &TestKitApi, by: u64) -> Verified<AnyTx> {
     tx
 }
 
-fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl AccessExt + 'a> {
+fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a> {
     CounterSchema::new(snapshot.for_service(SERVICE_NAME).unwrap())
 }
 

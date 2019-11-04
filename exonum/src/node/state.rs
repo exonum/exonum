@@ -15,7 +15,7 @@
 //! State of the `NodeHandler`.
 
 use bit_vec::BitVec;
-use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
+use exonum_merkledb::{KeySetIndex, MapIndex, ObjectHash, Patch, RawAccess};
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
@@ -911,7 +911,7 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose<S: IndexAccess>(
+    pub fn add_propose<S: RawAccess>(
         &mut self,
         msg: Verified<Propose>,
         transactions: &MapIndex<S, Hash, Verified<AnyTx>>,
@@ -984,7 +984,7 @@ impl State {
     ///
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
-    pub fn create_incomplete_block<S: IndexAccess>(
+    pub fn create_incomplete_block<S: RawAccess>(
         &mut self,
         msg: &Verified<BlockResponse>,
         txs: &MapIndex<S, Hash, Verified<AnyTx>>,

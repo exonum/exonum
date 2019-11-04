@@ -5,8 +5,8 @@ use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, AccessExt, BinaryValue, Database, Fork, IndexAccessMut,
-    ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    impl_object_hash_for_binary_value, Access, BinaryValue, Database, Fork, ListIndex, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex, RawAccessMut, TemporaryDB,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -80,14 +80,14 @@ impl Transaction {
     }
 }
 
-struct Schema<T: AccessExt> {
+struct Schema<T: Access> {
     pub transactions: MapIndex<T::Base, Hash, Transaction>,
     pub blocks: ListIndex<T::Base, Hash>,
     pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
     access: T,
 }
 
-impl<T: AccessExt> Schema<T> {
+impl<T: Access> Schema<T> {
     fn new(access: T) -> Option<Self> {
         Some(Self {
             transactions: access.map("transactions")?,
@@ -100,8 +100,8 @@ impl<T: AccessExt> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     fn get_or_create(access: T) -> Self {
         Self {

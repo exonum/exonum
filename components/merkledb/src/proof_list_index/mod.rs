@@ -28,8 +28,7 @@ use self::{
 use crate::{
     hash::HashTag,
     views::{
-        IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter, View,
-        ViewWithMetadata,
+        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
     BinaryValue, ObjectHash,
 };
@@ -55,7 +54,7 @@ fn tree_height_by_length(len: u64) -> u8 {
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ProofListIndex<T: IndexAccess, V> {
+pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
@@ -76,7 +75,7 @@ pub struct ProofListIndexIter<'a, V> {
 
 impl<T, V> MerkleTree<V> for ProofListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     fn len(&self) -> u64 {
@@ -98,7 +97,7 @@ where
 
 impl<T, V> ProofListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
@@ -138,7 +137,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -157,7 +156,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -179,7 +178,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -198,7 +197,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -220,7 +219,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -242,7 +241,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -268,7 +267,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -293,7 +292,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -315,7 +314,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -334,7 +333,7 @@ where
 
 impl<T, V> ProofListIndex<T, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     V: BinaryValue,
 {
     fn set_len(&mut self, len: u64) {
@@ -462,7 +461,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -480,7 +479,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -522,7 +521,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -558,7 +557,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -596,7 +595,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -626,7 +625,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -644,7 +643,7 @@ where
 
 impl<T, V> ObjectHash for ProofListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     /// Returns a list hash of the proof list or a hash value of the empty list.
@@ -664,7 +663,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -684,7 +683,7 @@ where
 
 impl<'a, T, V> std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     type Item = V;

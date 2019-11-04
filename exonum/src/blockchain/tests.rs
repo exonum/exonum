@@ -14,7 +14,7 @@
 
 use exonum_crypto::{self as crypto, Hash};
 use exonum_merkledb::{
-    AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, Snapshot, TemporaryDB,
+    Access, BinaryValue, Database, Error as StorageError, ObjectHash, Snapshot, TemporaryDB,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};

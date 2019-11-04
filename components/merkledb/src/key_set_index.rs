@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    views::{IndexAccess, IndexAccessMut, IndexType, Iter as ViewIter, View, ViewWithMetadata},
+    views::{IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryKey,
 };
 
@@ -32,7 +32,7 @@ use crate::{
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 #[derive(Debug)]
-pub struct KeySetIndex<T: IndexAccess, K> {
+pub struct KeySetIndex<T: RawAccess, K> {
     base: View<T>,
     _k: PhantomData<K>,
 }
@@ -52,7 +52,7 @@ pub struct KeySetIndexIter<'a, K> {
 
 impl<T, K> KeySetIndex<T, K>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
 {
     pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
@@ -69,7 +69,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -92,7 +92,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -114,7 +114,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -133,7 +133,7 @@ where
 
 impl<T, K> KeySetIndex<T, K>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     K: BinaryKey,
 {
     /// Adds a key to the set.
@@ -141,7 +141,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -160,7 +160,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -190,7 +190,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -209,7 +209,7 @@ where
 
 impl<'a, T, K> std::iter::IntoIterator for &'a KeySetIndex<T, K>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
 {
     type Item = K::Owned;

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{IndexAccess, Prefixed, Snapshot, ToReadonly};
+use exonum_merkledb::{Prefixed, RawAccess, Snapshot, ToReadonly};
 
 use super::{DeployStatus, DispatcherSchema, InstanceDescriptor, InstanceQuery};
 use crate::blockchain::Schema as CoreSchema;
@@ -24,7 +24,7 @@ pub struct BlockchainData<'a, T> {
     service_instance: InstanceDescriptor<'a>,
 }
 
-impl<'a, T: IndexAccess + ToReadonly> BlockchainData<'a, T> {
+impl<'a, T: RawAccess + ToReadonly> BlockchainData<'a, T> {
     pub(super) fn new(access: T, service_instance: InstanceDescriptor<'a>) -> Self {
         Self {
             access,
@@ -60,7 +60,7 @@ impl<'a, T: IndexAccess + ToReadonly> BlockchainData<'a, T> {
     }
 }
 
-fn mount_point_for_service<'q, T: IndexAccess>(
+fn mount_point_for_service<'q, T: RawAccess>(
     access: T,
     id: impl Into<InstanceQuery<'q>>,
 ) -> Option<Prefixed<'static, T>> {

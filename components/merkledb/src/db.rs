@@ -29,7 +29,7 @@ use std::{
 };
 
 use crate::{
-    views::{IndexAccess, IndexAddress, ToReadonly, View},
+    views::{IndexAddress, RawAccess, ToReadonly, View},
     Error, Result,
 };
 
@@ -403,7 +403,7 @@ pub enum Change {
 /// For example the code below will panic at runtime.
 ///
 /// ```rust,should_panic
-/// use exonum_merkledb::{AccessExt, TemporaryDB, ListIndex, Database};
+/// use exonum_merkledb::{Access, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 ///
@@ -415,7 +415,7 @@ pub enum Change {
 /// To enable immutable / shared references to indexes, you may use [`readonly`] method:
 ///
 /// ```
-/// use exonum_merkledb::{AccessExt, TemporaryDB, ListIndex, Database};
+/// use exonum_merkledb::{Access, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.as_ref().ensure_list::<_, u8>("index").extend(vec![1, 2, 3]);
@@ -490,7 +490,7 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use exonum_merkledb::{AccessExt, Database, IndexType, TemporaryDB};
+/// use exonum_merkledb::{Access, Database, IndexType, TemporaryDB};
 ///
 /// // not declared as `mut db`!
 /// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
@@ -687,8 +687,9 @@ impl Fork {
         &self.working_patch
     }
 
-    /// Returns snapshot that also captures flushed changes in the fork.
-    pub fn snapshot_with_flushed_changes(&self) -> &dyn Snapshot {
+    /// Returns snapshot that also captures flushed changes in the fork,
+    /// but does not capture unflushed changes.
+    pub fn snapshot_without_unflushed_changes(&self) -> &dyn Snapshot {
         &self.patch
     }
 
@@ -714,7 +715,7 @@ impl From<Patch> for Fork {
     }
 }
 
-impl<'a> IndexAccess for &'a Fork {
+impl<'a> RawAccess for &'a Fork {
     type Changes = ChangesMut<'a>;
 
     fn snapshot(&self) -> &dyn Snapshot {
@@ -726,7 +727,7 @@ impl<'a> IndexAccess for &'a Fork {
     }
 }
 
-impl IndexAccess for Rc<Fork> {
+impl RawAccess for Rc<Fork> {
     type Changes = ChangesMut<'static>;
 
     fn snapshot(&self) -> &dyn Snapshot {
@@ -755,7 +756,7 @@ impl<'a> ToReadonly for &'a Fork {
     }
 }
 
-impl<'a> IndexAccess for ReadonlyFork<'a> {
+impl<'a> RawAccess for ReadonlyFork<'a> {
     type Changes = ChangesRef;
 
     fn snapshot(&self) -> &dyn Snapshot {

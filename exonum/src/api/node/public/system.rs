@@ -14,7 +14,7 @@
 
 //! Public system API.
 
-use exonum_merkledb::IndexAccess;
+use exonum_merkledb::RawAccess;
 use failure::format_err;
 
 use crate::runtime::ProtoSourceFile;
@@ -70,7 +70,7 @@ pub struct DispatcherInfo {
 
 impl DispatcherInfo {
     /// Loads dispatcher information from database.
-    pub fn load(access: impl IndexAccess) -> Self {
+    pub fn load(access: impl RawAccess) -> Self {
         let schema = DispatcherSchema::new(access);
         Self {
             artifacts: schema

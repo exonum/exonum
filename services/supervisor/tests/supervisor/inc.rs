@@ -24,7 +24,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
-use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, Snapshot};
+use exonum_merkledb::{Access, Entry, RawAccessMut, Snapshot};
 use exonum_proto::ProtobufConvert;
 
 use crate::proto;
@@ -34,12 +34,12 @@ pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
 #[derive(Debug)]
-pub struct Schema<T: AccessExt> {
+pub struct Schema<T: Access> {
     count: Entry<T::Base, u64>,
     params: Entry<T::Base, String>,
 }
 
-impl<T: AccessExt> Schema<T> {
+impl<T: Access> Schema<T> {
     pub fn new(access: T) -> Self {
         Self {
             count: access.entry("count").unwrap(),
@@ -54,8 +54,8 @@ impl<T: AccessExt> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     fn initialize(access: T) -> Self {
         Self {

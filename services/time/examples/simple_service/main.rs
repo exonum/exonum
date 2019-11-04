@@ -21,7 +21,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use exonum_merkledb::{AccessExt, IndexAccessMut, ObjectHash, ProofMapIndex, Snapshot};
+use exonum_merkledb::{Access, ObjectHash, ProofMapIndex, RawAccessMut, Snapshot};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
@@ -57,11 +57,11 @@ const SERVICE_NAME: &str = "marker";
 
 /// Marker service database schema.
 #[derive(Debug)]
-pub struct MarkerSchema<T: AccessExt> {
+pub struct MarkerSchema<T: Access> {
     marks: ProofMapIndex<T::Base, PublicKey, i32>,
 }
 
-impl<T: AccessExt> MarkerSchema<T> {
+impl<T: Access> MarkerSchema<T> {
     fn new(access: T) -> Self {
         Self {
             marks: access.proof_map("marks").unwrap(),
@@ -76,8 +76,8 @@ impl<T: AccessExt> MarkerSchema<T> {
 
 impl<T> MarkerSchema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     fn initialize(access: T) -> Self {
         Self {

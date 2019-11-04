@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    views::{IndexAccess, IndexAccessMut, IndexType, Iter as ViewIter, View, ViewWithMetadata},
+    views::{IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryKey, BinaryValue,
 };
 
@@ -33,7 +33,7 @@ use super::{
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct MapIndex<T: IndexAccess, K, V> {
+pub struct MapIndex<T: RawAccess, K, V> {
     base: View<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -80,7 +80,7 @@ pub struct MapIndexValues<'a, V> {
 
 impl<T, K, V> MapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
     V: BinaryValue,
 {
@@ -99,7 +99,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -122,7 +122,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -146,7 +146,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -168,7 +168,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -190,7 +190,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -212,7 +212,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -238,7 +238,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -264,7 +264,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -286,7 +286,7 @@ where
 
 impl<T, K, V> MapIndex<T, K, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     K: BinaryKey,
     V: BinaryValue,
 {
@@ -295,7 +295,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -313,7 +313,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -343,7 +343,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -362,7 +362,7 @@ where
 
 impl<'a, T, K, V> std::iter::IntoIterator for &'a MapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
     V: BinaryValue,
 {

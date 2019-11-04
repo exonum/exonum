@@ -40,7 +40,7 @@ pub mod proto;
 /// Persistent data.
 pub mod schema {
     use exonum::crypto::{Hash, PublicKey};
-    use exonum_merkledb::{AccessExt, IndexAccessMut, MapIndex};
+    use exonum_merkledb::{Access, MapIndex, RawAccessMut};
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -88,7 +88,7 @@ pub mod schema {
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
     #[derive(Debug)]
-    pub struct CurrencySchema<T: AccessExt> {
+    pub struct CurrencySchema<T: Access> {
         /// Correspondence of public keys of users to account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
@@ -98,7 +98,7 @@ pub mod schema {
     ///
     /// [`MapIndex`]: https://exonum.com/doc/version/latest/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<T: AccessExt> CurrencySchema<T> {
+    impl<T: Access> CurrencySchema<T> {
         /// Creates a new schema instance.
         pub fn new(access: T) -> Self {
             Self {
@@ -120,8 +120,8 @@ pub mod schema {
 
     impl<T> CurrencySchema<T>
     where
-        T: AccessExt,
-        T::Base: IndexAccessMut,
+        T: Access,
+        T::Base: RawAccessMut,
     {
         pub(crate) fn initialize(access: T) -> Self {
             Self {

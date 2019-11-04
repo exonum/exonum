@@ -29,7 +29,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
-use exonum_merkledb::{AccessExt, Entry, IndexAccessMut, ObjectHash, Snapshot};
+use exonum_merkledb::{Access, Entry, ObjectHash, RawAccessMut, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
@@ -44,11 +44,11 @@ pub const SERVICE_ID: InstanceId = 2;
 /// "correct horse battery staple" brainwallet pubkey in Ed25519 with a SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 
-pub struct CounterSchema<T: AccessExt> {
+pub struct CounterSchema<T: Access> {
     pub counter: Entry<T::Base, u64>,
 }
 
-impl<T: AccessExt> CounterSchema<T> {
+impl<T: Access> CounterSchema<T> {
     pub fn new(access: T) -> Self {
         Self {
             counter: access.entry("counter").unwrap(),
@@ -58,8 +58,8 @@ impl<T: AccessExt> CounterSchema<T> {
 
 impl<T> CounterSchema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     fn initialize(access: T) -> Self {
         Self {
@@ -152,7 +152,7 @@ impl CounterApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn count(snapshot: impl AccessExt) -> api::Result<u64> {
+    fn count(snapshot: impl Access) -> api::Result<u64> {
         let schema = CounterSchema::new(snapshot);
         Ok(schema.counter.get().unwrap_or_default())
     }

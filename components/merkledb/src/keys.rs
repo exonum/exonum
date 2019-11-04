@@ -337,7 +337,7 @@ impl BinaryKey for Decimal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extensions::AccessExt;
+    use crate::extensions::Access;
 
     use std::{fmt::Debug, str::FromStr};
 

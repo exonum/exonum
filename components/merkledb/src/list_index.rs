@@ -21,8 +21,7 @@ use std::marker::PhantomData;
 
 use crate::{
     views::{
-        IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter, View,
-        ViewWithMetadata,
+        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
     BinaryValue,
 };
@@ -37,7 +36,7 @@ use crate::{
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ListIndex<T: IndexAccess, V> {
+pub struct ListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
@@ -58,7 +57,7 @@ pub struct ListIndexIter<'a, V> {
 
 impl<T, V> ListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
@@ -77,7 +76,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -96,7 +95,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -118,7 +117,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -137,7 +136,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -159,7 +158,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -183,7 +182,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -204,7 +203,7 @@ where
 
 impl<T, V> ListIndex<T, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     V: BinaryValue,
 {
     /// Appends an element to the back of the list.
@@ -212,7 +211,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -233,7 +232,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -260,7 +259,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -291,7 +290,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -319,7 +318,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -354,7 +353,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -378,7 +377,7 @@ where
 
 impl<'a, T, V> std::iter::IntoIterator for &'a ListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     type Item = V;
@@ -465,7 +464,7 @@ mod tests {
         // ^-- better for type inference: we want `T == &Fork`, not `T == Fork`.
         fn list<T>(index: u32, view: T) -> ListIndex<T, String>
         where
-            T: IndexAccessMut,
+            T: RawAccessMut,
         {
             view.ensure_list(("family", &index))
         }

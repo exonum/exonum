@@ -14,7 +14,7 @@
 
 //! Cryptocurrency database schema.
 
-use exonum_merkledb::{AccessExt, IndexAccessMut, ObjectHash, ProofListIndex, ProofMapIndex};
+use exonum_merkledb::{Access, ObjectHash, ProofListIndex, ProofMapIndex, RawAccessMut};
 
 use exonum::crypto::{Hash, PublicKey};
 
@@ -24,13 +24,13 @@ const NOT_INITIALIZED: &str = "Cryptocurrency schema is not initialized";
 
 /// Database schema for the cryptocurrency.
 #[derive(Debug)]
-pub struct Schema<T: AccessExt> {
+pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
     access: T,
 }
 
-impl<T: AccessExt> Schema<T> {
+impl<T: Access> Schema<T> {
     /// Creates a new schema from the database view.
     pub fn new(access: T) -> Self {
         Self {
@@ -57,8 +57,8 @@ impl<T: AccessExt> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     pub(crate) fn initialize(access: T) -> Self {
         Self {

@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use super::{
-    views::{IndexAccess, IndexAccessMut, IndexType, Iter as ViewIter, View, ViewWithMetadata},
+    views::{IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, ObjectHash,
 };
 
@@ -34,7 +34,7 @@ use super::{
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ValueSetIndex<T: IndexAccess, V> {
+pub struct ValueSetIndex<T: RawAccess, V> {
     base: View<T>,
     _v: PhantomData<V>,
 }
@@ -67,7 +67,7 @@ pub struct ValueSetIndexHashes<'a> {
 
 impl<T, V> ValueSetIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
     pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
@@ -84,7 +84,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -103,7 +103,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
     /// let db = TemporaryDB::new();
@@ -126,7 +126,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -148,7 +148,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -173,7 +173,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -195,7 +195,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -217,7 +217,7 @@ where
 
 impl<T, V> ValueSetIndex<T, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     V: BinaryValue + ObjectHash,
 {
     /// Adds a value to the set.
@@ -225,7 +225,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -243,7 +243,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -264,7 +264,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
     /// let db = TemporaryDB::new();
@@ -293,7 +293,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -312,7 +312,7 @@ where
 
 impl<'a, T, V> std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
     type Item = (Hash, V);

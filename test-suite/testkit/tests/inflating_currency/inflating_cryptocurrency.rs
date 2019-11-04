@@ -22,7 +22,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
-use exonum_merkledb::{AccessExt, IndexAccessMut, MapIndex, Snapshot};
+use exonum_merkledb::{Access, MapIndex, RawAccessMut, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -75,11 +75,11 @@ impl Wallet {
 
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
-pub struct CurrencySchema<T: AccessExt> {
+pub struct CurrencySchema<T: Access> {
     pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
 }
 
-impl<T: AccessExt> CurrencySchema<T> {
+impl<T: Access> CurrencySchema<T> {
     /// Creates a new schema instance.
     pub fn new(access: T) -> Self {
         Self {
@@ -95,8 +95,8 @@ impl<T: AccessExt> CurrencySchema<T> {
 
 impl<T> CurrencySchema<T>
 where
-    T: AccessExt,
-    T::Base: IndexAccessMut,
+    T: Access,
+    T::Base: RawAccessMut,
 {
     pub fn initialize(access: T) -> Self {
         Self {

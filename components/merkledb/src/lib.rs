@@ -136,7 +136,7 @@ pub use self::{
     },
     entry::Entry,
     error::Error,
-    extensions::{AccessExt, Prefixed},
+    extensions::{Access, Prefixed},
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
     key_set_index::KeySetIndex,
     keys::BinaryKey,
@@ -146,7 +146,7 @@ pub use self::{
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAccess, IndexAccessMut, IndexAddress, IndexType, ToReadonly, View},
+    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, ToReadonly, View},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'

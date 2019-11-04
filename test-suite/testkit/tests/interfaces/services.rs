@@ -24,7 +24,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
-use exonum_merkledb::{AccessExt, Snapshot};
+use exonum_merkledb::{Access, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -57,7 +57,7 @@ pub struct WalletService;
 impl WalletService {
     pub const ID: InstanceId = 24;
 
-    pub fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> WalletSchema<impl AccessExt + 'a> {
+    pub fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> WalletSchema<impl Access + 'a> {
         WalletSchema::new(snapshot.for_service(Self::ID).unwrap())
     }
 }

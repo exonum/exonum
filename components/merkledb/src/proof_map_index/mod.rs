@@ -30,8 +30,8 @@ use self::{
 };
 use crate::{
     views::{
-        BinaryAttribute, IndexAccess, IndexAccessMut, IndexState, IndexType, Iter as ViewIter,
-        View, ViewWithMetadata,
+        BinaryAttribute, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
+        ViewWithMetadata,
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
@@ -46,7 +46,7 @@ mod tests;
 // Necessary to allow building proofs.
 impl<T, K, V> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
@@ -72,7 +72,7 @@ where
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
-pub struct ProofMapIndex<T: IndexAccess, K, V> {
+pub struct ProofMapIndex<T: RawAccess, K, V> {
     base: View<T>,
     state: IndexState<T, ProofPath>,
     _k: PhantomData<K>,
@@ -176,7 +176,7 @@ impl BinaryAttribute for ProofPath {
 
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
@@ -228,7 +228,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -250,7 +250,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -272,7 +272,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -290,7 +290,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -311,7 +311,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -335,7 +335,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -359,7 +359,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -382,7 +382,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -409,7 +409,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -436,7 +436,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -459,7 +459,7 @@ where
 
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
@@ -600,7 +600,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -677,7 +677,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -742,7 +742,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -764,7 +764,7 @@ where
 
 impl<T, K, V> ObjectHash for ProofMapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
@@ -774,7 +774,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -798,7 +798,7 @@ where
 
 impl<'a, T, K, V> std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
@@ -848,12 +848,12 @@ where
 
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct Entry<'a, T: IndexAccess, K, V: BinaryValue> {
+        struct Entry<'a, T: RawAccess, K, V: BinaryValue> {
             index: &'a ProofMapIndex<T, K, V>,
             path: ProofPath,
             hash: Hash,
@@ -862,7 +862,7 @@ where
 
         impl<'a, T, K, V> Entry<'a, T, K, V>
         where
-            T: IndexAccess,
+            T: RawAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue,
         {
@@ -886,7 +886,7 @@ where
 
         impl<T, K, V> fmt::Debug for Entry<'_, T, K, V>
         where
-            T: IndexAccess,
+            T: RawAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue + fmt::Debug,
         {

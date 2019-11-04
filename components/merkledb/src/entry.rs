@@ -19,7 +19,7 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use crate::{
-    views::{IndexAccess, IndexAccessMut, IndexType, View, ViewWithMetadata},
+    views::{IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, ObjectHash,
 };
 
@@ -30,14 +30,14 @@ use crate::{
 ///
 /// [`BinaryValue`]: trait.BinaryValue.html
 #[derive(Debug)]
-pub struct Entry<T: IndexAccess, V> {
+pub struct Entry<T: RawAccess, V> {
     base: View<T>,
     _v: PhantomData<V>,
 }
 
 impl<T, V> Entry<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
@@ -58,7 +58,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -77,7 +77,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -94,7 +94,7 @@ where
 
 impl<T, V> Entry<T, V>
 where
-    T: IndexAccessMut,
+    T: RawAccessMut,
     V: BinaryValue + ObjectHash,
 {
     /// Changes a value of the entry.
@@ -102,7 +102,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -120,7 +120,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -141,7 +141,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -167,7 +167,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -189,7 +189,7 @@ where
 
 impl<T, V> ObjectHash for Entry<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
     /// Returns hash of the entry or default hash value if does not exist.
@@ -197,7 +197,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, Entry, ObjectHash};
+    /// use exonum_merkledb::{Access, TemporaryDB, Database, Entry, ObjectHash};
     /// use exonum_crypto::{self, Hash};
     ///
     /// let db = TemporaryDB::new();
