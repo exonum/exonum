@@ -304,15 +304,16 @@ impl SupervisorInterface for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        // Verifies that we doesn't reach deadline height.
-        if confirmation.deadline_height < core_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
-        }
-
         let mut schema = Schema::new(context.service_data());
         // Verifies that this deployment is registered.
-        if !schema.pending_deployments.contains(&confirmation.artifact) {
-            return Err(Error::DeployRequestNotRegistered.into());
+        let deploy_request = schema
+            .pending_deployments
+            .get(&confirmation.artifact)
+            .ok_or(Error::DeployRequestNotRegistered)?;
+
+        // Verifies that we didn't reach deadline height.
+        if deploy_request.deadline_height < core_schema.height() {
+            return Err(Error::DeadlineExceeded.into());
         }
 
         let confirmations = schema.deploy_confirmations.confirm(&confirmation, author);
@@ -327,7 +328,7 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments.remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
-            context.start_artifact_registration(confirmation.artifact, confirmation.spec)?;
+            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
         }
 
         Ok(())
