@@ -82,10 +82,6 @@ impl ChangeSet for ChangesMut<'_> {
 }
 
 /// Allows to read data from indexes.
-///
-/// You rarely need to use `RawAccess` methods directly; instead, use more high-level [`Access`].
-///
-/// [`Access`]: trait.Access.html
 pub trait RawAccess: Clone {
     /// Type of the `changes` that will be applied to the database.
     ///

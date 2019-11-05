@@ -14,10 +14,9 @@ use crate::{
 
 mod extensions;
 
-/// Extension trait allowing for easy access to indices from any type implementing
-/// `Access`.
+/// High-level access to indexes.
 pub trait Access: Clone {
-    /// Index access serving as the basis for created indices.
+    /// Raw access serving as the basis for created indices.
     type Base: RawAccess;
 
     /// Gets or creates a generic `View` with the specified address.
@@ -82,7 +81,7 @@ impl<T: Access> Access for Prefixed<'_, T> {
 /// Error together with location information.
 #[derive(Debug, Fail)]
 pub struct AccessError {
-    /// Address of the index where the error has occurred relative to the `root`.
+    /// Address of the index where the error has occurred.
     pub addr: IndexAddress,
     /// Error kind.
     #[fail(cause)]
@@ -91,6 +90,7 @@ pub struct AccessError {
 
 impl fmt::Display for AccessError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: implement `Display` for `IndexAddress` for human-readable errors
         write!(formatter, "Error accessing {:?}: {}", self.addr, self.kind)
     }
 }
