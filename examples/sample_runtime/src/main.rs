@@ -23,9 +23,9 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, DeployStatus,
-        DispatcherError, DispatcherSchema, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, Mailbox, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::Transaction, AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError,
+        DispatcherSchema, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
+        Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -104,11 +104,8 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
-        let res = self
-            .deploy_artifact(artifact, spec)
-            .map(|()| ArtifactProtobufSpec::default());
-        Box::new(res.into_future())
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        Box::new(self.deploy_artifact(artifact, spec).into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

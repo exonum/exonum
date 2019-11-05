@@ -25,7 +25,6 @@ use std::{
     },
 };
 
-use crate::runtime::DispatcherState;
 use crate::{
     blockchain::{Block, Blockchain, Schema as CoreSchema},
     helpers::{Height, ValidatorId},
@@ -33,9 +32,8 @@ use crate::{
     runtime::{
         dispatcher::{Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError, ExecutionContext,
-        ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime, RuntimeIdentifier,
-        StateHashAggregator,
+        ArtifactId, CallInfo, Caller, DispatcherError, ExecutionContext, ExecutionError,
+        InstanceId, InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -96,7 +94,6 @@ impl DispatcherBuilder {
             dispatcher: Dispatcher {
                 runtimes: Default::default(),
                 service_infos: Default::default(),
-                shared_state: DispatcherState::default(),
             },
         }
     }
@@ -170,9 +167,9 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         let res = if artifact.runtime_id == self.runtime_type {
-            Ok(ArtifactProtobufSpec::default())
+            Ok(())
         } else {
             Err(DispatcherError::IncorrectRuntime.into())
         };
@@ -500,8 +497,8 @@ impl Runtime for ShutdownRuntime {
         &mut self,
         _artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
-        Box::new(Ok(ArtifactProtobufSpec::default()).into_future())
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        Box::new(Ok(()).into_future())
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {

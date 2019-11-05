@@ -15,8 +15,8 @@
 use exonum::{
     blockchain::InstanceConfig,
     runtime::{
-        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, Mailbox, Runtime, StateHashAggregator,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
+        Runtime, StateHashAggregator,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -102,9 +102,9 @@ impl Runtime for TestRuntime {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         self.tester.deploy_artifact(artifact, deploy_spec);
-        Box::new(Ok(ArtifactProtobufSpec::default()).into_future())
+        Box::new(Ok(()).into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

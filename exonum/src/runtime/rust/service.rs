@@ -26,12 +26,11 @@ use crate::{
     runtime::{
         api::ServiceApiBuilder,
         dispatcher::{Action, Mailbox},
-        AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionError, InstanceDescriptor,
-        InstanceId, MethodId,
+        AnyTx, ArtifactId, CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
-use super::{CallContext, RustArtifactId};
+use super::{ArtifactProtobufSpec, CallContext, RustArtifactId};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
