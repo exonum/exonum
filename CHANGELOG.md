@@ -82,7 +82,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `system/v1/shutdown` endpoint doesn't requre json body with "null". (#1526)
+- `system/v1/shutdown` endpoint doesn't require json body with "null". (#1526)
 
 #### exonum-merkledb
 
