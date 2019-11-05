@@ -5,8 +5,9 @@ use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, Access, BinaryValue, Database, Fork, Group, ListIndex,
-    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, RawAccessMut, TemporaryDB,
+    access::{Access, Ensure, RawAccessMut, Restore},
+    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -65,7 +66,7 @@ impl Transaction {
     fn execute(&self, fork: &Fork) {
         let tx_hash = self.object_hash();
 
-        let mut schema = Schema::new(fork).expect("Schema is not initialized");
+        let mut schema = Schema::restore(fork);
         schema.transactions.put(&self.object_hash(), *self);
 
         let mut owner_wallet = schema.wallets.get(&self.sender).unwrap_or_default();
@@ -88,27 +89,26 @@ struct Schema<T: Access> {
 }
 
 impl<T: Access> Schema<T> {
-    fn new(access: T) -> Option<Self> {
-        Some(Self {
-            transactions: access.map("transactions")?,
-            blocks: access.list("blocks")?,
-            wallets: access.proof_map("wallets")?,
-            wallet_history: access.group("wallet_history"),
-        })
+    fn restore(access: T) -> Self {
+        Self {
+            transactions: Restore::restore(&access, "transactions".into()).unwrap(),
+            blocks: Restore::restore(&access, "blocks".into()).unwrap(),
+            wallets: Restore::restore(&access, "wallets".into()).unwrap(),
+            wallet_history: Restore::restore(&access, "wallet_history".into()).unwrap(),
+        }
     }
 }
 
-impl<T> Schema<T>
+impl<T: Access> Schema<T>
 where
-    T: Access,
     T::Base: RawAccessMut,
 {
-    fn get_or_create(access: T) -> Self {
+    fn ensure(access: T) -> Self {
         Self {
-            transactions: access.ensure_map("transactions"),
-            blocks: access.ensure_list("blocks"),
-            wallets: access.ensure_proof_map("wallets"),
-            wallet_history: access.group("wallet_history"),
+            transactions: Ensure::ensure(&access, "transactions".into()).unwrap(),
+            blocks: Ensure::ensure(&access, "blocks".into()).unwrap(),
+            wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
+            wallet_history: Ensure::ensure(&access, "wallet_history".into()).unwrap(),
         }
     }
 
@@ -125,7 +125,7 @@ impl Block {
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        Schema::get_or_create(&fork).blocks.push(self.object_hash());
+        Schema::ensure(&fork).blocks.push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }
@@ -168,7 +168,7 @@ fn main() {
 
     // Gets a snapshot of the current database state.
     let snapshot = db.snapshot();
-    let schema = Schema::new(&snapshot).expect("Schema not initialized");
+    let schema = Schema::restore(&snapshot);
 
     // Checks that our users have the specified amount of money.
     let alice_wallet = schema.wallets.get(&alice).unwrap();

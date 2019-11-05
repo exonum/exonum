@@ -116,7 +116,7 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 
 impl Service for SimpleSupervisor {
     fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        Schema::initialize(context.service_data());
+        Schema::ensure(context.service_data());
         Ok(())
     }
 

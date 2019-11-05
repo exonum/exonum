@@ -16,7 +16,10 @@
 // TODO move out from helpers [ECR-3222]
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use exonum_merkledb::{Access, BinaryKey, BinaryValue, ObjectHash, ProofMapIndex, RawAccessMut};
+use exonum_merkledb::{
+    access::{Access, Ensure, RawAccessMut, Restore},
+    BinaryKey, BinaryValue, IndexAddress, ObjectHash, ProofMapIndex,
+};
 
 use std::{
     borrow::Cow,
@@ -26,6 +29,7 @@ use std::{
 };
 
 use crate::crypto::{self, Hash, PublicKey};
+use exonum_merkledb::access::AccessError;
 
 /// A set of binary values.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord)]
@@ -93,16 +97,36 @@ where
     }
 }
 
+impl<T, V> Restore<T> for ValidatorMultisig<T, V>
+where
+    T: Access,
+    V: BinaryKey + ObjectHash,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        Ok(Self {
+            index: Restore::restore(access, addr)?,
+        })
+    }
+}
+
+impl<T, V> Ensure<T> for ValidatorMultisig<T, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    V: BinaryKey + ObjectHash,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        Ok(Self {
+            index: Ensure::ensure(access, addr)?,
+        })
+    }
+}
+
 impl<T, V> ValidatorMultisig<T, V>
 where
     T: Access,
     V: BinaryKey + ObjectHash,
 {
-    pub fn get(index_name: &str, access: T) -> Option<Self> {
-        let index = access.proof_map(index_name)?;
-        Some(Self { index })
-    }
-
     pub fn confirmed_by(&self, id: &V, author: &PublicKey) -> bool {
         self.index
             .get(id)
@@ -127,12 +151,6 @@ where
     T::Base: RawAccessMut,
     V: BinaryKey + ObjectHash,
 {
-    pub fn initialize(index_name: &str, access: T) -> Self {
-        Self {
-            index: access.ensure_proof_map(index_name),
-        }
-    }
-
     pub fn confirm(&mut self, id: &V, author: PublicKey) -> usize {
         let mut confirmations = self.index.get(id).unwrap_or_default();
         confirmations.0.insert(author);

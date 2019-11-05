@@ -18,7 +18,7 @@
 
 pub use crate::api::{ApiContext, Error, FutureResult, Result};
 
-use exonum_merkledb::{Prefixed, Snapshot};
+use exonum_merkledb::{access::Prefixed, Snapshot};
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 

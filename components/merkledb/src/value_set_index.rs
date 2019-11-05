@@ -23,7 +23,10 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use super::{
-    views::{IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata},
+    access::{restore_view, Access, AccessError, Ensure, Restore},
+    views::{
+        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+    },
     BinaryValue, ObjectHash,
 };
 
@@ -65,13 +68,35 @@ pub struct ValueSetIndexHashes<'a> {
     base_iter: ViewIter<'a, Hash, ()>,
 }
 
+impl<T, V> Restore<T> for ValueSetIndex<T::Base, V>
+where
+    T: Access,
+    V: BinaryValue + ObjectHash,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::ValueSet)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, V> Ensure<T> for ValueSetIndex<T::Base, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    V: BinaryValue + ObjectHash,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::ValueSet)?;
+        Ok(Self::new(view))
+    }
+}
+
 impl<T, V> ValueSetIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
-        view.assert_type(IndexType::ValueSet);
+    fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, _) = view.into_parts::<()>();
         Self {
             base,
@@ -344,7 +369,7 @@ impl<'a> Iterator for ValueSetIndexHashes<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{extensions::*, Database, ObjectHash, TemporaryDB};
+    use crate::{access::AccessExt, Database, ObjectHash, TemporaryDB};
 
     #[test]
     fn value_set_methods() {

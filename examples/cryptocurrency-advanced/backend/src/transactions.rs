@@ -104,8 +104,8 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             return Err(Error::SenderSameAsReceiver);
         }
 
-        let sender = schema.wallet(&from).ok_or(Error::SenderNotFound)?;
-        let receiver = schema.wallet(&to).ok_or(Error::ReceiverNotFound)?;
+        let sender = schema.wallets.get(&from).ok_or(Error::SenderNotFound)?;
+        let receiver = schema.wallets.get(&to).ok_or(Error::ReceiverNotFound)?;
         if sender.balance < amount {
             Err(Error::InsufficientCurrencyAmount)
         } else {
@@ -123,7 +123,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
 
         let mut schema = Schema::new(context.service_data());
 
-        if let Some(wallet) = schema.wallet(&from) {
+        if let Some(wallet) = schema.wallets.get(&from) {
             let amount = arg.amount;
             schema.increase_wallet_balance(wallet, amount, tx_hash);
             Ok(())
@@ -139,7 +139,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             .expect("Wrong `CreateWallet` initiator");
 
         let mut schema = Schema::new(context.service_data());
-        if schema.wallet(&from).is_none() {
+        if schema.wallets.get(&from).is_none() {
             let name = &arg.name;
             schema.create_wallet(&from, name, tx_hash);
             Ok(())

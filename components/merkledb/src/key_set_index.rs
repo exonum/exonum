@@ -21,7 +21,10 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    views::{IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata},
+    access::{restore_view, Access, AccessError, Ensure, Restore},
+    views::{
+        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+    },
     BinaryKey,
 };
 
@@ -50,13 +53,35 @@ pub struct KeySetIndexIter<'a, K> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
+impl<T, K> Restore<T> for KeySetIndex<T::Base, K>
+where
+    T: Access,
+    K: BinaryKey,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::KeySet)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, K> Ensure<T> for KeySetIndex<T::Base, K>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    K: BinaryKey,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::KeySet)?;
+        Ok(Self::new(view))
+    }
+}
+
 impl<T, K> KeySetIndex<T, K>
 where
     T: RawAccess,
     K: BinaryKey,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
-        view.assert_type(IndexType::KeySet);
+    fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, _) = view.into_parts::<()>();
         Self {
             base,
@@ -234,7 +259,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{extensions::*, Database, TemporaryDB};
+    use crate::{access::AccessExt, Database, TemporaryDB};
 
     const INDEX_NAME: &str = "test_index_name";
 

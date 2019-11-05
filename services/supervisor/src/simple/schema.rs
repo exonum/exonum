@@ -14,21 +14,22 @@
 
 use exonum::{
     crypto::Hash,
-    merkledb::{Access, Entry, ObjectHash, RawAccessMut},
+    merkledb::{
+        access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+        Entry, ObjectHash,
+    },
 };
 
 use super::ConfigPropose;
-
-const NOT_INITIALIZED: &str = "Supervisor schema is not initialized";
 
 pub struct Schema<T: Access> {
     pub config_propose: Entry<T::Base, ConfigPropose>,
 }
 
-impl<T: Access> Schema<T> {
-    pub fn new(access: T) -> Self {
+impl<'a, T: Access> Schema<Prefixed<'a, T>> {
+    pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            config_propose: access.entry("config_propose").expect(NOT_INITIALIZED),
+            config_propose: Restore::restore(&access, "config_propose".into()).unwrap(),
         }
     }
 
@@ -37,14 +38,14 @@ impl<T: Access> Schema<T> {
     }
 }
 
-impl<T> Schema<T>
+impl<'a, T> Schema<Prefixed<'a, T>>
 where
     T: Access,
     T::Base: RawAccessMut,
 {
-    pub(super) fn initialize(access: T) -> Self {
+    pub(super) fn ensure(access: Prefixed<'a, T>) -> Self {
         Self {
-            config_propose: access.ensure_entry("config_propose"),
+            config_propose: Ensure::ensure(&access, "config_propose".into()).unwrap(),
         }
     }
 }

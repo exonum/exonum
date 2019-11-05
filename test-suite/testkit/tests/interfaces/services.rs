@@ -24,7 +24,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
-use exonum_merkledb::{Access, Snapshot};
+use exonum_merkledb::{access::Access, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -64,7 +64,7 @@ impl WalletService {
 
 impl Service for WalletService {
     fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        WalletSchema::initialize(context.service_data());
+        WalletSchema::ensure(context.service_data());
         Ok(())
     }
 

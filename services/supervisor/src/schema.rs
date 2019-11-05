@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{Access, Entry, ObjectHash, ProofMapIndex, RawAccessMut};
+use exonum_merkledb::{
+    access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+    Entry, ObjectHash, ProofMapIndex,
+};
 
 use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
-
-const NOT_INITIALIZED: &str = "Supervisor schema is not initialized";
 
 /// Service information schema.
 #[derive(Debug)]
@@ -30,22 +31,16 @@ pub struct Schema<T: Access> {
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
 }
 
-impl<T: Access + Clone> Schema<T> {
+impl<'a, T: Access> Schema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
-    pub fn new(access: T) -> Self {
+    pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            deploy_requests: ValidatorMultisig::get("deploy_requests", access.clone())
-                .expect(NOT_INITIALIZED),
-            deploy_confirmations: ValidatorMultisig::get("deploy_confirmations", access.clone())
-                .expect(NOT_INITIALIZED),
-            pending_deployments: access
-                .proof_map("pending_deployments")
-                .expect(NOT_INITIALIZED),
-            pending_instances: ValidatorMultisig::get("pending_instances", access.clone())
-                .expect(NOT_INITIALIZED),
-            config_confirms: ValidatorMultisig::get("config_confirms", access.clone())
-                .expect(NOT_INITIALIZED),
-            pending_proposal: access.entry("pending_proposal").expect(NOT_INITIALIZED),
+            deploy_requests: Restore::restore(&access, "deploy_requests".into()).unwrap(),
+            deploy_confirmations: Restore::restore(&access, "deploy_confirmations".into()).unwrap(),
+            pending_deployments: Restore::restore(&access, "pending_deployments".into()).unwrap(),
+            pending_instances: Restore::restore(&access, "pending_instances".into()).unwrap(),
+            config_confirms: Restore::restore(&access, "config_confirms".into()).unwrap(),
+            pending_proposal: Restore::restore(&access, "pending_proposal".into()).unwrap(),
         }
     }
 
@@ -61,22 +56,19 @@ impl<T: Access + Clone> Schema<T> {
     }
 }
 
-impl<T> Schema<T>
+impl<'a, T> Schema<Prefixed<'a, T>>
 where
-    T: Access + Clone,
+    T: Access,
     T::Base: RawAccessMut,
 {
-    pub(crate) fn initialize(access: T) -> Self {
+    pub(crate) fn ensure(access: Prefixed<'a, T>) -> Self {
         Self {
-            deploy_requests: ValidatorMultisig::initialize("deploy_requests", access.clone()),
-            deploy_confirmations: ValidatorMultisig::initialize(
-                "deploy_confirmations",
-                access.clone(),
-            ),
-            pending_deployments: access.ensure_proof_map("pending_deployments"),
-            pending_instances: ValidatorMultisig::initialize("pending_instances", access.clone()),
-            config_confirms: ValidatorMultisig::initialize("config_confirms", access.clone()),
-            pending_proposal: access.ensure_entry("pending_proposal"),
+            deploy_requests: Ensure::ensure(&access, "deploy_requests".into()).unwrap(),
+            deploy_confirmations: Ensure::ensure(&access, "deploy_confirmations".into()).unwrap(),
+            pending_deployments: Ensure::ensure(&access, "pending_deployments".into()).unwrap(),
+            pending_instances: Ensure::ensure(&access, "pending_instances".into()).unwrap(),
+            config_confirms: Ensure::ensure(&access, "config_confirms".into()).unwrap(),
+            pending_proposal: Ensure::ensure(&access, "pending_proposal".into()).unwrap(),
         }
     }
 }

@@ -22,7 +22,7 @@ use exonum::{
         SUPERVISOR_INSTANCE_NAME,
     },
 };
-use exonum_merkledb::Access;
+use exonum_merkledb::access::AccessExt;
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use crate::{

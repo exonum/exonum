@@ -325,14 +325,6 @@ where
         self.metadata.index_type
     }
 
-    pub(crate) fn assert_type(&self, expected_type: IndexType) {
-        assert_eq!(
-            self.metadata.index_type, expected_type,
-            "Unexpected index type (expected {:?})",
-            expected_type
-        );
-    }
-
     pub fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
     where
         V: BinaryAttribute,
@@ -386,16 +378,6 @@ where
             Err(this)
         }
     }
-}
-
-/// Denotes index types that can be converted from a `View`.
-pub trait FromView<T: RawAccess> {
-    /// Type of the index.
-    const TYPE: IndexType;
-
-    /// Converts a generic view into an index. This method should panic if the view has
-    /// incorrect type.
-    fn from_view(view: ViewWithMetadata<T>) -> Self;
 }
 
 #[cfg(test)]

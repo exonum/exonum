@@ -15,7 +15,7 @@
 //! State of the `NodeHandler`.
 
 use bit_vec::BitVec;
-use exonum_merkledb::{KeySetIndex, MapIndex, ObjectHash, Patch, RawAccess};
+use exonum_merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
@@ -911,11 +911,11 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose<S: RawAccess>(
+    pub fn add_propose<T: RawAccess>(
         &mut self,
         msg: Verified<Propose>,
-        transactions: &MapIndex<S, Hash, Verified<AnyTx>>,
-        transaction_pool: &KeySetIndex<S, Hash>,
+        transactions: &MapIndex<T, Hash, Verified<AnyTx>>,
+        transaction_pool: &KeySetIndex<T, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.object_hash();
         match self.proposes.entry(propose_hash) {

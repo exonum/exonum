@@ -24,7 +24,10 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
-use exonum_merkledb::{Access, Entry, RawAccessMut, Snapshot};
+use exonum_merkledb::{
+    access::{Access, Ensure, RawAccessMut, Restore},
+    Entry, Snapshot,
+};
 use exonum_proto::ProtobufConvert;
 
 use crate::proto;
@@ -42,8 +45,8 @@ pub struct Schema<T: Access> {
 impl<T: Access> Schema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            count: access.entry("count").unwrap(),
-            params: access.entry("params").unwrap(),
+            count: Restore::restore(&access, "count".into()).unwrap(),
+            params: Restore::restore(&access, "params".into()).unwrap(),
         }
     }
 
@@ -59,8 +62,8 @@ where
 {
     fn initialize(access: T) -> Self {
         Self {
-            count: access.ensure_entry("count"),
-            params: access.ensure_entry("params"),
+            count: Ensure::ensure(&access, "count".into()).unwrap(),
+            params: Ensure::ensure(&access, "params".into()).unwrap(),
         }
     }
 

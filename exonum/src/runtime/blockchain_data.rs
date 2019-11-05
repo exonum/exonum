@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{Prefixed, RawAccess, Snapshot, ToReadonly};
+use exonum_merkledb::{
+    access::{Prefixed, RawAccess, ToReadonly},
+    Snapshot,
+};
 
 use super::{DeployStatus, DispatcherSchema, InstanceDescriptor, InstanceQuery};
 use crate::blockchain::Schema as CoreSchema;

@@ -26,7 +26,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, SnapshotExt},
 };
-use exonum_merkledb::{Access, HashTag, ObjectHash, Snapshot};
+use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{
     txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
 };

@@ -29,7 +29,10 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
-use exonum_merkledb::{Access, Entry, ObjectHash, RawAccessMut, Snapshot};
+use exonum_merkledb::{
+    access::{Access, Ensure, RawAccessMut, Restore},
+    Entry, ObjectHash, Snapshot,
+};
 use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
@@ -51,7 +54,7 @@ pub struct CounterSchema<T: Access> {
 impl<T: Access> CounterSchema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            counter: access.entry("counter").unwrap(),
+            counter: Restore::restore(&access, "counter".into()).unwrap(),
         }
     }
 }
@@ -63,7 +66,7 @@ where
 {
     fn initialize(access: T) -> Self {
         Self {
-            counter: access.ensure_entry("counter"),
+            counter: Ensure::ensure(&access, "counter".into()).unwrap(),
         }
     }
 

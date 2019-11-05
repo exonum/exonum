@@ -16,12 +16,13 @@
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
-use exonum_merkledb::{Access, Entry, ObjectHash, ProofMapIndex, RawAccessMut};
+use exonum_merkledb::{
+    access::{Access, Ensure, RawAccessMut, Restore},
+    Entry, ObjectHash, ProofMapIndex,
+};
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, transactions::Config};
-
-const NOT_INITIALIZED: &str = "Timestamping schema is not initialized";
 
 /// Stores content's hash and some metadata about it.
 #[derive(
@@ -79,8 +80,8 @@ impl<T: Access> Schema<T> {
     /// Creates a new schema from the database view.
     pub fn new(access: T) -> Self {
         Self {
-            config: access.entry("config").expect(NOT_INITIALIZED),
-            timestamps: access.proof_map("timestamps").expect(NOT_INITIALIZED),
+            config: Restore::restore(&access, "config".into()).unwrap(),
+            timestamps: Restore::restore(&access, "timestamps".into()).unwrap(),
         }
     }
 
@@ -95,10 +96,10 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
-    pub fn initialize(access: T) -> Self {
+    pub fn ensure(access: T) -> Self {
         Self {
-            config: access.ensure_entry("config"),
-            timestamps: access.ensure_proof_map("timestamps"),
+            config: Ensure::ensure(&access, "config".into()).unwrap(),
+            timestamps: Ensure::ensure(&access, "timestamps".into()).unwrap(),
         }
     }
 

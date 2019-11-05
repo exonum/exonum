@@ -18,9 +18,10 @@ use exonum::{
     blockchain::ValidatorKeys,
     crypto::{Hash, PublicKey},
 };
-use exonum_merkledb::{Access, Entry, ObjectHash, ProofMapIndex, RawAccessMut};
-
-const NOT_INITIALIZED: &str = "Time service schema is not initialized";
+use exonum_merkledb::{
+    access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+    Entry, ObjectHash, ProofMapIndex,
+};
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
@@ -31,12 +32,12 @@ pub struct TimeSchema<T: Access> {
     pub time: Entry<T::Base, DateTime<Utc>>,
 }
 
-impl<T: Access> TimeSchema<T> {
+impl<'a, T: Access> TimeSchema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
-    pub fn new(access: T) -> Self {
-        TimeSchema {
-            validators_times: access.proof_map("validators_times").expect(NOT_INITIALIZED),
-            time: access.entry("time").expect(NOT_INITIALIZED),
+    pub fn new(access: Prefixed<'a, T>) -> Self {
+        Self {
+            validators_times: Restore::restore(&access, "validators_times".into()).unwrap(),
+            time: Restore::restore(&access, "time".into()).unwrap(),
         }
     }
 
@@ -46,15 +47,15 @@ impl<T: Access> TimeSchema<T> {
     }
 }
 
-impl<T> TimeSchema<T>
+impl<'a, T> TimeSchema<Prefixed<'a, T>>
 where
     T: Access,
     T::Base: RawAccessMut,
 {
-    pub(crate) fn initialize(access: T) -> Self {
+    pub(crate) fn ensure(access: Prefixed<'a, T>) -> Self {
         Self {
-            validators_times: access.ensure_proof_map("validators_times"),
-            time: access.ensure_entry("time"),
+            validators_times: Ensure::ensure(&access, "validators_times".into()).unwrap(),
+            time: Ensure::ensure(&access, "time".into()).unwrap(),
         }
     }
 

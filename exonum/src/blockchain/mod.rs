@@ -32,8 +32,8 @@ pub mod config;
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
-    Database, Fork, MapIndex, ObjectHash, Patch, RawAccess, Result as StorageResult, Snapshot,
-    TemporaryDB,
+    access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
+    Snapshot, TemporaryDB,
 };
 use failure::{format_err, Error};
 

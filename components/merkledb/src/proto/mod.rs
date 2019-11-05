@@ -125,8 +125,8 @@ mod tests {
     use std::fmt;
 
     use crate::{
-        proto, Access, BinaryKey, BinaryValue, Database, ListProof, MapProof, ObjectHash,
-        TemporaryDB,
+        access::AccessExt, proto, BinaryKey, BinaryValue, Database, ListProof, MapProof,
+        ObjectHash, TemporaryDB,
     };
     use protobuf::RepeatedField;
 

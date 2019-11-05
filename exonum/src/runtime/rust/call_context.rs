@@ -1,4 +1,4 @@
-use exonum_merkledb::{BinaryValue, Fork, Prefixed};
+use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
 use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{

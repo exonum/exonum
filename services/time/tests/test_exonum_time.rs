@@ -24,7 +24,7 @@ use exonum::{
     helpers::Height,
     runtime::{rust::Transaction, InstanceId, SnapshotExt},
 };
-use exonum_merkledb::{Access, Snapshot};
+use exonum_merkledb::{access::Access, Snapshot};
 use exonum_supervisor::{simple::SimpleSupervisor, ConfigPropose};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 

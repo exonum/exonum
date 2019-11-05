@@ -25,7 +25,7 @@ use proptest::{
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 use exonum_merkledb::{
-    Access, BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+    access::AccessExt, BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 
 mod common;

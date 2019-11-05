@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    Access, BinaryKey, Entry, IndexType, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofListIndex, ProofMapIndex, RawAccessMut,
+    access::{Access, AccessExt, RawAccessMut},
+    BinaryKey, Entry, IndexType, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex,
+    ProofMapIndex,
 };
 
 use exonum_proto::ProtobufConvert;

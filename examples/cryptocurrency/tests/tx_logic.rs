@@ -26,7 +26,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, SnapshotExt},
 };
-use exonum_merkledb::{Access, Snapshot};
+use exonum_merkledb::{access::Access, Snapshot};
 use exonum_testkit::TestKit;
 
 // Import data types used in tests from the crate where the service is defined.
@@ -206,8 +206,14 @@ fn test_transfers_in_single_block() {
 
         let snapshot = testkit.probe_all(txvec![tx_b_to_a.clone(), tx_a_to_b.clone()]);
         let schema = get_schema(&snapshot);
-        assert_eq!(schema.wallet(&alice_pubkey).map(|w| w.balance), Some(10));
-        assert_eq!(schema.wallet(&bob_pubkey).map(|w| w.balance), Some(190));
+        assert_eq!(
+            schema.wallets.get(&alice_pubkey).map(|w| w.balance),
+            Some(10)
+        );
+        assert_eq!(
+            schema.wallets.get(&bob_pubkey).map(|w| w.balance),
+            Some(190)
+        );
     }
 
     testkit.create_block_with_transactions(txvec![tx_a_to_b, tx_b_to_a]);
@@ -305,7 +311,7 @@ fn create_wallet(testkit: &mut TestKit, name: String) -> (Verified<AnyTx>, Secre
 fn try_get_wallet(testkit: &TestKit, pubkey: &PublicKey) -> Option<Wallet> {
     let snapshot = testkit.snapshot();
     let schema = get_schema(&snapshot);
-    schema.wallet(pubkey)
+    schema.wallets.get(pubkey)
 }
 
 /// Returns the wallet identified by the given public key.

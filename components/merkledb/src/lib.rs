@@ -136,17 +136,18 @@ pub use self::{
     },
     entry::Entry,
     error::Error,
-    extensions::{Access, Group, Prefixed},
+    group::Group,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
     key_set_index::KeySetIndex,
     keys::BinaryKey,
+    lazy::Lazy,
     list_index::ListIndex,
     map_index::MapIndex,
     options::DbOptions,
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, ToReadonly, View},
+    views::{IndexAddress, IndexType, View},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'
@@ -168,13 +169,15 @@ mod backends;
 mod db;
 mod entry;
 mod error;
-mod extensions;
+mod group;
 mod hash;
 mod keys;
+mod lazy;
 mod options;
 mod values;
 mod views;
 
+pub mod access;
 pub mod key_set_index;
 pub mod list_index;
 pub mod map_index;

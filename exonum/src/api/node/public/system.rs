@@ -14,7 +14,7 @@
 
 //! Public system API.
 
-use exonum_merkledb::RawAccess;
+use exonum_merkledb::access::Access;
 use failure::format_err;
 
 use crate::runtime::ProtoSourceFile;
@@ -23,7 +23,7 @@ use crate::{
     blockchain::Schema,
     helpers::user_agent,
     proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
-    runtime::{ArtifactId, DispatcherSchema, InstanceSpec},
+    runtime::{ArtifactId, DispatcherSchema, InstanceSpec, SnapshotExt},
 };
 
 /// Information about the current state of the node memory pool.
@@ -70,8 +70,7 @@ pub struct DispatcherInfo {
 
 impl DispatcherInfo {
     /// Loads dispatcher information from database.
-    pub fn load(access: impl RawAccess) -> Self {
-        let schema = DispatcherSchema::new(access);
+    pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
         Self {
             artifacts: schema
                 .artifacts()
@@ -143,7 +142,8 @@ impl SystemApi {
     fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_query: ()| {
-            Ok(DispatcherInfo::load(&self_.context.snapshot()))
+            let snapshot = self_.context.snapshot();
+            Ok(DispatcherInfo::load(&snapshot.for_dispatcher()))
         });
         self
     }

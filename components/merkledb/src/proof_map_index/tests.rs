@@ -30,7 +30,7 @@ use super::{
     MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
 use crate::{
-    extensions::*, BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
+    access::AccessExt, BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";

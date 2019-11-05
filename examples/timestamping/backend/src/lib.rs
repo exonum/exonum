@@ -70,9 +70,7 @@ impl Service for TimestampingService {
             return Err(Error::TimeServiceNotFound.into());
         }
 
-        Schema::initialize(context.service_data())
-            .config
-            .set(config);
+        Schema::ensure(context.service_data()).config.set(config);
         Ok(())
     }
 

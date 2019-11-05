@@ -22,9 +22,10 @@ use std::{io::Error, marker::PhantomData};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
+    access::{restore_view, Access, AccessError, Ensure, Restore},
     views::{
-        BinaryAttribute, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
-        ViewWithMetadata,
+        BinaryAttribute, IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess,
+        RawAccessMut, View, ViewWithMetadata,
     },
     BinaryValue,
 };
@@ -116,13 +117,35 @@ pub struct SparseListIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
+impl<T, V> Restore<T> for SparseListIndex<T::Base, V>
+where
+    T: Access,
+    V: BinaryValue,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::SparseList)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, V> Ensure<T> for SparseListIndex<T::Base, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    V: BinaryValue,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::SparseList)?;
+        Ok(Self::new(view))
+    }
+}
+
 impl<T, V> SparseListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
-        view.assert_type(IndexType::SparseList);
+    fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, state) = view.into_parts();
         Self {
             base,
@@ -562,7 +585,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{db::Database, extensions::*, TemporaryDB};
+    use crate::{access::AccessExt, db::Database, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
 

@@ -26,12 +26,12 @@ use self::{
     proof_builder::{BuildProof, MerkleTree},
 };
 use crate::{
+    access::{restore_view, Access, AccessError, Ensure, Restore},
     hash::HashTag,
     views::{
-        FromView, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
-        ViewWithMetadata,
+        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
-    BinaryValue, ObjectHash,
+    BinaryValue, IndexAddress, ObjectHash,
 };
 
 mod key;
@@ -96,21 +96,26 @@ where
     }
 }
 
-impl<T, V> FromView<T> for ProofListIndex<T, V>
+impl<T, V> Restore<T> for ProofListIndex<T::Base, V>
 where
-    T: RawAccess,
+    T: Access,
     V: BinaryValue,
 {
-    const TYPE: IndexType = IndexType::ProofList;
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::ProofList)?;
+        Ok(Self::new(view))
+    }
+}
 
-    fn from_view(view: ViewWithMetadata<T>) -> Self {
-        view.assert_type(IndexType::ProofList);
-        let (base, state) = view.into_parts();
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
+impl<T, V> Ensure<T> for ProofListIndex<T::Base, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    V: BinaryValue,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::ProofList)?;
+        Ok(Self::new(view))
     }
 }
 
@@ -119,6 +124,15 @@ where
     T: RawAccess,
     V: BinaryValue,
 {
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let (base, state) = view.into_parts();
+        Self {
+            base,
+            state,
+            _v: PhantomData,
+        }
+    }
+
     fn has_branch(&self, key: ProofListKey) -> bool {
         key.first_left_leaf_index() < self.len()
     }

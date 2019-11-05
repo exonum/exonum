@@ -21,7 +21,8 @@ use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, Access, BinaryValue, Database, Fork, ListIndex, MapIndex,
+    access::{Access, Ensure, Restore},
+    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
@@ -178,7 +179,7 @@ impl Transaction {
     fn execute(&self, fork: &Fork) {
         let tx_hash = self.object_hash();
 
-        let mut schema = Schema::get_or_create(fork);
+        let mut schema = Schema::ensure(fork);
         schema.transactions.put(&self.object_hash(), *self);
 
         let mut owner_wallet = schema.wallets.get(&self.sender).unwrap_or_default();
@@ -194,39 +195,35 @@ impl Transaction {
 }
 
 struct Schema<T: Access> {
-    pub transactions: MapIndex<T::Base, Hash, Transaction>,
-    pub blocks: ListIndex<T::Base, Hash>,
-    pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
-    access: T,
+    transactions: MapIndex<T::Base, Hash, Transaction>,
+    blocks: ListIndex<T::Base, Hash>,
+    wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
+    wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
 }
 
 impl<T: Access> Schema<T> {
-    fn new_unchecked(access: T) -> Self {
+    fn restore(access: T) -> Self {
         Self {
-            transactions: access.map("transactions").unwrap(),
-            blocks: access.list("blocks").unwrap(),
-            wallets: access.proof_map("wallets").unwrap(),
-            access,
+            transactions: Restore::restore(&access, "transactions".into()).unwrap(),
+            blocks: Restore::restore(&access, "blocks".into()).unwrap(),
+            wallets: Restore::restore(&access, "wallets".into()).unwrap(),
+            wallet_history: Restore::restore(&access, "wallet_history".into()).unwrap(),
         }
     }
 }
 
 impl<'a> Schema<&'a Fork> {
-    fn get_or_create(access: &'a Fork) -> Self {
+    fn ensure(access: &'a Fork) -> Self {
         Self {
-            transactions: access.ensure_map("transactions"),
-            blocks: access.ensure_list("block"),
-            wallets: access.ensure_proof_map("wallets"),
-            access,
+            transactions: Ensure::ensure(&access, "transactions".into()).unwrap(),
+            blocks: Ensure::ensure(&access, "blocks".into()).unwrap(),
+            wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
+            wallet_history: Ensure::ensure(&access, "wallet_history".into()).unwrap(),
         }
     }
 
-    fn ensure_wallets_history(&self, owner: &PublicKey) -> ProofListIndex<&'a Fork, Hash> {
-        self.access.ensure_proof_list(("wallets.history", owner))
-    }
-
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
-        let mut history = self.ensure_wallets_history(owner);
+        let mut history = self.wallet_history.ensure(owner);
         history.push(tx_hash);
         history.object_hash()
     }
@@ -238,7 +235,7 @@ impl Block {
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        Schema::get_or_create(&fork).blocks.push(self.object_hash());
+        Schema::ensure(&fork).blocks.push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }
@@ -288,7 +285,7 @@ pub fn bench_transactions(c: &mut Criterion) {
                     }
                     // Some fast assertions.
                     let snapshot = db.snapshot();
-                    let schema = Schema::new_unchecked(&snapshot);
+                    let schema = Schema::restore(&snapshot);
                     assert_eq!(schema.blocks.len(), params.blocks as u64);
                 })
             },

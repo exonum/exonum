@@ -23,8 +23,9 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::ProofPath, Access, BinaryKey, Database, MapProof, ProofMapIndex, RawAccess,
-    TemporaryDB,
+    access::{AccessExt, RawAccess},
+    proof_map_index::ProofPath,
+    BinaryKey, Database, MapProof, ProofMapIndex, TemporaryDB,
 };
 use proptest::{
     prelude::prop::{

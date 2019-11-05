@@ -220,7 +220,7 @@ mod cryptocurrency {
             AnyTx, BlockchainData, ErrorKind, InstanceId,
         },
     };
-    use exonum_merkledb::{Access, Snapshot};
+    use exonum_merkledb::{access::AccessExt, Snapshot};
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 

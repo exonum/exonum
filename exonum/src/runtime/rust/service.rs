@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Prefixed, Snapshot};
+use exonum_merkledb::{access::Prefixed, BinaryValue, Snapshot};
 use futures::IntoFuture;
 
 use std::fmt::{self, Debug};

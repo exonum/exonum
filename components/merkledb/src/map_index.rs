@@ -21,7 +21,10 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    views::{IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata},
+    access::{restore_view, Access, AccessError, Ensure, Restore},
+    views::{
+        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+    },
     BinaryKey, BinaryValue,
 };
 
@@ -78,14 +81,38 @@ pub struct MapIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
+impl<T, K, V> Restore<T> for MapIndex<T::Base, K, V>
+where
+    T: Access,
+    K: BinaryKey,
+    V: BinaryValue,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::Map)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, K, V> Ensure<T> for MapIndex<T::Base, K, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    K: BinaryKey,
+    V: BinaryValue,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::Map)?;
+        Ok(Self::new(view))
+    }
+}
+
 impl<T, K, V> MapIndex<T, K, V>
 where
     T: RawAccess,
     K: BinaryKey,
     V: BinaryValue,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
-        view.assert_type(IndexType::Map);
+    fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, _) = view.into_parts::<()>();
         Self {
             base,
@@ -411,7 +438,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{extensions::*, Database, TemporaryDB};
+    use crate::{access::AccessExt, Database, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
 

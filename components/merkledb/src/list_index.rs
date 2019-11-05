@@ -20,8 +20,10 @@
 use std::marker::PhantomData;
 
 use crate::{
+    access::{restore_view, Access, AccessError, Ensure, Restore},
     views::{
-        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+        IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
+        ViewWithMetadata,
     },
     BinaryValue,
 };
@@ -55,13 +57,35 @@ pub struct ListIndexIter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
+impl<T, V> Restore<T> for ListIndex<T::Base, V>
+where
+    T: Access,
+    V: BinaryValue,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::List)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, V> Ensure<T> for ListIndex<T::Base, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    V: BinaryValue,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::List)?;
+        Ok(Self::new(view))
+    }
+}
+
 impl<T, V> ListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
-        view.assert_type(IndexType::List);
+    fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, state) = view.into_parts();
         Self {
             base,
@@ -402,7 +426,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{extensions::*, Database, Fork, TemporaryDB};
+    use crate::{access::AccessExt, Database, Fork, TemporaryDB};
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {
         assert!(list_index.is_empty());

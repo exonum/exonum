@@ -19,7 +19,8 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use crate::{
-    views::{IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
+    access::{restore_view, Access, AccessError, Ensure, Restore},
+    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, ObjectHash,
 };
 
@@ -35,17 +36,35 @@ pub struct Entry<T: RawAccess, V> {
     _v: PhantomData<V>,
 }
 
+impl<T, V> Restore<T> for Entry<T::Base, V>
+where
+    T: Access,
+    V: BinaryValue,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::Entry)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, V> Ensure<T> for Entry<T::Base, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    V: BinaryValue,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::Entry)?;
+        Ok(Self::new(view))
+    }
+}
+
 impl<T, V> Entry<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
-        assert_eq!(
-            view.index_type(),
-            IndexType::Entry,
-            "Unexpected index type, entry expected"
-        );
+    fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, _) = view.into_parts::<()>();
         Self {
             base,

@@ -40,7 +40,10 @@ pub mod proto;
 /// Persistent data.
 pub mod schema {
     use exonum::crypto::{Hash, PublicKey};
-    use exonum_merkledb::{Access, MapIndex, RawAccessMut};
+    use exonum_merkledb::{
+        access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+        MapIndex,
+    };
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -98,17 +101,12 @@ pub mod schema {
     ///
     /// [`MapIndex`]: https://exonum.com/doc/version/latest/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<T: Access> CurrencySchema<T> {
+    impl<'a, T: Access> CurrencySchema<Prefixed<'a, T>> {
         /// Creates a new schema instance.
-        pub fn new(access: T) -> Self {
+        pub fn new(access: Prefixed<'a, T>) -> Self {
             Self {
-                wallets: access.map("wallets").unwrap(),
+                wallets: Restore::restore(&access, "wallets".into()).unwrap(),
             }
-        }
-
-        /// Gets a specific wallet from the storage.
-        pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-            self.wallets.get(pub_key)
         }
 
         /// Returns the state hash of cryptocurrency service.
@@ -118,14 +116,14 @@ pub mod schema {
         }
     }
 
-    impl<T> CurrencySchema<T>
+    impl<'a, T> CurrencySchema<Prefixed<'a, T>>
     where
         T: Access,
         T::Base: RawAccessMut,
     {
-        pub(crate) fn initialize(access: T) -> Self {
+        pub(crate) fn ensure(access: Prefixed<'a, T>) -> Self {
             Self {
-                wallets: access.ensure_map("wallets"),
+                wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
             }
         }
     }
@@ -246,7 +244,7 @@ pub mod contracts {
                 .expect("Wrong 'TxCreateWallet' initiator");
 
             let mut schema = CurrencySchema::new(context.service_data());
-            if schema.wallet(&author).is_none() {
+            if schema.wallets.get(&author).is_none() {
                 let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
                 schema.wallets.put(&author, wallet);
@@ -266,8 +264,8 @@ pub mod contracts {
             }
 
             let mut schema = CurrencySchema::new(context.service_data());
-            let sender = schema.wallet(&author).ok_or(Error::SenderNotFound)?;
-            let receiver = schema.wallet(&arg.to).ok_or(Error::ReceiverNotFound)?;
+            let sender = schema.wallets.get(&author).ok_or(Error::SenderNotFound)?;
+            let receiver = schema.wallets.get(&arg.to).ok_or(Error::ReceiverNotFound)?;
 
             let amount = arg.amount;
             if sender.balance >= amount {
@@ -289,7 +287,7 @@ pub mod contracts {
             context: CallContext<'_>,
             _params: Vec<u8>,
         ) -> Result<(), ExecutionError> {
-            CurrencySchema::initialize(context.service_data());
+            CurrencySchema::ensure(context.service_data());
             Ok(())
         }
 
@@ -332,7 +330,8 @@ pub mod api {
         ) -> api::Result<Wallet> {
             let schema = CurrencySchema::new(state.service_data());
             schema
-                .wallet(&pub_key)
+                .wallets
+                .get(&pub_key)
                 .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
         }
 

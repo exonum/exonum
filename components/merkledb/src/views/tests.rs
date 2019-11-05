@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
 use std::{panic, rc::Rc};
 
 use crate::{
+    access::AccessExt,
     db,
-    extensions::*,
     validation::is_valid_index_name,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
     Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
@@ -906,8 +907,12 @@ fn test_metadata_incorrect_index_type() {
 }
 
 #[test]
-#[should_panic(expected = "Unexpected index type")]
 fn test_metadata_index_wrong_type() {
+    use crate::{
+        access::{AccessError, AccessErrorKind, Restore},
+        ListIndex,
+    };
+
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
@@ -918,12 +923,16 @@ fn test_metadata_index_wrong_type() {
     db.merge(fork.into_patch()).unwrap();
     // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
-    snapshot.as_ref().list::<_, Vec<u8>>("simple");
+    let err = ListIndex::<_, Vec<u8>>::restore(&&snapshot, "simple".into()).unwrap_err();
+    assert_matches!(
+        err,
+        AccessError { ref addr, kind: AccessErrorKind::WrongIndexType { .. } }
+            if *addr == IndexAddress::from("simple")
+    );
 }
 
 #[test]
-#[ignore]
-//TODO: fix test [ECR-2869]
+#[ignore] // TODO: fix test [ECR-2869]
 fn multiple_patch() {
     fn list_index(view: &Fork) -> ListIndex<&Fork, u64> {
         view.ensure_list("list_index")

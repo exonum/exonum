@@ -623,7 +623,7 @@ pub enum ListProofError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{extensions::*, Database, TemporaryDB};
+    use crate::{access::AccessExt, Database, TemporaryDB};
 
     fn entry(height: u8, index: u64) -> HashedEntry {
         HashedEntry::new(

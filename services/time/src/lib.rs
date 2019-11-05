@@ -72,7 +72,7 @@ pub struct TimeService {
 
 impl Service for TimeService {
     fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        TimeSchema::initialize(context.service_data());
+        TimeSchema::ensure(context.service_data());
         Ok(())
     }
 

@@ -87,11 +87,11 @@ impl PublicApi {
             to_table,
             to_wallet,
         };
-        let wallet = currency_schema.wallet(&pub_key);
+        let wallet = currency_schema.wallets.get(&pub_key);
 
         let wallet_history = wallet.map(|_| {
             // `history` is always present for existing wallets.
-            let history = currency_schema.wallet_history(&pub_key).unwrap();
+            let history = currency_schema.wallet_history.get(&pub_key).unwrap();
             let proof = history.get_range_proof(0..history.len());
 
             let transactions = history

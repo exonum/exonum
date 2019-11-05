@@ -29,9 +29,10 @@ use self::{
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
 use crate::{
+    access::{restore_view, Access, AccessError, Ensure, Restore},
     views::{
-        BinaryAttribute, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
-        ViewWithMetadata,
+        BinaryAttribute, IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess,
+        RawAccessMut, View, ViewWithMetadata,
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
@@ -174,14 +175,38 @@ impl BinaryAttribute for ProofPath {
     }
 }
 
+impl<T, K, V> Restore<T> for ProofMapIndex<T::Base, K, V>
+where
+    T: Access,
+    K: BinaryKey + ObjectHash,
+    V: BinaryValue,
+{
+    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = restore_view(access, addr, IndexType::ProofMap)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, K, V> Ensure<T> for ProofMapIndex<T::Base, K, V>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+    K: BinaryKey + ObjectHash,
+    V: BinaryValue,
+{
+    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::ProofMap)?;
+        Ok(Self::new(view))
+    }
+}
+
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: RawAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
-    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
-        view.assert_type(IndexType::ProofMap);
+    fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, state) = view.into_parts();
         Self {
             base,

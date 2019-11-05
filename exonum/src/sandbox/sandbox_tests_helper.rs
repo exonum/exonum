@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Purpose of this module is to keep functions with reusable code used for sandbox tests
+//! Functions with reusable code used for sandbox tests.
 
 use bit_vec::BitVec;
-use exonum_merkledb::{Access, Database, HashTag, ObjectHash, TemporaryDB};
+use exonum_merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB};
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 

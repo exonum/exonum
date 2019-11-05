@@ -22,7 +22,10 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
-use exonum_merkledb::{Access, MapIndex, RawAccessMut, Snapshot};
+use exonum_merkledb::{
+    access::{Access, Ensure, RawAccessMut, Restore},
+    MapIndex, Snapshot,
+};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -83,7 +86,7 @@ impl<T: Access> CurrencySchema<T> {
     /// Creates a new schema instance.
     pub fn new(access: T) -> Self {
         Self {
-            wallets: access.map("wallets").unwrap(),
+            wallets: Restore::restore(&access, "wallets".into()).unwrap(),
         }
     }
 
@@ -100,7 +103,7 @@ where
 {
     pub fn initialize(access: T) -> Self {
         Self {
-            wallets: access.ensure_map("wallets"),
+            wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
         }
     }
 }

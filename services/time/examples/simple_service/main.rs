@@ -21,7 +21,10 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use exonum_merkledb::{Access, ObjectHash, ProofMapIndex, RawAccessMut, Snapshot};
+use exonum_merkledb::{
+    access::{Access, Ensure, RawAccessMut, Restore},
+    ObjectHash, ProofMapIndex, Snapshot,
+};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
@@ -64,7 +67,7 @@ pub struct MarkerSchema<T: Access> {
 impl<T: Access> MarkerSchema<T> {
     fn new(access: T) -> Self {
         Self {
-            marks: access.proof_map("marks").unwrap(),
+            marks: Restore::restore(&access, "marks".into()).unwrap(),
         }
     }
 
@@ -81,7 +84,7 @@ where
 {
     fn initialize(access: T) -> Self {
         Self {
-            marks: access.ensure_proof_map("marks"),
+            marks: Ensure::ensure(&access, "marks".into()).unwrap(),
         }
     }
 }
