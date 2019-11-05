@@ -16,14 +16,14 @@ pub use crate::runtime::AnyTx;
 
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
+use exonum_merkledb::{BinaryValue, HashTag};
 
 use std::convert::TryFrom;
 
 use crate::{
     blockchain::Block,
-    crypto::{Hash, HashStream, PublicKey, Signature},
+    crypto::{Hash, PublicKey, Signature},
     helpers::{Height, Round, ValidatorId},
-    merkledb::{BinaryValue, HashTag, ObjectHash},
     proto::schema::consensus,
 };
 
@@ -32,7 +32,7 @@ use exonum_proto::ProtobufConvert;
 /// Protobuf based container for any signed messages.
 ///
 /// See module [documentation](index.html#examples) for examples.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "consensus::SignedMessage")]
 pub struct SignedMessage {
     /// Message payload.
@@ -41,16 +41,6 @@ pub struct SignedMessage {
     pub author: PublicKey,
     /// Digital signature.
     pub signature: Signature,
-}
-
-impl ObjectHash for SignedMessage {
-    fn object_hash(&self) -> Hash {
-        HashStream::new()
-            .update(&self.payload)
-            .update(&self.author.to_bytes())
-            .update(self.signature.as_ref())
-            .hash()
-    }
 }
 
 /// Connect to a node.
