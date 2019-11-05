@@ -113,7 +113,7 @@ where
 
 impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        fork.ensure_map("test")
+        fork.get_map("test")
     }
 
     fn clear(&mut self) {
@@ -123,7 +123,7 @@ impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
 
 impl<V: BinaryValue + ObjectHash> FromFork for ProofMapIndex<Rc<Fork>, [u8; 32], V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        fork.ensure_proof_map("test")
+        fork.get_proof_map("test")
     }
 
     fn clear(&mut self) {

@@ -5,7 +5,7 @@ use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
-    access::{Access, Ensure, RawAccessMut, Restore},
+    access::{Access, RawAccessMut, Restore},
     impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
@@ -66,7 +66,7 @@ impl Transaction {
     fn execute(&self, fork: &Fork) {
         let tx_hash = self.object_hash();
 
-        let mut schema = Schema::restore(fork);
+        let mut schema = Schema::new(fork);
         schema.transactions.put(&self.object_hash(), *self);
 
         let mut owner_wallet = schema.wallets.get(&self.sender).unwrap_or_default();
@@ -89,7 +89,7 @@ struct Schema<T: Access> {
 }
 
 impl<T: Access> Schema<T> {
-    fn restore(access: T) -> Self {
+    fn new(access: T) -> Self {
         Self {
             transactions: Restore::restore(&access, "transactions".into()).unwrap(),
             blocks: Restore::restore(&access, "blocks".into()).unwrap(),
@@ -103,17 +103,8 @@ impl<T: Access> Schema<T>
 where
     T::Base: RawAccessMut,
 {
-    fn ensure(access: T) -> Self {
-        Self {
-            transactions: Ensure::ensure(&access, "transactions".into()).unwrap(),
-            blocks: Ensure::ensure(&access, "blocks".into()).unwrap(),
-            wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
-            wallet_history: Ensure::ensure(&access, "wallet_history".into()).unwrap(),
-        }
-    }
-
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
-        let mut history = self.wallet_history.ensure(owner);
+        let mut history = self.wallet_history.get(owner);
         history.push(tx_hash);
         history.object_hash()
     }
@@ -125,7 +116,7 @@ impl Block {
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        Schema::ensure(&fork).blocks.push(self.object_hash());
+        Schema::new(&fork).blocks.push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }
@@ -143,7 +134,7 @@ fn main() {
     // Creates an empty genesis block.
     let genesis = Block {
         prev_block: Hash::zero(),
-        transactions: Vec::new(),
+        transactions: vec![],
     };
     genesis.execute(&db);
 
@@ -168,7 +159,7 @@ fn main() {
 
     // Gets a snapshot of the current database state.
     let snapshot = db.snapshot();
-    let schema = Schema::restore(&snapshot);
+    let schema = Schema::new(&snapshot);
 
     // Checks that our users have the specified amount of money.
     let alice_wallet = schema.wallets.get(&alice).unwrap();
@@ -186,10 +177,10 @@ fn main() {
     );
 
     // Checks that transaction is recorded in wallet history.
-    let history = schema.wallet_history.get(&alice).unwrap();
+    let history = schema.wallet_history.get(&alice);
     assert_eq!(history.len(), 1);
     assert_eq!(history.get(0), Some(tx_hash));
-    let history = schema.wallet_history.get(&bob).unwrap();
+    let history = schema.wallet_history.get(&bob);
     assert_eq!(history.len(), 1);
     assert_eq!(history.get(0), Some(tx_hash));
 }

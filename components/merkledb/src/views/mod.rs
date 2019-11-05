@@ -48,11 +48,17 @@ impl<T: RawAccess> fmt::Debug for View<T> {
 /// Utility trait to provide optional references to `ViewChanges`.
 pub trait ChangeSet {
     fn as_ref(&self) -> Option<&ViewChanges>;
+    /// Provides mutable reference to changes. The implementation for a `RawAccessMut` type
+    /// should always return `Some(_)`.
+    fn as_mut(&mut self) -> Option<&mut ViewChanges>;
 }
 
 /// No-op implementation used in `Snapshot`.
 impl ChangeSet for () {
     fn as_ref(&self) -> Option<&ViewChanges> {
+        None
+    }
+    fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         None
     }
 }
@@ -61,11 +67,17 @@ impl ChangeSet for ChangesRef {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(&*self)
     }
+    fn as_mut(&mut self) -> Option<&mut ViewChanges> {
+        None
+    }
 }
 
 impl ChangeSet for ChangesMut<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(&*self)
+    }
+    fn as_mut(&mut self) -> Option<&mut ViewChanges> {
+        Some(&mut *self)
     }
 }
 
@@ -88,19 +100,9 @@ pub trait RawAccess: Clone {
 }
 
 /// Allows to mutate data in indexes.
-pub trait RawAccessMut: RawAccess {
-    /// Dereferences the changes into a mutable form.
-    fn deref_mut(changes: &mut Self::Changes) -> &mut ViewChanges;
-}
+pub trait RawAccessMut: RawAccess {}
 
-impl<'a, T> RawAccessMut for T
-where
-    T: RawAccess<Changes = ChangesMut<'a>>,
-{
-    fn deref_mut(changes: &mut Self::Changes) -> &mut ViewChanges {
-        &mut *changes
-    }
-}
+impl<'a, T> RawAccessMut for T where T: RawAccess<Changes = ChangesMut<'a>> {}
 
 /// Converts index access to a readonly presentation.
 pub trait ToReadonly: RawAccess {
@@ -406,6 +408,26 @@ impl<T: RawAccess> View<T> {
             _v: PhantomData,
         }
     }
+
+    /// Crutch to be able to create metadata for indexes not present in the storage.
+    ///
+    /// # Return value
+    ///
+    /// Returns whether the changes were saved.
+    pub(crate) fn put_or_forget<K, V>(&mut self, key: &K, value: V) -> bool
+    where
+        K: BinaryKey + ?Sized,
+        V: BinaryValue,
+    {
+        if let Some(changes) = self.changes.as_mut() {
+            changes
+                .data
+                .insert(concat_keys!(key), Change::Put(value.into_bytes()));
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl<T: RawAccessMut> View<T> {
@@ -415,7 +437,9 @@ impl<T: RawAccessMut> View<T> {
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        T::deref_mut(&mut self.changes)
+        self.changes
+            .as_mut()
+            .unwrap()
             .data
             .insert(concat_keys!(key), Change::Put(value.into_bytes()));
     }
@@ -425,14 +449,16 @@ impl<T: RawAccessMut> View<T> {
     where
         K: BinaryKey + ?Sized,
     {
-        T::deref_mut(&mut self.changes)
+        self.changes
+            .as_mut()
+            .unwrap()
             .data
             .insert(concat_keys!(key), Change::Delete);
     }
 
     /// Clears the view removing all its elements.
     pub fn clear(&mut self) {
-        T::deref_mut(&mut self.changes).clear();
+        self.changes.as_mut().unwrap().clear();
     }
 }
 

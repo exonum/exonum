@@ -111,7 +111,7 @@ impl Modifier<ValueSetIndex<Rc<Fork>, u8>> for SetAction<u8> {
 
 impl FromFork for KeySetIndex<Rc<Fork>, u8> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        fork.ensure_key_set("test")
+        fork.get_key_set("test")
     }
 
     fn clear(&mut self) {
@@ -121,7 +121,7 @@ impl FromFork for KeySetIndex<Rc<Fork>, u8> {
 
 impl FromFork for ValueSetIndex<Rc<Fork>, u8> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        fork.ensure_value_set("test")
+        fork.get_value_set("test")
     }
 
     fn clear(&mut self) {

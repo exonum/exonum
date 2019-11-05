@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use super::{
-    access::{restore_view, Access, AccessError, Ensure, Restore},
+    access::{Access, AccessError, Restore},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
@@ -74,18 +74,6 @@ where
     V: BinaryValue + ObjectHash,
 {
     fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
-        let view = restore_view(access, addr, IndexType::ValueSet)?;
-        Ok(Self::new(view))
-    }
-}
-
-impl<T, V> Ensure<T> for ValueSetIndex<T::Base, V>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-    V: BinaryValue + ObjectHash,
-{
-    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::ValueSet)?;
         Ok(Self::new(view))
     }
@@ -113,7 +101,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_value_set("name");
+    /// let mut index = fork.as_ref().get_value_set("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -133,7 +121,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_value_set("name");
+    /// let mut index = fork.as_ref().get_value_set("name");
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -155,7 +143,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().get_value_set("name");
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -178,7 +166,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().get_value_set("name");
     ///
     /// let hash = Hash::default();
     ///
@@ -202,7 +190,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().get_value_set("name");
     ///
     /// for val in index.hashes() {
     ///     println!("{:?}", val);
@@ -225,7 +213,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index: ValueSetIndex<_, u8> = fork.as_ref().ensure_value_set("name");
+    /// let index: ValueSetIndex<_, u8> = fork.as_ref().get_value_set("name");
     ///
     /// let hash = Hash::default();
     ///
@@ -254,7 +242,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_value_set("name");
+    /// let mut index = fork.as_ref().get_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -272,7 +260,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_value_set("name");
+    /// let mut index = fork.as_ref().get_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -294,7 +282,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_value_set("name");
+    /// let mut index = fork.as_ref().get_value_set("name");
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -322,7 +310,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_value_set("name");
+    /// let mut index = fork.as_ref().get_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -375,7 +363,7 @@ mod tests {
     fn value_set_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut index = fork.as_ref().ensure_value_set("index");
+        let mut index = fork.as_ref().get_value_set("index");
 
         assert!(!index.contains(&1_u8));
         assert!(!index.contains_by_hash(&1_u8.object_hash()));

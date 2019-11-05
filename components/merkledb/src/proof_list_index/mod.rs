@@ -26,7 +26,7 @@ use self::{
     proof_builder::{BuildProof, MerkleTree},
 };
 use crate::{
-    access::{restore_view, Access, AccessError, Ensure, Restore},
+    access::{Access, AccessError, Restore},
     hash::HashTag,
     views::{
         IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
@@ -102,18 +102,6 @@ where
     V: BinaryValue,
 {
     fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
-        let view = restore_view(access, addr, IndexType::ProofList)?;
-        Ok(Self::new(view))
-    }
-}
-
-impl<T, V> Ensure<T> for ProofListIndex<T::Base, V>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-    V: BinaryValue,
-{
-    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::ProofList)?;
         Ok(Self::new(view))
     }

@@ -456,8 +456,8 @@ fn multiple_indexes() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut list: ListIndex<_, u32> = fork.as_ref().ensure_list(IDX_NAME);
-        let mut map = fork.as_ref().ensure_map(("idx", &3));
+        let mut list: ListIndex<_, u32> = fork.as_ref().get_list(IDX_NAME);
+        let mut map = fork.as_ref().get_map(("idx", &3));
 
         for i in 0..10 {
             list.push(i);
@@ -469,14 +469,14 @@ fn multiple_indexes() {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let list: ListIndex<_, u32> = snapshot.as_ref().list(IDX_NAME).unwrap();
-    let map: MapIndex<_, u32, String> = snapshot.as_ref().map(("idx", &3)).unwrap();
+    let list: ListIndex<_, u32> = snapshot.as_ref().get_list(IDX_NAME);
+    let map: MapIndex<_, u32, String> = snapshot.as_ref().get_map(("idx", &3));
     assert_eq!(list.len(), 10);
     assert!(map.values().all(|val| val == "??"));
 
     let fork = db.fork();
-    let list: ListIndex<_, u32> = fork.as_ref().list(IDX_NAME).unwrap();
-    let mut map = fork.as_ref().map(("idx", &3)).unwrap();
+    let list: ListIndex<_, u32> = fork.as_ref().get_list(IDX_NAME);
+    let mut map = fork.as_ref().get_map(("idx", &3));
     for item in &list {
         map.put(&item, item.to_string());
     }
@@ -548,8 +548,8 @@ fn rollbacks_for_indexes_in_same_family() {
     use crate::ProofListIndex;
 
     fn indexes(fork: &Fork) -> (ProofListIndex<&Fork, i64>, ProofListIndex<&Fork, i64>) {
-        let list1 = fork.ensure_proof_list(("foo", &1));
-        let list2 = fork.ensure_proof_list(("foo", &2));
+        let list1 = fork.get_proof_list(("foo", &1));
+        let list2 = fork.get_proof_list(("foo", &2));
         (list1, list2)
     }
 
@@ -822,12 +822,17 @@ fn test_metadata(addr: impl Into<IndexAddress>) {
     ViewWithMetadata::get_or_create(&fork, &addr, IndexType::ProofMap)
         .map_err(drop)
         .unwrap();
-    assert!(ViewWithMetadata::get(&db.snapshot(), &addr).is_none());
+    assert!(
+        ViewWithMetadata::get_or_create(&db.snapshot(), &addr, IndexType::ProofMap)
+            .unwrap()
+            .is_phantom()
+    );
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view = ViewWithMetadata::get(&snapshot, &addr).unwrap();
+    let view = ViewWithMetadata::get_or_create(&snapshot, &addr, IndexType::ProofMap).unwrap();
     assert_eq!(view.index_type(), IndexType::ProofMap);
+    assert!(!view.is_phantom());
 
     let fork = db.fork();
     ViewWithMetadata::get_or_create(&fork, &addr, IndexType::ProofMap)
@@ -916,7 +921,7 @@ fn test_metadata_index_wrong_type() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut map = fork.as_ref().ensure_map("simple");
+        let mut map = fork.as_ref().get_map("simple");
         map.put(&1, vec![1, 2, 3]);
     }
 
@@ -935,7 +940,7 @@ fn test_metadata_index_wrong_type() {
 #[ignore] // TODO: fix test [ECR-2869]
 fn multiple_patch() {
     fn list_index(view: &Fork) -> ListIndex<&Fork, u64> {
-        view.ensure_list("list_index")
+        view.get_list("list_index")
     }
 
     let db = TemporaryDB::new();
@@ -959,7 +964,7 @@ fn multiple_patch() {
     db.merge(patch1).unwrap();
     db.merge(patch2).unwrap();
     let snapshot = db.snapshot();
-    let index: ListIndex<_, u64> = snapshot.as_ref().list("list_index").unwrap();
+    let index: ListIndex<_, u64> = snapshot.as_ref().get_list("list_index");
     assert_eq!(index.len() as usize, index.iter().count());
 }
 
@@ -999,7 +1004,7 @@ fn valid_name_for_url() {
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let _: ListIndex<_, u8> = fork.as_ref().ensure_list("ind\u{435}x-name");
+    let _: ListIndex<_, u8> = fork.as_ref().get_list("ind\u{435}x-name");
 }
 
 fn assert_valid_name_url(name: &str) {
@@ -1011,7 +1016,7 @@ fn check_valid_name(name: &str) -> bool {
     let db = TemporaryDB::new();
     let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let fork = db.fork();
-        let _: ListIndex<_, u8> = fork.as_ref().ensure_list(name.as_ref());
+        let _: ListIndex<_, u8> = fork.as_ref().get_list(name.as_ref());
     }));
     catch_result.is_ok()
 }
@@ -1021,7 +1026,7 @@ fn fork_from_patch() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut index = fork.as_ref().ensure_list("index");
+        let mut index = fork.as_ref().get_list("index");
         index.push(1);
         index.push(2);
         index.push(3);
@@ -1033,7 +1038,7 @@ fn fork_from_patch() {
     let patch = fork.into_patch();
     let fork: Fork = patch.into();
     {
-        let index = fork.as_ref().ensure_list("index");
+        let index = fork.as_ref().get_list("index");
         assert_eq!(index.get(0), Some(1));
         assert_eq!(index.get(1), Some(5));
         assert_eq!(index.get(2), None);

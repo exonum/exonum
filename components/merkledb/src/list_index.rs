@@ -20,7 +20,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    access::{restore_view, Access, AccessError, Ensure, Restore},
+    access::{Access, AccessError, Restore},
     views::{
         IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
         ViewWithMetadata,
@@ -63,18 +63,6 @@ where
     V: BinaryValue,
 {
     fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
-        let view = restore_view(access, addr, IndexType::List)?;
-        Ok(Self::new(view))
-    }
-}
-
-impl<T, V> Ensure<T> for ListIndex<T::Base, V>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-    V: BinaryValue,
-{
-    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::List)?;
         Ok(Self::new(view))
     }
@@ -104,7 +92,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -123,7 +111,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     /// assert_eq!(None, index.last());
     ///
     /// index.push(42);
@@ -145,7 +133,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -164,7 +152,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -186,7 +174,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -210,7 +198,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -239,7 +227,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -260,7 +248,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     ///
     /// assert_eq!(None, index.pop());
     /// index.push(1);
@@ -287,7 +275,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -318,7 +306,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
@@ -346,7 +334,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -381,7 +369,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_list("name");
+    /// let mut index = fork.as_ref().get_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -490,7 +478,7 @@ mod tests {
         where
             T: RawAccessMut,
         {
-            view.ensure_list(("family", &index))
+            view.get_list(("family", &index))
         }
 
         assert_ne!(x, y);
@@ -533,9 +521,9 @@ mod tests {
         // ...even after fork merge.
         db.merge_sync(fork.into_patch()).expect("merge");
         let snapshot = db.snapshot();
-        let index: ListIndex<_, String> = snapshot.as_ref().list(("family", &x)).unwrap();
+        let index: ListIndex<_, String> = snapshot.as_ref().get_list(("family", &x));
         assert!(index.is_empty());
-        let index: ListIndex<_, String> = snapshot.as_ref().list(("family", &y)).unwrap();
+        let index: ListIndex<_, String> = snapshot.as_ref().get_list(("family", &y));
         assert_eq!(
             index.iter().collect::<Vec<_>>(),
             vec!["baz".to_owned(), "qux".to_owned()]
@@ -552,7 +540,7 @@ mod tests {
     fn test_list_index_methods() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = fork.as_ref().ensure_list(IDX_NAME);
+        let mut list_index = fork.as_ref().get_list(IDX_NAME);
         list_index_methods(&mut list_index);
     }
 
@@ -560,7 +548,7 @@ mod tests {
     fn test_list_index_in_family_methods() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = fork.as_ref().ensure_list((IDX_NAME, &vec![1]));
+        let mut list_index = fork.as_ref().get_list((IDX_NAME, &vec![1]));
         list_index_methods(&mut list_index);
     }
 
@@ -568,7 +556,7 @@ mod tests {
     fn test_list_index_iter() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = fork.as_ref().ensure_list(IDX_NAME);
+        let mut list_index = fork.as_ref().get_list(IDX_NAME);
         list_index_iter(&mut list_index);
     }
 
@@ -576,7 +564,7 @@ mod tests {
     fn test_list_index_in_family_iter() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = fork.as_ref().ensure_list((IDX_NAME, &vec![1]));
+        let mut list_index = fork.as_ref().get_list((IDX_NAME, &vec![1]));
         list_index_iter(&mut list_index);
     }
 
@@ -592,8 +580,8 @@ mod tests {
     fn restore_after_no_op_initialization() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        fork.as_ref().ensure_list::<_, u32>(IDX_NAME);
-        let list: ListIndex<_, u32> = fork.readonly().list(IDX_NAME).unwrap();
+        fork.as_ref().get_list::<_, u32>(IDX_NAME);
+        let list: ListIndex<_, u32> = fork.readonly().get_list(IDX_NAME);
         assert!(list.is_empty());
     }
 }

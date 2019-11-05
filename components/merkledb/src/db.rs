@@ -421,9 +421,9 @@ pub enum Change {
 /// fork.as_ref().ensure_list::<_, u8>("index").extend(vec![1, 2, 3]);
 ///
 /// let readonly = fork.readonly();
-/// let index = readonly.list::<_, u8>("index").unwrap();
+/// let index = readonly.get_list::<_, u8>("index").unwrap();
 /// // Works fine.
-/// let index2 = readonly.list::<_, u8>("index").unwrap();
+/// let index2 = readonly.get_list::<_, u8>("index").unwrap();
 /// ```
 ///
 /// It is impossible to mutate index contents having a readonly access to the fork; this is

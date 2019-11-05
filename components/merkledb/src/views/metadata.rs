@@ -264,18 +264,16 @@ impl<T: RawAccess> IndexesPool<T> {
     fn index_metadata(&self, index_name: &[u8]) -> Option<IndexMetadata> {
         self.0.get(index_name)
     }
-}
 
-impl<T: RawAccessMut> IndexesPool<T> {
     fn set_len(&mut self, len: u64) {
-        self.0.put(&(), len)
+        self.0.put_or_forget(&(), len);
     }
 
     fn create_index_metadata<V>(
         &mut self,
         index_name: &[u8],
         index_type: IndexType,
-    ) -> IndexMetadata<V>
+    ) -> (IndexMetadata<V>, bool)
     where
         V: BinaryAttribute,
     {
@@ -285,9 +283,9 @@ impl<T: RawAccessMut> IndexesPool<T> {
             index_type,
             state: None,
         };
-        self.0.put(index_name, metadata.to_bytes());
+        let is_phantom = !self.0.put_or_forget(index_name, metadata.to_bytes());
         self.set_len(len + 1);
-        metadata
+        (metadata, is_phantom)
     }
 }
 
@@ -297,32 +295,54 @@ pub struct ViewWithMetadata<T: RawAccess> {
     view: View<T>,
     metadata: IndexMetadata,
     index_full_name: Vec<u8>,
+    is_phantom: bool,
 }
 
 impl<T> ViewWithMetadata<T>
 where
     T: RawAccess,
 {
-    pub(crate) fn get(index_access: T, index_address: &IndexAddress) -> Option<Self> {
+    pub(crate) fn get_or_create(
+        index_access: T,
+        index_address: &IndexAddress,
+        index_type: IndexType,
+    ) -> Result<Self, Self> {
+        assert_valid_name(index_address.name());
         // Actual name.
         let index_name = index_address.name.clone();
         // Full name for internal usage.
         let index_full_name = index_address.fully_qualified_name();
 
-        let pool = IndexesPool::new(index_access.clone());
-        let metadata = pool.index_metadata(&index_full_name)?;
+        let mut pool = IndexesPool::new(index_access.clone());
+        let mut is_phantom = false;
+        let metadata = pool.index_metadata(&index_full_name).unwrap_or_else(|| {
+            let (metadata, phantom_flag) = pool.create_index_metadata(&index_full_name, index_type);
+            is_phantom = phantom_flag;
+            metadata
+        });
+        let real_index_type = metadata.index_type;
         let mut index_address = metadata.index_address();
         // Set index address name, since metadata itself doesn't know it.
         index_address.name = index_name;
-        Some(Self {
+        let this = Self {
             view: View::new(index_access, index_address),
             metadata,
             index_full_name,
-        })
+            is_phantom,
+        };
+        if real_index_type == index_type {
+            Ok(this)
+        } else {
+            Err(this)
+        }
     }
 
     pub fn index_type(&self) -> IndexType {
         self.metadata.index_type
+    }
+
+    pub fn is_phantom(&self) -> bool {
+        self.is_phantom
     }
 
     pub fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
@@ -335,48 +355,6 @@ where
             index_full_name: self.index_full_name,
         };
         (self.view, state)
-    }
-}
-
-impl<T> ViewWithMetadata<T>
-where
-    T: RawAccessMut,
-{
-    /// # Return value
-    ///
-    /// Returns `Ok(_)` if the index was newly created or had the expected type, or `Err(_)`
-    /// if the index existed and has an unexpected type.
-    pub(crate) fn get_or_create(
-        index_access: T,
-        index_address: &IndexAddress,
-        index_type: IndexType,
-    ) -> Result<Self, Self> {
-        assert_valid_name(index_address.name());
-
-        // Actual name.
-        let index_name = index_address.name.clone();
-        // Full name for internal usage.
-        let index_full_name = index_address.fully_qualified_name();
-
-        let mut pool = IndexesPool::new(index_access.clone());
-        let metadata = pool
-            .index_metadata(&index_full_name)
-            .unwrap_or_else(|| pool.create_index_metadata(&index_full_name, index_type));
-        let real_index_type = metadata.index_type;
-
-        let mut index_address = metadata.index_address();
-        // Set index address name, since metadata itself doesn't know it.
-        index_address.name = index_name;
-        let this = Self {
-            view: View::new(index_access, index_address),
-            metadata,
-            index_full_name,
-        };
-        if real_index_type == index_type {
-            Ok(this)
-        } else {
-            Err(this)
-        }
     }
 }
 

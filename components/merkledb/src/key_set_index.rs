@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    access::{restore_view, Access, AccessError, Ensure, Restore},
+    access::{Access, AccessError, Restore},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
@@ -59,18 +59,6 @@ where
     K: BinaryKey,
 {
     fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
-        let view = restore_view(access, addr, IndexType::KeySet)?;
-        Ok(Self::new(view))
-    }
-}
-
-impl<T, K> Ensure<T> for KeySetIndex<T::Base, K>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-    K: BinaryKey,
-{
-    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::KeySet)?;
         Ok(Self::new(view))
     }
@@ -98,7 +86,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_key_set("name");
+    /// let mut index = fork.as_ref().get_key_set("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -121,7 +109,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().ensure_key_set::<_, u8>("name");
+    /// let index = fork.as_ref().get_key_set::<_, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -143,7 +131,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().ensure_key_set::<_, u8>("name");
+    /// let index = fork.as_ref().get_key_set::<_, u8>("name");
     ///
     /// for val in index.iter_from(&2) {
     ///     println!("{}", val);
@@ -170,7 +158,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_key_set("name");
+    /// let mut index = fork.as_ref().get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -189,7 +177,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_key_set("name");
+    /// let mut index = fork.as_ref().get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -219,7 +207,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_key_set("name");
+    /// let mut index = fork.as_ref().get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -269,7 +257,7 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, String> = fork.as_ref().ensure_key_set(INDEX_NAME);
+        let mut index: KeySetIndex<_, String> = fork.as_ref().get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
         index.insert(KEY.to_owned());
         assert_eq!(true, index.contains(KEY));
@@ -283,7 +271,7 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, Vec<u8>> = fork.as_ref().ensure_key_set(INDEX_NAME);
+        let mut index: KeySetIndex<_, Vec<u8>> = fork.as_ref().get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
         index.insert(KEY.to_owned());
         assert_eq!(true, index.contains(KEY));
@@ -296,7 +284,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index = fork.as_ref().ensure_key_set(INDEX_NAME);
+        let mut index = fork.as_ref().get_key_set(INDEX_NAME);
         assert!(!index.contains(&1_u8));
         index.insert(1_u8);
         assert!(index.contains(&1_u8));

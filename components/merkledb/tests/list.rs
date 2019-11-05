@@ -157,7 +157,7 @@ where
 
 impl<V: BinaryValue> FromFork for ListIndex<Rc<Fork>, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        fork.ensure_list("test")
+        fork.get_list("test")
     }
 
     fn clear(&mut self) {
@@ -167,7 +167,7 @@ impl<V: BinaryValue> FromFork for ListIndex<Rc<Fork>, V> {
 
 impl<V: BinaryValue> FromFork for ProofListIndex<Rc<Fork>, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        fork.ensure_proof_list("test")
+        fork.get_proof_list("test")
     }
 
     fn clear(&mut self) {

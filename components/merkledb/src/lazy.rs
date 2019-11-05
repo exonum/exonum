@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    access::{Access, AccessError, Ensure, RawAccessMut, Restore},
+    access::{Access, AccessError, Restore},
     views::IndexAddress,
 };
 
@@ -19,21 +19,6 @@ where
     I: Restore<T>,
 {
     fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
-        Ok(Self {
-            access: access.to_owned(),
-            address: addr,
-            _index: PhantomData,
-        })
-    }
-}
-
-impl<T, I> Ensure<T> for Lazy<T, I>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-    I: Ensure<T>,
-{
-    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
         Ok(Self {
             access: access.to_owned(),
             address: addr,
@@ -62,18 +47,6 @@ where
     }
 }
 
-impl<T, I> Lazy<T, I>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-    I: Ensure<T>,
-{
-    /// Gets or creates an object in the database.
-    pub fn get_or_create(&self) -> I {
-        I::ensure(&self.access, self.address.clone()).unwrap()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
@@ -87,8 +60,8 @@ mod tests {
         let fork = db.fork();
         {
             let lazy_index: Lazy<_, ListIndex<_, u64>> =
-                Lazy::ensure(&&fork, "lazy".into()).unwrap();
-            lazy_index.get_or_create().extend(vec![1, 2, 3]);
+                Lazy::restore(&&fork, "lazy".into()).unwrap();
+            lazy_index.get().extend(vec![1, 2, 3]);
             assert_eq!(lazy_index.get().len(), 3);
             lazy_index.get().push(4);
         }

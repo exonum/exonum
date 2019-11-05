@@ -62,7 +62,7 @@ impl HashedEntry {
 /// # use failure::Error;
 /// # fn main() -> Result<(), Error> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut list = fork.as_ref().ensure_proof_list("index");
+/// let mut list = fork.as_ref().get_proof_list("index");
 /// list.extend(vec![100_u32, 200_u32, 300_u32]);
 ///
 /// // Get the proof from the index
@@ -97,7 +97,7 @@ impl HashedEntry {
 /// # };
 /// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut list = fork.as_ref().ensure_proof_list("index");
+/// let mut list = fork.as_ref().get_proof_list("index");
 /// list.extend(vec![1_u32, 2, 3]);
 /// let h1 = HashTag::hash_leaf(&1_u32.to_bytes());
 /// let h3 = HashTag::hash_leaf(&3_u32.to_bytes());
@@ -794,7 +794,7 @@ mod tests {
 
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list = fork.as_ref().ensure_proof_list("test");
+        let mut list = fork.as_ref().get_proof_list("test");
         list.extend(0_u32..8);
 
         for len in 1..8 {

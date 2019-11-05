@@ -1,4 +1,4 @@
-//! High-level access to MerkleDB data.
+//! High-level access to database.
 
 use failure::{Error, Fail};
 
@@ -20,37 +20,22 @@ pub trait Access: Clone {
     /// Index access serving as the basis for created indices.
     type Base: RawAccess;
 
-    /// Gets a generic `View` with the specified address.
-    fn get_view(&self, addr: IndexAddress) -> Result<ViewWithMetadata<Self::Base>, AccessError>;
-
     /// Gets or creates a generic `View` with the specified address.
     fn get_or_create_view(
         &self,
         addr: IndexAddress,
         index_type: IndexType,
-    ) -> Result<ViewWithMetadata<Self::Base>, AccessError>
-    where
-        Self::Base: RawAccessMut;
+    ) -> Result<ViewWithMetadata<Self::Base>, AccessError>;
 }
 
 impl<T: RawAccess> Access for T {
     type Base = Self;
 
-    fn get_view(&self, addr: IndexAddress) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        ViewWithMetadata::get(self.clone(), &addr).ok_or_else(|| AccessError {
-            addr,
-            kind: AccessErrorKind::DoesNotExist,
-        })
-    }
-
     fn get_or_create_view(
         &self,
         addr: IndexAddress,
         index_type: IndexType,
-    ) -> Result<ViewWithMetadata<Self::Base>, AccessError>
-    where
-        Self: RawAccessMut,
-    {
+    ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
         ViewWithMetadata::get_or_create(self.clone(), &addr, index_type).map_err(|e| AccessError {
             addr,
             kind: AccessErrorKind::WrongIndexType {
@@ -84,19 +69,11 @@ impl<'a, T: Access> Prefixed<'a, T> {
 impl<T: Access> Access for Prefixed<'_, T> {
     type Base = T::Base;
 
-    fn get_view(&self, addr: IndexAddress) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        let prefixed_addr = addr.prepend_name(self.prefix.as_ref());
-        self.access.get_view(prefixed_addr)
-    }
-
     fn get_or_create_view(
         &self,
         addr: IndexAddress,
         index_type: IndexType,
-    ) -> Result<ViewWithMetadata<Self::Base>, AccessError>
-    where
-        T::Base: RawAccessMut,
-    {
+    ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
         let prefixed_addr = addr.prepend_name(self.prefix.as_ref());
         self.access.get_or_create_view(prefixed_addr, index_type)
     }
@@ -121,10 +98,6 @@ impl fmt::Display for AccessError {
 /// Error that can be emitted during accessing an object from the database.
 #[derive(Debug, Fail)]
 pub enum AccessErrorKind {
-    /// Index does not exist.
-    #[fail(display = "Index does not exist")]
-    DoesNotExist,
-
     /// Index has wrong type.
     #[fail(
         display = "Wrong index type: expected {:?}, but got {:?}",
@@ -152,31 +125,6 @@ pub trait Restore<T: Access>: Sized {
     fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError>;
 }
 
-/// Ensures that the object is in the database, creating it if necessary.
-pub trait Ensure<T: Access>: Sized {
-    /// Ensures that the object is in the database. If the object is not in the database,
-    /// it should be created by this method.
-    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError>;
-}
-
-pub(crate) fn restore_view<T: Access>(
-    access: &T,
-    addr: IndexAddress,
-    expected_type: IndexType,
-) -> Result<ViewWithMetadata<T::Base>, AccessError> {
-    let view = access.get_view(addr.clone())?;
-    if view.index_type() != expected_type {
-        return Err(AccessError {
-            addr,
-            kind: AccessErrorKind::WrongIndexType {
-                expected: expected_type,
-                actual: view.index_type(),
-            },
-        });
-    }
-    Ok(view)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,23 +136,23 @@ mod tests {
         let fork = db.fork();
         {
             let prefixed = Prefixed::new("test", &fork);
-            let mut list = prefixed.ensure_list::<_, i32>("foo");
+            let mut list = prefixed.get_list::<_, i32>("foo");
             list.extend(vec![1, 2, 3]);
         }
         {
-            let list = fork.as_ref().list::<_, i32>("test.foo").unwrap();
+            let list = fork.as_ref().get_list::<_, i32>("test.foo");
             assert_eq!(list.len(), 3);
             assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
         }
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let list = snapshot.as_ref().list::<_, i32>("test.foo").unwrap();
+        let list = snapshot.as_ref().get_list::<_, i32>("test.foo");
         assert_eq!(list.len(), 3);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
 
         let prefixed = Prefixed::new("test", &snapshot);
-        let list = prefixed.list::<_, i32>("foo").unwrap();
+        let list = prefixed.get_list::<_, i32>("foo");
         assert_eq!(list.len(), 3);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
     }
@@ -216,9 +164,9 @@ mod tests {
         let foo_space = Prefixed::new("foo", &fork);
         let bar_space = Prefixed::new("bar", &fork);
         {
-            let mut list = foo_space.ensure_list("test");
+            let mut list = foo_space.get_list("test");
             list.push("Test".to_owned());
-            let mut other_list = bar_space.ensure_list("test");
+            let mut other_list = bar_space.get_list("test");
             other_list.extend(vec![1_u64, 2, 3]);
 
             assert_eq!(list.len(), 1);
@@ -228,30 +176,34 @@ mod tests {
 
         let snapshot = db.snapshot();
         let foo_space = Prefixed::new("foo", &snapshot);
-        let list = foo_space.list::<_, String>("test").unwrap();
+        let list = foo_space.get_list::<_, String>("test");
         assert_eq!(list.get(0), Some("Test".to_owned()));
         let bar_space = Prefixed::new("bar", &snapshot);
-        let list = bar_space.list::<_, u64>("test").unwrap();
+        let list = bar_space.get_list::<_, u64>("test");
         assert_eq!(list.get(0), Some(1_u64));
 
         // It is possible to create indexes of the different types at the same place.
         let fork = db.fork();
         let foo_space = Prefixed::new("foo", &fork);
-        foo_space.ensure_type(("fam", &1_u32), IndexType::List);
+        foo_space
+            .touch_index(("fam", &1_u32), IndexType::List)
+            .unwrap();
         let bar_space = Prefixed::new("bar", &fork);
-        bar_space.ensure_type(("fam", &1_u32), IndexType::ProofMap);
+        bar_space
+            .touch_index(("fam", &1_u32), IndexType::ProofMap)
+            .unwrap();
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
         let view = snapshot
             .as_ref()
-            .get_view(("foo.fam", &1_u32).into())
+            .get_or_create_view(("foo.fam", &1_u32).into(), IndexType::List)
             .unwrap();
-        assert_eq!(view.index_type(), IndexType::List);
+        assert!(!view.is_phantom());
         let view = snapshot
             .as_ref()
-            .get_view(("bar.fam", &1_u32).into())
+            .get_or_create_view(("bar.fam", &1_u32).into(), IndexType::ProofMap)
             .unwrap();
-        assert_eq!(view.index_type(), IndexType::ProofMap);
+        assert!(!view.is_phantom());
     }
 }

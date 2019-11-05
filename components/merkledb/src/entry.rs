@@ -19,7 +19,7 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use crate::{
-    access::{restore_view, Access, AccessError, Ensure, Restore},
+    access::{Access, AccessError, Restore},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, ObjectHash,
 };
@@ -42,18 +42,6 @@ where
     V: BinaryValue,
 {
     fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
-        let view = restore_view(access, addr, IndexType::Entry)?;
-        Ok(Self::new(view))
-    }
-}
-
-impl<T, V> Ensure<T> for Entry<T::Base, V>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-    V: BinaryValue,
-{
-    fn ensure(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::Entry)?;
         Ok(Self::new(view))
     }
