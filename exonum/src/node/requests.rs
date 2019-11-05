@@ -165,8 +165,8 @@ impl NodeHandler {
         let block_hash = schema.block_hash_by_height(height).unwrap();
 
         let block = schema.blocks().get(&block_hash).unwrap();
-        let precommits = schema.precommits(&block_hash).unwrap();
-        let transactions = schema.block_transactions(height).unwrap();
+        let precommits = schema.precommits(&block_hash);
+        let transactions = schema.block_transactions(height);
 
         let block_msg = self.sign_message(BlockResponse::new(
             msg.author(),

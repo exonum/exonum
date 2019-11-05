@@ -41,7 +41,7 @@ pub mod proto;
 pub mod schema {
     use exonum::crypto::{Hash, PublicKey};
     use exonum_merkledb::{
-        access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+        access::{Access, Prefixed, Restore},
         MapIndex,
     };
     use exonum_proto::ProtobufConvert;
@@ -113,18 +113,6 @@ pub mod schema {
         pub fn state_hash(&self) -> Vec<Hash> {
             // Since wallets are stored in MapIndex, there is no state hash.
             vec![]
-        }
-    }
-
-    impl<'a, T> CurrencySchema<Prefixed<'a, T>>
-    where
-        T: Access,
-        T::Base: RawAccessMut,
-    {
-        pub(crate) fn ensure(access: Prefixed<'a, T>) -> Self {
-            Self {
-                wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
-            }
         }
     }
 }
@@ -217,7 +205,6 @@ pub mod contracts {
         schema::{CurrencySchema, Wallet},
         transactions::{CreateWallet, TxTransfer},
     };
-    use exonum::runtime::ExecutionError;
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
@@ -282,15 +269,6 @@ pub mod contracts {
     }
 
     impl Service for CryptocurrencyService {
-        fn initialize(
-            &self,
-            context: CallContext<'_>,
-            _params: Vec<u8>,
-        ) -> Result<(), ExecutionError> {
-            CurrencySchema::ensure(context.service_data());
-            Ok(())
-        }
-
         fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             CurrencySchema::new(data.for_executing_service()).state_hash()
         }

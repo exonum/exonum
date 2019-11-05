@@ -15,7 +15,7 @@
 //! Cryptocurrency database schema.
 
 use exonum_merkledb::{
-    access::{Access, Ensure, RawAccessMut, Restore},
+    access::{Access, RawAccessMut, Restore},
     Group, ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
@@ -52,13 +52,6 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
-    pub(crate) fn initialize(access: T) -> Self {
-        Self {
-            wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
-            wallet_history: Ensure::ensure(&access, "wallet_history".into()).unwrap(),
-        }
-    }
-
     /// Increase balance of the wallet and append new record to its history.
     ///
     /// Panics if there is no wallet with given public key.
@@ -68,7 +61,7 @@ where
         amount: u64,
         transaction: Hash,
     ) {
-        let mut history = self.wallet_history.ensure(&wallet.pub_key);
+        let mut history = self.wallet_history.get(&wallet.pub_key);
         history.push(transaction);
         let history_hash = history.object_hash();
         let balance = wallet.balance;
@@ -86,7 +79,7 @@ where
         amount: u64,
         transaction: Hash,
     ) {
-        let mut history = self.wallet_history.ensure(&wallet.pub_key);
+        let mut history = self.wallet_history.get(&wallet.pub_key);
         history.push(transaction);
         let history_hash = history.object_hash();
         let balance = wallet.balance;
@@ -97,7 +90,7 @@ where
 
     /// Create new wallet and append first record to its history.
     pub(crate) fn create_wallet(&mut self, key: &PublicKey, name: &str, transaction: Hash) {
-        let mut history = self.wallet_history.ensure(key);
+        let mut history = self.wallet_history.get(key);
         history.push(transaction);
         let history_hash = history.object_hash();
         let wallet = Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash);

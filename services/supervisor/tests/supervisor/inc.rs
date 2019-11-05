@@ -25,7 +25,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::{
-    access::{Access, Ensure, RawAccessMut, Restore},
+    access::{Access, RawAccessMut, Restore},
     Entry, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -60,13 +60,6 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
-    fn initialize(access: T) -> Self {
-        Self {
-            count: Ensure::ensure(&access, "count".into()).unwrap(),
-            params: Ensure::ensure(&access, "params".into()).unwrap(),
-        }
-    }
-
     fn inc(&mut self) -> u64 {
         let new_count = self
             .count()
@@ -125,11 +118,6 @@ impl PublicApi {
 }
 
 impl Service for IncService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        Schema::initialize(context.service_data());
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }

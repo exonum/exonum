@@ -14,7 +14,7 @@
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
 use exonum_merkledb::{
-    access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+    access::{Access, Prefixed, Restore},
     Entry, ObjectHash, ProofMapIndex,
 };
 
@@ -53,22 +53,5 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
             self.pending_instances.object_hash(),
             self.config_confirms.object_hash(),
         ]
-    }
-}
-
-impl<'a, T> Schema<Prefixed<'a, T>>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-{
-    pub(crate) fn ensure(access: Prefixed<'a, T>) -> Self {
-        Self {
-            deploy_requests: Ensure::ensure(&access, "deploy_requests".into()).unwrap(),
-            deploy_confirmations: Ensure::ensure(&access, "deploy_confirmations".into()).unwrap(),
-            pending_deployments: Ensure::ensure(&access, "pending_deployments".into()).unwrap(),
-            pending_instances: Ensure::ensure(&access, "pending_instances".into()).unwrap(),
-            config_confirms: Ensure::ensure(&access, "config_confirms".into()).unwrap(),
-            pending_proposal: Ensure::ensure(&access, "pending_proposal".into()).unwrap(),
-        }
     }
 }

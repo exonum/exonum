@@ -114,7 +114,7 @@ impl CommittedTransactionSummary {
         let tx_result = schema.transaction_results().get(tx_hash)?;
         let location = schema.transactions_locations().get(tx_hash)?;
         let location_proof = schema
-            .block_transactions(location.block_height())?
+            .block_transactions(location.block_height())
             .get_proof(location.position_in_block());
         let time = median_precommits_time(
             &schema
@@ -308,7 +308,7 @@ impl Handler<Broadcast> for Server {
         self.broadcast_message(SubscriptionType::Blocks, &block_header);
 
         // Get list of transactions in block and notify about each of them.
-        let tx_hashes_table = schema.block_transactions(height).unwrap();
+        let tx_hashes_table = schema.block_transactions(height);
         tx_hashes_table
             .iter()
             .filter_map(|hash| {

@@ -15,7 +15,7 @@
 use exonum::{
     crypto::Hash,
     merkledb::{
-        access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+        access::{Access, Prefixed, Restore},
         Entry, ObjectHash,
     },
 };
@@ -35,17 +35,5 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
 
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.config_propose.object_hash()]
-    }
-}
-
-impl<'a, T> Schema<Prefixed<'a, T>>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-{
-    pub(super) fn ensure(access: Prefixed<'a, T>) -> Self {
-        Self {
-            config_propose: Ensure::ensure(&access, "config_propose".into()).unwrap(),
-        }
     }
 }

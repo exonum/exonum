@@ -174,10 +174,10 @@ pub fn check_service_actual_param(testkit: &TestKit, param: Option<String>) {
     let actual_params = snapshot
         .for_service(CONFIG_SERVICE_NAME)
         .unwrap()
-        .entry::<_, String>("params");
+        .get_entry::<_, String>("params");
     match param {
-        Some(param) => assert_eq!(actual_params.unwrap().get().unwrap(), param),
-        None => assert!(actual_params.is_none() || actual_params.unwrap().get().is_none()),
+        Some(param) => assert_eq!(actual_params.get().unwrap(), param),
+        None => assert!(!actual_params.exists()),
     }
 }
 
@@ -186,9 +186,9 @@ pub fn check_second_service_actual_param(testkit: &TestKit, param: Option<String
     let actual_params = snapshot
         .for_service(SECOND_SERVICE_NAME)
         .unwrap()
-        .entry::<_, String>("params");
+        .get_entry::<_, String>("params");
     match param {
-        Some(param) => assert_eq!(actual_params.unwrap().get().unwrap(), param),
-        None => assert!(actual_params.is_none() || actual_params.unwrap().get().is_none()),
+        Some(param) => assert_eq!(actual_params.get().unwrap(), param),
+        None => assert!(!actual_params.exists()),
     }
 }

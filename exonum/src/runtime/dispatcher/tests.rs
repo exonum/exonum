@@ -33,9 +33,9 @@ use crate::{
     runtime::{
         dispatcher::{Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError, DispatcherSchema,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
-        RuntimeIdentifier, StateHashAggregator,
+        ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, DispatcherError, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime, RuntimeIdentifier,
+        StateHashAggregator,
     },
 };
 
@@ -43,9 +43,10 @@ use crate::{
 /// `Runtime::after_commit()` is called. Thus, we need to perform this commitment
 /// manually here, emulating the relevant part of `BlockchainMut::create_genesis_block()`.
 fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
-    let is_genesis_block = CoreSchema::get(&*fork).is_none();
+    let is_genesis_block = CoreSchema::get_unchecked(&*fork)
+        .block_hashes_by_height()
+        .is_empty();
     assert!(is_genesis_block);
-    DispatcherSchema::initialize(fork);
     dispatcher.commit_block(fork);
 
     let block = Block::new(
@@ -57,7 +58,7 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
         Hash::zero(),
     );
     let block_hash = block.object_hash();
-    let schema = CoreSchema::initialize(&*fork);
+    let schema = CoreSchema::get_unchecked(&*fork);
     schema.block_hashes_by_height().push(block_hash);
     schema.blocks().put(&block_hash, block);
     fork.flush();
@@ -303,7 +304,6 @@ fn test_dispatcher_simple() {
 
     // Check if the services are ready for deploy.
     let mut fork = db.fork();
-    DispatcherSchema::initialize(&fork);
     dispatcher
         .deploy_artifact_sync(&fork, rust_artifact.clone(), vec![])
         .unwrap();

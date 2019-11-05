@@ -110,8 +110,9 @@ impl BlockchainBuilder {
         // If genesis block had been already created just restores dispatcher state from database
         // otherwise creates genesis block with the given specification.
         let snapshot = blockchain.snapshot();
-        let has_genesis_block = Schema::get(&snapshot)
-            .map_or(false, |schema| !schema.block_hashes_by_height().is_empty());
+        let has_genesis_block = !Schema::get_unchecked(&snapshot)
+            .block_hashes_by_height()
+            .is_empty();
 
         if has_genesis_block {
             blockchain.dispatcher.restore_state(&snapshot)?;

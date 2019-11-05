@@ -536,12 +536,12 @@ impl<'a> BlockchainExplorer<'a> {
     fn precommits(&self, block: &Block) -> Vec<Verified<Precommit>> {
         self.schema
             .precommits(&block.object_hash())
-            .map(|index| index.iter().collect())
-            .unwrap_or_default()
+            .iter()
+            .collect()
     }
 
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
-        let tx_hashes_table = self.schema.block_transactions(block.height()).unwrap();
+        let tx_hashes_table = self.schema.block_transactions(block.height());
         tx_hashes_table.iter().collect()
     }
 
@@ -560,7 +560,6 @@ impl<'a> BlockchainExplorer<'a> {
         let location_proof = self
             .schema
             .block_transactions(location.block_height())
-            .unwrap()
             .get_proof(location.position_in_block());
 
         let block_precommits = self
@@ -610,7 +609,6 @@ impl<'a> BlockchainExplorer<'a> {
             header: proof.block,
             precommits: proof.precommits,
             transactions: txs_table
-                .expect("Missing transactions for committed block")
                 .iter()
                 .map(|tx_hash| self.committed_transaction(&tx_hash, None))
                 .collect(),

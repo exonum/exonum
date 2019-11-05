@@ -21,7 +21,7 @@ use exonum::{
     messages::Verified,
     runtime::{
         rust::{CallContext, Service},
-        AnyTx, BlockchainData, ExecutionError, InstanceId,
+        AnyTx, BlockchainData, InstanceId,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
@@ -104,14 +104,6 @@ impl ExplorerTransactions for MyService {
 }
 
 impl Service for MyService {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }

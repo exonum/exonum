@@ -15,7 +15,7 @@
 use exonum::{
     crypto::PublicKey,
     merkledb::{
-        access::{Access, Ensure, RawAccessMut, Restore},
+        access::{Access, Restore},
         MapIndex,
     },
 };
@@ -40,18 +40,6 @@ impl<T: Access> WalletSchema<T> {
     pub fn new(access: T) -> Self {
         Self {
             wallets: Restore::restore(&access, "wallets".into()).unwrap(),
-        }
-    }
-}
-
-impl<T> WalletSchema<T>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-{
-    pub fn ensure(access: T) -> Self {
-        Self {
-            wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
         }
     }
 }

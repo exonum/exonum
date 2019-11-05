@@ -63,11 +63,6 @@ impl WalletService {
 }
 
 impl Service for WalletService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        WalletSchema::ensure(context.service_data());
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
@@ -138,14 +133,6 @@ impl DepositService {
 }
 
 impl Service for DepositService {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
@@ -228,14 +215,6 @@ impl AnyCall for AnyCallService {
 }
 
 impl Service for AnyCallService {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }

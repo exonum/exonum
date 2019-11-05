@@ -73,14 +73,6 @@ impl From<ConfigChangeService> for InstanceCollection {
 }
 
 impl Service for ConfigChangeService {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
@@ -118,7 +110,7 @@ impl Configure for ConfigChangeService {
 
         context
             .service_data()
-            .ensure_entry("params")
+            .get_entry("params")
             .set(params.clone());
 
         match params.as_str() {
@@ -293,8 +285,7 @@ fn service_config_change() {
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry("params")
-        .unwrap()
+        .get_entry("params")
         .get()
         .unwrap();
 
@@ -330,12 +321,12 @@ fn discard_errored_service_config_change() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    assert!(testkit
+    assert!(!testkit
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry::<_, String>("params")
-        .is_none());
+        .get_entry::<_, String>("params")
+        .exists());
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(0)));
 }
 
@@ -368,12 +359,12 @@ fn discard_panicked_service_config_change() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    assert!(testkit
+    assert!(!testkit
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry::<_, String>("params")
-        .is_none());
+        .get_entry::<_, String>("params")
+        .exists());
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(0)));
 }
 
@@ -443,8 +434,7 @@ fn another_configuration_change_proposal() {
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry::<_, String>("params")
-        .unwrap()
+        .get_entry::<_, String>("params")
         .get();
 
     assert_eq!(actual_params, Some(params));
@@ -556,12 +546,12 @@ fn service_config_rollback_apply_error() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    assert!(testkit
+    assert!(!testkit
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry::<_, String>("params")
-        .is_none());
+        .get_entry::<_, String>("params")
+        .exists());
 }
 
 #[test]
@@ -585,12 +575,12 @@ fn service_config_rollback_apply_panic() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    assert!(testkit
+    assert!(!testkit
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry::<_, String>("params")
-        .is_none());
+        .get_entry::<_, String>("params")
+        .exists());
 }
 
 #[test]
@@ -619,8 +609,7 @@ fn service_config_apply_multiple_configs() {
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry::<_, String>("params")
-        .unwrap()
+        .get_entry::<_, String>("params")
         .get();
 
     assert_eq!(actual_params, Some(params));
@@ -655,8 +644,7 @@ fn several_service_config_changes() {
         .snapshot()
         .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
-        .entry::<_, String>("params")
-        .unwrap()
+        .get_entry::<_, String>("params")
         .get();
 
     assert_eq!(actual_params, Some("Change 4".to_owned()));

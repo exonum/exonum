@@ -115,11 +115,6 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 }
 
 impl Service for SimpleSupervisor {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        Schema::ensure(context.service_data());
-        Ok(())
-    }
-
     fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         Schema::new(data.for_executing_service()).state_hash()
     }

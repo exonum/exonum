@@ -148,9 +148,9 @@ pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Opt
 ///
 /// Used in `exonum-cli` to implement `clear-cache` maintenance action.
 pub fn clear_consensus_messages_cache(fork: &Fork) {
-    if let Some(schema) = Schema::get(fork) {
-        schema.consensus_messages_cache().clear();
-    }
+    Schema::get_unchecked(fork)
+        .consensus_messages_cache()
+        .clear();
 }
 
 /// Returns sufficient number of votes for the given validators number.

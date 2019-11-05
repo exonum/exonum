@@ -25,12 +25,12 @@ use exonum::{
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
         rust::{CallContext, Service},
-        BlockchainData, ExecutionError, InstanceId,
+        BlockchainData, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{
-    access::{Access, Ensure, RawAccessMut, Restore},
+    access::{Access, RawAccessMut, Restore},
     Entry, ObjectHash, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -64,12 +64,6 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
-    fn initialize(access: T) -> Self {
-        Self {
-            counter: Ensure::ensure(&access, "counter".into()).unwrap(),
-        }
-    }
-
     fn inc_counter(&mut self, inc: u64) -> u64 {
         let count = self
             .counter
@@ -235,11 +229,6 @@ impl CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn initialize(&self, context: CallContext<'_>, _: Vec<u8>) -> Result<(), ExecutionError> {
-        CounterSchema::initialize(context.service_data());
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }

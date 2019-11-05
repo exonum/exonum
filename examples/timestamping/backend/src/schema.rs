@@ -17,7 +17,7 @@
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, Ensure, RawAccessMut, Restore},
+    access::{Access, RawAccessMut, Restore},
     Entry, ObjectHash, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
@@ -96,13 +96,6 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
-    pub fn ensure(access: T) -> Self {
-        Self {
-            config: Ensure::ensure(&access, "config".into()).unwrap(),
-            timestamps: Ensure::ensure(&access, "timestamps".into()).unwrap(),
-        }
-    }
-
     /// Adds the timestamp entry to the database.
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp.clone();

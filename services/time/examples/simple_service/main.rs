@@ -22,7 +22,7 @@ extern crate serde_derive;
 extern crate exonum_derive;
 
 use exonum_merkledb::{
-    access::{Access, Ensure, RawAccessMut, Restore},
+    access::{Access, Restore},
     ObjectHash, ProofMapIndex, Snapshot,
 };
 
@@ -74,18 +74,6 @@ impl<T: Access> MarkerSchema<T> {
     /// Returns hashes for stored table.
     fn state_hash(&self) -> Vec<Hash> {
         vec![self.marks.object_hash()]
-    }
-}
-
-impl<T> MarkerSchema<T>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-{
-    fn initialize(access: T) -> Self {
-        Self {
-            marks: Ensure::ensure(&access, "marks".into()).unwrap(),
-        }
     }
 }
 
@@ -146,11 +134,6 @@ impl MarkerInterface for MarkerService {
 }
 
 impl Service for MarkerService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        MarkerSchema::initialize(context.service_data());
-        Ok(())
-    }
-
     fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         MarkerSchema::new(data.for_executing_service()).state_hash()
     }

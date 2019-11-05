@@ -158,14 +158,6 @@ mod timestamping {
     }
 
     impl Service for Timestamping {
-        fn initialize(
-            &self,
-            _context: CallContext<'_>,
-            _params: Vec<u8>,
-        ) -> Result<(), ExecutionError> {
-            Ok(())
-        }
-
         fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
@@ -263,7 +255,7 @@ mod cryptocurrency {
     impl CryptocurrencyInterface for Cryptocurrency {
         fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-            let mut index = context.service_data().ensure_proof_map("provable_balances");
+            let mut index = context.service_data().get_proof_map("provable_balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -279,7 +271,7 @@ mod cryptocurrency {
             arg: SimpleTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-            let mut index = context.service_data().ensure_map("balances");
+            let mut index = context.service_data().get_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -295,7 +287,7 @@ mod cryptocurrency {
             arg: RollbackTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-            let mut index = context.service_data().ensure_map("balances");
+            let mut index = context.service_data().get_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -313,14 +305,6 @@ mod cryptocurrency {
     }
 
     impl Service for Cryptocurrency {
-        fn initialize(
-            &self,
-            _context: CallContext<'_>,
-            _params: Vec<u8>,
-        ) -> Result<(), ExecutionError> {
-            Ok(())
-        }
-
         fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
@@ -542,14 +526,6 @@ mod foreign_interface_call {
     impl ERC30Tokens for Timestamping {}
 
     impl Service for Timestamping {
-        fn initialize(
-            &self,
-            _context: CallContext<'_>,
-            _params: Vec<u8>,
-        ) -> Result<(), ExecutionError> {
-            Ok(())
-        }
-
         fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }

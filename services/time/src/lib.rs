@@ -46,8 +46,8 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, CallContext, Service},
-        BlockchainData, ExecutionError,
+        rust::{AfterCommitContext, Service},
+        BlockchainData,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -71,11 +71,6 @@ pub struct TimeService {
 }
 
 impl Service for TimeService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        TimeSchema::ensure(context.service_data());
-        Ok(())
-    }
-
     fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         TimeSchema::new(data.for_executing_service()).state_hash()
     }

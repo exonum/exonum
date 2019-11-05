@@ -18,12 +18,12 @@ use exonum::{
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{CallContext, Service},
-        BlockchainData, ExecutionError, InstanceId,
+        BlockchainData, InstanceId,
     },
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{
-    access::{Access, Ensure, RawAccessMut, Restore},
+    access::{Access, Restore},
     MapIndex, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -93,18 +93,6 @@ impl<T: Access> CurrencySchema<T> {
     /// Gets a specific wallet from the storage.
     pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets.get(pub_key)
-    }
-}
-
-impl<T> CurrencySchema<T>
-where
-    T: Access,
-    T::Base: RawAccessMut,
-{
-    pub fn initialize(access: T) -> Self {
-        Self {
-            wallets: Ensure::ensure(&access, "wallets".into()).unwrap(),
-        }
     }
 }
 
@@ -223,11 +211,6 @@ pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
-        CurrencySchema::initialize(context.service_data());
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }

@@ -257,7 +257,7 @@ impl TestService for TestServiceImpl {
     fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
         context
             .service_data()
-            .ensure_entry("method_a_entry")
+            .get_entry("method_a_entry")
             .set(arg.value);
         // Test calling one service from another.
         context
@@ -270,7 +270,7 @@ impl TestService for TestServiceImpl {
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
         context
             .service_data()
-            .ensure_entry("method_b_entry")
+            .get_entry("method_b_entry")
             .set(arg.value);
         Ok(())
     }
@@ -281,7 +281,7 @@ impl Service for TestServiceImpl {
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         context
             .service_data()
-            .ensure_entry("constructor_entry")
+            .get_entry("constructor_entry")
             .set(init.msg);
         Ok(())
     }
@@ -348,7 +348,7 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.constructor_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
+        let entry = fork.as_ref().get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
     commit_block(&mut blockchain, fork);
@@ -382,10 +382,10 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
+        let entry = fork.as_ref().get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
         let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
+        let entry = fork.as_ref().get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -416,7 +416,7 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().entry(idx_name.as_str()).unwrap();
+        let entry = fork.as_ref().get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
     commit_block(&mut blockchain, fork);

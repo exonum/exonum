@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Entry, Fork, IndexType, MapIndex,
+    Entry, Fork, MapIndex,
 };
 
 use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
@@ -29,8 +29,6 @@ const PENDING_INSTANCES: &str = "core.dispatcher.pending_service_instances";
 const INSTANCE_IDS: &str = "core.dispatcher.service_instance_ids";
 const PENDING_INSTANCE_IDS: &str = "core.dispatcher.pending_instance_ids";
 const VACANT_INSTANCE_ID: &str = "core.dispatcher.vacant_instance_id";
-
-const NOT_INITIALIZED: &str = "Dispatcher schema is not initialized";
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
@@ -48,35 +46,33 @@ impl<T: Access> Schema<T> {
 
     /// Artifacts registry indexed by the artifact name.
     pub(crate) fn artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
-        self.access.map(ARTIFACTS).expect(NOT_INITIALIZED)
+        self.access.get_map(ARTIFACTS)
     }
 
     pub(super) fn pending_artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
-        self.access.map(PENDING_ARTIFACTS).expect(NOT_INITIALIZED)
+        self.access.get_map(PENDING_ARTIFACTS)
     }
 
     /// Set of launched service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
     pub(crate) fn service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
-        self.access.map(SERVICE_INSTANCES).expect(NOT_INITIALIZED)
+        self.access.get_map(SERVICE_INSTANCES)
     }
 
     /// Set of pending service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
     pub(super) fn pending_service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
-        self.access.map(PENDING_INSTANCES).expect(NOT_INITIALIZED)
+        self.access.get_map(PENDING_INSTANCES)
     }
 
     /// Identifiers of launched service instances.
     fn service_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
-        self.access.map(INSTANCE_IDS).expect(NOT_INITIALIZED)
+        self.access.get_map(INSTANCE_IDS)
     }
 
     /// Identifiers of pending service instances.
     fn pending_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
-        self.access
-            .map(PENDING_INSTANCE_IDS)
-            .expect(NOT_INITIALIZED)
+        self.access.get_map(PENDING_INSTANCE_IDS)
     }
 
     /// Returns the information about a service instance by its identifier.
@@ -125,16 +121,6 @@ impl<T: Access> Schema<T> {
 }
 
 impl Schema<&Fork> {
-    pub(crate) fn initialize(access: &Fork) {
-        access
-            .ensure_type(ARTIFACTS, IndexType::Map)
-            .ensure_type(PENDING_ARTIFACTS, IndexType::Map)
-            .ensure_type(SERVICE_INSTANCES, IndexType::Map)
-            .ensure_type(PENDING_INSTANCES, IndexType::Map)
-            .ensure_type(INSTANCE_IDS, IndexType::Map)
-            .ensure_type(PENDING_INSTANCE_IDS, IndexType::Map);
-    }
-
     /// Adds artifact specification to the set of the pending artifacts.
     pub(super) fn add_pending_artifact(
         &mut self,
@@ -211,7 +197,7 @@ impl Schema<&Fork> {
 
     /// Vacant identifier for user service instances.
     fn vacant_instance_id(&self) -> Entry<&Fork, InstanceId> {
-        self.access.ensure_entry(VACANT_INSTANCE_ID)
+        self.access.get_entry(VACANT_INSTANCE_ID)
     }
 
     /// Assign unique identifier for an instance.

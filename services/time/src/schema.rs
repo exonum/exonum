@@ -19,7 +19,7 @@ use exonum::{
     crypto::{Hash, PublicKey},
 };
 use exonum_merkledb::{
-    access::{Access, Ensure, Prefixed, RawAccessMut, Restore},
+    access::{Access, Prefixed, RawAccessMut, Restore},
     Entry, ObjectHash, ProofMapIndex,
 };
 
@@ -52,13 +52,6 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
-    pub(crate) fn ensure(access: Prefixed<'a, T>) -> Self {
-        Self {
-            validators_times: Ensure::ensure(&access, "validators_times".into()).unwrap(),
-            time: Ensure::ensure(&access, "time".into()).unwrap(),
-        }
-    }
-
     /// Returns an error if the currently registered validator time is greater than `time`.
     pub(crate) fn update_validator_time(
         &mut self,

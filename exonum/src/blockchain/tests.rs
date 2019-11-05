@@ -119,14 +119,14 @@ impl TestDispatcherInterface for TestDispatcherService {
         if arg.value == 42 {
             panic!(StorageError::new("42"))
         }
-        let mut index = context.service_data().ensure_list("val");
+        let mut index = context.service_data().get_list("val");
         index.push(arg.value);
         index.push(42 / arg.value);
         Ok(())
     }
 
     fn test_deploy(&self, context: CallContext<'_>, arg: TestDeploy) -> Result<(), ExecutionError> {
-        context.service_data().ensure_entry("val").set(arg.value);
+        context.service_data().get_entry("val").set(arg.value);
 
         let artifact = if arg.value == 24 {
             ServicePanicImpl.artifact_id().into()
@@ -142,7 +142,7 @@ impl TestDispatcherInterface for TestDispatcherService {
     }
 
     fn test_add(&self, mut context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError> {
-        let mut index = context.service_data().ensure_entry("val");
+        let mut index = context.service_data().get_entry("val");
         index.set(arg.value);
         drop(index);
 
@@ -177,20 +177,12 @@ pub struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 
     fn before_commit(&self, context: CallContext) {
-        let mut index = context.service_data().ensure_list("val");
+        let mut index = context.service_data().get_list("val");
         index.push(1);
     }
 }
@@ -211,14 +203,6 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
@@ -244,14 +228,6 @@ struct ServicePanicStorageErrorImpl;
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
@@ -290,21 +266,13 @@ struct TxResultCheckService;
 
 impl TxResultCheckInterface for TxResultCheckService {
     fn tx_result(&self, context: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError> {
-        let mut entry = context.service_data().ensure_entry("status");
+        let mut entry = context.service_data().get_entry("status");
         entry.set(arg.value);
         EXECUTION_STATUS.lock().unwrap().clone()
     }
 }
 
 impl Service for TxResultCheckService {
-    fn initialize(
-        &self,
-        _context: CallContext<'_>,
-        _params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
@@ -315,7 +283,7 @@ fn assert_service_execute(blockchain: &mut BlockchainMut) {
         blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
-    let index = snapshot.as_ref().list("service_good.val").unwrap();
+    let index = snapshot.as_ref().get_list("service_good.val");
     assert_eq!(index.len(), 1);
     assert_eq!(index.get(0), Some(1));
 }
@@ -327,8 +295,8 @@ fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
     let snapshot = blockchain.snapshot();
     assert!(snapshot
         .as_ref()
-        .list::<_, u32>("service_panic.val")
-        .is_none());
+        .get_list::<_, u32>("service_panic.val")
+        .is_empty());
 }
 
 fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> ExecutionStatus {
@@ -417,7 +385,7 @@ fn handling_tx_panic_error() {
         Some(tx_failed.clone())
     );
 
-    let index = snapshot.as_ref().list(IDX_NAME).unwrap();
+    let index = snapshot.as_ref().get_list(IDX_NAME);
     assert_eq!(index.len(), 4);
     assert_eq!(index.get(0), Some(3));
     assert_eq!(index.get(1), Some(14));
@@ -517,11 +485,14 @@ fn error_discards_transaction_changes() {
         db.merge(patch).unwrap();
 
         let snapshot = db.snapshot();
-        let entry = snapshot.as_ref().entry::<_, u64>("check_result.status");
+        let entry = snapshot
+            .as_ref()
+            .get_entry::<_, u64>("check_result.status")
+            .get();
         if status.is_err() {
             assert!(entry.is_none());
         } else {
-            assert_eq!(Some(index), entry.unwrap().get());
+            assert_eq!(Some(index), entry);
         }
     }
 }
@@ -570,10 +541,7 @@ fn test_dispatcher_deploy_good() {
     assert!(DispatcherSchema::new(snapshot.as_ref())
         .artifacts()
         .contains(&artifact_id.name));
-    assert_eq!(
-        snapshot.as_ref().entry(IDX_NAME).unwrap().get(),
-        Some(1_u64)
-    );
+    assert_eq!(snapshot.as_ref().get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
 #[test]
@@ -635,7 +603,7 @@ fn test_dispatcher_register_unavailable() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .artifacts()
         .contains(&artifact_id.name));
-    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
+    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
     // Tests that an unavailable artifact will not be registered.
     let error_string = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         execute_transaction(
@@ -670,10 +638,7 @@ fn test_dispatcher_start_service_good() {
     assert!(DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-1".to_owned()));
-    assert_eq!(
-        snapshot.as_ref().entry(IDX_NAME).unwrap().get(),
-        Some(1_u64)
-    );
+    assert_eq!(snapshot.as_ref().get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
 #[test]
@@ -695,7 +660,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-24".to_owned()));
-    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
+    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
 
     // Tests that a service with panic during the configure will not be started.
     assert!(!DispatcherSchema::new(snapshot.as_ref())
@@ -709,7 +674,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-42".to_owned()));
-    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
+    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
 
     // Tests that a service with execution error during the configure will not be started.
     assert!(!DispatcherSchema::new(snapshot.as_ref())
@@ -723,5 +688,5 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(snapshot.as_ref())
         .service_instances()
         .contains(&"good-service-18".to_owned()));
-    assert!(snapshot.as_ref().entry::<_, u64>(IDX_NAME).is_none());
+    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
 }
