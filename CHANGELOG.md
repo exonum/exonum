@@ -80,6 +80,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Internal improvements
 
+#### exonum
+
+- `system/v1/shutdown` endpoint doesn't requre json body with "null". (#)
+
 #### exonum-merkledb
 
 - `ProofListIndex::extend()` method has been refactored, leading to up to 10x

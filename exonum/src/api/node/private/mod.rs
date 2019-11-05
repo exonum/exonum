@@ -192,7 +192,7 @@ impl SystemApi {
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint_mut(name, move |_query: ()| -> Result<(), ApiError> {
+        api_scope.endpoint_mut_empty(name, move |_query: ()| -> Result<(), ApiError> {
             self.sender
                 .send_external_message(ExternalMessage::Shutdown)
                 .map_err(ApiError::from)

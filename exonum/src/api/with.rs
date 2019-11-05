@@ -55,6 +55,11 @@ pub struct Immutable;
 #[derive(Debug)]
 pub struct Mutable;
 
+/// EmptyMutable endpoint marker, which enables creating a mutable kind of `NamedWith`,
+/// allows to send empty POST request
+#[derive(Debug)]
+pub struct EmptyMutable;
+
 /// API Endpoint extractor that also contains the endpoint name and its kind.
 #[derive(Debug)]
 pub struct NamedWith<Q, I, R, F, K> {

@@ -225,7 +225,7 @@ impl ServiceApiScope {
 ///     // Add a mutable endpoint to the private API.
 ///     builder
 ///         .private_scope()
-///         .endpoint_mut("v1/shutdown", MyApi::shutdown);
+///         .endpoint_mut_empty("v1/shutdown", MyApi::shutdown);
 ///     builder
 /// }
 ///

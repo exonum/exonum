@@ -16,7 +16,7 @@
 
 pub use self::{
     error::Error,
-    with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
+    with::{EmptyMutable, FutureResult, Immutable, Mutable, NamedWith, Result, With},
 };
 
 pub mod backends;
@@ -81,6 +81,21 @@ pub trait ApiBackend: Sized {
         self.raw_handler(Self::Handler::from(named_with))
     }
 
+    /// Add the given mutable endpoint handler to the backend.
+    /// Intend to process the POST requests with empty request body.
+    fn endpoint_mut_empty<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    where
+        N: Into<String>,
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        Self::Handler: From<NamedWith<Q, I, R, F, EmptyMutable>>,
+    {
+        let named_with = NamedWith::new(name, endpoint);
+        self.raw_handler(Self::Handler::from(named_with))
+    }
+
     /// Add the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
 
@@ -140,6 +155,30 @@ impl ApiScope {
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
         self.actix_backend.endpoint_mut(name, endpoint);
+        self
+    }
+
+    /// Add the given mutable endpoint handler to the API scope. These endpoints
+    /// are designed for modification operations.
+    ///
+    /// For now there is only web backend and it has the following requirements:
+    ///
+    /// - Query parameters should be decodable via `serde_urlencoded`, i.e. from the
+    ///   "first_param=value1&second_param=value2" form.
+    /// - Response items should be encodable via `serde_json` crate.
+    pub fn endpoint_mut_empty<Q, I, R, F, E>(
+        &mut self,
+        name: &'static str,
+        endpoint: E,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F, EmptyMutable>>,
+    {
+        self.actix_backend.endpoint_mut_empty(name, endpoint);
         self
     }
 
