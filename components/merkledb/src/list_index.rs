@@ -88,7 +88,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -107,7 +107,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -129,7 +129,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -148,7 +148,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -170,7 +170,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -194,7 +194,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -223,7 +223,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -244,7 +244,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -271,7 +271,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -302,7 +302,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -330,7 +330,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -365,7 +365,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();

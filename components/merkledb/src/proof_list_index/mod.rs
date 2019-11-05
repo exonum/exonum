@@ -148,11 +148,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(10);
@@ -167,11 +167,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// assert_eq!(None, index.last());
     ///
     /// index.push(1);
@@ -189,11 +189,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.push(10);
@@ -208,11 +208,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// assert_eq!(0, index.len());
     ///
     /// index.push(1);
@@ -230,11 +230,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// assert_eq!(0, index.height());
     /// index.push(1);
     /// assert_eq!(1, index.height());
@@ -252,11 +252,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     ///
     /// index.push(1);
     /// let proof = index.get_proof(0);
@@ -278,11 +278,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// index.extend(vec![1, 2, 3, 4, 5]);
     ///
     /// let range_proof = index.get_range_proof(1..3);
@@ -303,11 +303,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().ensure_proof_list::<_, u8>("name");
+    /// let index = fork.as_ref().get_proof_list::<_, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -325,11 +325,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().ensure_proof_list::<_, u8>("name");
+    /// let index = fork.as_ref().get_proof_list::<_, u8>("name");
     ///
     /// for val in index.iter_from(1) {
     ///     println!("{}", val);
@@ -472,11 +472,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -490,11 +490,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     ///
     /// index.extend([1, 2, 3].iter().cloned());
     /// assert_eq!(3, index.len());
@@ -532,11 +532,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -568,11 +568,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
@@ -606,11 +606,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// assert_eq!(None, index.pop());
     /// index.push(1);
     /// assert_eq!(Some(1), index.pop());
@@ -636,11 +636,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     /// index.push(1);
     /// assert!(!index.is_empty());
     /// index.clear();
@@ -674,12 +674,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().ensure_proof_list("name");
+    /// let mut index = fork.as_ref().get_proof_list("name");
     ///
     /// let default_hash = index.object_hash();
     /// assert_eq!(HashTag::empty_list_hash(), default_hash);

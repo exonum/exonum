@@ -57,7 +57,7 @@ impl HashedEntry {
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     Access, Database, TemporaryDB, BinaryValue, ListProof, ProofListIndex, ObjectHash,
+/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, ListProof, ObjectHash,
 /// # };
 /// # use failure::Error;
 /// # fn main() -> Result<(), Error> {
@@ -93,7 +93,7 @@ impl HashedEntry {
 /// ```
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
-/// #     Access, Database, TemporaryDB, BinaryValue, HashTag, ListProof, ProofListIndex,
+/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, HashTag, ListProof,
 /// # };
 /// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };

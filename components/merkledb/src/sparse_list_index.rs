@@ -152,7 +152,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -175,7 +175,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -195,7 +195,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -220,7 +220,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -244,7 +244,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -267,7 +267,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -291,7 +291,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -315,7 +315,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -345,7 +345,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -368,7 +368,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -382,7 +382,6 @@ where
     /// assert_eq!(None, index.remove(0));
     /// assert_eq!(2, index.capacity());
     /// assert_eq!(1, index.len());
-
     /// assert_eq!(Some(12), index.remove(1));
     /// assert_eq!(2, index.capacity());
     /// ```
@@ -405,7 +404,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -438,7 +437,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -477,7 +476,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -500,7 +499,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{Access, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();

@@ -403,27 +403,27 @@ pub enum Change {
 /// For example the code below will panic at runtime.
 ///
 /// ```rust,should_panic
-/// use exonum_merkledb::{Access, TemporaryDB, ListIndex, Database};
+/// use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 ///
-/// let index = fork.as_ref().ensure_list::<_, u8>("index");
+/// let index = fork.as_ref().get_list::<_, u8>("index");
 /// // This code will panic at runtime.
-/// let index2 = fork.as_ref().ensure_list::<_, u8>("index");
+/// let index2 = fork.as_ref().get_list::<_, u8>("index");
 /// ```
 ///
 /// To enable immutable / shared references to indexes, you may use [`readonly`] method:
 ///
 /// ```
-/// use exonum_merkledb::{Access, TemporaryDB, ListIndex, Database};
+/// use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// fork.as_ref().ensure_list::<_, u8>("index").extend(vec![1, 2, 3]);
+/// fork.as_ref().get_list::<_, u8>("index").extend(vec![1, 2, 3]);
 ///
 /// let readonly = fork.readonly();
-/// let index = readonly.get_list::<_, u8>("index").unwrap();
+/// let index = readonly.get_list::<_, u8>("index");
 /// // Works fine.
-/// let index2 = readonly.get_list::<_, u8>("index").unwrap();
+/// let index2 = readonly.get_list::<_, u8>("index");
 /// ```
 ///
 /// It is impossible to mutate index contents having a readonly access to the fork; this is
@@ -496,7 +496,7 @@ enum NextIterValue {
 /// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
 /// let fork = db.fork();
 /// {
-///     let mut list = fork.as_ref().ensure_proof_list("list");
+///     let mut list = fork.as_ref().get_proof_list("list");
 ///     list.push(42_u64);
 /// }
 /// db.merge(fork.into_patch()).unwrap();
