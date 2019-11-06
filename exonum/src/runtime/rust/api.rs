@@ -46,6 +46,8 @@ pub struct ArtifactProtobufSpec {
     /// List of Protobuf files that make up the service interface.
     ///
     /// The common interface entry point is always in the `service.proto` file.
+    /// Entry point contains descriptions of the service transactions and configuration
+    /// parameters. Message with the configuration parameters should be named as `Config`.
     pub sources: Vec<ProtoSourceFile>,
     /// List of service's proto include files.
     pub includes: Vec<ProtoSourceFile>,
