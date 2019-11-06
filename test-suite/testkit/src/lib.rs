@@ -353,7 +353,7 @@ impl TestKit {
     /// # use exonum::{
     /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{InstanceDescriptor, rust::{Transaction, CallContext, Service}},
+    /// #     runtime::{BlockchainData, rust::{Transaction, CallContext, Service}},
     /// # };
     /// #
     /// # const SERVICE_ID: u32 = 1;
@@ -368,7 +368,7 @@ impl TestKit {
     /// # pub struct ExampleService;
     /// #
     /// # impl Service for ExampleService {
-    /// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
+    /// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
     /// # }
     /// #
     /// # #[exonum_service]
