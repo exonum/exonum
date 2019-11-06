@@ -121,7 +121,7 @@ impl Runtime for TestRuntime {
 
     fn start_adding_service(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -131,7 +131,7 @@ impl Runtime for TestRuntime {
 
     fn execute(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _call_info: &CallInfo,
         _arguments: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -144,7 +144,7 @@ impl Runtime for TestRuntime {
 
     fn before_commit(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Ok(())

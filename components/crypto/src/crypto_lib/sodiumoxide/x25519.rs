@@ -135,7 +135,7 @@ macro_rules! implement_x25519_type {
     }
 
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             write_short_hex(f, &self.0[..])?;

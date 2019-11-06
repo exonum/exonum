@@ -87,7 +87,7 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
-pub extern crate structopt;
+pub use structopt;
 
 use exonum::{
     blockchain::InstanceCollection,

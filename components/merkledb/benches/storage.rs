@@ -69,7 +69,7 @@ fn generate_random_values(len: usize) -> Vec<Vec<u8>> {
         .collect()
 }
 
-fn plain_map_index_insert(b: &mut Bencher, len: usize) {
+fn plain_map_index_insert(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || (TemporaryDB::default(), data.clone()),
@@ -86,7 +86,7 @@ fn plain_map_index_insert(b: &mut Bencher, len: usize) {
     );
 }
 
-fn plain_map_index_with_family_insert(b: &mut Bencher, len: usize) {
+fn plain_map_index_with_family_insert(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || (TemporaryDB::default(), data.clone()),
@@ -103,7 +103,7 @@ fn plain_map_index_with_family_insert(b: &mut Bencher, len: usize) {
     );
 }
 
-fn plain_map_index_iter(b: &mut Bencher, len: usize) {
+fn plain_map_index_iter(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let fork = db.fork();
@@ -129,7 +129,7 @@ fn plain_map_index_iter(b: &mut Bencher, len: usize) {
     );
 }
 
-fn plain_map_index_with_family_iter(b: &mut Bencher, len: usize) {
+fn plain_map_index_with_family_iter(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let fork = db.fork();
@@ -156,7 +156,7 @@ fn plain_map_index_with_family_iter(b: &mut Bencher, len: usize) {
     );
 }
 
-fn plain_map_index_read(b: &mut Bencher, len: usize) {
+fn plain_map_index_read(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let fork = db.fork();
@@ -182,7 +182,7 @@ fn plain_map_index_read(b: &mut Bencher, len: usize) {
     );
 }
 
-fn plain_map_index_with_family_read(b: &mut Bencher, len: usize) {
+fn plain_map_index_with_family_read(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let fork = db.fork();
@@ -209,7 +209,7 @@ fn plain_map_index_with_family_read(b: &mut Bencher, len: usize) {
     );
 }
 
-fn proof_list_append(b: &mut Bencher, len: usize) {
+fn proof_list_append(b: &mut Bencher<'_>, len: usize) {
     let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let data = (0..len)
         .map(|_| {
@@ -232,7 +232,7 @@ fn proof_list_append(b: &mut Bencher, len: usize) {
     );
 }
 
-fn proof_list_extend(b: &mut Bencher, len: usize) {
+fn proof_list_extend(b: &mut Bencher<'_>, len: usize) {
     let mut rng: StdRng = SeedableRng::from_seed(SEED);
     let data = (0..len)
         .map(|_| {
@@ -253,7 +253,7 @@ fn proof_list_extend(b: &mut Bencher, len: usize) {
     );
 }
 
-fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
+fn proof_map_insert_without_merge(b: &mut Bencher<'_>, len: usize) {
     let db = TemporaryDB::default();
     let data = generate_random_kv(len);
     b.iter_with_setup(
@@ -267,7 +267,7 @@ fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
     );
 }
 
-fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
+fn proof_map_insert_with_merge(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || (TemporaryDB::default(), data.clone()),
@@ -284,7 +284,7 @@ fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
     );
 }
 
-fn proof_list_index_build_proofs(b: &mut Bencher, len: usize) {
+fn proof_list_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_values(len);
     let db = TemporaryDB::default();
     let storage = db.fork();
@@ -308,7 +308,7 @@ fn proof_list_index_build_proofs(b: &mut Bencher, len: usize) {
     }
 }
 
-fn proof_list_index_verify_proofs(b: &mut Bencher, len: usize) {
+fn proof_list_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_values(len);
     let db = TemporaryDB::default();
     let storage = db.fork();
@@ -328,7 +328,7 @@ fn proof_list_index_verify_proofs(b: &mut Bencher, len: usize) {
     });
 }
 
-fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
+fn proof_map_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let storage = db.fork();
@@ -351,7 +351,7 @@ fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
     }
 }
 
-fn proof_map_index_verify_proofs(b: &mut Bencher, len: usize) {
+fn proof_map_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let storage = db.fork();
@@ -373,14 +373,14 @@ fn proof_map_index_verify_proofs(b: &mut Bencher, len: usize) {
 
 fn bench_fn<F>(c: &mut Criterion, name: &str, benchmark: F)
 where
-    F: Fn(&mut Bencher, usize) + 'static,
+    F: Fn(&mut Bencher<'_>, usize) + 'static,
 {
     let item_counts = ITEM_COUNTS.iter().cloned();
     c.bench(
         name,
         ParameterizedBenchmark::new(
             "items",
-            move |b: &mut Bencher, &len: &usize| benchmark(b, len),
+            move |b: &mut Bencher<'_>, &len: &usize| benchmark(b, len),
             item_counts,
         )
         .throughput(|s| Throughput::Elements((*s).try_into().unwrap()))

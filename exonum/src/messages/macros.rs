@@ -49,7 +49,7 @@ macro_rules! impl_serde_hex_for_binary_value {
         }
 
         impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 use hex::ToHex;
 
                 write!(f, "{}", self.encode_hex::<String>())

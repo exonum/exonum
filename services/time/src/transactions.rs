@@ -121,11 +121,11 @@ impl TxTime {
 #[exonum_service]
 pub trait TimeOracleInterface {
     /// Receives a new time from one of validators.
-    fn time(&self, ctx: CallContext, arg: TxTime) -> Result<(), Error>;
+    fn time(&self, ctx: CallContext<'_>, arg: TxTime) -> Result<(), Error>;
 }
 
 impl TimeOracleInterface for TimeService {
-    fn time(&self, context: CallContext, arg: TxTime) -> Result<(), Error> {
+    fn time(&self, context: CallContext<'_>, arg: TxTime) -> Result<(), Error> {
         let author = context
             .caller()
             .as_transaction()

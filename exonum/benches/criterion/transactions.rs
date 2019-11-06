@@ -205,7 +205,7 @@ impl MessageVerifier {
     }
 }
 
-fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
+fn bench_verify_messages_simple(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
     b.iter_with_setup(
         || messages.clone(),
@@ -217,7 +217,7 @@ fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     )
 }
 
-fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
+fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
 
     let verifier = MessageVerifier::new();

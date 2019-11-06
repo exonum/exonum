@@ -107,13 +107,13 @@ pub enum Error {
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: CallContext, arg: TxIncrement) -> Result<(), Error>;
+    fn increment(&self, context: CallContext<'_>, arg: TxIncrement) -> Result<(), Error>;
 
-    fn reset(&self, context: CallContext, arg: TxReset) -> Result<(), Error>;
+    fn reset(&self, context: CallContext<'_>, arg: TxReset) -> Result<(), Error>;
 }
 
 impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: CallContext, arg: TxIncrement) -> Result<(), Error> {
+    fn increment(&self, context: CallContext<'_>, arg: TxIncrement) -> Result<(), Error> {
         if arg.by == 0 {
             return Err(Error::AddingZero);
         }
@@ -123,7 +123,7 @@ impl CounterServiceInterface for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: CallContext, _arg: TxReset) -> Result<(), Error> {
+    fn reset(&self, context: CallContext<'_>, _arg: TxReset) -> Result<(), Error> {
         let mut schema = CounterSchema::new(context.fork());
         schema.set_count(0);
         Ok(())
@@ -142,7 +142,7 @@ struct CounterApi;
 
 impl CounterApi {
     fn increment(
-        state: &ServiceApiState,
+        state: &ServiceApiState<'_>,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
@@ -158,7 +158,7 @@ impl CounterApi {
     }
 
     fn reset(
-        state: &ServiceApiState,
+        state: &ServiceApiState<'_>,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
@@ -232,7 +232,7 @@ impl Service for CounterService {
         CounterApi::wire(builder)
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }

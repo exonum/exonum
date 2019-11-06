@@ -502,7 +502,7 @@ impl<V: BinaryValue> ListProof<V> {
     /// - There is sufficient information in `proof` and `entries` to restore the Merkle tree root.
     /// - There are no redundant entries in `proof` (i.e., ones that can be inferred from other
     ///   `proof` elements / `entries`).
-    pub fn check(&self) -> Result<CheckedListProof<V>, ListProofError> {
+    pub fn check(&self) -> Result<CheckedListProof<'_, V>, ListProofError> {
         let tree_root = self.collect()?;
         Ok(CheckedListProof {
             entries: &self.entries,
@@ -522,7 +522,7 @@ impl<V: BinaryValue> ListProof<V> {
     pub fn check_against_hash(
         &self,
         expected_list_hash: Hash,
-    ) -> Result<CheckedListProof<V>, ValidationError<ListProofError>> {
+    ) -> Result<CheckedListProof<'_, V>, ValidationError<ListProofError>> {
         self.check()
             .map_err(ValidationError::Malformed)
             .and_then(|checked_proof| {

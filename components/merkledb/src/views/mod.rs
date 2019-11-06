@@ -44,7 +44,7 @@ pub struct View<T: IndexAccess> {
 }
 
 impl<T: IndexAccess> fmt::Debug for View<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("View")
             .field("address", &self.address)
             .finish()
@@ -441,7 +441,7 @@ impl<T: IndexAccess> View<T> {
         self.snapshot().contains(name, &key)
     }
 
-    fn iter_bytes(&self, from: &[u8]) -> BytesIter {
+    fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
         use std::collections::Bound::*;
 
         let (name, key) = self.address.keyed(from);
@@ -488,7 +488,7 @@ impl<T: IndexAccess> View<T> {
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
     /// type is *any* key-value pair. An argument `subprefix` allows specifying a subset of keys
     /// for iteration.
-    pub fn iter<P, K, V>(&self, subprefix: &P) -> Iter<K, V>
+    pub fn iter<P, K, V>(&self, subprefix: &P) -> Iter<'_, K, V>
     where
         P: BinaryKey + ?Sized,
         K: BinaryKey,
@@ -507,7 +507,7 @@ impl<T: IndexAccess> View<T> {
     /// Returns an iterator over the entries of the index in ascending order starting from the
     /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
     /// allows specifying a subset of iteration.
-    pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> Iter<K, V>
+    pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> Iter<'_, K, V>
     where
         P: BinaryKey,
         F: BinaryKey + ?Sized,
@@ -564,7 +564,7 @@ struct SnapshotIter<'a> {
 }
 
 impl<'a> fmt::Debug for SnapshotIter<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SnapshotIter")
             .field("prefix", &self.prefix)
             .field("ended", &self.ended)
@@ -684,7 +684,7 @@ pub struct Iter<'a, K, V> {
 }
 
 impl<'a, K, V> fmt::Debug for Iter<'a, K, V> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Iter(..)")
     }
 }
