@@ -12,77 +12,85 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Transactions Runtime.
-//!
-//! This module contains common building blocks for creating runtimes for the Exonum blockchain.
+//! Common building blocks for creating runtimes for the Exonum blockchain.
 //!
 //! Each runtime contains specific services to execute transactions, process events,
 //! provide user APIs, etc. There is a unified dispatcher that redirects all the calls
-//! and requests to the appropriate runtime environment. Thus, blockchain interacts with the
-//! dispatcher, and not with a specific runtime instance.
+//! and requests to the appropriate runtime environment. Thus, a blockchain interacts with the
+//! dispatcher, and not with specific runtime instances.
 //!
-//! # Service Life Cycle
+//! # Artifacts
 //!
-//! 1. Each runtime has its own [artifacts] registry from which users can deploy them. The artifact
-//! identifier is required by the runtime for constructing service instances. In other words,
-//! an artifact identifier is similar to a class name, and a specific
-//! service instance - to a class instance.
+//! Each runtime has its own [artifacts] registry from which users can create service.
+//! The artifact identifier is required by the runtime for constructing service instances.
+//! In other words, an artifact identifier is similar to a class name, and a specific
+//! service instance - to a class instance. A single artifact may be used to instantiate
+//! zero or more services.
 //!
-//! 2. Each validator administrator requests the dispatcher to deploy an artifact
-//! and then the validator node should send the confirmation if this request is successful. Then, if the
-//! number of confirmations is equal to the total number of validators, each validator calls the
-//! dispatcher to register the artifact as deployed. After that the validators can send requests to
-//! start new service instances from this artifact.
+//! The format of an artifact ID is uniform across runtimes (it is essentially a string),
+//! but the runtime may customize artifact deployment via a runtime-specific deployment arguments.
 //!
-//! 3. To start a new service instance, each validator administrator should send a request
-//! to the dispatcher. Each request contains exactly the same artifact identifier, instance name, and
-//! instance configuration parameters. Then, as in the previous case, if the number of
-//! confirmations is equal to the total number of validators, each validator calls the dispatcher
-//! to start a new service instance.
+//! # Service lifecycle
 //!
-//! 4. Modify instance configuration procedure. TODO [ECR-3306]
+//! 1. An artifact with the service is deployed on the blockchain. The decision to deploy an
+//!   artifact and the deployment spec are usually performed by the blockchain administators.
+//!   The corresponding logic is customizable via a [supervisor service](#supervisor-service).
 //!
-//! 5. Stop instance procedure. TODO
+//! 2. Once the artifact is deployed, it is possible to instantiate service.
+//!   Each start request contains the same artifact identifier, instance IDs (the numeric one
+//!   is used in transactions, and the string one in blockchain storage), and
+//!   instance configuration parameters. As with the artifacts, the instantiation logic
+//!   is encapsulated in the supervisor service.
 //!
-//! Each Exonum transaction is an [`AnyTx`] message with a correct signature.
+//! 3. Once the service is instantiated, it can process transactions and interact with the
+//!   external users in other ways. Different services instantiated from the same artifact
+//!   are independent and have separated blockchain storage. Users can distinguish services
+//!   by their IDs; both numeric and string IDs are unique within a blockchain.
 //!
-//! # Transaction Life Cycle
+//! [`Dispatcher`] is responsible in persisting artifacts and services across node restarts.
 //!
-//! 1. An Exonum client creates a transaction message which includes [CallInfo] information
-//! about the corresponding method to call and serialized method parameters as a payload.
-//! The client then signs the message with the author's key pair.
+//! # Transaction Lifecycle
+//!
+//! 1. An Exonum client creates a transaction message which includes [`CallInfo`] information
+//!   about the corresponding method to call and serialized method parameters as a payload.
+//!   The client then signs the message with the author's key pair.
 //!
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
-//! The transaction is identified by the hash of the corresponding message.
+//!   The transaction is identified by the hash of the corresponding message.
 //!
 //! 3. The node verifies the transaction for correctness of the signature and retransmits it to
-//! the other network nodes if it is correct.
+//!   the other network nodes if it is correct.
 //!
-//! 4. When the validator decides to include the transaction into the next block it takes the message
-//! from the transaction pool and passes it to the [`Dispatcher`] for execution.
+//! 4. When the validator decides to include the transaction into the next block,
+//!   it takes the message
+//!   from the transaction pool and passes it to the [`Dispatcher`] for execution.
 //!
 //! 5. The dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
-//! by the service [instance_id] recorded in the message. If the corresponding runtime is
-//! successfully found, the dispatcher passes the transaction into this runtime for
-//! immediate [execution].
+//!   by the [`instance_id`] recorded in the message. If the corresponding runtime is
+//!   successfully found, the dispatcher passes the transaction into this runtime for
+//!   immediate [execution].
 //!
 //! 6. After execution the transaction [execution status] is written into the blockchain.
 //!
-//! # Service interfaces
+//! # Supervisor Service
 //!
-//! In addition to its own methods, a service can implement methods of additional interfaces.
-//! In your own runtime implementation, you must provide support of the following interfaces:
+//! A supervisor service is a service that has additional privileges: it can command deployment of
+//! artifacts and instantiation of services. Other than that, it is an ordinary service.
+//! A supervisor should be present on blockchain start, otherwise no new artifacts / services
+//! could ever be added to the blockchain.
 //!
-//! TODO: Think about runtime agnostic interfaces description. [ECR-3531]
+//! A supervisor service is distinguished by its numerical ID, which must be set
+//! to [`SUPERVISOR_INSTANCE_ID`].
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
-//! [`Dispatcher`]: dispatcher/struct.Dispatcher.html
+//! [`Dispatcher`]: struct.Dispatcher.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.instance_id
 //! [`Runtime`]: trait.Runtime.html
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
+//! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 
 pub use self::{
     dispatcher::{
@@ -143,28 +151,35 @@ impl From<RuntimeIdentifier> for u32 {
 /// You can read more about the life cycle of services and transactions
 /// [above](index.html#service-life-cycle).
 ///
-/// Using this trait, you can extend the Exonum blockchain with the services written in
+/// Using this trait, one can extend the Exonum blockchain with the services written in
 /// different languages. It assumes that the deployment procedure of a new service may be
-/// complex and long and even may fail;
-/// therefore, we introduce an additional entity - artifacts.
+/// complex and long and even may fail; therefore, an additional entity is introduced - *artifacts*.
 /// Each artifact has a unique identifier and, depending on the runtime, may have an additional
-/// specification needed for its deployment. For example, the file to be compiled.
-/// Artifact creates corresponding service instances similar to classes in the object
-/// oriented programming.
+/// specification needed for its deployment; e.g., files to be compiled.
+/// Artifact creates corresponding service instances similar to classes in object-oriented
+/// programming.
 ///
-/// # Notes
+/// # Call Ordering
 ///
-/// * Please pay attention to the panic handling policy during the implementation of methods.
-/// If no policy is specified, then the method should not panic and each panic will abort the node.
-/// * If you have to revert changes in the fork, you should revert only changes which were made by
-/// the service that caused panic.
-/// * Keep in mind that runtime methods can be executed in two ways: during the blocks execution
-/// and during the node restart. Thus, be careful to avoid unnecessary actions in the runtime
-/// methods.
+/// Within lifetime of a `Runtime`, calls to its methods are ordered as follows:
 ///
-/// # Hints
+/// ```text
+/// LIFE ::= initialize (GENESIS | RESUME) BLOCK* shutdown
+/// GENESIS ::= (deploy_artifact | start_adding_service commit_service)* after_commit
+/// RESUME ::= (deploy_artifact | commit_service)* on_resume
+/// BLOCK* ::= PROPOSAL+ COMMIT
+/// PROPOSAL ::= (execute | start_adding_service)* before_commit*
+/// COMMIT ::= deploy_artifact* commit_service* after_commit
+/// ```
 ///
-/// * You may use [`catch_panic`](error/fn.catch_panic.html) method to catch panics according to panic policy.
+/// The ordering to "readonly" methods `is_artifact_deployed` and `state_hashes` relative
+/// to the lifecycle above is not specified.
+///
+/// # Handling Panics
+///
+/// Unless specified in the method docs, a panic in the `Runtime` methods will **not** be caught
+/// and will cause node termination. You may use [`catch_panic`](error/fn.catch_panic.html) method
+/// to catch panics according to panic policy.
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.
@@ -188,15 +203,11 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 
     /// Request to deploy artifact with the given identifier and additional deploy specification.
     ///
-    /// This method may be called multiple times with the same params; in particular, the method
-    /// is called for all deployed artifacts after node restart. The successive calls must return
-    /// the same spec as the first call. In most cases, it is prudent to cache the spec in the runtime,
-    /// so that the successive calls are effectively synchronous.
+    /// This method is called *once* for a specific artifact during `Runtime` lifetime:
     ///
-    /// # Policy on Panics
-    ///
-    /// * Catch each kind of panics except for `FatalError` and convert
-    /// them into `ExecutionError`.
+    /// - For newly added artifacts, the method is called as the decision to deploy the artifact
+    ///   is made by the supervisor service.
+    /// - After a node restart, the method is called for all previously deployed artifacts.
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
@@ -207,21 +218,27 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
 
     /// Runs the constructor of a new service instance with the given specification
-    /// and initial configuration.
+    /// and initial arguments. The constructor can initialize the storage of the service,
+    /// check for dependencies, etc.
     ///
-    /// The service is not guaranteed to be added to the blockchain at this point.
-    /// In particular, the dispatcher does not route transactions and `before_commit` events
-    /// until after `commit_service()` is called with the same instance spec. A call
-    /// to `commit_service()` is not guaranteed for each `start_adding_service()`; indeed,
-    /// committing the service will not follow if the alternative block proposal without
-    /// the service instantiation was accepted. If the call is performed, it is
+    /// The constructor is run *exactly once* during blockchain lifetime for each successfully
+    /// initialized service instance. That is to say, it is *not* called on a node restart.
+    /// The caveat here is "successfully initialized"; at the point `start_adding_service` is called,
+    /// the service is not guaranteed to eventually be added to the blockchain via `commit_service`.
+    /// Indeed, committing the service will not follow if the alternative block proposal without
+    /// the service instantiation was accepted. If the `commit_service` call *is* performed, it is
     /// guaranteed to be performed in the closest committed block, i.e., before the nearest
     /// `Runtime::after_commit()`.
     ///
-    /// The runtime can discard the instantiated service instance after completing this method.
-    /// (Alternatively, "garbage" services may be removed from `Runtime` in `after_commit`
-    /// because of the time dependence between `commit_service` and `after_commit` described above.)
-    /// The runtime should commit resources for the service after a `commit_service()` call.
+    /// The dispatcher does not route transactions and `before_commit` events to the service
+    /// until after `commit_service()` is called with the same instance spec.
+    ///
+    /// The runtime should discard the instantiated service instance after completing this method,
+    /// unless there are compelling reasons to retain it (e.g., creating an instance takes very
+    /// long time).
+    /// Alternatively, "garbage" services may be removed from `Runtime` in `after_commit`
+    /// because of the time dependence between `commit_service` and `after_commit` described above.
+    /// The runtime should commit long-term resources for the service after a `commit_service()` call.
     /// Since discarded instances persist their state in a discarded fork, no further action
     /// is required to remove this state.
     ///
@@ -240,18 +257,22 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 
     /// Permanently adds a service to the runtime.
     ///
+    /// This method is called *once* for a specific service instance during `Runtime` lifetime:
+    ///
+    /// - For newly added instances, the method is called when the fork with the corresponding
+    ///   `start_adding_service()` call is committed.
+    /// - After a node restart, the method is called for all existing service instances.
+    ///
     /// It is guaranteed that `start_adding_service()` was called with the same `spec` earlier
     /// and returned `Ok(())`. The results of the call (i.e., changes to the blockchain state)
     /// are guaranteed to be persisted from the call.
     ///
-    /// A call to `start_adding_service()` may have happened indefinite time ago;
-    /// indeed, `commit_service()` is called for all services on the node startup. Likewise,
-    /// `commit_service()` may be called an indefinite number of times for the same instance.
+    /// # Arguments
     ///
     /// `snapshot` is the storage snapshot at the latest height when the method is called:
     ///
     /// - If the service is committed during node operation, `snapshot` is taken at the
-    ///   moment after applying the fork, for which the corresponding `start_adding_service`
+    ///   moment after applying the fork for which the corresponding `start_adding_service`
     ///   was performed.
     /// - If the service is resumed after node restart, `snapshot` is the storage state
     ///   at the node start.
@@ -262,7 +283,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// # Return value
     ///
-    /// Any error or panic returned from this method should be considered as fatal. There are edge
+    /// Any error or panic returned from this method should be considered fatal. There are edge
     /// cases where the returned error does not stop the enclosing process (e.g.,
     /// if several alternative initial service configurations are tried), but as a rule of thumb,
     /// a `Runtime` should not return an error or panic here unless it wants the node to stop forever.
@@ -273,19 +294,32 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ) -> Result<(), ExecutionError>;
 
     /// Dispatches payload to the method of a specific service instance.
+    ///
+    /// # Arguments
+    ///
     /// Service instance name and method ID are provided in the `call_info` argument and
     /// interface name is provided as the corresponding field of the `context` argument.
     ///
-    /// # Notes for Runtime Developers
+    /// Blank interface name denotes the "default" interface; it should be supported by all
+    /// services. The methods of the default interface are defined by the service artifact
+    /// and thus may have different signatures for different services.
     ///
-    /// * If service does not implement required interface, return `NoSuchInterface` error.
-    /// * If interface does not have required method, return `NoSuchMethod` error.
-    /// * For compatibility reasons, the interface name for user transactions is currently
-    /// always blank. But it may be changed in future releases.
+    /// Non-empty interface name denotes an interface defined externally to the service instance.
+    /// In this case, the name is a Protobuf flavor of a fully qualified name
+    /// (e.g., `exonum.Configure`), and method signatures can be inferred from the name
+    /// using an interface definition.
     ///
-    /// # Policy on Panics
+    /// **Note**. Support of non-default interfaces is experimental; as such, an IDL for them
+    /// is not stabilized yet.
     ///
-    /// Do not process. Panic will be processed by the method caller.
+    /// # Return value
+    ///
+    /// - If service does not implement an interface, return `NoSuchInterface` error.
+    /// - If the interface does not have a method, return `NoSuchMethod` error.
+    ///
+    /// An error or panic returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
+    /// into errors.
     fn execute(
         &self,
         context: ExecutionContext<'_>,
@@ -293,21 +327,21 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
-    /// Gets the state hashes of the every available service.
+    /// Gets the state hashes of the every available service in the runtime.
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
 
-    /// Calls `before_commit` for a service stored in the runtime.
+    /// Notifies a service stored in this runtime about the end of the block, allowing it
+    /// to modify the blockchain state after all transactions in the block are processed.
     ///
-    /// `before_commit` is called for all services active at the beginning of the block
+    /// `before_commit` is called for every service active at the beginning of the block
     /// (i.e., services instantiated within the block do **not** receive a call) exactly
-    /// once for each block.
+    /// once for each block. The method is not called for the genesis block.
     ///
-    /// # Guarantees
+    /// # Return value
     ///
-    /// - Each `before_commit` call is isolated with a separate checkpoint. A call that returns
-    ///   an error will be rolled back.
-    /// - Ordering of calls among service instances is not specified, but is guaranteed
-    ///   to be the same for all nodes.
+    /// An error or panic returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
+    /// into errors.
     fn before_commit(
         &self,
         context: ExecutionContext<'_>,
@@ -324,10 +358,9 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// is provided in the `snapshot`. It corresponds exactly to the information
     /// eventually persisted; i.e., no modifying operations are performed on the block.
     ///
-    /// # Policy on Panics
-    ///
-    /// Catch each kind of panics except for `FatalError` and write them into the log. A panic
-    /// will bubble up, i.e., will lead to immediate node termination.
+    /// `mailbox` is used to send async commands to the dispatcher. This mechanism is used, e.g.,
+    /// by the supervisor service to enqueue artifact deployment. A runtime may ignore `mailbox`
+    /// if its services (or the runtime itself) do not require privileged access to the dispatcher.
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox);
 
     /// Notify the runtime that it has to shutdown.
