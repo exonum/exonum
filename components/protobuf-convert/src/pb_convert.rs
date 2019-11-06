@@ -433,7 +433,6 @@ impl ToTokens for ProtobufConvert {
                 use super::*;
 
                 use protobuf::Message as _ProtobufMessage;
-                use exonum_proto::ProtobufConvert;
 
                 #protobuf_convert
                 #serde_traits
