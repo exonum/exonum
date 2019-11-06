@@ -17,16 +17,18 @@
 //! Private API includes requests that are available only to the blockchain
 //! administrators, e.g. view the list of services on the current node.
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
-    api::{ApiScope, Error as ApiError},
+    api::backends::actix::{FutureResponse as BackendFutureResponse, RawHandler, RequestHandler},
+    api::{node::SharedNodeState, ApiBackend, ApiScope, Error as ApiError},
     crypto::PublicKey,
     node::{ApiSender, ConnectInfo, ExternalMessage},
     runtime::InstanceId,
 };
 
-use super::SharedNodeState;
+use actix_web::{HttpRequest, HttpResponse};
+use futures::IntoFuture;
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -192,11 +194,30 @@ impl SystemApi {
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint_mut_empty(name, move |_query: ()| -> Result<(), ApiError> {
+
+        let handler = move || -> Result<(), ApiError> {
             self.sender
                 .send_external_message(ExternalMessage::Shutdown)
                 .map_err(ApiError::from)
-        });
+        };
+
+        let index = move |_request: HttpRequest| -> BackendFutureResponse {
+            let handler = handler.clone();
+
+            let future = Ok(handler())
+                .and_then(|_| Ok(HttpResponse::Ok().json(())))
+                .into_future();
+            Box::new(future)
+        };
+
+        let handler = RequestHandler {
+            name: name.to_owned(),
+            method: actix_web::http::Method::POST,
+            inner: Arc::from(index) as Arc<RawHandler>,
+        };
+
+        api_scope.web_backend().raw_handler(handler);
+
         self_
     }
 }

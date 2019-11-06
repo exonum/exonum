@@ -42,8 +42,8 @@ use std::{
 use crate::api::{
     self,
     manager::{ApiManager, UpdateEndpoints},
-    ApiAccess, ApiAggregator, ApiBackend, ApiScope, EmptyMutable, ExtendApiBackend, FutureResult,
-    Immutable, Mutable, NamedWith,
+    ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend, FutureResult, Immutable,
+    Mutable, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -181,33 +181,6 @@ where
                         .map_err(From::from)
                 })
                 .responder()
-        };
-
-        Self {
-            name: f.name,
-            method: actix_web::http::Method::POST,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        }
-    }
-}
-
-impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F, EmptyMutable>> for RequestHandler
-where
-    F: for<'r> Fn(Q) -> api::Result<I> + 'static + Send + Sync + Clone,
-    Q: DeserializeOwned + 'static,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<Q, I, api::Result<I>, F, EmptyMutable>) -> Self {
-        let handler = f.inner.handler;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let handler = handler.clone();
-
-            let future = Query::from_request(&request, &Default::default())
-                .map(Query::into_inner)
-                .and_then(|query| handler(query).map_err(From::from))
-                .and_then(|value| Ok(HttpResponse::Ok().json(value)))
-                .into_future();
-            Box::new(future)
         };
 
         Self {
