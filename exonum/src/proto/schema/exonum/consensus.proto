@@ -27,9 +27,6 @@ import "runtime.proto";
 import "google/protobuf/timestamp.proto";
 
 // Container for the signed messages.
-//
-// Keep in mind, that:
-// hash(SignedMessage) = hash(payload || key.bytes || sign.bytes)
 message SignedMessage {
   // Payload of the message.
   bytes payload = 1;

@@ -46,7 +46,10 @@ use tempdir::TempDir;
 use std::{collections::BTreeMap, iter, sync::Arc};
 
 use exonum::{
-    blockchain::{Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, ValidatorKeys},
+    blockchain::{
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection,
+        ValidatorKeys,
+    },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
@@ -89,8 +92,8 @@ fn create_blockchain(
     };
 
     let api_sender = ApiSender::new(mpsc::channel(0).0);
-    Blockchain::new(db, service_keypair, api_sender)
-        .into_mut(genesis_config)
+    let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
+    BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_rust_runtime(mpsc::channel(0).0, services)
         .build()
         .unwrap()

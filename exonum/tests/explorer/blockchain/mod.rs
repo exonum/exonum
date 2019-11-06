@@ -15,7 +15,7 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, BlockchainMut, InstanceCollection},
+    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, InstanceCollection},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
@@ -124,8 +124,7 @@ pub fn create_blockchain() -> BlockchainMut {
 
     let services =
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
-    blockchain
-        .into_mut(config.consensus)
+    BlockchainBuilder::new(blockchain, config.consensus)
         .with_rust_runtime(mpsc::channel(1).0, services)
         .build()
         .unwrap()

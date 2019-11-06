@@ -153,7 +153,7 @@ use exonum::{
         manager::UpdateEndpoints,
         ApiAccess,
     },
-    blockchain::{Blockchain, BlockchainMut, ConsensusConfig, InstanceConfig},
+    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceConfig},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
@@ -253,7 +253,7 @@ impl TestKit {
             api_sender.clone(),
         );
 
-        let mut builder = blockchain.into_mut(genesis);
+        let mut builder = BlockchainBuilder::new(blockchain, genesis);
         for runtime in runtimes {
             builder = builder.with_additional_runtime(runtime);
         }
@@ -265,7 +265,7 @@ impl TestKit {
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
         let api_aggregator = ApiAggregator::new(
-            blockchain.as_ref(),
+            blockchain.immutable_view(),
             SharedNodeState::new(&blockchain, 10_000),
         );
 
@@ -307,7 +307,7 @@ impl TestKit {
     fn update_aggregator(&mut self) -> ApiAggregator {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
             let mut aggregator = ApiAggregator::new(
-                self.blockchain.as_ref(),
+                self.blockchain.immutable_view(),
                 SharedNodeState::new(&self.blockchain, 10_000),
             );
             aggregator.extend(update.user_endpoints);

@@ -14,9 +14,7 @@
 
 //! Building blocks for creating API of services.
 
-// FIXME: move to Rust runtime.
-
-pub use crate::api::{ApiContext, Error, FutureResult, Result};
+pub use crate::api::{Error, FutureResult, Result};
 
 use exonum_merkledb::{access::Prefixed, Snapshot};
 use futures::IntoFuture;
@@ -24,6 +22,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     api::{ApiBuilder, ApiScope},
+    blockchain::Blockchain,
     crypto::{PublicKey, SecretKey},
     node::ApiSender,
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
@@ -45,13 +44,13 @@ pub struct ServiceApiState<'a> {
 }
 
 impl<'a> ServiceApiState<'a> {
-    /// Create service API state snapshot from the given context and instance descriptor.
-    pub fn from_api_context(context: &'a ApiContext, instance: InstanceDescriptor<'a>) -> Self {
+    /// Create service API state snapshot from the given blockchain and instance descriptor.
+    pub fn from_api_context(blockchain: &'a Blockchain, instance: InstanceDescriptor<'a>) -> Self {
         Self {
-            service_keypair: context.service_keypair(),
+            service_keypair: blockchain.service_keypair(),
             instance,
-            api_sender: context.sender(),
-            snapshot: context.snapshot(),
+            api_sender: blockchain.sender(),
+            snapshot: blockchain.snapshot(),
         }
     }
 
@@ -77,16 +76,16 @@ impl<'a> ServiceApiState<'a> {
 #[derive(Debug, Clone)]
 pub struct ServiceApiScope {
     inner: ApiScope,
-    context: ApiContext,
+    blockchain: Blockchain,
     descriptor: (InstanceId, String),
 }
 
 impl ServiceApiScope {
     /// Create a new service API scope for the specified service instance.
-    pub fn new(context: ApiContext, instance: InstanceDescriptor<'_>) -> Self {
+    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
         Self {
             inner: ApiScope::new(),
-            context,
+            blockchain,
             descriptor: instance.into(),
         }
     }
@@ -102,12 +101,12 @@ impl ServiceApiScope {
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
         R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
     {
-        let context = self.context.clone();
+        let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         self.inner
             .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
                 let state = ServiceApiState::from_api_context(
-                    &context,
+                    &blockchain,
                     InstanceDescriptor {
                         id: descriptor.0,
                         name: descriptor.1.as_ref(),
@@ -130,12 +129,12 @@ impl ServiceApiScope {
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
         R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
     {
-        let context = self.context.clone();
+        let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         self.inner
             .endpoint_mut(name, move |query: Q| -> crate::api::FutureResult<I> {
                 let state = ServiceApiState::from_api_context(
-                    &context,
+                    &blockchain,
                     InstanceDescriptor {
                         id: descriptor.0,
                         name: descriptor.1.as_ref(),
@@ -237,17 +236,17 @@ impl ServiceApiScope {
 /// }
 ///
 /// # fn main() {
-/// #     use exonum::{api::ApiContext, node::ApiSender, runtime::InstanceDescriptor};
+/// #     use exonum::{blockchain::Blockchain, node::ApiSender, runtime::InstanceDescriptor};
 /// #     use exonum_merkledb::TemporaryDB;
 /// #     use futures::sync::mpsc;
 /// #
-/// #     let context = ApiContext::new(
-/// #         TemporaryDB::new().into(),
+/// #     let blockchain = Blockchain::new(
+/// #         TemporaryDB::new(),
 /// #         crypto::gen_keypair(),
 /// #         ApiSender::new(mpsc::channel(0).0),
 /// #     );
 /// #     let mut builder = ServiceApiBuilder::new(
-/// #         context,
+/// #         blockchain,
 /// #         InstanceDescriptor {
 /// #             id: 1100,
 /// #             name: "example",
@@ -258,7 +257,7 @@ impl ServiceApiScope {
 /// ```
 #[derive(Debug)]
 pub struct ServiceApiBuilder {
-    context: ApiContext,
+    blockchain: Blockchain,
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
 }
@@ -266,11 +265,11 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Create a new service API builder for the specified service instance.
     #[doc(hidden)]
-    pub fn new(context: ApiContext, instance: InstanceDescriptor<'_>) -> Self {
+    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
         Self {
-            context: context.clone(),
-            public_scope: ServiceApiScope::new(context.clone(), instance),
-            private_scope: ServiceApiScope::new(context, instance),
+            blockchain: blockchain.clone(),
+            public_scope: ServiceApiScope::new(blockchain.clone(), instance),
+            private_scope: ServiceApiScope::new(blockchain, instance),
         }
     }
 
@@ -284,9 +283,9 @@ impl ServiceApiBuilder {
         &mut self.private_scope
     }
 
-    /// Return a reference to the underlying API context.
-    pub fn context(&self) -> &ApiContext {
-        &self.context
+    /// Return a reference to the blockchain.
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
     }
 }
 

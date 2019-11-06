@@ -42,7 +42,7 @@ use crate::{
 };
 
 use super::{
-    api::{ApiContext, ServiceApiBuilder},
+    api::ServiceApiBuilder,
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
     ArtifactId, ArtifactProtobufSpec, BlockchainData, CallInfo, ExecutionContext,
@@ -56,7 +56,7 @@ mod tests;
 
 #[derive(Debug)]
 pub struct RustRuntime {
-    api_context: Option<ApiContext>,
+    blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
@@ -103,7 +103,7 @@ impl RustRuntime {
     /// Creates a new Rust runtime instance.
     pub fn new(api_notifier: mpsc::Sender<UpdateEndpoints>) -> Self {
         Self {
-            api_context: None,
+            blockchain: None,
             api_notifier,
             available_artifacts: Default::default(),
             deployed_artifacts: Default::default(),
@@ -113,8 +113,8 @@ impl RustRuntime {
         }
     }
 
-    fn api_context(&self) -> &ApiContext {
-        self.api_context
+    fn blockchain(&self) -> &Blockchain {
+        self.blockchain
             .as_ref()
             .expect("Method called before Rust runtime is initialized")
     }
@@ -182,7 +182,7 @@ impl RustRuntime {
             .values()
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
-                    self.api_context().clone(),
+                    self.blockchain().clone(),
                     InstanceDescriptor {
                         id: instance.id,
                         name: instance.name.as_ref(),
@@ -279,7 +279,7 @@ impl FromStr for RustArtifactId {
 
 impl Runtime for RustRuntime {
     fn initialize(&mut self, blockchain: &Blockchain) {
-        self.api_context = Some(ApiContext::with_blockchain(blockchain));
+        self.blockchain = Some(blockchain.clone());
     }
 
     // We need to propagate changes in the services immediately after initialization.
@@ -402,14 +402,14 @@ impl Runtime for RustRuntime {
             return;
         }
 
-        let api_context = self.api_context();
+        let blockchain = self.blockchain();
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,
                 service.descriptor(),
                 snapshot,
-                api_context.service_keypair(),
-                api_context.sender(),
+                blockchain.service_keypair(),
+                blockchain.sender(),
             ));
         }
     }
