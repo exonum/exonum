@@ -54,7 +54,8 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection, Schema,
+        ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     events::{
@@ -937,8 +938,7 @@ impl Node {
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
-        let blockchain = blockchain
-            .into_mut(node_cfg.consensus.clone())
+        let blockchain = BlockchainBuilder::new(blockchain, node_cfg.consensus.clone())
             .with_rust_runtime(channel.endpoints.0.clone(), services)
             .with_external_runtimes(external_runtimes)
             .build()

@@ -145,7 +145,8 @@ impl Blockchain {
 
     /// Starts promotion into a mutable blockchain instance that can be used to process
     /// transactions and create blocks.
-    pub(crate) fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
+    #[cfg(test)]
+    pub fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
         BlockchainBuilder::new(self, genesis_config)
     }
 
