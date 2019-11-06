@@ -102,7 +102,7 @@ pub struct Schema<T> {
 
 impl<T: Access> Schema<T> {
     /// Constructs information schema based on the given `access`.
-    pub(crate) fn get_unchecked(access: T) -> Self {
+    pub(crate) fn new(access: T) -> Self {
         Self { access }
     }
 

@@ -462,7 +462,7 @@ impl NodeHandler {
         };
 
         let snapshot = blockchain.snapshot();
-        let consensus_config = Schema::get_unchecked(&snapshot).consensus_config();
+        let consensus_config = Schema::new(&snapshot).consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
         let validator_id = consensus_config
@@ -604,7 +604,7 @@ impl NodeHandler {
         }
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
         // Recover previous saved round if any.
         let round = schema.consensus_round();
         self.state.jump_round(round);
@@ -721,8 +721,8 @@ impl NodeHandler {
 
     fn need_faster_propose(&self) -> bool {
         let snapshot = self.blockchain.snapshot();
-        let pending_tx_count = Schema::get_unchecked(&snapshot).transactions_pool_len()
-            + self.state.tx_cache_len() as u64;
+        let pending_tx_count =
+            Schema::new(&snapshot).transactions_pool_len() + self.state.tx_cache_len() as u64;
         pending_tx_count >= u64::from(self.propose_timeout_threshold())
     }
 
@@ -1228,7 +1228,7 @@ mod tests {
 
         // Initial transaction should be added to the pool.
         let snapshot = node.blockchain().snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 1);
 
         // Create duplicated transaction.
@@ -1238,7 +1238,7 @@ mod tests {
 
         // Duplicated transaction shouldn't be added to the pool.
         let snapshot = node.blockchain().snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 1);
     }
 
@@ -1262,7 +1262,7 @@ mod tests {
 
         // Service not found for transaction.
         let snapshot = node.blockchain().snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 0);
     }
 

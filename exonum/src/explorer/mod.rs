@@ -513,7 +513,7 @@ impl<'a> BlockchainExplorer<'a> {
     /// Create a new `BlockchainExplorer` instance.
     pub fn new(snapshot: &'a dyn Snapshot) -> Self {
         BlockchainExplorer {
-            schema: Schema::get_unchecked(snapshot),
+            schema: Schema::new(snapshot),
         }
     }
 

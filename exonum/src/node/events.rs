@@ -132,7 +132,7 @@ impl NodeHandler {
         }
 
         let fork = self.blockchain.fork();
-        let mut schema = Schema::get_unchecked(&fork);
+        let mut schema = Schema::new(&fork);
 
         for tx in self.state().tx_cache().values() {
             schema.add_transaction_into_pool(tx.clone());

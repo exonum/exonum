@@ -276,7 +276,7 @@ fn test_store_txs_positions() {
     sandbox.assert_state(committed_height.next(), Round(1));
 
     let snapshot = sandbox.blockchain().snapshot();
-    let schema = Schema::get_unchecked(&snapshot);
+    let schema = Schema::new(&snapshot);
     let locations = schema.transactions_locations();
     for (expected_idx, hash) in hashes.iter().enumerate() {
         let location = locations.get(hash).unwrap();

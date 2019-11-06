@@ -110,7 +110,7 @@ impl Blockchain {
     ///
     /// If the genesis block was not committed.
     pub fn last_hash(&self) -> Hash {
-        Schema::get_unchecked(&self.snapshot())
+        Schema::new(&self.snapshot())
             .block_hashes_by_height()
             .last()
             .unwrap_or_else(Hash::default)
@@ -118,7 +118,7 @@ impl Blockchain {
 
     /// Returns the latest committed block.
     pub fn last_block(&self) -> Block {
-        Schema::get_unchecked(&self.snapshot()).last_block()
+        Schema::new(&self.snapshot()).last_block()
     }
 
     // TODO: remove
@@ -134,16 +134,13 @@ impl Blockchain {
 
     /// Returns the transactions pool size.
     pub fn pool_size(&self) -> u64 {
-        Schema::get_unchecked(&self.snapshot()).transactions_pool_len()
+        Schema::new(&self.snapshot()).transactions_pool_len()
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
         let snapshot = self.snapshot();
-        Schema::get_unchecked(&snapshot)
-            .peers_cache()
-            .iter()
-            .collect()
+        Schema::new(&snapshot).peers_cache().iter().collect()
     }
 
     /// Starts promotion into a mutable blockchain instance that can be used to process
@@ -242,9 +239,7 @@ impl BlockchainMut {
     ) -> Result<(), Error> {
         config.validate()?;
         let mut fork = self.fork();
-        Schema::get_unchecked(&fork)
-            .consensus_config_entry()
-            .set(config);
+        Schema::new(&fork).consensus_config_entry().set(config);
 
         // Add service instances.
         for instance_config in initial_services {
@@ -309,7 +304,7 @@ impl BlockchainMut {
         }
 
         // Get tx & state hash.
-        let schema = Schema::get_unchecked(&fork);
+        let schema = Schema::new(&fork);
         let state_hash = {
             let mut sum_table = schema.state_hash_aggregator();
             // Clear old state hash.
@@ -346,7 +341,7 @@ impl BlockchainMut {
         // Calculate block hash.
         let block_hash = block.object_hash();
         // Update height.
-        let schema = Schema::get_unchecked(&fork);
+        let schema = Schema::new(&fork);
         schema.block_hashes_by_height().push(block_hash);
         // Save block.
         schema.blocks().put(&block_hash, block);
@@ -361,7 +356,7 @@ impl BlockchainMut {
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> Result<(), Error> {
-        let schema = Schema::get_unchecked(&*fork);
+        let schema = Schema::new(&*fork);
         let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
             .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
         fork.flush();
@@ -383,7 +378,7 @@ impl BlockchainMut {
             }
         }
 
-        let mut schema = Schema::get_unchecked(&*fork);
+        let mut schema = Schema::new(&*fork);
         schema
             .transaction_results()
             .put(&tx_hash, ExecutionStatus(tx_result));
@@ -409,7 +404,7 @@ impl BlockchainMut {
         I: IntoIterator<Item = Verified<Precommit>>,
     {
         let mut fork: Fork = patch.into();
-        let mut schema = Schema::get_unchecked(&fork);
+        let mut schema = Schema::new(&fork);
         schema.precommits(&block_hash).extend(precommits);
         // Consensus messages cache is useful only during one height, so it should be
         // cleared when a new height is achieved.
@@ -455,7 +450,7 @@ impl BlockchainMut {
         transactions: impl IntoIterator<Item = Verified<AnyTx>>,
     ) {
         let fork = db.fork();
-        let mut schema = Schema::get_unchecked(&fork);
+        let mut schema = Schema::new(&fork);
         for transaction in transactions {
             if !schema.transactions().contains(&transaction.object_hash()) {
                 schema.add_transaction_into_pool(transaction);
@@ -482,7 +477,7 @@ impl BlockchainMut {
         I: IntoIterator<Item = Message>,
     {
         let fork = self.fork();
-        let mut schema = Schema::get_unchecked(&fork);
+        let mut schema = Schema::new(&fork);
         schema.consensus_messages_cache().extend(iter);
         schema.set_consensus_round(round);
         self.merge(fork.into_patch())
@@ -492,7 +487,7 @@ impl BlockchainMut {
     /// Saves the `Connect` message from a peer to the cache.
     pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Verified<Connect>) {
         let fork = self.fork();
-        Schema::get_unchecked(&fork).peers_cache().put(pubkey, peer);
+        Schema::new(&fork).peers_cache().put(pubkey, peer);
         self.merge(fork.into_patch())
             .expect("Unable to save peer to the peers cache");
     }
@@ -500,7 +495,7 @@ impl BlockchainMut {
     /// Removes from the cache the `Connect` message from a peer.
     pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
         let fork = self.fork();
-        Schema::get_unchecked(&fork).peers_cache().remove(key);
+        Schema::new(&fork).peers_cache().remove(key);
         self.merge(fork.into_patch())
             .expect("Unable to remove peer from the peers cache");
     }

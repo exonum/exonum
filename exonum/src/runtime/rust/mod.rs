@@ -398,7 +398,7 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
 
         // By convention, services don't handle `after_commit()` on the genesis block.
-        if CoreSchema::get_unchecked(snapshot).height() == Height(0) {
+        if CoreSchema::new(snapshot).height() == Height(0) {
             return;
         }
 

@@ -128,7 +128,7 @@ impl NodeHandler {
         trace!("Handle propose");
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
         let has_unknown_txs = match self.state.add_propose(
             msg.clone(),
             &schema.transactions(),
@@ -212,7 +212,7 @@ impl NodeHandler {
         let block_hash = block.object_hash();
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
-            let schema = Schema::get_unchecked(&snapshot);
+            let schema = Schema::new(&snapshot);
             let has_unknown_txs = self
                 .state
                 .create_incomplete_block(&msg, &schema.transactions(), &schema.transactions_pool())
@@ -502,9 +502,8 @@ impl NodeHandler {
                 (committed_txs, proposer)
             };
             // Update node state.
-            self.state.update_config(
-                Schema::get_unchecked(&self.blockchain.snapshot()).consensus_config(),
-            );
+            self.state
+                .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
             // Update state to new height.
             let block_hash = self.blockchain.as_ref().last_hash();
             self.state
@@ -515,7 +514,7 @@ impl NodeHandler {
         self.api_state.broadcast(&block_hash);
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();
 
         metric!("node.mempool", pool_len);
@@ -553,7 +552,7 @@ impl NodeHandler {
         let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
 
         if contains_transaction(&hash, &schema.transactions(), self.state.tx_cache()) {
             bail!("Received already processed transaction, hash {:?}", hash)
@@ -734,7 +733,7 @@ impl NodeHandler {
         let tx_block_limit = self.txs_block_limit();
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::get_unchecked(&snapshot);
+        let schema = Schema::new(&snapshot);
         let pool = schema.transactions_pool();
         let pool_len = schema.transactions_pool_len();
 

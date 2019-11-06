@@ -109,7 +109,7 @@ impl SystemApi {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_query: ()| {
             let snapshot = self.blockchain.snapshot();
-            let schema = Schema::get_unchecked(&snapshot);
+            let schema = Schema::new(&snapshot);
             Ok(StatsInfo {
                 tx_pool_size: schema.transactions_pool_len(),
                 tx_count: schema.transactions_len(),

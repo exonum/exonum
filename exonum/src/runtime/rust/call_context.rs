@@ -142,7 +142,7 @@ impl<'a> CallContext<'a> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`writeable_core_schema` called within a non-supervisor service");
         }
-        CoreSchema::get_unchecked(self.inner.fork)
+        CoreSchema::new(self.inner.fork)
     }
 
     /// Marks an artifact as *registered*, i.e., one which service instances can be deployed from.

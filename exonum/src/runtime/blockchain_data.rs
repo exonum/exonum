@@ -37,7 +37,7 @@ impl<'a, T: RawAccess + ToReadonly> BlockchainData<'a, T> {
 
     /// Returns core schema.
     pub fn for_core(&self) -> CoreSchema<T::Readonly> {
-        CoreSchema::get_unchecked(self.access.to_readonly())
+        CoreSchema::new(self.access.to_readonly())
     }
 
     /// Returns dispatcher schema.
@@ -89,7 +89,7 @@ pub trait SnapshotExt {
 
 impl SnapshotExt for dyn Snapshot {
     fn for_core(&self) -> CoreSchema<&'_ dyn Snapshot> {
-        CoreSchema::get_unchecked(self)
+        CoreSchema::new(self)
     }
 
     fn for_dispatcher(&self) -> DispatcherSchema<&'_ dyn Snapshot> {
