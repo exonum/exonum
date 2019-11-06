@@ -64,7 +64,7 @@
 //!
 //! 1. An Exonum client creates a transaction message which includes [`CallInfo`] information
 //!   about the corresponding method to call and serialized method parameters as a payload.
-//!   The client then signs the message with a secret key in the Ed25519 cryptosystem.
+//!   The client then signs the message using the Ed25519 signature system.
 //!
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
 //!
