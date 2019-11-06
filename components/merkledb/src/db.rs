@@ -490,7 +490,7 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use exonum_merkledb::{Access, Database, IndexType, TemporaryDB};
+/// use exonum_merkledb::{access::AccessExt, Database, TemporaryDB};
 ///
 /// // not declared as `mut db`!
 /// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
