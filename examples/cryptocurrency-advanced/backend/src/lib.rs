@@ -51,7 +51,7 @@ impl Service for CryptocurrencyService {
         CryptocurrencyApi.wire(builder);
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         Schema::new(descriptor.name, snapshot).state_hash()
     }
 }

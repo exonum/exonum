@@ -48,10 +48,6 @@ pub struct DeployRequest {
 pub struct DeployConfirmation {
     /// Artifact identifier.
     pub artifact: ArtifactId,
-    /// Additional information for Runtime to deploy.
-    pub spec: Vec<u8>,
-    /// The height until which the deployment procedure should be completed.
-    pub deadline_height: Height,
 }
 
 /// Request for the artifact deployment.
@@ -136,13 +132,16 @@ impl ConfigPropose {
     }
 
     /// Signs the proposal for a simple supervisor with a randomly generated keypair.
-    pub fn sign_for_simple_supervisor(self) -> Verified<AnyTx> {
-        let (public_key, secret_key) = exonum_crypto::gen_keypair();
+    pub fn sign_for_simple_supervisor(
+        self,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Verified<AnyTx> {
         Transaction::<dyn SimpleSupervisorInterface>::sign(
             self,
             SUPERVISOR_INSTANCE_ID,
             public_key,
-            &secret_key,
+            secret_key,
         )
     }
 
@@ -206,8 +205,6 @@ impl From<DeployRequest> for DeployConfirmation {
     fn from(v: DeployRequest) -> Self {
         Self {
             artifact: v.artifact,
-            deadline_height: v.deadline_height,
-            spec: v.spec,
         }
     }
 }

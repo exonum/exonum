@@ -77,7 +77,7 @@ pub struct ServiceApiScope {
 
 impl ServiceApiScope {
     /// Create a new service API scope for the specified service instance.
-    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor) -> Self {
+    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
         Self {
             inner: ApiScope::new(),
             blockchain,
@@ -93,7 +93,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
         R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
@@ -121,7 +121,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
         R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
@@ -260,7 +260,7 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Create a new service API builder for the specified service instance.
     #[doc(hidden)]
-    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor) -> Self {
+    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
         Self {
             blockchain: blockchain.clone(),
             public_scope: ServiceApiScope::new(blockchain.clone(), instance),

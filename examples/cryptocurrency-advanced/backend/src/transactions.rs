@@ -82,15 +82,15 @@ pub struct CreateWallet {
 #[exonum_service]
 pub trait CryptocurrencyInterface {
     /// Transfers `amount` of the currency from one wallet to another.
-    fn transfer(&self, ctx: CallContext, arg: Transfer) -> Result<(), Error>;
+    fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
     /// Issues `amount` of the currency to the `wallet`.
-    fn issue(&self, ctx: CallContext, arg: Issue) -> Result<(), Error>;
+    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Result<(), Error>;
     /// Creates wallet with the given `name`.
-    fn create_wallet(&self, ctx: CallContext, arg: CreateWallet) -> Result<(), Error>;
+    fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
 }
 
 impl CryptocurrencyInterface for CryptocurrencyService {
-    fn transfer(&self, context: CallContext, arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
@@ -118,7 +118,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn issue(&self, context: CallContext, arg: Issue) -> Result<(), Error> {
+    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
@@ -135,7 +135,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn create_wallet(&self, context: CallContext, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()

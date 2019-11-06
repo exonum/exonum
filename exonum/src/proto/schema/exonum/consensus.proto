@@ -31,11 +31,11 @@ import "google/protobuf/timestamp.proto";
 // Keep in mind, that:
 // hash(SignedMessage) = hash(payload || key.bytes || sign.bytes)
 message SignedMessage {
-  // Message payload.
+  // Payload of the message.
   bytes payload = 1;
-  // Message author.
+  // Public key of the author of the message.
   exonum.crypto.PublicKey author = 2;
-  // Digital signature.
+  // Digital signature over the payload created with a secret key of the author of the message.
   exonum.crypto.Signature signature = 3;
 }
 

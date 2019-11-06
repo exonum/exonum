@@ -96,7 +96,7 @@ impl BinaryValue for BranchNode {
         self.raw
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let raw = bytes.into_owned();
         ensure!(raw.len() == BRANCH_NODE_SIZE, "Wrong buffer size");
         Ok(Self { raw })
@@ -120,7 +120,7 @@ impl ObjectHash for BranchNode {
 }
 
 impl std::fmt::Debug for BranchNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BranchNode")
             .field("left_path", &self.child_path(ChildKind::Left))
             .field("left_hash", &self.child_hash(ChildKind::Left))

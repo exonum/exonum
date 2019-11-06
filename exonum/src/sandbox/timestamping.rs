@@ -32,7 +32,7 @@ pub const DATA_SIZE: usize = 64;
 
 #[exonum_service(crate = "crate")]
 pub trait TimestampingInterface {
-    fn timestamp(&self, context: CallContext, arg: TimestampTx) -> Result<(), ExecutionError>;
+    fn timestamp(&self, context: CallContext<'_>, arg: TimestampTx) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -46,13 +46,17 @@ pub trait TimestampingInterface {
 pub struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, _context: CallContext, _arg: TimestampTx) -> Result<(), ExecutionError> {
+    fn timestamp(
+        &self,
+        _context: CallContext<'_>,
+        _arg: TimestampTx,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 }

@@ -780,7 +780,7 @@ impl NodeHandler {
 }
 
 impl fmt::Debug for NodeHandler {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
@@ -824,7 +824,7 @@ impl ApiSender {
 }
 
 impl fmt::Debug for ApiSender {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ApiSender").finish()
     }
 }
@@ -839,7 +839,7 @@ pub struct ConnectInfo {
 }
 
 impl fmt::Display for ConnectInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.address)
     }
 }
@@ -1170,7 +1170,7 @@ mod tests {
 
     #[exonum_service(crate = "crate")]
     pub trait TestInterface {
-        fn simple(&self, context: CallContext, arg: TxSimple) -> Result<(), ExecutionError>;
+        fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug, ServiceFactory)]
@@ -1184,13 +1184,17 @@ mod tests {
     struct TestService;
 
     impl TestInterface for TestService {
-        fn simple(&self, _context: CallContext, _arg: TxSimple) -> Result<(), ExecutionError> {
+        fn simple(&self, _context: CallContext<'_>, _arg: TxSimple) -> Result<(), ExecutionError> {
             Ok(())
         }
     }
 
     impl Service for TestService {
-        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(
+            &self,
+            _instance: InstanceDescriptor<'_>,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
             vec![]
         }
     }

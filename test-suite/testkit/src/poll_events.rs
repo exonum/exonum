@@ -23,7 +23,7 @@ struct TakeWhileReady<S> {
 }
 
 impl<S> fmt::Debug for TakeWhileReady<S> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("TakeWhileReady")
             .field("exhausted", &self.exhausted)
             .finish()

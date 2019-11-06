@@ -177,7 +177,7 @@ pub enum ApiAccess {
 }
 
 impl fmt::Display for ApiAccess {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ApiAccess::Public => f.write_str("public"),
             ApiAccess::Private => f.write_str("private"),

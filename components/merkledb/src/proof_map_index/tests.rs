@@ -1394,7 +1394,7 @@ fn test_tree_with_hashed_key() {
             buf
         }
 
-        fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
             let bytes = bytes.as_ref();
             ensure!(
                 bytes.len() == 4,

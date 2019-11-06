@@ -52,7 +52,7 @@ pub enum ApiKind {
 }
 
 impl fmt::Display for ApiKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ApiKind::System => write!(f, "api/system"),
             ApiKind::Explorer => write!(f, "api/explorer"),
@@ -70,7 +70,7 @@ pub struct TestKitApi {
 }
 
 impl fmt::Debug for TestKitApi {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("TestKitApi").finish()
     }
 }
@@ -100,7 +100,7 @@ impl TestKitApi {
     }
 
     /// Creates a requests builder for the public API scope.
-    pub fn public(&self, kind: impl Display) -> RequestBuilder {
+    pub fn public(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
             self.test_server.url(""),
             &self.test_client,
@@ -110,7 +110,7 @@ impl TestKitApi {
     }
 
     /// Creates a requests builder for the private API scope.
-    pub fn private(&self, kind: impl Display) -> RequestBuilder {
+    pub fn private(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
             self.test_server.url(""),
             &self.test_client,
@@ -119,7 +119,7 @@ impl TestKitApi {
         )
     }
 
-    pub fn exonum_api(&self) -> ExonumNodeApi {
+    pub fn exonum_api(&self) -> ExonumNodeApi<'_> {
         ExonumNodeApi::new(self)
     }
 }
@@ -128,10 +128,7 @@ type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + 'b
 
 /// An HTTP requests builder. This type can be used to send requests to
 /// the appropriate `TestKitApi` handlers.
-pub struct RequestBuilder<'a, 'b, Q = ()>
-where
-    Q: 'b,
-{
+pub struct RequestBuilder<'a, 'b, Q = ()> {
     test_server_url: String,
     test_client: &'a Client,
     access: ApiAccess,
@@ -144,7 +141,7 @@ impl<'a, 'b, Q> fmt::Debug for RequestBuilder<'a, 'b, Q>
 where
     Q: 'b + fmt::Debug + Serialize,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("RequestBuilder")
             .field("access", &self.access)
             .field("prefix", &self.prefix)
