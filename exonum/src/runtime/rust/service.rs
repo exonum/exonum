@@ -235,6 +235,7 @@ impl<'a> AfterCommitContext<'a> {
     }
 }
 
+/// Special extensions for the service instance authorized as a supervisor.
 #[derive(Debug)]
 pub struct SupervisorExtensions<'a> {
     mailbox: &'a mut Mailbox,

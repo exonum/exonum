@@ -12,7 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Built-in Rust runtime module.
+//! The basic runtime with the native Rust services.
+//!
+//! This runtime is usually presents in every blockchain instance and can only process a static set
+//! of available Rust services. To change this set you have to recompile the node binary.
+//! During this procedure, be very careful and avoid situations when some of deployed services do
+//! not exist in the list of available. The easiest way to add only a new available artifacts, rather
+//! than delete.
+//!
+//! Rust runtime does not provide any level of service isolation from the operation system, therefore
+//! you should only use a trusted artifacts.
+//!
+//! Artifacts available for deployment are presented by the [`ServiceFactory`][ServiceFactory] objects.
+//!
+//! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
     call_context::CallContext,
@@ -54,6 +67,9 @@ mod service;
 #[cfg(test)]
 mod tests;
 
+/// Rust runtime instance.
+///
+/// [Read more about the Rust runtime](index.html).
 #[derive(Debug)]
 pub struct RustRuntime {
     api_context: Option<ApiContext>,
@@ -73,18 +89,18 @@ struct Instance {
 }
 
 impl Instance {
-    pub fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
+    fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
         Self { id, name, service }
     }
 
-    pub fn descriptor(&self) -> InstanceDescriptor<'_> {
+    fn descriptor(&self) -> InstanceDescriptor<'_> {
         InstanceDescriptor {
             id: self.id,
             name: &self.name,
         }
     }
 
-    pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
         (
             self.id,
             self.service.state_hash(self.descriptor(), snapshot),
@@ -121,12 +137,15 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
+    /// Adds a new service factory to the list of available artifacts.
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
 
+    /// Adds a new service factory to the list of available artifacts and returns
+    /// itself for further chaining.
     pub fn with_available_service(
         mut self,
         service_factory: impl Into<Box<dyn ServiceFactory>>,
@@ -221,14 +240,27 @@ impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
     }
 }
 
+/// The unique name of the Rust artifact, contains the name and version of the artifact.
+///
+/// In string representation the artifact name is written as follows:
+///
+/// `{artifact_name}:{artifact_version}`, where `artifact_name` is a unique name of the artifact,
+/// and 'artifact_version` is a version number.
+///
+/// * Artifact name contains only the following characters: `a-zA-Z0-9` and one of `_-.`.
+/// * Artifact version number must conform to the semantic version scheme.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactId {
+    /// Artifact name.
     pub name: String,
+    /// Artifact version number conforming to the semantic versioning scheme.
     pub version: Version,
 }
 
 impl RustArtifactId {
+    /// Creates a new Rust artifact id from the specified parts.
     pub fn new(name: &str, major: u64, minor: u64, patch: u64) -> Self {
+        // TODO Check that the name contains only valid symbols and is not empty. [ECR-3222]
         Self {
             name: name.to_owned(),
             version: Version::new(major, minor, patch),
