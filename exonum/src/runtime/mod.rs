@@ -188,6 +188,12 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 
     /// Request to deploy artifact with the given identifier and additional deploy specification.
     ///
+    /// Review: 'The successive calls must return the same spec as the first call.'
+    /// it requires the runtime to keep around the original id *and* the spec
+    /// *and* detect mismatch errors; I'd change this requirement to the previous
+    /// 'once per artifact' (= never on the same runtime instance), because I don't see
+    /// why the runtime implementation has to tolerate attempts to deploy the same thing.
+    ///
     /// This method may be called multiple times with the same params; in particular, the method
     /// is called for all deployed artifacts after node restart. The successive calls must return
     /// the same spec as the first call. In most cases, it is prudent to cache the spec in the runtime,
@@ -195,6 +201,13 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// # Policy on Panics
     ///
+    /// Review: What's the point of 'catching' panics if there is no service code involved
+    /// (and a 'panic' is not an appropriate term for that for a runtime in a foreign language)?
+    /// I'd clarify (here and elsewhere) that the runtime has to report errors as errors and
+    /// if it fails to do that (= panics), the node will fail (? by default).
+    ///
+    /// When it is important which conditions are represented as which Errors (kind, etc) —
+    /// specify that.
     /// * Catch each kind of panics except for `FatalError` and convert
     /// them into `ExecutionError`.
     fn deploy_artifact(
@@ -209,6 +222,12 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Runs the constructor of a new service instance with the given specification
     /// and initial configuration.
     ///
+    /// Review:
+    /// What the runtime *have* to do? What is a 'constructor' — the method creating a service
+    /// instance of the service method performing the initial configuration? Does the runtime
+    /// have to pass the initial configuration (on *each* restart)? Or shall it be performed once
+    /// in the service lifetime (then why is it passed again)?
+    ///
     /// The service is not guaranteed to be added to the blockchain at this point.
     /// In particular, the dispatcher does not route transactions and `before_commit` events
     /// until after `commit_service()` is called with the same instance spec. A call
@@ -218,6 +237,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// guaranteed to be performed in the closest committed block, i.e., before the nearest
     /// `Runtime::after_commit()`.
     ///
+    /// Review: can or shall, as there seem to be no other (direct) way?
     /// The runtime can discard the instantiated service instance after completing this method.
     /// (Alternatively, "garbage" services may be removed from `Runtime` in `after_commit`
     /// because of the time dependence between `commit_service` and `after_commit` described above.)
@@ -246,6 +266,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// A call to `start_adding_service()` may have happened indefinite time ago;
     /// indeed, `commit_service()` is called for all services on the node startup. Likewise,
+    /// Review: Why would it happen an indefinite number of times if the method '*Permanently*
+    /// adds a service to the runtime'?
     /// `commit_service()` may be called an indefinite number of times for the same instance.
     ///
     /// `snapshot` is the storage snapshot at the latest height when the method is called:
@@ -328,6 +350,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// Catch each kind of panics except for `FatalError` and write them into the log. A panic
     /// will bubble up, i.e., will lead to immediate node termination.
+    /// Review: Why the Mailbox is passed?
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox);
 
     /// Notify the runtime that it has to shutdown.
