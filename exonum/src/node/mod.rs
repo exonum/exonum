@@ -54,7 +54,8 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, BlockchainMut, ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection, Schema,
+        ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     events::{
@@ -779,7 +780,7 @@ impl NodeHandler {
 }
 
 impl fmt::Debug for NodeHandler {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
@@ -823,7 +824,7 @@ impl ApiSender {
 }
 
 impl fmt::Debug for ApiSender {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ApiSender").finish()
     }
 }
@@ -838,7 +839,7 @@ pub struct ConnectInfo {
 }
 
 impl fmt::Display for ConnectInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.address)
     }
 }
@@ -937,8 +938,7 @@ impl Node {
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
-        let blockchain = blockchain
-            .into_mut(node_cfg.consensus.clone())
+        let blockchain = BlockchainBuilder::new(blockchain, node_cfg.consensus.clone())
             .with_rust_runtime(channel.endpoints.0.clone(), services)
             .with_external_runtimes(external_runtimes)
             .build()
@@ -1006,7 +1006,7 @@ impl Node {
                     .chain(private_api_handler)
                     .collect::<Vec<_>>()
             },
-            api_aggregator: ApiAggregator::new(blockchain.as_ref(), api_state.clone()),
+            api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
         };
 
         let handler = NodeHandler::new(
@@ -1170,7 +1170,7 @@ mod tests {
 
     #[exonum_service(crate = "crate")]
     pub trait TestInterface {
-        fn simple(&self, context: CallContext, arg: TxSimple) -> Result<(), ExecutionError>;
+        fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
     #[derive(Debug, ServiceFactory)]
@@ -1184,13 +1184,17 @@ mod tests {
     struct TestService;
 
     impl TestInterface for TestService {
-        fn simple(&self, _context: CallContext, _arg: TxSimple) -> Result<(), ExecutionError> {
+        fn simple(&self, _context: CallContext<'_>, _arg: TxSimple) -> Result<(), ExecutionError> {
             Ok(())
         }
     }
 
     impl Service for TestService {
-        fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        fn state_hash(
+            &self,
+            _instance: InstanceDescriptor<'_>,
+            _snapshot: &dyn Snapshot,
+        ) -> Vec<Hash> {
             vec![]
         }
     }

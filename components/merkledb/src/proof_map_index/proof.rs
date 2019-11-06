@@ -61,7 +61,7 @@ impl<'de> serde::Deserialize<'de> for ProofPath {
         impl<'de> Visitor<'de> for ProofPathVisitor {
             type Value = ProofPath;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(
                     formatter,
                     "binary string with length between 1 and {}",
@@ -293,7 +293,7 @@ pub struct CheckedMapProof<'a, K, V> {
 /// added to it.
 ///
 /// `entries` are assumed to be sorted by the path in increasing order.
-fn collect(entries: &[Cow<MapProofEntry>]) -> Result<Hash, MapProofError> {
+fn collect(entries: &[Cow<'_, MapProofEntry>]) -> Result<Hash, MapProofError> {
     fn common_prefix(x: &ProofPath, y: &ProofPath) -> ProofPath {
         x.prefix(x.common_prefix_len(y))
     }
@@ -533,7 +533,7 @@ where
     /// ```
     ///
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
-    pub fn check(&self) -> Result<CheckedMapProof<K, V>, MapProofError> {
+    pub fn check(&self) -> Result<CheckedMapProof<'_, K, V>, MapProofError> {
         self.precheck()?;
 
         let mut proof: Vec<_> = self.proof.iter().map(Cow::Borrowed).collect();
@@ -576,7 +576,7 @@ where
     pub fn check_against_hash(
         &self,
         expected_map_hash: Hash,
-    ) -> Result<CheckedMapProof<K, V>, ValidationError<MapProofError>> {
+    ) -> Result<CheckedMapProof<'_, K, V>, ValidationError<MapProofError>> {
         self.check()
             .map_err(ValidationError::Malformed)
             .and_then(|checked| {

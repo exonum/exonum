@@ -44,7 +44,7 @@
 extern crate pretty_assertions;
 #[macro_use]
 extern crate exonum_derive;
-pub extern crate exonum_merkledb;
+pub use exonum_merkledb;
 #[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]

@@ -169,7 +169,7 @@ where
         self.raw.to_bytes()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let raw = SignedMessage::from_bytes(bytes)?;
         let inner =
             T::try_from(&raw).map_err(|_| failure::format_err!("Unable to decode message"))?;

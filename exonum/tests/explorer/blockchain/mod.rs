@@ -15,7 +15,7 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, BlockchainMut, InstanceCollection, Schema},
+    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, InstanceCollection, Schema},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
@@ -76,8 +76,8 @@ pub enum Error {
 
 #[exonum_service]
 pub trait ExplorerTransactions {
-    fn create_wallet(&self, context: CallContext, arg: CreateWallet) -> Result<(), Error>;
-    fn transfer(&self, context: CallContext, arg: Transfer) -> Result<(), Error>;
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -90,7 +90,7 @@ pub trait ExplorerTransactions {
 struct MyService;
 
 impl ExplorerTransactions for MyService {
-    fn create_wallet(&self, _context: CallContext, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -98,13 +98,13 @@ impl ExplorerTransactions for MyService {
         }
     }
 
-    fn transfer(&self, _context: CallContext, _arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), Error> {
         panic!("oops");
     }
 }
 
 impl Service for MyService {
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -124,8 +124,7 @@ pub fn create_blockchain() -> BlockchainMut {
 
     let services =
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
-    blockchain
-        .into_mut(config.consensus)
+    BlockchainBuilder::new(blockchain, config.consensus)
         .with_rust_runtime(mpsc::channel(1).0, services)
         .build()
         .unwrap()

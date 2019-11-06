@@ -238,7 +238,7 @@ impl BinaryValue for ExecutionError {
             .expect("Failed to serialize in BinaryValue for ExecutionError")
     }
 
-    fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
         inner.merge_from_bytes(value.as_ref())?;
         ProtobufConvert::from_pb(inner)
@@ -310,7 +310,7 @@ impl BinaryValue for ExecutionStatus {
             .expect("Failed to serialize in BinaryValue for ExecutionStatus")
     }
 
-    fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
         inner.merge_from_bytes(value.as_ref())?;
         ProtobufConvert::from_pb(inner)

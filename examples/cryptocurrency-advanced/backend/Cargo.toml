@@ -20,7 +20,6 @@ exonum-derive = { version = "0.12.0", path = "../../../components/derive" }
 exonum-merkledb = { version = "0.12.0", path = "../../../components/merkledb" }
 exonum-crypto = { version = "0.12.0", path = "../../../components/crypto"}
 exonum-proto = { version = "0.12.0", path = "../../../components/proto" }
-exonum-proto-derive = { version = "0.12.0", path = "../../../components/proto-derive"}
 exonum-cli = { version = "0.12.0", path = "../../../cli" }
 serde = "1.0.0"
 serde_derive = "1.0.0"

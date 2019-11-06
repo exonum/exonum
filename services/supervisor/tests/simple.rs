@@ -116,7 +116,7 @@ impl From<ConfigChangeService> for InstanceCollection {
 }
 
 impl Service for ConfigChangeService {
-    fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: InstanceDescriptor<'_>, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 }
@@ -126,7 +126,7 @@ impl Configure for ConfigChangeService {
 
     fn verify_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -142,7 +142,7 @@ impl Configure for ConfigChangeService {
 
     fn apply_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context

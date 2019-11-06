@@ -16,7 +16,9 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, ValidatorKeys},
+    blockchain::{
+        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys,
+    },
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
@@ -130,7 +132,7 @@ impl Runtime for SampleRuntime {
     /// Starts a new service instance and sets the counter value for this.
     fn start_adding_service(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -144,7 +146,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -201,7 +203,7 @@ impl Runtime for SampleRuntime {
 
     fn before_commit(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -273,8 +275,8 @@ fn main() {
 
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
-    let blockchain = Blockchain::new(db, service_keypair.clone(), api_sender.clone())
-        .into_mut(genesis)
+    let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
+    let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
         .with_rust_runtime(
             channel.endpoints.0.clone(),
             vec![InstanceCollection::from(Supervisor)],

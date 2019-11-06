@@ -278,7 +278,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ListIndexIter<V> {
+    pub fn iter(&self) -> ListIndexIter<'_, V> {
         ListIndexIter {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
@@ -303,7 +303,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
+    pub fn iter_from(&self, from: u64) -> ListIndexIter<'_, V> {
         ListIndexIter {
             base_iter: self.base.iter_from(&(), &from),
         }

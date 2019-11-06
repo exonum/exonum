@@ -58,7 +58,7 @@ macro_rules! implement_public_crypto_wrapper {
     }
 
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             write_short_hex(f, &self[..])?;
@@ -67,7 +67,7 @@ macro_rules! implement_public_crypto_wrapper {
     }
 
     impl fmt::Display for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write_short_hex(f, &self[..])
         }
     }
@@ -106,7 +106,7 @@ macro_rules! implement_private_crypto_wrapper {
     }
 
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             write_short_hex(f, &self[..])?;
@@ -166,7 +166,7 @@ macro_rules! implement_serde {
 
                 impl<'v> Visitor<'v> for HexVisitor {
                     type Value = $name;
-                    fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                    fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
                         write!(fmt, "expecting str.")
                     }
                     fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>

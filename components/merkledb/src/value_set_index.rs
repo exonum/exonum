@@ -241,7 +241,7 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ValueSetIndexIter<V> {
+    pub fn iter(&self) -> ValueSetIndexIter<'_, V> {
         ValueSetIndexIter {
             base_iter: self.base.iter(&()),
         }
@@ -267,7 +267,7 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
+    pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<'_, V> {
         ValueSetIndexIter {
             base_iter: self.base.iter_from(&(), from),
         }
@@ -290,7 +290,7 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn hashes(&self) -> ValueSetIndexHashes {
+    pub fn hashes(&self) -> ValueSetIndexHashes<'_> {
         ValueSetIndexHashes {
             base_iter: self.base.iter(&()),
         }
@@ -316,7 +316,7 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
+    pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes<'_> {
         ValueSetIndexHashes {
             base_iter: self.base.iter_from(&(), from),
         }

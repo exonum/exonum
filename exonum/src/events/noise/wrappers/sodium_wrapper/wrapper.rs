@@ -45,7 +45,7 @@ pub struct NoiseWrapper {
 impl NoiseWrapper {
     pub fn initiator(params: &HandshakeParams) -> Self {
         if let Some(ref remote_key) = params.remote_key {
-            let builder: Builder = Self::noise_builder()
+            let builder: Builder<'_> = Self::noise_builder()
                 .local_private_key(params.secret_key.as_ref())
                 .remote_public_key(remote_key.as_ref());
             let state = builder
@@ -58,7 +58,7 @@ impl NoiseWrapper {
     }
 
     pub fn responder(params: &HandshakeParams) -> Self {
-        let builder: Builder = Self::noise_builder();
+        let builder: Builder<'_> = Self::noise_builder();
 
         let state = builder
             .local_private_key(params.secret_key.as_ref())
@@ -98,7 +98,7 @@ impl NoiseWrapper {
 }
 
 impl fmt::Debug for NoiseWrapper {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(
             f,
             "NoiseWrapper {{ handshake finished: {} }}",
@@ -195,7 +195,7 @@ fn div_ceil(lhs: usize, rhs: usize) -> usize {
 }
 
 impl fmt::Debug for TransportWrapper {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(
             f,
             "TransportWrapper {{ is initiator: {} }}",

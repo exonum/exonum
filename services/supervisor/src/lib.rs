@@ -53,7 +53,7 @@ const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged 
 /// Any panic occured during the invocation will be catched and turned into `ExecutionError`
 /// and changes will be rolled back.
 fn apply_consensus_config(
-    context: &mut CallContext,
+    context: &mut CallContext<'_>,
     config: ConsensusConfig,
 ) -> Result<(), ExecutionError> {
     context.isolate(|context| {
@@ -68,12 +68,12 @@ fn apply_consensus_config(
 /// Any panic occured during the invocation will be catched and turned into `ExecutionError`
 /// and changes will be rolled back.
 fn apply_service_config(
-    context: &mut CallContext,
+    context: &mut CallContext<'_>,
     config: ServiceConfig,
 ) -> Result<(), ExecutionError> {
     context.isolate(|mut context| {
         context
-            .interface::<ConfigureCall>(config.instance_id)?
+            .interface::<ConfigureCall<'_>>(config.instance_id)?
             .apply_config(config.params.clone())
     })
 }
@@ -93,7 +93,7 @@ fn apply_service_config(
 ///   by a panic / error *before* hitting the call; if this happens, the usual rules apply.
 ///
 /// These restrictions are the result of `Fork` not having multi-layered checkpoints.
-fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
+fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
     // An error while configuring one of the service instances should not affect others.
     changes.into_iter().for_each(|change| match change {
         ConfigChange::Consensus(config) => {
@@ -138,11 +138,11 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
 pub struct Supervisor;
 
 impl Service for Supervisor {
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         Schema::new(descriptor.name, snapshot).state_hash()
     }
 
-    fn before_commit(&self, mut context: CallContext) {
+    fn before_commit(&self, mut context: CallContext<'_>) {
         let schema = Schema::new(context.instance().name, context.fork());
         let height = blockchain::Schema::new(context.fork()).height();
 
@@ -186,7 +186,7 @@ impl Service for Supervisor {
         }
     }
 
-    fn after_commit(&self, mut context: AfterCommitContext) {
+    fn after_commit(&self, mut context: AfterCommitContext<'_>) {
         let schema = Schema::new(context.instance.name, context.snapshot);
         let pending_deployments = schema.pending_deployments();
         let keypair = context.service_keypair;
