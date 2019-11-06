@@ -411,7 +411,7 @@ pub enum Action {
 }
 
 impl fmt::Debug for Action {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Action::StartDeploy { artifact, spec, .. } => formatter
                 .debug_struct("StartDeploy")

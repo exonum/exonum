@@ -17,8 +17,8 @@
 use exonum_merkledb::IndexAccess;
 
 use crate::{
-    api::{node::SharedNodeState, ApiContext, ApiScope},
-    blockchain::Schema,
+    api::{node::SharedNodeState, ApiScope},
+    blockchain::{Blockchain, Schema},
     helpers::user_agent,
     runtime::{ArtifactId, DispatcherSchema, InstanceSpec},
 };
@@ -91,15 +91,15 @@ pub struct ProtoSourcesQuery {
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
-    context: ApiContext,
+    blockchain: Blockchain,
     node_state: SharedNodeState,
 }
 
 impl SystemApi {
     /// Create a new `public::SystemApi` instance.
-    pub fn new(context: ApiContext, node_state: SharedNodeState) -> Self {
+    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
         Self {
-            context,
+            blockchain,
             node_state,
         }
     }
@@ -107,7 +107,7 @@ impl SystemApi {
     fn handle_stats_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_query: ()| {
-            let snapshot = self.context.snapshot();
+            let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
             Ok(StatsInfo {
                 tx_pool_size: schema.transactions_pool_len(),
@@ -137,7 +137,7 @@ impl SystemApi {
     fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_query: ()| {
-            Ok(DispatcherInfo::load(&self_.context.snapshot()))
+            Ok(DispatcherInfo::load(&self_.blockchain.snapshot()))
         });
         self
     }

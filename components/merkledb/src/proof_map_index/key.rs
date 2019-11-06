@@ -293,7 +293,7 @@ impl PartialEq for ProofPath {
 }
 
 impl std::fmt::Debug for ProofPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // 8 bits + '|' symbol per byte.
         let mut bits = String::with_capacity(KEY_SIZE * 9);
         for byte in 0..self.raw_key().len() {

@@ -263,7 +263,7 @@ impl TestService for TestServiceImpl {
 
         // Test calling one service from another.
         context
-            .interface::<TestServiceClient>(SERVICE_INSTANCE_ID)?
+            .interface::<TestServiceClient<'_>>(SERVICE_INSTANCE_ID)?
             .method_b(TxB { value: arg.value })
             .expect("Failed to dispatch call");
         Ok(())

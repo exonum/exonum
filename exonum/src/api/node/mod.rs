@@ -50,7 +50,7 @@ pub struct ApiNodeState {
 }
 
 impl fmt::Debug for ApiNodeState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ApiNodeState")
             .field("incoming_connections", &self.incoming_connections)
             .field("outgoing_connections", &self.outgoing_connections)

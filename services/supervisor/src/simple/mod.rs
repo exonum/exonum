@@ -17,17 +17,19 @@
 use exonum::{
     blockchain::{self, InstanceCollection},
     crypto::Hash,
-    helpers::ValidateInput,
+    helpers::{validator::validator_id as find_validator_id, ValidateInput},
     merkledb::Snapshot,
     runtime::{
+        api::ServiceApiBuilder,
         rust::{CallContext, Service},
-        Caller, DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
+        DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
 
 use crate::{update_configs, ConfigChange, ConfigPropose, ConfigureCall};
 
+mod api;
 mod schema;
 pub use self::schema::Schema;
 
@@ -50,24 +52,31 @@ pub enum Error {
     ConsensusConfigInvalid = 3,
     /// Actual height for config proposal is in the past.
     ActualFromIsPast = 4,
+    /// Transaction author is not a validator.
+    UnknownAuthor = 5,
 }
 
 #[exonum_service]
 pub trait SimpleSupervisorInterface {
-    fn change_config(&self, context: CallContext, arg: ConfigPropose)
-        -> Result<(), ExecutionError>;
+    fn change_config(
+        &self,
+        context: CallContext<'_>,
+        arg: ConfigPropose,
+    ) -> Result<(), ExecutionError>;
 }
 
 impl SimpleSupervisorInterface for SimpleSupervisor {
-    // TODO: check auth by one of validators [ECR-3742]
     fn change_config(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        context
-            .verify_caller(Caller::as_transaction)
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+        // Verify that transaction author is validator.
+        let author = context
+            .caller()
+            .author()
+            .ok_or(DispatcherError::UnauthorizedCaller)?;;
+        find_validator_id(context.fork().as_ref(), author).ok_or(Error::UnknownAuthor)?;
 
         // Check that the `actual_from` height is in the future.
         if blockchain::Schema::new(context.fork()).height() >= arg.actual_from {
@@ -91,7 +100,7 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 
                 ConfigChange::Service(config) => {
                     context
-                        .interface::<ConfigureCall>(config.instance_id)?
+                        .interface::<ConfigureCall<'_>>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
@@ -106,11 +115,11 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 }
 
 impl Service for SimpleSupervisor {
-    fn state_hash(&self, _instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         Schema::new(snapshot).state_hash()
     }
 
-    fn before_commit(&self, mut context: CallContext) {
+    fn before_commit(&self, mut context: CallContext<'_>) {
         let schema = Schema::new(context.fork());
         let proposal = if let Some(proposal) =
             schema.config_propose_entry().get().filter(|proposal| {
@@ -127,6 +136,10 @@ impl Service for SimpleSupervisor {
         // Remove config from proposals.
         let schema = Schema::new(context.fork());
         schema.config_propose_entry().remove();
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::wire(builder)
     }
 }
 

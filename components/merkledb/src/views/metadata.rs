@@ -123,7 +123,7 @@ where
         buf
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut bytes = bytes.as_ref();
 
         let identifier = bytes.read_u64::<LittleEndian>()?;
@@ -305,7 +305,7 @@ where
     T: IndexAccess,
     V: BinaryAttribute + Default + Copy,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IndexState")
             .field("index_name", &self.index_name)
             .field("is_new", &self.is_new)

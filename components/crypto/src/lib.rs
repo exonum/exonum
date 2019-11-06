@@ -63,7 +63,7 @@ pub(crate) mod crypto_lib;
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
-fn write_short_hex(f: &mut fmt::Formatter, slice: &[u8]) -> fmt::Result {
+fn write_short_hex(f: &mut fmt::Formatter<'_>, slice: &[u8]) -> fmt::Result {
     for byte in slice.iter().take(BYTES_IN_DEBUG) {
         write!(f, "{:02x}", byte)?;
     }

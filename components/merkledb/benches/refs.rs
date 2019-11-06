@@ -5,7 +5,7 @@ use rand::{rngs::StdRng, RngCore, SeedableRng};
 const SEED: [u8; 32] = [100; 32];
 const ITEM_COUNT: u16 = 10000;
 
-fn bench_fn<T, F>(b: &mut Bencher, index_access: T, benchmark: F)
+fn bench_fn<T, F>(b: &mut Bencher<'_>, index_access: T, benchmark: F)
 where
     T: IndexAccess,
     F: Fn(T),

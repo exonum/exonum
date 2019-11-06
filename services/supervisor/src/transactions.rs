@@ -37,7 +37,7 @@ pub trait SupervisorInterface {
     /// will be successful it will send `confirm_artifact_deploy` transaction.
     fn request_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         artifact: DeployRequest,
     ) -> Result<(), ExecutionError>;
 
@@ -46,7 +46,7 @@ pub trait SupervisorInterface {
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
     fn confirm_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         artifact: DeployConfirmation,
     ) -> Result<(), ExecutionError>;
 
@@ -55,7 +55,7 @@ pub trait SupervisorInterface {
     /// Service will be started if all of validators will send this confirmation.
     fn start_service(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         service: StartService,
     ) -> Result<(), ExecutionError>;
 
@@ -67,7 +67,7 @@ pub trait SupervisorInterface {
     /// Note: only one proposal at time is possible.
     fn propose_config_change(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError>;
 
@@ -79,7 +79,7 @@ pub trait SupervisorInterface {
     /// The configuration will be applied if 2/3+1 validators voted for it.
     fn confirm_config_change(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError>;
 }
@@ -120,7 +120,7 @@ impl ValidateInput for StartService {
 impl SupervisorInterface for Supervisor {
     fn propose_config_change(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         let ((_, author), fork) = context
@@ -174,7 +174,7 @@ impl SupervisorInterface for Supervisor {
                     service_ids.insert(config.instance_id);
 
                     context
-                        .interface::<ConfigureCall>(config.instance_id)?
+                        .interface::<ConfigureCall<'_>>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
@@ -196,7 +196,7 @@ impl SupervisorInterface for Supervisor {
 
     fn confirm_config_change(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError> {
         let ((_, author), fork) = context
@@ -244,7 +244,7 @@ impl SupervisorInterface for Supervisor {
 
     fn request_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
         deploy.validate()?;
@@ -291,35 +291,34 @@ impl SupervisorInterface for Supervisor {
 
     fn confirm_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
         let blockchain_schema = blockchain::Schema::new(context.fork());
 
-        // Verifies that we doesn't reach deadline height.
-        if confirmation.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
-        }
         let schema = Schema::new(context.instance().name, context.fork());
 
         // Verifies that transaction author is validator.
-        let mut deploy_confirmations = schema.deploy_confirmations();
         let author = context
             .caller()
             .author()
             .expect("Wrong `DeployConfirmation` initiator");
 
+        let mut deploy_confirmations = schema.deploy_confirmations();
         deploy_confirmations
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
         // Verifies that this deployment is registered.
-        if !schema
+        let deploy_request = schema
             .pending_deployments()
-            .contains(&confirmation.artifact)
-        {
-            return Err(Error::DeployRequestNotRegistered.into());
+            .get(&confirmation.artifact)
+            .ok_or(Error::DeployRequestNotRegistered)?;
+
+        // Verifies that we didn't reach deadline height.
+        if deploy_request.deadline_height < blockchain_schema.height() {
+            return Err(Error::DeadlineExceeded.into());
         }
 
         let confirmations = deploy_confirmations.confirm(&confirmation, author);
@@ -333,7 +332,7 @@ impl SupervisorInterface for Supervisor {
             schema.pending_deployments().remove(&confirmation.artifact);
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
-            context.start_artifact_registration(confirmation.artifact, confirmation.spec)?;
+            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
         }
 
         Ok(())
@@ -341,7 +340,7 @@ impl SupervisorInterface for Supervisor {
 
     fn start_service(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;

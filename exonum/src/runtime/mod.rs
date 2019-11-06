@@ -229,7 +229,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// (the exact logic is determined by the supervisor).
     fn start_adding_service(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
@@ -284,7 +284,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Do not process. Panic will be processed by the method caller.
     fn execute(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -306,7 +306,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///   to be the same for all nodes.
     fn before_commit(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError>;
 
@@ -452,7 +452,7 @@ impl<'a> ExecutionContext<'a> {
         }
     }
 
-    pub(crate) fn child_context(&mut self, caller_service_id: InstanceId) -> ExecutionContext {
+    pub(crate) fn child_context(&mut self, caller_service_id: InstanceId) -> ExecutionContext<'_> {
         ExecutionContext {
             dispatcher: self.dispatcher,
             fork: self.fork,
@@ -544,7 +544,7 @@ impl fmt::Display for InstanceDescriptor<'_> {
 }
 
 impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
-    fn from(descriptor: InstanceDescriptor) -> Self {
+    fn from(descriptor: InstanceDescriptor<'_>) -> Self {
         (descriptor.id, descriptor.name.to_owned())
     }
 }
