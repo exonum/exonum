@@ -65,6 +65,10 @@ message ConfigChange {
     exonum.Config consensus = 1;
     // New service instance config.
     ServiceConfig service = 2;
+    // Request for the artifact deployment.
+    DeployRequest deploy_request = 3;
+    // Request for the start service instance.
+    StartService start_service = 4;
   }
 }
 

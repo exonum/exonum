@@ -136,13 +136,17 @@ impl SupervisorInterface for Supervisor {
 
         // Verifies that the `actual_from` height is in the future.
         if blockchain::Schema::new(fork).height() >= propose.actual_from {
+            log::warn!("Received config proposal with incorrect height");
             return Err(Error::ActualFromIsPast.into());
         }
 
         // Verifies that there are no pending config changes.
         if schema.pending_proposal().exists() {
+            log::warn!("Received config proposal while pending proposal already exists");
             return Err(Error::ConfigProposeExists.into());
         }
+
+        log::info!("Received a new config proposal: {:?}", &propose);
 
         // To prevent multiple consensus change proposition in one request
         let mut consensus_propose_added = false;
@@ -154,21 +158,20 @@ impl SupervisorInterface for Supervisor {
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
-                        log::trace!(
-                            "Discarded multiple consensus change proposals in one request."
-                        );
+                        log::warn!("Discarded multiple consensus change proposals in one request.");
                         return Err(Error::MalformedConfigPropose.into());
                     }
                     consensus_propose_added = true;
 
-                    config
-                        .validate()
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                    config.validate().map_err(|e| {
+                        log::warn!("Consensus config entry validation failed: {:?}", &e);
+                        (Error::MalformedConfigPropose, e)
+                    })?;
                 }
 
                 ConfigChange::Service(config) => {
                     if service_ids.contains(&config.instance_id) {
-                        log::trace!("Discarded multiple service change proposals in one request.");
+                        log::warn!("Discarded multiple service change proposals in one request.");
                         return Err(Error::MalformedConfigPropose.into());
                     }
                     service_ids.insert(config.instance_id);
@@ -176,7 +179,25 @@ impl SupervisorInterface for Supervisor {
                     context
                         .interface::<ConfigureCall>(config.instance_id)?
                         .verify_config(config.params.clone())
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                        .map_err(|e| {
+                            log::warn!("Service config entry validation failed: {:?}", &e);
+                            (Error::MalformedConfigPropose, e)
+                        })?;
+                }
+
+                // TODO: Deploy&init mechanism should be available through `ConfigChange`
+                // interface [ECR-3799].
+                ConfigChange::DeployRequest(_) => {
+                    log::warn!(
+                        "Deploy requests in the config change proposals aren't supported yet; \
+                         discarding proposal"
+                    );
+                    return Err(Error::MalformedConfigPropose.into());
+                }
+                ConfigChange::StartService(_) => {
+                    log::warn!("Start service requests in the config change proposals aren't supported yet; \
+                                discarding proposal");
+                    return Err(Error::MalformedConfigPropose.into());
                 }
             }
         }
@@ -184,6 +205,11 @@ impl SupervisorInterface for Supervisor {
         let schema = Schema::new(context.instance().name, context.fork());
         let propose_hash = propose.object_hash();
         schema.config_confirms().confirm(&propose_hash, author);
+
+        log::info!(
+            "Proposal confirmed and set as pending. It will be applied at the height {}",
+            propose.actual_from
+        );
 
         let config_entry = ConfigProposalWithHash {
             config_propose: propose,

@@ -31,7 +31,7 @@ use exonum_proto::ProtobufConvert;
 use super::{proto, simple::SimpleSupervisorInterface, transactions::SupervisorInterface};
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::DeployRequest")]
 pub struct DeployRequest {
     /// Artifact identifier.
@@ -43,7 +43,7 @@ pub struct DeployRequest {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::DeployConfirmation")]
 pub struct DeployConfirmation {
     /// Artifact identifier.
@@ -52,7 +52,7 @@ pub struct DeployConfirmation {
 
 /// Request for the artifact deployment.
 #[protobuf_convert(source = "proto::StartService")]
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -104,6 +104,10 @@ pub enum ConfigChange {
     Consensus(ConsensusConfig),
     /// New service instance config.
     Service(ServiceConfig),
+    /// Request for the artifact deployment.
+    DeployRequest(DeployRequest),
+    /// Request for the start service instance.
+    StartService(StartService),
 }
 
 /// Request for the configuration change
@@ -165,6 +169,19 @@ impl ConfigPropose {
             instance_id,
             params: config.into_bytes(),
         }));
+        self
+    }
+
+    /// Adds a deploy request to this proposal.
+    pub fn deploy_request(mut self, deploy_request: DeployRequest) -> Self {
+        self.changes
+            .push(ConfigChange::DeployRequest(deploy_request));
+        self
+    }
+
+    /// Adds a service start request to this proposal.
+    pub fn start_service(mut self, start_service: StartService) -> Self {
+        self.changes.push(ConfigChange::StartService(start_service));
         self
     }
 }

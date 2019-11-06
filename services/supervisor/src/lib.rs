@@ -24,13 +24,13 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::{self, InstanceCollection},
+    blockchain::{self, ConsensusConfig, InstanceCollection},
     crypto::Hash,
     helpers::{byzantine_quorum, validator::validator_id},
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
-        InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
+        ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
     },
 };
 use exonum_derive::*;
@@ -48,6 +48,35 @@ mod transactions;
 /// Error message emitted when the `Supervisor` is installed as a non-privileged service.
 const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged service. \
                                   For correct operation, `Supervisor` needs to have numeric ID 0.";
+
+/// Attempts to apply new consensus config.
+/// Any panic occured during the invocation will be catched and turned into `ExecutionError`
+/// and changes will be rolled back.
+fn apply_consensus_config(
+    context: &mut CallContext,
+    config: ConsensusConfig,
+) -> Result<(), ExecutionError> {
+    context.isolate(|context| {
+        blockchain::Schema::new(context.fork())
+            .consensus_config_entry()
+            .set(config);
+        Ok(())
+    })
+}
+
+/// Attempts to apply new service config.
+/// Any panic occured during the invocation will be catched and turned into `ExecutionError`
+/// and changes will be rolled back.
+fn apply_service_config(
+    context: &mut CallContext,
+    config: ServiceConfig,
+) -> Result<(), ExecutionError> {
+    context.isolate(|mut context| {
+        context
+            .interface::<ConfigureCall>(config.instance_id)?
+            .apply_config(config.params.clone())
+    })
+}
 
 /// Applies configuration changes, isolating each of them with by using `Fork` checkpoints.
 ///
@@ -69,14 +98,13 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
     changes.into_iter().for_each(|change| match change {
         ConfigChange::Consensus(config) => {
             log::trace!("Updating consensus configuration {:?}", config);
+            let configure_result = apply_consensus_config(context, config);
 
-            let result = context.isolate(|context| {
-                blockchain::Schema::new(context.fork())
-                    .consensus_config_entry()
-                    .set(config);
-                Ok(())
-            });
-            assert!(result.is_ok());
+            if let Err(e) = configure_result {
+                // Consensus configuration is not allowed to fail, since it was validated and approved.
+                // This is an unrecoverable error.
+                panic!("Consensus configuration failed with error {:?}", e)
+            }
         }
 
         ConfigChange::Service(config) => {
@@ -84,12 +112,8 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
                 "Updating service instance configuration, instance ID is {}",
                 config.instance_id
             );
+            let configure_result = apply_service_config(context, config);
 
-            let configure_result = context.isolate(|mut context| {
-                context
-                    .interface::<ConfigureCall>(config.instance_id)?
-                    .apply_config(config.params.clone())
-            });
             if let Err(e) = configure_result {
                 log::error!(
                     "An error occurred while applying service configuration. {}",
@@ -97,6 +121,11 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
                 );
             }
         }
+
+        // TODO: Since those variants should be discarded at the config proposal verification step,
+        // this code is unreachable [ECR-3799].
+        ConfigChange::DeployRequest(_) => unreachable!("DeployRequest in approved config proposal"),
+        ConfigChange::StartService(_) => unreachable!("StartService in approved config proposal"),
     })
 }
 
