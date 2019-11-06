@@ -189,8 +189,8 @@ impl SystemApi {
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        // These uses need to provide realisation of the support of empty request
-        // which is not easy in the generic approach, so it will be harder to misuse
+        // These backend-dependent uses are needed to provide realization of the support of empty
+        // request which is not easy in the generic approach, so it will be harder to misuse
         // those features (and as a result get a completely backend-dependent code).
         use crate::api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
         use actix_web::{HttpRequest, HttpResponse};
