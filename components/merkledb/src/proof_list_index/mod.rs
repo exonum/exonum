@@ -313,7 +313,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ProofListIndexIter<V> {
+    pub fn iter(&self) -> ProofListIndexIter<'_, V> {
         ProofListIndexIter {
             base_iter: self.base.iter(&0_u8),
         }
@@ -335,7 +335,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
+    pub fn iter_from(&self, from: u64) -> ProofListIndexIter<'_, V> {
         ProofListIndexIter {
             base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }

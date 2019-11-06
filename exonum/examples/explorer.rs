@@ -79,7 +79,7 @@ fn main() {
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
 
     // `BlockInfo` usage
-    let block: BlockInfo = explorer.block(Height(1)).unwrap();
+    let block: BlockInfo<'_> = explorer.block(Height(1)).unwrap();
     assert_eq!(block.height(), Height(1));
     assert_eq!(block.len(), 3);
 

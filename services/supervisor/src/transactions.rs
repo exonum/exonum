@@ -36,7 +36,7 @@ pub trait SupervisorInterface {
     /// will be successful it will send `confirm_artifact_deploy` transaction.
     fn request_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         artifact: DeployRequest,
     ) -> Result<(), ExecutionError>;
 
@@ -45,7 +45,7 @@ pub trait SupervisorInterface {
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
     fn confirm_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         artifact: DeployConfirmation,
     ) -> Result<(), ExecutionError>;
 
@@ -54,7 +54,7 @@ pub trait SupervisorInterface {
     /// Service will be started if all of validators will send this confirmation.
     fn start_service(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         service: StartService,
     ) -> Result<(), ExecutionError>;
 
@@ -66,7 +66,7 @@ pub trait SupervisorInterface {
     /// Note: only one proposal at time is possible.
     fn propose_config_change(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError>;
 
@@ -78,7 +78,7 @@ pub trait SupervisorInterface {
     /// The configuration will be applied if 2/3+1 validators voted for it.
     fn confirm_config_change(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError>;
 }
@@ -119,7 +119,7 @@ impl ValidateInput for StartService {
 impl SupervisorInterface for Supervisor {
     fn propose_config_change(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         let (_, author) = context
@@ -177,7 +177,7 @@ impl SupervisorInterface for Supervisor {
                     service_ids.insert(config.instance_id);
 
                     context
-                        .interface::<ConfigureCall>(config.instance_id)?
+                        .interface::<ConfigureCall<'_>>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }
@@ -199,7 +199,7 @@ impl SupervisorInterface for Supervisor {
 
     fn confirm_config_change(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         vote: ConfigVote,
     ) -> Result<(), ExecutionError> {
         let (_, author) = context
@@ -248,7 +248,7 @@ impl SupervisorInterface for Supervisor {
 
     fn request_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
         deploy.validate()?;
@@ -292,7 +292,7 @@ impl SupervisorInterface for Supervisor {
 
     fn confirm_artifact_deploy(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
         confirmation.validate()?;
@@ -336,7 +336,7 @@ impl SupervisorInterface for Supervisor {
 
     fn start_service(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         service: StartService,
     ) -> Result<(), ExecutionError> {
         service.validate()?;

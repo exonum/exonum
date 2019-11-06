@@ -43,7 +43,7 @@ pub struct TxCreateWallet {
 
 #[exonum_service]
 pub trait WalletInterface {
-    fn create(&self, context: CallContext, arg: TxCreateWallet) -> Result<(), ExecutionError>;
+    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -117,7 +117,7 @@ pub struct TxIssue {
 
 #[exonum_service]
 pub trait DepositInterface {
-    fn issue(&self, context: CallContext, arg: TxIssue) -> Result<(), ExecutionError>;
+    fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -139,9 +139,9 @@ impl Service for DepositService {
 }
 
 impl DepositInterface for DepositService {
-    fn issue(&self, mut context: CallContext, arg: TxIssue) -> Result<(), ExecutionError> {
+    fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
         context
-            .interface::<IssueReceiverClient>(WalletService::ID)?
+            .interface::<IssueReceiverClient<'_>>(WalletService::ID)?
             .issue(Issue {
                 to: arg.to,
                 amount: arg.amount,
@@ -165,11 +165,11 @@ pub struct TxRecursiveCall {
 
 #[exonum_service]
 pub trait AnyCall {
-    fn call_any(&self, context: CallContext, arg: TxAnyCall) -> Result<(), ExecutionError>;
+    fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
 
     fn call_recursive(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         arg: TxRecursiveCall,
     ) -> Result<(), ExecutionError>;
 }
@@ -187,7 +187,7 @@ impl AnyCallService {
 }
 
 impl AnyCall for AnyCallService {
-    fn call_any(&self, mut context: CallContext, tx: TxAnyCall) -> Result<(), ExecutionError> {
+    fn call_any(&self, mut context: CallContext<'_>, tx: TxAnyCall) -> Result<(), ExecutionError> {
         context.call_context(tx.call_info.instance_id)?.call(
             tx.interface_name,
             tx.call_info.method_id,
@@ -197,7 +197,7 @@ impl AnyCall for AnyCallService {
 
     fn call_recursive(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         arg: TxRecursiveCall,
     ) -> Result<(), ExecutionError> {
         if arg.depth == 1 {

@@ -170,7 +170,7 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter(&self) -> MapIndexIter<K, V> {
+    pub fn iter(&self) -> MapIndexIter<'_, K, V> {
         MapIndexIter {
             base_iter: self.base.iter(&()),
         }
@@ -192,7 +192,7 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys(&self) -> MapIndexKeys<K> {
+    pub fn keys(&self) -> MapIndexKeys<'_, K> {
         MapIndexKeys {
             base_iter: self.base.iter(&()),
         }
@@ -214,7 +214,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> MapIndexValues<V> {
+    pub fn values(&self) -> MapIndexValues<'_, V> {
         MapIndexValues {
             base_iter: self.base.iter(&()),
         }
@@ -236,7 +236,7 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from<Q>(&self, from: &Q) -> MapIndexIter<K, V>
+    pub fn iter_from<Q>(&self, from: &Q) -> MapIndexIter<'_, K, V>
     where
         K: Borrow<Q>,
         Q: BinaryKey + ?Sized,
@@ -262,7 +262,7 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys_from<Q>(&self, from: &Q) -> MapIndexKeys<K>
+    pub fn keys_from<Q>(&self, from: &Q) -> MapIndexKeys<'_, K>
     where
         K: Borrow<Q>,
         Q: BinaryKey + ?Sized,
@@ -287,7 +287,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from<Q>(&self, from: &Q) -> MapIndexValues<V>
+    pub fn values_from<Q>(&self, from: &Q) -> MapIndexValues<'_, V>
     where
         K: Borrow<Q>,
         Q: BinaryKey + ?Sized,

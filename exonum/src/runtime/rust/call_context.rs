@@ -44,7 +44,7 @@ impl<'a> CallContext<'a> {
         &self.inner.caller
     }
 
-    pub fn instance(&self) -> InstanceDescriptor {
+    pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
     }
 
@@ -117,7 +117,7 @@ impl<'a> CallContext<'a> {
     #[doc(hidden)]
     pub fn isolate(
         &mut self,
-        f: impl FnOnce(CallContext) -> Result<(), ExecutionError>,
+        f: impl FnOnce(CallContext<'_>) -> Result<(), ExecutionError>,
     ) -> Result<(), ExecutionError> {
         let result = catch_panic(|| f(self.reborrow()));
         match result {

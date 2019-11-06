@@ -334,7 +334,7 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ProofMapIndexIter<K, V> {
+    pub fn iter(&self) -> ProofMapIndexIter<'_, K, V> {
         ProofMapIndexIter {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
             _k: PhantomData,
@@ -358,7 +358,7 @@ where
     ///     println!("{:?}", key);
     /// }
     /// ```
-    pub fn keys(&self) -> ProofMapIndexKeys<K> {
+    pub fn keys(&self) -> ProofMapIndexKeys<'_, K> {
         ProofMapIndexKeys {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
             _k: PhantomData,
@@ -382,7 +382,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> ProofMapIndexValues<V> {
+    pub fn values(&self) -> ProofMapIndexValues<'_, V> {
         ProofMapIndexValues {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
         }
@@ -406,7 +406,7 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
+    pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<'_, K, V> {
         ProofMapIndexIter {
             base_iter: self
                 .base
@@ -433,7 +433,7 @@ where
     ///     println!("{:?}", key);
     /// }
     /// ```
-    pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
+    pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<'_, K> {
         ProofMapIndexKeys {
             base_iter: self
                 .base
@@ -460,7 +460,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
+    pub fn values_from(&self, from: &K) -> ProofMapIndexValues<'_, V> {
         ProofMapIndexValues {
             base_iter: self
                 .base
@@ -864,7 +864,7 @@ where
     K: BinaryKey + ObjectHash,
     V: BinaryValue + fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct Entry<'a, T: RawAccess, K, V: BinaryValue> {
             index: &'a ProofMapIndex<T, K, V>,
             path: ProofPath,
@@ -902,7 +902,7 @@ where
             K: BinaryKey + ObjectHash,
             V: BinaryValue + fmt::Debug,
         {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.node {
                     Node::Leaf(ref value) => f
                         .debug_struct("Leaf")

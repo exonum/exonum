@@ -42,7 +42,7 @@ pub trait ServiceDispatcher: Send {
         &self,
         interface_name: &str,
         method: MethodId,
-        ctx: CallContext,
+        ctx: CallContext<'_>,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 }
@@ -270,7 +270,7 @@ impl SupervisorExtensions<'_> {
 }
 
 impl Debug for AfterCommitContext<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
             .field("instance", &self.instance)
             .finish()
@@ -284,7 +284,7 @@ pub trait Interface {
     /// Invokes the specified method handler of the service instance.
     fn dispatch(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;

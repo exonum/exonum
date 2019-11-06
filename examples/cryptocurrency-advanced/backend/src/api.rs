@@ -68,7 +68,7 @@ impl PublicApi {
     /// Endpoint for getting a single wallet.
     pub fn wallet_info(
         self,
-        state: &ServiceApiState,
+        state: &ServiceApiState<'_>,
         pub_key: PublicKey,
     ) -> api::Result<WalletInfo> {
         let blockchain_schema = state.data().for_core();
@@ -116,7 +116,7 @@ impl PublicApi {
     pub fn wire(self, builder: &mut ServiceApiBuilder) {
         builder.public_scope().endpoint(
             "v1/wallets/info",
-            move |state: &ServiceApiState, query: WalletQuery| {
+            move |state: &ServiceApiState<'_>, query: WalletQuery| {
                 self.wallet_info(state, query.pub_key)
             },
         );

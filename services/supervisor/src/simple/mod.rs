@@ -58,14 +58,17 @@ pub enum Error {
 
 #[exonum_service]
 pub trait SimpleSupervisorInterface {
-    fn change_config(&self, context: CallContext, arg: ConfigPropose)
-        -> Result<(), ExecutionError>;
+    fn change_config(
+        &self,
+        context: CallContext<'_>,
+        arg: ConfigPropose,
+    ) -> Result<(), ExecutionError>;
 }
 
 impl SimpleSupervisorInterface for SimpleSupervisor {
     fn change_config(
         &self,
-        mut context: CallContext,
+        mut context: CallContext<'_>,
         arg: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         // Verify that transaction author is validator.
@@ -100,7 +103,7 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 
                 ConfigChange::Service(config) => {
                     context
-                        .interface::<ConfigureCall>(config.instance_id)?
+                        .interface::<ConfigureCall<'_>>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
                 }

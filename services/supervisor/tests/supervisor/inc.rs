@@ -81,7 +81,7 @@ pub struct Inc {
 
 #[exonum_service]
 pub trait IncInterface {
-    fn inc(&self, context: CallContext, arg: Inc) -> Result<(), ExecutionError>;
+    fn inc(&self, context: CallContext<'_>, arg: Inc) -> Result<(), ExecutionError>;
 }
 
 /// Very simple test service that has one tx and one endpoint.
@@ -106,7 +106,7 @@ impl IncInterface for IncService {
 pub struct PublicApi;
 
 impl PublicApi {
-    fn counter(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
+    fn counter(state: &api::ServiceApiState<'_>, _query: ()) -> api::Result<u64> {
         Schema::new(state.service_data())
             .count()
             .ok_or_else(|| api::Error::NotFound("Counter is not set yet".to_owned()))
@@ -138,7 +138,7 @@ impl Configure for IncService {
 
     fn verify_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context

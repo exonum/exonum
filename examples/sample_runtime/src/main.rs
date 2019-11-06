@@ -130,7 +130,7 @@ impl Runtime for SampleRuntime {
     /// Starts a new service instance and sets the counter value for this.
     fn start_adding_service(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -144,7 +144,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -201,7 +201,7 @@ impl Runtime for SampleRuntime {
 
     fn before_commit(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Ok(())

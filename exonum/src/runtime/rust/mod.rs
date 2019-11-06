@@ -77,7 +77,7 @@ impl Instance {
         Self { id, name, service }
     }
 
-    pub fn descriptor(&self) -> InstanceDescriptor {
+    pub fn descriptor(&self) -> InstanceDescriptor<'_> {
         InstanceDescriptor {
             id: self.id,
             name: &self.name,
@@ -254,7 +254,7 @@ impl From<RustArtifactId> for ArtifactId {
 }
 
 impl fmt::Display for RustArtifactId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.name, self.version)
     }
 }
@@ -316,7 +316,7 @@ impl Runtime for RustRuntime {
 
     fn start_adding_service(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -340,7 +340,7 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -371,7 +371,7 @@ impl Runtime for RustRuntime {
 
     fn before_commit(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
         let instance = self

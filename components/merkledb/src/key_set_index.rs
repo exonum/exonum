@@ -115,7 +115,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> KeySetIndexIter<K> {
+    pub fn iter(&self) -> KeySetIndexIter<'_, K> {
         KeySetIndexIter {
             base_iter: self.base.iter(&()),
         }
@@ -137,7 +137,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
+    pub fn iter_from(&self, from: &K) -> KeySetIndexIter<'_, K> {
         KeySetIndexIter {
             base_iter: self.base.iter_from(&(), from),
         }

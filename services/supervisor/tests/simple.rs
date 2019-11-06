@@ -83,7 +83,7 @@ impl Configure for ConfigChangeService {
 
     fn verify_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -100,7 +100,7 @@ impl Configure for ConfigChangeService {
 
     fn apply_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context

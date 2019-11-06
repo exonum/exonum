@@ -58,7 +58,7 @@ impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
         buf.into_inner()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut values = BTreeSet::new();
 
         let mut reader = bytes.as_ref();

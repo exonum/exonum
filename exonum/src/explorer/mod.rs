@@ -74,7 +74,7 @@ pub struct BlockInfo<'a> {
 }
 
 impl<'a> BlockInfo<'a> {
-    fn new(explorer: &'a BlockchainExplorer, height: Height) -> Self {
+    fn new(explorer: &'a BlockchainExplorer<'_>, height: Height) -> Self {
         let schema = explorer.schema;
         let hashes = schema.block_hashes_by_height();
         let blocks = schema.blocks();
@@ -122,7 +122,7 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Returns a list of precommits for this block.
-    pub fn precommits(&self) -> Ref<[Verified<Precommit>]> {
+    pub fn precommits(&self) -> Ref<'_, [Verified<Precommit>]> {
         if self.precommits.borrow().is_none() {
             let precommits = self.explorer.precommits(&self.header);
             *self.precommits.borrow_mut() = Some(precommits);
@@ -134,7 +134,7 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Lists hashes of transactions included in this block.
-    pub fn transaction_hashes(&self) -> Ref<[Hash]> {
+    pub fn transaction_hashes(&self) -> Ref<'_, [Hash]> {
         if self.txs.borrow().is_none() {
             let txs = self.explorer.transaction_hashes(&self.header);
             *self.txs.borrow_mut() = Some(txs);
@@ -151,7 +151,7 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Iterates over transactions in the block.
-    pub fn iter(&self) -> Transactions {
+    pub fn iter(&self) -> Transactions<'_, '_> {
         Transactions {
             block: self,
             ptr: 0,
@@ -196,7 +196,7 @@ impl<'a> Serialize for BlockInfo<'a> {
 
 /// Iterator over transactions in a block.
 #[derive(Debug)]
-pub struct Transactions<'r, 'a: 'r> {
+pub struct Transactions<'r, 'a> {
     block: &'r BlockInfo<'a>,
     ptr: usize,
     len: usize,
@@ -256,7 +256,7 @@ impl BlockWithTransactions {
     }
 
     /// Iterates over transactions in the block.
-    pub fn iter(&self) -> EagerTransactions {
+    pub fn iter(&self) -> EagerTransactions<'_> {
         self.transactions.iter()
     }
 }
@@ -591,7 +591,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     /// Returns block information for the specified height or `None` if there is no such block.
-    pub fn block(&self, height: Height) -> Option<BlockInfo> {
+    pub fn block(&self, height: Height) -> Option<BlockInfo<'_>> {
         if self.height() >= height {
             Some(BlockInfo::new(self, height))
         } else {
@@ -616,7 +616,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     /// Iterates over blocks in the blockchain.
-    pub fn blocks<R: RangeBounds<Height>>(&self, heights: R) -> Blocks {
+    pub fn blocks<R: RangeBounds<Height>>(&self, heights: R) -> Blocks<'_> {
         use std::cmp::max;
 
         let max_height = self.schema.height();
@@ -641,7 +641,7 @@ pub struct Blocks<'a> {
 }
 
 impl<'a> fmt::Debug for Blocks<'a> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         formatter
             .debug_struct("Blocks")
             .field("ptr", &self.ptr)

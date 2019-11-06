@@ -47,7 +47,7 @@ pub struct TxAfterCommit {
 pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         arg: TxAfterCommit,
     ) -> Result<(), ExecutionError>;
 }
@@ -73,7 +73,7 @@ pub struct AfterCommitService {
 impl AfterCommitInterface for AfterCommitService {
     fn handle_after_commit(
         &self,
-        _context: CallContext,
+        _context: CallContext<'_>,
         _arg: TxAfterCommit,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -99,7 +99,7 @@ impl Service for AfterCommitService {
         vec![]
     }
 
-    fn after_commit(&self, context: AfterCommitContext) {
+    fn after_commit(&self, context: AfterCommitContext<'_>) {
         self.counter.fetch_add(1, Ordering::SeqCst);
         let tx = TxAfterCommit::new(context.height());
         context.broadcast_transaction(tx);

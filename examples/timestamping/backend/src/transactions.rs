@@ -51,11 +51,11 @@ pub struct Config {
 
 #[exonum_service]
 pub trait TimestampingInterface {
-    fn timestamp(&self, ctx: CallContext, arg: TxTimestamp) -> Result<(), Error>;
+    fn timestamp(&self, ctx: CallContext<'_>, arg: TxTimestamp) -> Result<(), Error>;
 }
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, context: CallContext, arg: TxTimestamp) -> Result<(), Error> {
+    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), Error> {
         let tx_hash = context
             .caller()
             .as_transaction()

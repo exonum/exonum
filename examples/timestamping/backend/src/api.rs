@@ -56,7 +56,7 @@ impl PublicApi {
     /// Endpoint for getting a single timestamp.
     pub fn handle_timestamp(
         self,
-        state: &ServiceApiState,
+        state: &ServiceApiState<'_>,
         hash: &Hash,
     ) -> api::Result<Option<TimestampEntry>> {
         let schema = Schema::new(state.service_data());
@@ -66,7 +66,7 @@ impl PublicApi {
     /// Endpoint for getting the proof of a single timestamp.
     pub fn handle_timestamp_proof(
         self,
-        state: &ServiceApiState,
+        state: &ServiceApiState<'_>,
         hash: Hash,
     ) -> api::Result<TimestampProof> {
         let blockchain_schema = state.data().for_core();
@@ -92,12 +92,12 @@ impl PublicApi {
         builder
             .public_scope()
             .endpoint("v1/timestamps/value", {
-                move |state: &ServiceApiState, query: TimestampQuery| {
+                move |state: &ServiceApiState<'_>, query: TimestampQuery| {
                     self.handle_timestamp(state, &query.hash)
                 }
             })
             .endpoint("v1/timestamps/proof", {
-                move |state: &ServiceApiState, query: TimestampQuery| {
+                move |state: &ServiceApiState<'_>, query: TimestampQuery| {
                     self.handle_timestamp_proof(state, query.hash)
                 }
             });

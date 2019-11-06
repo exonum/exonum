@@ -76,7 +76,7 @@ impl Service for TimeService {
     }
 
     /// Creates transaction after commit of the block.
-    fn after_commit(&self, context: AfterCommitContext) {
+    fn after_commit(&self, context: AfterCommitContext<'_>) {
         // The transaction must be created by the validator.
         if context
             .data()

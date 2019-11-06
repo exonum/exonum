@@ -200,7 +200,7 @@ impl Runtime for SampleRuntime {
 
     fn start_adding_service(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -209,7 +209,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         call_info: &CallInfo,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -226,7 +226,7 @@ impl Runtime for SampleRuntime {
 
     fn before_commit(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -514,7 +514,7 @@ impl Runtime for ShutdownRuntime {
 
     fn start_adding_service(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -531,7 +531,7 @@ impl Runtime for ShutdownRuntime {
 
     fn execute(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _call_info: &CallInfo,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -544,7 +544,7 @@ impl Runtime for ShutdownRuntime {
 
     fn before_commit(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Ok(())

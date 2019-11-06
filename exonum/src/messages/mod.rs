@@ -405,7 +405,7 @@ impl BinaryValue for Message {
         self.as_raw().to_bytes()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_bytes(value)?;
         Self::from_signed(message)
     }

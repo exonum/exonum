@@ -136,7 +136,7 @@ impl BinaryValue for Wallet {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -153,7 +153,7 @@ impl BinaryValue for Transaction {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -170,7 +170,7 @@ impl BinaryValue for Block {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -268,7 +268,7 @@ pub fn bench_transactions(c: &mut Criterion) {
         "transactions",
         ParameterizedBenchmark::new(
             "currency_like",
-            move |b: &mut Bencher, params: &BenchParams| {
+            move |b: &mut Bencher<'_>, params: &BenchParams| {
                 let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
                 b.iter_with_setup(TemporaryDB::new, |db| {
                     for block in &blocks {

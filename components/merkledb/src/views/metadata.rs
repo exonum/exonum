@@ -153,7 +153,7 @@ where
         buf
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut bytes = bytes.as_ref();
 
         let identifier = bytes.read_u64::<LittleEndian>()?;

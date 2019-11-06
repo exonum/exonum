@@ -485,11 +485,11 @@ impl Sandbox {
         *inner.time.lock().unwrap() = new_time;
     }
 
-    pub fn node_handler_mut(&self) -> RefMut<NodeHandler> {
+    pub fn node_handler_mut(&self) -> RefMut<'_, NodeHandler> {
         RefMut::map(self.inner.borrow_mut(), |inner| &mut inner.handler)
     }
 
-    pub fn node_state(&self) -> Ref<State> {
+    pub fn node_state(&self) -> Ref<'_, State> {
         Ref::map(self.inner.borrow(), |inner| inner.handler.state())
     }
 
@@ -1278,7 +1278,7 @@ mod tests {
     pub trait AfterCommitInterface {
         fn after_commit(
             &self,
-            context: CallContext,
+            context: CallContext<'_>,
             arg: TxAfterCommit,
         ) -> Result<(), ExecutionError>;
     }
@@ -1296,7 +1296,7 @@ mod tests {
     impl AfterCommitInterface for AfterCommitService {
         fn after_commit(
             &self,
-            _context: CallContext,
+            _context: CallContext<'_>,
             _arg: TxAfterCommit,
         ) -> Result<(), ExecutionError> {
             Ok(())
@@ -1308,7 +1308,7 @@ mod tests {
             vec![]
         }
 
-        fn after_commit(&self, context: AfterCommitContext) {
+        fn after_commit(&self, context: AfterCommitContext<'_>) {
             let tx = TxAfterCommit::new_with_height(context.height());
             context.broadcast_signed_transaction(tx);
         }

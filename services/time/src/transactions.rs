@@ -51,10 +51,7 @@ pub trait TimeOracleInterface {
 
 impl TimeOracleInterface for TimeService {
     fn time(&self, context: CallContext<'_>, arg: TxTime) -> Result<(), Error> {
-        let (_, author) = context
-            .caller()
-            .as_transaction()
-            .ok_or(Error::UnknownSender)?;
+        let author = context.caller().author().ok_or(Error::UnknownSender)?;
         // Check that the transaction is signed by a validator.
         let core_schema = context.data().for_core();
         core_schema

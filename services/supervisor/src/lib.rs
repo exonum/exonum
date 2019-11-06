@@ -64,7 +64,7 @@ const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged 
 ///   by a panic / error *before* hitting the call; if this happens, the usual rules apply.
 ///
 /// These restrictions are the result of `Fork` not having multi-layered checkpoints.
-fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
+fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
     // An error while configuring one of the service instances should not affect others.
     changes.into_iter().for_each(|change| match change {
         ConfigChange::Consensus(config) => {
@@ -88,7 +88,7 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
 
             let configure_result = context.isolate(|mut context| {
                 context
-                    .interface::<ConfigureCall>(config.instance_id)?
+                    .interface::<ConfigureCall<'_>>(config.instance_id)?
                     .apply_config(config.params.clone())
             });
             if let Err(e) = configure_result {
@@ -110,7 +110,7 @@ fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
 pub struct Supervisor;
 
 impl Service for Supervisor {
-    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         Schema::new(data.for_executing_service()).state_hash()
     }
 

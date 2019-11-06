@@ -62,7 +62,7 @@ impl Service for CommitWatcherService {
         vec![]
     }
 
-    fn after_commit(&self, _context: AfterCommitContext) {
+    fn after_commit(&self, _context: AfterCommitContext<'_>) {
         self.0.unbounded_send(()).ok();
     }
 }

@@ -116,7 +116,7 @@ pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Opt
     } else {
         let mut ita = path.components();
         let mut itb = base.components();
-        let mut comps: Vec<Component> = vec![];
+        let mut comps: Vec<Component<'_>> = vec![];
         loop {
             match (ita.next(), itb.next()) {
                 (None, None) => break,

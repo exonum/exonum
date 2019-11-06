@@ -200,7 +200,7 @@ impl From<(String, u32)> for ArtifactId {
 }
 
 impl Display for ArtifactId {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", self.runtime_id, self.name)
     }
 }
@@ -299,7 +299,7 @@ impl InstanceSpec {
     }
 
     /// Return the corresponding descriptor of this instance specification.
-    pub fn as_descriptor(&self) -> InstanceDescriptor {
+    pub fn as_descriptor(&self) -> InstanceDescriptor<'_> {
         InstanceDescriptor {
             id: self.id,
             name: self.name.as_ref(),
@@ -317,7 +317,7 @@ impl ValidateInput for InstanceSpec {
 }
 
 impl Display for InstanceSpec {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}@{}:{}", self.artifact, self.id, self.name)
     }
 }

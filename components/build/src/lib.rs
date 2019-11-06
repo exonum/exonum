@@ -265,7 +265,7 @@ impl<'a> ProtobufGenerator<'a> {
     }
 
     /// Add multiple include directories.
-    pub fn with_includes(mut self, includes: &'a [ProtoSources]) -> Self {
+    pub fn with_includes(mut self, includes: &'a [ProtoSources<'_>]) -> Self {
         self.includes.extend_from_slice(includes);
         self
     }
@@ -282,7 +282,7 @@ impl<'a> ProtobufGenerator<'a> {
     }
 }
 
-fn protobuf_generate<P, T>(input_dir: P, includes: &[ProtoSources], mod_file_name: T)
+fn protobuf_generate<P, T>(input_dir: P, includes: &[ProtoSources<'_>], mod_file_name: T)
 where
     P: AsRef<Path>,
     T: AsRef<str>,

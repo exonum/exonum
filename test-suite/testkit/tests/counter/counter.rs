@@ -120,7 +120,7 @@ impl CounterServiceInterface for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _: Reset) -> Result<(), Error> {
+    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), Error> {
         let mut schema = CounterSchema::new(context.service_data());
         schema.counter.set(0);
         Ok(())
@@ -139,7 +139,7 @@ struct CounterApi;
 
 impl CounterApi {
     fn increment(
-        state: &ServiceApiState,
+        state: &ServiceApiState<'_>,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
@@ -155,7 +155,7 @@ impl CounterApi {
     }
 
     fn reset(
-        state: &ServiceApiState,
+        state: &ServiceApiState<'_>,
         transaction: Verified<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");

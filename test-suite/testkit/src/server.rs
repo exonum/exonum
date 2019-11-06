@@ -239,15 +239,7 @@ mod tests {
     }
 
     impl Service for SampleService {
-        fn initialize(
-            &self,
-            _context: CallContext<'_>,
-            _params: Vec<u8>,
-        ) -> Result<(), ExecutionError> {
-            Ok(())
-        }
-
-        fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }

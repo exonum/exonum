@@ -22,7 +22,7 @@ impl BinaryValue for Wallet {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -39,7 +39,7 @@ impl BinaryValue for Transaction {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -57,7 +57,7 @@ impl BinaryValue for Block {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }

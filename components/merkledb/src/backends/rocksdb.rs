@@ -116,7 +116,7 @@ impl RocksDB {
     fn remove_with_prefix(
         &self,
         batch: &mut WriteBatch,
-        cf: ColumnFamily,
+        cf: ColumnFamily<'_>,
         cf_name: &str,
         prefix: &[u8],
     ) -> crate::Result<()> {
@@ -208,13 +208,13 @@ impl From<RocksDB> for Arc<dyn Database> {
 }
 
 impl fmt::Debug for RocksDB {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RocksDB").finish()
     }
 }
 
 impl fmt::Debug for RocksDBSnapshot {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RocksDBSnapshot").finish()
     }
 }
