@@ -50,7 +50,7 @@ const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged 
                                   For correct operation, `Supervisor` needs to have numeric ID 0.";
 
 /// Attempts to apply new consensus config.
-/// Any panic occured during the invocation will be catched and turned into `ExecutionError`
+/// Any panic occurred during the invocation will be caught and turned into `ExecutionError`
 /// and changes will be rolled back.
 fn apply_consensus_config(
     context: &mut CallContext<'_>,
@@ -65,7 +65,7 @@ fn apply_consensus_config(
 }
 
 /// Attempts to apply new service config.
-/// Any panic occured during the invocation will be catched and turned into `ExecutionError`
+/// Any panic occurred during the invocation will be caught and turned into `ExecutionError`
 /// and changes will be rolled back.
 fn apply_service_config(
     context: &mut CallContext<'_>,
