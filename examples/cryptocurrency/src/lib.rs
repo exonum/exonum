@@ -269,7 +269,7 @@ pub mod contracts {
     }
 
     impl Service for CryptocurrencyService {
-        fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+        fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             CurrencySchema::new(data.for_executing_service()).state_hash()
         }
 

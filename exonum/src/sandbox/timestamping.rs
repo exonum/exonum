@@ -52,7 +52,7 @@ impl TimestampingInterface for TimestampingService {
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 }

@@ -63,7 +63,7 @@ impl WalletService {
 }
 
 impl Service for WalletService {
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -133,7 +133,7 @@ impl DepositService {
 }
 
 impl Service for DepositService {
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -215,7 +215,7 @@ impl AnyCall for AnyCallService {
 }
 
 impl Service for AnyCallService {
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

@@ -95,7 +95,7 @@ impl AfterCommitService {
 }
 
 impl Service for AfterCommitService {
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 

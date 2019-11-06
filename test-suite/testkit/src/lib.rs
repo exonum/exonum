@@ -51,7 +51,7 @@
 //! struct TimestampingService;
 //!
 //! impl Service for TimestampingService {
-//!     fn state_hash(&self, _: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> { vec![] }
+//!     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
 //! }
 //!
 //! #[exonum_service]
@@ -749,7 +749,7 @@ impl TestKit {
 /// # use exonum_derive::{exonum_service, ServiceFactory};
 /// # use exonum::{
 /// #     crypto::{PublicKey, Hash},
-/// #     runtime::{InstanceDescriptor, rust::{AfterCommitContext, RustRuntime, Service}},
+/// #     runtime::{BlockchainData, rust::{AfterCommitContext, RustRuntime, Service}},
 /// #     helpers::Height,
 /// # };
 /// # use exonum_merkledb::{Fork, Snapshot};
@@ -789,7 +789,10 @@ impl TestKit {
 /// # impl AfterCommitInterface for AfterCommitService {}
 /// #
 /// impl Service for AfterCommitService {
-/// #   fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
+///     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+///         vec![]
+///     }
+///
 ///     fn after_commit(&self, _: AfterCommitContext) {
 ///         self.counter.fetch_add(1, Ordering::SeqCst);
 ///     }

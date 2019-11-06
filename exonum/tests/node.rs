@@ -58,7 +58,7 @@ impl CommitWatcherService {
 impl CommitWatcherInterface for CommitWatcherService {}
 
 impl Service for CommitWatcherService {
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 
@@ -76,7 +76,7 @@ struct StartCheckerService;
 impl StartCheckerInterface for StartCheckerService {}
 
 impl Service for StartCheckerService {
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

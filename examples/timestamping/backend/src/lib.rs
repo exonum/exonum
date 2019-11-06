@@ -57,7 +57,7 @@ use crate::{
 pub struct TimestampingService;
 
 impl Service for TimestampingService {
-    fn initialize(&self, context: CallContext, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         let config =
             Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
@@ -70,10 +70,11 @@ impl Service for TimestampingService {
             return Err(Error::TimeServiceNotFound.into());
         }
 
+        Schema::new(context.service_data()).config.set(config);
         Ok(())
     }
 
-    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         Schema::new(data.for_executing_service()).state_hash()
     }
 

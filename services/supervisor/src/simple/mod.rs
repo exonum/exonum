@@ -81,12 +81,12 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 
         // Check that the `actual_from` height is in the future.
         if context.data().for_core().height() >= arg.actual_from {
-            Err(Error::ActualFromIsPast)?;
+            return Err(Error::ActualFromIsPast.into());
         }
 
         // Check that there are no pending config changes.
         if Schema::new(context.service_data()).config_propose.exists() {
-            Err(Error::ConfigProposeExists)?;
+            return Err(Error::ConfigProposeExists.into());
         }
 
         // Perform config verification.
@@ -115,7 +115,7 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 }
 
 impl Service for SimpleSupervisor {
-    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         Schema::new(data.for_executing_service()).state_hash()
     }
 

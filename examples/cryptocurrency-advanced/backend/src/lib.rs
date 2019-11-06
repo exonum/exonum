@@ -47,7 +47,7 @@ pub const INITIAL_BALANCE: u64 = 100;
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {
-    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         Schema::new(data.for_executing_service()).state_hash()
     }
 

@@ -79,7 +79,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// [1]: ../struct.StateHashAggregator.html
     /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
     /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash>;
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash>;
 
     /// Performs storage operations on behalf of the service before committing the block.
     ///

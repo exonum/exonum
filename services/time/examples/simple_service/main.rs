@@ -134,7 +134,7 @@ impl MarkerInterface for MarkerService {
 }
 
 impl Service for MarkerService {
-    fn state_hash(&self, data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         MarkerSchema::new(data.for_executing_service()).state_hash()
     }
 }

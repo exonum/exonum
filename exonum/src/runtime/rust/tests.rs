@@ -286,7 +286,7 @@ impl Service for TestServiceImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -616,7 +616,7 @@ impl Service for DependentServiceImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _data: BlockchainData<&'_ dyn Snapshot>) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
