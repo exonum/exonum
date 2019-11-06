@@ -20,15 +20,11 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
-    api::backends::actix::{FutureResponse as BackendFutureResponse, RawHandler, RequestHandler},
     api::{node::SharedNodeState, ApiBackend, ApiScope, Error as ApiError},
     crypto::PublicKey,
     node::{ApiSender, ConnectInfo, ExternalMessage},
     runtime::InstanceId,
 };
-
-use actix_web::{HttpRequest, HttpResponse};
-use futures::IntoFuture;
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -193,20 +189,26 @@ impl SystemApi {
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        // These uses need to provide realisation of the support of empty request
+        // which is not easy in the generic approach, so it will be harder to misuse
+        // those features (and as a result get a completely backend-dependent code).
+        use crate::api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
+        use actix_web::{HttpRequest, HttpResponse};
+        use futures::IntoFuture;
+
         let self_ = self.clone();
 
-        let handler = move || -> Result<(), ApiError> {
+        let handler = move || -> Result<HttpResponse, ApiError> {
             self.sender
                 .send_external_message(ExternalMessage::Shutdown)
-                .map_err(ApiError::from)
+                .map_err(ApiError::from)?;
+
+            let ok_response = HttpResponse::Ok().json(());
+            Ok(ok_response)
         };
 
-        let index = move |_request: HttpRequest| -> BackendFutureResponse {
-            let handler = handler.clone();
-
-            let future = Ok(handler())
-                .and_then(|_| Ok(HttpResponse::Ok().json(())))
-                .into_future();
+        let index = move |_request: HttpRequest| -> FutureResponse {
+            let future = handler().map_err(From::from).into_future();
             Box::new(future)
         };
 
