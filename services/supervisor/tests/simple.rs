@@ -20,15 +20,15 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        Caller, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
+        ArtifactId, Caller, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::ServiceFactory;
+use exonum_derive::{exonum_service, ServiceFactory};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    simple::{Schema, SimpleSupervisor, SimpleSupervisorInterface},
-    ConfigPropose, Configure,
+    simple::{Error as SimpleSupervisorError, Schema, SimpleSupervisor, SimpleSupervisorInterface},
+    ConfigPropose, Configure, DeployRequest, StartService,
 };
 
 pub fn sign_config_propose_transaction(
@@ -48,6 +48,50 @@ pub fn sign_config_propose_transaction_by_us(
 
     sign_config_propose_transaction(&testkit, config, initiator_id)
 }
+
+fn create_deploy_request(artifact: ArtifactId) -> DeployRequest {
+    DeployRequest {
+        artifact,
+        spec: Vec::default(),
+        // Deadline height is ignored within simple supervisor.
+        deadline_height: Height(0),
+    }
+}
+
+fn create_start_service(artifact: ArtifactId, name: String) -> StartService {
+    StartService {
+        artifact,
+        name,
+        config: Vec::default(),
+        // Deadline height is ignored within simple supervisor.
+        deadline_height: Height(0),
+    }
+}
+
+#[derive(Debug, ServiceFactory)]
+#[exonum(
+    artifact_name = "deployable-test-service",
+    artifact_version = "0.1.0",
+    implements("DeployableServiceInterface")
+)]
+pub struct DeployableService;
+
+impl Service for DeployableService {
+    fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> {
+        Vec::new()
+    }
+}
+
+impl From<DeployableService> for InstanceCollection {
+    fn from(instance: DeployableService) -> Self {
+        InstanceCollection::new(instance)
+    }
+}
+
+#[exonum_service]
+pub trait DeployableServiceInterface {}
+
+impl DeployableServiceInterface for DeployableService {}
 
 #[derive(Debug, ServiceFactory)]
 #[exonum(
@@ -738,4 +782,250 @@ fn test_send_proposal_with_api() {
     assert_eq!(testkit.consensus_config(), new_consensus_config);
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_ne!(old_validators, testkit.network().validators());
+}
+
+/// Tests that correct deploy request is executed successfully.
+#[test]
+fn deploy_service() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(DeployableService)
+        .create();
+
+    let artifact_id = ArtifactId::new(0_u32, "deployable-test-service:0.1.0").unwrap();
+    let deploy_request = create_deploy_request(artifact_id.clone());
+
+    let cfg_change_height = Height(3);
+
+    let config_propose =
+        ConfigPropose::actual_from(cfg_change_height).deploy_request(deploy_request);
+    let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+
+    let tx_hash = deploy_tx.object_hash();
+
+    testkit.create_block_with_transaction(deploy_tx);
+
+    // Verify that transaction succeed.
+    let api = testkit.api();
+    let system_api = api.exonum_api();
+    system_api.assert_tx_success(tx_hash);
+
+    // Verify that after the block commit (but before config change height)
+    // artifact is not deployed.
+    assert_eq!(
+        system_api.services().artifacts.contains(&artifact_id),
+        false
+    );
+
+    // Reach config change height.
+    testkit.create_blocks_until(cfg_change_height);
+
+    // Verify that after the config change height artifact is deployed.
+    assert_eq!(system_api.services().artifacts.contains(&artifact_id), true);
+}
+
+/// Tests that incorrect deploy requests result in the tx execution error.
+#[test]
+fn deploy_service_errors() {
+    // Start with a deployment of the service.
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(DeployableService)
+        .create();
+
+    let artifact_id = ArtifactId::new(0_u32, "deployable-test-service:0.1.0").unwrap();
+    let deploy_request = create_deploy_request(artifact_id.clone());
+
+    let cfg_change_height = Height(3);
+
+    let config_propose =
+        ConfigPropose::actual_from(cfg_change_height).deploy_request(deploy_request);
+    let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+    testkit.create_block_with_transaction(deploy_tx);
+    testkit.create_blocks_until(cfg_change_height);
+
+    // Prepare test data.
+    let api = testkit.api();
+    let system_api = api.exonum_api();
+
+    let bad_name_msg =
+        "Artifact name contains an illegal character, use only: a-zA-Z0-9 and one of _-.:";
+    let incorrect_artifact_id_err = (SimpleSupervisorError::InvalidArtifactId, bad_name_msg).into();
+
+    // Declare different malformed deploy requests and expected errors.
+    let test_vector: Vec<(ArtifactId, ExecutionError)> = vec![
+        // Already deployed artifact.
+        (artifact_id, SimpleSupervisorError::AlreadyDeployed.into()),
+        // Incorrect artifact name.
+        (
+            ArtifactId {
+                runtime_id: 0,
+                name: "$#@$:0.1.0".into(),
+            },
+            incorrect_artifact_id_err,
+        ),
+    ];
+
+    // We don't really care about it, since all requests should fail.
+    let cfg_change_height = Height(100);
+
+    // For each pair in test vector check that transaction fails with expected result.
+    for (artifact_id, expected) in test_vector.into_iter() {
+        let deploy_request = create_deploy_request(artifact_id);
+        let config_propose =
+            ConfigPropose::actual_from(cfg_change_height).deploy_request(deploy_request);
+
+        let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+        let tx_hash = deploy_tx.object_hash();
+        testkit.create_block_with_transaction(deploy_tx);
+
+        system_api.assert_tx_status(tx_hash, &Err(expected).into());
+    }
+}
+
+/// Tests that correct service instance start request is executed successfully.
+#[test]
+fn init_service() {
+    // At first, deploy the service (w/o any checks, since we're not testing deploy).
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(DeployableService)
+        .create();
+
+    let artifact_id = ArtifactId::new(0_u32, "deployable-test-service:0.1.0").unwrap();
+    let deploy_request = create_deploy_request(artifact_id.clone());
+
+    let cfg_change_height = Height(3);
+
+    let config_propose =
+        ConfigPropose::actual_from(cfg_change_height).deploy_request(deploy_request);
+    let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+    testkit.create_block_with_transaction(deploy_tx);
+    testkit.create_blocks_until(cfg_change_height);
+
+    // Initialize the service.
+
+    let cfg_change_height = Height(6);
+
+    let start_service = create_start_service(artifact_id.clone(), "example".into());
+    let config_propose = ConfigPropose::actual_from(cfg_change_height).start_service(start_service);
+
+    let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+    let tx_hash = deploy_tx.object_hash();
+
+    testkit.create_block_with_transaction(deploy_tx);
+
+    // Verify that transaction succeed.
+    let api = testkit.api();
+    let system_api = api.exonum_api();
+    system_api.assert_tx_success(tx_hash);
+
+    // Verify that after the block commit (but before config change height)
+    // instance is not running yet.
+    assert_eq!(
+        system_api
+            .services()
+            .services
+            .iter()
+            .any(|instance| instance.name == "example"),
+        false
+    );
+
+    // Reach config change height.
+    testkit.create_blocks_until(cfg_change_height);
+
+    // Verify that after the config change height instance is running.
+    let instance = system_api
+        .services()
+        .services
+        .iter()
+        .find(|instance| instance.name == "example")
+        .cloned()
+        .expect("Service did not start");
+
+    assert_eq!(instance.artifact, artifact_id);
+}
+
+/// Tests that incorrect service instance start requests result in the tx execution error.
+#[test]
+fn init_service_errors() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(2)
+        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(DeployableService)
+        .create();
+
+    // Deploy service.
+    let cfg_change_height = Height(3);
+
+    let artifact_id = ArtifactId::new(0_u32, "deployable-test-service:0.1.0").unwrap();
+    let deploy_request = create_deploy_request(artifact_id.clone());
+
+    let config_propose =
+        ConfigPropose::actual_from(cfg_change_height).deploy_request(deploy_request);
+    let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+    testkit.create_block_with_transaction(deploy_tx);
+    testkit.create_blocks_until(cfg_change_height);
+
+    // Init service.
+    let cfg_change_height = Height(6);
+
+    let start_service = create_start_service(artifact_id.clone(), "example".into());
+    let config_propose = ConfigPropose::actual_from(cfg_change_height).start_service(start_service);
+    let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+    testkit.create_block_with_transaction(deploy_tx);
+    testkit.create_blocks_until(cfg_change_height);
+
+    // Prepare test data.
+    let api = testkit.api();
+    let system_api = api.exonum_api();
+
+    let bad_name_msg =
+        "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-.";
+    let incorrect_instance_name_err =
+        (SimpleSupervisorError::InvalidInstanceName, bad_name_msg).into();
+
+    // Declare different malformed init requests and expected errors.
+    let test_vector: Vec<(ArtifactId, String, ExecutionError)> = vec![
+        // Unknown artifact ID.
+        (
+            ArtifactId {
+                runtime_id: 0,
+                name: "unknown-artifact:0.1.0".into(),
+            },
+            String::from("instance"),
+            SimpleSupervisorError::UnknownArtifact.into(),
+        ),
+        // Bad instance name.
+        (
+            artifact_id.clone(),
+            String::from("#$#&#"),
+            incorrect_instance_name_err,
+        ),
+        // Already running instance.
+        (
+            artifact_id.clone(),
+            String::from("example"),
+            SimpleSupervisorError::InstanceExists.into(),
+        ),
+    ];
+
+    // We don't really care about it, since all requests should fail.
+    let cfg_change_height = Height(100);
+
+    // For each pair in test vector check that transaction fails with expected result.
+    for (artifact_id, name, expected) in test_vector.into_iter() {
+        let start_service = create_start_service(artifact_id, name);
+        let config_propose =
+            ConfigPropose::actual_from(cfg_change_height).start_service(start_service);
+
+        let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+        let tx_hash = deploy_tx.object_hash();
+        testkit.create_block_with_transaction(deploy_tx);
+
+        system_api.assert_tx_status(tx_hash, &Err(expected).into());
+    }
 }
