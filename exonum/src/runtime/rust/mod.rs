@@ -37,7 +37,7 @@ pub use self::{
 
 pub mod error;
 
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{is_valid_index_name, Snapshot};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
@@ -259,12 +259,27 @@ pub struct RustArtifactId {
 
 impl RustArtifactId {
     /// Creates a new Rust artifact id from the specified parts.
+    ///
+    /// # Panics
+    ///
+    /// If the `name` is empty or contains illegal character.
     pub fn new(name: &str, major: u64, minor: u64, patch: u64) -> Self {
-        // TODO Check that the name contains only valid symbols and is not empty. [ECR-3222]
+        Self::is_valid_name(name).expect("Invalid Rust artifact name.");
         Self {
             name: name.to_owned(),
             version: Version::new(major, minor, patch),
         }
+    }
+
+    /// Checks that the Rust artifact name contains only allowed characters and is not empty.
+    fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
+        let name = name.as_ref();
+        ensure!(!name.is_empty(), "Rust artifact name should not be empty.");
+        ensure!(
+            is_valid_index_name(name),
+            "Rust artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-."
+        );
+        Ok(())
     }
 
     fn parse(artifact: &ArtifactId) -> Result<Self, ExecutionError> {
@@ -300,6 +315,7 @@ impl FromStr for RustArtifactId {
         let split = s.split(':').take(2).collect::<Vec<_>>();
         match &split[..] {
             [name, version] => {
+                Self::is_valid_name(name)?;
                 let version = Version::parse(version)?;
                 Ok(Self {
                     name: name.to_string(),
@@ -455,4 +471,27 @@ impl Runtime for RustRuntime {
 #[test]
 fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service:1.0.0").unwrap();
+}
+
+#[test]
+fn parse_rust_artifact_id_incorrect() {
+    let cases = vec![
+        ("my-service:1.1.1.1.1", "Extra junk after valid version"),
+        (":1.0", "Rust artifact name should not be empty"),
+        ("name:", "Error parsing major identifier"),
+        ("$name:1.0", "Rust artifact name contains illegal character"),
+        ("aAa", "Wrong rust artifact name format"),
+    ];
+
+    for (artifact_str, expected_err) in cases {
+        let actual_err = RustArtifactId::from_str(artifact_str)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            actual_err.contains(expected_err),
+            "Actual error is: \"{}\", but expected \"{}\"",
+            actual_err,
+            expected_err
+        )
+    }
 }
