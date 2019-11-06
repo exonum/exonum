@@ -14,11 +14,21 @@
 
 use criterion::{criterion_group, criterion_main};
 
-use crate::{encoding::bench_encoding, storage::bench_storage, transactions::bench_transactions};
+use crate::{
+    encoding::bench_encoding, schema_patterns::bench_schema_patterns, storage::bench_storage,
+    transactions::bench_transactions,
+};
 
 mod encoding;
+mod schema_patterns;
 mod storage;
 mod transactions;
 
-criterion_group!(benches, bench_storage, bench_encoding, bench_transactions,);
+criterion_group!(
+    benches,
+    bench_storage,
+    bench_encoding,
+    bench_schema_patterns,
+    bench_transactions
+);
 criterion_main!(benches);
