@@ -175,14 +175,6 @@ impl RustRuntime {
         Ok(Instance::new(spec.id, spec.name.clone(), service))
     }
 
-    fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
-        if self.deployed_artifacts.contains(&id) {
-            self.available_artifacts.get(&id).map(AsRef::as_ref)
-        } else {
-            None
-        }
-    }
-
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
         self.started_services
             .values()
@@ -200,15 +192,8 @@ impl RustRuntime {
                     ApiBuilder::from(builder),
                 )
             })
-            .chain(std::iter::once(self.runtime_endpoints()))
+            .chain(self::api::endpoints(self))
             .collect()
-    }
-
-    fn runtime_endpoints(&self) -> (String, ApiBuilder) {
-        (
-            ["runtimes/", Self::NAME].concat(),
-            self::api::endpoints(self),
-        )
     }
 
     fn push_api_changes(&mut self) {
@@ -310,13 +295,7 @@ impl Runtime for RustRuntime {
             // Keep the spec for Rust artifacts empty.
             Box::new(future::err(Error::IncorrectArtifactId.into()))
         } else {
-            let res = self.deploy(&artifact).and_then(|()| {
-                let id = RustArtifactId::parse(&artifact)?;
-                self.deployed_artifact(&id)
-                    .map(drop)
-                    .ok_or_else(|| Error::UnableToDeploy.into())
-            });
-            Box::new(res.into_future())
+            Box::new(self.deploy(&artifact).into_future())
         }
     }
 

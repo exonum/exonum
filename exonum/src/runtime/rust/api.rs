@@ -102,7 +102,7 @@ fn filter_exonum_proto_sources(
 
 /// Returns API builder instance with the appropriate endpoints for the specified
 /// Rust runtime instance.
-pub fn endpoints(runtime: &RustRuntime) -> ApiBuilder {
+pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, ApiBuilder)> {
     let artifact_proto_sources = runtime
         .available_artifacts
         .iter()
@@ -146,5 +146,6 @@ pub fn endpoints(runtime: &RustRuntime) -> ApiBuilder {
                 }
             }
         });
-    builder
+
+    std::iter::once((["runtimes/", RustRuntime::NAME].concat(), builder))
 }

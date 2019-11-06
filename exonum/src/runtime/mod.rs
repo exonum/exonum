@@ -187,9 +187,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Request to deploy artifact with the given identifier and additional deploy specification.
     ///
     /// This method may be called multiple times with the same params; in particular, the method
-    /// is called for all deployed artifacts after node restart. The successive calls must return
-    /// the same spec as the first call. In most cases, it is prudent to cache the spec in the runtime,
-    /// so that the successive calls are effectively synchronous.
+    /// is called for all deployed artifacts after node restart.
     ///
     /// # Policy on Panics
     ///
