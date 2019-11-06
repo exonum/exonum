@@ -88,6 +88,21 @@ pub trait ProofMapKey
     fn read_key(from: &[u8]) -> Self::Output;
 }
 
+#[derive(Debug)]
+struct Hashed<K>(pub K);
+
+impl <K> ProofMapKey for Hashed<K> where K: BinaryKey + ObjectHash {
+    type Output = dyn ProofMapKey;
+
+    fn write_key(&self, to: &mut [u8]) {
+        self.object_hash().write(buffer);
+    }
+
+    fn read_key(from: &[u8]) -> Self::Output {
+        <Hash as BinaryKey>::read(buffer)
+    }
+}
+
 /// A trait denoting that a certain storage value is suitable for use as a key for
 /// `ProofMapIndex` after hashing.
 ///

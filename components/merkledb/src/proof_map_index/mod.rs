@@ -39,6 +39,7 @@ use crate::{
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
+use crate::proof_map_index::key::ProofMapKey;
 
 mod key;
 mod node;
@@ -127,7 +128,7 @@ pub struct ProofMapIndexValues<'a, V> {
 impl<T, K, V> AnyObject<T> for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
-    K: BinaryKey + ObjectHash,
+    K: ProofMapKey + BinaryKey + ObjectHash,
     V: BinaryValue + ObjectHash,
 {
     fn view(self) -> View<T> {
