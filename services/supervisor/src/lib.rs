@@ -30,7 +30,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
-        InstanceDescriptor, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME,
+        InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -107,6 +107,11 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
     implements("transactions::SupervisorInterface")
 )]
 pub struct Supervisor;
+
+impl Supervisor {
+    /// Name of the supervisor service.
+    pub const NAME: &'static str = "supervisor";
+}
 
 impl Service for Supervisor {
     fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
@@ -206,7 +211,7 @@ impl From<Supervisor> for InstanceCollection {
     fn from(service: Supervisor) -> Self {
         InstanceCollection::new(service).with_instance(
             SUPERVISOR_INSTANCE_ID,
-            SUPERVISOR_INSTANCE_NAME,
+            Supervisor::NAME,
             Vec::default(),
         )
     }

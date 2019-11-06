@@ -32,17 +32,28 @@
 //!
 //! # Service lifecycle
 //!
-//! 1. An artifact with the service is deployed on the blockchain. The decision to deploy an
-//!   artifact and the deployment spec are usually performed by the blockchain administators.
-//!   The corresponding logic is customizable via a [supervisor service](#supervisor-service).
+//! 1. An artifact is assembled in a way specific to the runtime. For example, the artifact may
+//!   be compiled from sources and packaged using an automated build system.
 //!
-//! 2. Once the artifact is deployed, it is possible to instantiate service.
-//!   Each start request contains the same artifact identifier, instance IDs (the numeric one
-//!   is used in transactions, and the string one in blockchain storage), and
-//!   instance configuration parameters. As with the artifacts, the instantiation logic
+//! 2. An artifact with the service is deployed on the blockchain. The decision to deploy an
+//!   artifact and the deployment spec are usually performed by the blockchain administrators.
+//!   The corresponding logic is customizable via a [supervisor service](#supervisor-service).
+//!   What deployment entails depends on the runtime; e.g., an artifact may be downloaded
+//!   by each Exonum node, verified for integrity and then added into the execution environment.
+//!
+//! 3. Once the artifact is deployed, it is possible to instantiate a corresponding service.
+//!   Each instantiation request contains an ID of a previously deployed artifact,
+//!   a string instance ID, and instantiation arguments in a binary encoding
+//!   (by convention, Protobuf). As with the artifacts, the logic controlling instantiation
 //!   is encapsulated in the supervisor service.
 //!
-//! 3. Once the service is instantiated, it can process transactions and interact with the
+//! 4. During instantiation, the service is assigned a numeric ID, which is used to reference
+//!   the service in transactions. The runtime can execute initialization logic defined
+//!   in the service artifact; e.g., a service may store some initial data in the storage,
+//!   check service dependencies, etc. The service (or the enclosing runtime) may signal that
+//!   the initialization failed, in which case the service is considered not instantiated.
+//!
+//! 5. Once the service is instantiated, it can process transactions and interact with the
 //!   external users in other ways. Different services instantiated from the same artifact
 //!   are independent and have separated blockchain storage. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
@@ -53,21 +64,19 @@
 //!
 //! 1. An Exonum client creates a transaction message which includes [`CallInfo`] information
 //!   about the corresponding method to call and serialized method parameters as a payload.
-//!   The client then signs the message with the author's key pair.
+//!   The client then signs the message with a secret key in the Ed25519 cryptosystem.
 //!
 //! 2. The client transmits the message to one of the Exonum nodes in the network.
-//!   The transaction is identified by the hash of the corresponding message.
 //!
-//! 3. The node verifies the transaction for correctness of the signature and retransmits it to
+//! 3. The node verifies correctness of the transaction signature and retransmits it to
 //!   the other network nodes if it is correct.
 //!
-//! 4. When the validator decides to include the transaction into the next block,
-//!   it takes the message
-//!   from the transaction pool and passes it to the [`Dispatcher`] for execution.
+//! 4. When the consensus algorithm run by Exonum nodes finds a feasible candidate for the next block
+//!   of transactions, transactions in the block are passed to the [`Dispatcher`] for execution.
 //!
 //! 5. The dispatcher uses a lookup table to find the corresponding [`Runtime`] for the transaction
 //!   by the [`instance_id`] recorded in the message. If the corresponding runtime is
-//!   successfully found, the dispatcher passes the transaction into this runtime for
+//!   found, the dispatcher passes the transaction into this runtime for
 //!   immediate [execution].
 //!
 //! 6. After execution the transaction [execution status] is written into the blockchain.
@@ -75,12 +84,14 @@
 //! # Supervisor Service
 //!
 //! A supervisor service is a service that has additional privileges: it can command deployment of
-//! artifacts and instantiation of services. Other than that, it is an ordinary service.
+//! artifacts and instantiation of services. Other than that, it looks like an ordinary service.
 //! A supervisor should be present on blockchain start, otherwise no new artifacts / services
 //! could ever be added to the blockchain.
 //!
 //! A supervisor service is distinguished by its numerical ID, which must be set
-//! to [`SUPERVISOR_INSTANCE_ID`].
+//! to [`SUPERVISOR_INSTANCE_ID`]. Services may assume that transactions originating from
+//! the supervisor service are authorized by the blockchain administrators, which can be used
+//! in authorization verification in the service logic.
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
@@ -127,8 +138,6 @@ mod types;
 ///
 /// Only a service with this ID can perform actions with the dispatcher.
 pub const SUPERVISOR_INSTANCE_ID: InstanceId = 0;
-/// Persistent name of supervisor service instance.
-pub const SUPERVISOR_INSTANCE_NAME: &str = "supervisor";
 
 /// List of predefined runtimes.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -196,7 +205,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// This method is called *no more than once* during `Runtime` lifetime. It is called iff
     /// the blockchain had genesis block when the node was started. The blockchain state
-    /// is guaranteed to not change between `initialize` and `after_initialize` calls.
+    /// is guaranteed to not change between `initialize` and `on_resume` calls.
     ///
     /// The default implementation does nothing.
     fn on_resume(&mut self) {}
