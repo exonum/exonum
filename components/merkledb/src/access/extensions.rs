@@ -8,6 +8,30 @@ use crate::{
 
 /// Extension trait allowing for easy access to indices from any type implementing
 /// `Access`.
+///
+/// # Examples
+///
+/// ```
+/// use exonum_merkledb::{access::AccessExt, Database, ListIndex, TemporaryDB};
+///
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// // Since `Access` is implemented for `&Fork` rather than `Fork`, it is necessary
+/// // to use `fork.as_ref()` or `(&fork)` when using the `AccessExt` methods:
+/// {
+///     let mut list: ListIndex<_, String> = fork.as_ref().get_list("list");
+///     list.push("foo".to_owned());
+/// }
+/// // ...same with snapshots:
+/// let snapshot = db.snapshot();
+/// assert!((&snapshot)
+///     .get_map::<_, u64, String>("map")
+///     .get(&0)
+///     .is_none());
+/// // ...but with `ReadonlyFork`, no wrapping is necessary.
+/// let list = fork.readonly().get_list::<_, String>("list");
+/// assert_eq!(list.len(), 1);
+/// ```
 pub trait AccessExt: Access {
     /// Returns a group of indexes. All indexes in the group have the same type.
     /// Indexes are initialized lazily; i.e., no initialization is performed when the group

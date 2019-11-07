@@ -81,21 +81,45 @@ impl ChangeSet for ChangesMut<'_> {
     }
 }
 
-/// Allows to read data from indexes.
+/// Allows to read data from the database.
+///
+/// This trait is rarely needs to be used directly; [`Access`] is a more high-level trait
+/// encompassing access to database.
+///
+/// [`Access`]: trait.Access.html
 pub trait RawAccess: Clone {
-    /// Type of the `changes` that will be applied to the database.
-    ///
-    /// In case of `snapshot` changes are represented by the empty type `()`,
-    /// because `snapshot` is read-only.
+    /// Type of the `changes()` that will be applied to the database.
     type Changes: ChangeSet;
 
-    /// Reference to `Snapshot` used in `View` implementation.
+    /// Reference to a `Snapshot`.
     fn snapshot(&self) -> &dyn Snapshot;
     /// Returns changes related to specific `address` compared to the `snapshot()`.
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
 /// Allows to mutate data in indexes.
+///
+/// This is a marker trait that is used as a bound for mutable operations on indexes.
+/// It can be used in the same way for high-level database objects:
+///
+/// ```
+/// use exonum_merkledb::{access::{Access, RawAccessMut}, ListIndex, MapIndex};
+///
+/// pub struct Schema<T: Access> {
+///     list: ListIndex<T::Base, String>,
+///     map: MapIndex<T::Base, u64, u64>,
+/// }
+///
+/// impl<T: Access> Schema<T>
+/// where
+///     T::Base: RawAccessMut,
+/// {
+///     pub fn mutate(&mut self) {
+///         self.list.push("foo".to_owned());
+///         self.map.put(&1, 2);
+///     }
+/// }
+/// ```
 pub trait RawAccessMut: RawAccess {}
 
 impl<'a, T> RawAccessMut for T where T: RawAccess<Changes = ChangesMut<'a>> {}

@@ -387,26 +387,24 @@ pub enum Change {
 /// [`rollback`] methods), which allows rolling back some of the latest changes (e.g., after
 /// a runtime error). Checkpoint is created automatically after calling the `flush` method.
 ///
-/// `Fork` implements the [`Snapshot`] trait and provides methods for both reading and
-/// writing data. Thus, `&mut Fork` is used as a storage view for creating
-/// read-write indices representation.
+/// `Fork` provides methods for both reading and writing data. Thus, `&Fork` is used
+/// as a storage view for creating read-write indices representation.
 ///
 /// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
 /// to a full key (a string column family name + key as an array of bytes within the family).
 ///
 /// # Borrow checking
 ///
-/// It is possible to create only one instance of index with the specified name based on a
+/// It is possible to create only one instance of index with the specified `IndexAddress` based on a
 /// single fork. If an additional instance is requested, the code will panic in runtime.
 /// Hence, obtaining indexes from a `Fork` functions similarly to [`RefCell::borrow_mut()`].
 ///
 /// For example the code below will panic at runtime.
 ///
 /// ```rust,should_panic
-/// use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-///
 /// let index = fork.as_ref().get_list::<_, u8>("index");
 /// // This code will panic at runtime.
 /// let index2 = fork.as_ref().get_list::<_, u8>("index");
@@ -415,7 +413,7 @@ pub enum Change {
 /// To enable immutable / shared references to indexes, you may use [`readonly`] method:
 ///
 /// ```
-/// use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.as_ref().get_list::<_, u8>("index").extend(vec![1, 2, 3]);
@@ -429,7 +427,7 @@ pub enum Change {
 /// It is impossible to mutate index contents having a readonly access to the fork; this is
 /// checked by the Rust type system.
 ///
-/// Shared references work like `RefCell::borrow`; it is a runtime error to try to obtain
+/// Shared references work like `RefCell::borrow()`; it is a runtime error to try to obtain
 /// a shared reference to an index if there is an exclusive reference to the same index,
 /// and vice versa.
 ///
@@ -441,6 +439,7 @@ pub enum Change {
 /// [`into_patch`]: #method.into_patch
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`commit`]: #method.commit
+/// [`flush`]: #method.flush
 /// [`rollback`]: #method.rollback
 /// [`readonly`]: #method.readonly
 /// [`RefCell::borrow_mut()`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html#method.borrow_mut
@@ -745,6 +744,46 @@ impl RawAccess for Rc<Fork> {
 }
 
 /// Readonly wrapper for a `Fork`.
+///
+/// This wrapper allows to read from index state from the fork
+/// in a type-safe manner (it is impossible to accidentally modify data in the index), and
+/// without encountering runtime errors when attempting to concurrently get the same index
+/// more than once.
+///
+/// Since the wrapper borrows the `Fork` immutably, it is still possible to access indexes
+/// in the fork directly. In this scenario, the caller should be careful that `ReadonlyFork`
+/// does not access the same indexes as the original `Fork`: this will result in a runtime
+/// error (sort of like attempting both an exclusive and a shared borrow from a `RefCell`
+/// or `RwLock`).
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// fork.as_ref().get_list("list").push(1_u32);
+/// let readonly: ReadonlyFork<'_> = fork.readonly();
+/// let list = readonly.get_list::<_, u32>("list");
+/// assert_eq!(list.get(0), Some(1));
+/// let same_list = readonly.get_list::<_, u32>("list");
+/// // ^-- Does not result in an error!
+///
+/// // Original fork is still accessible.
+/// let mut map = fork.as_ref().get_map("map");
+/// map.put(&1_u32, "foo".to_string());
+/// ```
+///
+/// There are no write methods in indexes instantiated from `ReadonlyFork`:
+///
+/// ```compile_fail
+/// # use exonum_merkledb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let readonly: ReadonlyFork<'_> = fork.readonly();
+/// let mut list = readonly.get_list("list");
+/// list.push(1_u32); // No `push` method for `ListIndex<ReadonlyFork, u32>`!
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct ReadonlyFork<'a>(&'a Fork);
 

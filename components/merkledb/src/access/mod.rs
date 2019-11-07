@@ -14,7 +14,27 @@ use crate::{
 
 mod extensions;
 
-/// High-level access to indexes.
+/// High-level access to database data.
+///
+/// # Examples
+///
+/// `Access` can be used as a bound on structured database objects and their
+/// readonly methods:
+///
+/// ```
+/// use exonum_merkledb::{access::Access, ListIndex, ProofMapIndex};
+///
+/// struct Schema<T: Access> {
+///     list: ListIndex<T::Base, u64>,
+///     map: ProofMapIndex<T::Base, String, u64>,
+/// }
+///
+/// impl<T: Access> Schema<T> {
+///     fn get_some_data(&self) -> Option<u64> {
+///         Some(self.list.get(0)? + self.map.get(&"foo".to_owned())?)
+///     }
+/// }
+/// ```
 pub trait Access: Clone {
     /// Raw access serving as the basis for created indices.
     type Base: RawAccess;
@@ -46,6 +66,19 @@ impl<T: RawAccess> Access for T {
 }
 
 /// Access that prepends the specified prefix to each created view.
+///
+/// # Examples
+///
+/// ```
+/// use exonum_merkledb::{access::{AccessExt, Prefixed}, Database, TemporaryDB};
+///
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let prefixed = Prefixed::new("prefixed", &fork);
+/// prefixed.get_list("list").extend(vec![1_u32, 2, 3]);
+/// let same_list = fork.as_ref().get_list::<_, u32>("prefixed.list");
+/// assert_eq!(same_list.len(), 3);
+/// ```
 #[derive(Debug, Clone)]
 pub struct Prefixed<'a, T> {
     access: T,

@@ -7,6 +7,23 @@ use crate::{
 };
 
 /// Group of indexes distinguished by a prefix.
+///
+/// All indexes in the group have the same type. Indexes are initialized lazily;
+/// i.e., no initialization is performed when the group is created.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{access::{AccessExt, Restore}, Database, Group, ListIndex, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let group: Group<_, u64, ListIndex<_, u64>> =
+///     Restore::restore(&&fork, "group".into()).unwrap();
+/// group.get(&1).push(1);
+/// group.get(&2).extend(vec![1, 2, 3]);
+/// // Members of the group can be accessed independently.
+/// assert_eq!(fork.as_ref().get_list::<_, u64>(("group", &2_u64)).len(), 3);
+/// ```
 #[derive(Debug)]
 pub struct Group<T, K: ?Sized, I> {
     access: T,
