@@ -20,7 +20,7 @@ use std::{
 
 use leb128;
 
-use exonum_crypto::HASH_SIZE;
+use exonum_crypto::{PublicKey, Hash, HASH_SIZE};
 
 use crate::{BinaryKey, ObjectHash};
 
@@ -65,8 +65,8 @@ fn reset_bits(value: &mut u8, pos: u16) {
 ///
 /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
 pub trait ProofMapKey
-    where
-        Self::Output: ProofMapKey,
+where
+    Self::Output: ProofMapKey,
 {
     /// The type of keys as read from the database.
     ///
@@ -89,73 +89,15 @@ pub trait ProofMapKey
 }
 
 #[derive(Debug)]
-struct Hashed<K>(pub K);
+pub enum Hashed {}
 
-impl <K> ProofMapKey for Hashed<K> where K: BinaryKey + ObjectHash {
-    type Output = dyn ProofMapKey;
-
-    fn write_key(&self, to: &mut [u8]) {
-        self.object_hash().write(buffer);
-    }
-
-    fn read_key(from: &[u8]) -> Self::Output {
-        <Hash as BinaryKey>::read(buffer)
-    }
+pub trait KeyTransform<K> {
+    fn transform_key(key: &K) -> ProofPath;
 }
 
-/// A trait denoting that a certain storage value is suitable for use as a key for
-/// `ProofMapIndex` after hashing.
-///
-/// **Warning:** The implementation of the [`ProofMapKey.write_key()`] method provided
-/// by this trait is not efficient; it calculates the hash anew on each call.
-///
-/// # Example
-///
-/// ```
-/// # use byteorder::{LittleEndian, ByteOrder};
-/// # use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex, HashedKey};
-///
-/// #[derive(Debug, Copy, Clone, PartialEq)]
-/// struct Point {
-///     y: i16,
-///     x: i16,
-/// }
-///
-/// impl exonum_crypto::CryptoHash for Point {
-///     fn hash(&self) -> exonum_crypto::Hash {
-///         let mut buffer = [0; 4];
-///         LittleEndian::write_i16(&mut buffer[0..2], self.x);
-///         LittleEndian::write_i16(&mut buffer[2..4], self.y);
-///         exonum_crypto::hash(&buffer)
-///     }
-/// }
-///
-/// impl HashedKey for Point {}
-///
-///
-///
-/// # fn main() {
-/// let mut fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut map = ProofMapIndex::new("index", &mut fork);
-/// map.put(&Point { x: 3, y: -4 }, 5u32);
-/// assert_eq!(map.get(&Point { x: 3, y: -4 }), Some(5));
-/// assert_eq!(map.get(&Point { x: 3, y: 4 }), None);
-/// # }
-/// ```
-///
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
-/// [`ProofMapKey.write_key()`]: trait.ProofMapKey.html#tymethod.write_key
-pub trait HashedKey: CryptoHash {}
-
-impl<T: HashedKey> ProofMapKey for T {
-    type Output = Hash;
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        self.hash().write(buffer);
-    }
-
-    fn read_key(buffer: &[u8]) -> Hash {
-        <Hash as BinaryKey>::read(buffer)
+impl<K: ObjectHash> KeyTransform<K> for Hashed {
+    fn transform_key(key: &K) -> ProofPath {
+        ProofPath::from_bytes(key.object_hash())
     }
 }
 

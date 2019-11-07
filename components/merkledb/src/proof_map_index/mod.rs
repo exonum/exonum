@@ -32,6 +32,7 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
+use crate::proof_map_index::key::{Hashed, ProofMapKey, KeyTransform};
 use crate::views::{AnyObject, IndexAddress};
 use crate::{
     views::{
@@ -39,7 +40,6 @@ use crate::{
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
-use crate::proof_map_index::key::ProofMapKey;
 
 mod key;
 mod node;
@@ -77,11 +77,12 @@ where
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
-pub struct ProofMapIndex<T: IndexAccess, K, V> {
+pub struct ProofMapIndex<T:IndexAccess, K, V, Style: KeyTransform<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, Option<ProofPath>>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
+    _s: PhantomData<Style>,
 }
 
 /// An iterator over the entries of a `ProofMapIndex`.
@@ -203,7 +204,7 @@ impl BinaryAttribute for Option<ProofPath> {
     }
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V>
+impl<T, K, V> ProofMapIndex<T, K, V, Hashed>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
@@ -242,6 +243,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
+            _s: PhantomData,
         }
     }
 
@@ -294,6 +296,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
+            _s: PhantomData,
         }
     }
 
@@ -306,6 +309,7 @@ where
                 state,
                 _k: PhantomData,
                 _v: PhantomData,
+                _s: PhantomData,
             })
     }
 
@@ -319,6 +323,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
+            _s: PhantomData,
         }
     }
 
@@ -745,7 +750,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let proof_path = ProofPath::new(key);
+        let proof_path = Hashed::transform_key(key);
         let root_path = match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_path = prefix;
@@ -988,7 +993,7 @@ where
     V: BinaryValue + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct Entry<'a, T: IndexAccess, K, V: BinaryValue> {
+        struct Entry<'a, T: IndexAccess, K: ObjectHash, V: BinaryValue> {
             index: &'a ProofMapIndex<T, K, V>,
             path: ProofPath,
             hash: Hash,
