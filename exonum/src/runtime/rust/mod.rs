@@ -15,15 +15,18 @@
 //! The runtime for the native Rust services.
 //!
 //! This runtime is usually presents in every blockchain instance and can only process a static set
-//! of available Rust services. This set is defined at the compile-time level. Once created, it can be changed only by the node binary recompilation.
-//! During this procedure, be very careful and avoid situations when some of deployed services do
-//! not exist in the list of available. The easiest way to add only a new available artifacts, rather
-//! than delete.
+//! of available Rust services. This set is defined at the compile-time level. Once created, it can
+//! be changed only by the node binary recompilation.
 //!
-//! Rust runtime does not provide any level of service isolation from the operation system, therefore
-//! security audit of the artifacts to be deployed is up to the node administrators.
+//! Beware of the removing the artifacts from the Rust runtime, since attempt to remove an artifact
+//! with already running instances can cause blockchain to break. The only safe change that can be
+//! performed here is adding new artifacts.
 //!
-//! Artifacts available for deployment are presented by the [`ServiceFactory`][ServiceFactory] objects.
+//! Rust runtime does not provide any level of service isolation from the operation system,
+//! therefore security audit of the artifacts to be deployed is up to the node administrators.
+//!
+//! Artifacts available for deployment are presented by the [`ServiceFactory`][ServiceFactory]
+//! objects.
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html
 
@@ -145,7 +148,7 @@ impl RustRuntime {
     }
 
     /// Adds a new service factory to the list of available artifacts and returns
-    /// itself for further chaining.
+    /// modified `RustRuntime` object for further chaining.
     pub fn with_available_service(
         mut self,
         service_factory: impl Into<Box<dyn ServiceFactory>>,
