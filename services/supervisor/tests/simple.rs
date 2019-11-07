@@ -883,6 +883,20 @@ fn deploy_service_errors() {
 
         system_api.assert_tx_status(tx_hash, &Err(expected).into());
     }
+
+    // Test that proposals with the duplicated names are discarded as well.
+    let artifact_id = ArtifactId::new(0_u32, "duplicated-name:0.1.0").unwrap();
+    let deploy_request = create_deploy_request(artifact_id);
+    let config_propose = ConfigPropose::actual_from(cfg_change_height)
+        .deploy_request(deploy_request.clone())
+        .deploy_request(deploy_request.clone());
+    let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+
+    let tx_hash = deploy_tx.object_hash();
+    testkit.create_block_with_transaction(deploy_tx);
+
+    let expected_error = SimpleSupervisorError::MalformedConfigPropose.into();
+    system_api.assert_tx_status(tx_hash, &Err(expected_error).into());
 }
 
 /// Tests that correct service instance start request is executed successfully.
@@ -1022,10 +1036,23 @@ fn init_service_errors() {
         let config_propose =
             ConfigPropose::actual_from(cfg_change_height).start_service(start_service);
 
-        let deploy_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
-        let tx_hash = deploy_tx.object_hash();
-        testkit.create_block_with_transaction(deploy_tx);
+        let start_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+        let tx_hash = start_tx.object_hash();
+        testkit.create_block_with_transaction(start_tx);
 
         system_api.assert_tx_status(tx_hash, &Err(expected).into());
     }
+
+    // Test that proposals with the duplicated names are discarded as well.
+    let start_service = create_start_service(artifact_id.clone(), "duplicated_name".into());
+    let config_propose = ConfigPropose::actual_from(cfg_change_height)
+        .start_service(start_service.clone())
+        .start_service(start_service.clone());
+    let start_tx = sign_config_propose_transaction_by_us(&testkit, config_propose);
+
+    let tx_hash = start_tx.object_hash();
+    testkit.create_block_with_transaction(start_tx);
+
+    let expected_error = SimpleSupervisorError::MalformedConfigPropose.into();
+    system_api.assert_tx_status(tx_hash, &Err(expected_error).into());
 }

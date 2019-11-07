@@ -26,6 +26,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
+use std::collections::HashSet;
 
 use crate::{
     apply_consensus_config, apply_service_config, ConfigChange, ConfigPropose, ConfigureCall,
@@ -50,7 +51,7 @@ pub use self::schema::Schema;
 ///   by a panic / error *before* hitting the call; if this happens, the usual rules apply.
 ///
 /// These restrictions are the result of `Fork` not having multi-layered checkpoints.
-fn update_configs(context: &mut CallContext, changes: Vec<ConfigChange>) {
+fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
     // An error while configuring one of the service instances should not affect others.
     changes.into_iter().for_each(|change| match change {
         ConfigChange::Consensus(config) => {
@@ -175,6 +176,11 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 
         log::info!("Received a new config proposal: {:?}", &propose);
 
+        // To prevent multiple artifacts with the same name in one request.
+        let mut services_to_deploy = HashSet::new();
+        // To prevent multiple instances with the same name in one request.
+        let mut instances_to_start = HashSet::new();
+
         // Perform config verification.
         for change in &propose.changes {
             match change {
@@ -195,6 +201,14 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
                         })?;
                 }
                 ConfigChange::DeployRequest(request) => {
+                    if services_to_deploy.contains(&request.artifact.name) {
+                        log::warn!(
+                            "Discarded multiple artifacts with the same name in one request."
+                        );
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    services_to_deploy.insert(request.artifact.name.clone());
+
                     request.artifact.validate().map_err(|e| {
                         log::warn!("Invalid artifact name {:?}", &request.artifact);
                         ExecutionError::from((Error::InvalidArtifactId, e))
@@ -210,6 +224,12 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
                     }
                 }
                 ConfigChange::StartService(request) => {
+                    if instances_to_start.contains(&request.name) {
+                        log::warn!("Discarded multiple service instances with the same name in one request.");
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    instances_to_start.insert(request.name.clone());
+
                     request.artifact.validate().map_err(|e| {
                         log::warn!(
                             "Invalid artifact name within StartService request: {:?}",
