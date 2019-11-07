@@ -93,11 +93,10 @@ fn exonum_proto_sources() -> Vec<ProtoSourceFile> {
 
 fn filter_exonum_proto_sources(
     files: Vec<ProtoSourceFile>,
-    exonum_sources: Vec<ProtoSourceFile>,
+    exonum_sources: &[ProtoSourceFile],
 ) -> Vec<ProtoSourceFile> {
     files
-        .iter()
-        .cloned()
+        .into_iter()
         .filter(|file| !exonum_sources.contains(file))
         .collect()
 }
@@ -118,13 +117,12 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
     let exonum_sources = exonum_proto_sources();
     // Cache filtered sources to avoid expensive operations in the endpoint handler.
     let filtered_sources = artifact_proto_sources
-        .clone()
         .into_iter()
         .map(|(artifact_id, sources)| {
             let mut proto = sources.sources;
             proto.extend(filter_exonum_proto_sources(
                 sources.includes,
-                exonum_sources.clone(),
+                &exonum_sources,
             ));
             (artifact_id, proto)
         })
@@ -136,7 +134,7 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         // This endpoint returns list of protobuf source files of the specified artifact,
         // otherwise it returns source files of Exonum itself.
         .endpoint("proto-sources", {
-            move |query: ProtoSourcesQuery| {
+            move |query: ProtoSourcesQuery| -> Result<Vec<ProtoSourceFile>, api::Error> {
                 if let Some(artifact_id) = query.artifact {
                     let artifact_id = artifact_id.parse::<RustArtifactId>()?;
                     filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
