@@ -30,12 +30,12 @@ impl<'a> CallContext<'a> {
     }
 
     /// Provides access to blockchain data.
-    pub fn data(&self) -> BlockchainData<&'_ Fork> {
+    pub fn data(&self) -> BlockchainData<'a, &Fork> {
         BlockchainData::new(self.inner.fork, self.instance)
     }
 
     /// Provides access to the data of the executing service.
-    pub fn service_data(&self) -> Prefixed<&'_ Fork> {
+    pub fn service_data(&self) -> Prefixed<'a, &Fork> {
         self.data().for_executing_service()
     }
 

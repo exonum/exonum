@@ -613,6 +613,17 @@ impl Service for DependentServiceImpl {
         {
             return Err(ExecutionError::new(ErrorKind::service(0), "no dependency"));
         }
+
+        // Check that it is possible to access data of the dependency right away,
+        // even if it is deployed in the same block.
+        let dependency_data = context
+            .data()
+            .for_service(&*init.msg)
+            .expect("Dependency exists, but its data does not");
+        assert!(dependency_data
+            .get_entry::<_, String>("constructor_entry")
+            .exists());
+
         Ok(())
     }
 

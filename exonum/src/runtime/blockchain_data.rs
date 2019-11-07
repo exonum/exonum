@@ -17,7 +17,7 @@ use exonum_merkledb::{
     Snapshot,
 };
 
-use super::{DeployStatus, DispatcherSchema, InstanceDescriptor, InstanceQuery};
+use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery};
 use crate::blockchain::Schema as CoreSchema;
 
 /// Provides access to blockchain data for the executing service.
@@ -28,7 +28,9 @@ pub struct BlockchainData<'a, T> {
 }
 
 impl<'a, T: RawAccess + ToReadonly> BlockchainData<'a, T> {
-    pub(super) fn new(access: T, service_instance: InstanceDescriptor<'a>) -> Self {
+    /// Creates structured access to blockchain data based on the unstructured access
+    /// (e.g., a `Snapshot` or a `Fork`) and the descriptor of the executing service.
+    pub fn new(access: T, service_instance: InstanceDescriptor<'a>) -> Self {
         Self {
             access,
             service_instance,
@@ -45,13 +47,16 @@ impl<'a, T: RawAccess + ToReadonly> BlockchainData<'a, T> {
         DispatcherSchema::new(self.access.to_readonly())
     }
 
-    /// Returns a mount point for another service.
+    /// Returns a mount point for another service. If the service with `id` does not exist,
+    /// returns `None`.
+    ///
+    /// Note that this method does not check the service type; the caller is responsible
+    /// for constructing a schema of a correct type around the returned access. Constructing
+    /// an incorrect schema can lead to a panic or unexpected behavior.
     pub fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<Prefixed<'_, T::Readonly>> {
-        // The returned value is `Prefixed<'static, _>`, but we coerce it to a shorter lifetime
-        // for future compatibility.
+    ) -> Option<Prefixed<'static, T::Readonly>> {
         mount_point_for_service(self.access.to_readonly(), id)
     }
 
@@ -67,10 +72,7 @@ fn mount_point_for_service<'q, T: RawAccess>(
     access: T,
     id: impl Into<InstanceQuery<'q>>,
 ) -> Option<Prefixed<'static, T>> {
-    let (spec, status) = DispatcherSchema::new(access.clone()).get_instance(id)?;
-    if status != DeployStatus::Active {
-        return None;
-    }
+    let (spec, _) = DispatcherSchema::new(access.clone()).get_instance(id)?;
     Some(Prefixed::new(spec.name, access))
 }
 
@@ -84,7 +86,7 @@ pub trait SnapshotExt {
     fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<Prefixed<'_, &'_ dyn Snapshot>>;
+    ) -> Option<Prefixed<'static, &dyn Snapshot>>;
 }
 
 impl SnapshotExt for dyn Snapshot {
@@ -99,9 +101,7 @@ impl SnapshotExt for dyn Snapshot {
     fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<Prefixed<'_, &'_ dyn Snapshot>> {
-        // The returned value is `Prefixed<'static, _>`, but we coerce it to a shorter lifetime
-        // for future compatibility.
+    ) -> Option<Prefixed<'static, &dyn Snapshot>> {
         mount_point_for_service(self, id)
     }
 }
