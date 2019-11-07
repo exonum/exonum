@@ -14,9 +14,8 @@
 
 //! The runtime for the native Rust services.
 //!
-//! This runtime is usually presents in every blockchain instance and can only process a static set
-//! of available Rust services. This set is defined at the compile-time level. Once created, it can
-//! be changed only by the node binary recompilation.
+//! A set of artifacts available to deploy in the Rust runtime is static and defined at the compile
+//! time. Once created, it can be changed only by the node binary recompilation.
 //!
 //! Beware of the removing the artifacts from the Rust runtime, since attempt to remove an artifact
 //! with already running instances can cause blockchain to break. The only safe change that can be
@@ -25,8 +24,9 @@
 //! Rust runtime does not provide any level of service isolation from the operation system,
 //! therefore security audit of the artifacts to be deployed is up to the node administrators.
 //!
-//! Artifacts available for deployment are presented by the [`ServiceFactory`][ServiceFactory]
-//! objects.
+//! The artifact interface in the Rust runtime is represented by the
+//! [`ServiceFactory`][ServiceFactory] trait, which creates service instances and provides
+//! information about the artifact.
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html
 
