@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The basic runtime with the native Rust services.
+//! The runtime for the native Rust services.
 //!
 //! This runtime is usually presents in every blockchain instance and can only process a static set
-//! of available Rust services. To change this set you have to recompile the node binary.
+//! of available Rust services. This set is defined at the compile-time level. Once created, it can be changed only by the node binary recompilation.
 //! During this procedure, be very careful and avoid situations when some of deployed services do
 //! not exist in the list of available. The easiest way to add only a new available artifacts, rather
 //! than delete.
 //!
 //! Rust runtime does not provide any level of service isolation from the operation system, therefore
-//! you should only use a trusted artifacts.
+//! security audit of the artifacts to be deployed is up to the node administrators.
 //!
 //! Artifacts available for deployment are presented by the [`ServiceFactory`][ServiceFactory] objects.
 //!
@@ -67,9 +67,9 @@ mod service;
 #[cfg(test)]
 mod tests;
 
-/// Rust runtime instance.
+/// Rust runtime entity.
 ///
-/// [Read more about the Rust runtime](index.html).
+/// [Detailed description of the Rust runtime](index.html).
 #[derive(Debug)]
 pub struct RustRuntime {
     api_context: Option<ApiContext>,
@@ -240,25 +240,25 @@ impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
     }
 }
 
-/// The unique name of the Rust artifact, contains the name and version of the artifact.
+/// The unique identifier of the Rust artifact, containing the name and version of the artifact.
 ///
-/// In string representation the artifact name is written as follows:
+/// As a string, the artifact name is represented as follows:
 ///
 /// `{artifact_name}:{artifact_version}`, where `artifact_name` is a unique name of the artifact,
-/// and 'artifact_version` is a version number.
+/// and `artifact_version` is a semantic version identifier.
 ///
-/// * Artifact name contains only the following characters: `a-zA-Z0-9` and one of `_-.`.
-/// * Artifact version number must conform to the semantic version scheme.
+/// * Artifact name can contain only the following characters: `a-zA-Z0-9` and one of `_-.`.
+/// * Artifact version identifier must conform to the semantic version scheme (major.minor.patch).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactId {
     /// Artifact name.
     pub name: String,
-    /// Artifact version number conforming to the semantic versioning scheme.
+    /// Artifact version identifier conforming to the semantic versioning scheme.
     pub version: Version,
 }
 
 impl RustArtifactId {
-    /// Creates a new Rust artifact id from the specified parts.
+    /// Creates a new Rust artifact ID from the provided name and version.
     ///
     /// # Panics
     ///
