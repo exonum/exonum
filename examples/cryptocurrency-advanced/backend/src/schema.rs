@@ -19,6 +19,7 @@ use exonum_merkledb::{IndexAccess, ObjectHash, ProofListIndex, ProofMapIndex};
 use exonum::crypto::{Hash, PublicKey};
 
 use crate::{wallet::Wallet, INITIAL_BALANCE};
+use exonum_merkledb::proof_map_index::RawProofMap;
 
 /// Database schema for the cryptocurrency.
 #[derive(Debug)]
@@ -40,8 +41,8 @@ where
     }
 
     /// Returns `ProofMapIndex` with wallets.
-    pub fn wallets(&self) -> ProofMapIndex<T, PublicKey, Wallet> {
-        ProofMapIndex::new(
+    pub fn wallets(&self) -> RawProofMap<T, PublicKey, Wallet> {
+        RawProofMap::new(
             [self.service_name, ".wallets"].concat(),
             self.access.clone(),
         )

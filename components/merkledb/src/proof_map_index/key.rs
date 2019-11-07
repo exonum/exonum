@@ -20,7 +20,7 @@ use std::{
 
 use leb128;
 
-use exonum_crypto::{PublicKey, Hash, HASH_SIZE};
+use exonum_crypto::{Hash, PublicKey, HASH_SIZE};
 
 use crate::{BinaryKey, ObjectHash};
 
@@ -91,6 +91,9 @@ where
 #[derive(Debug)]
 pub enum Hashed {}
 
+#[derive(Debug)]
+pub enum Raw {}
+
 pub trait KeyTransform<K> {
     fn transform_key(key: &K) -> ProofPath;
 }
@@ -101,41 +104,15 @@ impl<K: ObjectHash> KeyTransform<K> for Hashed {
     }
 }
 
-impl ProofMapKey for PublicKey {
-    type Output = Self;
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        BinaryKey::write(self, buffer);
-    }
-
-    fn read_key(raw: &[u8]) -> Self {
-        <Self as BinaryKey>::read(raw)
+impl KeyTransform<PublicKey> for Raw {
+    fn transform_key(key: &PublicKey) -> ProofPath {
+        ProofPath::from_bytes(key.as_ref())
     }
 }
 
-impl ProofMapKey for Hash {
-    type Output = Self;
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        BinaryKey::write(self, buffer);
-    }
-
-    fn read_key(raw: &[u8]) -> Self {
-        <Self as BinaryKey>::read(raw)
-    }
-}
-
-impl ProofMapKey for [u8; 32] {
-    type Output = [u8; 32];
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self);
-    }
-
-    fn read_key(raw: &[u8]) -> [u8; 32] {
-        let mut value = [0; KEY_SIZE];
-        value.copy_from_slice(raw);
-        value
+impl KeyTransform<Hash> for Raw {
+    fn transform_key(key: &Hash) -> ProofPath {
+        ProofPath::from_bytes(key.as_ref())
     }
 }
 

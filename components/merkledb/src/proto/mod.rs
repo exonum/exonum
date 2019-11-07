@@ -124,9 +124,10 @@ mod tests {
     use exonum_proto::ProtobufConvert;
     use std::fmt;
 
+    use crate::proof_map_index::HashedProofMap;
     use crate::{
         proto, BinaryKey, BinaryValue, Database, ListProof, MapProof, ObjectHash, ProofListIndex,
-        ProofMapIndex, TemporaryDB,
+        TemporaryDB,
     };
     use protobuf::RepeatedField;
 
@@ -135,7 +136,7 @@ mod tests {
         let db = TemporaryDB::default();
         let storage = db.fork();
 
-        let mut table = ProofMapIndex::new("index", &storage);
+        let mut table = HashedProofMap::new("index", &storage);
 
         let proof = table.get_proof(0);
         assert_proof_roundtrip(&proof);

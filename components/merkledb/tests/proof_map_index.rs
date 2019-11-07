@@ -41,6 +41,7 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
+use exonum_merkledb::proof_map_index::HashedProofMap;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 
 const INDEX_NAME: &str = "index";
@@ -124,7 +125,7 @@ where
 fn write_data(db: &TemporaryDB, data: Data) {
     let fork = db.fork();
     {
-        let mut table = ProofMapIndex::new(INDEX_NAME, &fork);
+        let mut table = HashedProofMap::new(INDEX_NAME, &fork);
         table.clear();
         for (key, value) in data {
             table.put(&key, value);

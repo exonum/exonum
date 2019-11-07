@@ -93,6 +93,9 @@ pub trait MerklePatriciaTree<K, V> {
     /// It is assumed that this method cannot fail since it is queried with `key`s
     /// that are guaranteed to be present in the tree.
     fn value(&self, key: &K) -> V;
+
+    /// TODO: maybe exists better place for this method
+    fn transform_key(key: &K) -> ProofPath;
 }
 
 /// Combines two lists of hashes produces when building a `MapProof`.
@@ -172,7 +175,7 @@ where
     T: MerklePatriciaTree<K, V>,
 {
     fn create_proof(&self, key: K) -> MapProof<K, V> {
-        let searched_path = ProofPath::new(&key);
+        let searched_path = T::transform_key(&key);
 
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
@@ -248,8 +251,10 @@ where
                 let mut proof = MapProof::new();
 
                 let searched_paths = {
-                    let mut keys: Vec<_> =
-                        keys.into_iter().map(|k| (ProofPath::new(&k), k)).collect();
+                    let mut keys: Vec<_> = keys
+                        .into_iter()
+                        .map(|k| (T::transform_key(&k), k))
+                        .collect();
 
                     keys.sort_unstable_by(|x, y| {
                         // `unwrap` is safe here because all keys start from the same position `0`
@@ -284,7 +289,7 @@ where
                 let mut found_key: Option<K> = None;
 
                 for key in keys {
-                    let searched_path = ProofPath::new(&key);
+                    let searched_path = T::transform_key(&key);
                     if root_path == searched_path {
                         found_key = Some(key);
                     } else {

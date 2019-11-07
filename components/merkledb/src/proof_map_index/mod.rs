@@ -32,7 +32,7 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
-use crate::proof_map_index::key::{Hashed, ProofMapKey, KeyTransform};
+use crate::proof_map_index::key::{Hashed, KeyTransform, ProofMapKey, Raw};
 use crate::views::{AnyObject, IndexAddress};
 use crate::{
     views::{
@@ -49,11 +49,12 @@ mod proof_builder;
 mod tests;
 
 // Necessary to allow building proofs.
-impl<T, K, V> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V>
+impl<T, K, V, Style> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, Style>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
+    Style: KeyTransform<K>,
 {
     fn root_node(&self) -> Option<(ProofPath, Node)> {
         self.get_root_node()
@@ -66,6 +67,10 @@ where
     fn value(&self, key: &K) -> V {
         self.get_value_unchecked(key)
     }
+
+    fn transform_key(key: &K) -> ProofPath {
+        Style::transform_key(key)
+    }
 }
 
 /// A Merkelized version of a map that provides proofs of existence or non-existence for the map
@@ -77,12 +82,12 @@ where
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
-pub struct ProofMapIndex<T:IndexAccess, K, V, Style: KeyTransform<K> = Hashed> {
+pub struct ProofMapIndex<T: IndexAccess, K, V, Style: KeyTransform<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, Option<ProofPath>>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
-    _s: PhantomData<Style>,
+    style: PhantomData<Style>,
 }
 
 /// An iterator over the entries of a `ProofMapIndex`.
@@ -204,11 +209,17 @@ impl BinaryAttribute for Option<ProofPath> {
     }
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V, Hashed>
+///TODO:
+pub type HashedProofMap<T, K, V> = ProofMapIndex<T, K, V, Hashed>;
+///TODO:
+pub type RawProofMap<T, K, V> = ProofMapIndex<T, K, V, Raw>;
+
+impl<T, K, V, Style> ProofMapIndex<T, K, V, Style>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
+    Style: KeyTransform<K>,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -243,7 +254,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            _s: PhantomData,
+            style: PhantomData,
         }
     }
 
@@ -296,7 +307,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            _s: PhantomData,
+            style: PhantomData,
         }
     }
 
@@ -309,7 +320,7 @@ where
                 state,
                 _k: PhantomData,
                 _v: PhantomData,
-                _s: PhantomData,
+                style: PhantomData,
             })
     }
 
@@ -323,7 +334,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            _s: PhantomData,
+            style: PhantomData,
         }
     }
 
@@ -750,7 +761,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let proof_path = Hashed::transform_key(key);
+        let proof_path = Style::transform_key(key);
         let root_path = match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_path = prefix;
@@ -831,7 +842,7 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
-        let proof_path = ProofPath::new(key);
+        let proof_path = Style::transform_key(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -901,11 +912,12 @@ where
     }
 }
 
-impl<T, K, V> ObjectHash for ProofMapIndex<T, K, V>
+impl<T, K, V, Style> ObjectHash for ProofMapIndex<T, K, V, Style>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
+    Style: KeyTransform<K>,
 {
     /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
     /// For hash of the empty map see [`HashTag::empty_map_hash`].
