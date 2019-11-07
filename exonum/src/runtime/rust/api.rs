@@ -116,6 +116,19 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         })
         .collect::<HashMap<_, _>>();
     let exonum_sources = exonum_proto_sources();
+    // Cache filtered sources to avoid expensive operations in the endpoint handler.
+    let filtered_sources = artifact_proto_sources
+        .clone()
+        .into_iter()
+        .map(|(artifact_id, sources)| {
+            let mut proto = sources.sources;
+            proto.extend(filter_exonum_proto_sources(
+                sources.includes,
+                exonum_sources.clone(),
+            ));
+            (artifact_id, proto)
+        })
+        .collect::<HashMap<_, _>>();
 
     let mut builder = ApiBuilder::new();
     builder
@@ -124,25 +137,14 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         // otherwise it returns source files of Exonum itself.
         .endpoint("proto-sources", {
             move |query: ProtoSourcesQuery| {
-                let exonum_sources = exonum_sources.clone();
                 if let Some(artifact_id) = query.artifact {
                     let artifact_id = artifact_id.parse::<RustArtifactId>()?;
-                    let sources = artifact_proto_sources
-                        .get(&artifact_id)
-                        .ok_or_else(|| {
-                            api::Error::NotFound(format!(
-                                "Unable to find sources for artifact {}",
-                                artifact_id
-                            ))
-                        })?
-                        .clone();
-
-                    let mut proto = sources.sources;
-                    proto.extend(filter_exonum_proto_sources(
-                        sources.includes,
-                        exonum_sources.clone(),
-                    ));
-                    Ok(proto)
+                    filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
+                        api::Error::NotFound(format!(
+                            "Unable to find sources for artifact {}",
+                            artifact_id
+                        ))
+                    })
                 } else {
                     Ok(exonum_sources.clone())
                 }
