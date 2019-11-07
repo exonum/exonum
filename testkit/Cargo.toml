@@ -23,7 +23,7 @@ circle-ci = { repository = "exonum/exonum" }
 actix-web = { version = "0.7.18", default-features = false }
 exonum = { version = "0.12.0", path = "../exonum" }
 failure = "0.1.5"
-futures = "0.1.25"
+futures = "0.3.1"
 reqwest = "0.9.8"
 log = "0.4.6"
 serde = "1.0.10"
