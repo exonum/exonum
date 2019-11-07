@@ -58,7 +58,7 @@ where
     T: Access,
     K: BinaryKey,
 {
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::KeySet)?;
         Ok(Self::new(view))
     }
@@ -86,7 +86,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_key_set("name");
+    /// let mut index = fork.get_key_set("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -109,7 +109,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_key_set::<_, u8>("name");
+    /// let index = fork.get_key_set::<_, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -131,7 +131,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_key_set::<_, u8>("name");
+    /// let index = fork.get_key_set::<_, u8>("name");
     ///
     /// for val in index.iter_from(&2) {
     ///     println!("{}", val);
@@ -158,7 +158,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_key_set("name");
+    /// let mut index = fork.get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -177,7 +177,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_key_set("name");
+    /// let mut index = fork.get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -207,7 +207,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_key_set("name");
+    /// let mut index = fork.get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -257,7 +257,7 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, String> = fork.as_ref().get_key_set(INDEX_NAME);
+        let mut index: KeySetIndex<_, String> = fork.get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
         index.insert(KEY.to_owned());
         assert_eq!(true, index.contains(KEY));
@@ -271,7 +271,7 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, Vec<u8>> = fork.as_ref().get_key_set(INDEX_NAME);
+        let mut index: KeySetIndex<_, Vec<u8>> = fork.get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
         index.insert(KEY.to_owned());
         assert_eq!(true, index.contains(KEY));
@@ -284,7 +284,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index = fork.as_ref().get_key_set(INDEX_NAME);
+        let mut index = fork.get_key_set(INDEX_NAME);
         assert!(!index.contains(&1_u8));
         index.insert(1_u8);
         assert!(index.contains(&1_u8));

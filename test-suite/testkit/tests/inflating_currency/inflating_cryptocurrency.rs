@@ -86,7 +86,7 @@ impl<T: Access> CurrencySchema<T> {
     /// Creates a new schema instance.
     pub fn new(access: T) -> Self {
         Self {
-            wallets: Restore::restore(&access, "wallets".into()).unwrap(),
+            wallets: Restore::restore(access, "wallets".into()).unwrap(),
         }
     }
 

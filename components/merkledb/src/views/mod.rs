@@ -147,12 +147,12 @@ pub trait ToReadonly: RawAccess {
 /// let fork = db.fork();
 ///
 /// // Using a string address:
-/// let map = fork.as_ref().get_map::<_, String, u8>("map");
+/// let map = fork.get_map::<_, String, u8>("map");
 /// // Using an address within an index family:
-/// let list = fork.as_ref().get_list::<_, String>(("index", &3_u32));
+/// let list = fork.get_list::<_, String>(("index", &3_u32));
 /// // Using `IndexAddress` explicitly:
 /// let addr = IndexAddress::with_root("data").append_bytes(&vec![1, 2, 3]);
-/// let set = fork.as_ref().get_value_set::<_, u64>(addr);
+/// let set = fork.get_value_set::<_, u64>(addr);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub struct IndexAddress {

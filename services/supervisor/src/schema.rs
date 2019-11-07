@@ -35,12 +35,15 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
     pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            deploy_requests: Restore::restore(&access, "deploy_requests".into()).unwrap(),
-            deploy_confirmations: Restore::restore(&access, "deploy_confirmations".into()).unwrap(),
-            pending_deployments: Restore::restore(&access, "pending_deployments".into()).unwrap(),
-            pending_instances: Restore::restore(&access, "pending_instances".into()).unwrap(),
-            config_confirms: Restore::restore(&access, "config_confirms".into()).unwrap(),
-            pending_proposal: Restore::restore(&access, "pending_proposal".into()).unwrap(),
+            deploy_requests: Restore::restore(access.clone(), "deploy_requests".into()).unwrap(),
+            deploy_confirmations: Restore::restore(access.clone(), "deploy_confirmations".into())
+                .unwrap(),
+            pending_deployments: Restore::restore(access.clone(), "pending_deployments".into())
+                .unwrap(),
+            pending_instances: Restore::restore(access.clone(), "pending_instances".into())
+                .unwrap(),
+            config_confirms: Restore::restore(access.clone(), "config_confirms".into()).unwrap(),
+            pending_proposal: Restore::restore(access, "pending_proposal".into()).unwrap(),
         }
     }
 

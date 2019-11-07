@@ -109,7 +109,7 @@ impl<T: Access> Schema<T> {
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
     pub fn transactions(&self) -> MapIndex<T::Base, Hash, Verified<AnyTx>> {
-        self.access.get_map(TRANSACTIONS)
+        self.access.clone().get_map(TRANSACTIONS)
     }
 
     /// Returns a table that represents a map with a key-value pair of a transaction
@@ -118,12 +118,12 @@ impl<T: Access> Schema<T> {
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
     pub fn transaction_results(&self) -> ProofMapIndex<T::Base, Hash, ExecutionStatus> {
-        self.access.get_proof_map(TRANSACTION_RESULTS)
+        self.access.clone().get_proof_map(TRANSACTION_RESULTS)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
     pub(crate) fn transactions_len_index(&self) -> Entry<T::Base, u64> {
-        self.access.get_entry(TRANSACTIONS_LEN)
+        self.access.clone().get_entry(TRANSACTIONS_LEN)
     }
 
     /// Returns the number of transactions in the blockchain.
@@ -135,12 +135,12 @@ impl<T: Access> Schema<T> {
 
     /// Returns a table that represents a set of uncommitted transactions hashes.
     pub fn transactions_pool(&self) -> KeySetIndex<T::Base, Hash> {
-        self.access.get_key_set(TRANSACTIONS_POOL)
+        self.access.clone().get_key_set(TRANSACTIONS_POOL)
     }
 
     /// Returns an entry that represents count of uncommitted transactions.
     pub(crate) fn transactions_pool_len_index(&self) -> Entry<T::Base, u64> {
-        self.access.get_entry(TRANSACTIONS_POOL_LEN)
+        self.access.clone().get_entry(TRANSACTIONS_POOL_LEN)
     }
 
     /// Returns the number of transactions in the pool.
@@ -152,33 +152,35 @@ impl<T: Access> Schema<T> {
     /// Returns a table that keeps the block height and transaction position inside the block for every
     /// transaction hash.
     pub fn transactions_locations(&self) -> MapIndex<T::Base, Hash, TxLocation> {
-        self.access.get_map(TRANSACTIONS_LOCATIONS)
+        self.access.clone().get_map(TRANSACTIONS_LOCATIONS)
     }
 
     /// Returns a table that stores a block object for every block height.
     pub fn blocks(&self) -> MapIndex<T::Base, Hash, Block> {
-        self.access.get_map(BLOCKS)
+        self.access.clone().get_map(BLOCKS)
     }
 
     /// Returns a table that keeps block hashes for corresponding block heights.
     pub fn block_hashes_by_height(&self) -> ListIndex<T::Base, Hash> {
-        self.access.get_list(BLOCK_HASHES_BY_HEIGHT)
+        self.access.clone().get_list(BLOCK_HASHES_BY_HEIGHT)
     }
 
     /// Returns a table that keeps a list of transactions for each block.
     pub fn block_transactions(&self, height: Height) -> ProofListIndex<T::Base, Hash> {
         let height: u64 = height.into();
-        self.access.get_proof_list((BLOCK_TRANSACTIONS, &height))
+        self.access
+            .clone()
+            .get_proof_list((BLOCK_TRANSACTIONS, &height))
     }
 
     /// Returns a table that keeps a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<T::Base, Verified<Precommit>> {
-        self.access.get_list((PRECOMMITS, hash))
+        self.access.clone().get_list((PRECOMMITS, hash))
     }
 
     /// Returns an actual consensus configuration entry.
     pub fn consensus_config_entry(&self) -> Entry<T::Base, ConsensusConfig> {
-        self.access.get_entry(CONSENSUS_CONFIG)
+        self.access.clone().get_entry(CONSENSUS_CONFIG)
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -196,25 +198,26 @@ impl<T: Access> Schema<T> {
     /// Core tables participate in the resulting state_hash with `CORE_ID`
     /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<T::Base, IndexCoordinates, Hash> {
-        self.access.get_proof_map(STATE_HASH_AGGREGATOR)
+        self.access.clone().get_proof_map(STATE_HASH_AGGREGATOR)
     }
 
     /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn peers_cache(&self) -> MapIndex<T::Base, PublicKey, Verified<Connect>> {
-        self.access.get_map(PEERS_CACHE)
+        self.access.clone().get_map(PEERS_CACHE)
     }
 
     /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn consensus_messages_cache(&self) -> ListIndex<T::Base, Message> {
-        self.access.get_list(CONSENSUS_MESSAGES_CACHE)
+        self.access.clone().get_list(CONSENSUS_MESSAGES_CACHE)
     }
 
     /// Returns the saved value of the consensus round. Returns the first round
     /// if it has not been saved.
     pub(crate) fn consensus_round(&self) -> Round {
         self.access
+            .clone()
             .get_entry(CONSENSUS_ROUND)
             .get()
             .unwrap_or_else(Round::first)
@@ -292,7 +295,7 @@ where
 {
     /// Saves the given consensus round value into the storage.
     pub(crate) fn set_consensus_round(&mut self, round: Round) {
-        self.access.get_entry(CONSENSUS_ROUND).set(round);
+        self.access.clone().get_entry(CONSENSUS_ROUND).set(round);
     }
 
     /// Adds a transaction into the persistent pool. The caller must ensure that the transaction

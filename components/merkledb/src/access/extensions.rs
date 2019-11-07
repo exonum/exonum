@@ -17,9 +17,9 @@ use crate::{
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// // Since `Access` is implemented for `&Fork` rather than `Fork`, it is necessary
-/// // to use `fork.as_ref()` or `(&fork)` when using the `AccessExt` methods:
+/// // to use `fork` or `(&fork)` when using the `AccessExt` methods:
 /// {
-///     let mut list: ListIndex<_, String> = fork.as_ref().get_list("list");
+///     let mut list: ListIndex<_, String> = fork.get_list("list");
 ///     list.push("foo".to_owned());
 /// }
 /// // ...same with snapshots:
@@ -39,7 +39,7 @@ pub trait AccessExt: Access {
     ///
     /// Note that unlike other methods, this one requires address to be a string.
     /// This is to prevent collisions among groups.
-    fn get_group<K, I>(&self, name: impl Into<String>) -> Group<Self, K, I>
+    fn get_group<K, I>(self, name: impl Into<String>) -> Group<Self, K, I>
     where
         K: BinaryKey + ?Sized,
         I: Restore<Self>,
@@ -53,7 +53,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not an entry.
-    fn get_entry<I, V>(&self, addr: I) -> Entry<Self::Base, V>
+    fn get_entry<I, V>(self, addr: I) -> Entry<Self::Base, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
@@ -66,7 +66,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a list.
-    fn get_list<I, V>(&self, addr: I) -> ListIndex<Self::Base, V>
+    fn get_list<I, V>(self, addr: I) -> ListIndex<Self::Base, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
@@ -79,7 +79,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a map.
-    fn get_map<I, K, V>(&self, addr: I) -> MapIndex<Self::Base, K, V>
+    fn get_map<I, K, V>(self, addr: I) -> MapIndex<Self::Base, K, V>
     where
         I: Into<IndexAddress>,
         K: BinaryKey,
@@ -93,7 +93,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a Merkelized list.
-    fn get_proof_list<I, V>(&self, addr: I) -> ProofListIndex<Self::Base, V>
+    fn get_proof_list<I, V>(self, addr: I) -> ProofListIndex<Self::Base, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
@@ -106,7 +106,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a Merkelized list.
-    fn get_proof_map<I, K, V>(&self, addr: I) -> ProofMapIndex<Self::Base, K, V>
+    fn get_proof_map<I, K, V>(self, addr: I) -> ProofMapIndex<Self::Base, K, V>
     where
         I: Into<IndexAddress>,
         K: BinaryKey + ObjectHash,
@@ -120,7 +120,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a sparse list.
-    fn get_sparse_list<I, V>(&self, addr: I) -> SparseListIndex<Self::Base, V>
+    fn get_sparse_list<I, V>(self, addr: I) -> SparseListIndex<Self::Base, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
@@ -133,7 +133,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a key set.
-    fn get_key_set<I, V>(&self, addr: I) -> KeySetIndex<Self::Base, V>
+    fn get_key_set<I, V>(self, addr: I) -> KeySetIndex<Self::Base, V>
     where
         I: Into<IndexAddress>,
         V: BinaryKey,
@@ -146,7 +146,7 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a value set.
-    fn get_value_set<I, V>(&self, addr: I) -> ValueSetIndex<Self::Base, V>
+    fn get_value_set<I, V>(self, addr: I) -> ValueSetIndex<Self::Base, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
@@ -155,7 +155,7 @@ pub trait AccessExt: Access {
     }
 
     /// Touches an index at the specified address, asserting that it has a specific type.
-    fn touch_index<I>(&self, addr: I, index_type: IndexType) -> Result<(), AccessError>
+    fn touch_index<I>(self, addr: I, index_type: IndexType) -> Result<(), AccessError>
     where
         I: Into<IndexAddress>,
     {

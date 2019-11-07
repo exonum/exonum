@@ -67,7 +67,7 @@ pub struct MarkerSchema<T: Access> {
 impl<T: Access> MarkerSchema<T> {
     fn new(access: T) -> Self {
         Self {
-            marks: Restore::restore(&access, "marks".into()).unwrap(),
+            marks: Restore::restore(access, "marks".into()).unwrap(),
         }
     }
 

@@ -41,7 +41,7 @@ where
     T: Access,
     V: BinaryValue,
 {
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::Entry)?;
         Ok(Self::new(view))
     }
@@ -69,7 +69,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_entry("name");
+    /// let mut index = fork.get_entry("name");
     /// assert_eq!(None, index.get());
     ///
     /// index.set(10);
@@ -88,7 +88,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_entry("name");
+    /// let mut index = fork.get_entry("name");
     /// assert!(!index.exists());
     ///
     /// index.set(10);
@@ -113,7 +113,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_entry("name");
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -131,7 +131,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_entry("name");
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -152,7 +152,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_entry("name");
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -178,7 +178,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_entry("name");
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -209,7 +209,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_entry("name");
+    /// let mut index = fork.get_entry("name");
     /// assert_eq!(Hash::default(), index.object_hash());
     ///
     /// let value = 10;

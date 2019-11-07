@@ -181,7 +181,7 @@ where
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::ProofMap)?;
         Ok(Self::new(view))
     }
@@ -245,7 +245,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_proof_map("name");
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// assert_eq!(None, index.get(&hash));
@@ -267,7 +267,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_proof_map("name");
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// assert!(!index.contains(&hash));
@@ -289,7 +289,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, Hash, u8>("name");
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
@@ -306,7 +306,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, String, u8>("name");
+    /// let index = fork.get_proof_map::<_, String, u8>("name");
     ///
     /// let proof = index.get_multiproof(vec!["foo".to_owned(), "bar".to_owned()]);
     /// ```
@@ -328,7 +328,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, Hash, u8>("name");
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -352,7 +352,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, Hash, u8>("name");
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// for key in index.keys() {
     ///     println!("{:?}", key);
@@ -376,7 +376,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, Hash, u8>("name");
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
@@ -399,7 +399,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, Hash, u8>("name");
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let hash = Hash::default();
     /// for val in index.iter_from(&hash) {
@@ -426,7 +426,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, Hash, u8>("name");
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let hash = Hash::default();
     /// for key in index.keys_from(&hash) {
@@ -453,7 +453,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let index = fork.as_ref().get_proof_map::<_, Hash, u8>("name");
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let hash = Hash::default();
     /// for val in index.values_from(&hash) {
@@ -617,7 +617,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_proof_map("name");
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -694,7 +694,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_proof_map("name");
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -759,7 +759,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_proof_map("name");
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -791,7 +791,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_proof_map("name");
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let default_hash = index.object_hash();
     /// assert_eq!(HashTag::empty_map_hash(), default_hash);

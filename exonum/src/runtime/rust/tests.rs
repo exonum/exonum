@@ -348,7 +348,7 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.constructor_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().get_entry(idx_name.as_str());
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
     commit_block(&mut blockchain, fork);
@@ -382,10 +382,10 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().get_entry(idx_name.as_str());
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
         let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().get_entry(idx_name.as_str());
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -416,7 +416,7 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.as_ref().get_entry(idx_name.as_str());
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
     commit_block(&mut blockchain, fork);

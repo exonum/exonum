@@ -87,7 +87,7 @@ where
     K: BinaryKey,
     V: BinaryValue,
 {
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::Map)?;
         Ok(Self::new(view))
     }
@@ -117,7 +117,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_map("name");
+    /// let mut index = fork.get_map("name");
     /// assert!(index.get(&1).is_none());
     ///
     /// index.put(&1, 2);
@@ -140,7 +140,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_map("name");
+    /// let mut index = fork.get_map("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.put(&1, 2);
@@ -164,7 +164,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let index: MapIndex<_, u8, u8> = fork.as_ref().get_map("name");
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for v in index.iter() {
     ///     println!("{:?}", v);
@@ -186,7 +186,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let index: MapIndex<_, u8, u8> = fork.as_ref().get_map("name");
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for key in index.keys() {
     ///     println!("{}", key);
@@ -208,7 +208,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let index: MapIndex<_, u8, u8> = fork.as_ref().get_map("name");
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
@@ -230,7 +230,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let index: MapIndex<_, u8, u8> = fork.as_ref().get_map("name");
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for v in index.iter_from(&2) {
     ///     println!("{:?}", v);
@@ -256,7 +256,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let index: MapIndex<_, u8, u8> = fork.as_ref().get_map("name");
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for key in index.keys_from(&2) {
     ///     println!("{}", key);
@@ -282,7 +282,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let index: MapIndex<_, u8, u8> = fork.as_ref().get_map("name");
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     /// for val in index.values_from(&2) {
     ///     println!("{}", val);
     /// }
@@ -313,7 +313,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_map("name");
+    /// let mut index = fork.get_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -331,7 +331,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_map("name");
+    /// let mut index = fork.get_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -361,7 +361,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
-    /// let mut index = fork.as_ref().get_map("name");
+    /// let mut index = fork.get_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -435,7 +435,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, String, _> = fork.as_ref().get_map(IDX_NAME);
+        let mut index: MapIndex<_, String, _> = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
         index.put(&KEY.to_owned(), 0);
         assert_eq!(true, index.contains(KEY));
@@ -449,7 +449,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, Vec<u8>, _> = fork.as_ref().get_map(IDX_NAME);
+        let mut index: MapIndex<_, Vec<u8>, _> = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
 
         index.put(&KEY.to_owned(), 0);
@@ -464,7 +464,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut map_index = fork.as_ref().get_map(IDX_NAME);
+        let mut map_index = fork.get_map(IDX_NAME);
         assert_eq!(map_index.get(&1_u8), None);
         assert!(!map_index.contains(&1_u8));
 
@@ -488,7 +488,7 @@ mod tests {
     fn test_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut map_index = fork.as_ref().get_map(IDX_NAME);
+        let mut map_index = fork.get_map(IDX_NAME);
 
         map_index.put(&1_u8, 1_u8);
         map_index.put(&2_u8, 2_u8);

@@ -36,8 +36,8 @@ impl<T: Access> Schema<T> {
     /// Creates a new schema from the database view.
     pub fn new(access: T) -> Self {
         Self {
-            wallets: Restore::restore(&access, "wallets".into()).unwrap(),
-            wallet_history: Restore::restore(&access, "wallet_history".into()).unwrap(),
+            wallets: Restore::restore(access.clone(), "wallets".into()).unwrap(),
+            wallet_history: Restore::restore(access, "wallet_history".into()).unwrap(),
         }
     }
 

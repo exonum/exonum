@@ -18,11 +18,11 @@ use crate::{
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let group: Group<_, u64, ListIndex<_, u64>> =
-///     Restore::restore(&&fork, "group".into()).unwrap();
+///     Restore::restore(&fork, "group".into()).unwrap();
 /// group.get(&1).push(1);
 /// group.get(&2).extend(vec![1, 2, 3]);
 /// // Members of the group can be accessed independently.
-/// assert_eq!(fork.as_ref().get_list::<_, u64>(("group", &2_u64)).len(), 3);
+/// assert_eq!(fork.get_list::<_, u64>(("group", &2_u64)).len(), 3);
 /// ```
 #[derive(Debug)]
 pub struct Group<T, K: ?Sized, I> {
@@ -38,9 +38,9 @@ where
     K: BinaryKey + ?Sized,
     I: Restore<T>,
 {
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         Ok(Self {
-            access: access.to_owned(),
+            access,
             prefix: addr,
             _key: PhantomData,
             _index: PhantomData,
@@ -62,7 +62,7 @@ where
     /// If the index is present, but has the wrong type.
     pub fn get(&self, key: &K) -> I {
         let addr = self.prefix.clone().append_bytes(key);
-        I::restore(&self.access, addr).unwrap()
+        I::restore(self.access.clone(), addr).unwrap()
     }
 }
 
@@ -77,7 +77,7 @@ mod tests {
         let fork = db.fork();
 
         {
-            let group: Group<_, u32, ProofListIndex<_, String>> = fork.as_ref().get_group("group");
+            let group: Group<_, u32, ProofListIndex<_, String>> = fork.get_group("group");
             let mut list = group.get(&1);
             list.push("foo".to_owned());
             list.push("bar".to_owned());
@@ -85,16 +85,16 @@ mod tests {
         }
 
         {
-            let list = fork.as_ref().get_proof_list::<_, String>(("group", &1_u32));
+            let list = fork.get_proof_list::<_, String>(("group", &1_u32));
             assert_eq!(list.len(), 2);
             assert_eq!(list.get(1), Some("bar".to_owned()));
-            let other_list = fork.as_ref().get_proof_list::<_, String>(("group", &2_u32));
+            let other_list = fork.get_proof_list::<_, String>(("group", &2_u32));
             assert_eq!(other_list.len(), 1);
         }
 
         db.merge_sync(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
-        let group: Group<_, u32, ProofListIndex<_, String>> = snapshot.as_ref().get_group("group");
+        let group: Group<_, u32, ProofListIndex<_, String>> = snapshot.get_group("group");
         assert_eq!(group.get(&1).len(), 2);
         assert_eq!(group.get(&2).len(), 1);
         assert!(group.get(&0).is_empty());

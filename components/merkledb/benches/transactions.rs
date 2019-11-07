@@ -204,10 +204,10 @@ struct Schema<T: Access> {
 impl<T: Access> Schema<T> {
     fn new(access: T) -> Self {
         Self {
-            transactions: Restore::restore(&access, "transactions".into()).unwrap(),
-            blocks: Restore::restore(&access, "blocks".into()).unwrap(),
-            wallets: Restore::restore(&access, "wallets".into()).unwrap(),
-            wallet_history: Restore::restore(&access, "wallet_history".into()).unwrap(),
+            transactions: Restore::restore(access.clone(), "transactions".into()).unwrap(),
+            blocks: Restore::restore(access.clone(), "blocks".into()).unwrap(),
+            wallets: Restore::restore(access.clone(), "wallets".into()).unwrap(),
+            wallet_history: Restore::restore(access.clone(), "wallet_history".into()).unwrap(),
         }
     }
 }

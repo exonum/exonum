@@ -207,7 +207,7 @@ pub fn empty_hash() -> Hash {
 
 pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
     let fork = TemporaryDB::new().fork();
-    let mut hashes = fork.as_ref().get_proof_list("name");
+    let mut hashes = fork.get_proof_list("name");
     hashes.extend(txs.iter().cloned());
     hashes.object_hash()
 }

@@ -46,33 +46,33 @@ impl<T: Access> Schema<T> {
 
     /// Artifacts registry indexed by the artifact name.
     pub(crate) fn artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
-        self.access.get_map(ARTIFACTS)
+        self.access.clone().get_map(ARTIFACTS)
     }
 
     pub(super) fn pending_artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
-        self.access.get_map(PENDING_ARTIFACTS)
+        self.access.clone().get_map(PENDING_ARTIFACTS)
     }
 
     /// Set of launched service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
     pub(crate) fn service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
-        self.access.get_map(SERVICE_INSTANCES)
+        self.access.clone().get_map(SERVICE_INSTANCES)
     }
 
     /// Set of pending service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
     pub(super) fn pending_service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
-        self.access.get_map(PENDING_INSTANCES)
+        self.access.clone().get_map(PENDING_INSTANCES)
     }
 
     /// Identifiers of launched service instances.
     fn service_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
-        self.access.get_map(INSTANCE_IDS)
+        self.access.clone().get_map(INSTANCE_IDS)
     }
 
     /// Identifiers of pending service instances.
     fn pending_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
-        self.access.get_map(PENDING_INSTANCE_IDS)
+        self.access.clone().get_map(PENDING_INSTANCE_IDS)
     }
 
     /// Returns the information about a service instance by its identifier.

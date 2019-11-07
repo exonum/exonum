@@ -54,7 +54,7 @@ pub struct CounterSchema<T: Access> {
 impl<T: Access> CounterSchema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            counter: Restore::restore(&access, "counter".into()).unwrap(),
+            counter: Restore::restore(access, "counter".into()).unwrap(),
         }
     }
 }

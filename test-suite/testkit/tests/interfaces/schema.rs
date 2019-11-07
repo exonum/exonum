@@ -39,7 +39,7 @@ pub struct WalletSchema<T: Access> {
 impl<T: Access> WalletSchema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            wallets: Restore::restore(&access, "wallets".into()).unwrap(),
+            wallets: Restore::restore(access, "wallets".into()).unwrap(),
         }
     }
 }

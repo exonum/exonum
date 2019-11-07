@@ -23,13 +23,13 @@ use crate::{
 /// let fork = db.fork();
 /// {
 ///     let lazy: Lazy<_, ListIndex<_, String>> =
-///         Lazy::restore(&&fork, "lazy_list".into()).unwrap();
+///         Lazy::restore(&fork, "lazy_list".into()).unwrap();
 ///     lazy.get().push("!".to_owned());
 ///     assert_eq!(lazy.get().len(), 1);
 /// }
 /// // List can then be accessed eagerly.
 /// assert_eq!(
-///     fork.as_ref().get_list::<_, String>("lazy_list").get(0),
+///     fork.get_list::<_, String>("lazy_list").get(0),
 ///     Some("!".to_owned())
 /// );
 /// ```
@@ -48,9 +48,9 @@ where
     T: Access,
     I: Restore<T>,
 {
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         Ok(Self {
-            access: access.to_owned(),
+            access,
             address: addr,
             _index: PhantomData,
         })
@@ -73,7 +73,7 @@ where
 
     /// Tries to restore the object from the database.
     pub fn try_get(&self) -> Result<I, AccessError> {
-        I::restore(&self.access, self.address.clone())
+        I::restore(self.access.clone(), self.address.clone())
     }
 }
 
@@ -90,7 +90,7 @@ mod tests {
         let fork = db.fork();
         {
             let lazy_index: Lazy<_, ListIndex<_, u64>> =
-                Lazy::restore(&&fork, "lazy".into()).unwrap();
+                Lazy::restore(&fork, "lazy".into()).unwrap();
             lazy_index.get().extend(vec![1, 2, 3]);
             assert_eq!(lazy_index.get().len(), 3);
             lazy_index.get().push(4);
@@ -99,7 +99,7 @@ mod tests {
 
         let snapshot = db.snapshot();
         let lazy_index: Lazy<_, ListIndex<_, u64>> =
-            Lazy::restore(&&snapshot, "lazy".into()).unwrap();
+            Lazy::restore(&snapshot, "lazy".into()).unwrap();
         assert_eq!(
             lazy_index.get().iter().collect::<Vec<_>>(),
             vec![1, 2, 3, 4]
@@ -107,7 +107,7 @@ mod tests {
 
         // Note that index type is not checked on `restore` / `ensure`, so the following is valid:
         let bogus: Lazy<_, MapIndex<_, u64, String>> =
-            Lazy::restore(&&snapshot, "lazy".into()).unwrap();
+            Lazy::restore(&snapshot, "lazy".into()).unwrap();
         // ...but this errors:
         assert_matches!(
             bogus.try_get().unwrap_err().kind,

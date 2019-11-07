@@ -105,7 +105,7 @@ pub mod schema {
         /// Creates a new schema instance.
         pub fn new(access: Prefixed<'a, T>) -> Self {
             Self {
-                wallets: Restore::restore(&access, "wallets".into()).unwrap(),
+                wallets: Restore::restore(access, "wallets".into()).unwrap(),
             }
         }
 

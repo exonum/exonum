@@ -405,9 +405,9 @@ pub enum Change {
 /// # use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// let index = fork.as_ref().get_list::<_, u8>("index");
+/// let index = fork.get_list::<_, u8>("index");
 /// // This code will panic at runtime.
-/// let index2 = fork.as_ref().get_list::<_, u8>("index");
+/// let index2 = fork.get_list::<_, u8>("index");
 /// ```
 ///
 /// To enable immutable / shared references to indexes, you may use [`readonly`] method:
@@ -416,7 +416,7 @@ pub enum Change {
 /// # use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// fork.as_ref().get_list::<_, u8>("index").extend(vec![1, 2, 3]);
+/// fork.get_list::<_, u8>("index").extend(vec![1, 2, 3]);
 ///
 /// let readonly = fork.readonly();
 /// let index = readonly.get_list::<_, u8>("index");
@@ -495,7 +495,7 @@ enum NextIterValue {
 /// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
 /// let fork = db.fork();
 /// {
-///     let mut list = fork.as_ref().get_proof_list("list");
+///     let mut list = fork.get_proof_list("list");
 ///     list.push(42_u64);
 /// }
 /// db.merge(fork.into_patch()).unwrap();
@@ -762,7 +762,7 @@ impl RawAccess for Rc<Fork> {
 /// # use exonum_merkledb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// fork.as_ref().get_list("list").push(1_u32);
+/// fork.get_list("list").push(1_u32);
 /// let readonly: ReadonlyFork<'_> = fork.readonly();
 /// let list = readonly.get_list::<_, u32>("list");
 /// assert_eq!(list.get(0), Some(1));
@@ -770,7 +770,7 @@ impl RawAccess for Rc<Fork> {
 /// // ^-- Does not result in an error!
 ///
 /// // Original fork is still accessible.
-/// let mut map = fork.as_ref().get_map("map");
+/// let mut map = fork.get_map("map");
 /// map.put(&1_u32, "foo".to_string());
 /// ```
 ///

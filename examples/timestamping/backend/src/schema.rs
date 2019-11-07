@@ -80,8 +80,8 @@ impl<T: Access> Schema<T> {
     /// Creates a new schema from the database view.
     pub fn new(access: T) -> Self {
         Self {
-            config: Restore::restore(&access, "config".into()).unwrap(),
-            timestamps: Restore::restore(&access, "timestamps".into()).unwrap(),
+            config: Restore::restore(access.clone(), "config".into()).unwrap(),
+            timestamps: Restore::restore(access, "timestamps".into()).unwrap(),
         }
     }
 

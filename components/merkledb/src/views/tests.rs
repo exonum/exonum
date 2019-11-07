@@ -456,8 +456,8 @@ fn multiple_indexes() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut list: ListIndex<_, u32> = fork.as_ref().get_list(IDX_NAME);
-        let mut map = fork.as_ref().get_map(("idx", &3));
+        let mut list: ListIndex<_, u32> = fork.get_list(IDX_NAME);
+        let mut map = fork.get_map(("idx", &3));
 
         for i in 0..10 {
             list.push(i);
@@ -469,14 +469,14 @@ fn multiple_indexes() {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let list: ListIndex<_, u32> = snapshot.as_ref().get_list(IDX_NAME);
-    let map: MapIndex<_, u32, String> = snapshot.as_ref().get_map(("idx", &3));
+    let list: ListIndex<_, u32> = snapshot.get_list(IDX_NAME);
+    let map: MapIndex<_, u32, String> = snapshot.get_map(("idx", &3));
     assert_eq!(list.len(), 10);
     assert!(map.values().all(|val| val == "??"));
 
     let fork = db.fork();
-    let list: ListIndex<_, u32> = fork.as_ref().get_list(IDX_NAME);
-    let mut map = fork.as_ref().get_map(("idx", &3));
+    let list: ListIndex<_, u32> = fork.get_list(IDX_NAME);
+    let mut map = fork.get_map(("idx", &3));
     for item in &list {
         map.put(&item, item.to_string());
     }
@@ -921,14 +921,14 @@ fn test_metadata_index_wrong_type() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut map = fork.as_ref().get_map("simple");
+        let mut map = fork.get_map("simple");
         map.put(&1, vec![1, 2, 3]);
     }
 
     db.merge(fork.into_patch()).unwrap();
     // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
-    let err = ListIndex::<_, Vec<u8>>::restore(&&snapshot, "simple".into()).unwrap_err();
+    let err = ListIndex::<_, Vec<u8>>::restore(&snapshot, "simple".into()).unwrap_err();
     assert_matches!(
         err,
         AccessError { ref addr, kind: AccessErrorKind::WrongIndexType { .. } }
@@ -964,7 +964,7 @@ fn multiple_patch() {
     db.merge(patch1).unwrap();
     db.merge(patch2).unwrap();
     let snapshot = db.snapshot();
-    let index: ListIndex<_, u64> = snapshot.as_ref().get_list("list_index");
+    let index: ListIndex<_, u64> = snapshot.get_list("list_index");
     assert_eq!(index.len() as usize, index.iter().count());
 }
 
@@ -1004,7 +1004,7 @@ fn valid_name_for_url() {
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let _: ListIndex<_, u8> = fork.as_ref().get_list("ind\u{435}x-name");
+    let _: ListIndex<_, u8> = fork.get_list("ind\u{435}x-name");
 }
 
 fn assert_valid_name_url(name: &str) {
@@ -1016,7 +1016,7 @@ fn check_valid_name(name: &str) -> bool {
     let db = TemporaryDB::new();
     let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let fork = db.fork();
-        let _: ListIndex<_, u8> = fork.as_ref().get_list(name.as_ref());
+        let _: ListIndex<_, u8> = fork.get_list(name.as_ref());
     }));
     catch_result.is_ok()
 }
@@ -1026,7 +1026,7 @@ fn fork_from_patch() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut index = fork.as_ref().get_list("index");
+        let mut index = fork.get_list("index");
         index.push(1);
         index.push(2);
         index.push(3);
@@ -1038,7 +1038,7 @@ fn fork_from_patch() {
     let patch = fork.into_patch();
     let fork: Fork = patch.into();
     {
-        let index = fork.as_ref().get_list("index");
+        let index = fork.get_list("index");
         assert_eq!(index.get(0), Some(1));
         assert_eq!(index.get(1), Some(5));
         assert_eq!(index.get(2), None);

@@ -134,7 +134,7 @@ mod tests {
     fn serialize_map_proof() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut table = fork.as_ref().get_proof_map("index");
+        let mut table = fork.get_proof_map("index");
 
         let proof = table.get_proof(0);
         assert_proof_roundtrip(&proof);
@@ -207,7 +207,7 @@ mod tests {
     fn serialize_list_proof() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut table = fork.as_ref().get_proof_list("index");
+        let mut table = fork.get_proof_list("index");
 
         let proof = table.get_proof(0);
         assert_list_proof_roundtrip(&proof);

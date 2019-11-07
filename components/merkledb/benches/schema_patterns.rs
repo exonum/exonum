@@ -20,9 +20,9 @@ use std::borrow::Cow;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt, RawAccessMut, Restore},
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, KeySetIndex, Lazy,
-    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    access::{Access, AccessExt, Prefixed, RawAccessMut, Restore},
+    impl_object_hash_for_binary_value, BinaryValue, Database, Group, KeySetIndex, Lazy, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 const SEED: [u8; 32] = [100; 32];
@@ -56,7 +56,9 @@ impl BinaryValue for Transaction {
 impl_object_hash_for_binary_value! { Transaction }
 
 trait ExecuteTransaction {
-    fn execute(fork: &Fork, transaction: &Transaction);
+    fn execute<T: Access>(fork: T, transaction: &Transaction)
+    where
+        T::Base: RawAccessMut;
 }
 
 struct EagerSchema<T: Access> {
@@ -75,12 +77,12 @@ struct EagerSchema<T: Access> {
 impl<T: Access> EagerSchema<T> {
     fn new(access: T) -> Self {
         Self {
-            transactions: Restore::restore(&access, "transactions".into()).unwrap(),
-            hot_index: Restore::restore(&access, "hot_index".into()).unwrap(),
-            hot_group: Restore::restore(&access, "hot_group".into()).unwrap(),
-            cold_index: Restore::restore(&access, "cold_index".into()).unwrap(),
-            cold_group: Restore::restore(&access, "cold_group".into()).unwrap(),
-            other_cold_index: Restore::restore(&access, "other_cold_index".into()).unwrap(),
+            transactions: Restore::restore(access.clone(), "transactions".into()).unwrap(),
+            hot_index: Restore::restore(access.clone(), "hot_index".into()).unwrap(),
+            hot_group: Restore::restore(access.clone(), "hot_group".into()).unwrap(),
+            cold_index: Restore::restore(access.clone(), "cold_index".into()).unwrap(),
+            cold_group: Restore::restore(access.clone(), "cold_group".into()).unwrap(),
+            other_cold_index: Restore::restore(access.clone(), "other_cold_index".into()).unwrap(),
         }
     }
 }
@@ -116,8 +118,13 @@ where
     }
 }
 
-impl ExecuteTransaction for EagerSchema<&'static Fork> {
-    fn execute(fork: &Fork, transaction: &Transaction) {
+enum EagerStyle {}
+
+impl ExecuteTransaction for EagerStyle {
+    fn execute<T: Access>(fork: T, transaction: &Transaction)
+    where
+        T::Base: RawAccessMut,
+    {
         let mut schema = EagerSchema::new(fork);
         schema.execute(transaction);
     }
@@ -136,12 +143,12 @@ struct LazySchema<T: Access> {
 impl<T: Access> LazySchema<T> {
     fn new(access: T) -> Self {
         Self {
-            transactions: Restore::restore(&access, "transactions".into()).unwrap(),
-            hot_index: Restore::restore(&access, "hot_index".into()).unwrap(),
-            hot_group: Restore::restore(&access, "hot_group".into()).unwrap(),
-            cold_index: Restore::restore(&access, "cold_index".into()).unwrap(),
-            cold_group: Restore::restore(&access, "cold_group".into()).unwrap(),
-            other_cold_index: Restore::restore(&access, "other_cold_index".into()).unwrap(),
+            transactions: Restore::restore(access.clone(), "transactions".into()).unwrap(),
+            hot_index: Restore::restore(access.clone(), "hot_index".into()).unwrap(),
+            hot_group: Restore::restore(access.clone(), "hot_group".into()).unwrap(),
+            cold_index: Restore::restore(access.clone(), "cold_index".into()).unwrap(),
+            cold_group: Restore::restore(access.clone(), "cold_group".into()).unwrap(),
+            other_cold_index: Restore::restore(access.clone(), "other_cold_index".into()).unwrap(),
         }
     }
 }
@@ -178,8 +185,13 @@ where
     }
 }
 
-impl ExecuteTransaction for LazySchema<&'static Fork> {
-    fn execute(fork: &Fork, transaction: &Transaction) {
+enum LazyStyle {}
+
+impl ExecuteTransaction for LazyStyle {
+    fn execute<T: Access>(fork: T, transaction: &Transaction)
+    where
+        T::Base: RawAccessMut,
+    {
         let mut schema = LazySchema::new(fork);
         schema.execute(transaction);
     }
@@ -193,27 +205,27 @@ impl<T: Access> WrapperSchema<T> {
     }
 
     fn transactions(&self) -> MapIndex<T::Base, Hash, Transaction> {
-        self.0.get_map("transactions")
+        self.0.clone().get_map("transactions")
     }
 
     fn hot_index(&self) -> ProofMapIndex<T::Base, u64, Hash> {
-        self.0.get_proof_map("hot_index")
+        self.0.clone().get_proof_map("hot_index")
     }
 
     fn hot_group(&self, group_id: u64) -> ProofListIndex<T::Base, u64> {
-        self.0.get_proof_list(("hot_group", &group_id))
+        self.0.clone().get_proof_list(("hot_group", &group_id))
     }
 
     fn cold_index(&self) -> ProofMapIndex<T::Base, u64, Hash> {
-        self.0.get_proof_map("cold_index")
+        self.0.clone().get_proof_map("cold_index")
     }
 
     fn cold_group(&self, group_id: u64) -> ProofListIndex<T::Base, u64> {
-        self.0.get_proof_list(("cold_group", &group_id))
+        self.0.clone().get_proof_list(("cold_group", &group_id))
     }
 
     fn other_cold_index(&self) -> KeySetIndex<T::Base, u64> {
-        self.0.get_key_set("other_cold_index")
+        self.0.clone().get_key_set("other_cold_index")
     }
 }
 
@@ -250,8 +262,13 @@ where
     }
 }
 
-impl ExecuteTransaction for WrapperSchema<()> {
-    fn execute(fork: &Fork, transaction: &Transaction) {
+enum WrapperStyle {}
+
+impl ExecuteTransaction for WrapperStyle {
+    fn execute<T: Access>(fork: T, transaction: &Transaction)
+    where
+        T::Base: RawAccessMut,
+    {
         let schema = WrapperSchema::new(fork);
         schema.execute(transaction);
     }
@@ -267,13 +284,22 @@ fn gen_random_transactions(count: usize) -> Vec<Transaction> {
         .collect()
 }
 
-fn bench<T: ExecuteTransaction>(bencher: &mut Bencher) {
+fn bench<T: ExecuteTransaction>(bencher: &mut Bencher, prefixed: bool) {
+    const PREFIX: &str = "moderately_long_prefix";
+
     let transactions = gen_random_transactions(TX_COUNT);
     bencher.iter_with_setup(TemporaryDB::new, |db| {
         let fork = db.fork();
-        for transaction in &transactions {
-            T::execute(black_box(&fork), transaction);
-            // ^-- prevent compiler from moving schema initialization from outside the loop.
+        if prefixed {
+            for transaction in &transactions {
+                let prefix = black_box(PREFIX.to_owned());
+                T::execute(black_box(Prefixed::new(prefix, &fork)), transaction);
+                // ^-- prevent compiler from moving schema initialization from outside the loop.
+            }
+        } else {
+            for transaction in &transactions {
+                T::execute(black_box(&fork), transaction);
+            }
         }
     })
 }
@@ -283,9 +309,18 @@ pub fn bench_schema_patterns(c: &mut Criterion) {
 
     c.bench(
         "schema_patterns",
-        Benchmark::new("eager", bench::<EagerSchema<&'static Fork>>)
-            .with_function("lazy", bench::<LazySchema<&'static Fork>>)
-            .with_function("wrapper", bench::<WrapperSchema<()>>)
+        Benchmark::new("eager", |b| bench::<EagerStyle>(b, false))
+            .with_function("lazy", |b| bench::<LazyStyle>(b, false))
+            .with_function("wrapper", |b| bench::<WrapperStyle>(b, false))
+            .throughput(Throughput::Elements(TX_COUNT as u64))
+            .sample_size(SAMPLE_SIZE),
+    );
+
+    c.bench(
+        "schema_patterns/prefixed",
+        Benchmark::new("eager", |b| bench::<EagerStyle>(b, true))
+            .with_function("lazy", |b| bench::<LazyStyle>(b, true))
+            .with_function("wrapper", |b| bench::<WrapperStyle>(b, true))
             .throughput(Throughput::Elements(TX_COUNT as u64))
             .sample_size(SAMPLE_SIZE),
     );

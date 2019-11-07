@@ -102,7 +102,7 @@ where
     T: Access,
     V: BinaryKey + ObjectHash,
 {
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         Ok(Self {
             index: Restore::restore(access, addr)?,
         })

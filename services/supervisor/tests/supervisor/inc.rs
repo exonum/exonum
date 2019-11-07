@@ -45,8 +45,8 @@ pub struct Schema<T: Access> {
 impl<T: Access> Schema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            count: Restore::restore(&access, "count".into()).unwrap(),
-            params: Restore::restore(&access, "params".into()).unwrap(),
+            count: Restore::restore(access.clone(), "count".into()).unwrap(),
+            params: Restore::restore(access, "params".into()).unwrap(),
         }
     }
 

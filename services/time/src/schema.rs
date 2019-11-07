@@ -36,8 +36,8 @@ impl<'a, T: Access> TimeSchema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
     pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            validators_times: Restore::restore(&access, "validators_times".into()).unwrap(),
-            time: Restore::restore(&access, "time".into()).unwrap(),
+            validators_times: Restore::restore(access.clone(), "validators_times".into()).unwrap(),
+            time: Restore::restore(access, "time".into()).unwrap(),
         }
     }
 

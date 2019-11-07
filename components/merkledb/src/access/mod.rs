@@ -41,7 +41,7 @@ pub trait Access: Clone {
 
     /// Gets or creates a generic `View` with the specified address.
     fn get_or_create_view(
-        &self,
+        self,
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError>;
@@ -51,11 +51,11 @@ impl<T: RawAccess> Access for T {
     type Base = Self;
 
     fn get_or_create_view(
-        &self,
+        self,
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        ViewWithMetadata::get_or_create(self.clone(), &addr, index_type).map_err(|e| AccessError {
+        ViewWithMetadata::get_or_create(self, &addr, index_type).map_err(|e| AccessError {
             addr,
             kind: AccessErrorKind::WrongIndexType {
                 expected: index_type,
@@ -76,7 +76,7 @@ impl<T: RawAccess> Access for T {
 /// let fork = db.fork();
 /// let prefixed = Prefixed::new("prefixed", &fork);
 /// prefixed.get_list("list").extend(vec![1_u32, 2, 3]);
-/// let same_list = fork.as_ref().get_list::<_, u32>("prefixed.list");
+/// let same_list = fork.get_list::<_, u32>("prefixed.list");
 /// assert_eq!(same_list.len(), 3);
 /// ```
 #[derive(Debug, Clone)]
@@ -102,7 +102,7 @@ impl<T: Access> Access for Prefixed<'_, T> {
     type Base = T::Base;
 
     fn get_or_create_view(
-        &self,
+        self,
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
@@ -155,7 +155,7 @@ pub trait Restore<T: Access>: Sized {
     /// # Return value
     ///
     /// An error should be returned if the object cannot be restored.
-    fn restore(access: &T, addr: IndexAddress) -> Result<Self, AccessError>;
+    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError>;
 }
 
 #[cfg(test)]
@@ -173,14 +173,14 @@ mod tests {
             list.extend(vec![1, 2, 3]);
         }
         {
-            let list = fork.as_ref().get_list::<_, i32>("test.foo");
+            let list = fork.get_list::<_, i32>("test.foo");
             assert_eq!(list.len(), 3);
             assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
         }
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let list = snapshot.as_ref().get_list::<_, i32>("test.foo");
+        let list = snapshot.get_list::<_, i32>("test.foo");
         assert_eq!(list.len(), 3);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
 

@@ -283,7 +283,7 @@ fn assert_service_execute(blockchain: &mut BlockchainMut) {
         blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
-    let index = snapshot.as_ref().get_list("service_good.val");
+    let index = snapshot.get_list("service_good.val");
     assert_eq!(index.len(), 1);
     assert_eq!(index.get(0), Some(1));
 }
@@ -321,7 +321,7 @@ fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> E
         .commit(patch, block_hash, vec![], &mut BTreeMap::new())
         .unwrap();
     let snapshot = blockchain.snapshot();
-    Schema::new(snapshot.as_ref())
+    Schema::new(&snapshot)
         .transaction_results()
         .get(&tx_hash)
         .unwrap()
@@ -385,7 +385,7 @@ fn handling_tx_panic_error() {
         Some(tx_failed.clone())
     );
 
-    let index = snapshot.as_ref().get_list(IDX_NAME);
+    let index = snapshot.get_list(IDX_NAME);
     assert_eq!(index.len(), 4);
     assert_eq!(index.get(0), Some(3));
     assert_eq!(index.get(1), Some(14));
@@ -530,7 +530,7 @@ fn test_dispatcher_deploy_good() {
 
     // Tests the register artifact action for the deployed artifact.
     let snapshot = blockchain.snapshot();
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .artifacts()
         .contains(&artifact_id.name));
     execute_transaction(
@@ -538,10 +538,10 @@ fn test_dispatcher_deploy_good() {
         TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(DispatcherSchema::new(snapshot.as_ref())
+    assert!(DispatcherSchema::new(&snapshot)
         .artifacts()
         .contains(&artifact_id.name));
-    assert_eq!(snapshot.as_ref().get_entry(IDX_NAME).get(), Some(1_u64));
+    assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
 #[test]
@@ -600,10 +600,10 @@ fn test_dispatcher_register_unavailable() {
         TestDeploy { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .artifacts()
         .contains(&artifact_id.name));
-    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
     // Tests that an unavailable artifact will not be registered.
     let error_string = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         execute_transaction(
@@ -627,7 +627,7 @@ fn test_dispatcher_start_service_good() {
         .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
     // Tests start service for the good service.
     let snapshot = blockchain.snapshot();
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-1".to_owned()));
     execute_transaction(
@@ -635,10 +635,10 @@ fn test_dispatcher_start_service_good() {
         TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(DispatcherSchema::new(snapshot.as_ref())
+    assert!(DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-1".to_owned()));
-    assert_eq!(snapshot.as_ref().get_entry(IDX_NAME).get(), Some(1_u64));
+    assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
 #[test]
@@ -649,7 +649,7 @@ fn test_dispatcher_start_service_rollback() {
 
     // Tests that a service with an unregistered artifact will not be started.
     let snapshot = blockchain.snapshot();
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-24".to_owned()));
     execute_transaction(
@@ -657,13 +657,13 @@ fn test_dispatcher_start_service_rollback() {
         TestAdd { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-24".to_owned()));
-    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 
     // Tests that a service with panic during the configure will not be started.
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-42".to_owned()));
     execute_transaction(
@@ -671,13 +671,13 @@ fn test_dispatcher_start_service_rollback() {
         TestAdd { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-42".to_owned()));
-    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 
     // Tests that a service with execution error during the configure will not be started.
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-18".to_owned()));
     execute_transaction(
@@ -685,8 +685,8 @@ fn test_dispatcher_start_service_rollback() {
         TestAdd { value: 18 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     let snapshot = blockchain.snapshot();
-    assert!(!DispatcherSchema::new(snapshot.as_ref())
+    assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-18".to_owned()));
-    assert!(!snapshot.as_ref().get_entry::<_, u64>(IDX_NAME).exists());
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 }
