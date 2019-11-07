@@ -358,6 +358,12 @@ where
     }
 }
 
+impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
+    fn from(view_with_metadata: ViewWithMetadata<T>) -> Self {
+        view_with_metadata.view
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

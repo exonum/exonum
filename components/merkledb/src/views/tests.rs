@@ -855,11 +855,11 @@ fn test_metadata_index_identifiers() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     // Creates the first index metadata.
-    let (view, _) =
+    let view: View<_> =
         ViewWithMetadata::get_or_create(&fork, &("simple", "family_id").into(), IndexType::Map)
             .map_err(drop)
             .unwrap()
-            .into_parts::<()>();
+            .into();
     assert_eq!(
         view.address,
         IndexAddress {
@@ -870,11 +870,11 @@ fn test_metadata_index_identifiers() {
     drop(view); // Prevent "multiple mutable borrows" error later
 
     // Creates the second index metadata.
-    let (view, _) =
+    let view: View<_> =
         ViewWithMetadata::get_or_create(&fork, &("second", "family_id").into(), IndexType::Map)
             .map_err(drop)
             .unwrap()
-            .into_parts::<()>();
+            .into();
     assert_eq!(
         view.address,
         IndexAddress {
@@ -884,11 +884,11 @@ fn test_metadata_index_identifiers() {
     );
 
     // Recreates the first index instance.
-    let (view, _) =
+    let view: View<_> =
         ViewWithMetadata::get_or_create(&fork, &("simple", "family_id").into(), IndexType::Map)
             .map_err(drop)
             .unwrap()
-            .into_parts::<()>();
+            .into();
     assert_eq!(
         view.address,
         IndexAddress {

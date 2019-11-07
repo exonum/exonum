@@ -70,7 +70,7 @@ where
     K: BinaryKey,
 {
     fn new(view: ViewWithMetadata<T>) -> Self {
-        let (base, _) = view.into_parts::<()>();
+        let base = view.into();
         Self {
             base,
             _k: PhantomData,

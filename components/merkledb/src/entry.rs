@@ -53,7 +53,7 @@ where
     V: BinaryValue,
 {
     fn new(view: ViewWithMetadata<T>) -> Self {
-        let (base, _) = view.into_parts::<()>();
+        let base = view.into();
         Self {
             base,
             _v: PhantomData,
