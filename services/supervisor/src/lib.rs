@@ -137,6 +137,11 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
 )]
 pub struct Supervisor;
 
+impl Supervisor {
+    /// Name of the supervisor service.
+    pub const NAME: &'static str = "supervisor";
+}
+
 impl Service for Supervisor {
     fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         Schema::new(descriptor.name, snapshot).state_hash()
@@ -235,7 +240,7 @@ impl From<Supervisor> for InstanceCollection {
     fn from(service: Supervisor) -> Self {
         InstanceCollection::new(service).with_instance(
             SUPERVISOR_INSTANCE_ID,
-            SUPERVISOR_INSTANCE_NAME,
+            Supervisor::NAME,
             Vec::default(),
         )
     }
