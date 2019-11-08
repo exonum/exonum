@@ -139,6 +139,8 @@ impl IntoIterator for Changes {
     }
 }
 
+/// Cell holding changes for a specific view. Mutable view borrows take changes out
+/// of the `Option` and unwraps `Rc` into inner data, while immutable borrows clone inner `Rc`.
 type ChangesCell = Option<Rc<ViewChanges>>;
 
 #[derive(Debug, Default)]
@@ -226,8 +228,10 @@ impl WorkingPatch {
         self.changes.borrow().is_empty()
     }
 
+    /// Takes a cell with changes for a specific `View` out of the patch.
+    /// The returned cell is guaranteed to contain an `Rc` with an exclusive ownership.
     fn take_view_changes(&self, address: &IndexAddress) -> ChangesCell {
-        let mut view_changes = {
+        let view_changes = {
             let mut changes = self.changes.borrow_mut();
             let view_changes = changes.get_mut(address).map(Option::take);
             view_changes.unwrap_or_else(|| {
@@ -238,19 +242,20 @@ impl WorkingPatch {
             })
         };
 
-        assert!(
-            view_changes.is_some(),
-            "multiple mutable borrows of an index at {:?}",
-            address
-        );
-        assert!(
-            Rc::get_mut(view_changes.as_mut().unwrap()).is_some(),
-            "Attempting to borrow {:?} mutably while it's borrowed immutably",
-            address
-        );
+        if let Some(ref view_changes) = view_changes {
+            assert!(
+                Rc::strong_count(view_changes) == 1,
+                "Attempting to borrow {:?} mutably while it's borrowed immutably",
+                address
+            );
+        } else {
+            panic!("Multiple mutable borrows of an index at {:?}", address);
+        }
         view_changes
     }
 
+    /// Clones changes for a specific `View` from the patch. Panics if the changes
+    /// are mutably borrowed.
     fn clone_view_changes(&self, address: &IndexAddress) -> Rc<ViewChanges> {
         let mut changes = self.changes.borrow_mut();
         changes
@@ -285,7 +290,7 @@ impl WorkingPatch {
     pub fn changes_mut(&self, address: &IndexAddress) -> ChangesMut<'_> {
         ChangesMut {
             changes: self.take_view_changes(address),
-            key: address.clone(),
+            key: address.to_owned(),
             parent: WorkingPatchRef::Borrowed(self),
         }
     }
@@ -299,11 +304,26 @@ impl WorkingPatch {
     // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
+            // Check that changes are not borrowed mutably (in this case, the corresponding
+            // `ChangesCell` is `None`).
+            //
+            // Both this and the following `panic`s cannot feasibly be triggered,
+            // since the only place where this method is called (`Fork::flush()`) borrows
+            // `Fork` mutably; this forces both mutable and immutable index borrows to be dropped,
+            // since they borrow `Fork` immutably.
             let changes = changes.unwrap_or_else(|| {
-                panic!("changes are still borrowed at address {:?}", address);
+                panic!(
+                    "changes are still mutably borrowed at address {:?}",
+                    address
+                );
             });
+            // Check that changes are not borrowed immutably (in this case, there is another
+            // `Rc<_>` pointer to changes somewhere).
             let changes = Rc::try_unwrap(changes).unwrap_or_else(|_| {
-                panic!("changes are still borrowed at address {:?}", address);
+                panic!(
+                    "changes are still immutably borrowed at address {:?}",
+                    address
+                );
             });
 
             let patch_changes = patch
