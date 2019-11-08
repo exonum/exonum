@@ -106,9 +106,7 @@
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 
 pub use self::{
-    dispatcher::{
-        Dispatcher, DispatcherState, Error as DispatcherError, Mailbox, Schema as DispatcherSchema,
-    },
+    dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{ErrorKind, ExecutionError},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, CallInfo, DeployStatus, InstanceId, InstanceQuery,
@@ -223,7 +221,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>>;
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
     /// Return true if the specified artifact is deployed in this runtime.
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
@@ -388,46 +386,6 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 impl<T: Runtime> From<T> for Box<dyn Runtime> {
     fn from(value: T) -> Self {
         Box::new(value)
-    }
-}
-
-/// Artifact Protobuf file sources.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ProtoSourceFile {
-    /// File name.
-    pub name: String,
-    /// File contents.
-    pub content: String,
-}
-
-impl From<&(&str, &str)> for ProtoSourceFile {
-    fn from(v: &(&str, &str)) -> Self {
-        Self {
-            name: v.0.to_owned(),
-            content: v.1.to_owned(),
-        }
-    }
-}
-
-/// Artifact Protobuf specification for the Exonum clients.
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct ArtifactProtobufSpec {
-    /// List of Protobuf files that make up the service interface.
-    ///
-    /// The common interface entry point is always in the `service.proto` file.
-    pub sources: Vec<ProtoSourceFile>,
-    /// List of service's proto include files.
-    pub includes: Vec<ProtoSourceFile>,
-}
-
-type ProtoSources<'a> = &'a [(&'a str, &'a str)];
-
-impl<'a> From<(ProtoSources<'a>, ProtoSources<'a>)> for ArtifactProtobufSpec {
-    fn from(sources_strings: (ProtoSources<'a>, ProtoSources<'a>)) -> Self {
-        let sources = sources_strings.0.iter().map(From::from).collect();
-        let includes = sources_strings.1.iter().map(From::from).collect();
-
-        Self { sources, includes }
     }
 }
 
