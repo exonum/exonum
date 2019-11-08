@@ -103,7 +103,6 @@ pub struct NetworkConfiguration {
     pub tcp_keep_alive: Option<u64>,
     pub tcp_connect_retry_timeout: Milliseconds,
     pub tcp_connect_max_retries: u64,
-    #[serde(default, skip)]
     pub http_backend_config: HttpBackendConfig,
 }
 
