@@ -21,7 +21,7 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, SUPERVISOR_INSTANCE_ID, SUPERVISOR_INSTANCE_NAME},
+    runtime::{rust::Transaction, SUPERVISOR_INSTANCE_ID},
 };
 
 use crate::{
@@ -39,7 +39,7 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
-    Schema::new(SUPERVISOR_INSTANCE_NAME, &snapshot)
+    Schema::new(Supervisor::NAME, &snapshot)
         .pending_proposal()
         .get()
         .map(|entry| entry.config_propose)
