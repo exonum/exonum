@@ -970,7 +970,7 @@ impl Node {
             keys: node_cfg.keys,
         };
 
-        let api_state = SharedNodeState::new(&blockchain, node_cfg.api.state_update_timeout as u64);
+        let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
 

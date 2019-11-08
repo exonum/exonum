@@ -15,6 +15,7 @@
 //! Built-in Rust runtime module.
 
 pub use self::{
+    api::ArtifactProtobufSpec,
     call_context::CallContext,
     error::Error,
     service::{
@@ -45,10 +46,11 @@ use super::{
     api::ServiceApiBuilder,
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, BlockchainData, CallInfo, ExecutionContext,
-    InstanceDescriptor, InstanceId, InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
+mod api;
 mod call_context;
 mod service;
 #[cfg(test)]
@@ -99,6 +101,8 @@ impl AsRef<dyn Service + 'static> for Instance {
 impl RustRuntime {
     /// Rust runtime identifier.
     pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
+    /// Rust runtime name.
+    pub const NAME: &'static str = "rust";
 
     /// Creates a new Rust runtime instance.
     pub fn new(api_notifier: mpsc::Sender<UpdateEndpoints>) -> Self {
@@ -169,14 +173,6 @@ impl RustRuntime {
         Ok(Instance::new(spec.id, spec.name.clone(), service))
     }
 
-    fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
-        if self.deployed_artifacts.contains(&id) {
-            self.available_artifacts.get(&id).map(AsRef::as_ref)
-        } else {
-            None
-        }
-    }
-
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
         self.started_services
             .values()
@@ -194,6 +190,7 @@ impl RustRuntime {
                     ApiBuilder::from(builder),
                 )
             })
+            .chain(self::api::endpoints(self))
             .collect()
     }
 
@@ -291,18 +288,12 @@ impl Runtime for RustRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             Box::new(future::err(Error::IncorrectArtifactId.into()))
         } else {
-            let res = self.deploy(&artifact).and_then(|()| {
-                let id = RustArtifactId::parse(&artifact)?;
-                self.deployed_artifact(&id)
-                    .map(ServiceFactory::artifact_protobuf_spec)
-                    .ok_or_else(|| Error::UnableToDeploy.into())
-            });
-            Box::new(res.into_future())
+            Box::new(self.deploy(&artifact).into_future())
         }
     }
 

@@ -264,10 +264,8 @@ impl TestKit {
             .expect("Unable to create blockchain instance");
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
-        let api_aggregator = ApiAggregator::new(
-            blockchain.immutable_view(),
-            SharedNodeState::new(&blockchain, 10_000),
-        );
+        let api_aggregator =
+            ApiAggregator::new(blockchain.immutable_view(), SharedNodeState::new(10_000));
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -308,7 +306,7 @@ impl TestKit {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
             let mut aggregator = ApiAggregator::new(
                 self.blockchain.immutable_view(),
-                SharedNodeState::new(&self.blockchain, 10_000),
+                SharedNodeState::new(10_000),
             );
             aggregator.extend(update.user_endpoints);
             self.api_aggregator = aggregator;

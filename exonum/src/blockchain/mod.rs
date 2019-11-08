@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, Dispatcher, DispatcherState},
+    runtime::{error::catch_panic, Dispatcher},
 };
 
 mod block;
@@ -211,11 +211,6 @@ impl BlockchainMut {
     /// Creates a read-only snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.inner.snapshot()
-    }
-
-    /// Returns the handle to the dispatcher state.
-    pub fn dispatcher_state(&self) -> DispatcherState {
-        self.dispatcher.state()
     }
 
     /// Creates a snapshot of the current storage state that can be later committed into the storage
