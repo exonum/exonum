@@ -78,15 +78,18 @@ pub enum NetworkRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub struct HttpBackendConfig {
-    pub restart_retry_attempts: u64,
-    pub restart_retry_intrval: u64,
+    /// The interval in milliseconds between attempts of restarting HTTP-server in case
+    /// the server failed to restart
+    pub restart_retry_attempts: u16,
+    /// The attempts counts of restarting HTTP-server in case the server failed to restart
+    pub restart_retry_interval: u64,
 }
 
 impl Default for HttpBackendConfig {
     fn default() -> Self {
         Self {
             restart_retry_attempts: 20,
-            restart_retry_intrval: 100,
+            restart_retry_interval: 500,
         }
     }
 }
@@ -100,7 +103,7 @@ pub struct NetworkConfiguration {
     pub tcp_keep_alive: Option<u64>,
     pub tcp_connect_retry_timeout: Milliseconds,
     pub tcp_connect_max_retries: u64,
-    #[serde(default)]
+    #[serde(default, skip)]
     pub http_backend_config: HttpBackendConfig,
 }
 

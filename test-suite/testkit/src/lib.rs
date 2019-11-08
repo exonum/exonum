@@ -691,7 +691,7 @@ impl TestKit {
             ],
             api_aggregator,
             service_retry_attempt: 20,
-            service_retry_interval: 100,
+            service_retry_interval: 500,
         };
         let system_runtime = system_runtime_config.start(endpoints_rx).unwrap();
 
