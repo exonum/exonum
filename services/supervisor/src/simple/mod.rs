@@ -75,7 +75,7 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
         find_validator_id(context.fork().as_ref(), author).ok_or(Error::UnknownAuthor)?;
 
         // Check that the `actual_from` height is in the future.
