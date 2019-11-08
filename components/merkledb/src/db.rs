@@ -86,7 +86,7 @@ impl Changes {
     }
 
     /// Returns an iterator over the changes.
-    pub fn iter(&self) -> BtmIter<Vec<u8>, Change> {
+    pub fn iter(&self) -> BtmIter<'_, Vec<u8>, Change> {
         self.data.iter()
     }
 
@@ -234,7 +234,7 @@ impl WorkingPatch {
     /// # Panics
     ///
     /// If an index with the `address` already exists in `Fork` that uses this patch.
-    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
+    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef<'_> {
         ChangesRef {
             changes: self.take_view_changes(address),
             key: address.clone(),
@@ -496,7 +496,7 @@ pub trait Snapshot: Send + Sync + 'static {
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter(&self, name: &str, from: &[u8]) -> Iter;
+    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -517,7 +517,7 @@ impl Patch {
     }
 
     /// Return an iterator over the underlying changes.
-    pub fn iter(&self) -> HmIter<String, Changes> {
+    pub fn iter(&self) -> HmIter<'_, String, Changes> {
         self.changes.iter()
     }
 }
@@ -547,7 +547,7 @@ impl Snapshot for Patch {
         self.snapshot.contains(name, key)
     }
 
-    fn iter(&self, name: &str, from: &[u8]) -> Iter {
+    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_> {
         let range = (Included(from), Unbounded);
         let changes = match self.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
@@ -680,7 +680,7 @@ impl Snapshot for Box<dyn Snapshot> {
         self.as_ref().contains(name, key)
     }
 
-    fn iter(&self, name: &str, from: &[u8]) -> Iter {
+    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_> {
         self.as_ref().iter(name, from)
     }
 }
@@ -803,19 +803,19 @@ where
 }
 
 impl fmt::Debug for dyn Database {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Database").finish()
     }
 }
 
 impl fmt::Debug for dyn Snapshot {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Snapshot").finish()
     }
 }
 
 impl fmt::Debug for dyn Iterator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Iterator").finish()
     }
 }

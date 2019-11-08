@@ -16,16 +16,18 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{Blockchain, ConsensusConfig, InstanceCollection, ValidatorKeys},
+    blockchain::{
+        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys,
+    },
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, DeployStatus,
-        DispatcherError, DispatcherSchema, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, Mailbox, Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::Transaction, AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError,
+        DispatcherSchema, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
+        Runtime, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -104,11 +106,8 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
-        let res = self
-            .deploy_artifact(artifact, spec)
-            .map(|()| ArtifactProtobufSpec::default());
-        Box::new(res.into_future())
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        Box::new(self.deploy_artifact(artifact, spec).into_future())
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -130,7 +129,7 @@ impl Runtime for SampleRuntime {
     /// Starts a new service instance and sets the counter value for this.
     fn start_adding_service(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         spec: &InstanceSpec,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -144,7 +143,7 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -201,7 +200,7 @@ impl Runtime for SampleRuntime {
 
     fn before_commit(
         &self,
-        _context: ExecutionContext,
+        _context: ExecutionContext<'_>,
         _id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -273,8 +272,8 @@ fn main() {
 
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
-    let blockchain = Blockchain::new(db, service_keypair.clone(), api_sender.clone())
-        .into_mut(genesis)
+    let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
+    let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
         .with_rust_runtime(
             channel.endpoints.0.clone(),
             vec![InstanceCollection::from(Supervisor)],

@@ -77,7 +77,7 @@ pub struct TxInc {
 
 #[exonum_service]
 pub trait IncInterface {
-    fn inc(&self, context: CallContext, arg: TxInc) -> Result<(), ExecutionError>;
+    fn inc(&self, context: CallContext<'_>, arg: TxInc) -> Result<(), ExecutionError>;
 }
 
 /// Very simple test service that has one tx and one endpoint.
@@ -92,7 +92,7 @@ pub trait IncInterface {
 pub struct IncService;
 
 impl IncInterface for IncService {
-    fn inc(&self, context: CallContext, _arg: TxInc) -> Result<(), ExecutionError> {
+    fn inc(&self, context: CallContext<'_>, _arg: TxInc) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(context.instance().name, context.fork());
         schema.inc();
         Ok(())
@@ -103,7 +103,7 @@ impl IncInterface for IncService {
 pub struct PublicApi;
 
 impl PublicApi {
-    fn counter(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
+    fn counter(state: &api::ServiceApiState<'_>, _query: ()) -> api::Result<u64> {
         let snapshot = state.snapshot();
         let schema = Schema::new(&state.instance.name, snapshot);
         schema
@@ -121,7 +121,7 @@ impl Service for IncService {
         PublicApi::wire(builder);
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 }
@@ -137,7 +137,7 @@ impl Configure for IncService {
 
     fn verify_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -153,7 +153,7 @@ impl Configure for IncService {
 
     fn apply_config(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let (_, fork) = context

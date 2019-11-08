@@ -42,10 +42,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` is moved
   to this crate. (#1496)
 
-#### exonum-proto-derive
+#### exonum-protobuf-convert
 
-- Introduced a new crate `exonum-proto-derive`. Derive macro `ProtobufConvert` is
-  moved to this crate. (#1501)
+- Introduced a new crate `exonum-protobuf-convert`. Derive macro `ProtobufConvert`
+  is moved to this crate. (#1501)
 
 - Derive macro `ProtobufConvert` now doesn't derive `BinaryValue` and `ObjectHash`
   traits. There are separate derive macros for them in `exonum-derive` crate. (#1501)
@@ -84,6 +84,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   (#1531)
 
 ### Internal improvements
+
+#### exonum
+
+- `system/v1/shutdown` endpoint has been modified and now accepts empty POST
+  requests. (#1526)
 
 #### exonum-merkledb
 

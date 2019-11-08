@@ -36,7 +36,7 @@ pub struct Issue {
 
 #[exonum_service(interface = "IssueReceiver")]
 pub trait IssueReceiver {
-    fn issue(&self, context: CallContext, arg: Issue) -> Result<(), ExecutionError>;
+    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError>;
 }
 
 pub struct IssueReceiverClient<'a>(CallContext<'a>);

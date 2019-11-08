@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, Dispatcher, DispatcherState},
+    runtime::{error::catch_panic, Dispatcher},
 };
 
 mod block;
@@ -145,6 +145,7 @@ impl Blockchain {
 
     /// Starts promotion into a mutable blockchain instance that can be used to process
     /// transactions and create blocks.
+    #[cfg(test)]
     pub fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
         BlockchainBuilder::new(self, genesis_config)
     }
@@ -159,6 +160,16 @@ impl Blockchain {
         let mut config = generate_testnet_config(1, 0).pop().unwrap();
         config.keys.service = KeyPair::from(self.service_keypair.clone());
         self.into_mut(config.consensus)
+    }
+
+    /// Returns reference to the transactions sender.
+    pub fn sender(&self) -> &ApiSender {
+        &self.api_sender
+    }
+
+    /// Returns reference to the service key pair of the current node.
+    pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
+        &self.service_keypair
     }
 }
 
@@ -192,14 +203,14 @@ impl BlockchainMut {
         &mut self.dispatcher
     }
 
+    /// Returns a copy of immutable blockchain view.
+    pub fn immutable_view(&self) -> Blockchain {
+        self.inner.clone()
+    }
+
     /// Creates a read-only snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.inner.snapshot()
-    }
-
-    /// Returns the handle to the dispatcher state.
-    pub fn dispatcher_state(&self) -> DispatcherState {
-        self.dispatcher.state()
     }
 
     /// Creates a snapshot of the current storage state that can be later committed into the storage

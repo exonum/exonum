@@ -30,9 +30,9 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         error::{ErrorKind, ExecutionError},
-        ArtifactProtobufSpec, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
-        DispatcherSchema, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Mailbox,
-        Runtime, StateHashAggregator,
+        CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError, DispatcherSchema,
+        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Mailbox, Runtime,
+        StateHashAggregator,
     },
 };
 
@@ -107,7 +107,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         self.events
             .lock()
             .unwrap()
@@ -263,7 +263,7 @@ impl TestService for TestServiceImpl {
 
         // Test calling one service from another.
         context
-            .interface::<TestServiceClient>(SERVICE_INSTANCE_ID)?
+            .interface::<TestServiceClient<'_>>(SERVICE_INSTANCE_ID)?
             .method_b(TxB { value: arg.value })
             .expect("Failed to dispatch call");
         Ok(())

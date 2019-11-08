@@ -15,6 +15,7 @@
 //! Built-in Rust runtime module.
 
 pub use self::{
+    api::ArtifactProtobufSpec,
     call_context::CallContext,
     error::Error,
     service::{
@@ -42,13 +43,14 @@ use crate::{
 };
 
 use super::{
-    api::{ApiContext, ServiceApiBuilder},
+    api::ServiceApiBuilder,
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
-    ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Runtime,
+    RuntimeIdentifier, StateHashAggregator,
 };
 
+mod api;
 mod call_context;
 mod service;
 #[cfg(test)]
@@ -56,7 +58,7 @@ mod tests;
 
 #[derive(Debug)]
 pub struct RustRuntime {
-    api_context: Option<ApiContext>,
+    blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
     available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
     deployed_artifacts: HashSet<RustArtifactId>,
@@ -77,7 +79,7 @@ impl Instance {
         Self { id, name, service }
     }
 
-    pub fn descriptor(&self) -> InstanceDescriptor {
+    pub fn descriptor(&self) -> InstanceDescriptor<'_> {
         InstanceDescriptor {
             id: self.id,
             name: &self.name,
@@ -101,11 +103,13 @@ impl AsRef<dyn Service + 'static> for Instance {
 impl RustRuntime {
     /// Rust runtime identifier.
     pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
+    /// Rust runtime name.
+    pub const NAME: &'static str = "rust";
 
     /// Creates a new Rust runtime instance.
     pub fn new(api_notifier: mpsc::Sender<UpdateEndpoints>) -> Self {
         Self {
-            api_context: None,
+            blockchain: None,
             api_notifier,
             available_artifacts: Default::default(),
             deployed_artifacts: Default::default(),
@@ -115,8 +119,8 @@ impl RustRuntime {
         }
     }
 
-    fn api_context(&self) -> &ApiContext {
-        self.api_context
+    fn blockchain(&self) -> &Blockchain {
+        self.blockchain
             .as_ref()
             .expect("Method called before Rust runtime is initialized")
     }
@@ -171,20 +175,12 @@ impl RustRuntime {
         Ok(Instance::new(spec.id, spec.name.clone(), service))
     }
 
-    fn deployed_artifact(&self, id: &RustArtifactId) -> Option<&dyn ServiceFactory> {
-        if self.deployed_artifacts.contains(&id) {
-            self.available_artifacts.get(&id).map(AsRef::as_ref)
-        } else {
-            None
-        }
-    }
-
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
         self.started_services
             .values()
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
-                    self.api_context().clone(),
+                    self.blockchain().clone(),
                     InstanceDescriptor {
                         id: instance.id,
                         name: instance.name.as_ref(),
@@ -196,6 +192,7 @@ impl RustRuntime {
                     ApiBuilder::from(builder),
                 )
             })
+            .chain(self::api::endpoints(self))
             .collect()
     }
 
@@ -256,7 +253,7 @@ impl From<RustArtifactId> for ArtifactId {
 }
 
 impl fmt::Display for RustArtifactId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.name, self.version)
     }
 }
@@ -281,7 +278,7 @@ impl FromStr for RustArtifactId {
 
 impl Runtime for RustRuntime {
     fn initialize(&mut self, blockchain: &Blockchain) {
-        self.api_context = Some(ApiContext::with_blockchain(blockchain));
+        self.blockchain = Some(blockchain.clone());
     }
 
     // We need to propagate changes in the services immediately after initialization.
@@ -293,18 +290,12 @@ impl Runtime for RustRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = ArtifactProtobufSpec, Error = ExecutionError>> {
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             Box::new(future::err(Error::IncorrectArtifactId.into()))
         } else {
-            let res = self.deploy(&artifact).and_then(|()| {
-                let id = RustArtifactId::parse(&artifact)?;
-                self.deployed_artifact(&id)
-                    .map(ServiceFactory::artifact_protobuf_spec)
-                    .ok_or_else(|| Error::UnableToDeploy.into())
-            });
-            Box::new(res.into_future())
+            Box::new(self.deploy(&artifact).into_future())
         }
     }
 
@@ -318,7 +309,7 @@ impl Runtime for RustRuntime {
 
     fn start_adding_service(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -342,7 +333,7 @@ impl Runtime for RustRuntime {
 
     fn execute(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         call_info: &CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -373,7 +364,7 @@ impl Runtime for RustRuntime {
 
     fn before_commit(
         &self,
-        context: ExecutionContext,
+        context: ExecutionContext<'_>,
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
         // We avoid a potential deadlock by cloning instances (i.e., copying them out
@@ -407,14 +398,14 @@ impl Runtime for RustRuntime {
             return;
         }
 
-        let api_context = self.api_context();
+        let blockchain = self.blockchain();
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,
                 service.descriptor(),
                 snapshot,
-                api_context.service_keypair(),
-                api_context.sender(),
+                blockchain.service_keypair(),
+                blockchain.sender(),
             ));
         }
     }

@@ -107,7 +107,7 @@ impl TxMarker {
 
 #[exonum_service]
 pub trait MarkerInterface {
-    fn mark(&self, context: CallContext, arg: TxMarker) -> Result<(), ExecutionError>;
+    fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceFactory)]
@@ -120,7 +120,7 @@ pub trait MarkerInterface {
 struct MarkerService;
 
 impl MarkerInterface for MarkerService {
-    fn mark(&self, context: CallContext, arg: TxMarker) -> Result<(), ExecutionError> {
+    fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError> {
         let author = context
             .caller()
             .as_transaction()
@@ -142,7 +142,7 @@ impl MarkerInterface for MarkerService {
 }
 
 impl Service for MarkerService {
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         MarkerSchema::new(descriptor.name, snapshot).state_hash()
     }
 }

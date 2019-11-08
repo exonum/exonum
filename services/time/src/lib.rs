@@ -77,13 +77,13 @@ impl Service for TimeService {
         api::PrivateApi.wire(builder);
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = TimeSchema::new(descriptor.name, snapshot);
         schema.state_hash()
     }
 
     /// Creates transaction after commit of the block.
-    fn after_commit(&self, context: AfterCommitContext) {
+    fn after_commit(&self, context: AfterCommitContext<'_>) {
         // The transaction must be created by the validator.
         if validator_id(context.snapshot, context.service_keypair.0).is_some() {
             context.broadcast_transaction(TxTime::new(self.time.current_time()));

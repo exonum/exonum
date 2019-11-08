@@ -36,7 +36,7 @@
 //!
 //TODO: revert the example
 
-pub use exonum_proto_derive::*;
+pub use exonum_protobuf_convert::*;
 
 use proto::common::BitVec;
 

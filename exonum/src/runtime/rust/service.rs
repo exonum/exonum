@@ -26,12 +26,11 @@ use crate::{
     runtime::{
         api::ServiceApiBuilder,
         dispatcher::{Action, Mailbox},
-        AnyTx, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionError, InstanceDescriptor,
-        InstanceId, MethodId,
+        AnyTx, ArtifactId, CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
-use super::{CallContext, RustArtifactId};
+use super::{ArtifactProtobufSpec, CallContext, RustArtifactId};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -43,7 +42,7 @@ pub trait ServiceDispatcher: Send {
         &self,
         interface_name: &str,
         method: MethodId,
-        ctx: CallContext,
+        ctx: CallContext<'_>,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 }
@@ -59,7 +58,11 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// The parameters passed to the method are not saved by the framework
     /// automatically, hence the user must do it manually, if needed.
-    fn initialize(&self, _context: CallContext, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        _context: CallContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -76,7 +79,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// [1]: ../struct.StateHashAggregator.html
     /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
     /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
-    fn state_hash(&self, instance: InstanceDescriptor, snapshot: &dyn Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, instance: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     /// Performs storage operations on behalf of the service before committing the block.
     ///
@@ -87,7 +90,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// The order of invoking the `before_commit` method is an implementation detail. Effectively,
     /// this means that services must not rely on a particular ordering of `Service::before_commit`
     /// invocations.
-    fn before_commit(&self, _context: CallContext) {}
+    fn before_commit(&self, _context: CallContext<'_>) {}
 
     /// Handles block commit event.
     ///
@@ -96,7 +99,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// if a specific condition has occurred.
     ///
     /// *Try not to perform long operations in this handler*.
-    fn after_commit(&self, _context: AfterCommitContext) {}
+    fn after_commit(&self, _context: AfterCommitContext<'_>) {}
 
     /// Attaches the request handlers of the service API to the Exonum API schema.
     ///
@@ -257,7 +260,7 @@ impl SupervisorExtensions<'_> {
 }
 
 impl Debug for AfterCommitContext<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
             .field("instance", &self.instance)
             .finish()
@@ -271,7 +274,7 @@ pub trait Interface {
     /// Invokes the specified method handler of the service instance.
     fn dispatch(
         &self,
-        context: CallContext,
+        context: CallContext<'_>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;

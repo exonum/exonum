@@ -35,7 +35,7 @@ pub struct ApiManager {
 }
 
 impl fmt::Debug for ApiManager {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ApiManager")
             .field("runtime_config", &self.runtime_config)
             .finish()

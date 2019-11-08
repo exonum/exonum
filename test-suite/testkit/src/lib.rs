@@ -154,7 +154,8 @@ use exonum::{
         ApiAccess,
     },
     blockchain::{
-        Blockchain, BlockchainMut, ConsensusConfig, InstanceConfig, Schema as CoreSchema,
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceConfig,
+        Schema as CoreSchema,
     },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
@@ -211,7 +212,7 @@ pub struct TestKit {
 }
 
 impl fmt::Debug for TestKit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("TestKit")
             .field("blockchain", &self.blockchain)
             .field("network", &self.network)
@@ -255,7 +256,7 @@ impl TestKit {
             api_sender.clone(),
         );
 
-        let mut builder = blockchain.into_mut(genesis);
+        let mut builder = BlockchainBuilder::new(blockchain, genesis);
         for runtime in runtimes {
             builder = builder.with_additional_runtime(runtime);
         }
@@ -266,10 +267,8 @@ impl TestKit {
             .expect("Unable to create blockchain instance");
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
-        let api_aggregator = ApiAggregator::new(
-            blockchain.as_ref(),
-            SharedNodeState::new(&blockchain, 10_000),
-        );
+        let api_aggregator =
+            ApiAggregator::new(blockchain.immutable_view(), SharedNodeState::new(10_000));
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -315,8 +314,8 @@ impl TestKit {
     fn update_aggregator(&mut self) -> ApiAggregator {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
             let mut aggregator = ApiAggregator::new(
-                self.blockchain.as_ref(),
-                SharedNodeState::new(&self.blockchain, 10_000),
+                self.blockchain.immutable_view(),
+                SharedNodeState::new(10_000),
             );
             aggregator.extend(update.user_endpoints);
             self.api_aggregator = aggregator;

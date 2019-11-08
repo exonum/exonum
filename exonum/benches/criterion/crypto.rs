@@ -23,20 +23,20 @@ use exonum::crypto::{gen_keypair, hash, sign, verify};
 use num::pow::pow;
 use std::convert::TryInto;
 
-fn bench_sign(b: &mut Bencher, &count: &usize) {
+fn bench_sign(b: &mut Bencher<'_>, &count: &usize) {
     let (_, secret_key) = gen_keypair();
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
     b.iter(|| sign(&data, &secret_key))
 }
 
-fn bench_verify(b: &mut Bencher, &count: &usize) {
+fn bench_verify(b: &mut Bencher<'_>, &count: &usize) {
     let (public_key, secret_key) = gen_keypair();
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
     let signature = sign(&data, &secret_key);
     b.iter(|| verify(&signature, &data, &public_key))
 }
 
-fn bench_hash(b: &mut Bencher, &count: &usize) {
+fn bench_hash(b: &mut Bencher<'_>, &count: &usize) {
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
     b.iter(|| hash(&data))
 }

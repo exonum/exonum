@@ -23,7 +23,6 @@ use futures::{
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, panic,
-    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -35,8 +34,8 @@ use crate::{
 };
 
 use super::{
-    error::ExecutionError, ArtifactId, ArtifactProtobufSpec, ArtifactSpec, Caller,
-    ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    error::ExecutionError, ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId,
+    InstanceSpec, Runtime,
 };
 use crate::runtime::{InstanceDescriptor, InstanceQuery};
 
@@ -64,7 +63,6 @@ struct ServiceInfo {
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     service_infos: BTreeMap<InstanceId, ServiceInfo>,
-    shared_state: DispatcherState,
 }
 
 impl Dispatcher {
@@ -76,7 +74,6 @@ impl Dispatcher {
         let mut this = Self {
             runtimes: runtimes.into_iter().collect(),
             service_infos: BTreeMap::new(),
-            shared_state: DispatcherState::default(),
         };
         for runtime in this.runtimes.values_mut() {
             runtime.initialize(blockchain);
@@ -177,19 +174,7 @@ impl Dispatcher {
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            let future_state = self.shared_state.clone();
-            let task =
-                runtime
-                    .deploy_artifact(artifact.clone(), payload)
-                    .and_then(move |sources| {
-                        future_state
-                            .artifact_sources
-                            .write()
-                            .unwrap()
-                            .insert(artifact, sources);
-                        Ok(())
-                    });
-            Either::A(task)
+            Either::A(runtime.deploy_artifact(artifact.clone(), payload))
         } else {
             Either::B(future::err(Error::IncorrectRuntime.into()))
         }
@@ -323,11 +308,6 @@ impl Dispatcher {
         self.notify_runtimes_about_commit(fork.as_ref());
     }
 
-    /// Returns the handle tracking the state of this dispatcher.
-    pub(crate) fn state(&self) -> DispatcherState {
-        self.shared_state.clone()
-    }
-
     /// Return true if the artifact with the given identifier is deployed.
     pub(crate) fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         if let Some(runtime) = self.runtimes.get(&id.runtime_id) {
@@ -431,7 +411,7 @@ pub enum Action {
 }
 
 impl fmt::Debug for Action {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Action::StartDeploy { artifact, spec, .. } => formatter
                 .debug_struct("StartDeploy")
@@ -459,20 +439,5 @@ impl Action {
                     });
             }
         }
-    }
-}
-
-type ArtifactSources = HashMap<ArtifactId, ArtifactProtobufSpec>;
-
-/// Cloneable dispatcher state.
-#[derive(Debug, Clone, Default)]
-pub struct DispatcherState {
-    artifact_sources: Arc<RwLock<ArtifactSources>>,
-}
-
-impl DispatcherState {
-    /// Returns the source files of the artifact with the specified identifier.
-    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.artifact_sources.read().unwrap().get(id).cloned()
     }
 }

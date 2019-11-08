@@ -25,12 +25,11 @@ use std::{
 
 use crate::{
     api::websocket,
-    blockchain::{BlockchainMut, ValidatorKeys},
+    blockchain::ValidatorKeys,
     crypto::Hash,
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
-    runtime::{ArtifactId, ArtifactProtobufSpec, DispatcherState},
 };
 
 pub mod private;
@@ -51,7 +50,7 @@ pub struct ApiNodeState {
 }
 
 impl fmt::Debug for ApiNodeState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ApiNodeState")
             .field("incoming_connections", &self.incoming_connections)
             .field("outgoing_connections", &self.outgoing_connections)
@@ -81,17 +80,15 @@ impl ApiNodeState {
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     node: Arc<RwLock<ApiNodeState>>,
-    dispatcher: DispatcherState,
     /// Timeout to update API state.
     pub state_update_timeout: Milliseconds,
 }
 
 impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
-    pub fn new(blockchain: &BlockchainMut, state_update_timeout: Milliseconds) -> Self {
+    pub fn new(state_update_timeout: Milliseconds) -> Self {
         Self {
             node: Arc::new(RwLock::new(ApiNodeState::new())),
-            dispatcher: blockchain.dispatcher_state(),
             state_update_timeout,
         }
     }
@@ -161,11 +158,6 @@ impl SharedNodeState {
     pub fn is_enabled(&self) -> bool {
         let state = self.node.read().expect("Expected read lock.");
         state.is_enabled
-    }
-
-    /// Returns the source files of the artifact with the specified identifier.
-    pub fn artifact_sources(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.dispatcher.artifact_sources(id)
     }
 
     /// Updates internal state, from `State` of a blockchain node.
