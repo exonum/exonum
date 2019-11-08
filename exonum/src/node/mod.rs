@@ -1007,6 +1007,8 @@ impl Node {
                     .collect::<Vec<_>>()
             },
             api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
+            service_retry_interval: node_cfg.network.http_backend_config.restart_retry_intrval,
+            service_retry_attempt: node_cfg.network.http_backend_config.restart_retry_attempts,
         };
 
         let handler = NodeHandler::new(

@@ -43,10 +43,6 @@ impl fmt::Debug for ApiManager {
 }
 
 impl ApiManager {
-    // TODO: extract into API configuration [ECR-3748]
-    const RETRY_INTERVAL: Duration = Duration::from_millis(500);
-    const RETRY_ATTEMPTS: usize = 10;
-
     pub fn new(
         runtime_config: SystemRuntimeConfig,
         endpoints_rx: mpsc::Receiver<UpdateEndpoints>,
@@ -136,12 +132,12 @@ impl Handler<StartServer> for ApiManager {
             Ok(addr) => addr,
             Err(e) => {
                 warn!("Error handling service start {:?}: {}", msg.config, e);
-                if msg.attempt == Self::RETRY_ATTEMPTS {
+                if msg.attempt == self.runtime_config.service_retry_attempt as usize {
                     error!("Cannot spawn server with config {:?}", msg.config);
                     ctx.terminate();
                 } else {
                     msg.attempt += 1;
-                    ctx.notify_later(msg, Self::RETRY_INTERVAL);
+                    ctx.notify_later(msg, Duration::from_millis(self.runtime_config.service_retry_interval));
                 }
                 return;
             }
