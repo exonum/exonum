@@ -224,8 +224,9 @@ pub mod contracts {
     }
 
     /// Cryptocurrency service implementation.
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(proto_sources = "crate::proto", implements("CryptocurrencyInterface"))]
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("CryptocurrencyInterface"))]
+    #[service_factory(proto_sources = "crate::proto")]
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {

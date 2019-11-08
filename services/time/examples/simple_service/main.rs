@@ -110,13 +110,13 @@ pub trait MarkerInterface {
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "marker",
     artifact_version = "0.1.0",
-    proto_sources = "proto",
-    implements("MarkerInterface")
+    proto_sources = "proto"
 )]
+#[service_dispatcher(implements("MarkerInterface"))]
 struct MarkerService;
 
 impl MarkerInterface for MarkerService {

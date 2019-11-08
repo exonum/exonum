@@ -1173,13 +1173,13 @@ mod tests {
         fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_dispatcher(crate = "crate", implements("TestInterface"))]
+    #[service_factory(
         crate = "crate",
         artifact_name = "test-service",
         artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema",
-        implements("TestInterface")
+        proto_sources = "crate::proto::schema"
     )]
     struct TestService;
 

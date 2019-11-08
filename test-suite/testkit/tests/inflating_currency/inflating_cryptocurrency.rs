@@ -23,7 +23,8 @@ use exonum::{
     },
 };
 use exonum_derive::{
-    exonum_interface, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory,
+    exonum_interface, BinaryValue, IntoExecutionError, ObjectHash, ServiceDispatcher,
+    ServiceFactory,
 };
 use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
 use exonum_proto::ProtobufConvert;
@@ -204,13 +205,13 @@ impl CryptocurrencyApi {
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 /// Define the service.
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "cryptocurrency",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto",
-    implements("CurrencyInterface")
+    proto_sources = "crate::proto"
 )]
+#[service_dispatcher(implements("CurrencyInterface"))]
 pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.

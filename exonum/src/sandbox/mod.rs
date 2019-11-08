@@ -1281,13 +1281,13 @@ mod tests {
         ) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_dispatcher(crate = "crate", implements("AfterCommitInterface"))]
+    #[service_factory(
         crate = "crate",
         artifact_name = "after_commit",
         artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema",
-        implements("AfterCommitInterface")
+        proto_sources = "crate::proto::schema"
     )]
     pub struct AfterCommitService;
 

@@ -23,7 +23,7 @@ use exonum::{
         Caller, DispatcherError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceFactory};
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
 use exonum_proto::ProtobufConvert;
 
@@ -82,12 +82,12 @@ pub trait IncInterface {
 
 /// Very simple test service that has one tx and one endpoint.
 /// Basically, it just counts how many time the tx was received.
-#[derive(Clone, Default, Debug, ServiceFactory)]
-#[exonum(
+#[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(implements("IncInterface", "Configure<Params = String>"))]
+#[service_factory(
     artifact_name = "inc",
     artifact_version = "1.0.0",
-    proto_sources = "proto",
-    implements("IncInterface", "Configure<Params = String>")
+    proto_sources = "proto"
 )]
 pub struct IncService;
 

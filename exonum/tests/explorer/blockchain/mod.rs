@@ -80,13 +80,13 @@ pub trait ExplorerTransactions {
     fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "my-service",
     artifact_version = "1.0.1",
-    proto_sources = "proto",
-    implements("ExplorerTransactions")
+    proto_sources = "proto"
 )]
+#[service_dispatcher(implements("ExplorerTransactions"))]
 struct MyService;
 
 impl ExplorerTransactions for MyService {

@@ -29,7 +29,8 @@ use exonum::{
     },
 };
 use exonum_derive::{
-    exonum_interface, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory,
+    exonum_interface, BinaryValue, IntoExecutionError, ObjectHash, ServiceDispatcher,
+    ServiceFactory,
 };
 use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
 use exonum_proto::ProtobufConvert;
@@ -220,13 +221,13 @@ impl CounterApi {
 
 // // // // Service // // // //
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "counter-service",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto",
-    implements("CounterServiceInterface")
+    proto_sources = "crate::proto"
 )]
+#[service_dispatcher(implements("CounterServiceInterface"))]
 pub struct CounterService;
 
 impl Service for CounterService {

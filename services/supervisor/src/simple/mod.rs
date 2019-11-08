@@ -25,7 +25,7 @@ use exonum::{
         DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::{exonum_interface, IntoExecutionError, ServiceFactory};
+use exonum_derive::{exonum_interface, IntoExecutionError, ServiceDispatcher, ServiceFactory};
 
 use crate::{update_configs, ConfigChange, ConfigPropose, ConfigureCall};
 
@@ -34,12 +34,9 @@ mod schema;
 pub use self::schema::Schema;
 
 /// Simple supervisor for testing purposes. **This supervisor is not fit for real-world use cases.**
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    proto_sources = "crate::proto",
-    artifact_name = "simple-supervisor",
-    implements("SimpleSupervisorInterface")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("SimpleSupervisorInterface"))]
+#[service_factory(proto_sources = "crate::proto", artifact_name = "simple-supervisor")]
 pub struct SimpleSupervisor;
 
 #[derive(Debug, Copy, Clone, IntoExecutionError)]

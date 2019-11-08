@@ -675,7 +675,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     ```
 
     where `MyQueryType` type implements `Deserialize` trait and `MyResponse`
-    implements `Serialize` trait.
+)]#[service_dispatcher( implements `Serialize` trait.
   - Replace old methods `public_api_handler` and `private_api_handler` of
     `Service` trait by a single `wire_api` method which takes
     `ServiceApiBuilder`. You can use this builder as a factory for your service

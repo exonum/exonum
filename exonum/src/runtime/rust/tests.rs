@@ -228,13 +228,13 @@ trait TestService {
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(crate = "crate", implements("TestService"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "test_service",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements("TestService")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct TestServiceImpl;
 
@@ -586,13 +586,13 @@ fn conflicting_service_instances() {
         .unwrap_err();
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements())]
+#[service_factory(
     crate = "crate",
     artifact_name = "dependent_service",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements()
+    proto_sources = "crate::proto::schema"
 )]
 pub struct DependentServiceImpl;
 

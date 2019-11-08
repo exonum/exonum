@@ -79,12 +79,12 @@ trait TestDispatcherInterface {
     fn test_add(&self, context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("TestDispatcherInterface"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "test_dispatcher",
-    proto_sources = "crate::proto::schema",
-    implements("TestDispatcherInterface")
+    proto_sources = "crate::proto::schema"
 )]
 struct TestDispatcherService;
 
@@ -167,13 +167,13 @@ impl TestDispatcherInterface for TestDispatcherService {
 #[exonum_interface(crate = "crate")]
 trait ServiceGood {}
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServiceGood"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "good_service",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto::schema",
-    implements("ServiceGood")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct ServiceGoodImpl;
 
@@ -193,13 +193,13 @@ impl Service for ServiceGoodImpl {
 #[exonum_interface(crate = "crate")]
 trait ServicePanic {}
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServicePanic"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "panic_service",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto::schema",
-    implements("ServicePanic")
+    proto_sources = "crate::proto::schema"
 )]
 struct ServicePanicImpl;
 
@@ -218,13 +218,13 @@ impl Service for ServicePanicImpl {
 #[exonum_interface(crate = "crate")]
 trait ServicePanicStorageError {}
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServicePanicStorageError"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "storage_error_service",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto::schema",
-    implements("ServicePanicStorageError")
+    proto_sources = "crate::proto::schema"
 )]
 struct ServicePanicStorageErrorImpl;
 
@@ -257,13 +257,13 @@ trait TxResultCheckInterface {
     fn tx_result(&self, context: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("TxResultCheckInterface"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "tx_result_check",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto::schema",
-    implements("TxResultCheckInterface")
+    proto_sources = "crate::proto::schema"
 )]
 struct TxResultCheckService;
 

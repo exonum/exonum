@@ -34,13 +34,13 @@ pub trait ConfigUpdaterInterface {
     fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ConfigUpdaterInterface"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "config_updater",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements("ConfigUpdaterInterface")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct ConfigUpdaterService;
 
