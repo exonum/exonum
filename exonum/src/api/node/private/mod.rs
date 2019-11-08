@@ -17,16 +17,14 @@
 //! Private API includes requests that are available only to the blockchain
 //! administrators, e.g. view the list of services on the current node.
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
-    api::{ApiScope, Error as ApiError},
+    api::{node::SharedNodeState, ApiBackend, ApiScope, Error as ApiError},
     crypto::PublicKey,
     node::{ApiSender, ConnectInfo, ExternalMessage},
     runtime::InstanceId,
 };
-
-use super::SharedNodeState;
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -191,12 +189,37 @@ impl SystemApi {
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        // These backend-dependent uses are needed to provide realization of the support of empty
+        // request which is not easy in the generic approach, so it will be harder to misuse
+        // those features (and as a result get a completely backend-dependent code).
+        use crate::api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
+        use actix_web::{HttpRequest, HttpResponse};
+        use futures::IntoFuture;
+
         let self_ = self.clone();
-        api_scope.endpoint_mut(name, move |_query: ()| -> Result<(), ApiError> {
+
+        let handler = move || -> Result<HttpResponse, ApiError> {
             self.sender
                 .send_external_message(ExternalMessage::Shutdown)
-                .map_err(ApiError::from)
-        });
+                .map_err(ApiError::from)?;
+
+            let ok_response = HttpResponse::Ok().json(());
+            Ok(ok_response)
+        };
+
+        let index = move |_request: HttpRequest| -> FutureResponse {
+            let future = handler().map_err(From::from).into_future();
+            Box::new(future)
+        };
+
+        let handler = RequestHandler {
+            name: name.to_owned(),
+            method: actix_web::http::Method::POST,
+            inner: Arc::from(index) as Arc<RawHandler>,
+        };
+
+        api_scope.web_backend().raw_handler(handler);
+
         self_
     }
 }
