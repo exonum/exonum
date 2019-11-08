@@ -23,15 +23,15 @@ use rand::{
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{self, json};
 
-use exonum_crypto::{gen_keypair, hash, Hash, HashStream};
+use exonum_crypto::{hash, Hash, HashStream};
 
 use super::{
     key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
     node::BranchNode,
     MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
-use crate::proof_map_index::key::Hashed;
-use crate::proof_map_index::{HashedProofMap, RawProofMap};
+use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
+use crate::proof_map_index::HashedProofMap;
 use crate::{BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB};
 
 const IDX_NAME: &str = "idx_name";
@@ -85,11 +85,46 @@ fn generate_random_data_keys<R: Rng>(
     (0..len).map(kv_generator).collect::<Vec<_>>()
 }
 
-#[test]
-fn test_map_methods() {
+macro_rules! make_tests {
+    ($name:ident { $( ($field:ident, $upper:ident)),* }) => {
+        paste::item! {
+                $(
+                    #[test]
+                    fn [<$name _ $field>]()  {
+                        $name::<$upper>();
+                    }
+                )*
+        }
+    }
+}
+
+make_tests! { test_map_methods { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_insert_trivial { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_insert_same_key { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_insert_simple { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_insert_reverse { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_remove_trivial { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_remove_simple { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_remove_reverse { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_clear { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_fuzz_insert { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_build_proof_in_empty_tree { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_build_multiproof_in_empty_tree { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_build_proof_in_single_node_tree { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_build_multiproof_in_single_node_tree { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_build_proof_in_complex_tree { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_build_multiproof_simple { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_fuzz_delete { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_fuzz_insert_after_delete { (raw, Raw), (hashed, Hashed) } }
+make_tests! { test_iter { (raw, Raw), (hashed, Hashed) } }
+
+fn test_map_methods<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let fork = db.fork();
-    let mut index = ProofMapIndex::<_, _, _, Hashed>::new(IDX_NAME, &fork);
+    let mut index = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &fork);
 
     assert_eq!(index.get(&[1; 32]), None);
     assert!(!index.contains(&[1; 32]));
@@ -114,21 +149,23 @@ fn test_map_methods() {
     index.clear();
 
     assert!(!index.contains(&[2; 32]));
-    assert!(!index.contains(&[3; 32]));
+    assert!(!index.contains(&[3; 32]))
 }
 
-#[test]
-fn test_insert_trivial() {
+fn test_insert_trivial<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
     let storage2 = db2.fork();
 
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![1]);
     index1.put(&[254; 32], vec![2]);
 
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[254; 32], vec![2]);
     index2.put(&[255; 32], vec![1]);
 
@@ -141,11 +178,13 @@ fn test_insert_trivial() {
     assert_eq!(index1.object_hash(), index2.object_hash());
 }
 
-#[test]
-fn test_insert_same_key() {
+fn test_insert_same_key<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = HashedProofMap::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
     assert_eq!(table.object_hash(), HashTag::empty_map_hash());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
     let hash = HashStream::new()
@@ -160,20 +199,22 @@ fn test_insert_same_key() {
     assert_eq!(table.object_hash(), HashTag::hash_map_node(hash));
 }
 
-#[test]
-fn test_insert_simple() {
+fn test_insert_simple<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
     let storage2 = db2.fork();
 
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![3]);
     index1.put(&[254; 32], vec![2]);
     index1.put(&[250; 32], vec![1]);
     index1.put(&[254; 32], vec![5]);
 
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[250; 32], vec![1]);
     index2.put(&[254; 32], vec![2]);
     index2.put(&[255; 32], vec![3]);
@@ -183,12 +224,14 @@ fn test_insert_simple() {
     assert_eq!(index1.object_hash(), index2.object_hash());
 }
 
-#[test]
-fn test_insert_reverse() {
+fn test_insert_reverse<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[42; 32], vec![1]);
     index1.put(&[64; 32], vec![2]);
     index1.put(&[240; 32], vec![3]);
@@ -197,7 +240,7 @@ fn test_insert_reverse() {
     index1.put(&[255; 32], vec![6]);
 
     let storage2 = db2.fork();
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[255; 32], vec![6]);
     index2.put(&[250; 32], vec![5]);
     index2.put(&[245; 32], vec![4]);
@@ -209,17 +252,19 @@ fn test_insert_reverse() {
     assert_eq!(index2.object_hash(), index1.object_hash());
 }
 
-#[test]
-fn test_remove_trivial() {
+fn test_remove_trivial<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![6]);
     index1.remove(&[255; 32]);
 
     let storage2 = db2.fork();
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[255; 32], vec![6]);
     index2.remove(&[255; 32]);
 
@@ -227,12 +272,14 @@ fn test_remove_trivial() {
     assert_eq!(index2.object_hash(), HashTag::empty_map_hash());
 }
 
-#[test]
-fn test_remove_simple() {
+fn test_remove_simple<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![1]);
     index1.put(&[250; 32], vec![2]);
     index1.put(&[245; 32], vec![3]);
@@ -241,7 +288,7 @@ fn test_remove_simple() {
     index1.remove(&[245; 32]);
 
     let storage2 = db2.fork();
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[250; 32], vec![2]);
     index2.put(&[255; 32], vec![1]);
     index2.put(&[245; 32], vec![3]);
@@ -259,12 +306,14 @@ fn test_remove_simple() {
     assert_eq!(index1.object_hash(), index2.object_hash());
 }
 
-#[test]
-fn test_remove_reverse() {
+fn test_remove_reverse<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[42; 32], vec![1]);
     index1.put(&[64; 32], vec![2]);
     index1.put(&[240; 32], vec![3]);
@@ -280,7 +329,7 @@ fn test_remove_reverse() {
     index1.remove(&[42; 32]);
 
     let storage2 = db2.fork();
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[255; 32], vec![6]);
     index2.put(&[250; 32], vec![5]);
     index2.put(&[245; 32], vec![4]);
@@ -298,12 +347,14 @@ fn test_remove_reverse() {
     assert_eq!(index2.object_hash(), index1.object_hash());
 }
 
-#[test]
-fn test_clear() {
+fn test_clear<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let fork = db.fork();
 
-    let mut index = HashedProofMap::new(IDX_NAME, &fork);
+    let mut index = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &fork);
     index.put(&[1; 32], 1);
     let root_hash = index.merkle_root();
 
@@ -332,21 +383,23 @@ fn test_merkle_root_leaf() {
     assert_eq!(HashTag::hash_map_node(merkle_root), index.object_hash());
 }
 
-#[test]
-fn test_fuzz_insert() {
+fn test_fuzz_insert<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
     let storage1 = db1.fork();
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
 
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
 
     let storage2 = db2.fork();
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, item.1.clone());
@@ -381,10 +434,14 @@ fn test_fuzz_insert() {
     assert_eq!(index2.object_hash(), index1.object_hash());
 }
 
-fn check_map_proof<K, V>(proof: &MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<&Fork, K, V>)
-where
+fn check_map_proof<K, V, S>(
+    proof: &MapProof<K, V>,
+    key: Option<K>,
+    table: &ProofMapIndex<&Fork, K, V, S>,
+) where
     K: BinaryKey + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
+    S: KeyTransform<K>,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
     let deserialized_proof: MapProof<K, V> = serde_json::from_value(serialized_proof).unwrap();
@@ -415,13 +472,14 @@ where
     assert_eq!(deserialized_proof.index_hash(), proof.index_hash());
 }
 
-fn check_map_multiproof<K, V>(
+fn check_map_multiproof<K, V, S>(
     proof: &MapProof<K, V>,
     keys: Vec<K>,
-    table: &ProofMapIndex<&Fork, K, V>,
+    table: &ProofMapIndex<&Fork, K, V, S>,
 ) where
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + ObjectHash + PartialEq + Debug,
+    S: KeyTransform<K>,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -478,7 +536,7 @@ where
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = HashedProofMap::new(IDX_NAME, &storage);
     for &(ref key, ref value) in data {
         table.put(key, value.clone());
     }
@@ -512,7 +570,7 @@ where
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize,
 {
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = HashedProofMap::new(IDX_NAME, &storage);
     for &(ref key, ref value) in data {
         table.put(key, value.clone());
     }
@@ -613,11 +671,13 @@ fn test_invalid_map_proofs() {
     }
 }
 
-#[test]
-fn test_build_proof_in_empty_tree() {
+fn test_build_proof_in_empty_tree<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
 
     // Just to notify the compiler of the types used; same key is added and then removed from tree.
     table.put(&[230; 32], vec![1]);
@@ -628,11 +688,13 @@ fn test_build_proof_in_empty_tree() {
     check_map_proof(&proof, None, &table);
 }
 
-#[test]
-fn test_build_multiproof_in_empty_tree() {
+fn test_build_multiproof_in_empty_tree<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
 
     // Just to notify the compiler of the types used; same key is added and then removed from tree.
     table.put(&[230; 32], vec![1]);
@@ -644,11 +706,13 @@ fn test_build_multiproof_in_empty_tree() {
     check_map_multiproof(&proof, keys, &table);
 }
 
-#[test]
-fn test_build_proof_in_single_node_tree() {
+fn test_build_proof_in_single_node_tree<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[230; 32], vec![1]);
     let proof = table.get_proof([230; 32]);
@@ -663,11 +727,13 @@ fn test_build_proof_in_single_node_tree() {
     check_map_proof(&proof, None, &table);
 }
 
-#[test]
-fn test_build_multiproof_in_single_node_tree() {
+fn test_build_multiproof_in_single_node_tree<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[230; 32], vec![1]);
 
@@ -685,11 +751,13 @@ fn test_build_multiproof_in_single_node_tree() {
     check_map_multiproof(&proof, keys, &table);
 }
 
-#[test]
-fn test_build_proof_in_complex_tree() {
+fn test_build_proof_in_complex_tree<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[128; 32], vec![1]); // 128 = 0b1000_0000 ~ ProofPath(00000001...)
     table.put(&[32; 32], vec![2]); //   32 = 0b0010_0000 ~ ProofPath(00000100...)
@@ -894,11 +962,13 @@ fn test_build_proof_in_complex_tree() {
     check_map_proof(&proof, Some([32; 32]), &table);
 }
 
-#[test]
-fn test_build_multiproof_simple() {
+fn test_build_multiproof_simple<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[128; 32], vec![1]);
     table.put(&[32; 32], vec![2]);
@@ -1149,7 +1219,7 @@ fn test_fuzz_delete_build_proofs() {
     let data = generate_random_data_keys(&mut exists_keys, SAMPLE_SIZE, &mut rng);
 
     let storage = db.fork();
-    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
+    let mut table = HashedProofMap::new(IDX_NAME, &storage);
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
@@ -1181,21 +1251,23 @@ fn test_fuzz_delete_build_proofs() {
     }
 }
 
-#[test]
-fn test_fuzz_delete() {
+fn test_fuzz_delete<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
     let storage1 = db1.fork();
-    let mut index1 = HashedProofMap::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage1);
 
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
 
     let storage2 = db2.fork();
-    let mut index2 = HashedProofMap::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage2);
     data.shuffle(&mut rng);
 
     for item in &data {
@@ -1245,11 +1317,13 @@ fn test_fuzz_delete() {
     assert_eq!(index2.object_hash(), saved_hash);
 }
 
-#[test]
-fn test_fuzz_insert_after_delete() {
+fn test_fuzz_insert_after_delete<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut index = HashedProofMap::new(IDX_NAME, &storage);
+    let mut index = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &storage);
 
     let data = generate_random_data(100);
 
@@ -1275,11 +1349,13 @@ fn test_fuzz_insert_after_delete() {
     assert_eq!(index.object_hash(), saved_hash);
 }
 
-#[test]
-fn test_iter() {
+fn test_iter<S>()
+where
+    S: KeyTransform<[u8; 32]>,
+{
     let db = TemporaryDB::default();
     let fork = db.fork();
-    let mut map_index = HashedProofMap::new(IDX_NAME, &fork);
+    let mut map_index = ProofMapIndex::<&Fork, _, _, S>::new(IDX_NAME, &fork);
 
     let k0 = [0; 32];
     let k1 = [1; 32];
@@ -1469,23 +1545,4 @@ fn test_tree_with_hashed_key() {
         table.object_hash(),
         hash_isolated_node(&ProofPath::new(&other_key), &HashTag::hash_leaf(&[1, 2, 3]))
     );
-}
-
-#[test]
-fn raw_hash_map() {
-    let db = TemporaryDB::default();
-    let fork = db.fork();
-    let mut map_index = RawProofMap::new(IDX_NAME, &fork);
-
-    let pk = gen_keypair().0;
-
-    map_index.put(&pk, 1);
-    let val = map_index.get(&pk).unwrap();
-
-    assert_eq!(val, 1);
-
-    let proof = map_index.get_proof(pk);
-    let proof = proof.check();
-
-    dbg!(proof);
 }

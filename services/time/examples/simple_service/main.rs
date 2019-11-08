@@ -21,7 +21,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex, Snapshot};
+use exonum_merkledb::{IndexAccess, ObjectHash, RawProofMap, Snapshot};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
@@ -76,8 +76,8 @@ impl<'a, T: IndexAccess> MarkerSchema<'a, T> {
     }
 
     /// Returns the table mapping `i32` value to public keys authoring marker transactions.
-    pub fn marks(&self) -> ProofMapIndex<T, PublicKey, i32> {
-        ProofMapIndex::new(self.index_name("marks"), self.access.clone())
+    pub fn marks(&self) -> RawProofMap<T, PublicKey, i32> {
+        RawProofMap::new(self.index_name("marks"), self.access.clone())
     }
 
     /// Returns hashes for stored table.

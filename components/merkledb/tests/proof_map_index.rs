@@ -23,8 +23,8 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::ProofPath, BinaryKey, Database, IndexAccess, MapProof, ProofMapIndex,
-    TemporaryDB,
+    proof_map_index::ProofPath, BinaryKey, BinaryValue, Database, HashedProofMap, IndexAccess,
+    MapProof, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 use proptest::{
     prelude::prop::{
@@ -40,9 +40,6 @@ use std::{
     fmt::Debug,
     ops::{Range, RangeInclusive},
 };
-
-use exonum_merkledb::proof_map_index::HashedProofMap;
-use exonum_merkledb::{BinaryValue, ObjectHash};
 
 const INDEX_NAME: &str = "index";
 

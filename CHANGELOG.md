@@ -78,6 +78,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ProtobufConvert` has been implemented for `MapProof`. (#1512)
 
+- New variants of the `ProofMapIndex` has been introduced. First variant
+  `HashedProofMap` is used for keys that implements `ObjectsHash`. Second
+  variant `RawProofMap` is used for keys that maps directly to `ProofPath`
+  (#1531)
+
 ### Internal improvements
 
 #### exonum-merkledb

@@ -15,7 +15,7 @@
 use chrono::{DateTime, Utc};
 
 use exonum::crypto::{Hash, PublicKey};
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, RawProofMap};
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
@@ -38,8 +38,8 @@ impl<'a, T: IndexAccess> TimeSchema<'a, T> {
     }
 
     /// Returns the table that stores `DateTime` for every validator.
-    pub fn validators_times(&self) -> ProofMapIndex<T, PublicKey, DateTime<Utc>> {
-        ProofMapIndex::new(self.index_name("validators_times"), self.access.clone())
+    pub fn validators_times(&self) -> RawProofMap<T, PublicKey, DateTime<Utc>> {
+        RawProofMap::new(self.index_name("validators_times"), self.access.clone())
     }
 
     /// Returns stored time.

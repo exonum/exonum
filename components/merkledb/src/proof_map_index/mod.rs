@@ -209,9 +209,12 @@ impl BinaryAttribute for Option<ProofPath> {
     }
 }
 
-///TODO:
+/// Hashed variant of the `ProofMapIndex`, useful for arbitrary keys that implement
+/// `ObjectHash` trait.
 pub type HashedProofMap<T, K, V> = ProofMapIndex<T, K, V, Hashed>;
-///TODO:
+
+/// Raw variant of the `ProofMapIndex`, useful for keys that mapped directly to
+/// `ProofPath`. For example `Hash` and `PublicKey`.
 pub type RawProofMap<T, K, V> = ProofMapIndex<T, K, V, Raw>;
 
 impl<T, K, V, Style> ProofMapIndex<T, K, V, Style>

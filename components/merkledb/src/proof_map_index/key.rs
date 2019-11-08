@@ -88,9 +88,11 @@ where
     fn read_key(from: &[u8]) -> Self::Output;
 }
 
+#[allow(clippy::empty_enum)]
 #[derive(Debug)]
 pub enum Hashed {}
 
+#[allow(clippy::empty_enum)]
 #[derive(Debug)]
 pub enum Raw {}
 
@@ -113,6 +115,12 @@ impl KeyTransform<PublicKey> for Raw {
 impl KeyTransform<Hash> for Raw {
     fn transform_key(key: &Hash) -> ProofPath {
         ProofPath::from_bytes(key.as_ref())
+    }
+}
+
+impl KeyTransform<[u8; 32]> for Raw {
+    fn transform_key(key: &[u8; 32]) -> ProofPath {
+        ProofPath::from_bytes(key)
     }
 }
 

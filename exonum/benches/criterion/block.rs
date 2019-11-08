@@ -212,7 +212,7 @@ mod cryptocurrency {
             AnyTx, ErrorKind, InstanceDescriptor, InstanceId,
         },
     };
-    use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
+    use exonum_merkledb::{HashedProofMap, MapIndex, Snapshot};
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
@@ -256,7 +256,7 @@ mod cryptocurrency {
         fn transfer(&self, context: CallContext, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
 
-            let mut index = ProofMapIndex::new("provable_balances", context.fork());
+            let mut index = HashedProofMap::new("provable_balances", context.fork());
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);

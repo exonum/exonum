@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    BinaryKey, Entry, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex,
-    ProofMapIndex,
+    BinaryKey, Entry, HashedProofMap, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
+    ProofListIndex, RawProofMap,
 };
 
 use exonum_proto::ProtobufConvert;
@@ -120,8 +120,8 @@ where
     ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
-    pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, ExecutionStatus> {
-        ProofMapIndex::new(TRANSACTION_RESULTS, self.access.clone())
+    pub fn transaction_results(&self) -> RawProofMap<T, Hash, ExecutionStatus> {
+        RawProofMap::new(TRANSACTION_RESULTS, self.access.clone())
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -198,8 +198,8 @@ where
     ///
     /// Core tables participate in the resulting state_hash with `CORE_ID`
     /// service_id. Their vector is returned by the `core_state_hash` method.
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, IndexCoordinates, Hash> {
-        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())
+    pub fn state_hash_aggregator(&self) -> HashedProofMap<T, IndexCoordinates, Hash> {
+        HashedProofMap::new(STATE_HASH_AGGREGATOR, self.access.clone())
     }
 
     /// Returns peers that have to be recovered in case of process restart
