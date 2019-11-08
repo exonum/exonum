@@ -9,7 +9,7 @@ use crate::{
 ///
 /// Unlike eagerly initialized objects, lazy ones are not accessed until a [`get()`] method
 /// is called; thus, construction of a lazy object is cheap.
-/// This can be used to improve performace of a database object, some components of which
+/// This can be used to improve performance of a database object, some components of which
 /// are rarely accessed.
 ///
 /// Note that [`Group`]s are already lazy, so it does not make sense to wrap a one into `Lazy<_>`
