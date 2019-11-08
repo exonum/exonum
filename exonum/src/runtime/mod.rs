@@ -15,7 +15,7 @@
 //! Common building blocks for creating runtimes for the Exonum blockchain.
 //!
 //! Each runtime contains specific services to execute transactions, process events,
-//! provide user APIs, etc. There is a unified dispatcher that redirects all the calls
+//! provide user APIs, etc. A unified dispatcher redirects all the calls
 //! and requests to the appropriate runtime environment. Thus, a blockchain interacts with the
 //! dispatcher, and not with specific runtime instances.
 //!
@@ -83,15 +83,17 @@
 //!
 //! # Supervisor Service
 //!
-//! A supervisor service is a service that has additional privileges: it can command deployment of
-//! artifacts and instantiation of services. Other than that, it looks like an ordinary service.
+//! A supervisor service is a service that has additional privileges. This service
+//! allows to deploy artifacts and instantiate new services after the blockchain is launched
+//! and running. Other than that, it looks like an ordinary service.
 //! The supervisor should be present during the blockchain start, otherwise no new artifacts / services
 //! could ever be added to the blockchain.
 //!
 //! The supervisor service is distinguished by its numerical ID, which must be set
 //! to [`SUPERVISOR_INSTANCE_ID`]. Services may assume that transactions originating from
-//! the supervisor service are authorized by the blockchain administrators, which can be used
-//! in authorization verification in the service logic.
+//! the supervisor service are authorized by the blockchain administrators. This can be used
+//! in services: if a certain transaction originates from a service with `SUPERVISOR_INSTANCE_ID`,
+//! it is authorized by the administrators.
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
@@ -160,12 +162,12 @@ impl From<RuntimeIdentifier> for u32 {
 /// You can read more about the life cycle of services and transactions
 /// [above](index.html#service-life-cycle).
 ///
-/// Using this trait, one can extend the Exonum blockchain with the services written in
+/// Using this trait, you can extend the Exonum blockchain with the services written in
 /// different languages. It assumes that the deployment procedure of a new service may be
 /// complex and long and even may fail; therefore, an additional entity is introduced - *artifacts*.
 /// Each artifact has a unique identifier and, depending on the runtime, may have an additional
 /// specification needed for its deployment; e.g., files to be compiled.
-/// Artifact creates corresponding service instances similar to classes in object-oriented
+/// An artifact creates corresponding service instances similar to classes in object-oriented
 /// programming.
 ///
 /// # Call Ordering
