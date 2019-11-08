@@ -21,24 +21,24 @@
 //!
 //! # Artifacts
 //!
-//! Each runtime has its own [artifacts] registry from which users can create service.
-//! The artifact identifier is required by the runtime for constructing service instances.
+//! Each runtime has its own [artifacts] registry from which users can create a service.
+//! The artifact identifier is required by the runtime to construct service instances.
 //! In other words, an artifact identifier is similar to a class name, and a specific
 //! service instance - to a class instance. A single artifact may be used to instantiate
 //! zero or more services.
 //!
 //! The format of an artifact ID is uniform across runtimes (it is essentially a string),
-//! but the runtime may customize artifact deployment via a runtime-specific deployment arguments.
+//! but the runtime may customize artifact deployment via runtime-specific deployment arguments.
 //!
-//! # Service lifecycle
+//! # Service Lifecycle
 //!
 //! 1. An artifact is assembled in a way specific to the runtime. For example, the artifact may
 //!   be compiled from sources and packaged using an automated build system.
 //!
-//! 2. An artifact with the service is deployed on the blockchain. The decision to deploy an
+//! 2. The artifact with the service is deployed on the blockchain. The decision to deploy the
 //!   artifact and the deployment spec are usually performed by the blockchain administrators.
 //!   The corresponding logic is customizable via a [supervisor service](#supervisor-service).
-//!   What deployment entails depends on the runtime; e.g., an artifact may be downloaded
+//!   What deployment entails depends on the runtime; e.g., the artifact may be downloaded
 //!   by each Exonum node, verified for integrity and then added into the execution environment.
 //!
 //! 3. Once the artifact is deployed, it is possible to instantiate a corresponding service.
@@ -49,16 +49,16 @@
 //!
 //! 4. During instantiation, the service is assigned a numeric ID, which is used to reference
 //!   the service in transactions. The runtime can execute initialization logic defined
-//!   in the service artifact; e.g., a service may store some initial data in the storage,
+//!   in the service artifact; e.g., the service may store some initial data in the storage,
 //!   check service dependencies, etc. The service (or the enclosing runtime) may signal that
 //!   the initialization failed, in which case the service is considered not instantiated.
 //!
 //! 5. Once the service is instantiated, it can process transactions and interact with the
 //!   external users in other ways. Different services instantiated from the same artifact
-//!   are independent and have separated blockchain storage. Users can distinguish services
+//!   are independent and have separate blockchain storages. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
 //!
-//! [`Dispatcher`] is responsible in persisting artifacts and services across node restarts.
+//! [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
 //!
 //! # Transaction Lifecycle
 //!
@@ -85,10 +85,10 @@
 //!
 //! A supervisor service is a service that has additional privileges: it can command deployment of
 //! artifacts and instantiation of services. Other than that, it looks like an ordinary service.
-//! A supervisor should be present on blockchain start, otherwise no new artifacts / services
+//! The supervisor should be present during the blockchain start, otherwise no new artifacts / services
 //! could ever be added to the blockchain.
 //!
-//! A supervisor service is distinguished by its numerical ID, which must be set
+//! The supervisor service is distinguished by its numerical ID, which must be set
 //! to [`SUPERVISOR_INSTANCE_ID`]. Services may assume that transactions originating from
 //! the supervisor service are authorized by the blockchain administrators, which can be used
 //! in authorization verification in the service logic.
@@ -170,7 +170,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// # Call Ordering
 ///
-/// Within lifetime of a `Runtime`, calls to its methods are ordered as follows:
+/// Within the lifetime of a `Runtime`, calls to its methods have the following order:
 ///
 /// ```text
 /// LIFE ::= initialize (GENESIS | RESUME) BLOCK* shutdown
@@ -181,7 +181,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// COMMIT ::= deploy_artifact* commit_service* after_commit
 /// ```
 ///
-/// The ordering to "readonly" methods `is_artifact_deployed` and `state_hashes` relative
+/// The ordering for the "readonly" methods `is_artifact_deployed` and `state_hashes` in relation
 /// to the lifecycle above is not specified.
 ///
 /// # Handling Panics
