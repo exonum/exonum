@@ -23,7 +23,7 @@ use exonum::{
         Caller, DispatcherError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
 use exonum_proto::ProtobufConvert;
 
@@ -75,7 +75,7 @@ pub struct TxInc {
     pub seed: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait IncInterface {
     fn inc(&self, context: CallContext<'_>, arg: TxInc) -> Result<(), ExecutionError>;
 }

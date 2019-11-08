@@ -29,7 +29,7 @@ use crate::{
     },
 };
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 pub trait ConfigUpdaterInterface {
     fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
 }

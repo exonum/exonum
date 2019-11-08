@@ -23,7 +23,7 @@ use exonum::{
         CallInfo, Caller, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::Snapshot;
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ pub struct TxCreateWallet {
     pub name: String,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait WalletInterface {
     fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
 }
@@ -110,7 +110,7 @@ pub struct TxIssue {
     pub amount: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait DepositInterface {
     fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
 }
@@ -158,7 +158,7 @@ pub struct TxRecursiveCall {
     pub depth: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait AnyCall {
     fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
 

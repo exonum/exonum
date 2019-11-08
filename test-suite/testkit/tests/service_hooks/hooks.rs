@@ -23,7 +23,7 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::Snapshot;
 use exonum_proto::ProtobufConvert;
 
@@ -43,7 +43,7 @@ pub struct TxAfterCommit {
     pub height: Height,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,

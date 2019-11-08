@@ -22,7 +22,7 @@ extern crate proc_macro;
 
 mod db_traits;
 mod execution_error;
-mod exonum_service;
+mod exonum_interface;
 mod service_factory;
 
 use darling::FromMeta;
@@ -166,8 +166,8 @@ pub fn generate_service_factory(input: TokenStream) -> TokenStream {
 
 /// Mark trait as an Exonum service interface.
 #[proc_macro_attribute]
-pub fn exonum_service(attr: TokenStream, item: TokenStream) -> TokenStream {
-    exonum_service::impl_service_interface(attr, item)
+pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
+    exonum_interface::impl_service_interface(attr, item)
 }
 
 /// Derive `Into<ExecutionError>` conversion for the specified enumeration.

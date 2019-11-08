@@ -219,7 +219,7 @@ mod tests {
     )]
     struct SampleService;
 
-    #[exonum_service]
+    #[exonum_interface]
     trait SampleServiceInterface {
         fn timestamp(
             &self,

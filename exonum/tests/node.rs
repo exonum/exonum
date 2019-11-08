@@ -24,7 +24,7 @@ use exonum::{
         InstanceDescriptor, Runtime,
     },
 };
-use exonum_derive::{exonum_service, ServiceFactory};
+use exonum_derive::{exonum_interface, ServiceFactory};
 use exonum_merkledb::{Database, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
@@ -36,7 +36,7 @@ use std::{
     time::Duration,
 };
 
-#[exonum_service]
+#[exonum_interface]
 trait CommitWatcherInterface {}
 
 #[derive(Debug, Clone, ServiceFactory)]
@@ -66,7 +66,7 @@ impl Service for CommitWatcherService {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 trait StartCheckerInterface {}
 
 #[derive(Debug)]

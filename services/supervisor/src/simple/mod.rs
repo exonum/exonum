@@ -25,7 +25,7 @@ use exonum::{
         DispatcherError, ExecutionError, InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::{exonum_service, IntoExecutionError, ServiceFactory};
+use exonum_derive::{exonum_interface, IntoExecutionError, ServiceFactory};
 
 use crate::{update_configs, ConfigChange, ConfigPropose, ConfigureCall};
 
@@ -56,7 +56,7 @@ pub enum Error {
     UnknownAuthor = 5,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait SimpleSupervisorInterface {
     fn change_config(
         &self,
@@ -75,7 +75,7 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
         find_validator_id(context.fork().as_ref(), author).ok_or(Error::UnknownAuthor)?;
 
         // Check that the `actual_from` height is in the future.

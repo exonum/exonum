@@ -26,7 +26,7 @@
 //!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
 //! };
 //! use serde_derive::{Serialize, Deserialize};
-//! use exonum_derive::{exonum_service, ServiceFactory, BinaryValue};
+//! use exonum_derive::{exonum_interface, ServiceFactory, BinaryValue};
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{txvec, ApiKind, TestKitBuilder};
@@ -54,7 +54,7 @@
 //!     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
 //! }
 //!
-//! #[exonum_service]
+//! #[exonum_interface]
 //! pub trait TimestampingInterface {
 //!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
 //! }
@@ -353,7 +353,7 @@ impl TestKit {
     ///
     /// ```
     /// # use serde_derive::{Serialize, Deserialize};
-    /// # use exonum_derive::{exonum_service, ServiceFactory, BinaryValue};
+    /// # use exonum_derive::{exonum_interface, ServiceFactory, BinaryValue};
     /// # use exonum_proto::ProtobufConvert;
     /// # use exonum_testkit::{txvec, TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
@@ -378,7 +378,7 @@ impl TestKit {
     /// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
     /// # }
     /// #
-    /// # #[exonum_service]
+    /// # #[exonum_interface]
     /// # pub trait ExampleInterface {
     /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError>;
     /// # }
@@ -754,7 +754,7 @@ impl TestKit {
 /// # Examples
 ///
 /// ```
-/// # use exonum_derive::{exonum_service, ServiceFactory};
+/// # use exonum_derive::{exonum_interface, ServiceFactory};
 /// # use exonum::{
 /// #     crypto::{PublicKey, Hash},
 /// #     runtime::{InstanceDescriptor, rust::{AfterCommitContext, RustRuntime, Service}},
@@ -791,7 +791,7 @@ impl TestKit {
 ///     }
 /// }
 ///
-/// # #[exonum_service]
+/// # #[exonum_interface]
 /// # trait AfterCommitInterface {}
 /// #
 /// # impl AfterCommitInterface for AfterCommitService {}

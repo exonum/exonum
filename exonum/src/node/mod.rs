@@ -1168,7 +1168,7 @@ mod tests {
 
     impl_binary_value_for_pb_message! { TxSimple }
 
-    #[exonum_service(crate = "crate")]
+    #[exonum_interface(crate = "crate")]
     pub trait TestInterface {
         fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
     }

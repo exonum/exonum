@@ -22,7 +22,9 @@ use exonum::{
         InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
+use exonum_derive::{
+    exonum_interface, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory,
+};
 use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
@@ -123,7 +125,7 @@ pub enum Error {
     Foo = 0,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
     fn create_wallet(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), Error>;

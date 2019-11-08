@@ -125,7 +125,7 @@ mod timestamping {
 
     const TIMESTAMPING_SERVICE_ID: InstanceId = 254;
 
-    #[exonum_service]
+    #[exonum_interface]
     pub trait TimestampingInterface {
         fn timestamp(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError>;
 
@@ -231,7 +231,7 @@ mod cryptocurrency {
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    #[exonum_service]
+    #[exonum_interface]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
         fn transfer(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError>;
@@ -431,7 +431,7 @@ mod foreign_interface_call {
         data: Hash,
     }
 
-    #[exonum_service]
+    #[exonum_interface]
     pub trait SelfInterface {
         fn timestamp(&self, context: CallContext<'_>, arg: SelfTx) -> Result<(), ExecutionError>;
 
@@ -482,13 +482,13 @@ mod foreign_interface_call {
         }
     }
 
-    #[exonum_service(interface = "Configure")]
+    #[exonum_interface(interface = "Configure")]
     pub trait Configure {}
 
-    #[exonum_service(interface = "Events")]
+    #[exonum_interface(interface = "Events")]
     pub trait Events {}
 
-    #[exonum_service(interface = "ERC30Tokens")]
+    #[exonum_interface(interface = "ERC30Tokens")]
     pub trait ERC30Tokens {}
 
     #[derive(Debug, ServiceFactory)]

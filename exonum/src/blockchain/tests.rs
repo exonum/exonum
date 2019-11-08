@@ -66,7 +66,7 @@ struct TestCallInitialize {
     value: u64,
 }
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 trait TestDispatcherInterface {
     fn test_execute(
         &self,
@@ -164,7 +164,7 @@ impl TestDispatcherInterface for TestDispatcherService {
     }
 }
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 trait ServiceGood {}
 
 #[derive(Debug, ServiceFactory)]
@@ -190,7 +190,7 @@ impl Service for ServiceGoodImpl {
     }
 }
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 trait ServicePanic {}
 
 #[derive(Debug, ServiceFactory)]
@@ -215,7 +215,7 @@ impl Service for ServicePanicImpl {
     }
 }
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 trait ServicePanicStorageError {}
 
 #[derive(Debug, ServiceFactory)]
@@ -252,7 +252,7 @@ struct TxResult {
     value: u64,
 }
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 trait TxResultCheckInterface {
     fn tx_result(&self, context: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError>;
 }

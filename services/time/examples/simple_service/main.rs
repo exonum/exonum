@@ -105,7 +105,7 @@ impl TxMarker {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait MarkerInterface {
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }

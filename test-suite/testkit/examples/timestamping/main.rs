@@ -50,7 +50,7 @@ impl TxTimestamp {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 trait TimestampingInterface {
     fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
 }

@@ -73,7 +73,7 @@ pub enum Error {
     NotAllowed = 0,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait MyServiceInterface {
     fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
     fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;

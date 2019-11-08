@@ -215,7 +215,7 @@ pub mod contracts {
     const INIT_BALANCE: u64 = 100;
 
     /// Cryptocurrency service transactions.
-    #[exonum_service]
+    #[exonum_interface]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
         fn create_wallet(&self, ctx: CallContext<'_>, arg: TxCreateWallet) -> Result<(), Error>;

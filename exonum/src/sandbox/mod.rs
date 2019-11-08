@@ -1272,7 +1272,7 @@ mod tests {
 
     use super::*;
 
-    #[exonum_service(crate = "crate")]
+    #[exonum_interface(crate = "crate")]
     pub trait AfterCommitInterface {
         fn after_commit(
             &self,
