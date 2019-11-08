@@ -65,6 +65,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New Features
 
+#### exonum
+
+- New config params `http_backend_config.restart_retry_attempts` and
+  `http_backend_config.restart_retry_interval` added into `NetworkConfiguration`.
+  They are intend to configure of the HTTP-server restart settings (#1536).
+
 #### exonum-merkledb
 
 - `ProofListIndex` now implements `truncate()` and `pop()` methods, allowing
