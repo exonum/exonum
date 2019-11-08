@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    access::{Prefixed, RawAccess, ToReadonly},
+    access::{AsReadonly, Prefixed, RawAccess},
     Snapshot,
 };
 
@@ -27,7 +27,7 @@ pub struct BlockchainData<'a, T> {
     service_instance: InstanceDescriptor<'a>,
 }
 
-impl<'a, T: RawAccess + ToReadonly> BlockchainData<'a, T> {
+impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// Creates structured access to blockchain data based on the unstructured access
     /// (e.g., a `Snapshot` or a `Fork`) and the descriptor of the executing service.
     pub fn new(access: T, service_instance: InstanceDescriptor<'a>) -> Self {
@@ -39,12 +39,12 @@ impl<'a, T: RawAccess + ToReadonly> BlockchainData<'a, T> {
 
     /// Returns core schema.
     pub fn for_core(&self) -> CoreSchema<T::Readonly> {
-        CoreSchema::new(self.access.to_readonly())
+        CoreSchema::new(self.access.as_readonly())
     }
 
     /// Returns dispatcher schema.
     pub fn for_dispatcher(&self) -> DispatcherSchema<T::Readonly> {
-        DispatcherSchema::new(self.access.to_readonly())
+        DispatcherSchema::new(self.access.as_readonly())
     }
 
     /// Returns a mount point for another service. If the service with `id` does not exist,
@@ -57,7 +57,7 @@ impl<'a, T: RawAccess + ToReadonly> BlockchainData<'a, T> {
         &self,
         id: impl Into<InstanceQuery<'q>>,
     ) -> Option<Prefixed<'static, T::Readonly>> {
-        mount_point_for_service(self.access.to_readonly(), id)
+        mount_point_for_service(self.access.as_readonly(), id)
     }
 
     /// Returns a mount point for the data of the executing service instance.

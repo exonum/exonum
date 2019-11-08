@@ -29,7 +29,7 @@ use std::{
 };
 
 use crate::{
-    views::{IndexAddress, RawAccess, ToReadonly, View},
+    views::{AsReadonly, IndexAddress, RawAccess, View},
     Error, Result,
 };
 
@@ -782,15 +782,15 @@ impl RawAccess for Rc<Fork> {
 /// let fork = db.fork();
 /// let readonly: ReadonlyFork<'_> = fork.readonly();
 /// let mut list = readonly.get_list("list");
-/// list.push(1_u32); // No `push` method for `ListIndex<ReadonlyFork, u32>`!
+/// list.push(1_u32); // Won't compile: no `push` method in `ListIndex<ReadonlyFork, u32>`!
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct ReadonlyFork<'a>(&'a Fork);
 
-impl<'a> ToReadonly for &'a Fork {
+impl<'a> AsReadonly for &'a Fork {
     type Readonly = ReadonlyFork<'a>;
 
-    fn to_readonly(&self) -> Self::Readonly {
+    fn as_readonly(&self) -> Self::Readonly {
         ReadonlyFork(*self)
     }
 }

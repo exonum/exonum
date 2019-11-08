@@ -124,13 +124,13 @@ pub trait RawAccessMut: RawAccess {}
 
 impl<'a, T> RawAccessMut for T where T: RawAccess<Changes = ChangesMut<'a>> {}
 
-/// Converts index access to a readonly presentation.
-pub trait ToReadonly: RawAccess {
+/// Converts index access to a readonly presentation. The conversion operation is cheap.
+pub trait AsReadonly: RawAccess {
     /// Readonly version of the access.
     type Readonly: RawAccess;
 
     /// Performs the conversion.
-    fn to_readonly(&self) -> Self::Readonly;
+    fn as_readonly(&self) -> Self::Readonly;
 }
 
 /// Represents address of the index in the database.
@@ -273,10 +273,10 @@ macro_rules! impl_snapshot_access {
             fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
         }
 
-        impl ToReadonly for $typ {
+        impl AsReadonly for $typ {
             type Readonly = Self;
 
-            fn to_readonly(&self) -> Self::Readonly {
+            fn as_readonly(&self) -> Self::Readonly {
                 self.clone()
             }
         }

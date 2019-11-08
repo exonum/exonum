@@ -5,7 +5,7 @@ use failure::{Error, Fail};
 use std::{borrow::Cow, fmt};
 
 pub use self::extensions::AccessExt;
-pub use crate::views::{RawAccess, RawAccessMut, ToReadonly};
+pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
 use crate::{
     validation::assert_valid_name,
