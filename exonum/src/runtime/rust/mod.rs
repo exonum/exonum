@@ -140,14 +140,14 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
-    /// Adds a new service factory to the list of available artifacts.
+    /// Adds a new service factory to the runtime.
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
 
-    /// Adds a new service factory to the list of available artifacts and returns
+    /// Adds a new service factory to the runtime and returns
     /// modified `RustRuntime` object for further chaining.
     pub fn with_available_service(
         mut self,
