@@ -323,6 +323,18 @@ impl ValidateInput for NodeConfig {
             capacity.network_requests_capacity
         );
 
+        let backend_config = &self.network.http_backend_config;
+        ensure!(
+            backend_config.restart_retry_attempts != 0,
+            "restart_retry_attempts({}) must be strictly larger than 0",
+            backend_config.restart_retry_attempts
+        );
+        ensure!(
+            backend_config.restart_retry_interval > 10,
+            "restart_retry_interval({}) must be strictly larger than 10",
+            backend_config.restart_retry_interval
+        );
+
         // Sanity checks for cases of accidental negative overflows.
         let sanity_max = 2_usize.pow(16);
         ensure!(
