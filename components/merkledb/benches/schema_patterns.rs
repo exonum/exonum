@@ -118,7 +118,7 @@ where
     }
 }
 
-enum EagerStyle {}
+struct EagerStyle;
 
 impl ExecuteTransaction for EagerStyle {
     fn execute<T: Access>(fork: T, transaction: &Transaction)
@@ -185,7 +185,7 @@ where
     }
 }
 
-enum LazyStyle {}
+struct LazyStyle;
 
 impl ExecuteTransaction for LazyStyle {
     fn execute<T: Access>(fork: T, transaction: &Transaction)
@@ -262,7 +262,7 @@ where
     }
 }
 
-enum WrapperStyle {}
+struct WrapperStyle;
 
 impl ExecuteTransaction for WrapperStyle {
     fn execute<T: Access>(fork: T, transaction: &Transaction)
