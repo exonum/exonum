@@ -24,6 +24,18 @@ use crate::{
 /// // Members of the group can be accessed independently.
 /// assert_eq!(fork.get_list::<_, u64>(("group", &2_u64)).len(), 3);
 /// ```
+///
+/// Group keys can be unsized:
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
+/// # let db = TemporaryDB::new();
+/// # let fork = db.fork();
+/// let group: Group<_, str, ListIndex<_, u64>> = fork.get_group("unsized_group");
+/// group.get("foo").push(1);
+/// group.get("bar").push(42);
+/// # assert_eq!(fork.readonly().get_list::<_, u64>(("unsized_group", "bar")).len(), 1);
+/// ```
 #[derive(Debug)]
 pub struct Group<T, K: ?Sized, I> {
     access: T,
@@ -54,12 +66,11 @@ where
     K: BinaryKey + ?Sized,
     I: FromAccess<T>,
 {
-    /// Gets an index corresponding to the specified key. If the index is not present in
-    /// the storage, returns `None`.
+    /// Gets an index corresponding to the specified key.
     ///
     /// # Panics
     ///
-    /// If the index is present, but has the wrong type.
+    /// If the index is present and has a wrong type.
     pub fn get(&self, key: &K) -> I {
         let addr = self.prefix.clone().append_bytes(key);
         I::from_access(self.access.clone(), addr).unwrap()

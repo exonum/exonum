@@ -198,6 +198,7 @@ unboxed
 unflushed
 unreceived
 unseparated
+unsized
 unsync
 untagged
 untrusted
