@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
@@ -81,13 +81,13 @@ pub struct MapIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
-impl<T, K, V> Restore<T> for MapIndex<T::Base, K, V>
+impl<T, K, V> FromAccess<T> for MapIndex<T::Base, K, V>
 where
     T: Access,
     K: BinaryKey,
     V: BinaryValue,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::Map)?;
         Ok(Self::new(view))
     }

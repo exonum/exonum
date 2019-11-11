@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::IndexAddress,
 };
 
@@ -18,12 +18,12 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// # use exonum_merkledb::{access::{AccessExt, Restore}, Database, Lazy, ListIndex, TemporaryDB};
+/// # use exonum_merkledb::{access::{AccessExt, FromAccess}, Database, Lazy, ListIndex, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// {
 ///     let lazy: Lazy<_, ListIndex<_, String>> =
-///         Lazy::restore(&fork, "lazy_list".into()).unwrap();
+///         Lazy::from_access(&fork, "lazy_list".into()).unwrap();
 ///     lazy.get().push("!".to_owned());
 ///     assert_eq!(lazy.get().len(), 1);
 /// }
@@ -43,12 +43,12 @@ pub struct Lazy<T, I> {
     _index: PhantomData<I>,
 }
 
-impl<T, I> Restore<T> for Lazy<T, I>
+impl<T, I> FromAccess<T> for Lazy<T, I>
 where
     T: Access,
-    I: Restore<T>,
+    I: FromAccess<T>,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         Ok(Self {
             access,
             address: addr,
@@ -60,7 +60,7 @@ where
 impl<T, I> Lazy<T, I>
 where
     T: Access,
-    I: Restore<T>,
+    I: FromAccess<T>,
 {
     /// Gets the object from the database.
     ///
@@ -73,7 +73,7 @@ where
 
     /// Tries to restore the object from the database.
     pub fn try_get(&self) -> Result<I, AccessError> {
-        I::restore(self.access.clone(), self.address.clone())
+        I::from_access(self.access.clone(), self.address.clone())
     }
 }
 
@@ -90,7 +90,7 @@ mod tests {
         let fork = db.fork();
         {
             let lazy_index: Lazy<_, ListIndex<_, u64>> =
-                Lazy::restore(&fork, "lazy".into()).unwrap();
+                Lazy::from_access(&fork, "lazy".into()).unwrap();
             lazy_index.get().extend(vec![1, 2, 3]);
             assert_eq!(lazy_index.get().len(), 3);
             lazy_index.get().push(4);
@@ -99,7 +99,7 @@ mod tests {
 
         let snapshot = db.snapshot();
         let lazy_index: Lazy<_, ListIndex<_, u64>> =
-            Lazy::restore(&snapshot, "lazy".into()).unwrap();
+            Lazy::from_access(&snapshot, "lazy".into()).unwrap();
         assert_eq!(
             lazy_index.get().iter().collect::<Vec<_>>(),
             vec![1, 2, 3, 4]
@@ -107,7 +107,7 @@ mod tests {
 
         // Note that index type is not checked on `restore` / `ensure`, so the following is valid:
         let bogus: Lazy<_, MapIndex<_, u64, String>> =
-            Lazy::restore(&snapshot, "lazy".into()).unwrap();
+            Lazy::from_access(&snapshot, "lazy".into()).unwrap();
         // ...but this errors:
         assert_matches!(
             bogus.try_get().unwrap_err().kind,

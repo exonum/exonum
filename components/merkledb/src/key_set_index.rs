@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
@@ -53,12 +53,12 @@ pub struct KeySetIndexIter<'a, K> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
-impl<T, K> Restore<T> for KeySetIndex<T::Base, K>
+impl<T, K> FromAccess<T> for KeySetIndex<T::Base, K>
 where
     T: Access,
     K: BinaryKey,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::KeySet)?;
         Ok(Self::new(view))
     }

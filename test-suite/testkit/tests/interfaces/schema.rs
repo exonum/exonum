@@ -15,7 +15,7 @@
 use exonum::{
     crypto::PublicKey,
     merkledb::{
-        access::{Access, Restore},
+        access::{Access, FromAccess},
         MapIndex,
     },
 };
@@ -39,7 +39,7 @@ pub struct WalletSchema<T: Access> {
 impl<T: Access> WalletSchema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            wallets: Restore::restore(access, "wallets".into()).unwrap(),
+            wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
         }
     }
 }

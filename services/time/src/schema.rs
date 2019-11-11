@@ -19,7 +19,7 @@ use exonum::{
     crypto::{Hash, PublicKey},
 };
 use exonum_merkledb::{
-    access::{Access, Prefixed, RawAccessMut, Restore},
+    access::{Access, FromAccess, Prefixed, RawAccessMut},
     Entry, ObjectHash, ProofMapIndex,
 };
 
@@ -36,8 +36,9 @@ impl<'a, T: Access> TimeSchema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
     pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            validators_times: Restore::restore(access.clone(), "validators_times".into()).unwrap(),
-            time: Restore::restore(access, "time".into()).unwrap(),
+            validators_times: FromAccess::from_access(access.clone(), "validators_times".into())
+                .unwrap(),
+            time: FromAccess::from_access(access, "time".into()).unwrap(),
         }
     }
 

@@ -20,7 +20,7 @@ use std::borrow::Cow;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt, Prefixed, RawAccessMut, Restore},
+    access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
     impl_object_hash_for_binary_value, BinaryValue, Database, Group, KeySetIndex, Lazy, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
@@ -77,12 +77,13 @@ struct EagerSchema<T: Access> {
 impl<T: Access> EagerSchema<T> {
     fn new(access: T) -> Self {
         Self {
-            transactions: Restore::restore(access.clone(), "transactions".into()).unwrap(),
-            hot_index: Restore::restore(access.clone(), "hot_index".into()).unwrap(),
-            hot_group: Restore::restore(access.clone(), "hot_group".into()).unwrap(),
-            cold_index: Restore::restore(access.clone(), "cold_index".into()).unwrap(),
-            cold_group: Restore::restore(access.clone(), "cold_group".into()).unwrap(),
-            other_cold_index: Restore::restore(access.clone(), "other_cold_index".into()).unwrap(),
+            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
+            hot_index: FromAccess::from_access(access.clone(), "hot_index".into()).unwrap(),
+            hot_group: FromAccess::from_access(access.clone(), "hot_group".into()).unwrap(),
+            cold_index: FromAccess::from_access(access.clone(), "cold_index".into()).unwrap(),
+            cold_group: FromAccess::from_access(access.clone(), "cold_group".into()).unwrap(),
+            other_cold_index: FromAccess::from_access(access.clone(), "other_cold_index".into())
+                .unwrap(),
         }
     }
 }
@@ -143,12 +144,13 @@ struct LazySchema<T: Access> {
 impl<T: Access> LazySchema<T> {
     fn new(access: T) -> Self {
         Self {
-            transactions: Restore::restore(access.clone(), "transactions".into()).unwrap(),
-            hot_index: Restore::restore(access.clone(), "hot_index".into()).unwrap(),
-            hot_group: Restore::restore(access.clone(), "hot_group".into()).unwrap(),
-            cold_index: Restore::restore(access.clone(), "cold_index".into()).unwrap(),
-            cold_group: Restore::restore(access.clone(), "cold_group".into()).unwrap(),
-            other_cold_index: Restore::restore(access.clone(), "other_cold_index".into()).unwrap(),
+            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
+            hot_index: FromAccess::from_access(access.clone(), "hot_index".into()).unwrap(),
+            hot_group: FromAccess::from_access(access.clone(), "hot_group".into()).unwrap(),
+            cold_index: FromAccess::from_access(access.clone(), "cold_index".into()).unwrap(),
+            cold_group: FromAccess::from_access(access.clone(), "cold_group".into()).unwrap(),
+            other_cold_index: FromAccess::from_access(access.clone(), "other_cold_index".into())
+                .unwrap(),
         }
     }
 }

@@ -25,7 +25,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
 use exonum_merkledb::{
-    access::{Access, RawAccessMut, Restore},
+    access::{Access, FromAccess, RawAccessMut},
     Entry, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -45,8 +45,8 @@ pub struct Schema<T: Access> {
 impl<T: Access> Schema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            count: Restore::restore(access.clone(), "count".into()).unwrap(),
-            params: Restore::restore(access, "params".into()).unwrap(),
+            count: FromAccess::from_access(access.clone(), "count".into()).unwrap(),
+            params: FromAccess::from_access(access, "params".into()).unwrap(),
         }
     }
 

@@ -29,7 +29,7 @@ use self::{
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
 use crate::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::{
         BinaryAttribute, IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess,
         RawAccessMut, View, ViewWithMetadata,
@@ -175,13 +175,13 @@ impl BinaryAttribute for ProofPath {
     }
 }
 
-impl<T, K, V> Restore<T> for ProofMapIndex<T::Base, K, V>
+impl<T, K, V> FromAccess<T> for ProofMapIndex<T::Base, K, V>
 where
     T: Access,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::ProofMap)?;
         Ok(Self::new(view))
     }

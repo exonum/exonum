@@ -20,7 +20,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
         ViewWithMetadata,
@@ -57,12 +57,12 @@ pub struct ListIndexIter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
-impl<T, V> Restore<T> for ListIndex<T::Base, V>
+impl<T, V> FromAccess<T> for ListIndex<T::Base, V>
 where
     T: Access,
     V: BinaryValue,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::List)?;
         Ok(Self::new(view))
     }

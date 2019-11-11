@@ -17,7 +17,7 @@
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, RawAccessMut, Restore},
+    access::{Access, FromAccess, RawAccessMut},
     Entry, ObjectHash, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
@@ -80,8 +80,8 @@ impl<T: Access> Schema<T> {
     /// Creates a new schema from the database view.
     pub fn new(access: T) -> Self {
         Self {
-            config: Restore::restore(access.clone(), "config".into()).unwrap(),
-            timestamps: Restore::restore(access, "timestamps".into()).unwrap(),
+            config: FromAccess::from_access(access.clone(), "config".into()).unwrap(),
+            timestamps: FromAccess::from_access(access, "timestamps".into()).unwrap(),
         }
     }
 

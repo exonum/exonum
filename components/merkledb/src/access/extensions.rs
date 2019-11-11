@@ -1,6 +1,6 @@
 //! Extension traits to simplify index instantiation.
 
-use super::{Access, AccessError, Restore};
+use super::{Access, AccessError, FromAccess};
 use crate::{
     views::IndexType, BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex,
     MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
@@ -42,10 +42,10 @@ pub trait AccessExt: Access {
     fn get_group<K, I>(self, name: impl Into<String>) -> Group<Self, K, I>
     where
         K: BinaryKey + ?Sized,
-        I: Restore<Self>,
+        I: FromAccess<Self>,
     {
         // We know that `Group` implementation of `Restore` never fails
-        Group::restore(self, IndexAddress::with_root(name)).unwrap()
+        Group::from_access(self, IndexAddress::with_root(name)).unwrap()
     }
 
     /// Gets an entry index with the specified address.
@@ -58,7 +58,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        Entry::restore(self, addr.into()).unwrap()
+        Entry::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a list index with the specified address.
@@ -71,7 +71,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ListIndex::restore(self, addr.into()).unwrap()
+        ListIndex::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a map index with the specified address.
@@ -85,7 +85,7 @@ pub trait AccessExt: Access {
         K: BinaryKey,
         V: BinaryValue,
     {
-        MapIndex::restore(self, addr.into()).unwrap()
+        MapIndex::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a Merkelized list index with the specified address.
@@ -98,7 +98,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ProofListIndex::restore(self, addr.into()).unwrap()
+        ProofListIndex::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a Merkelized list index with the specified address.
@@ -112,7 +112,7 @@ pub trait AccessExt: Access {
         K: BinaryKey + ObjectHash,
         V: BinaryValue,
     {
-        ProofMapIndex::restore(self, addr.into()).unwrap()
+        ProofMapIndex::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a sparse list index with the specified address.
@@ -125,7 +125,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        SparseListIndex::restore(self, addr.into()).unwrap()
+        SparseListIndex::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a key set index with the specified address.
@@ -138,7 +138,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryKey,
     {
-        KeySetIndex::restore(self, addr.into()).unwrap()
+        KeySetIndex::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a value set index with the specified address.
@@ -151,7 +151,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
     {
-        ValueSetIndex::restore(self, addr.into()).unwrap()
+        ValueSetIndex::from_access(self, addr.into()).unwrap()
     }
 
     /// Touches an index at the specified address, asserting that it has a specific type.

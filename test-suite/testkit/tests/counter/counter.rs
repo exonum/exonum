@@ -30,7 +30,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{
-    access::{Access, RawAccessMut, Restore},
+    access::{Access, FromAccess, RawAccessMut},
     Entry, ObjectHash, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -54,7 +54,7 @@ pub struct CounterSchema<T: Access> {
 impl<T: Access> CounterSchema<T> {
     pub fn new(access: T) -> Self {
         Self {
-            counter: Restore::restore(access, "counter".into()).unwrap(),
+            counter: FromAccess::from_access(access, "counter".into()).unwrap(),
         }
     }
 }

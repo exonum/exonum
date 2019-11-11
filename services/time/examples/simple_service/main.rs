@@ -22,7 +22,7 @@ extern crate serde_derive;
 extern crate exonum_derive;
 
 use exonum_merkledb::{
-    access::{Access, Restore},
+    access::{Access, FromAccess},
     ObjectHash, ProofMapIndex, Snapshot,
 };
 
@@ -67,7 +67,7 @@ pub struct MarkerSchema<T: Access> {
 impl<T: Access> MarkerSchema<T> {
     fn new(access: T) -> Self {
         Self {
-            marks: Restore::restore(access, "marks".into()).unwrap(),
+            marks: FromAccess::from_access(access, "marks".into()).unwrap(),
         }
     }
 

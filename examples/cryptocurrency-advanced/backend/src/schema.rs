@@ -15,7 +15,7 @@
 //! Cryptocurrency database schema.
 
 use exonum_merkledb::{
-    access::{Access, RawAccessMut, Restore},
+    access::{Access, FromAccess, RawAccessMut},
     Group, ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
@@ -36,8 +36,8 @@ impl<T: Access> Schema<T> {
     /// Creates a new schema from the database view.
     pub fn new(access: T) -> Self {
         Self {
-            wallets: Restore::restore(access.clone(), "wallets".into()).unwrap(),
-            wallet_history: Restore::restore(access, "wallet_history".into()).unwrap(),
+            wallets: FromAccess::from_access(access.clone(), "wallets".into()).unwrap(),
+            wallet_history: FromAccess::from_access(access, "wallet_history".into()).unwrap(),
         }
     }
 

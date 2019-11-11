@@ -22,7 +22,7 @@ use std::{io::Error, marker::PhantomData};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::{
         BinaryAttribute, IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess,
         RawAccessMut, View, ViewWithMetadata,
@@ -117,12 +117,12 @@ pub struct SparseListIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
-impl<T, V> Restore<T> for SparseListIndex<T::Base, V>
+impl<T, V> FromAccess<T> for SparseListIndex<T::Base, V>
 where
     T: Access,
     V: BinaryValue,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::SparseList)?;
         Ok(Self::new(view))
     }

@@ -17,7 +17,7 @@
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
 use exonum_merkledb::{
-    access::{Access, RawAccessMut, Restore},
+    access::{Access, FromAccess, RawAccessMut},
     BinaryKey, BinaryValue, IndexAddress, ObjectHash, ProofMapIndex,
 };
 
@@ -97,14 +97,14 @@ where
     }
 }
 
-impl<T, V> Restore<T> for ValidatorMultisig<T, V>
+impl<T, V> FromAccess<T> for ValidatorMultisig<T, V>
 where
     T: Access,
     V: BinaryKey + ObjectHash,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         Ok(Self {
-            index: Restore::restore(access, addr)?,
+            index: FromAccess::from_access(access, addr)?,
         })
     }
 }

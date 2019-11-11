@@ -14,7 +14,7 @@
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
 use exonum_merkledb::{
-    access::{Access, Prefixed, Restore},
+    access::{Access, FromAccess, Prefixed},
     Entry, ObjectHash, ProofMapIndex,
 };
 
@@ -35,15 +35,23 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
     pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            deploy_requests: Restore::restore(access.clone(), "deploy_requests".into()).unwrap(),
-            deploy_confirmations: Restore::restore(access.clone(), "deploy_confirmations".into())
+            deploy_requests: FromAccess::from_access(access.clone(), "deploy_requests".into())
                 .unwrap(),
-            pending_deployments: Restore::restore(access.clone(), "pending_deployments".into())
+            deploy_confirmations: FromAccess::from_access(
+                access.clone(),
+                "deploy_confirmations".into(),
+            )
+            .unwrap(),
+            pending_deployments: FromAccess::from_access(
+                access.clone(),
+                "pending_deployments".into(),
+            )
+            .unwrap(),
+            pending_instances: FromAccess::from_access(access.clone(), "pending_instances".into())
                 .unwrap(),
-            pending_instances: Restore::restore(access.clone(), "pending_instances".into())
+            config_confirms: FromAccess::from_access(access.clone(), "config_confirms".into())
                 .unwrap(),
-            config_confirms: Restore::restore(access.clone(), "config_confirms".into()).unwrap(),
-            pending_proposal: Restore::restore(access, "pending_proposal".into()).unwrap(),
+            pending_proposal: FromAccess::from_access(access, "pending_proposal".into()).unwrap(),
         }
     }
 

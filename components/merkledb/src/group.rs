@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::IndexAddress,
     BinaryKey,
 };
@@ -14,11 +14,11 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// # use exonum_merkledb::{access::{AccessExt, Restore}, Database, Group, ListIndex, TemporaryDB};
+/// # use exonum_merkledb::{access::{AccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let group: Group<_, u64, ListIndex<_, u64>> =
-///     Restore::restore(&fork, "group".into()).unwrap();
+///     FromAccess::from_access(&fork, "group".into()).unwrap();
 /// group.get(&1).push(1);
 /// group.get(&2).extend(vec![1, 2, 3]);
 /// // Members of the group can be accessed independently.
@@ -32,13 +32,13 @@ pub struct Group<T, K: ?Sized, I> {
     _index: PhantomData<I>,
 }
 
-impl<T, K, I> Restore<T> for Group<T, K, I>
+impl<T, K, I> FromAccess<T> for Group<T, K, I>
 where
     T: Access,
     K: BinaryKey + ?Sized,
-    I: Restore<T>,
+    I: FromAccess<T>,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         Ok(Self {
             access,
             prefix: addr,
@@ -52,7 +52,7 @@ impl<T, K, I> Group<T, K, I>
 where
     T: Access,
     K: BinaryKey + ?Sized,
-    I: Restore<T>,
+    I: FromAccess<T>,
 {
     /// Gets an index corresponding to the specified key. If the index is not present in
     /// the storage, returns `None`.
@@ -62,7 +62,7 @@ where
     /// If the index is present, but has the wrong type.
     pub fn get(&self, key: &K) -> I {
         let addr = self.prefix.clone().append_bytes(key);
-        I::restore(self.access.clone(), addr).unwrap()
+        I::from_access(self.access.clone(), addr).unwrap()
     }
 }
 

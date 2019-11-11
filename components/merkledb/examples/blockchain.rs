@@ -5,7 +5,7 @@ use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
-    access::{Access, RawAccessMut, Restore},
+    access::{Access, FromAccess, RawAccessMut},
     impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
@@ -91,10 +91,11 @@ struct Schema<T: Access> {
 impl<T: Access> Schema<T> {
     fn new(access: T) -> Self {
         Self {
-            transactions: Restore::restore(access.clone(), "transactions".into()).unwrap(),
-            blocks: Restore::restore(access.clone(), "blocks".into()).unwrap(),
-            wallets: Restore::restore(access.clone(), "wallets".into()).unwrap(),
-            wallet_history: Restore::restore(access.clone(), "wallet_history".into()).unwrap(),
+            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
+            blocks: FromAccess::from_access(access.clone(), "blocks".into()).unwrap(),
+            wallets: FromAccess::from_access(access.clone(), "wallets".into()).unwrap(),
+            wallet_history: FromAccess::from_access(access.clone(), "wallet_history".into())
+                .unwrap(),
         }
     }
 }

@@ -23,7 +23,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
 use exonum_merkledb::{
-    access::{Access, Restore},
+    access::{Access, FromAccess},
     MapIndex, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -86,7 +86,7 @@ impl<T: Access> CurrencySchema<T> {
     /// Creates a new schema instance.
     pub fn new(access: T) -> Self {
         Self {
-            wallets: Restore::restore(access, "wallets".into()).unwrap(),
+            wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
         }
     }
 

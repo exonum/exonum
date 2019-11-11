@@ -914,7 +914,7 @@ fn test_metadata_incorrect_index_type() {
 #[test]
 fn test_metadata_index_wrong_type() {
     use crate::{
-        access::{AccessError, AccessErrorKind, Restore},
+        access::{AccessError, AccessErrorKind, FromAccess},
         ListIndex,
     };
 
@@ -928,7 +928,7 @@ fn test_metadata_index_wrong_type() {
     db.merge(fork.into_patch()).unwrap();
     // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
-    let err = ListIndex::<_, Vec<u8>>::restore(&snapshot, "simple".into()).unwrap_err();
+    let err = ListIndex::<_, Vec<u8>>::from_access(&snapshot, "simple".into()).unwrap_err();
     assert_matches!(
         err,
         AccessError { ref addr, kind: AccessErrorKind::WrongIndexType { .. } }

@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use super::{
-    access::{Access, AccessError, Restore},
+    access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
     },
@@ -68,12 +68,12 @@ pub struct ValueSetIndexHashes<'a> {
     base_iter: ViewIter<'a, Hash, ()>,
 }
 
-impl<T, V> Restore<T> for ValueSetIndex<T::Base, V>
+impl<T, V> FromAccess<T> for ValueSetIndex<T::Base, V>
 where
     T: Access,
     V: BinaryValue + ObjectHash,
 {
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::ValueSet)?;
         Ok(Self::new(view))
     }

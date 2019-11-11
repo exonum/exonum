@@ -41,7 +41,7 @@ pub mod proto;
 pub mod schema {
     use exonum::crypto::{Hash, PublicKey};
     use exonum_merkledb::{
-        access::{Access, Prefixed, Restore},
+        access::{Access, FromAccess, Prefixed},
         MapIndex,
     };
     use exonum_proto::ProtobufConvert;
@@ -105,7 +105,7 @@ pub mod schema {
         /// Creates a new schema instance.
         pub fn new(access: Prefixed<'a, T>) -> Self {
             Self {
-                wallets: Restore::restore(access, "wallets".into()).unwrap(),
+                wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
             }
         }
 

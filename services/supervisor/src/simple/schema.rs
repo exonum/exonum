@@ -15,7 +15,7 @@
 use exonum::{
     crypto::Hash,
     merkledb::{
-        access::{Access, Prefixed, Restore},
+        access::{Access, FromAccess, Prefixed},
         Entry, ObjectHash,
     },
 };
@@ -29,7 +29,7 @@ pub struct Schema<T: Access> {
 impl<'a, T: Access> Schema<Prefixed<'a, T>> {
     pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            config_propose: Restore::restore(access, "config_propose".into()).unwrap(),
+            config_propose: FromAccess::from_access(access, "config_propose".into()).unwrap(),
         }
     }
 

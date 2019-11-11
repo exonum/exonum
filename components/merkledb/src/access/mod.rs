@@ -149,13 +149,13 @@ pub enum AccessErrorKind {
 }
 
 /// Restores an object from the database.
-pub trait Restore<T: Access>: Sized {
+pub trait FromAccess<T: Access>: Sized {
     /// Restores the object at the given address.
     ///
     /// # Return value
     ///
     /// An error should be returned if the object cannot be restored.
-    fn restore(access: T, addr: IndexAddress) -> Result<Self, AccessError>;
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError>;
 }
 
 #[cfg(test)]
