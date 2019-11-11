@@ -50,15 +50,6 @@ pub trait SupervisorInterface {
         artifact: DeployConfirmation,
     ) -> Result<(), ExecutionError>;
 
-    /// Requests start service.
-    ///
-    /// Service will be started if all of validators will send this confirmation.
-    fn start_service(
-        &self,
-        context: CallContext<'_>,
-        service: StartService,
-    ) -> Result<(), ExecutionError>;
-
     /// Propose config change
     ///
     /// This request should be sent by one of validators as the proposition to change
@@ -151,6 +142,8 @@ where
         let mut consensus_propose_added = false;
         // To prevent multiple service change proposition in one request
         let mut service_ids = HashSet::new();
+        // To prevent multiple services start in one request.
+        let mut services_to_start = HashSet::new();
 
         // Perform config verification.
         for change in &propose.changes {
@@ -180,6 +173,29 @@ where
                         .interface::<ConfigureCall<'_>>(config.instance_id)?
                         .verify_config(config.params.clone())
                         .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+
+                ConfigChange::StartService(start_service) => {
+                    if context
+                        .dispatcher_info()
+                        .get_instance(start_service.name.as_str())
+                        .is_some()
+                    {
+                        log::trace!(
+                            "Discarded start of the already running instance {}.",
+                            &start_service.name
+                        );
+                        return Err(Error::InstanceExists.into());
+                    }
+
+                    if services_to_start.contains(&start_service.name) {
+                        log::trace!(
+                            "Discarded multiple instances with the same name in one request."
+                        );
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+
+                    services_to_start.insert(&start_service.name);
                 }
             }
         }
@@ -336,54 +352,6 @@ where
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
             context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
-        }
-
-        Ok(())
-    }
-
-    fn start_service(
-        &self,
-        mut context: CallContext<'_>,
-        service: StartService,
-    ) -> Result<(), ExecutionError> {
-        service.validate()?;
-        let blockchain_schema = blockchain::Schema::new(context.fork());
-
-        // Verifies that we doesn't reach deadline height.
-        if service.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
-        }
-        let mut pending_instances =
-            Schema::new(context.instance().name, context.fork()).pending_instances();
-        let author = context
-            .caller()
-            .author()
-            .expect("Wrong `StartService` initiator");
-
-        // Verifies that transaction author is validator.
-        pending_instances
-            .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
-
-        // Verifies that the instance name does not exist.
-        if context
-            .dispatcher_info()
-            .get_instance(service.name.as_str())
-            .is_some()
-        {
-            return Err(Error::InstanceExists.into());
-        }
-
-        pending_instances.confirm(&service, author);
-        if Mode::start_approved(&service, &pending_instances) {
-            log::trace!(
-                "Request add service with name {:?} from artifact {:?}",
-                service.name,
-                service.artifact
-            );
-            // We have enough confirmations to add a new service instance;
-            // if this action fails this transaction will be canceled.
-            context.start_adding_service(service.artifact, service.name, service.config)?;
         }
 
         Ok(())

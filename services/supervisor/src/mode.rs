@@ -19,14 +19,14 @@
 //!   is reduced to the minimum: the only reuqirement is that every request is sent
 //!   by the validator.
 //! - Decentralized mode. Within decentralized mode, policy on requests is the following:
-//!   Deploy & StartService requests should be signed and sent by every validator,
+//!   deploy requests should be signed and sent by every validator,
 //!   config proposals should be approved by at least (2/3+1) validators.
 
 use exonum::helpers::{byzantine_quorum, multisig::ValidatorMultisig};
 use exonum_crypto::Hash;
 use exonum_merkledb::IndexAccess;
 
-use super::{DeployRequest, StartService};
+use super::DeployRequest;
 
 /// Simple supervisor mode: to deploy or initialize service one have to send
 /// one request to any of the validators.
@@ -47,12 +47,6 @@ pub trait SupervisorMode: std::fmt::Debug + Send + Sync + Copy + 'static {
         deploy_requests: &ValidatorMultisig<T, DeployRequest>,
     ) -> bool;
 
-    /// Checks whether service should be started within the network.
-    fn start_approved<T: IndexAccess>(
-        start: &StartService,
-        pending_instances: &ValidatorMultisig<T, StartService>,
-    ) -> bool;
-
     /// Checks whether config can be applied for the network.
     fn config_approved<T: IndexAccess>(
         config_hash: &Hash,
@@ -67,14 +61,6 @@ impl SupervisorMode for Simple {
     ) -> bool {
         // For simple supervisor request from 1 validator is enough.
         deploy_requests.confirmations(deploy) >= 1
-    }
-
-    fn start_approved<T: IndexAccess>(
-        start: &StartService,
-        pending_instances: &ValidatorMultisig<T, StartService>,
-    ) -> bool {
-        // For simple supervisor request from 1 validator is enough.
-        pending_instances.confirmations(start) >= 1
     }
 
     fn config_approved<T: IndexAccess>(
@@ -92,14 +78,6 @@ impl SupervisorMode for Decentralized {
     ) -> bool {
         // For decentralized supervisor deploy should be approved by every validator.
         deploy_requests.confirmations(deploy) == deploy_requests.validators_amount()
-    }
-
-    fn start_approved<T: IndexAccess>(
-        start: &StartService,
-        pending_instances: &ValidatorMultisig<T, StartService>,
-    ) -> bool {
-        // For decentralized supervisor start should be approved by every validator.
-        pending_instances.confirmations(start) == pending_instances.validators_amount()
     }
 
     fn config_approved<T: IndexAccess>(

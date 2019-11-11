@@ -25,7 +25,7 @@ use failure::Fail;
 
 use super::{
     schema::Schema, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
-    ConfigVote, DeployRequest, StartService,
+    ConfigVote, DeployRequest,
 };
 
 /// Private API specification of the supervisor service.
@@ -36,10 +36,6 @@ pub trait PrivateApi {
     /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
     /// by the current node, and returns its hash.
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
-
-    /// Creates and broadcasts the `StartService` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
 
     /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
     /// by the current node, and returns its hash.
@@ -82,10 +78,6 @@ impl PrivateApi for ApiImpl<'_> {
         self.broadcast_transaction(artifact).map_err(From::from)
     }
 
-    fn start_service(&self, service: StartService) -> Result<Hash, Self::Error> {
-        self.broadcast_transaction(service).map_err(From::from)
-    }
-
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         self.broadcast_transaction(proposal).map_err(From::from)
     }
@@ -114,9 +106,6 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         .private_scope()
         .endpoint_mut("deploy-artifact", |state, query| {
             ApiImpl(state).deploy_artifact(query)
-        })
-        .endpoint_mut("start-service", |state, query| {
-            ApiImpl(state).start_service(query)
         })
         .endpoint_mut("propose-config", |state, query| {
             ApiImpl(state).propose_config(query)

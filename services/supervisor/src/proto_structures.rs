@@ -52,7 +52,7 @@ pub struct DeployConfirmation {
 
 /// Request for the artifact deployment.
 #[protobuf_convert(source = "proto::StartService")]
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, ProtobufConvert, Hash, BinaryValue, ObjectHash)]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -60,8 +60,6 @@ pub struct StartService {
     pub name: String,
     /// Instance configuration.
     pub config: Vec<u8>,
-    /// The height until which the start service procedure should be completed.
-    pub deadline_height: Height,
 }
 
 /// Configuration parameters of the certain service instance.
@@ -104,6 +102,8 @@ pub enum ConfigChange {
     Consensus(ConsensusConfig),
     /// New service instance config.
     Service(ServiceConfig),
+    /// New service instance start request.
+    StartService(StartService),
 }
 
 /// Request for the configuration change

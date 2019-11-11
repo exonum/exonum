@@ -113,6 +113,25 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
                 );
             }
         }
+
+        ConfigChange::StartService(start_service) => {
+            log::trace!(
+                "Request add service with name {:?} from artifact {:?}",
+                start_service.name,
+                start_service.artifact
+            );
+            if let Err(e) = context.start_adding_service(
+                start_service.artifact,
+                start_service.name,
+                start_service.config,
+            ) {
+                // Panic will cause changes to be rolled back.
+                panic!(
+                    "An error occured while starting the service instance: {:?}",
+                    e
+                );
+            }
+        }
     })
 }
 

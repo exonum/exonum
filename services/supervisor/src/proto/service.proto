@@ -46,8 +46,6 @@ message StartService {
   string name = 2;
   // Instance configuration.
   bytes config = 3;
-  // The height until which the start service procedure should be completed.
-  uint64 deadline_height = 4;
 }
 
 // Configuration parameters of the certain service instance.
@@ -65,6 +63,8 @@ message ConfigChange {
     exonum.Config consensus = 1;
     // New service instance config.
     ServiceConfig service = 2;
+    // New service instance start request.
+    StartService start_service = 3;
   }
 }
 
