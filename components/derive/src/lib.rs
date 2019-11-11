@@ -139,11 +139,9 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 ///
 /// Typical usage.
 /// ```ignore
+/// #[derive(ServiceFactory, ServiceDispatcher)]
 /// #[service_dispatcher(implements("MyServiceInterface"))]
-/// #[derive(ServiceFactory)]
-/// #[service_factory(
-///     proto_sources = "crate::proto",
-/// )]
+/// #[service_factory(proto_sources = "crate::proto")]
 /// pub struct MyService;
 /// ```
 ///
