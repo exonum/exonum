@@ -16,7 +16,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, RawProofMap};
+use exonum_merkledb::{Entry, IndexAccess, ObjectHash, RawProofMapIndex};
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, transactions::Config};
@@ -88,8 +88,8 @@ where
     T: IndexAccess,
 {
     /// Returns the `ProofMapIndex` of timestamps.
-    pub fn timestamps(&self) -> RawProofMap<T, Hash, TimestampEntry> {
-        RawProofMap::new(
+    pub fn timestamps(&self) -> RawProofMapIndex<T, Hash, TimestampEntry> {
+        RawProofMapIndex::new(
             [self.service_name, ".timestamps"].concat(),
             self.access.clone(),
         )

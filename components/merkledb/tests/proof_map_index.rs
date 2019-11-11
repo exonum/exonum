@@ -23,8 +23,8 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::ProofPath, BinaryKey, BinaryValue, Database, HashedProofMap, IndexAccess,
-    MapProof, ObjectHash, ProofMapIndex, TemporaryDB,
+    proof_map_index::ProofPath, BinaryKey, BinaryValue, Database, IndexAccess, MapProof,
+    ObjectHash, ProofMapIndex, TemporaryDB,
 };
 use proptest::{
     prelude::prop::{
@@ -122,7 +122,7 @@ where
 fn write_data(db: &TemporaryDB, data: Data) {
     let fork = db.fork();
     {
-        let mut table = HashedProofMap::new(INDEX_NAME, &fork);
+        let mut table = ProofMapIndex::new(INDEX_NAME, &fork);
         table.clear();
         for (key, value) in data {
             table.put(&key, value);

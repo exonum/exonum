@@ -14,7 +14,7 @@
 
 //! Cryptocurrency database schema.
 
-use exonum_merkledb::{IndexAccess, ObjectHash, ProofListIndex, RawProofMap};
+use exonum_merkledb::{IndexAccess, ObjectHash, ProofListIndex, RawProofMapIndex};
 
 use exonum::crypto::{Hash, PublicKey};
 
@@ -40,8 +40,8 @@ where
     }
 
     /// Returns `ProofMapIndex` with wallets.
-    pub fn wallets(&self) -> RawProofMap<T, PublicKey, Wallet> {
-        RawProofMap::new(
+    pub fn wallets(&self) -> RawProofMapIndex<T, PublicKey, Wallet> {
+        RawProofMapIndex::new(
             [self.service_name, ".wallets"].concat(),
             self.access.clone(),
         )

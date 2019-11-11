@@ -31,7 +31,7 @@ use super::{
     MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
 use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
-use crate::proof_map_index::HashedProofMap;
+use crate::proof_map_index::ProofMapIndexBase;
 use crate::{BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB};
 
 const IDX_NAME: &str = "idx_name";
@@ -124,7 +124,7 @@ where
 {
     let db = TemporaryDB::default();
     let fork = db.fork();
-    let mut index = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &fork);
+    let mut index = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &fork);
 
     assert_eq!(index.get(&[1; 32]), None);
     assert!(!index.contains(&[1; 32]));
@@ -161,11 +161,11 @@ where
     let storage1 = db1.fork();
     let storage2 = db2.fork();
 
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![1]);
     index1.put(&[254; 32], vec![2]);
 
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[254; 32], vec![2]);
     index2.put(&[255; 32], vec![1]);
 
@@ -184,7 +184,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
     assert_eq!(table.object_hash(), HashTag::empty_map_hash());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
     let hash = HashStream::new()
@@ -208,13 +208,13 @@ where
     let storage1 = db1.fork();
     let storage2 = db2.fork();
 
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![3]);
     index1.put(&[254; 32], vec![2]);
     index1.put(&[250; 32], vec![1]);
     index1.put(&[254; 32], vec![5]);
 
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[250; 32], vec![1]);
     index2.put(&[254; 32], vec![2]);
     index2.put(&[255; 32], vec![3]);
@@ -231,7 +231,7 @@ where
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[42; 32], vec![1]);
     index1.put(&[64; 32], vec![2]);
     index1.put(&[240; 32], vec![3]);
@@ -240,7 +240,7 @@ where
     index1.put(&[255; 32], vec![6]);
 
     let storage2 = db2.fork();
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[255; 32], vec![6]);
     index2.put(&[250; 32], vec![5]);
     index2.put(&[245; 32], vec![4]);
@@ -259,12 +259,12 @@ where
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![6]);
     index1.remove(&[255; 32]);
 
     let storage2 = db2.fork();
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[255; 32], vec![6]);
     index2.remove(&[255; 32]);
 
@@ -279,7 +279,7 @@ where
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[255; 32], vec![1]);
     index1.put(&[250; 32], vec![2]);
     index1.put(&[245; 32], vec![3]);
@@ -288,7 +288,7 @@ where
     index1.remove(&[245; 32]);
 
     let storage2 = db2.fork();
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[250; 32], vec![2]);
     index2.put(&[255; 32], vec![1]);
     index2.put(&[245; 32], vec![3]);
@@ -313,7 +313,7 @@ where
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
     let storage1 = db1.fork();
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
     index1.put(&[42; 32], vec![1]);
     index1.put(&[64; 32], vec![2]);
     index1.put(&[240; 32], vec![3]);
@@ -329,7 +329,7 @@ where
     index1.remove(&[42; 32]);
 
     let storage2 = db2.fork();
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     index2.put(&[255; 32], vec![6]);
     index2.put(&[250; 32], vec![5]);
     index2.put(&[245; 32], vec![4]);
@@ -354,7 +354,7 @@ where
     let db = TemporaryDB::default();
     let fork = db.fork();
 
-    let mut index = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &fork);
+    let mut index = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &fork);
     index.put(&[1; 32], 1);
     let root_hash = index.merkle_root();
 
@@ -369,7 +369,7 @@ where
 fn test_merkle_root_leaf() {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut index = HashedProofMap::new(IDX_NAME, &storage);
+    let mut index = ProofMapIndex::new(IDX_NAME, &storage);
 
     let key = vec![1, 2, 3];
     let value = vec![4, 5, 6];
@@ -392,14 +392,14 @@ where
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
     let storage1 = db1.fork();
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
 
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
 
     let storage2 = db2.fork();
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, item.1.clone());
@@ -437,7 +437,7 @@ where
 fn check_map_proof<K, V, S>(
     proof: &MapProof<K, V>,
     key: Option<K>,
-    table: &ProofMapIndex<&Fork, K, V, S>,
+    table: &ProofMapIndexBase<&Fork, K, V, S>,
 ) where
     K: BinaryKey + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
@@ -475,7 +475,7 @@ fn check_map_proof<K, V, S>(
 fn check_map_multiproof<K, V, S>(
     proof: &MapProof<K, V>,
     keys: Vec<K>,
-    table: &ProofMapIndex<&Fork, K, V, S>,
+    table: &ProofMapIndexBase<&Fork, K, V, S>,
 ) where
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + ObjectHash + PartialEq + Debug,
@@ -536,7 +536,7 @@ where
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let storage = db.fork();
-    let mut table = HashedProofMap::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
     for &(ref key, ref value) in data {
         table.put(key, value.clone());
     }
@@ -570,7 +570,7 @@ where
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize,
 {
     let storage = db.fork();
-    let mut table = HashedProofMap::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
     for &(ref key, ref value) in data {
         table.put(key, value.clone());
     }
@@ -677,7 +677,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
 
     // Just to notify the compiler of the types used; same key is added and then removed from tree.
     table.put(&[230; 32], vec![1]);
@@ -694,7 +694,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
 
     // Just to notify the compiler of the types used; same key is added and then removed from tree.
     table.put(&[230; 32], vec![1]);
@@ -712,7 +712,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[230; 32], vec![1]);
     let proof = table.get_proof([230; 32]);
@@ -733,7 +733,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[230; 32], vec![1]);
 
@@ -757,7 +757,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[128; 32], vec![1]); // 128 = 0b1000_0000 ~ ProofPath(00000001...)
     table.put(&[32; 32], vec![2]); //   32 = 0b0010_0000 ~ ProofPath(00000100...)
@@ -968,7 +968,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
 
     table.put(&[128; 32], vec![1]);
     table.put(&[32; 32], vec![2]);
@@ -1219,7 +1219,7 @@ fn test_fuzz_delete_build_proofs() {
     let data = generate_random_data_keys(&mut exists_keys, SAMPLE_SIZE, &mut rng);
 
     let storage = db.fork();
-    let mut table = HashedProofMap::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
@@ -1260,14 +1260,14 @@ where
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
     let storage1 = db1.fork();
-    let mut index1 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage1);
+    let mut index1 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage1);
 
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
 
     let storage2 = db2.fork();
-    let mut index2 = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage2);
+    let mut index2 = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage2);
     data.shuffle(&mut rng);
 
     for item in &data {
@@ -1323,7 +1323,7 @@ where
 {
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut index = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &storage);
+    let mut index = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
 
     let data = generate_random_data(100);
 
@@ -1355,7 +1355,7 @@ where
 {
     let db = TemporaryDB::default();
     let fork = db.fork();
-    let mut map_index = ProofMapIndex::<_, _, _, S>::new(IDX_NAME, &fork);
+    let mut map_index = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &fork);
 
     let k0 = [0; 32];
     let k1 = [1; 32];
@@ -1496,7 +1496,7 @@ fn test_tree_with_hashed_key() {
 
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = HashedProofMap::new(IDX_NAME, &storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &storage);
 
     table.put(&Point::new(1, 2), vec![1, 2, 3]);
     table.put(&Point::new(3, 4), vec![2, 3, 4]);

@@ -49,7 +49,7 @@ mod proof_builder;
 mod tests;
 
 // Necessary to allow building proofs.
-impl<T, K, V, Style> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, Style>
+impl<T, K, V, Style> MerklePatriciaTree<K, V> for ProofMapIndexBase<T, K, V, Style>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
@@ -73,16 +73,8 @@ where
     }
 }
 
-/// A Merkelized version of a map that provides proofs of existence or non-existence for the map
-/// keys.
-///
-/// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
-/// `ProofMapIndex` requires that keys implement the [`BinaryKey`] trait and
-/// values implement the [`BinaryValue`] trait.
-///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryValue`]: ../trait.BinaryValue.html
-pub struct ProofMapIndex<T: IndexAccess, K, V, Style: KeyTransform<K> = Hashed> {
+#[doc(hidden)]
+pub struct ProofMapIndexBase<T: IndexAccess, K, V, Style: KeyTransform<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, Option<ProofPath>>,
     _k: PhantomData<K>,
@@ -209,15 +201,22 @@ impl BinaryAttribute for Option<ProofPath> {
     }
 }
 
-/// Hashed variant of the `ProofMapIndex`, useful for arbitrary keys that implement
-/// `ObjectHash` trait.
-pub type HashedProofMap<T, K, V> = ProofMapIndex<T, K, V, Hashed>;
+/// A Merkelized version of a map that provides proofs of existence or non-existence for the map
+/// keys.
+///
+/// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
+/// `ProofMapIndex` requires that keys implement the [`BinaryKey`] trait and
+/// values implement the [`BinaryValue`] trait.
+///
+/// [`BinaryKey`]: ../trait.BinaryKey.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
+pub type ProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Hashed>;
 
 /// Raw variant of the `ProofMapIndex`, useful for keys that mapped directly to
 /// `ProofPath`. For example `Hash` and `PublicKey`.
-pub type RawProofMap<T, K, V> = ProofMapIndex<T, K, V, Raw>;
+pub type RawProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Raw>;
 
-impl<T, K, V, Style> ProofMapIndex<T, K, V, Style>
+impl<T, K, V, Style> ProofMapIndexBase<T, K, V, Style>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
@@ -435,6 +434,7 @@ where
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
         self.create_proof(key)
+        //        unimplemented!()
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -774,11 +774,7 @@ where
                 if i < proof_path.len() {
                     let mut branch = BranchNode::empty();
                     branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &leaf_hash);
-                    branch.set_child(
-                        prefix_path.bit(i),
-                        &prefix_path.suffix(i),
-                        &prefix_data.object_hash(),
-                    );
+                    branch.set_child(prefix_path.bit(i), &prefix_path.suffix(i), &prefix_data);
                     let new_prefix = proof_path.prefix(i);
                     self.base.put(&new_prefix, branch);
                     new_prefix
@@ -915,7 +911,7 @@ where
     }
 }
 
-impl<T, K, V, Style> ObjectHash for ProofMapIndex<T, K, V, Style>
+impl<T, K, V, Style> ObjectHash for ProofMapIndexBase<T, K, V, Style>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
@@ -1001,27 +997,33 @@ where
     }
 }
 
-impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
+impl<T, K, V, Style> fmt::Debug for ProofMapIndexBase<T, K, V, Style>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue + fmt::Debug,
+    Style: KeyTransform<K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Entry<'a, T: IndexAccess, K: ObjectHash, V: BinaryValue> {
-            index: &'a ProofMapIndex<T, K, V>,
+        struct Entry<'a, T: IndexAccess, K: ObjectHash, V: BinaryValue, Style: KeyTransform<K>> {
+            index: &'a ProofMapIndexBase<T, K, V, Style>,
             path: ProofPath,
             hash: Hash,
             node: Node,
         }
 
-        impl<'a, T, K, V> Entry<'a, T, K, V>
+        impl<'a, T, K, V, Style> Entry<'a, T, K, V, Style>
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue,
+            Style: KeyTransform<K>,
         {
-            fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
+            fn new(
+                index: &'a ProofMapIndexBase<T, K, V, Style>,
+                hash: Hash,
+                path: ProofPath,
+            ) -> Self {
                 Self {
                     index,
                     path,
@@ -1039,11 +1041,12 @@ where
             }
         }
 
-        impl<T, K, V> fmt::Debug for Entry<'_, T, K, V>
+        impl<T, K, V, Style> fmt::Debug for Entry<'_, T, K, V, Style>
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue + fmt::Debug,
+            Style: KeyTransform<K>,
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.node {

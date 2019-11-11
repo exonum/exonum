@@ -14,9 +14,9 @@
 
 use exonum_crypto::Hash;
 
+use crate::proof_map_index::ProofMapIndex;
 use crate::{
-    Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, SparseListIndex,
-    ValueSetIndex,
+    Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, SparseListIndex, ValueSetIndex,
 };
 
 // This should compile to ensure ?Sized bound on `new_in_family` (see #1024).

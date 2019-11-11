@@ -57,13 +57,11 @@ fn reset_bits(value: &mut u8, pos: u16) {
     *value &= reset_bits_mask;
 }
 
-#[allow(clippy::empty_enum)]
 #[derive(Debug)]
-pub enum Hashed {}
+pub struct Hashed;
 
-#[allow(clippy::empty_enum)]
 #[derive(Debug)]
-pub enum Raw {}
+pub struct Raw;
 
 pub trait KeyTransform<K> {
     fn transform_key(key: &K) -> ProofPath;

@@ -20,7 +20,7 @@ use std::{collections::HashSet, convert::TryInto};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
 use exonum_merkledb::{
-    Database, HashedProofMap, MapIndex, ObjectHash, ProofListIndex, TemporaryDB,
+    Database, Fork, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 const NAME: &str = "name";
@@ -261,7 +261,7 @@ fn proof_map_insert_without_merge(b: &mut Bencher<'_>, len: usize) {
     b.iter_with_setup(
         || (db.fork(), data.clone()),
         |(storage, data)| {
-            let mut table = HashedProofMap::new(NAME, &storage);
+            let mut table: ProofMapIndex<&Fork, Hash, Vec<u8>> = ProofMapIndex::new(NAME, &storage);
             for item in data {
                 table.put(&item.0, item.1);
             }
@@ -276,7 +276,7 @@ fn proof_map_insert_with_merge(b: &mut Bencher<'_>, len: usize) {
         |(db, data)| {
             let fork = db.fork();
             {
-                let mut table = HashedProofMap::new(NAME, &fork);
+                let mut table = ProofMapIndex::new(NAME, &fork);
                 for item in data {
                     table.put(&item.0, item.1);
                 }
@@ -334,7 +334,7 @@ fn proof_map_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = HashedProofMap::new(NAME, &storage);
+    let mut table = ProofMapIndex::new(NAME, &storage);
 
     for item in &data {
         table.put(&item.0, item.1.clone());
@@ -357,7 +357,7 @@ fn proof_map_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
     let storage = db.fork();
-    let mut table = HashedProofMap::new(NAME, &storage);
+    let mut table = ProofMapIndex::new(NAME, &storage);
 
     for item in &data {
         table.put(&item.0, item.1.clone());
