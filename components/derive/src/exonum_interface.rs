@@ -22,7 +22,7 @@ use syn::{
 
 use std::convert::TryFrom;
 
-use super::{find_exonum_meta, CratePath};
+use super::{find_meta_attrs, CratePath};
 
 #[derive(Debug)]
 struct ServiceMethodDescriptor {
@@ -98,7 +98,7 @@ impl TryFrom<&[Attribute]> for ExonumServiceAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_meta_attrs("exonum", args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
@@ -229,7 +229,7 @@ impl ToTokens for ExonumService {
     }
 }
 
-pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn impl_exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_trait = parse_macro_input!(item as ItemTrait);
     let attrs = parse_macro_input!(attr as AttributeArgs);
 

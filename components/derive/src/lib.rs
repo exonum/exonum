@@ -50,7 +50,7 @@ use syn::{Attribute, NestedMeta};
 /// ```
 #[proc_macro_derive(BinaryValue)]
 pub fn binary_value(input: TokenStream) -> TokenStream {
-    db_traits::binary_value(input)
+    db_traits::impl_binary_value(input)
 }
 
 /// Derive `ObjectHash` trait.
@@ -72,7 +72,7 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_derive(ObjectHash)]
 pub fn object_hash(input: TokenStream) -> TokenStream {
-    db_traits::object_hash(input)
+    db_traits::impl_object_hash(input)
 }
 
 /// Derive `ServiceDispatcher` trait.
@@ -92,7 +92,7 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
 /// Prefix of the `exonum` crate(usually "crate" or "exonum").
 #[proc_macro_derive(ServiceDispatcher, attributes(service_dispatcher))]
 pub fn service_dispatcher(input: TokenStream) -> TokenStream {
-    service_dispatcher::implement_service_dispatcher(input)
+    service_dispatcher::impl_service_dispatcher(input)
 }
 
 /// Derive `ServiceFactory` and `ServiceDispatcher` traits.
@@ -186,7 +186,7 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
 /// Mark trait as an Exonum service interface.
 #[proc_macro_attribute]
 pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
-    exonum_interface::impl_service_interface(attr, item)
+    exonum_interface::impl_exonum_interface(attr, item)
 }
 
 /// Derive `Into<ExecutionError>` conversion for the specified enumeration.
@@ -209,16 +209,16 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-#[proc_macro_derive(IntoExecutionError, attributes(exonum))]
-pub fn generate_into_execution_error(input: TokenStream) -> TokenStream {
-    execution_error::implement_execution_error(input)
+#[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
+pub fn into_execution_error(input: TokenStream) -> TokenStream {
+    execution_error::impl_execution_error(input)
 }
 
-pub(crate) fn find_exonum_meta(args: &[Attribute]) -> Option<NestedMeta> {
+pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMeta> {
     args.as_ref()
         .iter()
         .filter_map(|a| a.parse_meta().ok())
-        .find(|m| m.path().is_ident("exonum"))
+        .find(|m| m.path().is_ident(name))
         .map(NestedMeta::from)
 }
 

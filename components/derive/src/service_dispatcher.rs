@@ -98,7 +98,7 @@ impl ToTokens for ServiceDispatcher {
     }
 }
 
-pub fn implement_service_dispatcher(input: TokenStream) -> TokenStream {
+pub fn impl_service_dispatcher(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let service_dispatcher = ServiceDispatcher::from_derive_input(&input)

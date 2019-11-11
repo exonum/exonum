@@ -16,7 +16,7 @@
 
 /// List of possible Rust runtime errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(crate = "crate", kind = "runtime")]
+#[execution_error(crate = "crate", kind = "runtime")]
 pub enum Error {
     /// Unable to parse artifact identifier or specified artifact has non-empty spec.
     IncorrectArtifactId = 0,
