@@ -36,6 +36,8 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::Snapshot;
 
+pub mod mode;
+
 mod api;
 mod configure;
 mod errors;
@@ -44,100 +46,19 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-pub mod mode {
-    //! Module with available modes for Supervisor.
-    use exonum::helpers::{byzantine_quorum, multisig::ValidatorMultisig};
-    use exonum_crypto::Hash;
-    use exonum_merkledb::IndexAccess;
+/// Creates a new decentralized `Supervisor`.
+pub fn decentralized_supervisor() -> Supervisor<mode::Decentralized> {
+    Supervisor::<mode::Decentralized>::new()
+}
 
-    use super::{DeployRequest, StartService};
+/// Creates a new simple `Supervisor`.
+pub fn simple_supervisor() -> Supervisor<mode::Simple> {
+    Supervisor::<mode::Simple>::new()
+}
 
-    /// Simple supervisor mode: to deploy or initialize service one have to send
-    /// one request to any of the validators.
-    #[derive(Debug, Clone, Copy, Default)]
-    pub struct Simple;
-
-    /// Decentralized supervisor mode (default): to deploy or initialize service
-    /// a request should be sent to **every** validator before it will be executed.
-    /// For configs, a byzantine majorify of validators should vote for it.
-    #[derive(Debug, Clone, Copy, Default)]
-    pub struct Decentralized;
-
-    /// Extension trait encapsulating the decision making logic of the supervisor.
-    pub trait SupervisorMode: std::fmt::Debug + Send + Sync + Copy + 'static {
-        /// Checks whether deploy should be performed within the network.
-        fn deploy_approved<T: IndexAccess>(
-            deploy: &DeployRequest,
-            deploy_requests: &ValidatorMultisig<T, DeployRequest>,
-        ) -> bool;
-
-        /// Checks whether service should be started within the network.
-        fn start_approved<T: IndexAccess>(
-            start: &StartService,
-            pending_instances: &ValidatorMultisig<T, StartService>,
-        ) -> bool;
-
-        /// Checks whether config can be applied for the network.
-        fn config_approved<T: IndexAccess>(
-            config_hash: &Hash,
-            config_confirms: &ValidatorMultisig<T, Hash>,
-        ) -> bool;
-    }
-
-    impl SupervisorMode for Simple {
-        fn deploy_approved<T: IndexAccess>(
-            deploy: &DeployRequest,
-            deploy_requests: &ValidatorMultisig<T, DeployRequest>,
-        ) -> bool {
-            // For simple supervisor request from 1 validator is enough.
-            deploy_requests.confirmations(deploy) >= 1
-        }
-
-        fn start_approved<T: IndexAccess>(
-            start: &StartService,
-            pending_instances: &ValidatorMultisig<T, StartService>,
-        ) -> bool {
-            // For simple supervisor request from 1 validator is enough.
-            pending_instances.confirmations(start) >= 1
-        }
-
-        fn config_approved<T: IndexAccess>(
-            config_hash: &Hash,
-            config_confirms: &ValidatorMultisig<T, Hash>,
-        ) -> bool {
-            let confirmations = config_confirms.confirmations(&config_hash);
-            confirmations >= 1
-        }
-    }
-
-    impl SupervisorMode for Decentralized {
-        fn deploy_approved<T: IndexAccess>(
-            deploy: &DeployRequest,
-            deploy_requests: &ValidatorMultisig<T, DeployRequest>,
-        ) -> bool {
-            // For decentralized supervisor deploy should be approved by every validator.
-            deploy_requests.confirmations(deploy) == deploy_requests.validators_amount()
-        }
-
-        fn start_approved<T: IndexAccess>(
-            start: &StartService,
-            pending_instances: &ValidatorMultisig<T, StartService>,
-        ) -> bool {
-            // For decentralized supervisor start should be approved by every validator.
-            pending_instances.confirmations(start) == pending_instances.validators_amount()
-        }
-
-        fn config_approved<T: IndexAccess>(
-            config_hash: &Hash,
-            config_confirms: &ValidatorMultisig<T, Hash>,
-        ) -> bool {
-            let confirmations = config_confirms.confirmations(&config_hash);
-            let validators = config_confirms.validators_amount();
-
-            // Apply pending config in case 2/3+1 validators voted for it.
-            confirmations >= byzantine_quorum(validators)
-        }
-    }
+/// Returns the `Supervisor` entity name.
+pub const fn supervisor_name() -> &'static str {
+    Supervisor::<mode::Decentralized>::NAME
 }
 
 /// Error message emitted when the `Supervisor` is installed as a non-privileged service.
@@ -193,16 +114,6 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
             }
         }
     })
-}
-
-/// Creates a new decentralized `Supervisor`.
-pub fn decentralized_supervisor() -> Supervisor<mode::Decentralized> {
-    Supervisor::<mode::Decentralized>::new()
-}
-
-/// Creates a new simple `Supervisor`.
-pub fn simple_supervisor() -> Supervisor<mode::Simple> {
-    Supervisor::<mode::Simple>::new()
 }
 
 #[derive(Debug, Default, Clone, Copy, ServiceFactory)]

@@ -26,7 +26,9 @@ use exonum::{
 use exonum_derive::ServiceFactory;
 use exonum_testkit::{TestKit, TestKitBuilder};
 
-use exonum_supervisor::{simple_supervisor, ConfigPropose, Configure, Schema, SupervisorInterface};
+use exonum_supervisor::{
+    simple_supervisor, supervisor_name, ConfigPropose, Configure, Schema, SupervisorInterface,
+};
 
 pub fn sign_config_propose_transaction(
     testkit: &TestKit,
@@ -116,8 +118,7 @@ impl Configure for ConfigChangeService {
 
 fn assert_config_change_is_applied(testkit: &TestKit) {
     let snapshot = testkit.snapshot();
-    // TODO do not use name directly
-    assert!(!Schema::new("supervisor", &snapshot)
+    assert!(!Schema::new(supervisor_name(), &snapshot)
         .pending_proposal()
         .exists());
 }
@@ -722,9 +723,8 @@ fn test_send_proposal_with_api() {
     testkit.api().exonum_api().assert_tx_success(hash);
 
     // Assert that config is now pending.
-    // TODO: don't use raw name
     assert_eq!(
-        Schema::new("supervisor", &testkit.snapshot())
+        Schema::new(supervisor_name(), &testkit.snapshot())
             .pending_proposal()
             .get()
             .unwrap()
