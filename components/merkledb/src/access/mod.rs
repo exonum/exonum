@@ -148,13 +148,89 @@ pub enum AccessErrorKind {
     Custom(#[fail(cause)] Error),
 }
 
-/// Restores an object from the database.
+/// Constructs an object atop the database. The constructed object provides access to data
+/// in the DB, akin to an object-relational mapping.
+///
+/// The access to DB can be readonly or read-write, depending on the `T: Access` type param.
+/// Most object should implement `FromAccess<T>` for all `T: Access`, unless there are compelling
+/// reasons not to.
+///
+/// Simplest `FromAccess` implementors are indexes; it is implemented for [`Lazy`] and [`Group`].
+/// `FromAccess` can be implemented for more complex *components*. `FromAccess` thus can provide
+/// composability when accessing the storage.
+///
+/// [`Lazy`]: ../struct.Lazy.html
+/// [`Group`]: ../struct.Group.html
+///
+/// # Examples
+///
+/// Component with two inner indexes.
+///
+/// ```
+/// # use exonum_merkledb::{
+/// #     access::{Access, AccessExt, AccessError, FromAccess, RawAccessMut},
+/// #     Database, Entry, Group, Lazy, MapIndex, IndexAddress, TemporaryDB,
+/// # };
+/// struct InsertOnlyMap<T: Access> {
+///     map: MapIndex<T::Base, String, String>,
+///     len: Entry<T::Base, u64>,
+/// }
+///
+/// impl<T: Access> FromAccess<T> for InsertOnlyMap<T> {
+///     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+///         Ok(Self {
+///             map: FromAccess::from_access(access.clone(), addr.clone().append_name("map"))?,
+///             len: FromAccess::from_access(access, addr.append_name("len"))?,
+///         })
+///     }
+/// }
+///
+/// impl<T: Access> InsertOnlyMap<T>
+/// where
+///     T::Base: RawAccessMut,
+/// {
+///     fn insert(&mut self, key: &str, value: String) -> bool {
+///         if self.map.contains(key) { return false; }
+///         self.map.put(&key.to_owned(), value);
+///         self.len.set(self.len.get().unwrap_or_default() + 1);
+///         true
+///     }
+/// }
+///
+/// # fn main() -> Result<(), AccessError> {
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// # {
+/// let mut map = InsertOnlyMap::from_access(&fork, "test".into())?;
+/// map.insert("foo", "FOO".to_owned());
+/// map.insert("bar", "BAR".to_owned());
+/// assert_eq!(map.len.get(), Some(2));
+/// # }
+///
+/// // Components could be used with `Group` / `Lazy` out of the box:
+/// let lazy_map: Lazy<_, InsertOnlyMap<_>> =
+///     Lazy::from_access(&fork, "test".into())?;
+/// assert_eq!(lazy_map.get().map.get("foo").unwrap(), "FOO");
+///
+/// let group_of_maps: Group<_, u16, InsertOnlyMap<_>> =
+///     fork.get_group("test_group");
+/// group_of_maps.get(&1).insert("baz", "BAZ".to_owned());
+/// group_of_maps.get(&2).insert("baz", "BUZZ".to_owned());
+/// # assert_eq!(group_of_maps.get(&1).len.get(), Some(1));
+/// # assert_eq!(
+/// #     fork.get_map::<_, String, String>(("test_group.map", &2_u16)).get("baz").unwrap(),
+/// #     "BUZZ"
+/// # );
+/// # Ok(())
+/// # }
+/// ```
 pub trait FromAccess<T: Access>: Sized {
-    /// Restores the object at the given address.
+    /// Constructs the object at the given address.
     ///
     /// # Return value
     ///
-    /// An error should be returned if the object cannot be restored.
+    /// Returns the constructed object. An error should be returned if the object cannot be
+    /// constructed.
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError>;
 }
 

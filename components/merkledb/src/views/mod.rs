@@ -199,7 +199,17 @@ impl IndexAddress {
         )
     }
 
-    /// Prepends a name part to `IndexAddress`.
+    /// Prepends a name part to `IndexAddress`. The name is separated from the existing name
+    /// by a dot `.`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use exonum_merkledb::IndexAddress;
+    /// let addr = IndexAddress::with_root("foo");
+    /// let prefixed = addr.prepend_name("prefix");
+    /// assert_eq!(prefixed.name(), "prefix.foo");
+    /// ```
     pub fn prepend_name<'a>(self, prefix: impl Into<Cow<'a, str>>) -> Self {
         let prefix = prefix.into();
         Self {
@@ -208,6 +218,31 @@ impl IndexAddress {
             } else {
                 // Because `concat` is faster than `format!("...")` in all cases.
                 [prefix.as_ref(), ".", self.name()].concat()
+            },
+
+            bytes: self.bytes,
+        }
+    }
+
+    /// Appends a name part to `IndexAddress`. The name is separated from the existing name
+    /// by a dot `.`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use exonum_merkledb::IndexAddress;
+    /// let addr = IndexAddress::with_root("foo");
+    /// let suffixed = addr.append_name("suffix");
+    /// assert_eq!(suffixed.name(), "foo.suffix");
+    /// ```
+    pub fn append_name<'a>(self, suffix: impl Into<Cow<'a, str>>) -> Self {
+        let suffix = suffix.into();
+        Self {
+            name: if self.name.is_empty() {
+                suffix.into_owned()
+            } else {
+                // Because `concat` is faster than `format!("...")` in all cases.
+                [self.name(), ".", suffix.as_ref()].concat()
             },
 
             bytes: self.bytes,
