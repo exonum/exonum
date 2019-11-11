@@ -101,11 +101,11 @@ pub trait AccessExt: Access {
         ProofListIndex::from_access(self, addr.into()).unwrap()
     }
 
-    /// Gets a Merkelized list index with the specified address.
+    /// Gets a Merkelized map index with the specified address.
     ///
     /// # Panics
     ///
-    /// If the index exists, but is not a Merkelized list.
+    /// If the index exists, but is not a Merkelized map.
     fn get_proof_map<I, K, V>(self, addr: I) -> ProofMapIndex<Self::Base, K, V>
     where
         I: Into<IndexAddress>,
