@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The runtime for the native Rust services.
+//! The current runtime is for running native services written in Rust.
 //!
-//! A set of artifacts available to deploy in the Rust runtime is static and defined at the compile
-//! time. Once created, it can be changed only by the node binary recompilation.
+//! A set of artifacts available to deploy in the Rust runtime is static. The set is defined at the time
+//! of compilation. Once created, the set can be changed only by the node binary recompilation.
 //!
-//! Beware of the removing the artifacts from the Rust runtime, since attempt to remove an artifact
-//! with already running instances can cause blockchain to break. The only safe change that can be
-//! performed here is adding new artifacts.
+//! Beware of removing the artifacts from the Rust runtime. An attempt to remove an artifact
+//! from an instance that is already running can cause blockchain to break. It is only safe
+//! to add new artifacts.
 //!
-//! Rust runtime does not provide any level of service isolation from the operation system,
-//! therefore security audit of the artifacts to be deployed is up to the node administrators.
+//! The Rust runtime does not provide any level of service isolation from the operation system.
+//! Therefore, the security audit of the artifacts that should be deployed is up to the node administrators.
 //!
 //! The artifact interface in the Rust runtime is represented by the
-//! [`ServiceFactory`][ServiceFactory] trait, which creates service instances and provides
+//! [`ServiceFactory`][ServiceFactory] trait. The trait creates service instances and provides
 //! information about the artifact.
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html
@@ -148,7 +148,7 @@ impl RustRuntime {
     }
 
     /// Adds a new service factory to the runtime and returns
-    /// modified `RustRuntime` object for further chaining.
+    /// a modified `RustRuntime` object for further chaining.
     pub fn with_available_service(
         mut self,
         service_factory: impl Into<Box<dyn ServiceFactory>>,
@@ -326,8 +326,8 @@ impl FromStr for RustArtifactId {
                 })
             }
             _ => Err(failure::format_err!(
-                "Wrong rust artifact name format, it should be \
-                 in form \"artifact_name:artifact_version\""
+                "Wrong Rust artifact name format. The name should be arranged \
+                 as follows \"artifact_name:artifact_version\""
             )),
         }
     }
