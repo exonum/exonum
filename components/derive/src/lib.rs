@@ -139,10 +139,10 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 ///
 /// Typical usage.
 /// ```ignore
+/// #[service_dispatcher(implements("MyServiceInterface"))]
 /// #[derive(ServiceFactory)]
 /// #[service_factory(
 ///     proto_sources = "crate::proto",
-/// )]#[service_dispatcher( implements("MyServiceInterface")
 /// )]
 /// pub struct MyService;
 /// ```
@@ -161,11 +161,11 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 /// // like in example bellow.
 /// // To resolve this problem you can specify your own constructor for the service instance.
 /// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// #[service_dispatcher(implements("TimeServiceInterface"))]
 /// #[service_factory(
 ///     proto_sources = "proto",
 ///     service_constructor = "TimeServiceFactory::create_instance",
 ///     service_name = "TimeService",
-/// )]#[service_dispatcher( implements("TimeServiceInterface"),
 /// )]
 /// pub struct TimeServiceFactory {
 ///     time_provider: Arc<dyn TimeProvider>,

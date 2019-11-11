@@ -366,7 +366,7 @@ impl TestKit {
     /// # const SERVICE_ID: u32 = 1;
     /// #
     /// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-    /// # #[service_dispatcher( implements("ExampleInterface"))]
+    /// # #[service_dispatcher(implements("ExampleInterface"))]
     /// # #[service_factory(
     /// #     artifact_name = "example",
     /// #     artifact_version = "1.0.0",
