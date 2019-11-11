@@ -329,7 +329,9 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 impl<T: RawAccess> View<T> {
     /// Creates a new view for an index with the specified address.
     #[doc(hidden)]
-    // ^-- This should be `pub(crate)`, but is currently used by the testkit to revert blocks.
+    // ^-- This method is used in the testkit to revert blocks. It should not be used
+    // in the user-facing code; use more high-level abstractions instead (e.g., indexes or
+    // `AccessExt` methods).
     pub fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
         let address = address.into();
         let changes = index_access.changes(&address);

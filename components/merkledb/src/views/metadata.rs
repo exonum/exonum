@@ -36,7 +36,7 @@ pub enum IndexType {
     Map = 1,
     /// Non-merkelized list index.
     List = 2,
-    /// Singleton entry.
+    /// Single entry acting like a Rust `Option`.
     Entry = 3,
     /// Set index with elements stored in a hash table.
     ValueSet = 4,
@@ -269,6 +269,10 @@ impl<T: RawAccess> IndexesPool<T> {
         self.0.put_or_forget(&(), len);
     }
 
+    /// # Return value
+    ///
+    /// Index metadata and a flag set to `true` if the index is phantom (i.e., is not in the storage
+    /// and cannot be persisted because the storage is immutable).
     fn create_index_metadata<V>(
         &mut self,
         index_name: &[u8],
@@ -302,6 +306,13 @@ impl<T> ViewWithMetadata<T>
 where
     T: RawAccess,
 {
+    /// Gets an index with the specified address and type. Creates an index if it is not present
+    /// in the storage.
+    ///
+    /// # Return value
+    ///
+    /// Returns `Err(Self)` if the index is in the storage and has a type different from
+    /// the one provided as an argument.
     pub(crate) fn get_or_create(
         index_access: T,
         index_address: &IndexAddress,

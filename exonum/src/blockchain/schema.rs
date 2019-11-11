@@ -97,6 +97,9 @@ impl TxLocation {
 /// committed transactions.
 #[derive(Debug, Clone, Copy)]
 pub struct Schema<T> {
+    // For performance reasons, we don't use the field-per-index schema pattern.
+    // Indeed, the core schema has many indexes, most of which are never accessed
+    // for any particular `Schema` instance.
     access: T,
 }
 
