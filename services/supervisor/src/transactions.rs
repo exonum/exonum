@@ -23,7 +23,7 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
+    mode, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
     DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor,
 };
 
@@ -117,7 +117,10 @@ impl ValidateInput for StartService {
     }
 }
 
-impl SupervisorInterface for Supervisor {
+impl<Mode> SupervisorInterface for Supervisor<Mode>
+where
+    Mode: mode::SupervisorMode,
+{
     fn propose_config_change(
         &self,
         mut context: CallContext<'_>,
@@ -280,8 +283,8 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::AlreadyDeployed.into());
         }
 
-        let confirmations = deploy_requests.confirm(&deploy, author);
-        if confirmations == deploy_requests.validators_amount() {
+        deploy_requests.confirm(&deploy, author);
+        if Mode::deploy_approved(&deploy, &deploy_requests) {
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
             schema.pending_deployments().put(&artifact, deploy);
@@ -371,8 +374,8 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::InstanceExists.into());
         }
 
-        let confirmations = pending_instances.confirm(&service, author);
-        if confirmations == pending_instances.validators_amount() {
+        pending_instances.confirm(&service, author);
+        if Mode::start_approved(&service, &pending_instances) {
             log::trace!(
                 "Request add service with name {:?} from artifact {:?}",
                 service.name,

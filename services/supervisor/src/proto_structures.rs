@@ -28,7 +28,7 @@ use exonum_derive::*;
 use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
 use exonum_proto::ProtobufConvert;
 
-use super::{proto, simple::SimpleSupervisorInterface, transactions::SupervisorInterface};
+use super::{proto, transactions::SupervisorInterface};
 
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
@@ -131,19 +131,19 @@ impl ConfigPropose {
         )
     }
 
-    /// Signs the proposal for a simple supervisor with a randomly generated keypair.
-    pub fn sign_for_simple_supervisor(
-        self,
-        public_key: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
-        Transaction::<dyn SimpleSupervisorInterface>::sign(
-            self,
-            SUPERVISOR_INSTANCE_ID,
-            public_key,
-            secret_key,
-        )
-    }
+    // /// Signs the proposal for a simple supervisor with a randomly generated keypair.
+    // pub fn sign_for_simple_supervisor(
+    //     self,
+    //     public_key: PublicKey,
+    //     secret_key: &SecretKey,
+    // ) -> Verified<AnyTx> {
+    //     Transaction::<dyn SimpleSupervisorInterface>::sign(
+    //         self,
+    //         SUPERVISOR_INSTANCE_ID,
+    //         public_key,
+    //         secret_key,
+    //     )
+    // }
 
     /// Creates a new proposal which activates at the specified height.
     pub fn actual_from(height: Height) -> Self {

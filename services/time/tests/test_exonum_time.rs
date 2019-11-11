@@ -28,7 +28,7 @@ use exonum::{
     runtime::{rust::Transaction, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_supervisor::{simple::SimpleSupervisor, ConfigPropose};
+use exonum_supervisor::{simple_supervisor, ConfigPropose};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
     api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
@@ -366,7 +366,7 @@ fn test_selected_time_less_than_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(simple_supervisor())
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -383,7 +383,7 @@ fn test_selected_time_less_than_time_in_storage() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_cfg)
-            .sign_for_simple_supervisor(pub_key_0, &sec_key_0),
+            .sign_for_supervisor(pub_key_0, &sec_key_0),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -539,7 +539,7 @@ fn test_endpoint_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(simple_supervisor())
         .create();
 
     let mut api = testkit.api();
@@ -611,7 +611,7 @@ fn test_endpoint_api() {
     testkit.create_block_with_transaction(
         ConfigPropose::actual_from(cfg_change_height)
             .consensus_config(new_cfg)
-            .sign_for_simple_supervisor(public_key_0, &secret_key_0),
+            .sign_for_supervisor(public_key_0, &secret_key_0),
     );
     testkit.create_blocks_until(cfg_change_height);
 

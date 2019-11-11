@@ -29,7 +29,7 @@ use crate::{
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
 use exonum_supervisor::{
-    ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
+    decentralized_supervisor, ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig,
 };
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(2);
@@ -39,7 +39,9 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
-    Schema::new(Supervisor::NAME, &snapshot)
+    // TODO fix this
+    // Schema::new(Supervisor::NAME, &snapshot)
+    Schema::new("supervisor", &snapshot)
         .pending_proposal()
         .get()
         .map(|entry| entry.config_propose)
@@ -140,7 +142,7 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
+        .with_rust_service(decentralized_supervisor())
         .create()
 }
 
@@ -150,7 +152,7 @@ pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
         InstanceCollection::new(service).with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
+        .with_rust_service(decentralized_supervisor())
         .with_rust_service(collection)
         .create()
 }
@@ -162,7 +164,7 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
         .with_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
+        .with_rust_service(decentralized_supervisor())
         .with_rust_service(collection)
         .create()
 }
