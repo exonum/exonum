@@ -32,7 +32,7 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
-use crate::proof_map_index::key::{Hashed, KeyTransform, ProofMapKey, Raw};
+use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
 use crate::views::{AnyObject, IndexAddress};
 use crate::{
     views::{
@@ -87,7 +87,7 @@ pub struct ProofMapIndex<T: IndexAccess, K, V, Style: KeyTransform<K> = Hashed> 
     state: IndexState<T, Option<ProofPath>>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
-    style: PhantomData<Style>,
+    _style: PhantomData<Style>,
 }
 
 /// An iterator over the entries of a `ProofMapIndex`.
@@ -134,7 +134,7 @@ pub struct ProofMapIndexValues<'a, V> {
 impl<T, K, V> AnyObject<T> for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
-    K: ProofMapKey + BinaryKey + ObjectHash,
+    K: BinaryKey + ObjectHash,
     V: BinaryValue + ObjectHash,
 {
     fn view(self) -> View<T> {
@@ -257,7 +257,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            style: PhantomData,
+            _style: PhantomData,
         }
     }
 
@@ -310,7 +310,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            style: PhantomData,
+            _style: PhantomData,
         }
     }
 
@@ -323,7 +323,7 @@ where
                 state,
                 _k: PhantomData,
                 _v: PhantomData,
-                style: PhantomData,
+                _style: PhantomData,
             })
     }
 
@@ -337,7 +337,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            style: PhantomData,
+            _style: PhantomData,
         }
     }
 

@@ -57,37 +57,6 @@ fn reset_bits(value: &mut u8, pos: u16) {
     *value &= reset_bits_mask;
 }
 
-/// A trait that defines a subset of storage key types which are suitable for use with
-/// `ProofMapIndex`.
-///
-/// The size of the keys must be exactly [`PROOF_MAP_KEY_SIZE`] bytes and the keys must have
-/// a uniform distribution.
-///
-/// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-pub trait ProofMapKey
-where
-    Self::Output: ProofMapKey,
-{
-    /// The type of keys as read from the database.
-    ///
-    /// `Output` is not necessarily equal to `Self`, which provides flexibility
-    /// for [`HashedKey`]s and similar cases
-    /// where the key cannot be uniquely restored from the database.
-    ///
-    /// [`HashedKey`]: trait.HashedKey.html
-    type Output;
-
-    /// Writes this key into a byte buffer.
-    ///
-    /// The buffer is guaranteed to have size [`PROOF_MAP_KEY_SIZE`].
-    ///
-    /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-    fn write_key(&self, to: &mut [u8]);
-
-    /// Reads this key from the buffer.
-    fn read_key(from: &[u8]) -> Self::Output;
-}
-
 #[allow(clippy::empty_enum)]
 #[derive(Debug)]
 pub enum Hashed {}
