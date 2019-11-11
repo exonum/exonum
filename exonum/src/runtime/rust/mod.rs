@@ -486,7 +486,10 @@ fn parse_rust_artifact_id_incorrect() {
         (":1.0", "Rust artifact name should not be empty"),
         ("name:", "Error parsing major identifier"),
         ("$name:1.0", "Rust artifact name contains illegal character"),
-        ("aAa", "Wrong rust artifact name format"),
+        (
+            "aAa",
+            "Wrong Rust artifact name format. The name should be arranged as follows",
+        ),
     ];
 
     for (artifact_str, expected_err) in cases {
