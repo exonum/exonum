@@ -291,7 +291,8 @@ mod tests {
         let list = bar_space.get_list::<_, u64>("test");
         assert_eq!(list.get(0), Some(1_u64));
 
-        // It is possible to create indexes of the different types at the same place.
+        // It is possible to create indexes of the different types at the same (relative) address
+        // in the different `Prefixed` instances.
         let fork = db.fork();
         let foo_space = Prefixed::new("foo", &fork);
         foo_space
