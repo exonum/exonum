@@ -69,7 +69,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - New config params `http_backend_config.restart_retry_attempts` and
   `http_backend_config.restart_retry_interval` added into `NetworkConfiguration`.
-  They are intend to configure of the HTTP-server restart settings (#1536).
+  They are intended to configure restart settings of the HTTP-server (#1536).
 
 #### exonum-merkledb
 
