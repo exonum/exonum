@@ -258,11 +258,16 @@ impl WorkingPatch {
     /// are mutably borrowed.
     fn clone_view_changes(&self, address: &IndexAddress) -> Rc<ViewChanges> {
         let mut changes = self.changes.borrow_mut();
-        changes
+        // Get changes for the specified address.
+        let changes: &ChangesCell = changes
             .entry(address.clone())
-            .or_insert_with(|| Some(Rc::new(ViewChanges::new())))
+            .or_insert_with(|| Some(Rc::new(ViewChanges::new())));
+
+        changes
             .as_ref()
             .unwrap_or_else(|| {
+                // If the `changes` are `None`, this means they have been taken by a previous call
+                // to `take_view_changes` and not yet returned.
                 panic!(
                     "Attempting to borrow {:?} immutably while it's borrowed mutably",
                     address
