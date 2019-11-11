@@ -318,20 +318,20 @@ impl ValidateInput for NodeConfig {
             capacity.internal_events_capacity
         );
         ensure!(
-            capacity.network_requests_capacity != 0,
+            capacity.network_requests_capacity > 0,
             "network_requests_capacity({}) must be strictly larger than 0",
             capacity.network_requests_capacity
         );
 
         let backend_config = &self.network.http_backend_config;
         ensure!(
-            backend_config.restart_retry_attempts != 0,
+            backend_config.restart_retry_attempts > 0,
             "restart_retry_attempts({}) must be strictly larger than 0",
             backend_config.restart_retry_attempts
         );
         ensure!(
-            backend_config.restart_retry_interval > 10,
-            "restart_retry_interval({}) must be strictly larger than 10",
+            backend_config.restart_retry_interval > 0,
+            "restart_retry_interval({}) must be strictly larger than 0",
             backend_config.restart_retry_interval
         );
 
