@@ -17,10 +17,7 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::Transaction, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
-        SUPERVISOR_INSTANCE_NAME,
-    },
+    runtime::{rust::Transaction, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::access::AccessExt;
 use exonum_testkit::{TestKit, TestKitBuilder};
@@ -40,7 +37,7 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
-    let snapshot = snapshot.for_service(SUPERVISOR_INSTANCE_NAME).unwrap();
+    let snapshot = snapshot.for_service(Supervisor::NAME).unwrap();
     Schema::new(snapshot)
         .pending_proposal
         .get()
