@@ -131,7 +131,7 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
     })
 }
 
-#[derive(Debug, Default, Clone, Copy, ServiceFactory)]
+#[derive(Debug, Default, Clone, ServiceFactory)]
 #[exonum(
     proto_sources = "proto",
     artifact_name = "exonum-supervisor",
@@ -158,10 +158,8 @@ where
         }
     }
 
-    // `ServiceFactory` requires constructor to take a reference.
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn construct(&self) -> Box<Self> {
-        Box::new(*self)
+        Box::new(Self::new())
     }
 }
 
