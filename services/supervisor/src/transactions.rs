@@ -100,16 +100,44 @@ impl ValidateInput for DeployConfirmation {
     }
 }
 
-impl ValidateInput for StartService {
-    type Error = ExecutionError;
-
-    fn validate(&self) -> Result<(), Self::Error> {
+impl StartService {
+    fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
         self.artifact
             .validate()
             .map_err(|e| (Error::InvalidArtifactId, e))?;
         InstanceSpec::is_valid_name(&self.name)
             .map_err(|e| (Error::InvalidInstanceName, e))
-            .map_err(Self::Error::from)
+            .map_err(ExecutionError::from)?;
+
+        // Check that artifact is deployed.
+        if context
+            .dispatcher_info()
+            .get_artifact(self.artifact.name.as_str())
+            .is_none()
+        {
+            log::trace!(
+                "Discarded start of service {} from the unknown artifact {}.",
+                &self.name,
+                &self.artifact.name,
+            );
+
+            return Err(Error::UnknownArtifact.into());
+        }
+
+        // Check that there is no instance with the same name.
+        if context
+            .dispatcher_info()
+            .get_instance(self.name.as_str())
+            .is_some()
+        {
+            log::trace!(
+                "Discarded start of the already running instance {}.",
+                &self.name
+            );
+            return Err(Error::InstanceExists.into());
+        }
+
+        Ok(())
     }
 }
 
@@ -149,83 +177,8 @@ where
             return Err(Error::ConfigProposeExists.into());
         }
 
-        // To prevent multiple consensus change proposition in one request
-        let mut consensus_propose_added = false;
-        // To prevent multiple service change proposition in one request
-        let mut service_ids = HashSet::new();
-        // To prevent multiple services start in one request.
-        let mut services_to_start = HashSet::new();
-
-        // Perform config verification.
-        for change in &propose.changes {
-            match change {
-                ConfigChange::Consensus(config) => {
-                    if consensus_propose_added {
-                        log::trace!(
-                            "Discarded multiple consensus change proposals in one request."
-                        );
-                        return Err(Error::MalformedConfigPropose.into());
-                    }
-                    consensus_propose_added = true;
-
-                    config
-                        .validate()
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
-                }
-
-                ConfigChange::Service(config) => {
-                    if service_ids.contains(&config.instance_id) {
-                        log::trace!("Discarded multiple service change proposals in one request.");
-                        return Err(Error::MalformedConfigPropose.into());
-                    }
-                    service_ids.insert(config.instance_id);
-
-                    context
-                        .interface::<ConfigureCall<'_>>(config.instance_id)?
-                        .verify_config(config.params.clone())
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
-                }
-
-                ConfigChange::StartService(start_service) => {
-                    start_service.validate()?;
-
-                    if context
-                        .dispatcher_info()
-                        .get_artifact(start_service.artifact.name.as_str())
-                        .is_none()
-                    {
-                        log::trace!(
-                            "Discarded start of service {} from the unknown artifact {}.",
-                            &start_service.name,
-                            &start_service.artifact.name,
-                        );
-
-                        return Err(Error::UnknownArtifact.into());
-                    }
-
-                    if context
-                        .dispatcher_info()
-                        .get_instance(start_service.name.as_str())
-                        .is_some()
-                    {
-                        log::trace!(
-                            "Discarded start of the already running instance {}.",
-                            &start_service.name
-                        );
-                        return Err(Error::InstanceExists.into());
-                    }
-
-                    if services_to_start.contains(&start_service.name) {
-                        log::trace!(
-                            "Discarded multiple instances with the same name in one request."
-                        );
-                        return Err(Error::MalformedConfigPropose.into());
-                    }
-
-                    services_to_start.insert(&start_service.name);
-                }
-            }
-        }
+        // Verify changes in the proposal.
+        self.verify_config_changeset(&mut context, &propose.changes)?;
 
         let schema = Schema::new(context.instance().name, context.fork());
 
@@ -389,5 +342,92 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl<Mode> Supervisor<Mode>
+where
+    Mode: mode::SupervisorMode,
+{
+    /// Verifies that each change introduced within config proposal is valid.
+    fn verify_config_changeset(
+        &self,
+        context: &mut CallContext<'_>,
+        changes: &[ConfigChange],
+    ) -> Result<(), ExecutionError> {
+        // To prevent multiple consensus change proposition in one request
+        let mut consensus_propose_added = false;
+        // To prevent multiple service change proposition in one request
+        let mut service_ids = UniqueSet::new();
+        // To prevent multiple services start in one request.
+        let mut services_to_start = UniqueSet::new();
+
+        // Perform config verification.
+        for change in changes {
+            match change {
+                ConfigChange::Consensus(config) => {
+                    if consensus_propose_added {
+                        log::trace!(
+                            "Discarded multiple consensus change proposals in one request."
+                        );
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    consensus_propose_added = true;
+
+                    config
+                        .validate()
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+
+                ConfigChange::Service(config) => {
+                    if !service_ids.check_unique(config.instance_id) {
+                        log::trace!("Discarded multiple service change proposals in one request.");
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+
+                    context
+                        .interface::<ConfigureCall<'_>>(config.instance_id)?
+                        .verify_config(config.params.clone())
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+
+                ConfigChange::StartService(start_service) => {
+                    if !services_to_start.check_unique(start_service.name.clone()) {
+                        log::trace!(
+                            "Discarded multiple instances with the same name in one request."
+                        );
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+
+                    start_service.validate(&context)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// A helper structure designed to check whether a newly
+/// introduced element is unique among others.
+#[derive(Debug, Default)]
+struct UniqueSet<T: std::hash::Hash + Eq + Default> {
+    inner: HashSet<T>,
+}
+
+impl<T: std::hash::Hash + Eq + Default> UniqueSet<T> {
+    /// Creates a new `UniqueSet` object.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Checks whether element is unique, and if so
+    /// adds it to the collection.
+    pub fn check_unique(&mut self, element: T) -> bool {
+        if self.inner.contains(&element) {
+            return false;
+        }
+
+        self.inner.insert(element);
+        true
     }
 }
