@@ -32,7 +32,9 @@ use super::{
 pub trait SupervisorInterface {
     /// Requests artifact deploy.
     ///
-    /// This request should be sent by the each of validators.
+    /// This request should be initiated by the validator (and depending on the `Supervisor`
+    /// mode several other actions can be required, e.g. sending the same request by every
+    /// other validator as well).
     /// After that, the supervisor will try to deploy the artifact, and if this procedure
     /// will be successful it will send `confirm_artifact_deploy` transaction.
     fn request_artifact_deploy(
@@ -53,9 +55,11 @@ pub trait SupervisorInterface {
     /// Propose config change
     ///
     /// This request should be sent by one of validators as the proposition to change
-    /// current configuration to new one. All another validators able to vote for this
+    /// current configuration to new one. All another validators are able to vote for this
     /// configuration by sending `confirm_config_change` transaction.
-    /// The configuration application rules rely on the `Supervisor` mode.
+    /// The configuration application rules rely on the `Supervisor` mode, e.g. confirmations
+    /// are not required for the `Simple` mode, and for `Decentralized` mode (2/3+1) confirmations
+    /// are required.
     /// Note: only one proposal at time is possible.
     fn propose_config_change(
         &self,
@@ -66,7 +70,7 @@ pub trait SupervisorInterface {
     /// Confirm config change
     ///
     /// This confirm should be sent by validators to vote for proposed configuration.
-    /// Vote of the author of the propose_config_change transaction is taken into
+    /// Vote of the author of the `propose_config_change` transaction is taken into
     /// account automatically.
     /// The configuration application rules rely on the `Supervisor` mode.
     fn confirm_config_change(
