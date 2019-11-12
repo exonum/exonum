@@ -89,7 +89,7 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
 ///
 /// * `#[service_dispatcher(crate = "path")]`
 ///
-/// Prefix of the `exonum` crate(usually "crate" or "exonum").
+/// Prefix of the `exonum` crate (usually it's "crate" or "exonum").
 #[proc_macro_derive(ServiceDispatcher, attributes(service_dispatcher))]
 pub fn service_dispatcher(input: TokenStream) -> TokenStream {
     service_dispatcher::impl_service_dispatcher(input)
