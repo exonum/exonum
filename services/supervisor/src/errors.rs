@@ -43,4 +43,6 @@ pub enum Error {
     ConfigProposeNotRegistered = 11,
     /// Transaction author attempts to vote twice.
     AttemptToVoteTwice = 12,
+    /// Start request contains unknonw artifact.
+    UnknownArtifact = 13,
 }

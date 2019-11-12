@@ -14,7 +14,7 @@
 
 use exonum::{
     blockchain,
-    helpers::ValidateInput,
+    helpers::{Height, ValidateInput},
     runtime::{rust::CallContext, Caller, DispatcherError, ExecutionError, InstanceSpec},
 };
 use exonum_derive::*;
@@ -115,7 +115,7 @@ where
     fn propose_config_change(
         &self,
         mut context: CallContext<'_>,
-        propose: ConfigPropose,
+        mut propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         let ((_, author), fork) = context
             .verify_caller(Caller::as_transaction)
@@ -128,8 +128,14 @@ where
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        // Verifies that the `actual_from` height is in the future.
-        if blockchain::Schema::new(fork).height() >= propose.actual_from {
+        let current_height = blockchain::Schema::new(fork).height();
+
+        // If `actual_from` field is not set, set it to the next height.
+        if propose.actual_from == Height(0) {
+            propose.actual_from = current_height.next();
+        }
+        // Otherwise verifiy that the `actual_from` height is in the future.
+        else if current_height >= propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
 
@@ -176,6 +182,22 @@ where
                 }
 
                 ConfigChange::StartService(start_service) => {
+                    start_service.validate()?;
+
+                    if context
+                        .dispatcher_info()
+                        .get_artifact(start_service.artifact.name.as_str())
+                        .is_none()
+                    {
+                        log::trace!(
+                            "Discarded start of service {} from the unknown artifact {}.",
+                            &start_service.name,
+                            &start_service.artifact.name,
+                        );
+
+                        return Err(Error::UnknownArtifact.into());
+                    }
+
                     if context
                         .dispatcher_info()
                         .get_instance(start_service.name.as_str())
@@ -270,7 +292,7 @@ where
         let blockchain_schema = blockchain::Schema::new(context.fork());
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < blockchain_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
+            return Err(Error::ActualFromIsPast.into());
         }
         let schema = Schema::new(context.instance().name, context.fork());
 

@@ -131,20 +131,6 @@ impl ConfigPropose {
         )
     }
 
-    // /// Signs the proposal for a simple supervisor with a randomly generated keypair.
-    // pub fn sign_for_simple_supervisor(
-    //     self,
-    //     public_key: PublicKey,
-    //     secret_key: &SecretKey,
-    // ) -> Verified<AnyTx> {
-    //     Transaction::<dyn SimpleSupervisorInterface>::sign(
-    //         self,
-    //         SUPERVISOR_INSTANCE_ID,
-    //         public_key,
-    //         secret_key,
-    //     )
-    // }
-
     /// Creates a new proposal which activates at the specified height.
     pub fn actual_from(height: Height) -> Self {
         Self {
@@ -165,6 +151,12 @@ impl ConfigPropose {
             instance_id,
             params: config.into_bytes(),
         }));
+        self
+    }
+
+    /// Adds service start request to this proposal.
+    pub fn start_service(mut self, start_service: StartService) -> Self {
+        self.changes.push(ConfigChange::StartService(start_service));
         self
     }
 }
