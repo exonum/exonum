@@ -27,10 +27,13 @@ use exonum::{
     },
 };
 use exonum_supervisor::{
-    decentralized_supervisor, DeployConfirmation, DeployRequest, StartService,
+    decentralized_supervisor, ConfigPropose, DeployConfirmation, DeployRequest, StartService,
 };
 
-use crate::inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME};
+use crate::{
+    inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME},
+    utils::build_confirmation_transactions,
+};
 
 mod config;
 mod config_api;
@@ -100,18 +103,22 @@ fn deploy_artifact_manually(
     signed_request.object_hash()
 }
 
-fn start_service(api: &TestKitApi, request: StartService) -> crypto::Hash {
+fn start_service(api: &TestKitApi, request: ConfigPropose) -> crypto::Hash {
+    // Even though this method sends a config proposal, it's *intended* to start
+    // services (so the callee-side code will be more readable).
+    // However, this convention is up to test writers.
+
     let hash: crypto::Hash = api
         .private(ApiKind::Service("supervisor"))
         .query(&request)
-        .post("start-service")
+        .post("propose-config")
         .unwrap();
     hash
 }
 
 fn start_service_manually(
     testkit: &mut TestKit,
-    request: &StartService,
+    request: &ConfigPropose,
     validator_id: ValidatorId,
 ) -> crypto::Hash {
     let service_id = SUPERVISOR_INSTANCE_ID;
@@ -157,13 +164,14 @@ fn start_service_request(
     artifact: ArtifactId,
     name: impl Into<String>,
     deadline_height: Height,
-) -> StartService {
-    StartService {
+) -> ConfigPropose {
+    let request = StartService {
         artifact,
         name: name.into(),
         config: Vec::default(),
-        deadline_height,
-    }
+    };
+
+    ConfigPropose::actual_from(deadline_height).start_service(request)
 }
 
 fn deploy_default(testkit: &mut TestKit) {
@@ -312,8 +320,8 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
 
     let system_api = api.exonum_api();
     let expected_status = Err(ExecutionError {
-        kind: ExecutionErrorKind::Service { code: 2 },
-        description: "Deadline exceeded for the current transaction.".into(),
+        kind: ExecutionErrorKind::Service { code: 8 },
+        description: "Actual height for config proposal is in the past.".into(),
     });
     system_api.assert_tx_status(hash, &expected_status.into());
 }
@@ -333,8 +341,8 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
 
     let system_api = api.exonum_api();
     let expected_status = Err(ExecutionError {
-        kind: ExecutionErrorKind::Service { code: 2 },
-        description: "Deadline exceeded for the current transaction.".into(),
+        kind: ExecutionErrorKind::Service { code: 8 },
+        description: "Actual height for config proposal is in the past.".into(),
     });
     system_api.assert_tx_status(hash, &expected_status.into());
 }
@@ -347,19 +355,14 @@ fn test_try_run_unregistered_service_instance() {
     // Deliberately missing the DeployRequest step.
 
     let instance_name = "wont_run";
-    let request = StartService {
-        artifact: artifact_default(),
-        name: instance_name.into(),
-        config: Vec::default(),
-        deadline_height: Height(1000),
-    };
+    let request = start_service_request(artifact_default(), instance_name.to_owned(), Height(1000));
     let hash = start_service(&api, request);
     testkit.create_block();
 
     let system_api = api.exonum_api();
     let expected_status = Err(ExecutionError {
-        kind: ExecutionErrorKind::Dispatcher { code: 3 },
-        description: "Artifact with the given identifier is not deployed.".into(),
+        kind: ExecutionErrorKind::Service { code: 13 },
+        description: "Start request contains unknonw artifact.".into(),
     });
     system_api.assert_tx_status(hash, &expected_status.into());
 }
@@ -501,6 +504,46 @@ fn test_start_service_instance_twice() {
         });
         system_api.assert_tx_status(hash, &expected_status.into());
     }
+}
+
+/// Checks that we can start several service instances in one request.
+#[test]
+fn test_start_two_services_in_one_request() {
+    let instance_name_1 = "inc";
+    let instance_name_2 = "inc2";
+    let mut testkit = testkit_with_inc_service();
+    deploy_default(&mut testkit);
+
+    let api = testkit.api();
+    assert!(!service_instance_exists(&api, instance_name_1));
+    assert!(!service_instance_exists(&api, instance_name_2));
+
+    let artifact = artifact_default();
+    let deadline = testkit.height().next();
+
+    let request_1 = StartService {
+        artifact: artifact.clone(),
+        name: instance_name_1.into(),
+        config: Vec::default(),
+    };
+    let request_2 = StartService {
+        artifact: artifact.clone(),
+        name: instance_name_2.into(),
+        config: Vec::default(),
+    };
+
+    let request = ConfigPropose::actual_from(deadline)
+        .start_service(request_1)
+        .start_service(request_2);
+
+    let hash = start_service(&api, request);
+    testkit.create_block();
+
+    api.exonum_api().assert_tx_success(hash);
+
+    let api = testkit.api(); // Update the API
+    assert!(service_instance_exists(&api, instance_name_1));
+    assert!(service_instance_exists(&api, instance_name_2));
 }
 
 #[test]
@@ -645,18 +688,23 @@ fn test_multiple_validators() {
     // Start the service now
     {
         assert!(!service_instance_exists(&api, instance_name));
-        let deadline = testkit.height().next();
+        // Add two heights to the deadline: one for block with config proposal and one for confirmation.
+        let deadline = testkit.height().next().next();
         let request_start = start_service_request(artifact_default(), instance_name, deadline);
+        let propose_hash = request_start.object_hash();
 
         // Send a start instance request from this node.
-        let start_service_0_tx_hash = start_service(&api, request_start.clone());
-        // Emulate a start instance request from the second validator.
-        let start_service_1_tx_hash =
-            start_service_manually(&mut testkit, &request_start, ValidatorId(1));
-
+        start_service(&api, request_start.clone());
         testkit.create_block();
-        api.exonum_api()
-            .assert_txs_success(&[start_service_0_tx_hash, start_service_1_tx_hash]);
+
+        // Confirm changes.
+        let signed_txs = build_confirmation_transactions(&testkit, propose_hash, ValidatorId(0));
+        testkit
+            .create_block_with_transactions(signed_txs)
+            .transactions[0]
+            .status()
+            .expect("Transaction with confirmations discarded.");
+
         let api = testkit.api(); // Update the API
         assert!(service_instance_exists(&api, instance_name));
     }
