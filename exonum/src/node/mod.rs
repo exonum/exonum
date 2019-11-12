@@ -1019,8 +1019,14 @@ impl Node {
                     .collect::<Vec<_>>()
             },
             api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
-            server_restart_retry_timeout: node_cfg.network.http_backend_config.server_restart_retry_timeout,
-            server_restart_max_retries: node_cfg.network.http_backend_config.server_restart_max_retries,
+            server_restart_retry_timeout: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_retry_timeout,
+            server_restart_max_retries: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_max_retries,
         };
 
         let handler = NodeHandler::new(
