@@ -33,7 +33,7 @@ use super::DeployRequest;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Simple;
 
-/// Decentralized supervisor mode (default): to deploy or initialize service
+/// Decentralized supervisor mode: to deploy or initialize service
 /// a request should be sent to **every** validator before it will be executed.
 /// For configs, a byzantine majority of validators should vote for it.
 #[derive(Debug, Clone, Copy, Default)]
