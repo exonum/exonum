@@ -31,7 +31,7 @@ use exonum::{
     },
 };
 use exonum_derive::IntoExecutionError;
-use exonum_supervisor::{decentralized_supervisor, DeployRequest, StartService};
+use exonum_supervisor::{simple_supervisor, ConfigPropose, DeployRequest, StartService};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -276,7 +276,7 @@ fn main() {
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
         .with_rust_runtime(
             channel.endpoints.0.clone(),
-            vec![InstanceCollection::from(decentralized_supervisor())],
+            vec![InstanceCollection::from(simple_supervisor())],
         )
         .with_additional_runtime(SampleRuntime::default())
         .build()
@@ -288,13 +288,13 @@ fn main() {
     println!("Blockchain is ready for transactions!");
 
     let handle = thread::spawn(move || {
-        let deadline_height = Height(10_000_000);
+        let deploy_height = Height(50);
         // Send an artifact `DeployRequest` to the sample runtime.
         api_sender
             .broadcast_transaction(
                 DeployRequest {
                     artifact: "255:sample_artifact".parse().unwrap(),
-                    deadline_height,
+                    deadline_height: deploy_height,
                     spec: Vec::default(),
                 }
                 .sign(
@@ -309,23 +309,24 @@ fn main() {
 
         // Send a `StartService` request to the sample runtime.
         let instance_name = "instance".to_owned();
+
+        let start_service = StartService {
+            artifact: "255:sample_artifact".parse().unwrap(),
+            name: instance_name.clone(),
+            config: 10_u64.into_bytes(),
+        };
+
+        // `Height(0)` means that config will be applied in the next block.
+        let start_height = Height(0);
         api_sender
             .broadcast_transaction(
-                StartService {
-                    artifact: "255:sample_artifact".parse().unwrap(),
-                    name: instance_name.clone(),
-                    config: 10_u64.into_bytes(),
-                    deadline_height,
-                }
-                .sign(
-                    SUPERVISOR_INSTANCE_ID,
-                    service_keypair.0,
-                    &service_keypair.1,
-                ),
+                ConfigPropose::actual_from(start_height)
+                    .start_service(start_service)
+                    .sign_for_supervisor(service_keypair.0, &service_keypair.1),
             )
             .unwrap();
         // Wait until instance identifier is assigned.
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(Duration::from_secs(1));
 
         // Get an instance identifier.
         let snapshot = blockchain_ref.snapshot();
