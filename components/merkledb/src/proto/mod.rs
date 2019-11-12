@@ -29,7 +29,7 @@ pub use self::{list_proof::*, map_proof::*};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-impl<K, V> ProtobufConvert for crate::MapProof<K, V>
+impl<K, V, S> ProtobufConvert for crate::MapProof<K, V, S>
 where
     K: BinaryKey + ToOwned<Owned = K>,
     V: BinaryValue,
@@ -125,8 +125,8 @@ mod tests {
     use std::fmt;
 
     use crate::{
-        proto, BinaryKey, BinaryValue, Database, ListProof, MapProof, ObjectHash, ProofListIndex,
-        ProofMapIndex, TemporaryDB,
+        proof_map_index::KeyTransform, proto, BinaryKey, BinaryValue, Database, ListProof,
+        MapProof, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
     };
     use protobuf::RepeatedField;
 
@@ -151,14 +151,15 @@ mod tests {
         assert_proof_roundtrip(&proof);
     }
 
-    fn assert_proof_roundtrip<K, V>(proof: &MapProof<K, V>)
+    fn assert_proof_roundtrip<K, V, S>(proof: &MapProof<K, V, S>)
     where
         K: BinaryKey + ObjectHash + fmt::Debug,
         V: BinaryValue + ObjectHash + fmt::Debug,
-        MapProof<K, V>: ProtobufConvert + PartialEq,
+        S: KeyTransform<K> + fmt::Debug,
+        MapProof<K, V, S>: ProtobufConvert + PartialEq,
     {
         let pb = proof.to_pb();
-        let deserialized: MapProof<K, V> = MapProof::from_pb(pb).unwrap();
+        let deserialized: MapProof<K, V, S> = MapProof::from_pb(pb).unwrap();
         let checked_proof = deserialized
             .check()
             .expect("deserialized proof is not valid");

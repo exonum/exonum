@@ -57,10 +57,10 @@ fn reset_bits(value: &mut u8, pos: u16) {
     *value &= reset_bits_mask;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Hashed;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Raw;
 
 pub trait KeyTransform<K> {
@@ -133,6 +133,7 @@ pub struct ProofPath {
 
 impl ProofPath {
     /// Creates a path from the given key.
+    /// TODO: maybe this method should be removed if favor of transform_key.
     pub fn new(key: &impl ObjectHash) -> Self {
         Self::from_bytes(key.object_hash())
     }
@@ -503,7 +504,7 @@ mod tests {
         let path = ProofPath::from_bytes(&[1; 32]).prefix(3);
         assert_eq!(serde_json::to_value(&path).unwrap(), json!("100"));
         let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
-        assert_eq!(path, ProofPath::new(&[0b_0010_0101; 32]).prefix(6));
+        assert_eq!(path, Raw::transform_key(&[0b_0010_0101; 32]).prefix(6));
 
         // Fuzz tests for roundtrip.
         let mut rng = rand::thread_rng();

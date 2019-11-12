@@ -22,6 +22,7 @@ use exonum::{
 };
 
 use crate::schema::{Schema, TimestampEntry};
+use exonum_merkledb::proof_map_index::RawMapProof;
 
 /// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -45,7 +46,7 @@ pub struct TimestampProof {
     /// Actual state hashes of the timestamping service with their proofs.
     pub state_proof: MapProof<IndexCoordinates, Hash>,
     /// Actual state of the timestamping database with proofs.
-    pub timestamp_proof: MapProof<Hash, TimestampEntry>,
+    pub timestamp_proof: RawMapProof<Hash, TimestampEntry>,
 }
 
 /// Public service API.

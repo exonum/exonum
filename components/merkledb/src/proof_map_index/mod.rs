@@ -16,8 +16,8 @@
 
 pub use self::node::{BranchNode, Node};
 pub use self::{
-    key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
-    proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
+    key::{KeyTransform, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
+    proof::{CheckedMapProof, MapProof, MapProofError, RawMapProof, ValidationError},
 };
 
 use std::{
@@ -32,7 +32,7 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
-use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
+use crate::proof_map_index::key::{Hashed, Raw};
 use crate::views::{AnyObject, IndexAddress};
 use crate::{
     views::{
@@ -428,7 +428,7 @@ where
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: K) -> MapProof<K, V> {
+    pub fn get_proof(&self, key: K) -> MapProof<K, V, Style> {
         self.create_proof(Style::transform_key(&key), key)
     }
 
@@ -445,15 +445,13 @@ where
     ///
     /// let proof = index.get_multiproof(vec![vec![0; 32], vec![1; 32]]);
     /// ```
-    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V>
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V, Style>
     where
         KI: IntoIterator<Item = K>,
     {
         let keys = keys
             .into_iter()
-            .map(|key| {
-                (Style::transform_key(&key), key)
-            })
+            .map(|key| (Style::transform_key(&key), key))
             .collect::<Vec<_>>();
         self.create_multiproof(keys)
     }

@@ -25,7 +25,9 @@ use super::{
 };
 use crate::{BinaryValue, HashTag, ObjectHash};
 
-pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
+use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
+pub use crate::ValidationError;
+use failure::_core::marker::PhantomData; // TODO Change for a type alias after EJB switching to rust > 1.36
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -265,10 +267,14 @@ impl<K, V> OptionalEntry<K, V> {
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct MapProof<K, V> {
+pub struct MapProof<K, V, Style = Hashed> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
+    #[serde(skip)]
+    _style: PhantomData<Style>,
 }
+
+pub type RawMapProof<K, V> = MapProof<K, V, Raw>;
 
 /// Version of `MapProof` obtained after verification.
 ///
@@ -370,7 +376,7 @@ fn collect(entries: &[Cow<'_, MapProofEntry>]) -> Result<Hash, MapProofError> {
     }
 }
 
-impl<K, V> MapProof<K, V> {
+impl<K, V, Style> MapProof<K, V, Style> {
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof
@@ -402,6 +408,7 @@ impl<K, V> MapProof<K, V> {
         Self {
             entries: vec![],
             proof: vec![],
+            _style: PhantomData,
         }
     }
 
@@ -441,10 +448,11 @@ impl<K, V> MapProof<K, V> {
     }
 }
 
-impl<K, V> MapProof<K, V>
+impl<K, V, Style> MapProof<K, V, Style>
 where
     K: ObjectHash,
     V: BinaryValue,
+    Style: KeyTransform<K>,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use self::MapProofError::*;
@@ -476,7 +484,7 @@ where
         // In order to do this, it suffices to locate the closest smaller path in the proof entries
         // and check only it.
         for e in &self.entries {
-            let path = ProofPath::new(e.key());
+            let path = Style::transform_key(e.key());
 
             match self.proof.binary_search_by(|pe| {
                 pe.path
@@ -540,7 +548,7 @@ where
         proof.extend(self.entries.iter().filter_map(|e| {
             e.as_kv().map(|(k, v)| {
                 Cow::Owned(MapProofEntry {
-                    path: ProofPath::new(k),
+                    path: Style::transform_key(&k),
                     hash: HashTag::hash_leaf(&v.to_bytes()),
                 })
             })

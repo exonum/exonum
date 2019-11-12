@@ -19,9 +19,7 @@ use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::{collections::HashSet, convert::TryInto};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
-use exonum_merkledb::{
-    Database, Fork, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
-};
+use exonum_merkledb::{Database, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB};
 
 const NAME: &str = "name";
 const FAMILY: &str = "index_family";

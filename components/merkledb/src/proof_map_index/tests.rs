@@ -33,7 +33,7 @@ use super::{
 use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
 use crate::proof_map_index::ProofMapIndexBase;
 use crate::{
-    BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
+    BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, RawProofMapIndex, TemporaryDB,
 };
 use failure::_core::marker::PhantomData;
 
@@ -98,9 +98,11 @@ struct ProofMapTester<S> {
     _s: PhantomData<S>,
 }
 
-impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
-    fn test_map_methods()
-    {
+impl<S> ProofMapTester<S>
+where
+    S: KeyTransform<[u8; 32]>,
+{
+    fn test_map_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
         let mut index = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &fork);
@@ -131,8 +133,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert!(!index.contains(&[3; 32]));
     }
 
-    fn test_insert_trivial()
-    {
+    fn test_insert_trivial() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let storage1 = db1.fork();
@@ -155,8 +156,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index1.object_hash(), index2.object_hash());
     }
 
-    fn test_insert_same_key()
-    {
+    fn test_insert_same_key() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -174,8 +174,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(table.object_hash(), HashTag::hash_map_node(hash));
     }
 
-    fn test_insert_simple()
-    {
+    fn test_insert_simple() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let storage1 = db1.fork();
@@ -197,8 +196,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index1.object_hash(), index2.object_hash());
     }
 
-    fn test_insert_reverse()
-    {
+    fn test_insert_reverse() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let storage1 = db1.fork();
@@ -223,8 +221,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index2.object_hash(), index1.object_hash());
     }
 
-    fn test_remove_trivial()
-    {
+    fn test_remove_trivial() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let storage1 = db1.fork();
@@ -241,8 +238,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index2.object_hash(), HashTag::empty_map_hash());
     }
 
-    fn test_remove_simple()
-    {
+    fn test_remove_simple() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let storage1 = db1.fork();
@@ -273,8 +269,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index1.object_hash(), index2.object_hash());
     }
 
-    fn test_remove_reverse()
-    {
+    fn test_remove_reverse() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let storage1 = db1.fork();
@@ -312,8 +307,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index2.object_hash(), index1.object_hash());
     }
 
-    fn test_clear()
-    {
+    fn test_clear() {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
@@ -328,8 +322,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index.merkle_root(), root_hash);
     }
 
-    fn test_fuzz_insert()
-    {
+    fn test_fuzz_insert() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let mut data = generate_random_data(100);
@@ -377,8 +370,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index2.object_hash(), index1.object_hash());
     }
 
-    fn test_build_proof_in_empty_tree()
-    {
+    fn test_build_proof_in_empty_tree() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -392,8 +384,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         check_map_proof(&proof, None, &table);
     }
 
-    fn test_build_multiproof_in_empty_tree()
-    {
+    fn test_build_multiproof_in_empty_tree() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -408,9 +399,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         check_map_multiproof(&proof, keys, &table);
     }
 
-
-    fn test_build_proof_in_single_node_tree()
-    {
+    fn test_build_proof_in_single_node_tree() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -423,13 +412,12 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_proof([128; 32]);
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[230; 32]), HashTag::hash_leaf(&[1]))]
+            vec![(S::transform_key(&[230; 32]), HashTag::hash_leaf(&[1]))]
         );
         check_map_proof(&proof, None, &table);
     }
 
-    fn test_build_multiproof_in_single_node_tree()
-    {
+    fn test_build_multiproof_in_single_node_tree() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -445,13 +433,12 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_multiproof(keys.clone());
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[230; 32]), HashTag::hash_leaf(&[1]))]
+            vec![(S::transform_key(&[230; 32]), HashTag::hash_leaf(&[1]))]
         );
         check_map_multiproof(&proof, keys, &table);
     }
 
-    fn test_build_proof_in_complex_tree()
-    {
+    fn test_build_proof_in_complex_tree() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -461,22 +448,22 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_proof([128; 32]);
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
         );
         check_map_proof(&proof, Some([128; 32]), &table);
 
         let proof = table.get_proof([32; 32]);
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1]))]
+            vec![(S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1]))]
         );
         check_map_proof(&proof, Some([32; 32]), &table);
 
         // Key left of all keys in the tree
         let proof = table.get_proof([0; 32]);
         let exp_proof = vec![
-            (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+            (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+            (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
         ];
         assert_eq!(proof.proof_unchecked(), exp_proof);
         check_map_proof(&proof, None, &table);
@@ -504,12 +491,12 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
             let mut node = BranchNode::empty();
             node.set_child(
                 ChildKind::Left,
-                &ProofPath::new(&left_key),
+                &S::transform_key(&left_key),
                 &HashTag::hash_leaf(&[3]),
             );
             node.set_child(
                 ChildKind::Right,
-                &ProofPath::new(&[128; 32]),
+                &S::transform_key(&[128; 32]),
                 &HashTag::hash_leaf(&[1]),
             );
             node.object_hash()
@@ -519,8 +506,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_proof(&proof, Some([128; 32]), &table);
@@ -529,8 +516,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key).prefix(15), left_hash),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_proof(&proof, None, &table);
@@ -538,7 +525,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_proof([32; 32]);
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&left_key).prefix(15), left_hash)]
+            vec![(S::transform_key(&left_key).prefix(15), left_hash)]
         );
         check_map_proof(&proof, Some([32; 32]), &table);
 
@@ -546,8 +533,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key).prefix(15), left_hash),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_proof(&proof, None, &table);
@@ -566,12 +553,12 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
             let mut node = BranchNode::empty();
             node.set_child(
                 ChildKind::Left,
-                &ProofPath::new(&[32; 32]),
+                &S::transform_key(&[32; 32]),
                 &HashTag::hash_leaf(&[2]),
             );
             node.set_child(
                 ChildKind::Right,
-                &ProofPath::new(&right_key),
+                &S::transform_key(&right_key),
                 &HashTag::hash_leaf(&[4]),
             );
             node.object_hash()
@@ -581,8 +568,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-                (ProofPath::new(&right_key).prefix(12), right_hash),
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&right_key).prefix(12), right_hash),
             ]
         );
         check_map_proof(&proof, Some([128; 32]), &table);
@@ -592,8 +579,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key).prefix(15), left_hash),
-                (ProofPath::new(&right_key).prefix(12), right_hash),
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&right_key).prefix(12), right_hash),
             ]
         );
         check_map_proof(&proof, None, &table);
@@ -611,9 +598,9 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-                (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-                (ProofPath::new(&right_key).prefix(12), right_hash),
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&right_key).prefix(12), right_hash),
             ]
         );
         check_map_proof(&proof, None, &table);
@@ -633,7 +620,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_proof([129; 32]);
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[0; 32]).prefix(5), subtree_hash)]
+            vec![(S::transform_key(&[0; 32]).prefix(5), subtree_hash)]
         );
         check_map_proof(&proof, Some([129; 32]), &table);
 
@@ -641,8 +628,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&[0; 32]).prefix(5), subtree_hash),
-                (ProofPath::new(&[129; 32]), HashTag::hash_leaf(&[5])),
+                (S::transform_key(&[0; 32]).prefix(5), subtree_hash),
+                (S::transform_key(&[129; 32]), HashTag::hash_leaf(&[5])),
             ]
         );
         check_map_proof(&proof, None, &table);
@@ -651,16 +638,15 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key).prefix(15), left_hash),
-                (ProofPath::new(&right_key), HashTag::hash_leaf(&[4])),
-                (ProofPath::new(&[129; 32]), HashTag::hash_leaf(&[5])),
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&right_key), HashTag::hash_leaf(&[4])),
+                (S::transform_key(&[129; 32]), HashTag::hash_leaf(&[5])),
             ]
         );
         check_map_proof(&proof, Some([32; 32]), &table);
     }
 
-    fn test_build_multiproof_simple()
-    {
+    fn test_build_multiproof_simple() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut table = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -672,7 +658,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_multiproof(keys.clone());
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
         );
         check_map_multiproof(&proof, keys, &table);
 
@@ -680,7 +666,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_multiproof(keys.clone());
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
         );
         check_map_multiproof(&proof, keys, &table);
 
@@ -694,8 +680,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_multiproof(&proof, keys, &table);
@@ -705,8 +691,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_multiproof(&proof, keys, &table);
@@ -716,8 +702,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_multiproof(&proof, vec![[64; 32]], &table);
@@ -726,7 +712,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_multiproof(keys.clone());
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
         );
         check_map_multiproof(&proof, vec![[128; 32], [64; 32]], &table);
 
@@ -735,8 +721,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_multiproof(&proof, keys, &table);
@@ -754,12 +740,12 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
             let mut node = BranchNode::empty();
             node.set_child(
                 ChildKind::Left,
-                &ProofPath::new(&left_key),
+                &S::transform_key(&left_key),
                 &HashTag::hash_leaf(&[3]),
             );
             node.set_child(
                 ChildKind::Right,
-                &ProofPath::new(&[128; 32]),
+                &S::transform_key(&[128; 32]),
                 &HashTag::hash_leaf(&[1]),
             );
             node.object_hash()
@@ -769,8 +755,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&[128; 32]).prefix(15), left_hash),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&[128; 32]).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_multiproof(&proof, vec![[0; 32]], &table);
@@ -785,8 +771,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&[128; 32]).prefix(15), left_hash),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&[128; 32]).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_multiproof(&proof, keys, &table);
@@ -796,8 +782,8 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-                (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
             ]
         );
         check_map_multiproof(&proof, keys, &table);
@@ -806,7 +792,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_multiproof(keys.clone());
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&left_key), HashTag::hash_leaf(&[3]))]
+            vec![(S::transform_key(&left_key), HashTag::hash_leaf(&[3]))]
         );
         check_map_multiproof(&proof, keys, &table);
 
@@ -814,7 +800,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         let proof = table.get_multiproof(keys.clone());
         assert_eq!(
             proof.proof_unchecked(),
-            vec![(ProofPath::new(&[128; 32]).prefix(15), left_hash)]
+            vec![(S::transform_key(&[128; 32]).prefix(15), left_hash)]
         );
         check_map_multiproof(&proof, keys, &table);
 
@@ -830,16 +816,14 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(
             proof.proof_unchecked(),
             vec![
-                (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-                (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
             ]
         );
         check_map_multiproof(&proof, keys, &table);
     }
 
-
-    fn test_fuzz_delete()
-    {
+    fn test_fuzz_delete() {
         let db1 = TemporaryDB::default();
         let db2 = TemporaryDB::default();
         let mut data = generate_random_data(100);
@@ -902,8 +886,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index2.object_hash(), saved_hash);
     }
 
-    fn test_fuzz_insert_after_delete()
-    {
+    fn test_fuzz_insert_after_delete() {
         let db = TemporaryDB::default();
         let storage = db.fork();
         let mut index = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &storage);
@@ -932,8 +915,7 @@ impl <S> ProofMapTester<S> where S:KeyTransform<[u8; 32]> {
         assert_eq!(index.object_hash(), saved_hash);
     }
 
-    fn test_iter()
-    {
+    fn test_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
         let mut map_index = ProofMapIndexBase::<_, _, _, S>::new(IDX_NAME, &fork);
@@ -1033,11 +1015,6 @@ fn test_insert_trivial_hashed() {
 #[test]
 fn test_insert_same_key_raw() {
     ProofMapTester::<Raw>::test_insert_same_key()
-}
-
-#[test]
-fn test_insert_same_key_hashed() {
-    ProofMapTester::<Hashed>::test_insert_same_key()
 }
 
 #[test]
@@ -1146,18 +1123,8 @@ fn test_build_proof_in_complex_tree_raw() {
 }
 
 #[test]
-fn test_build_proof_in_complex_tree_hashed() {
-    ProofMapTester::<Hashed>::test_build_proof_in_complex_tree()
-}
-
-#[test]
 fn test_build_multiproof_simple_raw() {
     ProofMapTester::<Raw>::test_build_multiproof_simple()
-}
-
-#[test]
-fn test_build_multiproof_simple_hashed() {
-    ProofMapTester::<Hashed>::test_build_multiproof_simple()
 }
 
 #[test]
@@ -1201,6 +1168,25 @@ fn test_build_proof_in_single_node_tree_hashed() {
 }
 
 #[test]
+fn test_insert_same_key() {
+    let db = TemporaryDB::default();
+    let storage = db.fork();
+    let mut table = RawProofMapIndex::new(IDX_NAME, &storage);
+    assert_eq!(table.object_hash(), HashTag::empty_map_hash());
+    let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
+    let hash = HashStream::new()
+        .update(&[HashTag::MapBranchNode as u8])
+        .update(root_prefix)
+        .update(HashTag::hash_leaf(&[2]).as_ref())
+        .hash();
+
+    table.put(&[255; 32], vec![1]);
+    table.put(&[255; 32], vec![2]);
+    assert_eq!(table.get(&[255; 32]), Some(vec![2]));
+    assert_eq!(table.object_hash(), HashTag::hash_map_node(hash));
+}
+
+#[test]
 fn test_merkle_root_leaf() {
     let db = TemporaryDB::default();
     let storage = db.fork();
@@ -1218,10 +1204,8 @@ fn test_merkle_root_leaf() {
     assert_eq!(HashTag::hash_map_node(merkle_root), index.object_hash());
 }
 
-
-
 fn check_map_proof<K, V, S>(
-    proof: &MapProof<K, V>,
+    proof: &MapProof<K, V, S>,
     key: Option<K>,
     table: &ProofMapIndexBase<&Fork, K, V, S>,
 ) where
@@ -1230,7 +1214,7 @@ fn check_map_proof<K, V, S>(
     S: KeyTransform<K>,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
-    let deserialized_proof: MapProof<K, V> = serde_json::from_value(serialized_proof).unwrap();
+    let deserialized_proof: MapProof<K, V, S> = serde_json::from_value(serialized_proof).unwrap();
 
     let entries = match key {
         Some(key) => {
@@ -1259,7 +1243,7 @@ fn check_map_proof<K, V, S>(
 }
 
 fn check_map_multiproof<K, V, S>(
-    proof: &MapProof<K, V>,
+    proof: &MapProof<K, V, S>,
     keys: Vec<K>,
     table: &ProofMapIndexBase<&Fork, K, V, S>,
 ) where
@@ -1394,8 +1378,8 @@ fn test_invalid_map_proofs() {
 
     let h = hash(&[1]);
 
-    let proof: MapProof<[u8; 32], Vec<u8>> =
-        MapProof::new().add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h);
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> =
+        MapProof::new().add_proof_entry(Raw::transform_key(&[1; 32]).prefix(240), h);
     match proof.check().unwrap_err() {
         NonTerminalNode(..) => {}
         e => panic!("expected non-terminal node error, got {}", e),
@@ -1408,47 +1392,47 @@ fn test_invalid_map_proofs() {
         ],
         "entries": []
     });
-    let proof: MapProof<[u8; 32], Vec<u8>> = serde_json::from_value(json).unwrap();
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = serde_json::from_value(json).unwrap();
     match proof.check().unwrap_err() {
         InvalidOrdering(..) => {}
         e => panic!("expected invalid ordering error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(77), h);
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(3), h)
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(77), h);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
-        .add_proof_entry(ProofPath::new(&[1; 32]), h)
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[0; 32]).prefix(10), h)
+        .add_proof_entry(Raw::transform_key(&[1; 32]), h)
         .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         DuplicatePath(..) => {}
         e => panic!("expected duplicate path error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[0; 32]).prefix(10), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
@@ -1456,9 +1440,6 @@ fn test_invalid_map_proofs() {
         e => panic!("expected duplicate path error, got {}", e),
     }
 }
-
-
-
 
 #[test]
 fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
@@ -1568,7 +1549,6 @@ fn test_fuzz_delete_build_proofs() {
         check_map_proof(&proof, None, &table);
     }
 }
-
 
 #[test]
 fn test_tree_with_hashed_key() {

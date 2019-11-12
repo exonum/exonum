@@ -25,6 +25,7 @@ use exonum::{
 };
 
 use crate::{wallet::Wallet, Schema};
+use exonum_merkledb::proof_map_index::RawMapProof;
 
 /// Describes the query parameters for the `get_wallet` endpoint.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -39,7 +40,7 @@ pub struct WalletProof {
     /// Proof of the whole database table.
     pub to_table: MapProof<IndexCoordinates, Hash>,
     /// Proof of the specific wallet in this table.
-    pub to_wallet: MapProof<PublicKey, Wallet>,
+    pub to_wallet: RawMapProof<PublicKey, Wallet>,
 }
 
 /// Wallet history.
