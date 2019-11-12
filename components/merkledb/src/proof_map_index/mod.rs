@@ -67,10 +67,6 @@ where
     fn value(&self, key: &K) -> V {
         self.get_value_unchecked(key)
     }
-
-    fn transform_key(key: &K) -> ProofPath {
-        Style::transform_key(key)
-    }
 }
 
 #[doc(hidden)]
@@ -433,7 +429,7 @@ where
     /// let proof = index.get_proof(Hash::default());
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
-        self.create_proof(key)
+        self.create_proof(Style::transform_key(&key), key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -453,6 +449,12 @@ where
     where
         KI: IntoIterator<Item = K>,
     {
+        let keys = keys
+            .into_iter()
+            .map(|key| {
+                (Style::transform_key(&key), key)
+            })
+            .collect::<Vec<_>>();
         self.create_multiproof(keys)
     }
 

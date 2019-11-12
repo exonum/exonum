@@ -43,7 +43,6 @@ proptest = "0.9"
 modifier = "0.1"
 pretty_assertions = "0.6"
 url = "2.0.0"
-paste = "0.1"
 
 [[bench]]
 name = "criterion"
