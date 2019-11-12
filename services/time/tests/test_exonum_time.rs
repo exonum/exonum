@@ -381,7 +381,7 @@ fn test_selected_time_less_than_time_in_storage() {
     };
 
     testkit.create_block_with_transaction(
-        ConfigPropose::actual_from(cfg_change_height)
+        ConfigPropose::new(0, cfg_change_height)
             .consensus_config(new_cfg)
             .sign_for_supervisor(pub_key_0, &sec_key_0),
     );
@@ -609,7 +609,7 @@ fn test_endpoint_api() {
         cfg
     };
     testkit.create_block_with_transaction(
-        ConfigPropose::actual_from(cfg_change_height)
+        ConfigPropose::new(0, cfg_change_height)
             .consensus_config(new_cfg)
             .sign_for_supervisor(public_key_0, &secret_key_0),
     );
