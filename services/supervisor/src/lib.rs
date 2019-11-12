@@ -46,15 +46,11 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-/// Creates a new decentralized `Supervisor`.
-pub fn decentralized_supervisor() -> Supervisor<mode::Decentralized> {
-    Supervisor::<mode::Decentralized>::new()
-}
+/// Decentralized supervisor.
+pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
 
-/// Creates a new simple `Supervisor`.
-pub fn simple_supervisor() -> Supervisor<mode::Simple> {
-    Supervisor::<mode::Simple>::new()
-}
+/// Simple supervisor.
+pub type SimpleSupervisor = Supervisor<mode::Simple>;
 
 /// Returns the `Supervisor` entity name.
 pub const fn supervisor_name() -> &'static str {

@@ -23,7 +23,7 @@ use exonum::{
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
-use exonum_supervisor::{decentralized_supervisor, ConfigVote, Error, SupervisorInterface};
+use exonum_supervisor::{ConfigVote, DecentralizedSupervisor, Error, SupervisorInterface};
 
 #[test]
 fn test_multiple_consensus_change_proposes() {
@@ -467,7 +467,7 @@ fn test_service_config_discard_fake_supervisor() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
         .with_rust_service(
-            InstanceCollection::new(decentralized_supervisor()).with_instance(
+            InstanceCollection::new(DecentralizedSupervisor::new()).with_instance(
                 FAKE_SUPERVISOR_ID,
                 "fake-supervisor",
                 Vec::default(),

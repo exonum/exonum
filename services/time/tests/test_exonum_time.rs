@@ -28,7 +28,7 @@ use exonum::{
     runtime::{rust::Transaction, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_supervisor::{simple_supervisor, ConfigPropose};
+use exonum_supervisor::{ConfigPropose, SimpleSupervisor};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
     api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
@@ -366,7 +366,7 @@ fn test_selected_time_less_than_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(simple_supervisor())
+        .with_rust_service(SimpleSupervisor::new())
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -539,7 +539,7 @@ fn test_endpoint_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(simple_supervisor())
+        .with_rust_service(SimpleSupervisor::new())
         .create();
 
     let mut api = testkit.api();

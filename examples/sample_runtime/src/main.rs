@@ -31,7 +31,7 @@ use exonum::{
     },
 };
 use exonum_derive::IntoExecutionError;
-use exonum_supervisor::{simple_supervisor, ConfigPropose, DeployRequest, StartService};
+use exonum_supervisor::{ConfigPropose, DeployRequest, SimpleSupervisor, StartService};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -276,7 +276,7 @@ fn main() {
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
         .with_rust_runtime(
             channel.endpoints.0.clone(),
-            vec![InstanceCollection::from(simple_supervisor())],
+            vec![InstanceCollection::from(SimpleSupervisor::new())],
         )
         .with_additional_runtime(SampleRuntime::default())
         .build()

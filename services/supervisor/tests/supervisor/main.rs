@@ -27,7 +27,7 @@ use exonum::{
     },
 };
 use exonum_supervisor::{
-    decentralized_supervisor, ConfigPropose, DeployConfirmation, DeployRequest, StartService,
+    ConfigPropose, DecentralizedSupervisor, DeployConfirmation, DeployRequest, StartService,
 };
 
 use crate::{
@@ -215,7 +215,7 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(decentralized_supervisor())
+        .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(InstanceCollection::new(IncService))
         .create()
 }
@@ -223,7 +223,7 @@ fn testkit_with_inc_service() -> TestKit {
 fn testkit_with_inc_service_and_two_validators() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(decentralized_supervisor())
+        .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(InstanceCollection::new(IncService))
         .with_validators(2)
         .create()
@@ -232,7 +232,7 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
-        .with_rust_service(decentralized_supervisor())
+        .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(InstanceCollection::new(IncService))
         .with_validators(1)
         .create()
@@ -243,7 +243,7 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
     let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(decentralized_supervisor())
+        .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(collection)
         .create()
 }
@@ -251,7 +251,7 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
 fn add_available_services(runtime: RustRuntime) -> RustRuntime {
     runtime
         .with_available_service(IncService)
-        .with_available_service(decentralized_supervisor())
+        .with_available_service(DecentralizedSupervisor::new())
 }
 
 /// Just test that the Inc service works as intended.
@@ -550,7 +550,7 @@ fn test_start_two_services_in_one_request() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(decentralized_supervisor())
+        .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(InstanceCollection::new(IncService))
         .create();
     deploy_default(&mut testkit);
