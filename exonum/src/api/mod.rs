@@ -204,7 +204,7 @@ pub struct ApiAggregator {
 }
 
 impl ApiAggregator {
-    /// Aggregate API for the given blockchain and node state.
+    /// Creates an API aggregator for the given blockchain and node state.
     pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
         let mut endpoints = BTreeMap::new();
         endpoints.insert(
@@ -218,10 +218,12 @@ impl ApiAggregator {
         Self { endpoints }
     }
 
+    /// Inserts an endpoints handler with the given mount point.
     pub fn insert(&mut self, name: &str, api: ApiBuilder) {
         self.endpoints.insert(name.to_owned(), api);
     }
 
+    /// Extends the list of endpoint handlers with the specified ones.
     pub fn extend(&mut self, endpoints: impl IntoIterator<Item = (String, ApiBuilder)>) {
         self.endpoints.extend(endpoints);
     }

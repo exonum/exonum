@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Utilities for validators.
+
 use exonum_crypto::PublicKey;
 use exonum_merkledb::Snapshot;
 

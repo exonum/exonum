@@ -43,6 +43,7 @@ impl<'a> CallContext<'a> {
         Schema::new(self.fork())
     }
 
+    /// Returns the descriptor of the executing service instance.
     pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
     }

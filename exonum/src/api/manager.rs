@@ -47,6 +47,8 @@ impl ApiManager {
     const RETRY_INTERVAL: Duration = Duration::from_millis(500);
     const RETRY_ATTEMPTS: usize = 10;
 
+    /// Creates a new API manager instance with the specified runtime configuration and
+    /// the receiver of the `UpdateEndpoints` events.
     pub fn new(
         runtime_config: SystemRuntimeConfig,
         endpoints_rx: mpsc::Receiver<UpdateEndpoints>,

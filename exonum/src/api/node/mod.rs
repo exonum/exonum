@@ -36,7 +36,7 @@ pub mod private;
 pub mod public;
 
 #[derive(Default)]
-pub struct ApiNodeState {
+struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     incoming_connections: HashSet<ConnectInfo>,
     outgoing_connections: HashSet<ConnectInfo>,
@@ -73,10 +73,10 @@ impl ApiNodeState {
     }
 }
 
-/// Shared part of the context, used to take some values from the `Node`
-/// `State` and `Dispatcher`. As there is no way to directly access
-/// the node state, this entity is regularly updated with information about the
-/// node and transfers this information to API.
+/// Shared part of the context, used to take some values from the `Node`.
+/// As there is no way to directly access the node state, this entity is
+/// regularly updated with information about the node and transfers this
+/// information to API.
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     node: Arc<RwLock<ApiNodeState>>,

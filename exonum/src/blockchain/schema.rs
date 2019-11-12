@@ -324,6 +324,7 @@ where
     }
 }
 
+/// Describes affiliation of the index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IndexOwner {
     /// This index is part of core schema.
