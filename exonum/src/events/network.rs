@@ -80,16 +80,16 @@ pub enum NetworkRequest {
 pub struct HttpBackendConfig {
     /// The interval in milliseconds between attempts of restarting HTTP-server in case
     /// the server failed to restart
-    pub restart_retry_attempts: u16,
+    pub server_restart_max_retries: u16,
     /// The attempts counts of restarting HTTP-server in case the server failed to restart
-    pub restart_retry_interval: u64,
+    pub server_restart_retry_timeout: u64,
 }
 
 impl Default for HttpBackendConfig {
     fn default() -> Self {
         Self {
-            restart_retry_attempts: 20,
-            restart_retry_interval: 500,
+            server_restart_max_retries: 20,
+            server_restart_retry_timeout: 500,
         }
     }
 }

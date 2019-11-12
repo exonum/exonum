@@ -690,8 +690,8 @@ impl TestKit {
                 ApiRuntimeConfig::new(private_api_address, ApiAccess::Private),
             ],
             api_aggregator,
-            service_retry_attempt: 5,
-            service_retry_interval: 500,
+            server_restart_max_retries: 5,
+            server_restart_retry_timeout: 500,
         };
         let system_runtime = system_runtime_config.start(endpoints_rx).unwrap();
 

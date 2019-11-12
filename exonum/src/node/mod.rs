@@ -325,14 +325,14 @@ impl ValidateInput for NodeConfig {
 
         let backend_config = &self.network.http_backend_config;
         ensure!(
-            backend_config.restart_retry_attempts > 0,
-            "restart_retry_attempts({}) must be strictly larger than 0",
-            backend_config.restart_retry_attempts
+            backend_config.server_restart_max_retries > 0,
+            "server_restart_max_retries({}) must be strictly larger than 0",
+            backend_config.server_restart_max_retries
         );
         ensure!(
-            backend_config.restart_retry_interval > 0,
-            "restart_retry_interval({}) must be strictly larger than 0",
-            backend_config.restart_retry_interval
+            backend_config.server_restart_retry_timeout > 0,
+            "server_restart_retry_timeout({}) must be strictly larger than 0",
+            backend_config.server_restart_retry_timeout
         );
 
         // Sanity checks for cases of accidental negative overflows.
@@ -1019,8 +1019,8 @@ impl Node {
                     .collect::<Vec<_>>()
             },
             api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
-            service_retry_interval: node_cfg.network.http_backend_config.restart_retry_interval,
-            service_retry_attempt: node_cfg.network.http_backend_config.restart_retry_attempts,
+            server_restart_retry_timeout: node_cfg.network.http_backend_config.server_restart_retry_timeout,
+            server_restart_max_retries: node_cfg.network.http_backend_config.server_restart_max_retries,
         };
 
         let handler = NodeHandler::new(

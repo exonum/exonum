@@ -132,14 +132,14 @@ impl Handler<StartServer> for ApiManager {
             Ok(addr) => addr,
             Err(e) => {
                 warn!("Error handling service start {:?}: {}", msg.config, e);
-                if msg.attempt == self.runtime_config.service_retry_attempt {
+                if msg.attempt == self.runtime_config.server_restart_max_retries {
                     error!("Cannot spawn server with config {:?}", msg.config);
                     ctx.terminate();
                 } else {
                     msg.attempt += 1;
                     ctx.notify_later(
                         msg,
-                        Duration::from_millis(self.runtime_config.service_retry_interval),
+                        Duration::from_millis(self.runtime_config.server_restart_retry_timeout),
                     );
                 }
                 return;
