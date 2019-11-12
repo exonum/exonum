@@ -74,6 +74,8 @@ message ConfigPropose {
   uint64 actual_from = 1;
   // New configuration proposition.
   repeated ConfigChange changes = 2;
+  // Configuration proposal number to avoid conflicting proposals.
+  uint64 configuration_number = 3;
 }
 
 // Confirmation vote for the configuration change

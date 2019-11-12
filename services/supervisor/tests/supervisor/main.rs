@@ -362,7 +362,7 @@ fn test_try_run_unregistered_service_instance() {
     let system_api = api.exonum_api();
     let expected_status = Err(ExecutionError {
         kind: ExecutionErrorKind::Service { code: 13 },
-        description: "Start request contains unknonw artifact.".into(),
+        description: "Start request contains unknown artifact.".into(),
     });
     system_api.assert_tx_status(hash, &expected_status.into());
 }

@@ -85,8 +85,14 @@ impl ConfigProposeBuilder {
             config_propose: ConfigPropose {
                 actual_from: cfg_change_height,
                 changes: vec![],
+                configuration_number: 0,
             },
         }
+    }
+
+    pub fn configuration_number(mut self, configuration_number: u64) -> Self {
+        self.config_propose.configuration_number = configuration_number;
+        self
     }
 
     pub fn extend_consensus_config_propose(mut self, consensus_config: ConsensusConfig) -> Self {

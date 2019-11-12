@@ -75,6 +75,7 @@ fn test_sent_new_config_after_expired_one() {
     let first_consensus_config = consensus_config_propose_first_variant(&testkit);
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .configuration_number(0)
         .extend_consensus_config_propose(first_consensus_config.clone())
         .build();
 
@@ -95,6 +96,7 @@ fn test_sent_new_config_after_expired_one() {
     let second_consensus_config = consensus_config_propose_second_variant(&testkit);
 
     let config_proposal = ConfigProposeBuilder::new(cfg_change_height)
+        .configuration_number(1)
         .extend_consensus_config_propose(second_consensus_config.clone())
         .build();
     let proposal_hash = config_proposal.object_hash();
@@ -419,6 +421,7 @@ fn test_another_configuration_change_proposal() {
 
     let cfg_change_height = Height(4);
     let propose = ConfigProposeBuilder::new(cfg_change_height)
+        .configuration_number(0)
         .extend_service_config_propose(params.clone())
         .build();
 
@@ -435,6 +438,7 @@ fn test_another_configuration_change_proposal() {
 
     // Try to commit second config change propose.
     let second_propose = ConfigProposeBuilder::new(cfg_change_height)
+        .configuration_number(1)
         .extend_service_config_propose("I am an overridden parameter".to_string())
         .build();
 
@@ -649,6 +653,7 @@ fn test_several_service_config_changes() {
         let params = format!("Change {}", i);
 
         let propose = ConfigProposeBuilder::new(cfg_change_height)
+            .configuration_number(i - 1)
             .extend_service_config_propose(params.clone())
             .build();
         let proposal_hash = propose.object_hash();
@@ -673,4 +678,75 @@ fn test_several_service_config_changes() {
     }
 
     check_service_actual_param(&testkit, Some("Change 4".to_string()));
+}
+
+/// Checks that config with incorrect configuration number is discarded.
+#[test]
+fn test_discard_incorrect_configuration_number() {
+    let mut testkit = testkit_with_supervisor(4);
+
+    // Attempt to send config with incorrect configuration number (expected 0, actual 100).
+    let incorrect_configuration_number = 100;
+    let first_config_height = Height(2);
+
+    let config_proposal = ConfigProposeBuilder::new(first_config_height)
+        .configuration_number(incorrect_configuration_number)
+        .extend_consensus_config_propose(consensus_config_propose_first_variant(&testkit))
+        .build();
+
+    let signed_proposal =
+        sign_config_propose_transaction(&testkit, config_proposal, ValidatorId(0));
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::IncorrectConfigurationNumber.into()));
+    assert_eq!(config_propose_entry(&testkit), None);
+
+    // Apply some correct config (expected 0, actual 0).
+    let second_config_height = Height(4);
+    let initiator_id = testkit.network().us().validator_id().unwrap();
+
+    let first_consensus_config = consensus_config_propose_first_variant(&testkit);
+
+    let config_proposal = ConfigProposeBuilder::new(second_config_height)
+        .configuration_number(0)
+        .extend_consensus_config_propose(first_consensus_config.clone())
+        .build();
+    let proposal_hash = config_proposal.object_hash();
+
+    testkit
+        .create_block_with_transaction(sign_config_propose_transaction(
+            &testkit,
+            config_proposal,
+            initiator_id,
+        ))
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+
+    let signed_txs = build_confirmation_transactions(&testkit, proposal_hash, initiator_id);
+    testkit
+        .create_block_with_transactions(signed_txs)
+        .transactions[0]
+        .status()
+        .expect("Transaction with confirmations discarded.");
+    testkit.create_blocks_until(second_config_height);
+
+    assert_eq!(config_propose_entry(&testkit), None);
+    assert_eq!(testkit.consensus_config(), first_consensus_config);
+
+    // Attempt to send config with outdated configuration number (expected 1, actual 0).
+    let incorrect_configuration_number = 0;
+    let third_config_height = Height(6);
+
+    let config_proposal = ConfigProposeBuilder::new(third_config_height)
+        .configuration_number(incorrect_configuration_number)
+        .extend_consensus_config_propose(consensus_config_propose_first_variant(&testkit))
+        .build();
+
+    let signed_proposal =
+        sign_config_propose_transaction(&testkit, config_proposal, ValidatorId(0));
+    let block = testkit.create_block_with_transaction(signed_proposal);
+    let status = block.transactions[0].status();
+    assert_eq!(status, Err(&Error::IncorrectConfigurationNumber.into()));
+    assert_eq!(config_propose_entry(&testkit), None);
 }

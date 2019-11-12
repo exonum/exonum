@@ -134,7 +134,7 @@ where
         if propose.actual_from == Height(0) {
             propose.actual_from = current_height.next();
         }
-        // Otherwise verifiy that the `actual_from` height is in the future.
+        // Otherwise verify that the `actual_from` height is in the future.
         else if current_height >= propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
@@ -223,6 +223,13 @@ where
         }
 
         let schema = Schema::new(context.instance().name, context.fork());
+
+        // After all the checks verify that configuration number is expected one.
+        if propose.configuration_number != schema.get_configuration_number() {
+            return Err(Error::IncorrectConfigurationNumber.into());
+        }
+        schema.increase_configuration_number();
+
         let propose_hash = propose.object_hash();
         schema.config_confirms().confirm(&propose_hash, author);
 

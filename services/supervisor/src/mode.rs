@@ -16,7 +16,7 @@
 //!
 //! Currently two modes are available:
 //! - Simple mode. Within simple mode, the amount of checks performed by the Supervisor
-//!   is reduced to the minimum: the only reuqirement is that every request is sent
+//!   is reduced to the minimum: the only requirement is that every request is sent
 //!   by the validator.
 //! - Decentralized mode. Within decentralized mode, policy on requests is the following:
 //!   deploy requests should be signed and sent by every validator,
@@ -35,7 +35,7 @@ pub struct Simple;
 
 /// Decentralized supervisor mode (default): to deploy or initialize service
 /// a request should be sent to **every** validator before it will be executed.
-/// For configs, a byzantine majorify of validators should vote for it.
+/// For configs, a byzantine majority of validators should vote for it.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Decentralized;
 

@@ -44,6 +44,9 @@ pub trait PrivateApi {
     /// Creates and broadcasts the `ConfigVote` transaction, which is signed
     /// by the current node, and returns its hash.
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
+
+    /// Returns the number of processed configurations.
+    fn configuration_number(&self) -> Result<u64, Self::Error>;
 }
 
 pub trait PublicApi {
@@ -85,6 +88,13 @@ impl PrivateApi for ApiImpl<'_> {
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
         self.broadcast_transaction(vote).map_err(From::from)
     }
+
+    fn configuration_number(&self) -> Result<u64, Self::Error> {
+        let configuration_number =
+            Schema::new(self.0.instance.name, self.0.snapshot()).get_configuration_number();
+
+        Ok(configuration_number)
+    }
 }
 
 impl PublicApi for ApiImpl<'_> {
@@ -112,6 +122,9 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         })
         .endpoint_mut("confirm-config", |state, query| {
             ApiImpl(state).confirm_config(query)
+        })
+        .endpoint("configuration-number", |state, _query: ()| {
+            ApiImpl(state).configuration_number()
         });
     builder
         .public_scope()

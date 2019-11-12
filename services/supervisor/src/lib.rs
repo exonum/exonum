@@ -127,7 +127,7 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
             ) {
                 // Panic will cause changes to be rolled back.
                 panic!(
-                    "An error occured while starting the service instance: {:?}",
+                    "An error occurred while starting the service instance: {:?}",
                     e
                 );
             }
@@ -162,6 +162,8 @@ where
         }
     }
 
+    // `ServiceFactory` requires constructor to take a reference.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn construct(&self) -> Box<Self> {
         Box::new(*self)
     }

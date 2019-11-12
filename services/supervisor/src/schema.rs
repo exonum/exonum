@@ -68,6 +68,22 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
         )
     }
 
+    fn configuration_number(&self) -> Entry<T, u64> {
+        Entry::new(
+            [self.instance_name, ".configuration_number"].concat(),
+            self.access.clone(),
+        )
+    }
+
+    pub fn get_configuration_number(&self) -> u64 {
+        self.configuration_number().get().unwrap_or(0)
+    }
+
+    pub fn increase_configuration_number(&self) {
+        let new_configuration_number = self.get_configuration_number() + 1;
+        self.configuration_number().set(new_configuration_number);
+    }
+
     pub fn pending_proposal(&self) -> Entry<T, ConfigProposalWithHash> {
         Entry::new(
             [self.instance_name, ".pending_proposal"].concat(),
