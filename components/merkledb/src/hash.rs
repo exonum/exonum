@@ -217,11 +217,11 @@ impl ObjectHash for Hash {
 }
 
 /// Just returns the origin array.
-impl ObjectHash for [u8; HASH_SIZE] {
-    fn object_hash(&self) -> Hash {
-        Hash::new(*self)
-    }
-}
+//impl ObjectHash for [u8; HASH_SIZE] {
+//    fn object_hash(&self) -> Hash {
+//        Hash::new(*self)
+//    }
+//}
 
 /// Errors that can occur while validating a `ListProof` or `MapProof` against
 /// a trusted collection hash.

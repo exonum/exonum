@@ -25,11 +25,11 @@ use proptest::{
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 use exonum_merkledb::{
-    BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+    BinaryValue, BinaryKey, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 
-mod common;
-use crate::common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
+pub mod common;
+use crate::common::{Key, compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {
@@ -90,11 +90,11 @@ where
     }
 }
 
-impl<V> Modifier<ProofMapIndex<Rc<Fork>, [u8; 32], V>> for MapAction<[u8; 32], V>
+impl<V> Modifier<ProofMapIndex<Rc<Fork>, Key, V>> for MapAction<Key, V>
 where
     V: BinaryValue + ObjectHash,
 {
-    fn modify(self, map: &mut ProofMapIndex<Rc<Fork>, [u8; 32], V>) {
+    fn modify(self, map: &mut ProofMapIndex<Rc<Fork>, Key, V>) {
         match self {
             MapAction::Put(k, v) => {
                 map.put(&k, v);
@@ -121,7 +121,7 @@ impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
     }
 }
 
-impl<V: BinaryValue + ObjectHash> FromFork for ProofMapIndex<Rc<Fork>, [u8; 32], V> {
+impl<V: BinaryValue + ObjectHash> FromFork for ProofMapIndex<Rc<Fork>, Key, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
         Self::new("test", fork)
     }
@@ -142,8 +142,8 @@ fn compare_map(map: &MapIndex<Rc<Fork>, u8, i32>, ref_map: &HashMap<u8, i32>) ->
 }
 
 fn compare_proof_map(
-    map: &ProofMapIndex<Rc<Fork>, [u8; 32], i32>,
-    ref_map: &HashMap<[u8; 32], i32>,
+    map: &ProofMapIndex<Rc<Fork>, Key, i32>,
+    ref_map: &HashMap<Key, i32>,
 ) -> TestCaseResult {
     for k in ref_map.keys() {
         prop_assert!(map.contains(k));
@@ -163,10 +163,10 @@ fn generate_action() -> impl Strategy<Value = MapAction<u8, i32>> {
     ]
 }
 
-fn generate_proof_action() -> impl Strategy<Value = MapAction<[u8; 32], i32>> {
+fn generate_proof_action() -> impl Strategy<Value = MapAction<Key, i32>> {
     prop_oneof![
-        ((0..8u8), num::i32::ANY).prop_map(|(i, v)| MapAction::Put([i; 32], v)),
-        (0..8u8).prop_map(|i| MapAction::Remove([i; 32])),
+        ((0..8u8), num::i32::ANY).prop_map(|(i, v)| MapAction::Put([i; 32].into(), v)),
+        (0..8u8).prop_map(|i| MapAction::Remove([i; 32].into())),
         strategy::Just(MapAction::Clear),
         strategy::Just(MapAction::MergeFork),
     ]

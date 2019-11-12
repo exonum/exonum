@@ -41,6 +41,39 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
+use exonum_crypto::{hash, Hash, HASH_SIZE};
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Key(pub [u8; HASH_SIZE]);
+
+impl ObjectHash for Key {
+    fn object_hash(&self) -> Hash {
+        hash(&self.0)
+    }
+}
+
+impl BinaryKey for Key {
+    fn size(&self) -> usize {
+        HASH_SIZE
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        buffer.copy_from_slice(&self.0);
+        self.0.len()
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        let mut buf = [0; 32];
+        buf.copy_from_slice(&buffer);
+        Self(buf)    }
+}
+
+impl From<[u8; HASH_SIZE]> for Key {
+    fn from(key: [u8; HASH_SIZE]) -> Self {
+        Self(key)
+    }
+}
+
 const INDEX_NAME: &str = "index";
 
 type Data = BTreeMap<[u8; 32], u64>;
@@ -122,10 +155,10 @@ where
 fn write_data(db: &TemporaryDB, data: Data) {
     let fork = db.fork();
     {
-        let mut table = ProofMapIndex::new(INDEX_NAME, &fork);
+        let mut table: ProofMapIndex<_, Key, _> = ProofMapIndex::new(INDEX_NAME, &fork);
         table.clear();
         for (key, value) in data {
-            table.put(&key, value);
+            table.put(&key.into(), value);
         }
     }
     db.merge(fork.into_patch()).unwrap();
@@ -139,35 +172,47 @@ fn index_data(
     btree_map(array::uniform32(key_bytes), any::<u64>(), sizes)
 }
 
+fn data_for_absent(key_bytes: RangeInclusive<u8>) -> impl Strategy<Value = Vec<Key>> {
+    vec(array::uniform32(key_bytes), 20)
+        .prop_map(|key| {
+//            let mut buf = [0; 32];
+//            buf.copy_from_slice(key.as_slice());
+            vec![Key(*key.get(0).unwrap())]
+        })
+
+}
+
 /// Generates data to test a proof of presence.
 fn data_for_proof_of_presence(
     key_bytes: impl Strategy<Value = u8>,
     sizes: Range<usize>,
-) -> impl Strategy<Value = ([u8; 32], Data)> {
+) -> impl Strategy<Value = (Key, Data)> {
     index_data(key_bytes, sizes)
         .prop_flat_map(|data| (0..data.len(), Just(data)))
         .prop_map(|(index, data)| (*data.keys().nth(index).unwrap(), data))
+        .prop_map(|(index, data)| (index.into(), data))
 }
 
 fn data_for_multiproof(
     key_bytes: impl Strategy<Value = u8>,
     sizes: Range<usize>,
-) -> impl Strategy<Value = (Vec<[u8; 32]>, Data)> {
+) -> impl Strategy<Value = (Vec<Key>, Data)> {
     index_data(key_bytes, sizes)
         .prop_flat_map(|data| (vec(0..data.len(), data.len() / 5), Just(data)))
         .prop_map(|(indexes, data)| {
             // Note that keys may coincide; this is intentional.
-            let keys: Vec<_> = indexes
+            let keys: Vec<Key> = indexes
                 .into_iter()
                 .map(|i| *data.keys().nth(i).unwrap())
+                .map(|key| key.into())
                 .collect();
             (keys, data)
         })
 }
 
-fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
+fn test_proof(db: &TemporaryDB, key: Key) -> TestCaseResult {
     let snapshot = db.snapshot();
-    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let table: ProofMapIndex<_, Key, u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
     let proof = table.get_proof(key);
     let expected_key = if table.contains(&key) {
         Some(key)
@@ -177,9 +222,9 @@ fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
     check_map_proof(&proof, expected_key, &table)
 }
 
-fn test_multiproof(db: &TemporaryDB, keys: &[[u8; 32]]) -> TestCaseResult {
+fn test_multiproof(db: &TemporaryDB, keys: &[Key]) -> TestCaseResult {
     let snapshot = db.snapshot();
-    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let table: ProofMapIndex<_, Key, u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
     let proof = table.get_multiproof(keys.to_vec());
     let unique_keys: BTreeSet<_> = keys.iter().collect();
     check_map_multiproof(&proof, unique_keys, &table)
@@ -220,7 +265,7 @@ impl TestParams {
         let data_strategy = index_data(self.key_bytes(), self.index_sizes());
         proptest!(self.config(), |(key in key_strategy, data in data_strategy)| {
             write_data(&db, data);
-            test_proof(&db, key)?;
+            test_proof(&db, key.into())?;
         });
     }
 
@@ -233,9 +278,10 @@ impl TestParams {
         });
     }
 
+
     fn multiproof_of_absent_elements(&self) {
         let db = TemporaryDB::new();
-        let keys_strategy = vec(array::uniform32(self.key_bytes()), 20);
+        let keys_strategy = data_for_absent(self.key_bytes());
         let data_strategy = index_data(self.key_bytes(), self.index_sizes());
         proptest!(self.config(), |(keys in keys_strategy, data in data_strategy)| {
             write_data(&db, data);
@@ -246,7 +292,7 @@ impl TestParams {
     fn mixed_multiproof(&self) {
         let db = TemporaryDB::new();
         let strategy = data_for_multiproof(self.key_bytes(), self.index_sizes());
-        let absent_keys_strategy = vec(array::uniform32(self.key_bytes()), 20);
+        let absent_keys_strategy =  data_for_absent(self.key_bytes());
         proptest!(
             self.config(),
             |((mut keys, data) in strategy, absent_keys in absent_keys_strategy)| {
