@@ -1554,20 +1554,3 @@ fn test_tree_with_hashed_key() {
         hash_isolated_node(&ProofPath::new(&other_key), &HashTag::hash_leaf(&[1, 2, 3]))
     );
 }
-
-#[test]
-fn test_raw() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut index = RawProofMapIndex::new("index", &fork);
-
-    index.put(&[1; 32], 1);
-
-    dbg!("index {:?}", index);
-
-    let mut index = ProofMapIndex::new("index", &fork);
-
-    index.put(&[1; 32], 1);
-
-    dbg!("index {:?}", index);
-}

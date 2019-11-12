@@ -143,11 +143,7 @@ fn index_data(
 }
 
 fn data_for_absent(key_bytes: RangeInclusive<u8>) -> impl Strategy<Value = Vec<Key>> {
-    vec(array::uniform32(key_bytes), 20).prop_map(|key| {
-        //            let mut buf = [0; 32];
-        //            buf.copy_from_slice(key.as_slice());
-        vec![Key(*key.get(0).unwrap())]
-    })
+    vec(array::uniform32(key_bytes), 20).prop_map(|key| vec![Key(*key.get(0).unwrap())])
 }
 
 /// Generates data to test a proof of presence.

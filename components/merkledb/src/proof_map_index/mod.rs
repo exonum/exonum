@@ -434,7 +434,6 @@ where
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
         self.create_proof(key)
-        //        unimplemented!()
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.

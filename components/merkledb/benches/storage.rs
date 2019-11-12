@@ -261,7 +261,7 @@ fn proof_map_insert_without_merge(b: &mut Bencher<'_>, len: usize) {
     b.iter_with_setup(
         || (db.fork(), data.clone()),
         |(storage, data)| {
-            let mut table: ProofMapIndex<&Fork, Hash, Vec<u8>> = ProofMapIndex::new(NAME, &storage);
+            let mut table = ProofMapIndex::new(NAME, &storage);
             for item in data {
                 table.put(&item.0, item.1);
             }
