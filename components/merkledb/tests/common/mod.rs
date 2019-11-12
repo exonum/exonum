@@ -19,10 +19,11 @@ use proptest::test_runner::TestCaseResult;
 
 use std::rc::Rc;
 
-use exonum_merkledb::{Database, Fork, TemporaryDB, ObjectHash, BinaryKey};
 use exonum_crypto::{hash, Hash, HASH_SIZE};
+use exonum_merkledb::{BinaryKey, Database, Fork, ObjectHash, TemporaryDB};
 
 // Max size of the generated sequence of actions.
+#[allow(dead_code)]
 pub const ACTIONS_MAX_LEN: usize = 100;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -62,8 +63,10 @@ pub trait FromFork {
     fn clear(&mut self);
 }
 
+#[allow(dead_code)]
 pub struct MergeFork;
 
+#[allow(dead_code)]
 pub fn compare_collections<A, R, T>(
     db: &TemporaryDB,
     actions: &[A],

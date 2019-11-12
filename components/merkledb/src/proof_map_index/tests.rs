@@ -32,7 +32,9 @@ use super::{
 };
 use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
 use crate::proof_map_index::ProofMapIndexBase;
-use crate::{BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB, RawProofMapIndex};
+use crate::{
+    BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, RawProofMapIndex, TemporaryDB,
+};
 
 const IDX_NAME: &str = "idx_name";
 

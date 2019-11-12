@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use byteorder::{ByteOrder, LittleEndian};
-use exonum_crypto::{Hash, HashStream, HASH_SIZE};
+use exonum_crypto::{Hash, HashStream};
 use failure::Fail;
 use hex::FromHex;
 

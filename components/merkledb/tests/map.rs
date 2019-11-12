@@ -25,11 +25,11 @@ use proptest::{
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 use exonum_merkledb::{
-    BinaryValue, BinaryKey, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+    BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 
-pub mod common;
-use crate::common::{Key, compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
+mod common;
+use crate::common::{compare_collections, FromFork, Key, MergeFork, ACTIONS_MAX_LEN};
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {

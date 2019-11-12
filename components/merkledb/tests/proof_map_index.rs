@@ -41,38 +41,8 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
-use exonum_crypto::{hash, Hash, HASH_SIZE};
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Key(pub [u8; HASH_SIZE]);
-
-impl ObjectHash for Key {
-    fn object_hash(&self) -> Hash {
-        hash(&self.0)
-    }
-}
-
-impl BinaryKey for Key {
-    fn size(&self) -> usize {
-        HASH_SIZE
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer.copy_from_slice(&self.0);
-        self.0.len()
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        let mut buf = [0; 32];
-        buf.copy_from_slice(&buffer);
-        Self(buf)    }
-}
-
-impl From<[u8; HASH_SIZE]> for Key {
-    fn from(key: [u8; HASH_SIZE]) -> Self {
-        Self(key)
-    }
-}
+mod common;
+use crate::common::Key;
 
 const INDEX_NAME: &str = "index";
 
@@ -173,13 +143,11 @@ fn index_data(
 }
 
 fn data_for_absent(key_bytes: RangeInclusive<u8>) -> impl Strategy<Value = Vec<Key>> {
-    vec(array::uniform32(key_bytes), 20)
-        .prop_map(|key| {
-//            let mut buf = [0; 32];
-//            buf.copy_from_slice(key.as_slice());
-            vec![Key(*key.get(0).unwrap())]
-        })
-
+    vec(array::uniform32(key_bytes), 20).prop_map(|key| {
+        //            let mut buf = [0; 32];
+        //            buf.copy_from_slice(key.as_slice());
+        vec![Key(*key.get(0).unwrap())]
+    })
 }
 
 /// Generates data to test a proof of presence.
@@ -278,7 +246,6 @@ impl TestParams {
         });
     }
 
-
     fn multiproof_of_absent_elements(&self) {
         let db = TemporaryDB::new();
         let keys_strategy = data_for_absent(self.key_bytes());
@@ -292,7 +259,7 @@ impl TestParams {
     fn mixed_multiproof(&self) {
         let db = TemporaryDB::new();
         let strategy = data_for_multiproof(self.key_bytes(), self.index_sizes());
-        let absent_keys_strategy =  data_for_absent(self.key_bytes());
+        let absent_keys_strategy = data_for_absent(self.key_bytes());
         proptest!(
             self.config(),
             |((mut keys, data) in strategy, absent_keys in absent_keys_strategy)| {
