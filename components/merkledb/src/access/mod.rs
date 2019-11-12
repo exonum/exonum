@@ -156,8 +156,8 @@ pub enum AccessErrorKind {
 /// reasons not to.
 ///
 /// Simplest `FromAccess` implementors are indexes; it is implemented for [`Lazy`] and [`Group`].
-/// `FromAccess` can be implemented for more complex *components*. `FromAccess` thus can provide
-/// composability when accessing the storage.
+/// `FromAccess` can be implemented for more complex *components*. Thus, `FromAccess` can
+/// be used to compose storage objects from simpler ones.
 ///
 /// [`Lazy`]: ../struct.Lazy.html
 /// [`Group`]: ../struct.Group.html
