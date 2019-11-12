@@ -85,6 +85,8 @@ impl ConfigProposeBuilder {
             config_propose: ConfigPropose {
                 actual_from: cfg_change_height,
                 changes: vec![],
+                // As in the common cases we test only one config, it's ok
+                // to have default value of 0 for test purposes.
                 configuration_number: 0,
             },
         }

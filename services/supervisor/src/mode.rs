@@ -28,18 +28,18 @@ use exonum_merkledb::IndexAccess;
 
 use super::DeployRequest;
 
-/// Simple supervisor mode: to deploy or initialize service one have to send
+/// Simple supervisor mode: to deploy service one have to send
 /// one request to any of the validators.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Simple;
 
-/// Decentralized supervisor mode: to deploy or initialize service
-/// a request should be sent to **every** validator before it will be executed.
+/// Decentralized supervisor mode: to deploy service a request should be
+/// sent to **every** validator before it will be executed.
 /// For configs, a byzantine majority of validators should vote for it.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Decentralized;
 
-/// Extension trait encapsulating the decision making logic of the supervisor.
+/// Trait encapsulating the decision making logic of the supervisor.
 pub trait SupervisorMode: std::fmt::Debug + Send + Sync + Copy + 'static {
     /// Checks whether deploy should be performed within the network.
     fn deploy_approved<T: IndexAccess>(

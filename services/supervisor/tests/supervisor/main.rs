@@ -171,7 +171,7 @@ fn start_service_request(
         config: Vec::default(),
     };
 
-    ConfigPropose::actual_from(deadline_height).start_service(request)
+    ConfigPropose::new(0, deadline_height).start_service(request)
 }
 
 fn deploy_default(testkit: &mut TestKit) {
@@ -532,7 +532,7 @@ fn test_start_two_services_in_one_request() {
         config: Vec::default(),
     };
 
-    let request = ConfigPropose::actual_from(deadline)
+    let request = ConfigPropose::new(0, deadline)
         .start_service(request_1)
         .start_service(request_2);
 

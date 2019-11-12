@@ -320,7 +320,7 @@ fn main() {
         let start_height = Height(0);
         api_sender
             .broadcast_transaction(
-                ConfigPropose::actual_from(start_height)
+                ConfigPropose::new(0, start_height)
                     .start_service(start_service)
                     .sign_for_supervisor(service_keypair.0, &service_keypair.1),
             )

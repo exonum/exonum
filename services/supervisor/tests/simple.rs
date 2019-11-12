@@ -176,8 +176,8 @@ fn change_consensus_config_with_one_confirmation() {
 
     // Sign request by validator (we're an auditor yet).
     let initiator_id = testkit.network().validators()[0].validator_id().unwrap();
-    let config_propose = ConfigPropose::actual_from(cfg_change_height)
-        .consensus_config(new_consensus_config.clone());
+    let config_propose =
+        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config.clone());
 
     testkit.create_block_with_transaction(sign_config_propose_transaction(
         &testkit,
@@ -214,7 +214,7 @@ fn service_config_change() {
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
 
-    let config_propose = ConfigPropose::actual_from(cfg_change_height)
+    let config_propose = ConfigPropose::new(0, cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
     testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
@@ -246,7 +246,7 @@ fn incorrect_actual_from_field() {
 
     testkit.create_blocks_until(cfg_change_height);
 
-    let config_propose = ConfigPropose::actual_from(cfg_change_height)
+    let config_propose = ConfigPropose::new(0, cfg_change_height)
         .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
     testkit
@@ -280,7 +280,7 @@ fn discard_config_propose_from_auditor() {
 
     // Sign request by an auditor.
     let keys = &testkit.network().us().service_keypair();
-    let config_propose = ConfigPropose::actual_from(cfg_change_height)
+    let config_propose = ConfigPropose::new(0, cfg_change_height)
         .consensus_config(new_consensus_config.clone())
         .sign_for_supervisor(keys.0, &keys.1);
 
@@ -324,8 +324,8 @@ fn test_send_proposal_with_api() {
         cfg
     };
 
-    let config_propose = ConfigPropose::actual_from(cfg_change_height)
-        .consensus_config(new_consensus_config.clone());
+    let config_propose =
+        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config.clone());
 
     // Create proposal
     let hash = {
@@ -424,8 +424,8 @@ fn actual_from_is_zero() {
     };
 
     let initiator_id = testkit.network().validators()[0].validator_id().unwrap();
-    let config_propose = ConfigPropose::actual_from(cfg_change_height)
-        .consensus_config(new_consensus_config.clone());
+    let config_propose =
+        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config.clone());
 
     testkit.create_block_with_transaction(sign_config_propose_transaction(
         &testkit,

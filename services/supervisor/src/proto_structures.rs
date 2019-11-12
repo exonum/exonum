@@ -134,18 +134,12 @@ impl ConfigPropose {
     }
 
     /// Creates a new proposal which activates at the specified height.
-    pub fn actual_from(height: Height) -> Self {
+    pub fn new(configuration_number: u64, actual_from: Height) -> Self {
         Self {
-            actual_from: height,
+            actual_from,
             changes: Vec::default(),
-            configuration_number: 0,
+            configuration_number,
         }
-    }
-
-    /// Sets the `configuration_number` field.
-    pub fn configuration_number(mut self, configuration_number: u64) -> Self {
-        self.configuration_number = configuration_number;
-        self
     }
 
     /// Adds a change of consensus configuration to this proposal.
