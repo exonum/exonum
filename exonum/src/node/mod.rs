@@ -319,9 +319,21 @@ impl ValidateInput for NodeConfig {
             capacity.internal_events_capacity
         );
         ensure!(
-            capacity.network_requests_capacity != 0,
+            capacity.network_requests_capacity > 0,
             "network_requests_capacity({}) must be strictly larger than 0",
             capacity.network_requests_capacity
+        );
+
+        let backend_config = &self.network.http_backend_config;
+        ensure!(
+            backend_config.server_restart_max_retries > 0,
+            "server_restart_max_retries({}) must be strictly larger than 0",
+            backend_config.server_restart_max_retries
+        );
+        ensure!(
+            backend_config.server_restart_retry_timeout > 0,
+            "server_restart_retry_timeout({}) must be strictly larger than 0",
+            backend_config.server_restart_retry_timeout
         );
 
         // Sanity checks for cases of accidental negative overflows.
@@ -1009,6 +1021,14 @@ impl Node {
                     .collect::<Vec<_>>()
             },
             api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
+            server_restart_retry_timeout: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_retry_timeout,
+            server_restart_max_retries: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_max_retries,
         };
 
         let handler = NodeHandler::new(
