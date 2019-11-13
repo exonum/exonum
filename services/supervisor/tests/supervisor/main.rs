@@ -220,13 +220,17 @@ fn testkit_with_inc_service() -> TestKit {
         .create()
 }
 
-fn testkit_with_inc_service_and_two_validators() -> TestKit {
+fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(InstanceCollection::new(IncService))
-        .with_validators(2)
+        .with_validators(n)
         .create()
+}
+
+fn testkit_with_inc_service_and_two_validators() -> TestKit {
+    testkit_with_inc_service_and_n_validators(2)
 }
 
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
@@ -648,7 +652,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
 
 /// This test emulates a normal workflow with two validators.
 #[test]
-fn test_multiple_validators() {
+fn test_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
     let artifact = artifact_default();
     let api = testkit.api();
@@ -862,4 +866,109 @@ fn test_auditor_normal_workflow() {
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
+}
+
+/// This test emulates a deploy confirmation with 12 validators.
+/// Here we send confirmations by every validator and expect deploy to start.
+#[test]
+fn test_multiple_validators_deploy_confirm() {
+    let validators_count = 12;
+    let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
+    let artifact = artifact_default();
+    let api = testkit.api();
+    assert!(!artifact_exists(&api, &artifact.name));
+
+    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+
+    // Send deploy requests by every validator.
+    let deploy_tx_hashes: Vec<exonum_crypto::Hash> = (0..validators_count)
+        .map(|i| deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i)))
+        .collect();
+
+    // Verify that every transaction succeeded (even for confirmations
+    // sent after the quorum was achieved).
+    testkit.create_block();
+    api.exonum_api().assert_txs_success(&deploy_tx_hashes);
+
+    // Send deploy confirmations by every validator.
+    let deploy_confirmations: Vec<Verified<AnyTx>> = (0..validators_count)
+        .map(|i| deploy_confirmation(&testkit, &request_deploy, ValidatorId(i)))
+        .collect();
+
+    testkit.create_block_with_transactions(deploy_confirmations);
+
+    // Check that artifact is deployed now.
+    let api = testkit.api(); // update the API
+    assert!(artifact_exists(&api, &artifact.name));
+}
+
+/// This test emulates a deploy confirmation with 12 validators.
+/// Here we send confirmations by the byzantine majority (2/3+1) validators
+/// and expect deploy to start.
+#[test]
+fn test_multiple_validators_deploy_confirm_byzantine_majority() {
+    let validators_count = 12;
+    let byzantine_majority = (validators_count * 2 / 3) + 1;
+    let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
+    let artifact = artifact_default();
+    let api = testkit.api();
+    assert!(!artifact_exists(&api, &artifact.name));
+
+    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+
+    // Send deploy requests by byzantine majority of validators.
+    let deploy_tx_hashes: Vec<exonum_crypto::Hash> = (0..byzantine_majority)
+        .map(|i| deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i)))
+        .collect();
+
+    testkit.create_block();
+    api.exonum_api().assert_txs_success(&deploy_tx_hashes);
+
+    // Send deploy confirmations by every validator.
+    let deploy_confirmations: Vec<Verified<AnyTx>> = (0..validators_count)
+        .map(|i| deploy_confirmation(&testkit, &request_deploy, ValidatorId(i)))
+        .collect();
+
+    testkit.create_block_with_transactions(deploy_confirmations);
+
+    // Check that artifact is deployed now.
+    let api = testkit.api(); // update the API
+    assert!(artifact_exists(&api, &artifact.name));
+}
+
+/// This test emulates a deploy confirmation with 12 validators.
+/// Here we send confirmations by the byzantine minority (2/3) validators
+/// and expect deploy to not start.
+#[test]
+fn test_multiple_validators_deploy_confirm_byzantine_minority() {
+    let validators_count = 12;
+    let byzantine_minority = validators_count * 2 / 3;
+    let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
+    let artifact = artifact_default();
+    let api = testkit.api();
+    assert!(!artifact_exists(&api, &artifact.name));
+
+    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+
+    // Send deploy requests by byzantine majority of validators.
+    let deploy_tx_hashes: Vec<exonum_crypto::Hash> = (0..byzantine_minority)
+        .map(|i| deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i)))
+        .collect();
+
+    testkit.create_block();
+    api.exonum_api().assert_txs_success(&deploy_tx_hashes);
+
+    // Try to send confirmation. It should fail, since deploy was not approved
+    // and thus not registered.
+    let confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
+
+    testkit.add_tx(confirmation.clone());
+    testkit.create_block();
+
+    let expected_status = Err(ExecutionError {
+        kind: ExecutionErrorKind::Service { code: 5 },
+        description: "Deploy request has not been registered.".into(),
+    });
+    api.exonum_api()
+        .assert_tx_status(confirmation.object_hash(), &expected_status.into());
 }
