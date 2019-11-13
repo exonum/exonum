@@ -184,20 +184,17 @@ where
         Entry::new(CONSENSUS_CONFIG, self.access.clone())
     }
 
-    /// Returns the accessory `ProofMapIndex` for calculating
-    /// patches in the DBView layer.
+    // TODO Write more meaningful description [ECR-3824]
+    /// Returns the accessory `ProofMapIndex` for calculating patches.
     ///
     /// The table calculates the "aggregation" of root hashes of individual
     /// service tables, in effect summing the state of various entities,
     /// scattered across distinct services and their tables. Sum is performed by
     /// means of computing the root hash of this table.
     ///
-    /// - Table **key** is  normalized coordinates of a service.
-    /// - Table **value** is the root hash of a service table, which contributes
+    /// - Table **key** is normalized coordinates of an index.
+    /// - Table **value** is the root hash of an index, which contributes
     /// to the `state_hash` of the resulting block.
-    ///
-    /// Core tables participate in the resulting state_hash with `CORE_ID`
-    /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, IndexCoordinates, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())
     }
@@ -324,14 +321,15 @@ where
     }
 }
 
-/// Describes affiliation of the index.
+// TODO Write more meaningful description [ECR-3824]
+/// Describes the membership for the index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IndexOwner {
     /// This index is part of core schema.
     Core,
-    /// This index is a part of runtime schema.
+    /// This index is a part of runtime schema with the specified ID.
     Runtime(u32),
-    /// This index is a part of some service schema.
+    /// This index is a part of some service schema with the specified ID.
     Service(InstanceId),
 }
 
@@ -369,6 +367,8 @@ enum IndexTag {
     Service = 3,
 }
 
+// TODO Write more meaningful description [ECR-3824]
+/// Normalized coordinates of index in the `state_hash_aggregator` table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct IndexCoordinates {
     tag: u16,
@@ -386,6 +386,9 @@ impl IndexCoordinates {
         }
     }
 
+    // TODO Write more meaningful description [ECR-3824]
+    /// For a given index owner, returns a list if index coordinates for the corresponding
+    /// object hashes of the indexes.
     pub fn locate(
         owner: IndexOwner,
         object_hashes: impl IntoIterator<Item = Hash>,
@@ -396,6 +399,7 @@ impl IndexCoordinates {
             .map(move |(id, hash)| (owner.coordinate_for(id as u16), hash))
     }
 
+    /// Returns a membership for this index.
     pub fn owner(self) -> IndexOwner {
         match self.tag {
             0 => IndexOwner::Core,
