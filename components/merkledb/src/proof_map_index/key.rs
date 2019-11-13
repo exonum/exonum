@@ -63,7 +63,9 @@ pub struct Hashed;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Raw;
 
+/// Trait defines key transforming function used to transform key to `ProofPath`.
 pub trait KeyTransform<K> {
+    /// Transforms key to `ProofPath`.
     fn transform_key(key: &K) -> ProofPath;
 }
 

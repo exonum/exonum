@@ -23,6 +23,11 @@ use exonum_crypto::{hash, Hash, HASH_SIZE};
 use exonum_merkledb::{BinaryKey, Database, Fork, ObjectHash, TemporaryDB};
 
 // Max size of the generated sequence of actions.
+//
+// Due external tests running mechanism this file is linked
+// separately with other modules in tests directory. This
+// constant is used in all of then except `proof_map_index`, that's
+// why it marked with `dead_code`.
 #[allow(dead_code)]
 pub const ACTIONS_MAX_LEN: usize = 100;
 
@@ -63,9 +68,11 @@ pub trait FromFork {
     fn clear(&mut self);
 }
 
+// See `ACTIONS_MAX_LEN` comment above.
 #[allow(dead_code)]
 pub struct MergeFork;
 
+// See `ACTIONS_MAX_LEN` comment above.
 #[allow(dead_code)]
 pub fn compare_collections<A, R, T>(
     db: &TemporaryDB,

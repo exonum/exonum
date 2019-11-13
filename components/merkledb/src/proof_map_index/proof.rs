@@ -262,18 +262,23 @@ impl<K, V> OptionalEntry<K, V> {
 /// (e.g., ordering of `proof`; see [`check()`]) only if these invariants are checked
 /// during proof verification.
 ///
-/// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
-/// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
+/// [`get_proof()`]: type.ProofMapIndex.html#method.get_proof
+/// [`get_multiproof()`]: type.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct MapProof<K, V, Style = Hashed> {
+pub struct MapProof<K, V, KeyMode = Hashed> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
     #[serde(skip)]
-    _style: PhantomData<Style>,
+    _key_mode: PhantomData<KeyMode>,
 }
 
+/// Variant of [`MapProof`] with raw keys, in other words with keys that mapped
+/// directly to [`ProofPath`].
+///
+/// [`MapProof`]: struct.MapProof.html
+/// [`ProofPath`]: struct.ProofPath.html
 pub type RawMapProof<K, V> = MapProof<K, V, Raw>;
 
 /// Version of `MapProof` obtained after verification.
@@ -376,7 +381,7 @@ fn collect(entries: &[Cow<'_, MapProofEntry>]) -> Result<Hash, MapProofError> {
     }
 }
 
-impl<K, V, Style> MapProof<K, V, Style> {
+impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof
@@ -408,7 +413,7 @@ impl<K, V, Style> MapProof<K, V, Style> {
         Self {
             entries: vec![],
             proof: vec![],
-            _style: PhantomData,
+            _key_mode: PhantomData,
         }
     }
 
@@ -448,11 +453,11 @@ impl<K, V, Style> MapProof<K, V, Style> {
     }
 }
 
-impl<K, V, Style> MapProof<K, V, Style>
+impl<K, V, KeyMode> MapProof<K, V, KeyMode>
 where
     K: ObjectHash,
     V: BinaryValue,
-    Style: KeyTransform<K>,
+    KeyMode: KeyTransform<K>,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use self::MapProofError::*;
@@ -484,7 +489,7 @@ where
         // In order to do this, it suffices to locate the closest smaller path in the proof entries
         // and check only it.
         for e in &self.entries {
-            let path = Style::transform_key(e.key());
+            let path = KeyMode::transform_key(e.key());
 
             match self.proof.binary_search_by(|pe| {
                 pe.path
@@ -540,7 +545,7 @@ where
     /// assert_eq!(checked_proof.index_hash(), map.object_hash());
     /// ```
     ///
-    /// [`ProofMapIndex`]: struct.ProofMapIndex.html
+    /// [`ProofMapIndex`]: type.ProofMapIndex.html
     pub fn check(&self) -> Result<CheckedMapProof<'_, K, V>, MapProofError> {
         self.precheck()?;
 
@@ -548,7 +553,7 @@ where
         proof.extend(self.entries.iter().filter_map(|e| {
             e.as_kv().map(|(k, v)| {
                 Cow::Owned(MapProofEntry {
-                    path: Style::transform_key(&k),
+                    path: KeyMode::transform_key(&k),
                     hash: HashTag::hash_leaf(&v.to_bytes()),
                 })
             })

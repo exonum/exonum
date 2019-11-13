@@ -49,12 +49,12 @@ mod proof_builder;
 mod tests;
 
 // Necessary to allow building proofs.
-impl<T, K, V, Style> MerklePatriciaTree<K, V> for ProofMapIndexBase<T, K, V, Style>
+impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndexBase<T, K, V, KeyMode>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
-    Style: KeyTransform<K>,
+    KeyMode: KeyTransform<K>,
 {
     fn root_node(&self) -> Option<(ProofPath, Node)> {
         self.get_root_node()
@@ -70,12 +70,12 @@ where
 }
 
 #[doc(hidden)]
-pub struct ProofMapIndexBase<T: IndexAccess, K, V, Style: KeyTransform<K> = Hashed> {
+pub struct ProofMapIndexBase<T: IndexAccess, K, V, KeyMode: KeyTransform<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, Option<ProofPath>>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
-    _style: PhantomData<Style>,
+    _key_mode: PhantomData<KeyMode>,
 }
 
 /// An iterator over the entries of a `ProofMapIndex`.
@@ -83,9 +83,9 @@ pub struct ProofMapIndexBase<T: IndexAccess, K, V, Style: KeyTransform<K> = Hash
 /// This struct is created by the [`iter`] or
 /// [`iter_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
-/// [`iter`]: struct.ProofMapIndex.html#method.iter
-/// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
+/// [`iter`]: type.ProofMapIndex.html#method.iter
+/// [`iter_from`]: type.ProofMapIndex.html#method.iter_from
+/// [`ProofMapIndex`]: type.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexIter<'a, K, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
@@ -97,9 +97,9 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// This struct is created by the [`keys`] or
 /// [`keys_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
-/// [`keys`]: struct.ProofMapIndex.html#method.keys
-/// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
+/// [`keys`]: type.ProofMapIndex.html#method.keys
+/// [`keys_from`]: type.ProofMapIndex.html#method.keys_from
+/// [`ProofMapIndex`]: type.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
     base_iter: ViewIter<'a, Vec<u8>, ()>,
@@ -111,9 +111,9 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// This struct is created by the [`values`] or
 /// [`values_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
-/// [`values`]: struct.ProofMapIndex.html#method.values
-/// [`values_from`]: struct.ProofMapIndex.html#method.values_from
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
+/// [`values`]: type.ProofMapIndex.html#method.values
+/// [`values_from`]: type.ProofMapIndex.html#method.values_from
+/// [`ProofMapIndex`]: type.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
@@ -212,12 +212,12 @@ pub type ProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Hashed>;
 /// `ProofPath`. For example `Hash` and `PublicKey`.
 pub type RawProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Raw>;
 
-impl<T, K, V, Style> ProofMapIndexBase<T, K, V, Style>
+impl<T, K, V, KeyMode> ProofMapIndexBase<T, K, V, KeyMode>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
-    Style: KeyTransform<K>,
+    KeyMode: KeyTransform<K>,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -252,7 +252,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            _style: PhantomData,
+            _key_mode: PhantomData,
         }
     }
 
@@ -305,7 +305,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            _style: PhantomData,
+            _key_mode: PhantomData,
         }
     }
 
@@ -318,7 +318,7 @@ where
                 state,
                 _k: PhantomData,
                 _v: PhantomData,
-                _style: PhantomData,
+                _key_mode: PhantomData,
             })
     }
 
@@ -332,7 +332,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
-            _style: PhantomData,
+            _key_mode: PhantomData,
         }
     }
 
@@ -428,8 +428,8 @@ where
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: K) -> MapProof<K, V, Style> {
-        self.create_proof(Style::transform_key(&key), key)
+    pub fn get_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
+        self.create_proof(KeyMode::transform_key(&key), key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -445,13 +445,13 @@ where
     ///
     /// let proof = index.get_multiproof(vec![vec![0; 32], vec![1; 32]]);
     /// ```
-    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V, Style>
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V, KeyMode>
     where
         KI: IntoIterator<Item = K>,
     {
         let keys = keys
             .into_iter()
-            .map(|key| (Style::transform_key(&key), key))
+            .map(|key| (KeyMode::transform_key(&key), key))
             .collect::<Vec<_>>();
         self.create_multiproof(keys)
     }
@@ -763,7 +763,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let proof_path = Style::transform_key(key);
+        let proof_path = KeyMode::transform_key(key);
         let root_path = match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_path = prefix;
@@ -840,7 +840,7 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
-        let proof_path = Style::transform_key(key);
+        let proof_path = KeyMode::transform_key(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -910,12 +910,12 @@ where
     }
 }
 
-impl<T, K, V, Style> ObjectHash for ProofMapIndexBase<T, K, V, Style>
+impl<T, K, V, KeyMode> ObjectHash for ProofMapIndexBase<T, K, V, KeyMode>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
-    Style: KeyTransform<K>,
+    KeyMode: KeyTransform<K>,
 {
     /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
     /// For hash of the empty map see [`HashTag::empty_map_hash`].
@@ -996,30 +996,30 @@ where
     }
 }
 
-impl<T, K, V, Style> fmt::Debug for ProofMapIndexBase<T, K, V, Style>
+impl<T, K, V, KeyMode> fmt::Debug for ProofMapIndexBase<T, K, V, KeyMode>
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue + fmt::Debug,
-    Style: KeyTransform<K>,
+    KeyMode: KeyTransform<K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Entry<'a, T: IndexAccess, K: ObjectHash, V: BinaryValue, Style: KeyTransform<K>> {
-            index: &'a ProofMapIndexBase<T, K, V, Style>,
+        struct Entry<'a, T: IndexAccess, K: ObjectHash, V: BinaryValue, KeyMode: KeyTransform<K>> {
+            index: &'a ProofMapIndexBase<T, K, V, KeyMode>,
             path: ProofPath,
             hash: Hash,
             node: Node,
         }
 
-        impl<'a, T, K, V, Style> Entry<'a, T, K, V, Style>
+        impl<'a, T, K, V, KeyMode> Entry<'a, T, K, V, KeyMode>
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue,
-            Style: KeyTransform<K>,
+            KeyMode: KeyTransform<K>,
         {
             fn new(
-                index: &'a ProofMapIndexBase<T, K, V, Style>,
+                index: &'a ProofMapIndexBase<T, K, V, KeyMode>,
                 hash: Hash,
                 path: ProofPath,
             ) -> Self {
@@ -1040,12 +1040,12 @@ where
             }
         }
 
-        impl<T, K, V, Style> fmt::Debug for Entry<'_, T, K, V, Style>
+        impl<T, K, V, KeyMode> fmt::Debug for Entry<'_, T, K, V, KeyMode>
         where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue + fmt::Debug,
-            Style: KeyTransform<K>,
+            KeyMode: KeyTransform<K>,
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.node {

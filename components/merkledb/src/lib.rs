@@ -95,7 +95,7 @@
 //! [`SparseListIndex`]: sparse_list_index/struct.SparseListIndex.html
 //! [`MapIndex`]: map_index/struct.MapIndex.html
 //! [`ProofListIndex`]: proof_list_index/struct.ProofListIndex.html
-//! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
+//! [`ProofMapIndex`]: proof_map_index/type.ProofMapIndex.html
 //! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
 //! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
@@ -150,7 +150,7 @@ pub use self::{
         ObjectAccess, Ref, RefMut, View,
     },
 };
-// Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
+// Workaround for 'Linked file at path {exonum_merkledb_path}/type.ProofMapIndex.html
 // does not exist!'
 #[doc(no_inline)]
 pub use self::{
