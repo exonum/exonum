@@ -47,21 +47,22 @@
 //!   by the blockchain administrators.
 //!
 //! 4. Async deployment usually has a deadline and/or success and failure conditions. As an example,
-//!   the supervisor may collect confirmations from the validator nodes that they have
+//!   the supervisor may collect confirmations from the validator nodes that have
 //!   successfully deployed the artifact, and once all the validator nodes have sent
 //!   their confirmations, the artifact is *committed*.
 //!
-//! 5. Once the artifact is committed, it becomes required for any node in the network to deploy.
+//! 5. Once the artifact is committed, every node in the network is required to have it deployed
+//!   in order to continue functioning.
 //!   If a node has not deployed the artifact previously, deployment becomes blocking; the node
-//!   does not participate in consensus until the deployment is completed successfully.
-//!   If the deployment is unsuccessful, the node stops indefinitely.
+//!   does not participate in consensus or block processing until the deployment is completed
+//!   successfully. If the deployment is unsuccessful, the node stops indefinitely.
 //!   Due to deployment confirmation mechanics built into the supervisor, it is reasonable
-//!   to assume that the deployment failure is local to the node and could be fixed by the node
-//!   admin.
+//!   to assume that a deployment failure at this stage is local to the node and
+//!   could be fixed by the node admin.
 //!
 //! # Service Lifecycle
 //!
-//! 1. Once the artifact is deployed, it is possible to instantiate a corresponding service.
+//! 1. Once the artifact is committed, it is possible to instantiate a corresponding service.
 //!   Each instantiation request contains an ID of a previously deployed artifact,
 //!   a string instance ID, and instantiation arguments in a binary encoding
 //!   (by convention, Protobuf). As with the artifacts, the logic controlling instantiation
