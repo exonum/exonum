@@ -231,7 +231,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
 /// #    Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, HashTag,
-/// #    proof_map_index::ProofPath
+/// #    proof_map_index::{Hashed, ToProofPath}
 /// # };
 /// # use exonum_crypto::hash;
 /// # fn main() {
@@ -246,7 +246,7 @@ impl<K, V> OptionalEntry<K, V> {
 ///     serde_json::to_value(&proof).unwrap(),
 ///     json!({
 ///         "proof": [{
-///             "path": ProofPath::new(&h1),
+///             "path": Hashed::transform_key(&h1),
 ///             "hash": HashTag::hash_leaf(&100_u32.to_bytes()),
 ///         }],
 ///         "entries": [{ "key": h2, "value": 200 }],

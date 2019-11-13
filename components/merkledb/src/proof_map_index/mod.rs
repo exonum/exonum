@@ -16,7 +16,7 @@
 
 pub use self::node::{BranchNode, Node};
 pub use self::{
-    key::{ProofPath, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
+    key::{Hashed, ProofPath, Raw, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError, RawMapProof, ValidationError},
 };
 
@@ -32,7 +32,6 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
-use crate::proof_map_index::key::{Hashed, Raw};
 use crate::views::{AnyObject, IndexAddress};
 use crate::{
     views::{
