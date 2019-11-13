@@ -18,9 +18,8 @@
 //! - Simple mode. Within simple mode, the amount of checks performed by the Supervisor
 //!   is reduced to the minimum: the only requirement is that every request is sent
 //!   by the validator.
-//! - Decentralized mode. Within decentralized mode, policy on requests is the following:
-//!   deploy requests should be signed and sent by every validator,
-//!   config proposals should be approved by at least (2/3+1) validators.
+//! - Decentralized mode. Within decentralized mode, deploy requests
+//!   and config proposals should be approved by at least (2/3+1) validators.
 
 use exonum::helpers::{byzantine_quorum, multisig::ValidatorMultisig};
 use exonum_crypto::Hash;
@@ -76,8 +75,11 @@ impl SupervisorMode for Decentralized {
         deploy: &DeployRequest,
         deploy_requests: &ValidatorMultisig<T, DeployRequest>,
     ) -> bool {
-        // For decentralized supervisor deploy should be approved by every validator.
-        deploy_requests.confirmations(deploy) == deploy_requests.validators_amount()
+        let confirmations = deploy_requests.confirmations(&deploy);
+        let validators = deploy_requests.validators_amount();
+
+        // Approve deploy in case 2/3+1 validators confirmed it.
+        confirmations >= byzantine_quorum(validators)
     }
 
     fn config_approved<T: IndexAccess>(

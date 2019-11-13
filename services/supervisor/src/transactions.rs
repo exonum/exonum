@@ -33,8 +33,8 @@ pub trait SupervisorInterface {
     /// Requests artifact deploy.
     ///
     /// This request should be initiated by the validator (and depending on the `Supervisor`
-    /// mode several other actions can be required, e.g. sending the same request by every
-    /// other validator as well).
+    /// mode several other actions can be required, e.g. sending the same request by majority
+    /// of other validators as well).
     /// After that, the supervisor will try to deploy the artifact, and if this procedure
     /// will be successful it will send `confirm_artifact_deploy` transaction.
     fn request_artifact_deploy(
@@ -261,11 +261,6 @@ where
         }
         let schema = Schema::new(context.instance().name, context.fork());
 
-        // Verifies that the deployment request is not yet registered.
-        if schema.pending_deployments().contains(&deploy.artifact) {
-            return Err(Error::DeployRequestAlreadyRegistered.into());
-        }
-
         // Verifies that transaction author is validator.
         let mut deploy_requests = schema.deploy_requests();
         let author = context
@@ -284,6 +279,20 @@ where
             .is_some()
         {
             return Err(Error::AlreadyDeployed.into());
+        }
+
+        // If deployment is already registered, check whether request is initiated
+        if schema.pending_deployments().contains(&deploy.artifact) {
+            let new_confirmation = !deploy_requests.confirmed_by(&deploy, &author);
+            if new_confirmation {
+                // It's OK, just an additional confirmation.
+                deploy_requests.confirm(&deploy, author);
+                return Ok(());
+            } else {
+                // Author already confirmed deployment of this artifact,
+                // so it's a duplicate.
+                return Err(Error::DeployRequestAlreadyRegistered.into());
+            }
         }
 
         deploy_requests.confirm(&deploy, author);
