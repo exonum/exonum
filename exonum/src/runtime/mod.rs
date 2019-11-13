@@ -30,7 +30,7 @@
 //! The format of an artifact ID is uniform across runtimes (it is essentially a string),
 //! but the runtime may customize artifact deployment via runtime-specific deployment arguments.
 //!
-//! # Service Lifecycle
+//! # Artifact Lifecycle
 //!
 //! 1. An artifact is assembled in a way specific to the runtime. For example, the artifact may
 //!   be compiled from sources and packaged using an automated build system.
@@ -41,19 +41,39 @@
 //!   What deployment entails depends on the runtime; e.g., the artifact may be downloaded
 //!   by each Exonum node, verified for integrity and then added into the execution environment.
 //!
-//! 3. Once the artifact is deployed, it is possible to instantiate a corresponding service.
+//! 3. For each node, an artifact may be deployed either asynchronously or synchronously /
+//!   in a blocking manner. The supervisor usually first commands a node to deploy the artifact
+//!   asynchronously via [`Mailbox`] once the decision to start deployment is reached
+//!   by the blockchain administrators.
+//!
+//! 4. Async deployment usually has a deadline and/or success and failure conditions. As an example,
+//!   the supervisor may collect confirmations from the validator nodes that they have
+//!   successfully deployed the artifact, and once all the validator nodes have sent
+//!   their confirmations, the artifact is *committed*.
+//!
+//! 5. Once the artifact is committed, it becomes required for any node in the network to deploy.
+//!   If a node has not deployed the artifact previously, deployment becomes blocking; the node
+//!   does not participate in consensus until the deployment is completed successfully.
+//!   If the deployment is unsuccessful, the node stops indefinitely.
+//!   Due to deployment confirmation mechanics built into the supervisor, it is reasonable
+//!   to assume that the deployment failure is local to the node and could be fixed by the node
+//!   admin.
+//!
+//! # Service Lifecycle
+//!
+//! 1. Once the artifact is deployed, it is possible to instantiate a corresponding service.
 //!   Each instantiation request contains an ID of a previously deployed artifact,
 //!   a string instance ID, and instantiation arguments in a binary encoding
 //!   (by convention, Protobuf). As with the artifacts, the logic controlling instantiation
 //!   is encapsulated in the supervisor service.
 //!
-//! 4. During instantiation, the service is assigned a numeric ID, which is used to reference
+//! 2. During instantiation, the service is assigned a numeric ID, which is used to reference
 //!   the service in transactions. The runtime can execute initialization logic defined
 //!   in the service artifact; e.g., the service may store some initial data in the storage,
 //!   check service dependencies, etc. The service (or the enclosing runtime) may signal that
 //!   the initialization failed, in which case the service is considered not instantiated.
 //!
-//! 5. Once the service is instantiated, it can process transactions and interact with the
+//! 3. Once the service is instantiated, it can process transactions and interact with the
 //!   external users in other ways. Different services instantiated from the same artifact
 //!   are independent and have separate blockchain storages. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
@@ -104,6 +124,7 @@
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
+//! [`Mailbox`]: struct.Mailbox.html
 
 pub use self::{
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
