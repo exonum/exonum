@@ -27,7 +27,7 @@ use exonum::{
         ArtifactId, Caller, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, ServiceDispatcher, ServiceFactory};
+use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -72,12 +72,9 @@ impl From<ConfigChangeService> for InstanceCollection {
     }
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "deployable-test-service",
-    artifact_version = "0.1.0",
-    implements("DeployableServiceInterface")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("DeployableServiceInterface"))]
+#[service_factory(artifact_name = "deployable-test-service", artifact_version = "0.1.0")]
 pub struct DeployableService;
 
 impl Service for DeployableService {
@@ -92,7 +89,7 @@ impl From<DeployableService> for InstanceCollection {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait DeployableServiceInterface {}
 
 impl DeployableServiceInterface for DeployableService {}

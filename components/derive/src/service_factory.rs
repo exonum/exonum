@@ -16,7 +16,7 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use semver::Version;
-use syn::{DeriveInput, QIdent, Path};
+use syn::{DeriveInput, Generics, Ident, Path};
 
 use super::CratePath;
 
@@ -117,8 +117,6 @@ impl ServiceFactory {
             }
         }
     }
-        let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
-
 }
 
 impl ToTokens for ServiceFactory {
