@@ -57,7 +57,7 @@ pub trait SupervisorInterface {
     /// This request should be sent by one of validators as the proposition to change
     /// current configuration to new one. All another validators are able to vote for this
     /// configuration by sending `confirm_config_change` transaction.
-    /// The configuration application rules rely on the `Supervisor` mode, e.g. confirmations
+    /// The configuration application rules depend on the `Supervisor` mode, e.g. confirmations
     /// are not required for the `Simple` mode, and for `Decentralized` mode (2/3+1) confirmations
     /// are required.
     /// Note: only one proposal at time is possible.
@@ -72,7 +72,7 @@ pub trait SupervisorInterface {
     /// This confirm should be sent by validators to vote for proposed configuration.
     /// Vote of the author of the `propose_config_change` transaction is taken into
     /// account automatically.
-    /// The configuration application rules rely on the `Supervisor` mode.
+    /// The configuration application rules depend on the `Supervisor` mode.
     fn confirm_config_change(
         &self,
         context: CallContext<'_>,
