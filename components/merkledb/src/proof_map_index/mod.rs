@@ -209,7 +209,10 @@ impl BinaryAttribute for Option<ProofPath> {
 pub type ProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Hashed>;
 
 /// Raw variant of the `ProofMapIndex`, useful for keys that mapped directly to
-/// `ProofPath`. For example `Hash` and `PublicKey`.
+/// `ProofPath` without hashing. For example `Hash` and `PublicKey`.
+///
+/// It's possible to use any type that can be represented with byte array of length 32
+/// as a key for this map.
 pub type RawProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Raw>;
 
 impl<T, K, V, KeyMode> ProofMapIndexBase<T, K, V, KeyMode>
