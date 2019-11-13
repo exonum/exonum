@@ -21,7 +21,7 @@ use exonum::{
         ExecutionError,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash};
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -34,7 +34,7 @@ pub struct Issue {
     pub amount: u64,
 }
 
-#[exonum_service(interface = "IssueReceiver")]
+#[exonum_interface(interface = "IssueReceiver")]
 pub trait IssueReceiver {
     fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError>;
 }

@@ -23,7 +23,7 @@ use exonum::{
         CallInfo, Caller, ExecutionError, InstanceDescriptor, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::Snapshot;
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
@@ -41,17 +41,14 @@ pub struct TxCreateWallet {
     pub name: String,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait WalletInterface {
     fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "wallet-service",
-    proto_sources = "proto",
-    implements("WalletInterface", "IssueReceiver")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("WalletInterface", "IssueReceiver"))]
+#[service_factory(artifact_name = "wallet-service", proto_sources = "proto")]
 pub struct WalletService;
 
 impl WalletService {
@@ -110,17 +107,14 @@ pub struct TxIssue {
     pub amount: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait DepositInterface {
     fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "deposit-service",
-    proto_sources = "proto",
-    implements("DepositInterface")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "deposit-service", proto_sources = "proto")]
+#[service_dispatcher(implements("DepositInterface"))]
 pub struct DepositService;
 
 impl DepositService {
@@ -158,7 +152,7 @@ pub struct TxRecursiveCall {
     pub depth: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait AnyCall {
     fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
 
@@ -169,12 +163,9 @@ pub trait AnyCall {
     ) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "any-call-service",
-    proto_sources = "proto",
-    implements("AnyCall")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "any-call-service", proto_sources = "proto")]
+#[service_dispatcher(implements("AnyCall"))]
 pub struct AnyCallService;
 
 impl AnyCallService {

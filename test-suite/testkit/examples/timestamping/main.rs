@@ -50,18 +50,18 @@ impl TxTimestamp {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 trait TimestampingInterface {
     fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "timestamping",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto",
-    implements("TimestampingInterface")
+    proto_sources = "crate::proto"
 )]
+#[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {

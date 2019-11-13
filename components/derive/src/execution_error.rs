@@ -20,7 +20,7 @@ use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Path, Va
 
 use std::convert::TryFrom;
 
-use super::{find_exonum_meta, CratePath};
+use super::{find_meta_attrs, CratePath};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -43,7 +43,7 @@ impl TryFrom<&[Attribute]> for ExecutionErrorAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_exonum_meta(args)
+        find_meta_attrs("execution_error", args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(Self::default()))
     }
@@ -240,7 +240,7 @@ impl ToTokens for IntoExecutionError {
     }
 }
 
-pub fn implement_execution_error(input: TokenStream) -> TokenStream {
+pub fn impl_execution_error(input: TokenStream) -> TokenStream {
     let input = IntoExecutionError::from_derive_input(&syn::parse(input).unwrap())
         .unwrap_or_else(|e| panic!("IntoExecutionError: {}", e));
     let tokens = quote! {#input};

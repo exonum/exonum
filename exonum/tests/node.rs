@@ -24,7 +24,7 @@ use exonum::{
         InstanceDescriptor, Runtime,
     },
 };
-use exonum_derive::{exonum_service, ServiceFactory};
+use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{Database, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
@@ -36,15 +36,15 @@ use std::{
     time::Duration,
 };
 
-#[exonum_service]
+#[exonum_interface]
 trait CommitWatcherInterface {}
 
-#[derive(Debug, Clone, ServiceFactory)]
-#[exonum(
+#[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("CommitWatcherInterface"))]
+#[service_factory(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
     proto_sources = "exonum::proto::schema",
-    implements("CommitWatcherInterface"),
     service_constructor = "CommitWatcherService::new_instance"
 )]
 struct CommitWatcherService(mpsc::UnboundedSender<()>);
@@ -66,10 +66,11 @@ impl Service for CommitWatcherService {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 trait StartCheckerInterface {}
 
-#[derive(Debug)]
+#[derive(Debug, ServiceDispatcher)]
+#[service_dispatcher(implements("StartCheckerInterface"))]
 struct StartCheckerService;
 
 impl StartCheckerInterface for StartCheckerService {}
@@ -81,13 +82,11 @@ impl Service for StartCheckerService {
 }
 
 #[derive(Debug, ServiceFactory)]
-#[exonum(
+#[service_factory(
     artifact_name = "configure",
     artifact_version = "1.0.2",
     proto_sources = "exonum::proto::schema",
-    implements("StartCheckerInterface"),
-    service_constructor = "StartCheckerServiceFactory::new_instance",
-    service_name = "StartCheckerService"
+    service_constructor = "StartCheckerServiceFactory::new_instance"
 )]
 struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
 

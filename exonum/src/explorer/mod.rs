@@ -414,7 +414,7 @@ impl CommittedTransaction {
 /// # use exonum::explorer::TransactionInfo;
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
+/// #[service_factory(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
 /// struct CreateWallet {
 ///     name: String,
 /// }

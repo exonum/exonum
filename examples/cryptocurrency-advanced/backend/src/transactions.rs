@@ -79,7 +79,7 @@ pub struct CreateWallet {
 }
 
 /// Cryptocurrency service transactions.
-#[exonum_service]
+#[exonum_interface]
 pub trait CryptocurrencyInterface {
     /// Transfers `amount` of the currency from one wallet to another.
     fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
