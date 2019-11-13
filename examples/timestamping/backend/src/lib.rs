@@ -52,8 +52,9 @@ use crate::{
     transactions::{Config, Error, TimestampingInterface},
 };
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(proto_sources = "proto", implements("TimestampingInterface"))]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("TimestampingInterface"))]
+#[service_factory(proto_sources = "proto")]
 pub struct TimestampingService;
 
 impl Service for TimestampingService {

@@ -30,18 +30,18 @@ use crate::{
 
 pub const DATA_SIZE: usize = 64;
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 pub trait TimestampingInterface {
     fn timestamp(&self, context: CallContext<'_>, arg: TimestampTx) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("TimestampingInterface"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "timestamping",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements("TimestampingInterface")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct TimestampingService;
 

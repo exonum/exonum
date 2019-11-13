@@ -64,7 +64,8 @@ use crate::{
 // It should be configurable through the configuration service.
 
 /// Define the service.
-#[derive(Debug)]
+#[derive(Debug, ServiceDispatcher)]
+#[service_dispatcher(implements("TimeOracleInterface"))]
 pub struct TimeService {
     /// Current time.
     time: Arc<dyn TimeProvider>,
@@ -96,11 +97,9 @@ impl Service for TimeService {
 
 /// Time oracle service factory implementation.
 #[derive(Debug, ServiceFactory)]
-#[exonum(
+#[service_factory(
     proto_sources = "proto",
-    service_name = "TimeService",
-    service_constructor = "TimeServiceFactory::create_instance",
-    implements("TimeOracleInterface")
+    service_constructor = "TimeServiceFactory::create_instance"
 )]
 pub struct TimeServiceFactory {
     time_provider: Arc<dyn TimeProvider>,

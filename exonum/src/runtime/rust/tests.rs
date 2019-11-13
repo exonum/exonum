@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
-use exonum_derive::exonum_service;
+use exonum_derive::exonum_interface;
 use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
@@ -222,19 +222,19 @@ struct TxB {
     value: u64,
 }
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 trait TestService {
     fn method_a(&self, context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError>;
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(crate = "crate", implements("TestService"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "test_service",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements("TestService")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct TestServiceImpl;
 
@@ -591,13 +591,13 @@ fn conflicting_service_instances() {
         .unwrap_err();
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements())]
+#[service_factory(
     crate = "crate",
     artifact_name = "dependent_service",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements()
+    proto_sources = "crate::proto::schema"
 )]
 pub struct DependentServiceImpl;
 

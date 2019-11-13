@@ -23,7 +23,7 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::ServiceFactory;
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
@@ -50,11 +50,9 @@ pub fn sign_config_propose_transaction_by_us(
     sign_config_propose_transaction(&testkit, config, initiator_id)
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "config-change-test-service",
-    implements("Configure<Params = String>")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("Configure<Params=String>"))]
+#[service_factory(artifact_name = "config-change-test-service")]
 pub struct ConfigChangeService;
 
 impl ConfigChangeService {

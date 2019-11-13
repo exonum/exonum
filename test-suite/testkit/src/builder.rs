@@ -80,7 +80,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # Example
 ///
 /// ```
-/// # use exonum_derive::{exonum_service, ServiceFactory};
+/// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
 /// # use exonum_merkledb::Snapshot;
 /// # use exonum_testkit::TestKitBuilder;
 /// # use exonum::{
@@ -91,12 +91,12 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// #
 /// # const SERVICE_ID: u32 = 1;
 /// #
-/// # #[derive(Clone, Default, Debug, ServiceFactory)]
-/// # #[exonum(
+/// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
+/// # #[service_dispatcher(implements("ExampleInterface"))]
+/// # #[service_factory(
 /// #     artifact_name = "example",
 /// #     artifact_version = "1.0.0",
 /// #     proto_sources = "exonum_testkit::proto",
-/// #     implements("ExampleInterface")
 /// # )]
 /// # pub struct ExampleService;
 /// #
@@ -104,7 +104,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
 /// # }
 /// #
-/// # #[exonum_service]
+/// # #[exonum_interface]
 /// # pub trait ExampleInterface {}
 /// #
 /// # impl ExampleInterface for ExampleService {}

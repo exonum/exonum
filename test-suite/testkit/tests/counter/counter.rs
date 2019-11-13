@@ -28,7 +28,7 @@ use exonum::{
         BlockchainData, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, IntoExecutionError, ObjectHash, ServiceFactory};
+use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     Entry, ObjectHash, Snapshot,
@@ -100,7 +100,7 @@ pub enum Error {
     AddingZero = 0,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
@@ -219,13 +219,13 @@ impl CounterApi {
 
 // // // // Service // // // //
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "counter-service",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto",
-    implements("CounterServiceInterface")
+    proto_sources = "crate::proto"
 )]
+#[service_dispatcher(implements("CounterServiceInterface"))]
 pub struct CounterService;
 
 impl Service for CounterService {

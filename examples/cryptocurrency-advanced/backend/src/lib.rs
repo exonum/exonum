@@ -42,8 +42,9 @@ use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInt
 pub const INITIAL_BALANCE: u64 = 100;
 
 /// Cryptocurrency service implementation.
-#[derive(Debug, ServiceFactory)]
-#[exonum(proto_sources = "proto", implements("CryptocurrencyInterface"))]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("CryptocurrencyInterface"))]
+#[service_factory(proto_sources = "proto")]
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {

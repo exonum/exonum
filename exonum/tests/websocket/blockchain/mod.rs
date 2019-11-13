@@ -73,18 +73,15 @@ pub enum Error {
     NotAllowed = 0,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait MyServiceInterface {
     fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
     fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "ws-test",
-    proto_sources = "exonum::proto::schema",
-    implements("MyServiceInterface")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "ws-test", proto_sources = "exonum::proto::schema")]
+#[service_dispatcher(implements("MyServiceInterface"))]
 struct MyService;
 
 impl MyServiceInterface for MyService {

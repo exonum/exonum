@@ -127,7 +127,7 @@ struct SampleRuntime {
 }
 
 #[derive(Debug, IntoExecutionError)]
-#[exonum(crate = "crate")]
+#[execution_error(crate = "crate")]
 enum SampleError {
     Foo = 15,
 }

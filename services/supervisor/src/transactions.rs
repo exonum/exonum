@@ -27,7 +27,7 @@ use super::{
 };
 
 /// Supervisor service transactions.
-#[exonum_service]
+#[exonum_interface]
 pub trait SupervisorInterface {
     /// Requests artifact deploy.
     ///
