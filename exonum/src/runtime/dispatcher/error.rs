@@ -20,7 +20,7 @@ use super::ExecutionError;
 
 /// List of possible dispatcher errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(crate = "crate", kind = "dispatcher")]
+#[execution_error(crate = "crate", kind = "dispatcher")]
 pub enum Error {
     /// Runtime identifier is incorrect in this context.
     IncorrectRuntime = 0,

@@ -74,19 +74,19 @@ pub enum Error {
     NotAllowed = 0,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait ExplorerTransactions {
     fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
     fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "my-service",
     artifact_version = "1.0.1",
-    proto_sources = "proto",
-    implements("ExplorerTransactions")
+    proto_sources = "proto"
 )]
+#[service_dispatcher(implements("ExplorerTransactions"))]
 struct MyService;
 
 impl ExplorerTransactions for MyService {

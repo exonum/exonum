@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use darling::{FromDeriveInput, FromMeta};
+use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use semver::Version;
-use syn::{DeriveInput, Generics, Ident, Lit, NestedMeta, Path};
+use syn::{DeriveInput, QIdent, Path};
 
 use super::CratePath;
 
@@ -42,34 +42,8 @@ fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
     name.as_ref().iter().copied().all(is_allowed_latin1_char)
 }
 
-#[derive(Debug, Default)]
-struct ServiceInterfaces(Vec<Path>);
-
-impl FromMeta for ServiceInterfaces {
-    fn from_string(value: &str) -> darling::Result<Self> {
-        Path::from_string(value).map(|path| Self(vec![path]))
-    }
-
-    fn from_value(value: &Lit) -> darling::Result<Self> {
-        Path::from_value(value).map(|path| Self(vec![path]))
-    }
-
-    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
-        items
-            .iter()
-            .map(|meta| match meta {
-                NestedMeta::Lit(lit) => Path::from_value(lit),
-                _ => Err(darling::Error::unsupported_format(
-                    "Services should be in format: `implements(\"First\", \"Second\")`",
-                )),
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map(Self)
-    }
-}
-
 #[derive(Debug, FromDeriveInput)]
-#[darling(attributes(exonum), forward_attrs(allow, doc, cfg))]
+#[darling(attributes(service_factory), forward_attrs(allow, doc, cfg))]
 struct ServiceFactory {
     ident: Ident,
     #[darling(rename = "crate", default)]
@@ -82,9 +56,6 @@ struct ServiceFactory {
     proto_sources: Option<Path>,
     #[darling(default)]
     service_constructor: Option<Path>,
-    implements: ServiceInterfaces,
-    #[darling(default)]
-    service_name: Option<Ident>,
     #[darling(default)]
     generics: Generics,
 }
@@ -128,12 +99,6 @@ impl ServiceFactory {
         }
     }
 
-    fn service_name(&self) -> impl ToTokens {
-        self.service_name
-            .clone()
-            .unwrap_or_else(|| self.ident.clone())
-    }
-
     fn artifact_protobuf_spec(&self) -> impl ToTokens {
         let cr = &self.cr;
         if let Some(ref proto_sources_mod) = self.proto_sources {
@@ -152,49 +117,8 @@ impl ServiceFactory {
             }
         }
     }
-
-    fn impl_service_dispatcher(&self) -> impl ToTokens {
-        let cr = &self.cr;
-        let dispatcher = self.service_name();
-
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
-        let match_arms = self.implements.0.iter().map(|trait_name| {
-            let interface_trait = quote! {
-                <dyn #trait_name as #cr::runtime::rust::Interface>
-            };
-
-            quote! {
-                #interface_trait::INTERFACE_NAME => {
-                    #interface_trait::dispatch(self, ctx, method, payload)
-                }
-            }
-        });
-
-        quote! {
-            impl #impl_generics #cr::runtime::rust::ServiceDispatcher for #dispatcher #ty_generics #where_clause {
-                fn call(
-                    &self,
-                    interface_name: &str,
-                    method: #cr::runtime::MethodId,
-                    ctx: #cr::runtime::rust::CallContext,
-                    payload: &[u8],
-                ) -> Result<(), #cr::runtime::error::ExecutionError> {
-                    match interface_name {
-                        #( #match_arms )*
-                        other => {
-                            let message = format!(
-                                "Service instance `{}` does not implement a `{}` interface.",
-                                ctx.instance().name,
-                                other
-                            );
-                            Err(#cr::runtime::DispatcherError::no_such_interface(message))
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl ToTokens for ServiceFactory {
@@ -204,7 +128,6 @@ impl ToTokens for ServiceFactory {
         let artifact_id = self.artifact_id();
         let artifact_protobuf_spec = self.artifact_protobuf_spec();
         let service_constructor = self.service_constructor();
-        let service_dispatcher = self.impl_service_dispatcher();
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
         let expanded = quote! {
@@ -221,14 +144,12 @@ impl ToTokens for ServiceFactory {
                     #service_constructor
                 }
             }
-
-            #service_dispatcher
         };
         tokens.extend(expanded)
     }
 }
 
-pub fn implement_service_factory(input: TokenStream) -> TokenStream {
+pub fn impl_service_factory(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let service_factory = ServiceFactory::from_derive_input(&input)

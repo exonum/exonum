@@ -131,13 +131,10 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
     })
 }
 
-#[derive(Debug, Default, Clone, ServiceFactory)]
-#[exonum(
-    proto_sources = "proto",
-    artifact_name = "exonum-supervisor",
+#[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(implements("transactions::SupervisorInterface"))]
+#[service_factory(proto_sources = "proto", artifact_name = "exonum-supervisor")]
     service_constructor = "Self::construct",
-    implements("transactions::SupervisorInterface")
-)]
 pub struct Supervisor<Mode>
 where
     Mode: mode::SupervisorMode,

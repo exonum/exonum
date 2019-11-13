@@ -77,6 +77,24 @@ pub enum NetworkRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub struct HttpBackendConfig {
+    /// The interval in milliseconds between attempts of restarting HTTP-server in case
+    /// the server failed to restart
+    pub server_restart_max_retries: u16,
+    /// The attempts counts of restarting HTTP-server in case the server failed to restart
+    pub server_restart_retry_timeout: u64,
+}
+
+impl Default for HttpBackendConfig {
+    fn default() -> Self {
+        Self {
+            server_restart_max_retries: 20,
+            server_restart_retry_timeout: 500,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub struct NetworkConfiguration {
     // TODO: Think more about config parameters. (ECR-162)
     pub max_incoming_connections: usize,
@@ -85,6 +103,8 @@ pub struct NetworkConfiguration {
     pub tcp_keep_alive: Option<u64>,
     pub tcp_connect_retry_timeout: Milliseconds,
     pub tcp_connect_max_retries: u64,
+    #[serde(default)]
+    pub http_backend_config: HttpBackendConfig,
 }
 
 impl Default for NetworkConfiguration {
@@ -96,6 +116,7 @@ impl Default for NetworkConfiguration {
             tcp_nodelay: true,
             tcp_connect_retry_timeout: 15_000,
             tcp_connect_max_retries: 10,
+            http_backend_config: Default::default(),
         }
     }
 }

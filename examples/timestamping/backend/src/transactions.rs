@@ -49,7 +49,7 @@ pub struct Config {
     pub time_service_name: String,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait TimestampingInterface {
     fn timestamp(&self, ctx: CallContext<'_>, arg: TxTimestamp) -> Result<(), Error>;
 }
