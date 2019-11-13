@@ -26,7 +26,7 @@
 //!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
 //! };
 //! use serde_derive::{Serialize, Deserialize};
-//! use exonum_derive::{exonum_service, ServiceFactory, BinaryValue};
+//! use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{txvec, ApiKind, TestKitBuilder};
@@ -41,12 +41,12 @@
 //!     message: String,
 //! }
 //!
-//! #[derive(Clone, Default, Debug, ServiceFactory)]
-//! #[exonum(
+//! #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
+//! #[service_dispatcher(implements("TimestampingInterface"))]
+//! #[service_factory(
 //!     artifact_name = "timestamping",
 //!     artifact_version = "1.0.0",
 //!     proto_sources = "exonum_testkit::proto",
-//!     implements("TimestampingInterface")
 //! )]
 //! struct TimestampingService;
 //!
@@ -54,7 +54,7 @@
 //!     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
 //! }
 //!
-//! #[exonum_service]
+//! #[exonum_interface]
 //! pub trait TimestampingInterface {
 //!     fn timestamp(&self, _: CallContext, arg: TxTimestamp) -> Result<(), ExecutionError>;
 //! }
@@ -353,7 +353,7 @@ impl TestKit {
     ///
     /// ```
     /// # use serde_derive::{Serialize, Deserialize};
-    /// # use exonum_derive::{exonum_service, ServiceFactory, BinaryValue};
+    /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_proto::ProtobufConvert;
     /// # use exonum_testkit::{txvec, TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
@@ -365,12 +365,12 @@ impl TestKit {
     /// #
     /// # const SERVICE_ID: u32 = 1;
     /// #
-    /// # #[derive(Clone, Default, Debug, ServiceFactory)]
-    /// # #[exonum(
+    /// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
+    /// # #[service_dispatcher(implements("ExampleInterface"))]
+    /// # #[service_factory(
     /// #     artifact_name = "example",
     /// #     artifact_version = "1.0.0",
     /// #     proto_sources = "exonum_testkit::proto",
-    /// #     implements("ExampleInterface")
     /// # )]
     /// # pub struct ExampleService;
     /// #
@@ -378,7 +378,7 @@ impl TestKit {
     /// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
     /// # }
     /// #
-    /// # #[exonum_service]
+    /// # #[exonum_interface]
     /// # pub trait ExampleInterface {
     /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError>;
     /// # }
@@ -756,7 +756,7 @@ impl TestKit {
 /// # Examples
 ///
 /// ```
-/// # use exonum_derive::{exonum_service, ServiceFactory};
+/// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
 /// # use exonum::{
 /// #     crypto::{PublicKey, Hash},
 /// #     runtime::{InstanceDescriptor, rust::{AfterCommitContext, RustRuntime, Service}},
@@ -767,13 +767,13 @@ impl TestKit {
 /// # use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 /// # const SERVICE_ID: u32 = 1;
 /// // Service with internal state modified by a custom `after_commit` hook.
-/// # #[derive(Clone, Default, Debug, ServiceFactory)]
-/// # #[exonum(
+/// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
+/// # #[service_dispatcher(implements("AfterCommitInterface"))]
+/// # #[service_factory(
 /// #     artifact_name = "after_commit",
 /// #     artifact_version = "1.0.0",
 /// #     proto_sources = "exonum_testkit::proto",
 /// #     service_constructor = "Self::new_instance",
-/// #     implements("AfterCommitInterface")
 /// # )]
 /// struct AfterCommitService {
 ///     counter: Arc<AtomicUsize>,
@@ -793,7 +793,7 @@ impl TestKit {
 ///     }
 /// }
 ///
-/// # #[exonum_service]
+/// # #[exonum_interface]
 /// # trait AfterCommitInterface {}
 /// #
 /// # impl AfterCommitInterface for AfterCommitService {}

@@ -118,7 +118,7 @@ impl TxTime {
 }
 
 /// Time oracle service transaction.
-#[exonum_service]
+#[exonum_interface]
 pub trait TimeOracleInterface {
     /// Receives a new time from one of validators.
     fn time(&self, ctx: CallContext<'_>, arg: TxTime) -> Result<(), Error>;
