@@ -23,8 +23,9 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::ProofPath, BinaryKey, BinaryValue, Database, IndexAccess, MapProof,
-    ObjectHash, ProofMapIndex, TemporaryDB,
+    proof_map_index::{ProofMapIndexBase, ToProofPath},
+    BinaryKey, BinaryValue, Database, IndexAccess, MapProof, ObjectHash, ProofMapIndex,
+    TemporaryDB,
 };
 use proptest::{
     prelude::prop::{
@@ -41,8 +42,9 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
-mod common;
 use crate::common::Key;
+
+mod common;
 
 const INDEX_NAME: &str = "index";
 
@@ -69,15 +71,16 @@ where
     Ok(())
 }
 
-fn check_map_multiproof<T, K, V>(
-    proof: &MapProof<K, V>,
+fn check_map_multiproof<T, K, V, S>(
+    proof: &MapProof<K, V, S>,
     keys: BTreeSet<&K>,
-    table: &ProofMapIndex<T, K, V>,
+    table: &ProofMapIndexBase<T, K, V, S>,
 ) -> TestCaseResult
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + PartialEq + Debug,
+    S: ToProofPath<K>,
 {
     let mut entries: Vec<(&K, V)> = Vec::new();
     let mut missing_keys: Vec<&K> = Vec::new();
@@ -94,10 +97,15 @@ where
     // Sort entries and missing keys by the order imposed by the `ProofPath`
     // serialization of the keys
     entries.sort_unstable_by(|(x, _), (y, _)| {
-        ProofPath::new(*x).partial_cmp(&ProofPath::new(*y)).unwrap()
+        S::transform_key(*x)
+            .partial_cmp(&S::transform_key(*y))
+            .unwrap()
     });
-    missing_keys
-        .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+    missing_keys.sort_unstable_by(|&x, &y| {
+        S::transform_key(x)
+            .partial_cmp(&S::transform_key(y))
+            .unwrap()
+    });
 
     let unchecked_proof = proof;
     let proof = proof
@@ -109,13 +117,18 @@ where
     prop_assert_eq!(proof.index_hash(), table.object_hash());
 
     let mut actual_keys: Vec<&K> = proof.missing_keys().collect();
-    actual_keys
-        .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+    actual_keys.sort_unstable_by(|&x, &y| {
+        S::transform_key(x)
+            .partial_cmp(&S::transform_key(y))
+            .unwrap()
+    });
     prop_assert_eq!(missing_keys, actual_keys);
 
     let mut actual_entries: Vec<(&K, &V)> = proof.entries().collect();
     actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
-        ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
+        S::transform_key(x)
+            .partial_cmp(&S::transform_key(y))
+            .unwrap()
     });
     prop_assert!(entries.iter().map(|(k, v)| (*k, v)).eq(actual_entries));
     Ok(())

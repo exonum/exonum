@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
+
 use exonum_crypto::Hash;
 use failure::Fail;
 use serde::{Deserializer, Serializer};
 use serde_derive::{Deserialize, Serialize};
 
-use std::borrow::Cow;
+use std::{borrow::Cow, marker::PhantomData};
 
 use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
@@ -25,9 +27,7 @@ use super::{
 };
 use crate::{BinaryValue, HashTag, ObjectHash};
 
-use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
-pub use crate::ValidationError;
-use failure::_core::marker::PhantomData; // TODO Change for a type alias after EJB switching to rust > 1.36
+use crate::proof_map_index::key::{Hashed, Raw, ToProofPath};
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -457,7 +457,7 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode>
 where
     K: ObjectHash,
     V: BinaryValue,
-    KeyMode: KeyTransform<K>,
+    KeyMode: ToProofPath<K>,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use self::MapProofError::*;

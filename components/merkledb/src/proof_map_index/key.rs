@@ -64,30 +64,30 @@ pub struct Hashed;
 pub struct Raw;
 
 /// Trait defines key transforming function used to transform key to `ProofPath`.
-pub trait KeyTransform<K> {
+pub trait ToProofPath<K> {
     /// Transforms key to `ProofPath`.
     fn transform_key(key: &K) -> ProofPath;
 }
 
-impl<K: ObjectHash> KeyTransform<K> for Hashed {
+impl<K: ObjectHash> ToProofPath<K> for Hashed {
     fn transform_key(key: &K) -> ProofPath {
         ProofPath::from_bytes(key.object_hash())
     }
 }
 
-impl KeyTransform<PublicKey> for Raw {
+impl ToProofPath<PublicKey> for Raw {
     fn transform_key(key: &PublicKey) -> ProofPath {
         ProofPath::from_bytes(key.as_ref())
     }
 }
 
-impl KeyTransform<Hash> for Raw {
+impl ToProofPath<Hash> for Raw {
     fn transform_key(key: &Hash) -> ProofPath {
         ProofPath::from_bytes(key.as_ref())
     }
 }
 
-impl KeyTransform<[u8; 32]> for Raw {
+impl ToProofPath<[u8; 32]> for Raw {
     fn transform_key(key: &[u8; 32]) -> ProofPath {
         ProofPath::from_bytes(key)
     }
@@ -134,12 +134,6 @@ pub struct ProofPath {
 }
 
 impl ProofPath {
-    /// Creates a path from the given key.
-    /// TODO: maybe this method should be removed if favor of transform_key.
-    pub fn new(key: &impl ObjectHash) -> Self {
-        Self::from_bytes(key.object_hash())
-    }
-
     /// Checks if this is a path to a leaf `ProofMapIndex` node.
     pub fn is_leaf(&self) -> bool {
         self.bytes[0] == LEAF_KEY_PREFIX

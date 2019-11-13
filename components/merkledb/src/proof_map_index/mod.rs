@@ -16,7 +16,7 @@
 
 pub use self::node::{BranchNode, Node};
 pub use self::{
-    key::{KeyTransform, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
+    key::{ProofPath, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError, RawMapProof, ValidationError},
 };
 
@@ -54,7 +54,7 @@ where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
-    KeyMode: KeyTransform<K>,
+    KeyMode: ToProofPath<K>,
 {
     fn root_node(&self) -> Option<(ProofPath, Node)> {
         self.get_root_node()
@@ -70,7 +70,7 @@ where
 }
 
 #[doc(hidden)]
-pub struct ProofMapIndexBase<T: IndexAccess, K, V, KeyMode: KeyTransform<K> = Hashed> {
+pub struct ProofMapIndexBase<T: IndexAccess, K, V, KeyMode: ToProofPath<K>> {
     base: View<T>,
     state: IndexState<T, Option<ProofPath>>,
     _k: PhantomData<K>,
@@ -217,7 +217,7 @@ where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
-    KeyMode: KeyTransform<K>,
+    KeyMode: ToProofPath<K>,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -915,7 +915,7 @@ where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
-    KeyMode: KeyTransform<K>,
+    KeyMode: ToProofPath<K>,
 {
     /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
     /// For hash of the empty map see [`HashTag::empty_map_hash`].
@@ -1001,10 +1001,10 @@ where
     T: IndexAccess,
     K: BinaryKey + ObjectHash,
     V: BinaryValue + fmt::Debug,
-    KeyMode: KeyTransform<K>,
+    KeyMode: ToProofPath<K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Entry<'a, T: IndexAccess, K: ObjectHash, V: BinaryValue, KeyMode: KeyTransform<K>> {
+        struct Entry<'a, T: IndexAccess, K: ObjectHash, V: BinaryValue, KeyMode: ToProofPath<K>> {
             index: &'a ProofMapIndexBase<T, K, V, KeyMode>,
             path: ProofPath,
             hash: Hash,
@@ -1016,7 +1016,7 @@ where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue,
-            KeyMode: KeyTransform<K>,
+            KeyMode: ToProofPath<K>,
         {
             fn new(
                 index: &'a ProofMapIndexBase<T, K, V, KeyMode>,
@@ -1045,7 +1045,7 @@ where
             T: IndexAccess,
             K: BinaryKey + ObjectHash,
             V: BinaryValue + fmt::Debug,
-            KeyMode: KeyTransform<K>,
+            KeyMode: ToProofPath<K>,
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.node {

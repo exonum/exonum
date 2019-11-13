@@ -28,8 +28,9 @@ use exonum_merkledb::{
     BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 
-mod common;
 use crate::common::{compare_collections, FromFork, Key, MergeFork, ACTIONS_MAX_LEN};
+
+mod common;
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {

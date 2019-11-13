@@ -30,7 +30,7 @@ use super::{
     node::BranchNode,
     MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
-use crate::proof_map_index::key::{Hashed, KeyTransform, Raw};
+use crate::proof_map_index::key::{Hashed, Raw, ToProofPath};
 use crate::proof_map_index::ProofMapIndexBase;
 use crate::{
     BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, RawProofMapIndex, TemporaryDB,
@@ -100,7 +100,7 @@ struct ProofMapTester<S> {
 
 impl<S> ProofMapTester<S>
 where
-    S: KeyTransform<[u8; 32]>,
+    S: ToProofPath<[u8; 32]>,
 {
     fn test_map_methods() {
         let db = TemporaryDB::default();
@@ -1198,7 +1198,7 @@ fn test_merkle_root_leaf() {
 
     let merkle_root = HashStream::new()
         .update(&[HashTag::MapBranchNode as u8])
-        .update(ProofPath::new(&key).as_bytes())
+        .update(Hashed::transform_key(&key).as_bytes())
         .update(HashTag::hash_leaf(&value).as_ref())
         .hash();
     assert_eq!(HashTag::hash_map_node(merkle_root), index.object_hash());
@@ -1211,7 +1211,7 @@ fn check_map_proof<K, V, S>(
 ) where
     K: BinaryKey + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
-    S: KeyTransform<K>,
+    S: ToProofPath<K>,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
     let deserialized_proof: MapProof<K, V, S> = serde_json::from_value(serialized_proof).unwrap();
@@ -1249,7 +1249,7 @@ fn check_map_multiproof<K, V, S>(
 ) where
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + ObjectHash + PartialEq + Debug,
-    S: KeyTransform<K>,
+    S: ToProofPath<K>,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -1267,10 +1267,15 @@ fn check_map_multiproof<K, V, S>(
         // Sort entries and missing keys by the order imposed by the `ProofPath`
         // serialization of the keys
         entries.sort_unstable_by(|&(ref x, _), &(ref y, _)| {
-            ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
+            S::transform_key(x)
+                .partial_cmp(&S::transform_key(y))
+                .unwrap()
         });
-        missing_keys
-            .sort_unstable_by(|x, y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+        missing_keys.sort_unstable_by(|x, y| {
+            S::transform_key(x)
+                .partial_cmp(&S::transform_key(y))
+                .unwrap()
+        });
 
         (entries, missing_keys)
     };
@@ -1279,8 +1284,11 @@ fn check_map_multiproof<K, V, S>(
     assert_eq!(proof.index_hash(), table.object_hash());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
-        actual_keys
-            .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+        actual_keys.sort_unstable_by(|&x, &y| {
+            S::transform_key(x)
+                .partial_cmp(&S::transform_key(y))
+                .unwrap()
+        });
         actual_keys
     });
     assert_eq!(
@@ -1291,7 +1299,9 @@ fn check_map_multiproof<K, V, S>(
         {
             let mut actual_entries = proof.entries().collect::<Vec<_>>();
             actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
-                ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
+                S::transform_key(x)
+                    .partial_cmp(&S::transform_key(y))
+                    .unwrap()
             });
             actual_entries
         }
@@ -1645,7 +1655,7 @@ fn test_tree_with_hashed_key() {
     assert_eq!(
         proof.proof_unchecked(),
         vec![(
-            ProofPath::new(&Point::new(3, 4)),
+            Hashed::transform_key(&Point::new(3, 4)),
             HashTag::hash_leaf(&[2, 3, 4])
         )]
     );
@@ -1665,6 +1675,9 @@ fn test_tree_with_hashed_key() {
     assert_eq!(table.get(&other_key), Some(vec![1, 2, 3]));
     assert_eq!(
         table.object_hash(),
-        hash_isolated_node(&ProofPath::new(&other_key), &HashTag::hash_leaf(&[1, 2, 3]))
+        hash_isolated_node(
+            &Hashed::transform_key(&other_key),
+            &HashTag::hash_leaf(&[1, 2, 3])
+        )
     );
 }

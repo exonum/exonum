@@ -125,8 +125,8 @@ mod tests {
     use std::fmt;
 
     use crate::{
-        proof_map_index::KeyTransform, proto, BinaryKey, BinaryValue, Database, ListProof,
-        MapProof, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+        proof_map_index::ToProofPath, proto, BinaryKey, BinaryValue, Database, ListProof, MapProof,
+        ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
     };
     use protobuf::RepeatedField;
 
@@ -155,7 +155,7 @@ mod tests {
     where
         K: BinaryKey + ObjectHash + fmt::Debug,
         V: BinaryValue + ObjectHash + fmt::Debug,
-        S: KeyTransform<K> + fmt::Debug,
+        S: ToProofPath<K> + fmt::Debug,
         MapProof<K, V, S>: ProtobufConvert + PartialEq,
     {
         let pb = proof.to_pb();
