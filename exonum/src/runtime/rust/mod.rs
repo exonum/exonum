@@ -12,7 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Built-in Rust runtime module.
+//! The current runtime is for running native services written in Rust.
+//!
+//! A set of artifacts available to deploy in the Rust runtime is static. The set is defined at the time
+//! of compilation. Once created, the set can be changed only by the node binary recompilation.
+//!
+//! Beware of removing the artifacts from the Rust runtime. An attempt to remove an artifact
+//! from an instance that is already running can cause blockchain to break. It is only safe
+//! to add new artifacts.
+//!
+//! The Rust runtime does not provide any level of service isolation from the operation system.
+//! Therefore, the security audit of the artifacts that should be deployed is up to the node administrators.
+//!
+//! The artifact interface in the Rust runtime is represented by the
+//! [`ServiceFactory`][ServiceFactory] trait. The trait creates service instances and provides
+//! information about the artifact.
+//!
+//! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
     api::ArtifactProtobufSpec,
@@ -25,7 +41,7 @@ pub use self::{
 
 pub mod error;
 
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{validation::is_valid_index_name, Snapshot};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
@@ -56,6 +72,9 @@ mod service;
 #[cfg(test)]
 mod tests;
 
+/// Rust runtime entity.
+///
+/// [Detailed description of the Rust runtime](index.html).
 #[derive(Debug)]
 pub struct RustRuntime {
     blockchain: Option<Blockchain>,
@@ -75,18 +94,18 @@ struct Instance {
 }
 
 impl Instance {
-    pub fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
+    fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
         Self { id, name, service }
     }
 
-    pub fn descriptor(&self) -> InstanceDescriptor<'_> {
+    fn descriptor(&self) -> InstanceDescriptor<'_> {
         InstanceDescriptor {
             id: self.id,
             name: &self.name,
         }
     }
 
-    pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
         let blockchain_data = BlockchainData::new(snapshot, self.descriptor());
         (self.id, self.service.state_hash(blockchain_data))
     }
@@ -123,12 +142,15 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
+    /// Adds a new service factory to the runtime.
     pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
     }
 
+    /// Adds a new service factory to the runtime and returns
+    /// a modified `RustRuntime` object for further chaining.
     pub fn with_available_service(
         mut self,
         service_factory: impl Into<Box<dyn ServiceFactory>>,
@@ -216,18 +238,46 @@ impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
     }
 }
 
+/// The unique identifier of the Rust artifact, containing the name and version of the artifact.
+///
+/// As a string, the artifact name is represented as follows:
+///
+/// `{artifact_name}:{artifact_version}`, where `artifact_name` is a unique name of the artifact,
+/// and `artifact_version` is a semantic version identifier.
+///
+/// * Artifact name can contain only the following characters: `a-zA-Z0-9` and one of `_-.`.
+/// * Artifact version identifier must conform to the semantic version scheme (major.minor.patch).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactId {
+    /// Artifact name.
     pub name: String,
+    /// Artifact version identifier conforming to the semantic versioning scheme.
     pub version: Version,
 }
 
 impl RustArtifactId {
+    /// Creates a new Rust artifact ID from the provided name and version.
+    ///
+    /// # Panics
+    ///
+    /// If the `name` is empty or contains illegal character.
     pub fn new(name: &str, major: u64, minor: u64, patch: u64) -> Self {
+        Self::is_valid_name(name).expect("Invalid Rust artifact name.");
         Self {
             name: name.to_owned(),
             version: Version::new(major, minor, patch),
         }
+    }
+
+    /// Checks that the Rust artifact name contains only allowed characters and is not empty.
+    fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
+        let name = name.as_ref();
+        ensure!(!name.is_empty(), "Rust artifact name should not be empty.");
+        ensure!(
+            is_valid_index_name(name),
+            "Rust artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-."
+        );
+        Ok(())
     }
 
     fn parse(artifact: &ArtifactId) -> Result<Self, ExecutionError> {
@@ -263,13 +313,17 @@ impl FromStr for RustArtifactId {
         let split = s.split(':').take(2).collect::<Vec<_>>();
         match &split[..] {
             [name, version] => {
+                Self::is_valid_name(name)?;
                 let version = Version::parse(version)?;
                 Ok(Self {
                     name: name.to_string(),
                     version,
                 })
-            },
-            _ => Err(failure::format_err!("Wrong rust artifact name format, it should be in form \"artifact_name:artifact_version\""))
+            }
+            _ => Err(failure::format_err!(
+                "Wrong Rust artifact name format. The name should be arranged \
+                 as follows \"artifact_name:artifact_version\""
+            )),
         }
     }
 }
@@ -409,4 +463,30 @@ impl Runtime for RustRuntime {
 #[test]
 fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service:1.0.0").unwrap();
+}
+
+#[test]
+fn parse_rust_artifact_id_incorrect() {
+    let cases = vec![
+        ("my-service:1.1.1.1.1", "Extra junk after valid version"),
+        (":1.0", "Rust artifact name should not be empty"),
+        ("name:", "Error parsing major identifier"),
+        ("$name:1.0", "Rust artifact name contains illegal character"),
+        (
+            "aAa",
+            "Wrong Rust artifact name format. The name should be arranged as follows",
+        ),
+    ];
+
+    for (artifact_str, expected_err) in cases {
+        let actual_err = RustArtifactId::from_str(artifact_str)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            actual_err.contains(expected_err),
+            "Actual error is: \"{}\", but expected \"{}\"",
+            actual_err,
+            expected_err
+        )
+    }
 }

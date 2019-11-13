@@ -297,6 +297,11 @@ pub struct SystemRuntimeConfig {
     pub api_runtimes: Vec<ApiRuntimeConfig>,
     /// API aggregator.
     pub api_aggregator: ApiAggregator,
+    /// The interval in milliseconds between attempts of restarting HTTP-server in case
+    /// the server failed to restart
+    pub server_restart_retry_timeout: u64,
+    /// The attempts counts of restarting HTTP-server in case the server failed to restart
+    pub server_restart_max_retries: u16,
 }
 
 /// Actix system runtime handle.

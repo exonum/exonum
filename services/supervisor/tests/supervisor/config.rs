@@ -313,7 +313,7 @@ fn test_try_confirm_non_existing_proposal() {
         .status()
         .expect("Transaction with change propose discarded.");
 
-    let wrong_hash = crypto::hash(&[0]);;
+    let wrong_hash = crypto::hash(&[0]);
     let signed_confirm = build_confirmation_transactions(&testkit, wrong_hash, initiator_id);
 
     let block = testkit.create_block_with_transactions(signed_confirm);

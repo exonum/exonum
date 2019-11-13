@@ -243,6 +243,7 @@ impl<'a> AfterCommitContext<'a> {
     }
 }
 
+/// Extended blockchain interface for the service instance authorized as a supervisor.
 #[derive(Debug)]
 pub struct SupervisorExtensions<'a> {
     mailbox: &'a mut Mailbox,

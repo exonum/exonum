@@ -22,6 +22,4 @@ pub enum Error {
     IncorrectArtifactId = 0,
     /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
     UnableToDeploy = 1,
-    /// Unspecified error during the call invocation.
-    UnspecifiedError = 2,
 }
