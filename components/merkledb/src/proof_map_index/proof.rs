@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
+pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36 (ECR-3827)
 
 use exonum_crypto::Hash;
 use failure::Fail;
