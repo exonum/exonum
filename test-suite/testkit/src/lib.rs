@@ -259,7 +259,7 @@ impl TestKit {
             .into_iter()
             .fold(
                 BlockchainBuilder::new(blockchain, genesis_config),
-                |builder, runtime| builder.with_additional_runtime(runtime),
+                |builder, runtime| builder.with_runtime(runtime),
             )
             .build()
             .expect("Unable to create blockchain instance");
