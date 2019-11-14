@@ -15,13 +15,16 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, InstanceCollection},
+    blockchain::{
+        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut,
+        InstanceCollection,
+    },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
     node::ApiSender,
     runtime::{
-        rust::{CallContext, Service},
+        rust::{CallContext, RustRuntime, Service},
         AnyTx, BlockchainData, InstanceId,
     },
 };
@@ -126,10 +129,15 @@ pub fn create_blockchain() -> BlockchainMut {
         ApiSender::closed(),
     );
 
-    let services =
-        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
-    BlockchainBuilder::new(blockchain, config.consensus)
-        .with_rust_runtime(mpsc::channel(1).0, services)
+    let (factory, cfg) = InstanceCollection::new(MyService)
+        .with_instance(SERVICE_ID, "my-service", ())
+        .into();
+    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_available_service(factory);
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
+        .with_builtin_instance(cfg)
+        .build();
+    BlockchainBuilder::new(blockchain, genesis_config)
+        .with_additional_runtime(rust_runtime)
         .build()
         .unwrap()
 }
