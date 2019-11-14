@@ -662,6 +662,7 @@ impl Runtime for DeploymentRuntime {
             // This isn't a correct way to delay future completion, but the correct way
             // (`tokio::timer::Delay`) cannot be used since the futures returned by
             // `Runtime::deploy_artifact()` are not (yet?) run on the `tokio` runtime.
+            // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
             thread::sleep(delay);
             result
         })

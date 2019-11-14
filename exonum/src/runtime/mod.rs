@@ -257,6 +257,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - For newly added artifacts, the method is called as the decision to deploy the artifact
     ///   is made by the supervisor service.
     /// - After a node restart, the method is called for all previously deployed artifacts.
+    // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
