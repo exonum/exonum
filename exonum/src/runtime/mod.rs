@@ -208,6 +208,22 @@ impl From<RuntimeIdentifier> for u32 {
 /// The ordering for the "readonly" methods `is_artifact_deployed` and `state_hashes` in relation
 /// to the lifecycle above is not specified.
 ///
+/// # Consensus and Local Methods
+///
+/// The following methods should return the same result given the same arguments for all nodes
+/// in the blockchain network:
+///
+/// - `execute`
+/// - `before_commit`
+/// - `start_adding_service`
+/// - `state_hashes`
+///
+/// All these methods except for `state_hashes` should also produce the same changes
+/// to the storage via provided `ExecutionContext`. Discrepancy in node behavior within
+/// these methods may lead to a consensus failure.
+///
+/// The other methods may execute logic specific to the node.
+///
 /// # Handling Panics
 ///
 /// Unless specified in the method docs, a panic in the `Runtime` methods will **not** be caught
@@ -316,10 +332,12 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// # Return value
     ///
-    /// Any error or panic returned from this method should be considered fatal. There are edge
-    /// cases where the returned error does not stop the enclosing process (e.g.,
-    /// if several alternative initial service configurations are tried), but as a rule of thumb,
-    /// a `Runtime` should not return an error or panic here unless it wants the node to stop forever.
+    /// An error or panic returned from this method will not be processed and will lead
+    /// to the node stopping. A runtime should only return an error / panic if the error is local
+    /// to the node, rather than common to all nodes in the network. All consensus-related errors
+    /// should be reported during the preceding `start_adding_service` call. The error should
+    /// contain a description allowing the node administrator to determine the root cause
+    /// of the error and (ideally) recover the node by eliminating it.
     fn commit_service(
         &mut self,
         snapshot: &dyn Snapshot,
