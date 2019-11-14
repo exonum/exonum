@@ -119,7 +119,7 @@ impl Display for ErrorKind {
 /// `ExecutionError` by using the `IntoExecutionError` macro from the `exonum-derive` crate.
 ///
 /// This macro derives `From<MyErrorEnum>` trait for enums. Enumeration should have an explicit
-/// discriminant for each variant. Also this macro derives `Display` and `Fail` traits using 
+/// discriminant for each variant. Also this macro derives `Display` and `Fail` traits using
 /// documentation comments of each variant.
 ///
 /// # Examples
