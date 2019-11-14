@@ -41,7 +41,8 @@
 //!     },
 //! };
 //! use exonum_derive::{
-//!     exonum_interface, BinaryValue, IntoExecutionError, ObjectHash, ServiceDispatcher, ServiceFactory
+//!     exonum_interface, BinaryValue, IntoExecutionError,
+//!     ObjectHash, ServiceDispatcher, ServiceFactory
 //! };
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
@@ -64,17 +65,14 @@
 //!
 //! // You may create service-specific error types.
 //!
-//! /// Error codes emitted by wallet transactions during execution.
 //! #[derive(Debug, IntoExecutionError)]
 //! pub enum Error {
-//!     /// Point already exists.
 //!     PointAlreadyExists = 0,
-//!     /// Wallet already exists.
 //!     WalletAlreadyExists = 1,
 //! }
 //!
-//! // Define the transactions interface for your service by creating a trait with the following
-//! // attribute and method signatures.
+//! // Define the transactions interface for your service by creating a trait with
+//! // the following attribute and method signatures.
 //! #[exonum_interface]
 //! pub trait Transactions {
 //!     // You may use `ExecutionError` directly.
@@ -84,20 +82,22 @@
 //!         arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError>;
 //!     // Also you can use for error any type which implements `Into<ExecutionError>`.
-//!     fn add_point(&self, context: CallContext<'_>, arg: Point) -> Result<(), Error>;
+//!     fn add_point(
+//!         &self,
+//!         context: CallContext<'_>,
+//!         arg: Point,
+//!     ) -> Result<(), Error>;
 //! }
 //!
 //! // In order for a service to process transactions, you have to implement the
 //! // `ServiceDispatcher` trait, which can be derived using the corresponding macro.
-//! //
 //! // To explain runtime how to create instances of this service you have to implement
 //! // `ServiceFactory` trait by using the `ServiceFactory` derive macro.
-//! //
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 //! // Declare that a service implements a `Transactions` interface that was presented above.
 //! #[service_dispatcher(implements("Transactions"))]
-//! // By default macro uses crate name and version to provide artifact ID for this service factory.
-//! // You should only provide path to the generated Protobuf schema.
+//! // By default macro uses crate name and version to provide artifact ID for this
+//! // service factory. You should only provide path to the generated Protobuf schema.
 //! #[service_factory(proto_sources = "exonum::proto::schema")]
 //! pub struct PointService;
 //!
@@ -113,7 +113,11 @@
 //!         Ok(())
 //!     }
 //!
-//!     fn add_point(&self, _context: CallContext<'_>, _arg: Point) -> Result<(), Error> {
+//!     fn add_point(
+//!         &self,
+//!         _context: CallContext<'_>,
+//!         _arg: Point
+//!     ) -> Result<(), Error> {
 //!         // Some business logic...
 //!         Ok(())
 //!     }
