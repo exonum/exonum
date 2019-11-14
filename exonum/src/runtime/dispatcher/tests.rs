@@ -588,6 +588,9 @@ struct DeploymentRuntime {
 }
 
 impl DeploymentRuntime {
+    /// Artifact deploy spec. This is u64-LE encoding of the deploy delay in milliseconds.
+    const SPEC: [u8; 8] = [100, 0, 0, 0, 0, 0, 0, 0];
+
     fn deploy_attempts(&self, artifact: &ArtifactId) -> usize {
         self.artifacts
             .lock()
@@ -596,6 +599,31 @@ impl DeploymentRuntime {
             .copied()
             .unwrap_or_default()
             .attempts
+    }
+
+    /// Deploys a test artifact. Returns artifact ID and the deploy argument.
+    fn deploy_test_artifact(
+        &self,
+        name: &str,
+        dispatcher: &mut Dispatcher,
+        db: &Arc<TemporaryDB>,
+    ) -> (ArtifactId, Vec<u8>) {
+        let artifact = ArtifactId {
+            runtime_id: 2,
+            name: name.to_owned(),
+        };
+        self.mailbox_actions
+            .lock()
+            .unwrap()
+            .push(Action::StartDeploy {
+                artifact: artifact.clone(),
+                spec: Self::SPEC.to_vec(),
+                and_then: Box::new(|| Box::new(Ok(()).into_future())),
+            });
+        let mut fork = db.fork();
+        dispatcher.commit_block_and_notify_runtimes(&mut fork);
+        db.merge_sync(fork.into_patch()).unwrap();
+        (artifact, Self::SPEC.to_vec())
     }
 }
 
@@ -722,24 +750,7 @@ fn delayed_deployment() {
     db.merge_sync(fork.into_patch()).unwrap();
 
     // Queue an artifact for deployment.
-    let artifact = ArtifactId {
-        runtime_id: 2,
-        name: "good".to_owned(),
-    };
-    let mut spec = vec![0_u8; 8];
-    LittleEndian::write_u64(&mut spec, 100);
-    runtime
-        .mailbox_actions
-        .lock()
-        .unwrap()
-        .push(Action::StartDeploy {
-            artifact: artifact.clone(),
-            spec: spec.clone(),
-            and_then: Box::new(|| Box::new(Ok(()).into_future())),
-        });
-    let mut fork = db.fork();
-    dispatcher.commit_block_and_notify_runtimes(&mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let (artifact, spec) = runtime.deploy_test_artifact("good", &mut dispatcher, &db);
     // Note that deployment via `Mailbox` is currently blocking, so after the method completion
     // the artifact should be immediately marked as deployed.
     assert!(dispatcher.is_artifact_deployed(&artifact));
@@ -769,24 +780,7 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
     db.merge_sync(fork.into_patch()).unwrap();
 
     // Queue an artifact for deployment.
-    let artifact = ArtifactId {
-        runtime_id: 2,
-        name: artifact_name.to_owned(),
-    };
-    let mut spec = vec![0_u8; 8];
-    LittleEndian::write_u64(&mut spec, 100);
-    runtime
-        .mailbox_actions
-        .lock()
-        .unwrap()
-        .push(Action::StartDeploy {
-            artifact: artifact.clone(),
-            spec: spec.clone(),
-            and_then: Box::new(|| Box::new(Ok(()).into_future())),
-        });
-    let mut fork = db.fork();
-    dispatcher.commit_block_and_notify_runtimes(&mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let (artifact, spec) = runtime.deploy_test_artifact(artifact_name, &mut dispatcher, &db);
     // We should not panic during async deployment.
     assert!(!dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
@@ -794,7 +788,6 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
     let mut fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
     dispatcher.commit_block_and_notify_runtimes(&mut fork); // << should panic
-    db.merge_sync(fork.into_patch()).unwrap();
 }
 
 #[test]
@@ -811,9 +804,8 @@ fn failed_deployment_with_node_restart() {
     let runtime = DeploymentRuntime::default();
     let db_ = Arc::clone(&db);
     let runtime_ = runtime.clone();
-    // The node should stop after unsuccessful sync deployment.
     panic::catch_unwind(|| test_failed_deployment(db_, runtime_, "recoverable_after_restart"))
-        .unwrap_err();
+        .expect_err("Node didn't stop after unsuccessful sync deployment");
 
     let snapshot = db.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
@@ -871,24 +863,7 @@ fn recoverable_error_during_deployment() {
     db.merge_sync(fork.into_patch()).unwrap();
 
     // Queue an artifact for deployment.
-    let artifact = ArtifactId {
-        runtime_id: 2,
-        name: "recoverable".to_owned(),
-    };
-    let mut spec = vec![0_u8; 8];
-    LittleEndian::write_u64(&mut spec, 100);
-    runtime
-        .mailbox_actions
-        .lock()
-        .unwrap()
-        .push(Action::StartDeploy {
-            artifact: artifact.clone(),
-            spec: spec.clone(),
-            and_then: Box::new(|| Box::new(Ok(()).into_future())),
-        });
-    let mut fork = db.fork();
-    dispatcher.commit_block_and_notify_runtimes(&mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let (artifact, spec) = runtime.deploy_test_artifact("recoverable", &mut dispatcher, &db);
     assert!(!dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
