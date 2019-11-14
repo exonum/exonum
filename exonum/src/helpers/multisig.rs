@@ -16,20 +16,20 @@
 // TODO move out from helpers [ECR-3222]
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use exonum_merkledb::{BinaryKey, BinaryValue, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{
+    access::{Access, FromAccess, RawAccessMut},
+    BinaryKey, BinaryValue, IndexAddress, ObjectHash, ProofMapIndex,
+};
 
 use std::{
     borrow::Cow,
     collections::BTreeSet,
+    fmt,
     io::{Cursor, Write},
-    marker::PhantomData,
 };
 
-use crate::{
-    blockchain::{self, ValidatorKeys},
-    crypto::{self, Hash, PublicKey},
-    helpers::ValidatorId,
-};
+use crate::crypto::{self, Hash, PublicKey};
+use exonum_merkledb::access::AccessError;
 
 /// A set of binary values.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord)]
@@ -80,41 +80,42 @@ impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
     }
 }
 
-#[derive(Debug)]
-pub struct ValidatorMultisig<I, V>
-where
-    I: IndexAccess,
-{
-    index_name: String,
-    // List of validators' public keys.
-    validator_keys: Vec<ValidatorKeys>,
-    access: I,
-    _v: PhantomData<V>,
+pub struct ValidatorMultisig<T: Access, V> {
+    index: ProofMapIndex<T::Base, V, BinarySet<PublicKey>>,
 }
 
-impl<I, V> ValidatorMultisig<I, V>
+impl<T, V> fmt::Debug for ValidatorMultisig<T, V>
 where
-    I: IndexAccess,
+    T: Access,
     V: BinaryKey + ObjectHash,
 {
-    pub fn new(index_name: impl Into<String>, access: I) -> Self {
-        let validator_keys = blockchain::Schema::new(access.clone())
-            .consensus_config()
-            .validator_keys;
-        Self {
-            index_name: index_name.into(),
-            access,
-            validator_keys,
-            _v: PhantomData,
-        }
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ValidatorMultisig")
+            .field("index", &self.index)
+            .finish()
     }
+}
 
-    pub fn validators_amount(&self) -> usize {
-        self.validator_keys.len()
+impl<T, V> FromAccess<T> for ValidatorMultisig<T, V>
+where
+    T: Access,
+    V: BinaryKey + ObjectHash,
+{
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        Ok(Self {
+            index: FromAccess::from_access(access, addr)?,
+        })
     }
+}
 
+impl<T, V> ValidatorMultisig<T, V>
+where
+    T: Access,
+    V: BinaryKey + ObjectHash,
+{
     pub fn confirmed_by(&self, id: &V, author: &PublicKey) -> bool {
-        self.multisig_index()
+        self.index
             .get(id)
             .and_then(|set| {
                 if set.0.contains(&author) {
@@ -126,40 +127,33 @@ where
             .is_some()
     }
 
-    pub fn validator_id(&self, author: PublicKey) -> Option<ValidatorId> {
-        self.validator_keys
-            .iter()
-            .position(|validator_keys| validator_keys.service_key == author)
-            .map(|id| ValidatorId(id as u16))
-    }
-
-    pub fn confirm(&mut self, id: &V, author: PublicKey) -> usize {
-        let mut multisig_index = self.multisig_index();
-        let mut confirmations = multisig_index.get(id).unwrap_or_default();
-        confirmations.0.insert(author);
-        let len = confirmations.0.len();
-        multisig_index.put(id, confirmations);
-        len
-    }
-
     pub fn confirmations(&self, id: &V) -> usize {
-        self.multisig_index()
-            .get(id)
-            .map_or(0, |confirms| confirms.0.len())
-    }
-
-    fn multisig_index(&self) -> ProofMapIndex<I, V, BinarySet<PublicKey>> {
-        ProofMapIndex::new(self.index_name.clone(), self.access.clone())
+        self.index.get(id).map_or(0, |confirms| confirms.0.len())
     }
 }
 
-impl<I, V> ObjectHash for ValidatorMultisig<I, V>
+impl<T, V> ValidatorMultisig<T, V>
 where
-    I: IndexAccess,
+    T: Access,
+    T::Base: RawAccessMut,
+    V: BinaryKey + ObjectHash,
+{
+    pub fn confirm(&mut self, id: &V, author: PublicKey) -> usize {
+        let mut confirmations = self.index.get(id).unwrap_or_default();
+        confirmations.0.insert(author);
+        let len = confirmations.0.len();
+        self.index.put(id, confirmations);
+        len
+    }
+}
+
+impl<T, V> ObjectHash for ValidatorMultisig<T, V>
+where
+    T: Access,
     V: BinaryKey + ObjectHash,
 {
     fn object_hash(&self) -> Hash {
-        self.multisig_index().object_hash()
+        self.index.object_hash()
     }
 }
 

@@ -25,18 +25,19 @@ use exonum::{
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
         rust::{CallContext, Service},
-        InstanceDescriptor, InstanceId,
+        BlockchainData, InstanceId,
     },
 };
-use exonum_derive::{
-    exonum_interface, BinaryValue, IntoExecutionError, ObjectHash, ServiceDispatcher,
-    ServiceFactory,
+use exonum_derive::*;
+use exonum_merkledb::{
+    access::{Access, FromAccess, RawAccessMut},
+    Entry, ObjectHash, Snapshot,
 };
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
+
 use std::sync::Arc;
 
 use super::proto;
@@ -46,39 +47,32 @@ pub const SERVICE_ID: InstanceId = 2;
 /// "correct horse battery staple" brainwallet pubkey in Ed25519 with a SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 
-pub struct CounterSchema<T> {
-    access: T,
+pub struct CounterSchema<T: Access> {
+    pub counter: Entry<T::Base, u64>,
 }
 
-impl<'a, T: IndexAccess> CounterSchema<T> {
+impl<T: Access> CounterSchema<T> {
     pub fn new(access: T) -> Self {
-        CounterSchema { access }
+        Self {
+            counter: FromAccess::from_access(access, "counter".into()).unwrap(),
+        }
     }
+}
 
-    fn index_name(&self, name: &str) -> String {
-        [SERVICE_NAME, ".", name].concat()
-    }
-
-    fn entry(&self) -> Entry<T, u64> {
-        Entry::new(self.index_name("count"), self.access.clone())
-    }
-
-    pub fn count(&self) -> Option<u64> {
-        self.entry().get()
-    }
-
-    fn inc_count(&mut self, inc: u64) -> u64 {
+impl<T> CounterSchema<T>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+{
+    fn inc_counter(&mut self, inc: u64) -> u64 {
         let count = self
-            .count()
+            .counter
+            .get()
             .unwrap_or(0)
             .checked_add(inc)
             .expect("attempt to add with overflow");
-        self.entry().set(count);
+        self.counter.set(count);
         count
-    }
-
-    fn set_count(&mut self, count: u64) {
-        self.entry().set(count);
     }
 }
 
@@ -86,15 +80,15 @@ impl<'a, T: IndexAccess> CounterSchema<T> {
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxReset")]
-pub struct TxReset;
+pub struct Reset;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxIncrement")]
-pub struct TxIncrement {
+pub struct Increment {
     by: u64,
 }
 
-impl TxIncrement {
+impl Increment {
     pub fn new(by: u64) -> Self {
         Self { by }
     }
@@ -110,25 +104,25 @@ pub enum Error {
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: CallContext<'_>, arg: TxIncrement) -> Result<(), Error>;
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error>;
 
-    fn reset(&self, context: CallContext<'_>, arg: TxReset) -> Result<(), Error>;
+    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), Error>;
 }
 
 impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: CallContext<'_>, arg: TxIncrement) -> Result<(), Error> {
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error> {
         if arg.by == 0 {
             return Err(Error::AddingZero);
         }
 
-        let mut schema = CounterSchema::new(context.fork());
-        schema.inc_count(arg.by);
+        let mut schema = CounterSchema::new(context.service_data());
+        schema.inc_counter(arg.by);
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _arg: TxReset) -> Result<(), Error> {
-        let mut schema = CounterSchema::new(context.fork());
-        schema.set_count(0);
+    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), Error> {
+        let mut schema = CounterSchema::new(context.service_data());
+        schema.counter.set(0);
         Ok(())
     }
 }
@@ -155,9 +149,9 @@ impl CounterApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn count(snapshot: &dyn Snapshot) -> api::Result<u64> {
+    fn count(snapshot: impl Access) -> api::Result<u64> {
         let schema = CounterSchema::new(snapshot);
-        Ok(schema.count().unwrap_or_default())
+        Ok(schema.counter.get().unwrap_or_default())
     }
 
     fn reset(
@@ -174,11 +168,15 @@ impl CounterApi {
     fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .private_scope()
-            .endpoint("count", |state, _query: ()| Self::count(state.snapshot()))
+            .endpoint("count", |state, _query: ()| {
+                Self::count(state.service_data())
+            })
             .endpoint_mut("reset", Self::reset);
         builder
             .public_scope()
-            .endpoint("count", |state, _query: ()| Self::count(state.snapshot()))
+            .endpoint("count", |state, _query: ()| {
+                Self::count(state.service_data())
+            })
             .endpoint_mut("count", Self::increment);
 
         // Check processing of custom HTTP headers. We test this using simple authorization
@@ -231,11 +229,11 @@ impl CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        CounterApi::wire(builder)
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        CounterApi::wire(builder)
     }
 }

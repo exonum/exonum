@@ -19,7 +19,7 @@ use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::{collections::HashSet, convert::TryInto};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
-use exonum_merkledb::{Database, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB};
+use exonum_merkledb::{access::AccessExt, Database, MapIndex, ObjectHash, TemporaryDB};
 
 const NAME: &str = "name";
 const FAMILY: &str = "index_family";
@@ -76,7 +76,7 @@ fn plain_map_index_insert(b: &mut Bencher<'_>, len: usize) {
         |(db, data)| {
             let fork = db.fork();
             {
-                let mut table = MapIndex::new(NAME, &fork);
+                let mut table = fork.get_map(NAME);
                 for item in data {
                     table.put(&item.0, item.1);
                 }
@@ -93,7 +93,7 @@ fn plain_map_index_with_family_insert(b: &mut Bencher<'_>, len: usize) {
         |(db, data)| {
             let fork = db.fork();
             {
-                let mut table = MapIndex::new_in_family(NAME, FAMILY, &fork);
+                let mut table = fork.get_map((NAME, FAMILY));
                 for item in data {
                     table.put(&item.0, item.1);
                 }
@@ -109,7 +109,7 @@ fn plain_map_index_iter(b: &mut Bencher<'_>, len: usize) {
     let fork = db.fork();
 
     {
-        let mut table = MapIndex::new(NAME, &fork);
+        let mut table = fork.get_map(NAME);
         assert!(table.keys().next().is_none());
         for item in data {
             table.put(&item.0, item.1);
@@ -120,7 +120,7 @@ fn plain_map_index_iter(b: &mut Bencher<'_>, len: usize) {
     b.iter_with_setup(
         || db.snapshot(),
         |snapshot| {
-            let index: MapIndex<_, Hash, Vec<u8>> = MapIndex::new(NAME, &snapshot);
+            let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map(NAME);
             for (key, value) in &index {
                 black_box(key);
                 black_box(value);
@@ -135,7 +135,7 @@ fn plain_map_index_with_family_iter(b: &mut Bencher<'_>, len: usize) {
     let fork = db.fork();
 
     {
-        let mut table = MapIndex::new_in_family(NAME, FAMILY, &fork);
+        let mut table = fork.get_map((NAME, FAMILY));
         assert!(table.keys().next().is_none());
         for item in data {
             table.put(&item.0, item.1);
@@ -146,8 +146,7 @@ fn plain_map_index_with_family_iter(b: &mut Bencher<'_>, len: usize) {
     b.iter_with_setup(
         || db.snapshot(),
         |snapshot| {
-            let index: MapIndex<_, Hash, Vec<u8>> =
-                MapIndex::new_in_family(NAME, FAMILY, &snapshot);
+            let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map((NAME, FAMILY));
             for (key, value) in &index {
                 black_box(key);
                 black_box(value);
@@ -162,7 +161,7 @@ fn plain_map_index_read(b: &mut Bencher<'_>, len: usize) {
     let fork = db.fork();
 
     {
-        let mut table = MapIndex::new(NAME, &fork);
+        let mut table = fork.get_map(NAME);
         assert!(table.keys().next().is_none());
         for item in data.clone() {
             table.put(&item.0, item.1);
@@ -173,7 +172,7 @@ fn plain_map_index_read(b: &mut Bencher<'_>, len: usize) {
     b.iter_with_setup(
         || db.snapshot(),
         |snapshot| {
-            let index: MapIndex<_, Hash, Vec<u8>> = MapIndex::new(NAME, &snapshot);
+            let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map(NAME);
             for item in &data {
                 let value = index.get(&item.0);
                 black_box(value);
@@ -188,7 +187,7 @@ fn plain_map_index_with_family_read(b: &mut Bencher<'_>, len: usize) {
     let fork = db.fork();
 
     {
-        let mut table = MapIndex::new_in_family(NAME, FAMILY, &fork);
+        let mut table = fork.get_map((NAME, FAMILY));
         assert!(table.keys().next().is_none());
         for item in data.clone() {
             table.put(&item.0, item.1);
@@ -199,8 +198,7 @@ fn plain_map_index_with_family_read(b: &mut Bencher<'_>, len: usize) {
     b.iter_with_setup(
         || db.snapshot(),
         |snapshot| {
-            let index: MapIndex<_, Hash, Vec<u8>> =
-                MapIndex::new_in_family(NAME, FAMILY, &snapshot);
+            let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map((NAME, FAMILY));
             for item in &data {
                 let value = index.get(&item.0);
                 black_box(value);
@@ -222,8 +220,8 @@ fn proof_list_append(b: &mut Bencher<'_>, len: usize) {
     let db = TemporaryDB::default();
     b.iter_with_setup(
         || (db.fork(), data.clone()),
-        |(storage, data)| {
-            let mut table = ProofListIndex::new(NAME, &storage);
+        |(fork, data)| {
+            let mut table = fork.get_proof_list(NAME);
             assert!(table.is_empty());
             for item in data {
                 table.push(item);
@@ -245,8 +243,8 @@ fn proof_list_extend(b: &mut Bencher<'_>, len: usize) {
     let db = TemporaryDB::default();
     b.iter_with_setup(
         || (db.fork(), data.clone()),
-        |(storage, data)| {
-            let mut table = ProofListIndex::new(NAME, &storage);
+        |(fork, data)| {
+            let mut table = fork.get_proof_list(NAME);
             assert!(table.is_empty());
             table.extend(data);
         },
@@ -258,8 +256,8 @@ fn proof_map_insert_without_merge(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || (db.fork(), data.clone()),
-        |(storage, data)| {
-            let mut table = ProofMapIndex::new(NAME, &storage);
+        |(fork, data)| {
+            let mut table = fork.get_proof_map(NAME);
             for item in data {
                 table.put(&item.0, item.1);
             }
@@ -274,7 +272,7 @@ fn proof_map_insert_with_merge(b: &mut Bencher<'_>, len: usize) {
         |(db, data)| {
             let fork = db.fork();
             {
-                let mut table = ProofMapIndex::new(NAME, &fork);
+                let mut table = fork.get_proof_map(NAME);
                 for item in data {
                     table.put(&item.0, item.1);
                 }
@@ -287,8 +285,8 @@ fn proof_map_insert_with_merge(b: &mut Bencher<'_>, len: usize) {
 fn proof_list_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_values(len);
     let db = TemporaryDB::default();
-    let storage = db.fork();
-    let mut table = ProofListIndex::new(NAME, &storage);
+    let fork = db.fork();
+    let mut table = fork.get_proof_list(NAME);
 
     for item in &data {
         table.push(item.clone());
@@ -311,8 +309,8 @@ fn proof_list_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
 fn proof_list_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_values(len);
     let db = TemporaryDB::default();
-    let storage = db.fork();
-    let mut table = ProofListIndex::new(NAME, &storage);
+    let fork = db.fork();
+    let mut table = fork.get_proof_list(NAME);
 
     for item in &data {
         table.push(item.clone());
@@ -331,8 +329,8 @@ fn proof_list_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
 fn proof_map_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
-    let storage = db.fork();
-    let mut table = ProofMapIndex::new(NAME, &storage);
+    let fork = db.fork();
+    let mut table = fork.get_proof_map(NAME);
 
     for item in &data {
         table.put(&item.0, item.1.clone());
@@ -354,8 +352,8 @@ fn proof_map_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
 fn proof_map_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
-    let storage = db.fork();
-    let mut table = ProofMapIndex::new(NAME, &storage);
+    let fork = db.fork();
+    let mut table = fork.get_proof_map(NAME);
 
     for item in &data {
         table.put(&item.0, item.1.clone());

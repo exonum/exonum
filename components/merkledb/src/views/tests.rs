@@ -11,20 +11,24 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
 use std::{panic, rc::Rc};
 
 use crate::{
+    access::AccessExt,
     db,
-    views::{is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
-    Database, DbOptions, Entry, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
+    validation::is_valid_index_name,
+    views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
+    Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
 const PREFIXED_IDX: (&str, &[u8]) = ("idx", &[1_u8, 2, 3] as &[u8]);
 
-fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
+fn assert_iter<T: RawAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     let mut iter = view.iter_bytes(&[from]);
     let mut values = Vec::new();
     while let Some((k, v)) = iter.next() {
@@ -34,14 +38,18 @@ fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     assert_eq!(values, assumed);
 }
 
-fn assert_initial_state<T: IndexAccess>(view: &View<T>) {
+fn assert_initial_state<T: RawAccess>(view: &View<T>) {
     assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
     assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
     assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
     assert_eq!(view.get_bytes(&[4]), None);
 }
 
-fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: &T, address: I) {
+fn test_changelog<T, I>(db: &T, address: I)
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
+{
     let mut fork = db.fork();
     {
         let mut view = View::new(&fork, address);
@@ -161,7 +169,7 @@ fn _views_in_same_family<T: Database>(db: &T) {
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
 }
 
-fn _two_mutable_borrows<T, I>(db: &T, address: I)
+fn test_two_mutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -174,7 +182,7 @@ where
     assert_eq!(view2.get_bytes(&[0]), None);
 }
 
-fn _mutable_and_immutable_borrows<T, I>(db: &T, address: I)
+fn test_mutable_and_immutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -182,12 +190,12 @@ where
     let fork = db.fork();
 
     let view1 = View::new(&fork, address);
-    let view2 = View::new(&fork, address);
+    let view2 = View::new(fork.readonly(), address);
     assert_eq!(view1.get_bytes(&[0]), None);
     assert_eq!(view2.get_bytes(&[0]), None);
 }
 
-fn _clear_view<T, I>(db: &T, address: I)
+fn test_clear_view<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -250,7 +258,7 @@ where
     assert_iter(&view, 4, &[(4, 0)]);
 }
 
-fn _fork_iter<T, I>(db: &T, address: I)
+fn test_fork_iter<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -376,22 +384,22 @@ fn test_database_check_incorrect_version() {
 
 #[test]
 fn fork_iter() {
-    _fork_iter(&TemporaryDB::new(), IDX_NAME);
+    test_fork_iter(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn fork_iter_prefixed() {
-    _fork_iter(&TemporaryDB::new(), PREFIXED_IDX);
+    test_fork_iter(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 fn changelog() {
-    _changelog(&TemporaryDB::new(), IDX_NAME);
+    test_changelog(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn changelog_prefixed() {
-    _changelog(&TemporaryDB::new(), PREFIXED_IDX);
+    test_changelog(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
@@ -445,13 +453,11 @@ fn multiple_views() {
 
 #[test]
 fn multiple_indexes() {
-    use crate::{ListIndex, MapIndex};
-
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &fork);
-        let mut map = MapIndex::new_in_family("idx", &3, &fork);
+        let mut list: ListIndex<_, u32> = fork.get_list(IDX_NAME);
+        let mut map = fork.get_map(("idx", &3));
 
         for i in 0..10 {
             list.push(i);
@@ -462,18 +468,15 @@ fn multiple_indexes() {
     }
     db.merge(fork.into_patch()).unwrap();
 
-    {
-        let snapshot = db.snapshot();
-        let list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
-        let map: MapIndex<_, u32, String> = MapIndex::new_in_family("idx", &3, &snapshot);
-
-        assert_eq!(list.len(), 10);
-        assert!(map.values().all(|val| val == "??"));
-    }
+    let snapshot = db.snapshot();
+    let list: ListIndex<_, u32> = snapshot.get_list(IDX_NAME);
+    let map: MapIndex<_, u32, String> = snapshot.get_map(("idx", &3));
+    assert_eq!(list.len(), 10);
+    assert!(map.values().all(|val| val == "??"));
 
     let fork = db.fork();
-    let list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &fork);
-    let mut map = MapIndex::new_in_family("idx", &3, &fork);
+    let list: ListIndex<_, u32> = fork.get_list(IDX_NAME);
+    let mut map = fork.get_map(("idx", &3));
     for item in &list {
         map.put(&item, item.to_string());
     }
@@ -545,14 +548,12 @@ fn rollbacks_for_indexes_in_same_family() {
     use crate::ProofListIndex;
 
     fn indexes(fork: &Fork) -> (ProofListIndex<&Fork, i64>, ProofListIndex<&Fork, i64>) {
-        let list1 = ProofListIndex::new_in_family("foo", &1, fork);
-        let list2 = ProofListIndex::new_in_family("foo", &2, fork);
-
+        let list1 = fork.get_proof_list(("foo", &1));
+        let list2 = fork.get_proof_list(("foo", &2));
         (list1, list2)
     }
 
     let db = TemporaryDB::new();
-
     let mut fork = db.fork();
     {
         let (mut list1, mut list2) = indexes(&fork);
@@ -593,12 +594,12 @@ fn rollbacks_for_indexes_in_same_family() {
 
 #[test]
 fn clear_view() {
-    _clear_view(&TemporaryDB::new(), IDX_NAME);
+    test_clear_view(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn clear_prefixed_view() {
-    _clear_view(&TemporaryDB::new(), PREFIXED_IDX);
+    test_clear_view(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
@@ -606,7 +607,7 @@ fn clear_sibling_views() {
     const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
     const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
 
-    fn assert_view_states<I: IndexAccess + Copy>(db_view: I) {
+    fn assert_view_states<I: RawAccess + Copy>(db_view: I) {
         let view1 = View::new(db_view, IDX_1);
         let view2 = View::new(db_view, IDX_2);
 
@@ -658,25 +659,108 @@ fn clear_sibling_views() {
 #[test]
 #[should_panic]
 fn two_mutable_borrows() {
-    _two_mutable_borrows(&TemporaryDB::new(), IDX_NAME);
+    test_two_mutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn two_mutable_prefixed_borrows() {
-    _two_mutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
+    test_two_mutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_borrows() {
-    _mutable_and_immutable_borrows(&TemporaryDB::new(), IDX_NAME);
+    test_mutable_and_immutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_prefixed_borrows() {
-    _mutable_and_immutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
+    test_mutable_and_immutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
+}
+
+#[test]
+fn multiple_immutable_borrows_from_fork() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let view1 = View::new(fork.readonly(), IDX_NAME);
+    let view2 = View::new(fork.readonly(), IDX_NAME);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+
+    let view1 = View::new(fork.readonly(), PREFIXED_IDX);
+    let view2 = View::new(fork.readonly(), PREFIXED_IDX);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+}
+
+#[test]
+fn immutable_view_from_fork_reflects_changes_in_fork() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut view = View::new(&fork, IDX_NAME);
+        view.put(&vec![1], vec![1, 2, 3, 4]);
+        view.put(&vec![2], vec![5, 6, 7]);
+    }
+    {
+        let view = View::new(fork.readonly(), IDX_NAME);
+        assert_eq!(view.get_bytes(&[1]), Some(vec![1, 2, 3, 4]));
+        let other_view = View::new(fork.readonly(), IDX_NAME);
+        assert_eq!(other_view.get_bytes(&[2]), Some(vec![5, 6, 7]));
+    }
+    View::new(&fork, IDX_NAME).clear();
+    let view = View::new(fork.readonly(), IDX_NAME);
+    assert_eq!(view.get_bytes(&[1]), None);
+}
+
+#[test]
+fn immutable_view_from_fork_reads_from_snapshot() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut view = View::new(&fork, IDX_NAME);
+        view.put(&vec![1], vec![1, 2, 3, 4]);
+        view.put(&vec![2], vec![5, 6, 7]);
+    }
+    db.merge_sync(fork.into_patch()).unwrap();
+
+    let mut fork = db.fork();
+    View::new(&fork, IDX_NAME).put(&vec![1], vec![100]);
+    fork.flush();
+    View::new(&fork, IDX_NAME).put(&vec![3], vec![200]);
+
+    let fork = fork.readonly();
+    // Read from unflushed fork.
+    let view = View::new(fork, IDX_NAME);
+    assert_eq!(view.get_bytes(&[3]), Some(vec![200]));
+    // Read from flushed fork.
+    let view = View::new(fork, IDX_NAME);
+    assert_eq!(view.get_bytes(&[1]), Some(vec![100]));
+    // Read from snapshot.
+    let other_view = View::new(fork, IDX_NAME);
+    assert_eq!(other_view.get_bytes(&[2]), Some(vec![5, 6, 7]));
+}
+
+#[test]
+fn mutable_and_immutable_borrows_for_different_views() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let readonly = fork.readonly();
+
+    let immutable_view1 = View::new(readonly, "first");
+    let immutable_view2 = View::new(readonly, "second");
+    View::new(&fork, "third").put(&vec![1], vec![1, 2, 3]);
+    assert_eq!(immutable_view1.get_bytes(&[1]), None);
+    let immutable_view3 = View::new(readonly, "third");
+    assert_eq!(immutable_view3.get_bytes(&[1]), Some(vec![1, 2, 3]));
+
+    drop(immutable_view1);
+    View::new(&fork, "first").put(&vec![1], vec![4, 5, 6]);
+    let immutable_view1 = View::new(readonly, "first");
+    assert_eq!(immutable_view1.get_bytes(&[1]), Some(vec![4, 5, 6]));
+    assert_eq!(immutable_view2.get_bytes(&[1]), None);
 }
 
 #[test]
@@ -730,38 +814,40 @@ fn views_based_on_rc_fork() {
     assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
 }
 
-#[test]
-fn test_metadata_index_usual_correct() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    IndexBuilder::new(&db.fork())
-        .index_name("simple")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_name("simple")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
-}
-
-#[test]
-fn test_metadata_index_family_correct() {
+fn test_metadata(addr: impl Into<IndexAddress>) {
+    let addr = addr.into();
     let db = TemporaryDB::new();
     // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::new(&fork)
-        .index_name("simple")
-        .family_id("family")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
+    ViewWithMetadata::get_or_create(&fork, &addr, IndexType::ProofMap)
+        .map_err(drop)
+        .unwrap();
+    assert!(
+        ViewWithMetadata::get_or_create(&db.snapshot(), &addr, IndexType::ProofMap)
+            .unwrap()
+            .is_phantom()
+    );
     db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_name("simple")
-        .family_id("family")
-        .index_type(IndexType::ProofMap)
-        .build::<()>();
+
+    let snapshot = db.snapshot();
+    let view = ViewWithMetadata::get_or_create(&snapshot, &addr, IndexType::ProofMap).unwrap();
+    assert_eq!(view.index_type(), IndexType::ProofMap);
+    assert!(!view.is_phantom());
+
+    let fork = db.fork();
+    ViewWithMetadata::get_or_create(&fork, &addr, IndexType::ProofMap)
+        .map_err(drop)
+        .unwrap();
+}
+
+#[test]
+fn test_metadata_simple() {
+    test_metadata("simple");
+}
+
+#[test]
+fn test_metadata_index_family() {
+    test_metadata(("family", "family_id"));
 }
 
 #[test]
@@ -769,189 +855,117 @@ fn test_metadata_index_identifiers() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     // Creates the first index metadata.
-    {
-        let (view, _state) = IndexBuilder::new(&fork)
-            .index_name("simple")
-            .family_id("family")
-            .index_type(IndexType::ProofMap)
-            .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::new()
-                .append_name("simple")
-                .append_bytes(&0_u64)
-        );
-    }
+    let view: View<_> =
+        ViewWithMetadata::get_or_create(&fork, &("simple", "family_id").into(), IndexType::Map)
+            .map_err(drop)
+            .unwrap()
+            .into();
+    assert_eq!(
+        view.address,
+        IndexAddress {
+            name: "simple".to_owned(),
+            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+        }
+    );
+    drop(view); // Prevent "multiple mutable borrows" error later
 
     // Creates the second index metadata.
-    {
-        let (view, _state) = IndexBuilder::new(&fork)
-            .index_name("second")
-            .family_id("family")
-            .index_type(IndexType::ProofMap)
-            .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::new()
-                .append_name("second")
-                .append_bytes(&1_u64)
-        );
-    }
+    let view: View<_> =
+        ViewWithMetadata::get_or_create(&fork, &("second", "family_id").into(), IndexType::Map)
+            .map_err(drop)
+            .unwrap()
+            .into();
+    assert_eq!(
+        view.address,
+        IndexAddress {
+            name: "second".to_owned(),
+            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 1]),
+        }
+    );
 
-    // Tries to create the first index instance.
-    {
-        let (view, _state) = IndexBuilder::new(&fork)
-            .index_name("simple")
-            .family_id("family")
-            .index_type(IndexType::ProofMap)
-            .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::new()
-                .append_name("simple")
-                .append_bytes(&0_u64)
-        );
-    }
+    // Recreates the first index instance.
+    let view: View<_> =
+        ViewWithMetadata::get_or_create(&fork, &("simple", "family_id").into(), IndexType::Map)
+            .map_err(drop)
+            .unwrap()
+            .into();
+    assert_eq!(
+        view.address,
+        IndexAddress {
+            name: "simple".to_owned(),
+            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+        }
+    );
 }
 
 #[test]
-fn test_index_builder_without_type() {
+fn test_metadata_incorrect_index_type() {
     let db = TemporaryDB::new();
-    // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::new(&fork).index_name("simple").build::<()>();
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_name("simple")
-        .index_type(IndexType::Unknown)
-        .build::<()>();
+
+    ViewWithMetadata::get_or_create(&fork, &"simple".into(), IndexType::Map)
+        .map_err(drop)
+        .unwrap();
+    ViewWithMetadata::get_or_create(&fork, &"simple".into(), IndexType::List)
+        .map(drop)
+        .unwrap_err();
 }
 
 #[test]
-#[should_panic(expected = "Index name must not be empty")]
-fn test_index_builder_without_name() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    IndexBuilder::new(&fork).build::<()>();
-}
+fn test_metadata_index_wrong_type() {
+    use crate::{
+        access::{AccessError, AccessErrorKind, FromAccess},
+        ListIndex,
+    };
 
-#[test]
-#[should_panic(expected = "Index type does not match specified one")]
-fn test_metadata_index_usual_incorrect() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    IndexBuilder::new(&fork)
-        .index_type(IndexType::ProofMap)
-        .index_name("simple")
-        .build::<()>();
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_type(IndexType::ProofList)
-        .index_name("simple")
-        .build::<()>();
-}
-
-#[test]
-#[should_panic(expected = "Index type does not match specified one")]
-fn test_metadata_index_family_incorrect() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    IndexBuilder::new(&fork)
-        .index_type(IndexType::ProofMap)
-        .index_name("simple")
-        .family_id("family")
-        .build::<()>();
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    IndexBuilder::new(&db.snapshot())
-        .index_type(IndexType::Map)
-        .index_name("simple")
-        .family_id("family")
-        .build::<()>();
-}
-
-#[test]
-#[should_panic(
-    expected = "Error while reading the index state. Possibly the index type does not match specified one"
-)]
-fn test_metadata_index_wrong_type_map_list() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut map = MapIndex::new("simple", &fork);
+        let mut map = fork.get_map("simple");
         map.put(&1, vec![1, 2, 3]);
     }
 
     db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
+    // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
-    let list: ListIndex<_, Vec<u8>> = ListIndex::new("simple", &snapshot);
-    list.get(1);
+    let err = ListIndex::<_, Vec<u8>>::from_access(&snapshot, "simple".into()).unwrap_err();
+    assert_matches!(
+        err,
+        AccessError { ref addr, kind: AccessErrorKind::WrongIndexType { .. } }
+            if *addr == IndexAddress::from("simple")
+    );
 }
 
 #[test]
-#[should_panic(
-    expected = "Error while reading the index state. Possibly the index type does not match specified one"
-)]
-fn test_metadata_index_wrong_type_entry_list() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    {
-        let mut entry = Entry::new("simple", &fork);
-        entry.set(vec![1, 2, 3]);
-    }
-
-    db.merge(fork.into_patch()).unwrap();
-    // Checks the index metadata.
-    let snapshot = db.snapshot();
-    let list: ListIndex<_, Vec<u8>> = ListIndex::new("simple", &snapshot);
-    list.get(1);
-}
-
-#[test]
-#[ignore]
-//TODO: fix test [ECR-2869]
+#[ignore] // TODO: fix test [ECR-2869]
 fn multiple_patch() {
-    use crate::ListIndex;
-
-    fn list_index<View: IndexAccess>(view: View) -> ListIndex<View, u64> {
-        ListIndex::new("list_index", view)
+    fn list_index(view: &Fork) -> ListIndex<&Fork, u64> {
+        view.get_list("list_index")
     }
 
     let db = TemporaryDB::new();
     // create first patch
-    let patch1 = {
-        let fork = db.fork();
-        {
-            let mut index = list_index(&fork);
-            index.push(1);
-            index.push(3);
-            index.push(4);
-        }
-        fork.into_patch()
-    };
+    let fork = db.fork();
+    {
+        let mut index = list_index(&fork);
+        index.push(1);
+        index.push(3);
+        index.push(4);
+    }
+    let patch1 = fork.into_patch();
     // create second patch
-    let patch2 = {
-        let fork = db.fork();
-        {
-            let mut index = list_index(&fork);
-            index.push(10);
-        }
-        fork.into_patch()
-    };
+    let fork = db.fork();
+    {
+        let mut index = list_index(&fork);
+        index.push(10);
+    }
+    let patch2 = fork.into_patch();
 
     db.merge(patch1).unwrap();
     db.merge(patch2).unwrap();
     let snapshot = db.snapshot();
-    let index = list_index(&snapshot);
-    let iter = index.iter();
-    assert_eq!(index.len() as usize, iter.count());
+    let index: ListIndex<_, u64> = snapshot.get_list("list_index");
+    assert_eq!(index.len() as usize, index.iter().count());
 }
 
 #[test]
@@ -989,8 +1003,8 @@ fn valid_name_for_url() {
 #[should_panic(expected = "Wrong characters using in name")]
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
-    let snapshot = db.snapshot();
-    let _: ListIndex<_, u8> = ListIndex::new("ind\u{435}x-name", &snapshot);
+    let fork = db.fork();
+    let _: ListIndex<_, u8> = fork.get_list("ind\u{435}x-name");
 }
 
 fn assert_valid_name_url(name: &str) {
@@ -998,65 +1012,42 @@ fn assert_valid_name_url(name: &str) {
     assert_eq!(is_valid_index_name(name), name == urlencoded)
 }
 
-fn check_valid_name<S: AsRef<str>>(name: S) -> bool {
-    check_index_name(name).is_ok()
-}
-
-fn check_index_name<S: AsRef<str>>(name: S) -> Result<(), ()> {
+fn check_valid_name(name: &str) -> bool {
     let db = TemporaryDB::new();
-    let snapshot = db.snapshot();
-
     let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        let _: ListIndex<_, u8> = ListIndex::new(name.as_ref(), &snapshot);
+        let fork = db.fork();
+        let _: ListIndex<_, u8> = fork.get_list(name.as_ref());
     }));
-
-    catch_result.map_err(|_| ())
+    catch_result.is_ok()
 }
 
 #[test]
 fn fork_from_patch() {
-    use crate::ListIndex;
-
     let db = TemporaryDB::new();
     let fork = db.fork();
-
     {
-        let mut index = ListIndex::new("index", &fork);
+        let mut index = fork.get_list("index");
         index.push(1);
         index.push(2);
         index.push(3);
-
         let last = index.pop();
         assert_eq!(last, Some(3));
-
         index.set(1, 5);
     }
 
     let patch = fork.into_patch();
     let fork: Fork = patch.into();
     {
-        let index = ListIndex::new("index", &fork);
-
+        let index = fork.get_list("index");
         assert_eq!(index.get(0), Some(1));
         assert_eq!(index.get(1), Some(5));
         assert_eq!(index.get(2), None);
 
         let items: Vec<i32> = index.iter().collect();
-
         assert_eq!(items.len(), 2);
         assert_eq!(items, vec![1, 5]);
     }
 
     db.merge(fork.into_patch())
         .expect("Fork created from patch should be merged successfully");
-}
-
-#[test]
-fn test_index_builder_index_address() {
-    let db = TemporaryDB::new();
-    // Creates the index metadata.
-    let fork = db.fork();
-    let (view, _) = IndexBuilder::new(&fork).index_name("test").build::<()>();
-
-    assert_eq!(view.address.name, "test");
 }

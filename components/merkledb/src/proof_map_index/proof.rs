@@ -190,12 +190,14 @@ impl<K, V> OptionalEntry<K, V> {
 /// to obtain information about the proof.
 ///
 /// ```
-/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, ObjectHash};
+/// # use exonum_merkledb::{
+/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, MapProof, ObjectHash,
+/// # };
 /// # use exonum_crypto::hash;
 /// # use failure::Error;
 /// # fn main() -> Result<(), Error> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut map = ProofMapIndex::new("index", &fork);
+/// let mut map = fork.get_proof_map("index");
 /// let (h1, h2, h3) = (hash(&[1]), hash(&[2]), hash(&[3]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
@@ -228,13 +230,13 @@ impl<K, V> OptionalEntry<K, V> {
 /// ```
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
-/// #    Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, HashTag,
-/// #    proof_map_index::ProofPath
+/// #    access::AccessExt, Database, TemporaryDB, BinaryValue, MapProof, HashTag,
+/// #    proof_map_index::ProofPath,
 /// # };
 /// # use exonum_crypto::hash;
 /// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut map = ProofMapIndex::new("index", &fork);
+/// let mut map = fork.get_proof_map("index");
 /// let (h1, h2) = (HashTag::hash_leaf(&[1]), HashTag::hash_leaf(&[2]));
 /// map.put(&h1, 100_u32);
 /// map.put(&h2, 200_u32);
@@ -518,10 +520,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use exonum_merkledb::{Database, TemporaryDB, ProofMapIndex, ObjectHash};
+    /// # use exonum_merkledb::{access::AccessExt, Database, TemporaryDB, ProofMapIndex, ObjectHash};
     /// # use exonum_crypto::hash;
     /// let fork = { let db = TemporaryDB::new(); db.fork() };
-    /// let mut map = ProofMapIndex::new("index", &fork);
+    /// let mut map = fork.get_proof_map("index");
     /// let (h1, h2) = (hash(&[1]), hash(&[2]));
     /// map.put(&h1, 100u32);
     /// map.put(&h2, 200u32);

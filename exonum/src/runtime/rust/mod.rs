@@ -41,7 +41,7 @@ pub use self::{
 
 pub mod error;
 
-use exonum_merkledb::{is_valid_index_name, Snapshot};
+use exonum_merkledb::{validation::is_valid_index_name, Snapshot};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
@@ -62,8 +62,8 @@ use super::{
     api::ServiceApiBuilder,
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
-    ArtifactId, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Runtime,
-    RuntimeIdentifier, StateHashAggregator,
+    ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
 mod api;
@@ -106,10 +106,8 @@ impl Instance {
     }
 
     fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
-        (
-            self.id,
-            self.service.state_hash(self.descriptor(), snapshot),
-        )
+        let blockchain_data = BlockchainData::new(snapshot, self.descriptor());
+        (self.id, self.service.state_hash(blockchain_data))
     }
 }
 
@@ -421,9 +419,6 @@ impl Runtime for RustRuntime {
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
-        // We avoid a potential deadlock by cloning instances (i.e., copying them out
-        // of the locked memory). Thus, we don't need to hold the lock for the duration
-        // of the cycle below.
         let instance = self
             .started_services
             .get(&instance_id)

@@ -44,11 +44,10 @@ pub mod transactions;
 
 use exonum::{
     crypto::Hash,
-    helpers::validator::validator_id,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, Service},
-        InstanceDescriptor,
+        BlockchainData,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -73,22 +72,26 @@ pub struct TimeService {
 }
 
 impl Service for TimeService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi.wire(builder);
-        api::PrivateApi.wire(builder);
-    }
-
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = TimeSchema::new(descriptor.name, snapshot);
-        schema.state_hash()
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        TimeSchema::new(data.for_executing_service()).state_hash()
     }
 
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         // The transaction must be created by the validator.
-        if validator_id(context.snapshot, context.service_keypair.0).is_some() {
+        if context
+            .data()
+            .for_core()
+            .validator_id(context.service_keypair.0)
+            .is_some()
+        {
             context.broadcast_transaction(TxTime::new(self.time.current_time()));
         }
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi.wire(builder);
+        api::PrivateApi.wire(builder);
     }
 }
 

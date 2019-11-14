@@ -23,10 +23,12 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use super::{
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, ObjectHash,
+    access::{Access, AccessError, FromAccess},
+    views::{
+        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+    },
+    BinaryValue, ObjectHash,
 };
-use crate::views::IndexAddress;
 
 /// A set of value items.
 ///
@@ -35,9 +37,8 @@ use crate::views::IndexAddress;
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ValueSetIndex<T: IndexAccess, V> {
+pub struct ValueSetIndex<T: RawAccess, V> {
     base: View<T>,
-    state: IndexState<T, ()>,
     _v: PhantomData<V>,
 }
 
@@ -67,117 +68,26 @@ pub struct ValueSetIndexHashes<'a> {
     base_iter: ViewIter<'a, Hash, ()>,
 }
 
-impl<T, V> AnyObject<T> for ValueSetIndex<T, V>
+impl<T, V> FromAccess<T> for ValueSetIndex<T::Base, V>
 where
-    T: IndexAccess,
-    V: BinaryKey,
+    T: Access,
+    V: BinaryValue + ObjectHash,
 {
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::ValueSet
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::ValueSet)?;
+        Ok(Self::new(view))
     }
 }
 
 impl<T, V> ValueSetIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ValueSet)
-            .index_name(index_name)
-            .build();
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let base = view.into();
         Self {
             base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index_id = vec![123];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ValueSet)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build::<()>();
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ValueSet)
-            .build_existed::<()>()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ValueSet)
-            .build::<()>();
-
-        Self {
-            base,
-            state,
             _v: PhantomData,
         }
     }
@@ -187,12 +97,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.get_value_set("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -207,13 +116,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.get_value_set("name");
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -221,6 +129,7 @@ where
     ///
     /// index.insert(data);
     /// assert!(index.contains_by_hash(&data_hash));
+    /// ```
     pub fn contains_by_hash(&self, hash: &Hash) -> bool {
         self.base.contains(hash)
     }
@@ -230,12 +139,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.get_value_set("name");
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -253,13 +161,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.get_value_set("name");
     ///
     /// let hash = Hash::default();
     ///
@@ -279,12 +186,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.get_value_set("name");
     ///
     /// for val in index.hashes() {
     ///     println!("{:?}", val);
@@ -302,13 +208,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.get_value_set("name");
     ///
     /// let hash = Hash::default();
     ///
@@ -321,18 +226,23 @@ where
             base_iter: self.base.iter_from(&(), from),
         }
     }
+}
 
+impl<T, V> ValueSetIndex<T, V>
+where
+    T: RawAccessMut,
+    V: BinaryValue + ObjectHash,
+{
     /// Adds a value to the set.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.get_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -346,12 +256,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.get_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -368,13 +277,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.get_value_set("name");
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -383,6 +291,7 @@ where
     ///
     /// index.remove_by_hash(&data_hash);
     /// assert!(!index.contains_by_hash(&data_hash));
+    /// ```
     pub fn remove_by_hash(&mut self, hash: &Hash) {
         self.base.remove(hash)
     }
@@ -397,12 +306,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ValueSetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &fork);
+    /// let mut index = fork.get_value_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -417,7 +325,7 @@ where
 
 impl<'a, T, V> std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
     type Item = (Hash, V);
@@ -449,13 +357,13 @@ impl<'a> Iterator for ValueSetIndexHashes<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Database, ObjectHash, TemporaryDB, ValueSetIndex};
+    use crate::{access::AccessExt, Database, ObjectHash, TemporaryDB};
 
     #[test]
     fn value_set_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut index = ValueSetIndex::new("index", &fork);
+        let mut index = fork.get_value_set("index");
 
         assert!(!index.contains(&1_u8));
         assert!(!index.contains_by_hash(&1_u8.object_hash()));

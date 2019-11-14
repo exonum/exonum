@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, Service},
-        InstanceDescriptor, Runtime,
+        BlockchainData, Runtime,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -58,11 +58,12 @@ impl CommitWatcherService {
 impl CommitWatcherInterface for CommitWatcherService {}
 
 impl Service for CommitWatcherService {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
+
     fn after_commit(&self, _context: AfterCommitContext<'_>) {
         self.0.unbounded_send(()).ok();
-    }
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
     }
 }
 
@@ -76,7 +77,7 @@ struct StartCheckerService;
 impl StartCheckerInterface for StartCheckerService {}
 
 impl Service for StartCheckerService {
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

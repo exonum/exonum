@@ -1,10 +1,11 @@
-use exonum_merkledb::{BinaryValue, Fork};
+use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
+use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
-    dispatcher::{Dispatcher, Error as DispatcherError, Schema},
+    dispatcher::{Dispatcher, Error as DispatcherError},
     error::catch_panic,
-    ArtifactId, CallInfo, Caller, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
-    InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
+    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 
 /// Context for the executed call.
@@ -28,19 +29,19 @@ impl<'a> CallContext<'a> {
         }
     }
 
-    /// Returns a writable snapshot of the current blockchain state.
-    pub fn fork(&self) -> &Fork {
-        self.inner.fork
+    /// Provides access to blockchain data.
+    pub fn data(&self) -> BlockchainData<'a, &Fork> {
+        BlockchainData::new(self.inner.fork, self.instance)
+    }
+
+    /// Provides access to the data of the executing service.
+    pub fn service_data(&self) -> Prefixed<'a, &Fork> {
+        self.data().for_executing_service()
     }
 
     /// Returns the initiator of the actual transaction execution.
     pub fn caller(&self) -> &Caller {
         &self.inner.caller
-    }
-
-    /// Accesses dispatcher information.
-    pub fn dispatcher_info(&self) -> Schema<&Fork> {
-        Schema::new(self.fork())
     }
 
     /// Returns a descriptor of the executing service instance.
@@ -85,26 +86,12 @@ impl<'a> CallContext<'a> {
         let descriptor = self
             .inner
             .dispatcher
-            .get_service(self.fork(), called_id)
+            .get_service(self.inner.fork, called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         Ok(CallContext {
             inner: self.inner.child_context(self.instance.id),
             instance: descriptor,
         })
-    }
-
-    /// Checks the caller of this method with the specified closure.
-    ///
-    /// If the closure returns `Some(value)`, then the method returns `Some((value, fork))` thus you
-    /// get a write access to the blockchain state. Otherwise this method returns
-    /// an occurred error.
-    pub fn verify_caller<F, T>(&self, predicate: F) -> Option<(T, &Fork)>
-    where
-        F: Fn(&Caller) -> Option<T>,
-    {
-        // TODO Think about returning structure with the named fields instead of unnamed tuple
-        // to make code more clear. [ECR-3222]
-        predicate(&self.inner.caller).map(|result| (result, &*self.inner.fork))
     }
 
     /// Isolates execution of the provided closure.
@@ -120,17 +107,7 @@ impl<'a> CallContext<'a> {
     ///   persisted even if the following transaction code executes successfully.
     ///
     /// If there are several `isolate()` calls within the same execution context,
-    /// commitment / rollback rules are applied to changes since the last call. For example:
-    ///
-    /// ```ignore
-    /// SchemaA::new(ctx.fork()).mutate_ok();
-    /// ctx.isolate(|ctx| SchemaB::new(ctx.fork()).mutate_ok())?;
-    /// SchemaC::new(ctx.fork()).mutate_ok();
-    /// ctx.isolate(|ctx| SchemaD::new(ctx.fork()).mutate_panic())?;
-    /// ```
-    ///
-    /// As a result, changes to `SchemaA` and `SchemaB` will be committed, and the changes
-    /// `SchemaC` and `SchemaD` will be rolled back.
+    /// commitment / rollback rules are applied to changes since the last call.
     ///
     /// For these reasons, it is strongly advised to:
     ///
@@ -158,6 +135,17 @@ impl<'a> CallContext<'a> {
         }
     }
 
+    /// Provides writeable access to core schema.
+    ///
+    /// This method can only be called by the supervisor; the call will panic otherwise.
+    #[doc(hidden)]
+    pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`writeable_core_schema` called within a non-supervisor service");
+        }
+        CoreSchema::new(self.inner.fork)
+    }
+
     /// Marks an artifact as *registered*, i.e., one which service instances can be deployed from.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
@@ -171,7 +159,7 @@ impl<'a> CallContext<'a> {
             panic!("`start_artifact_registration` called within a non-supervisor service");
         }
 
-        Dispatcher::commit_artifact(self.fork(), artifact, spec)
+        Dispatcher::commit_artifact(self.inner.fork, artifact, spec)
     }
 
     /// Starts adding a service instance to the blockchain.
@@ -194,7 +182,7 @@ impl<'a> CallContext<'a> {
         let instance_spec = InstanceSpec {
             artifact,
             name: instance_name,
-            id: Dispatcher::assign_instance_id(self.fork()),
+            id: Dispatcher::assign_instance_id(self.inner.fork),
         };
         self.inner
             .child_context(self.instance.id)

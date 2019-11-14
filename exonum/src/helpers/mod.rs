@@ -22,7 +22,6 @@ pub mod multisig;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
-pub mod validator;
 
 use env_logger::Builder;
 use log::SetLoggerError;

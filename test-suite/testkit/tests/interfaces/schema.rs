@@ -14,7 +14,10 @@
 
 use exonum::{
     crypto::PublicKey,
-    merkledb::{IndexAccess, MapIndex},
+    merkledb::{
+        access::{Access, FromAccess},
+        MapIndex,
+    },
 };
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
@@ -29,14 +32,14 @@ pub struct Wallet {
     pub balance: u64,
 }
 
-pub struct WalletSchema<T>(T);
+pub struct WalletSchema<T: Access> {
+    pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+}
 
-impl<T: IndexAccess> WalletSchema<T> {
+impl<T: Access> WalletSchema<T> {
     pub fn new(access: T) -> Self {
-        Self(access)
-    }
-
-    pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
-        MapIndex::new("wallets", self.0.clone())
+        Self {
+            wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
+        }
     }
 }

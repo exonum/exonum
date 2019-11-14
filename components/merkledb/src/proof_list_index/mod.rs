@@ -25,11 +25,13 @@ use self::{
     proof::HashedEntry,
     proof_builder::{BuildProof, MerkleTree},
 };
-use crate::views::IndexAddress;
 use crate::{
+    access::{Access, AccessError, FromAccess},
     hash::HashTag,
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, ObjectHash,
+    views::{
+        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+    },
+    BinaryValue, IndexAddress, ObjectHash,
 };
 
 mod key;
@@ -37,8 +39,6 @@ mod proof;
 mod proof_builder;
 #[cfg(test)]
 mod tests;
-
-// TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
 fn tree_height_by_length(len: u64) -> u8 {
     if len == 0 {
@@ -55,7 +55,7 @@ fn tree_height_by_length(len: u64) -> u8 {
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ProofListIndex<T: IndexAccess, V> {
+pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
@@ -74,27 +74,9 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
-impl<T, V> AnyObject<T> for ProofListIndex<T, V>
-where
-    T: IndexAccess,
-    V: BinaryValue,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::ProofList
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 impl<T, V> MerkleTree<V> for ProofListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     fn len(&self) -> u64 {
@@ -114,111 +96,29 @@ where
     }
 }
 
-impl<T, V> ProofListIndex<T, V>
+impl<T, V> FromAccess<T> for ProofListIndex<T::Base, V>
 where
-    T: IndexAccess,
+    T: Access,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &fork);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::ProofList)
-            .index_name(index_name)
-            .build();
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::ProofList)?;
+        Ok(Self::new(view))
+    }
+}
+
+impl<T, V> ProofListIndex<T, V>
+where
+    T: RawAccess,
+    V: BinaryValue,
+{
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
             _v: PhantomData,
         }
-    }
-
-    /// Creates a new index representation based on the name, common prefix of its keys
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> =
-    ///     ProofListIndex::new_in_family(name, &index_id, &snapshot);
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index : ProofListIndex<_, u8> =
-    ///     ProofListIndex::new_in_family(name, &index_id, &fork);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::ProofList)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofList)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofList)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
     }
 
     fn has_branch(&self, key: ProofListKey) -> bool {
@@ -242,22 +142,17 @@ where
         ProofListKey::new(self.height(), 0)
     }
 
-    fn set_len(&mut self, len: u64) {
-        self.state.set(len)
-    }
-
     /// Returns the element at the indicated position or `None` if the indicated position
     /// is out of bounds.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(10);
@@ -272,12 +167,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// assert_eq!(None, index.last());
     ///
     /// index.push(1);
@@ -295,12 +189,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.push(10);
@@ -315,19 +208,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// assert_eq!(0, index.len());
     ///
     /// index.push(1);
     /// assert_eq!(1, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.state.get()
+        self.state.get().unwrap_or_default()
     }
 
     /// Returns the height of the Merkle tree built based on the list.
@@ -338,12 +230,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// assert_eq!(0, index.height());
     /// index.push(1);
     /// assert_eq!(1, index.height());
@@ -361,12 +252,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     ///
     /// index.push(1);
     /// let proof = index.get_proof(0);
@@ -388,12 +278,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// index.extend(vec![1, 2, 3, 4, 5]);
     ///
     /// let range_proof = index.get_range_proof(1..3);
@@ -414,12 +303,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_list::<_, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -437,12 +325,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_list::<_, u8>("name");
     ///
     /// for val in index.iter_from(1) {
     ///     println!("{}", val);
@@ -452,6 +339,16 @@ where
         ProofListIndexIter {
             base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }
+    }
+}
+
+impl<T, V> ProofListIndex<T, V>
+where
+    T: RawAccessMut,
+    V: BinaryValue,
+{
+    fn set_len(&mut self, len: u64) {
+        self.state.set(len)
     }
 
     /// Updates levels of the tree with heights `2..` after the values in the range
@@ -575,12 +472,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -594,12 +490,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     ///
     /// index.extend([1, 2, 3].iter().cloned());
     /// assert_eq!(3, index.len());
@@ -637,12 +532,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -674,12 +568,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
@@ -713,11 +606,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new("list", &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// assert_eq!(None, index.pop());
     /// index.push(1);
     /// assert_eq!(Some(1), index.pop());
@@ -743,12 +636,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     /// index.push(1);
     /// assert!(!index.is_empty());
     /// index.clear();
@@ -756,13 +648,13 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
+        self.state.unset();
     }
 }
 
 impl<T, V> ObjectHash for ProofListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     /// Returns a list hash of the proof list or a hash value of the empty list.
@@ -782,13 +674,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_list("name");
     ///
     /// let default_hash = index.object_hash();
     /// assert_eq!(HashTag::empty_list_hash(), default_hash);
@@ -803,7 +694,7 @@ where
 
 impl<'a, T, V> std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     type Item = V;

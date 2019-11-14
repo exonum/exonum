@@ -125,17 +125,16 @@ mod tests {
     use std::fmt;
 
     use crate::{
-        proto, BinaryKey, BinaryValue, Database, ListProof, MapProof, ObjectHash, ProofListIndex,
-        ProofMapIndex, TemporaryDB,
+        access::AccessExt, proto, BinaryKey, BinaryValue, Database, ListProof, MapProof,
+        ObjectHash, TemporaryDB,
     };
     use protobuf::RepeatedField;
 
     #[test]
     fn serialize_map_proof() {
         let db = TemporaryDB::default();
-        let storage = db.fork();
-
-        let mut table = ProofMapIndex::new("index", &storage);
+        let fork = db.fork();
+        let mut table = fork.get_proof_map("index");
 
         let proof = table.get_proof(0);
         assert_proof_roundtrip(&proof);
@@ -146,7 +145,6 @@ mod tests {
 
         let proof = table.get_proof(5);
         assert_proof_roundtrip(&proof);
-
         let proof = table.get_multiproof(5..15);
         assert_proof_roundtrip(&proof);
     }
@@ -208,9 +206,8 @@ mod tests {
     #[test]
     fn serialize_list_proof() {
         let db = TemporaryDB::default();
-        let storage = db.fork();
-
-        let mut table = ProofListIndex::new("index", &storage);
+        let fork = db.fork();
+        let mut table = fork.get_proof_list("index");
 
         let proof = table.get_proof(0);
         assert_list_proof_roundtrip(&proof);
@@ -221,7 +218,6 @@ mod tests {
 
         let proof = table.get_proof(5);
         assert_list_proof_roundtrip(&proof);
-
         let proof = table.get_range_proof(250..260);
         assert_list_proof_roundtrip(&proof);
     }
