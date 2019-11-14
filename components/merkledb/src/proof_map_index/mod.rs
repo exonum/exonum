@@ -431,7 +431,7 @@ where
     /// let proof = index.get_proof(Hash::default());
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
-        self.create_proof(KeyMode::transform_key(&key), key)
+        self.create_proof(key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -451,10 +451,6 @@ where
     where
         KI: IntoIterator<Item = K>,
     {
-        let keys = keys
-            .into_iter()
-            .map(|key| (KeyMode::transform_key(&key), key))
-            .collect::<Vec<_>>();
         self.create_multiproof(keys)
     }
 

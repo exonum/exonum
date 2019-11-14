@@ -28,9 +28,13 @@ use exonum_merkledb::{
     BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 
-use crate::common::{compare_collections, FromFork, Key, MergeFork, ACTIONS_MAX_LEN};
+use crate::{
+    common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN},
+    key::Key,
+};
 
 mod common;
+mod key;
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {
@@ -182,7 +186,7 @@ fn compare_map_to_hash_map() {
 }
 
 #[test]
-fn compare_proof_list_to_vec() {
+fn compare_proof_map_to_hash_map() {
     let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_proof_action(), 1..ACTIONS_MAX_LEN))| {
         compare_collections(&db, actions, compare_proof_map)?;

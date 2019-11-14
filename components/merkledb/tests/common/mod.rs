@@ -19,61 +19,18 @@ use proptest::test_runner::TestCaseResult;
 
 use std::rc::Rc;
 
-use exonum_crypto::{hash, Hash, HASH_SIZE};
-use exonum_merkledb::{BinaryKey, Database, Fork, ObjectHash, TemporaryDB};
+use exonum_merkledb::{Database, Fork, TemporaryDB};
 
 // Max size of the generated sequence of actions.
-//
-// Due external tests running mechanism this file is linked
-// separately with other modules in tests directory. This
-// constant is used in all of then except `proof_map_index`, that's
-// why it marked with `dead_code`.
-#[allow(dead_code)]
 pub const ACTIONS_MAX_LEN: usize = 100;
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Key(pub [u8; HASH_SIZE]);
-
-impl ObjectHash for Key {
-    fn object_hash(&self) -> Hash {
-        hash(&self.0)
-    }
-}
-
-impl From<[u8; HASH_SIZE]> for Key {
-    fn from(key: [u8; HASH_SIZE]) -> Self {
-        Self(key)
-    }
-}
-
-impl BinaryKey for Key {
-    fn size(&self) -> usize {
-        HASH_SIZE
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer.copy_from_slice(&self.0);
-        self.0.len()
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        let mut buf = [0; 32];
-        buf.copy_from_slice(&buffer);
-        Self(buf)
-    }
-}
 
 pub trait FromFork {
     fn from_fork(fork: Rc<Fork>) -> Self;
     fn clear(&mut self);
 }
 
-// See `ACTIONS_MAX_LEN` comment above.
-#[allow(dead_code)]
 pub struct MergeFork;
 
-// See `ACTIONS_MAX_LEN` comment above.
-#[allow(dead_code)]
 pub fn compare_collections<A, R, T>(
     db: &TemporaryDB,
     actions: &[A],

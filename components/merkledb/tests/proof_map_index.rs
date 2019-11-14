@@ -23,7 +23,7 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::{ProofMapIndexBase, ToProofPath},
+    proof_map_index::{Hashed, ToProofPath},
     BinaryKey, BinaryValue, Database, IndexAccess, MapProof, ObjectHash, ProofMapIndex,
     TemporaryDB,
 };
@@ -42,9 +42,9 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
-use crate::common::Key;
+use crate::key::Key;
 
-mod common;
+mod key;
 
 const INDEX_NAME: &str = "index";
 
@@ -71,16 +71,15 @@ where
     Ok(())
 }
 
-fn check_map_multiproof<T, K, V, S>(
-    proof: &MapProof<K, V, S>,
+fn check_map_multiproof<T, K, V>(
+    proof: &MapProof<K, V, Hashed>,
     keys: BTreeSet<&K>,
-    table: &ProofMapIndexBase<T, K, V, S>,
+    table: &ProofMapIndex<T, K, V>,
 ) -> TestCaseResult
 where
     T: IndexAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + PartialEq + Debug,
-    S: ToProofPath<K>,
 {
     let mut entries: Vec<(&K, V)> = Vec::new();
     let mut missing_keys: Vec<&K> = Vec::new();
@@ -97,13 +96,13 @@ where
     // Sort entries and missing keys by the order imposed by the `ProofPath`
     // serialization of the keys
     entries.sort_unstable_by(|(x, _), (y, _)| {
-        S::transform_key(*x)
-            .partial_cmp(&S::transform_key(*y))
+        Hashed::transform_key(*x)
+            .partial_cmp(&Hashed::transform_key(*y))
             .unwrap()
     });
     missing_keys.sort_unstable_by(|&x, &y| {
-        S::transform_key(x)
-            .partial_cmp(&S::transform_key(y))
+        Hashed::transform_key(x)
+            .partial_cmp(&Hashed::transform_key(y))
             .unwrap()
     });
 
@@ -118,16 +117,16 @@ where
 
     let mut actual_keys: Vec<&K> = proof.missing_keys().collect();
     actual_keys.sort_unstable_by(|&x, &y| {
-        S::transform_key(x)
-            .partial_cmp(&S::transform_key(y))
+        Hashed::transform_key(x)
+            .partial_cmp(&Hashed::transform_key(y))
             .unwrap()
     });
     prop_assert_eq!(missing_keys, actual_keys);
 
     let mut actual_entries: Vec<(&K, &V)> = proof.entries().collect();
     actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
-        S::transform_key(x)
-            .partial_cmp(&S::transform_key(y))
+        Hashed::transform_key(x)
+            .partial_cmp(&Hashed::transform_key(y))
             .unwrap()
     });
     prop_assert!(entries.iter().map(|(k, v)| (*k, v)).eq(actual_entries));
@@ -156,7 +155,8 @@ fn index_data(
 }
 
 fn data_for_absent(key_bytes: RangeInclusive<u8>) -> impl Strategy<Value = Vec<Key>> {
-    vec(array::uniform32(key_bytes), 20).prop_map(|key| vec![Key(*key.get(0).unwrap())])
+    vec(array::uniform32(key_bytes), 20)
+        .prop_map(|keys| keys.into_iter().map(|key| Key(key)).collect())
 }
 
 /// Generates data to test a proof of presence.

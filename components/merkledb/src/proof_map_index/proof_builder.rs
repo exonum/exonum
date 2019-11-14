@@ -6,7 +6,7 @@ use exonum_crypto::Hash;
 use super::{
     key::{BitsRange, ChildKind, ProofPath},
     node::{BranchNode, Node},
-    MapProof,
+    MapProof, ToProofPath,
 };
 use crate::ObjectHash;
 
@@ -163,21 +163,20 @@ impl ContourNode {
 /// [`MerklePatriciaTree`]: trait.MerklePatriciaTree.html
 pub trait BuildProof<K, V, KeyMode> {
     /// Creates a proof of existence / absence for a single key.
-    fn create_proof(&self, searched_path: ProofPath, key: K) -> MapProof<K, V, KeyMode>;
+    fn create_proof(&self, key: K) -> MapProof<K, V, KeyMode>;
 
     /// Creates a proof of existence / absence for multiple keys.
-    fn create_multiproof(
-        &self,
-        keys: impl IntoIterator<Item = (ProofPath, K)>,
-    ) -> MapProof<K, V, KeyMode>;
+    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V, KeyMode>;
 }
 
 impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
     K: ObjectHash,
     T: MerklePatriciaTree<K, V>,
+    KeyMode: ToProofPath<K>,
 {
-    fn create_proof(&self, searched_path: ProofPath, key: K) -> MapProof<K, V, KeyMode> {
+    fn create_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
+        let searched_path = KeyMode::transform_key(&key);
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut left_hashes = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
@@ -246,16 +245,16 @@ where
         }
     }
 
-    fn create_multiproof(
-        &self,
-        keys: impl IntoIterator<Item = (ProofPath, K)>,
-    ) -> MapProof<K, V, KeyMode> {
+    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V, KeyMode> {
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut proof = MapProof::new();
 
                 let searched_paths = {
-                    let mut keys: Vec<_> = keys.into_iter().collect();
+                    let mut keys: Vec<_> = keys
+                        .into_iter()
+                        .map(|k| (KeyMode::transform_key(&k), k))
+                        .collect();
 
                     keys.sort_unstable_by(|x, y| {
                         // `unwrap` is safe here because all keys start from the same position `0`
@@ -289,7 +288,8 @@ where
                 // (One of) keys corresponding to the existing table entry.
                 let mut found_key: Option<K> = None;
 
-                for (searched_path, key) in keys {
+                for key in keys {
+                    let searched_path = KeyMode::transform_key(&key);
                     if root_path == searched_path {
                         found_key = Some(key);
                     } else {
@@ -307,7 +307,6 @@ where
 
             None => keys
                 .into_iter()
-                .map(|(_, key)| key)
                 .fold(MapProof::new(), MapProof::add_missing),
         }
     }
