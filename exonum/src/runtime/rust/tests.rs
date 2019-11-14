@@ -25,7 +25,10 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Blockchain, BlockchainMut, InstanceConfig, Schema as CoreSchema},
+    blockchain::{
+        config::{GenesisConfigBuilder, InstanceConfig},
+        Blockchain, BlockchainMut, Schema as CoreSchema,
+    },
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
@@ -301,8 +304,9 @@ fn basic_rust_runtime() {
     let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
     // Create dummy dispatcher.
     let config = generate_testnet_config(1, 0)[0].clone();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
     let mut blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus)
+        .into_mut(genesis_config)
         .with_additional_runtime(runtime)
         .build()
         .unwrap();
@@ -443,15 +447,16 @@ fn rust_runtime_with_builtin_services() {
     let constructor = Init {
         msg: "constructor_message".to_owned(),
     };
+    let instance_cfg = InstanceConfig::new(artifact.clone(), vec![])
+        .with_instance(spec.clone(), constructor.clone().into_bytes());
+
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
+        .with_builtin_instance(instance_cfg)
+        .build();
 
     let mut blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus.clone())
+        .into_mut(genesis_config.clone())
         .with_additional_runtime(runtime)
-        .with_builtin_instances(vec![InstanceConfig::new(
-            spec.clone(),
-            Some(vec![]),
-            constructor.clone().into_bytes(),
-        )])
         .build()
         .unwrap();
 
@@ -482,7 +487,7 @@ fn rust_runtime_with_builtin_services() {
     let blockchain = blockchain.inner().to_owned();
     let (runtime, event_handle) = create_runtime();
     let mut blockchain = blockchain
-        .into_mut(config.consensus)
+        .into_mut(genesis_config)
         .with_additional_runtime(runtime)
         .build()
         .unwrap();
@@ -517,8 +522,9 @@ fn conflicting_service_instances() {
     let (runtime, event_handle) = create_runtime();
     let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
     let config = generate_testnet_config(1, 0)[0].clone();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
     let mut blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus.clone())
+        .into_mut(genesis_config)
         .with_additional_runtime(runtime)
         .build()
         .unwrap();
@@ -648,24 +654,27 @@ fn instance_configs() -> (InstanceConfig, InstanceConfig) {
     };
 
     (
-        InstanceConfig::new(main_spec, None, vec![]),
-        InstanceConfig::new(dependent_spec, None, dependent_constructor.into_bytes()),
+        InstanceConfig::from_spec(main_spec, vec![]),
+        InstanceConfig::from_spec(dependent_spec, dependent_constructor),
     )
 }
 
 #[test]
 fn dependent_builtin_service() {
-    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
-    runtime.add_service_factory(Box::new(TestServiceImpl));
-    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_available_service(TestServiceImpl)
+        .with_available_service(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     // Create a blockchain with both main and dependent services initialized in the genesis block.
     let config = generate_testnet_config(1, 0)[0].clone();
-    let blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus)
-        .with_additional_runtime(runtime)
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_builtin_instances(vec![main_service, dep_service])
+        .build();
+
+    let blockchain = Blockchain::build_for_tests()
+        .into_mut(genesis_config)
+        .with_additional_runtime(runtime)
         .build()
         .unwrap();
 
@@ -683,18 +692,22 @@ fn dependent_builtin_service() {
 
 #[test]
 fn dependent_builtin_service_with_incorrect_order() {
-    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
-    runtime.add_service_factory(Box::new(TestServiceImpl));
-    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_available_service(TestServiceImpl)
+        .with_available_service(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();
+
     // Error in the service instantiation in the genesis block bubbles up.
-    let err = Blockchain::build_for_tests()
-        .into_mut(config.consensus)
-        .with_additional_runtime(runtime)
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_builtin_instances(vec![dep_service, main_service])
         // ^-- Incorrect service ordering
+        .build();
+
+    let err = Blockchain::build_for_tests()
+        .into_mut(genesis_config)
+        .with_additional_runtime(runtime)
         .build()
         .unwrap_err();
     assert!(err.to_string().contains("no dependency"));
@@ -702,26 +715,29 @@ fn dependent_builtin_service_with_incorrect_order() {
 
 #[test]
 fn dependent_service_with_no_dependency() {
-    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
-    runtime.add_service_factory(Box::new(TestServiceImpl));
-    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_available_service(TestServiceImpl)
+        .with_available_service(DependentServiceImpl);
     let (_, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
+
     let mut blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus)
+        .into_mut(genesis_config)
         .with_additional_runtime(runtime)
         .build()
         .unwrap();
 
     let fork = create_block(&blockchain);
-    Dispatcher::commit_artifact(&fork, dep_service.instance_spec.artifact.clone(), vec![]).unwrap();
+    let spec = dep_service.instances[0].clone();
+    Dispatcher::commit_artifact(&fork, spec.instance_spec.artifact.clone(), vec![]).unwrap();
     commit_block(&mut blockchain, fork);
 
     let mut fork = create_block(&blockchain);
     let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain);
     let err = ctx
-        .start_adding_service(dep_service.instance_spec, dep_service.constructor)
+        .start_adding_service(spec.instance_spec, spec.constructor)
         .unwrap_err();
     assert!(err.to_string().contains("no dependency"));
 
@@ -735,31 +751,34 @@ fn dependent_service_with_no_dependency() {
 
 #[test]
 fn dependent_service_in_same_block() {
-    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
-    runtime.add_service_factory(Box::new(TestServiceImpl));
-    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_available_service(TestServiceImpl)
+        .with_available_service(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
+
     let mut blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus)
+        .into_mut(genesis_config)
         .with_additional_runtime(runtime)
         .build()
         .unwrap();
 
     // Artifacts need to be deployed in a separate block due to checks in `RustRuntime`.
     let fork = create_block(&blockchain);
-    Dispatcher::commit_artifact(&fork, main_service.instance_spec.artifact.clone(), vec![])
-        .unwrap();
-    Dispatcher::commit_artifact(&fork, dep_service.instance_spec.artifact.clone(), vec![]).unwrap();
+    let main_spec = main_service.instances[0].clone();
+    let dep_spec = dep_service.instances[0].clone();
+    Dispatcher::commit_artifact(&fork, main_spec.instance_spec.artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, dep_spec.instance_spec.artifact.clone(), vec![]).unwrap();
     commit_block(&mut blockchain, fork);
 
     // Deploy both services in the same block after genesis.
     let mut fork = create_block(&blockchain);
     let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain);
-    ctx.start_adding_service(main_service.instance_spec, main_service.constructor)
+    ctx.start_adding_service(main_spec.instance_spec, main_spec.constructor)
         .unwrap();
-    ctx.start_adding_service(dep_service.instance_spec, dep_service.constructor)
+    ctx.start_adding_service(dep_spec.instance_spec, dep_spec.constructor)
         .unwrap();
     commit_block(&mut blockchain, fork);
 
@@ -773,26 +792,30 @@ fn dependent_service_in_same_block() {
 
 #[test]
 fn dependent_service_in_successive_block() {
-    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
-    runtime.add_service_factory(Box::new(TestServiceImpl));
-    runtime.add_service_factory(Box::new(DependentServiceImpl));
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_available_service(TestServiceImpl)
+        .with_available_service(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
+        .with_builtin_instance(main_service)
+        .build();
+
     let mut blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus)
+        .into_mut(genesis_config)
         .with_additional_runtime(runtime)
-        .with_builtin_instances(vec![main_service])
         .build()
         .unwrap();
 
     let fork = create_block(&blockchain);
-    Dispatcher::commit_artifact(&fork, dep_service.instance_spec.artifact.clone(), vec![]).unwrap();
+    let dep_spec = dep_service.instances[0].clone();
+    Dispatcher::commit_artifact(&fork, dep_spec.instance_spec.artifact.clone(), vec![]).unwrap();
     commit_block(&mut blockchain, fork);
 
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .start_adding_service(dep_service.instance_spec, dep_service.constructor)
+        .start_adding_service(dep_spec.instance_spec, dep_spec.constructor)
         .unwrap();
     commit_block(&mut blockchain, fork);
 
