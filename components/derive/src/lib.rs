@@ -189,26 +189,10 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_interface::impl_exonum_interface(attr, item)
 }
 
-/// Derive `Into<ExecutionError>` conversion for the specified enumeration.
+/// Derives `From<MyError>` conversion to the `ExecutionError` for the given enum.
 ///
 /// Enumeration should have an explicit discriminant for each variant.
 /// Also this macro derives `Display` trait using documentation comments of each variant.
-///
-/// # Examples
-///
-/// ```ignore
-/// /// Error codes emitted by wallet transactions during execution.
-/// #[derive(Debug, IntoExecutionError)]
-/// pub enum Error {
-///     /// Content hash already exists.
-///     HashAlreadyExists = 0,
-///     /// Unable to parse service configuration.
-///     ConfigParseError = 1,
-///     /// Time service with the specified name doesn't exist.
-///     TimeServiceNotFound = 2,
-/// }
-/// ```
-///
 #[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
 pub fn into_execution_error(input: TokenStream) -> TokenStream {
     execution_error::impl_execution_error(input)
