@@ -153,7 +153,10 @@ use exonum::{
         manager::UpdateEndpoints,
         ApiAccess,
     },
-    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceConfig},
+    blockchain::{
+        config::{GenesisConfig, GenesisConfigBuilder},
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig
+    },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
@@ -237,9 +240,8 @@ impl TestKit {
     fn assemble(
         database: impl Into<CheckpointDb<TemporaryDB>>,
         network: TestNetwork,
-        genesis: ConsensusConfig,
+        genesis_config: GenesisConfig,
         runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
-        instances: impl IntoIterator<Item = InstanceConfig>,
         api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
@@ -253,13 +255,12 @@ impl TestKit {
             api_sender.clone(),
         );
 
-        let mut builder = BlockchainBuilder::new(blockchain, genesis);
-        for runtime in runtimes {
-            builder = builder.with_additional_runtime(runtime);
-        }
-
-        let blockchain = builder
-            .with_builtin_instances(instances)
+        let blockchain = runtimes
+            .into_iter()
+            .fold(
+                BlockchainBuilder::new(blockchain, genesis_config),
+                |builder, runtime| builder.with_additional_runtime(runtime),
+            )
             .build()
             .expect("Unable to create blockchain instance");
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
@@ -858,10 +859,9 @@ impl StoppedTestKit {
             self.db,
             self.network,
             // TODO make consensus config optional [ECR-3222]
-            ConsensusConfig::default(),
+            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
             runtimes.into_iter().map(|x| x.into()),
             // In this context, it is not possible to add new service instances.
-            vec![],
             self.api_notifier_channel,
         )
     }

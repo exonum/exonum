@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::InstanceConfig,
+    blockchain::config::InstanceConfig,
     runtime::{
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
         Runtime, StateHashAggregator,
@@ -175,20 +175,16 @@ fn test_runtime_factory() {
         &format!("{}:{}", TestRuntime::ID, "artifact_name"),
     )
     .unwrap();
-    let artifact_id = instance_spec.artifact.clone();
 
-    let instances = vec![InstanceConfig::new(
-        instance_spec.clone(),
-        Some(artifact_spec.clone()),
-        constructor.clone(),
-    )];
+    let inst_cfg = InstanceConfig::new(instance_spec.artifact.clone(), artifact_spec.clone())
+        .with_instance(instance_spec.clone(), constructor.clone());
 
     // This causes artifact deploying and service instantiation.
     TestKitBuilder::validator()
         .with_additional_runtime(TestRuntime::with_runtime_tester(tester.clone()))
-        .with_instances(instances)
+        .with_instances(vec![inst_cfg])
         .create();
 
-    tester.assert_artifact_deployed(artifact_id, artifact_spec);
+    tester.assert_artifact_deployed(instance_spec.artifact, artifact_spec);
     tester.assert_config_params_passed(constructor);
 }

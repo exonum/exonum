@@ -14,9 +14,10 @@
 
 //! Testkit builder.
 
-pub use exonum::blockchain::{InstanceCollection, InstanceConfig};
+pub use exonum::blockchain::InstanceCollection;
 
 use exonum::{
+    blockchain::config::{GenesisConfigBuilder, InstanceConfig},
     crypto,
     helpers::ValidatorId,
     keys::Keys,
@@ -173,9 +174,9 @@ impl TestKitBuilder {
 
     /// Adds a Rust service to the testkit.
     pub fn with_rust_service(mut self, service: impl Into<InstanceCollection>) -> Self {
-        let InstanceCollection { factory, instances } = service.into();
+        let (factory, instances) = service.into().into();
         self.rust_runtime = self.rust_runtime.with_available_service(factory);
-        self.instances.extend(instances);
+        self.instances.push(instances);
         self
     }
 
@@ -222,12 +223,16 @@ impl TestKitBuilder {
 
         let (id, runtime) = self.rust_runtime.into();
         self.additional_runtimes.insert(id, runtime);
+
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(genesis)
+            .with_builtin_instances(self.instances)
+            .build();
+
         TestKit::assemble(
             TemporaryDB::new(),
             network,
-            genesis,
+            genesis_config,
             self.additional_runtimes.into_iter(),
-            self.instances,
             self.api_notifier_channel,
         )
     }
