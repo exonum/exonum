@@ -23,7 +23,7 @@ pub use crate::runtime::{
 
 pub use self::{
     block::{Block, BlockProof},
-    builder::{BlockchainBuilder, InstanceCollection, InstanceConfig},
+    builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{IndexCoordinates, Schema, SchemaOrigin, TxLocation},
 };
@@ -44,12 +44,16 @@ use std::{
 };
 
 use crate::{
+    blockchain::config::{ConfiguredInstanceSpec, GenesisConfig},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, Dispatcher},
+    runtime::{error::catch_panic, ArtifactSpec, Dispatcher},
 };
+
+#[cfg(test)]
+use crate::blockchain::config::GenesisConfigBuilder;
 
 mod block;
 mod builder;
@@ -140,7 +144,7 @@ impl Blockchain {
     /// Starts promotion into a mutable blockchain instance that can be used to process
     /// transactions and create blocks.
     #[cfg(test)]
-    pub fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
+    pub fn into_mut(self, genesis_config: GenesisConfig) -> BlockchainBuilder {
         BlockchainBuilder::new(self, genesis_config)
     }
 
@@ -153,7 +157,8 @@ impl Blockchain {
 
         let mut config = generate_testnet_config(1, 0).pop().unwrap();
         config.keys.service = KeyPair::from(self.service_keypair.clone());
-        self.into_mut(config.consensus)
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
+        self.into_mut(genesis_config)
     }
 
     /// Returns reference to the transactions sender.
@@ -220,24 +225,26 @@ impl BlockchainMut {
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
-    // TODO: extract genesis block into separate struct [ECR-3750]
-    fn create_genesis_block(
-        &mut self,
-        config: ConsensusConfig,
-        initial_services: Vec<InstanceConfig>,
-    ) -> Result<(), Error> {
-        config.validate()?;
+    fn create_genesis_block(&mut self, genesis_config: GenesisConfig) -> Result<(), Error> {
+        let GenesisConfig {
+            consensus_config,
+            artifacts,
+            builtin_instances,
+        } = genesis_config;
+        consensus_config.validate()?;
         let mut fork = self.fork();
-        Schema::new(&fork).consensus_config_entry().set(config);
+        Schema::new(&fork)
+            .consensus_config_entry()
+            .set(consensus_config);
 
         // Add service instances.
-        for instance_config in initial_services {
-            self.dispatcher.add_builtin_service(
-                &mut fork,
-                instance_config.instance_spec,
-                instance_config.artifact_spec.unwrap_or_default(),
-                instance_config.constructor,
-            )?;
+        for ConfiguredInstanceSpec {
+            instance_spec,
+            constructor,
+        } in builtin_instances
+        {
+            self.dispatcher
+                .add_builtin_service(&mut fork, instance_spec, constructor)?;
         }
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,

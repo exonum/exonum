@@ -26,8 +26,9 @@ use std::collections::HashSet;
 use crate::{
     crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
-    messages::SIGNED_MESSAGE_MIN_SIZE,
-    proto::schema::blockchain,
+    messages::{BinaryValue, SIGNED_MESSAGE_MIN_SIZE},
+    proto::schema::{blockchain, runtime},
+    runtime::{ArtifactId, ArtifactSpec, InstanceSpec},
 };
 
 use exonum_proto::ProtobufConvert;
@@ -292,6 +293,135 @@ impl ValidateInput for ConsensusConfig {
         self.warn_if_nonoptimal();
 
         Ok(())
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "runtime::GenesisConfig")]
+pub struct GenesisConfig {
+    /// Blockchain configuration used to create the genesis block.
+    pub consensus_config: ConsensusConfig,
+
+    /// Artifacts specification of builtin services.
+    pub artifacts: Vec<ArtifactSpec>, // TODO: HashSet? Duplications? Perhaps check in builder?
+
+    /// List of the privileged services with the configuration parameters that are created directly
+    /// in the genesis block.
+    pub builtin_instances: Vec<ConfiguredInstanceSpec>,
+}
+
+/// A wrapper for `InstanceSpec` that also stores a constructor argument for the service instance.
+/// Used in `GenesisConfig`.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "runtime::ConfiguredInstanceSpec")]
+// TODO: Think about better name and/or substitution the `InstanceSpec`
+pub struct ConfiguredInstanceSpec {
+    /// Wrapped `InstanceSpec`.
+    pub instance_spec: InstanceSpec,
+    /// Constructor argument for specific `InstanceSpec`.
+    pub constructor: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct GenesisConfigBuilder {
+    /// Consensus config.
+    consensus_config: ConsensusConfig,
+    /// Artifacts specifications for builtin services.
+    artifacts: Vec<ArtifactSpec>,
+    /// Instances of builtin services.
+    builtin_instances: Vec<ConfiguredInstanceSpec>,
+}
+
+#[derive(Debug)]
+pub struct InstanceConfig {
+    pub artifact_spec: ArtifactSpec,
+    pub instances: Vec<ConfiguredInstanceSpec>,
+}
+
+impl InstanceConfig {
+    pub fn new(artifact_id: ArtifactId, deploy_args: Vec<u8>) -> Self {
+        let artifact_spec = ArtifactSpec {
+            artifact: artifact_id,
+            payload: deploy_args,
+        };
+        Self {
+            artifact_spec,
+            instances: vec![],
+        }
+    }
+
+    pub fn with_instance(
+        mut self,
+        instance_spec: InstanceSpec,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        assert_eq!(self.artifact_spec.artifact, instance_spec.artifact);
+        self.instances.push(ConfiguredInstanceSpec {
+            instance_spec,
+            constructor: constructor.into_bytes(),
+        });
+        self
+    }
+
+    pub fn from_spec(instance_spec: InstanceSpec, constructor: impl BinaryValue) -> Self {
+        Self::new(instance_spec.artifact.clone(), vec![]).with_instance(instance_spec, constructor)
+    }
+}
+
+impl GenesisConfigBuilder {
+    pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
+        Self {
+            consensus_config,
+            artifacts: vec![],
+            builtin_instances: vec![],
+        }
+    }
+
+    pub fn with_builtin_instance(mut self, instance_config: InstanceConfig) -> Self {
+        if !instance_config.instances.is_empty() {
+            self.artifacts.push(instance_config.artifact_spec);
+        }
+        self.builtin_instances.extend(instance_config.instances);
+        self
+    }
+
+    pub fn with_builtin_instances(
+        self,
+        instance_configs: impl IntoIterator<Item = InstanceConfig>,
+    ) -> Self {
+        instance_configs
+            .into_iter()
+            .fold(self, |s, instance| s.with_builtin_instance(instance))
+    }
+
+    pub fn build(self) -> GenesisConfig {
+        GenesisConfig {
+            consensus_config: self.consensus_config,
+            artifacts: self.artifacts,
+            builtin_instances: self.builtin_instances,
+        }
     }
 }
 

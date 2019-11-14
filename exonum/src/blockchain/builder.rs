@@ -14,16 +14,13 @@
 
 //! The module responsible for the correct Exonum blockchain creation.
 
-use futures::sync::mpsc;
-
 use crate::{
-    api::manager::UpdateEndpoints,
-    blockchain::{Blockchain, BlockchainMut, ConsensusConfig, Schema},
-    merkledb::BinaryValue,
-    runtime::{
-        rust::{RustRuntime, ServiceFactory},
-        Dispatcher, InstanceId, InstanceSpec, Runtime,
+    blockchain::{
+        config::{ConfiguredInstanceSpec, GenesisConfig, InstanceConfig},
+        Blockchain, BlockchainMut, Schema,
     },
+    merkledb::BinaryValue,
+    runtime::{rust::ServiceFactory, Dispatcher, InstanceId, InstanceSpec, Runtime},
 };
 
 /// The object responsible for the correct Exonum blockchain creation from the components.
@@ -38,35 +35,17 @@ pub struct BlockchainBuilder {
     /// List of the supported runtimes.
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
     /// Blockchain configuration used to create the genesis block.
-    pub genesis_config: ConsensusConfig,
-    /// List of the privileged services with the configuration parameters that are created directly
-    /// in the genesis block.
-    pub builtin_instances: Vec<InstanceConfig>,
+    pub genesis_config: GenesisConfig,
 }
 
 impl BlockchainBuilder {
     /// Creates a new builder instance based on the `Blockchain`.
-    pub fn new(blockchain: Blockchain, genesis_config: ConsensusConfig) -> Self {
+    pub fn new(blockchain: Blockchain, genesis_config: GenesisConfig) -> Self {
         Self {
             blockchain,
-            genesis_config,
             runtimes: vec![],
-            builtin_instances: vec![],
+            genesis_config,
         }
-    }
-
-    /// Adds the built-in Rust runtime with the specified built-in services.
-    pub fn with_rust_runtime(
-        mut self,
-        api_notifier: mpsc::Sender<UpdateEndpoints>,
-        services: impl IntoIterator<Item = InstanceCollection>,
-    ) -> Self {
-        let mut runtime = RustRuntime::new(api_notifier);
-        for service in services {
-            runtime.add_service_factory(service.factory);
-            self.builtin_instances.extend(service.instances);
-        }
-        self.with_additional_runtime(runtime)
     }
 
     /// Adds multiple runtimes with the specified identifiers and returns
@@ -85,15 +64,6 @@ impl BlockchainBuilder {
     /// a modified `Self` object for further chaining.
     pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
-        self
-    }
-
-    /// Adds instance specifications of the built-in services.
-    pub fn with_builtin_instances(
-        mut self,
-        instances: impl IntoIterator<Item = InstanceConfig>,
-    ) -> Self {
-        self.builtin_instances.extend(instances);
         self
     }
 
@@ -119,36 +89,9 @@ impl BlockchainBuilder {
         if has_genesis_block {
             blockchain.dispatcher.restore_state(&snapshot)?;
         } else {
-            // Adds builtin services.
-            blockchain.create_genesis_block(self.genesis_config, self.builtin_instances)?;
+            blockchain.create_genesis_block(self.genesis_config)?;
         };
         Ok(blockchain)
-    }
-}
-
-/// Instantiation parameters of service instance.
-#[derive(Debug)]
-pub struct InstanceConfig {
-    /// Service instance specification.
-    pub instance_spec: InstanceSpec,
-    /// Artifact deploy specification.
-    pub artifact_spec: Option<Vec<u8>>,
-    /// Service configuration parameters.
-    pub constructor: Vec<u8>,
-}
-
-impl InstanceConfig {
-    /// Creates new instantiation parameters of the service instance.
-    pub fn new(
-        instance_spec: InstanceSpec,
-        artifact_spec: Option<Vec<u8>>,
-        constructor: Vec<u8>,
-    ) -> Self {
-        Self {
-            instance_spec,
-            artifact_spec,
-            constructor,
-        }
     }
 }
 
@@ -158,7 +101,7 @@ pub struct InstanceCollection {
     /// Rust services factory as a special case of an artifact.
     pub factory: Box<dyn ServiceFactory>,
     /// List of service instances with the initial configuration parameters.
-    pub instances: Vec<InstanceConfig>,
+    pub instances: Vec<ConfiguredInstanceSpec>,
 }
 
 impl InstanceCollection {
@@ -182,9 +125,26 @@ impl InstanceCollection {
             id,
             name: name.into(),
         };
-        let instance_config = InstanceConfig::new(spec, None, params.into_bytes());
+        let instance_config = ConfiguredInstanceSpec {
+            instance_spec: spec,
+            constructor: params.into_bytes(),
+        };
         self.instances.push(instance_config);
         self
+    }
+}
+
+impl From<InstanceCollection> for (Box<dyn ServiceFactory>, InstanceConfig) {
+    fn from(other: InstanceCollection) -> Self {
+        let InstanceCollection { factory, instances } = other;
+        let artifact_id = factory.artifact_id().into();
+        let resulting_config = instances
+            .into_iter()
+            .fold(InstanceConfig::new(artifact_id, vec![]), |cfg, spec| {
+                cfg.with_instance(spec.instance_spec, spec.constructor)
+            });
+
+        (factory, resulting_config)
     }
 }
 
@@ -195,16 +155,18 @@ mod tests {
     use super::*;
     use crate::{
         // Import service from tests, so we won't have implement other one.
-        blockchain::tests::ServiceGoodImpl as SampleService,
-        helpers::{generate_testnet_config, Height},
+        blockchain::{tests::ServiceGoodImpl as SampleService, ConsensusConfig},
+        helpers::{create_rust_runtime_and_genesis_config, generate_testnet_config, Height},
     };
 
     #[test]
     fn finalize_without_genesis_block() {
         let config = generate_testnet_config(1, 0)[0].clone();
+        let (rust_runtime, genesis_config) =
+            create_rust_runtime_and_genesis_config(mpsc::channel(0).0, config.consensus, vec![]);
         let blockchain = Blockchain::build_for_tests()
-            .into_mut(config.consensus)
-            .with_rust_runtime(mpsc::channel(0).0, vec![])
+            .into_mut(genesis_config)
+            .with_additional_runtime(rust_runtime)
             .build()
             .unwrap();
 
@@ -215,9 +177,11 @@ mod tests {
 
     fn test_finalizing_services(services: Vec<InstanceCollection>) {
         let config = generate_testnet_config(1, 0)[0].clone();
+        let (rust_runtime, genesis_config) =
+            create_rust_runtime_and_genesis_config(mpsc::channel(0).0, config.consensus, services);
         Blockchain::build_for_tests()
-            .into_mut(config.consensus)
-            .with_rust_runtime(mpsc::channel(0).0, services)
+            .into_mut(genesis_config)
+            .with_additional_runtime(rust_runtime)
             .build()
             .unwrap();
     }
@@ -253,9 +217,11 @@ mod tests {
     #[should_panic(expected = "Consensus configuration must have at least one validator")]
     fn finalize_invalid_consensus_config() {
         let consensus_config = ConsensusConfig::default();
+        let (rust_runtime, genesis_config) =
+            create_rust_runtime_and_genesis_config(mpsc::channel(0).0, consensus_config, vec![]);
         Blockchain::build_for_tests()
-            .into_mut(consensus_config)
-            .with_rust_runtime(mpsc::channel(0).0, vec![])
+            .into_mut(genesis_config)
+            .with_additional_runtime(rust_runtime)
             .build()
             .unwrap();
     }

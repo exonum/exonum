@@ -227,7 +227,18 @@ impl FromStr for ArtifactId {
 }
 
 /// Exhaustive artifact specification.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
 #[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
 pub struct ArtifactSpec {
     /// Information uniquely identifying the artifact.
