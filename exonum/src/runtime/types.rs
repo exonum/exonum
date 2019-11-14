@@ -325,7 +325,9 @@ impl Display for InstanceSpec {
 /// Allows to query a service instance by either of the two identifiers.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum InstanceQuery<'a> {
+    /// Query by an instance ID.
     Id(InstanceId),
+    /// Query by an instance name.
     Name(&'a str),
 }
 

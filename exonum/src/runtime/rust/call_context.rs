@@ -44,6 +44,7 @@ impl<'a> CallContext<'a> {
         &self.inner.caller
     }
 
+    /// Returns a descriptor of the executing service instance.
     pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
     }

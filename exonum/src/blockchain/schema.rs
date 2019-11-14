@@ -194,12 +194,9 @@ impl<T: Access> Schema<T> {
     /// scattered across distinct services and their tables. Sum is performed by
     /// means of computing the root hash of this table.
     ///
-    /// - Table **key** is  normalized coordinates of a service.
-    /// - Table **value** is the root hash of a service table, which contributes
+    /// - Table **key** contains normalized coordinates of an index.
+    /// - Table **value** contains a root hash of the index, which contributes
     /// to the `state_hash` of the resulting block.
-    ///
-    /// Core tables participate in the resulting state_hash with `CORE_ID`
-    /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<T::Base, IndexCoordinates, Hash> {
         self.access.clone().get_proof_map(STATE_HASH_AGGREGATOR)
     }
@@ -337,13 +334,15 @@ where
     }
 }
 
+// TODO Write more meaningful description [ECR-3824]
+/// Describes the membership for the index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IndexOwner {
-    /// This index is part of core schema.
+    /// This index is a part of the core schema.
     Core,
-    /// This index is a part of runtime schema.
+    /// This index is a part of the runtime schema with the specified ID.
     Runtime(u32),
-    /// This index is a part of some service schema.
+    /// This index is a part of some service schema with the specified ID.
     Service(InstanceId),
 }
 
@@ -381,6 +380,8 @@ enum IndexTag {
     Service = 3,
 }
 
+// TODO Write more meaningful description [ECR-3824]
+/// Normalized coordinates of the index in the `state_hash_aggregator` table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct IndexCoordinates {
     tag: u16,
@@ -398,6 +399,9 @@ impl IndexCoordinates {
         }
     }
 
+    // TODO Write more meaningful description [ECR-3824]
+    /// For the given index owner, returns a list of the index coordinates that match the corresponding
+    /// object hashes of the indices.
     pub fn locate(
         owner: IndexOwner,
         object_hashes: impl IntoIterator<Item = Hash>,
@@ -408,6 +412,7 @@ impl IndexCoordinates {
             .map(move |(id, hash)| (owner.coordinate_for(id as u16), hash))
     }
 
+    /// Returns a membership for this index.
     pub fn owner(self) -> IndexOwner {
         match self.tag {
             0 => IndexOwner::Core,
