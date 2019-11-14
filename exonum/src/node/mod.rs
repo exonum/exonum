@@ -959,7 +959,7 @@ impl Node {
         );
 
         let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
-            .with_additional_runtime(rust_runtime)
+            .with_runtime(rust_runtime)
             .with_external_runtimes(external_runtimes)
             .build()
             .expect("Cannot create dispatcher");

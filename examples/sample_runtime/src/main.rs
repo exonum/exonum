@@ -283,8 +283,8 @@ fn main() {
         .with_builtin_instance(cfg)
         .build();
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
-        .with_additional_runtime(rust_runtime)
-        .with_additional_runtime(SampleRuntime::default())
+        .with_runtime(rust_runtime)
+        .with_runtime(SampleRuntime::default())
         .build()
         .unwrap();
 

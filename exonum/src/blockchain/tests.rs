@@ -353,7 +353,7 @@ fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) ->
 
     Blockchain::new(TemporaryDB::new(), service_keypair, ApiSender::closed())
         .into_mut(genesis_config)
-        .with_additional_runtime(rust_runtime)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap()
 }

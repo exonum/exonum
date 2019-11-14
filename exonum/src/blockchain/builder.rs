@@ -166,7 +166,7 @@ mod tests {
             create_rust_runtime_and_genesis_config(mpsc::channel(0).0, config.consensus, vec![]);
         let blockchain = Blockchain::build_for_tests()
             .into_mut(genesis_config)
-            .with_additional_runtime(rust_runtime)
+            .with_runtime(rust_runtime)
             .build()
             .unwrap();
 
@@ -181,7 +181,7 @@ mod tests {
             create_rust_runtime_and_genesis_config(mpsc::channel(0).0, config.consensus, services);
         Blockchain::build_for_tests()
             .into_mut(genesis_config)
-            .with_additional_runtime(rust_runtime)
+            .with_runtime(rust_runtime)
             .build()
             .unwrap();
     }
@@ -221,7 +221,7 @@ mod tests {
             create_rust_runtime_and_genesis_config(mpsc::channel(0).0, consensus_config, vec![]);
         Blockchain::build_for_tests()
             .into_mut(genesis_config)
-            .with_additional_runtime(rust_runtime)
+            .with_runtime(rust_runtime)
             .build()
             .unwrap();
     }

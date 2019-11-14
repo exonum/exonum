@@ -137,7 +137,7 @@ pub fn create_blockchain() -> BlockchainMut {
         .with_builtin_instance(cfg)
         .build();
     BlockchainBuilder::new(blockchain, genesis_config)
-        .with_additional_runtime(rust_runtime)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap()
 }

@@ -96,7 +96,7 @@ fn create_blockchain(
     let (rust_runtime, genesis_config) =
         create_rust_runtime_and_genesis_config(mpsc::channel(0).0, consensus_config, services);
     BlockchainBuilder::new(blockchain_base, genesis_config)
-        .with_additional_runtime(rust_runtime)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap()
 }

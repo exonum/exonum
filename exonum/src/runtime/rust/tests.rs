@@ -307,7 +307,7 @@ fn basic_rust_runtime() {
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -456,7 +456,7 @@ fn rust_runtime_with_builtin_services() {
 
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config.clone())
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -488,7 +488,7 @@ fn rust_runtime_with_builtin_services() {
     let (runtime, event_handle) = create_runtime();
     let mut blockchain = blockchain
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -525,7 +525,7 @@ fn conflicting_service_instances() {
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -675,7 +675,7 @@ fn dependent_builtin_service() {
 
     let blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -708,7 +708,7 @@ fn dependent_builtin_service_with_incorrect_order() {
 
     let err = Blockchain::build_for_tests()
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap_err();
     assert!(err.to_string().contains("no dependency"));
@@ -726,7 +726,7 @@ fn dependent_service_with_no_dependency() {
 
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -762,7 +762,7 @@ fn dependent_service_in_same_block() {
 
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -805,7 +805,7 @@ fn dependent_service_in_successive_block() {
 
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
-        .with_additional_runtime(runtime)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 

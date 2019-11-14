@@ -1161,7 +1161,7 @@ fn sandbox_with_services_uninitialized(
 
     let blockchain = blockchain
         .into_mut(genesis_config)
-        .with_additional_runtime(rust_runtime)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap();
 
