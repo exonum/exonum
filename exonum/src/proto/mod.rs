@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module containing protobuf messages used by Exonum.
+//! Module that contains Protobuf messages used by Exonum.
 
 use failure::Error;
 

@@ -69,7 +69,7 @@ impl BlockchainBuilder {
         self.with_additional_runtime(runtime)
     }
 
-    /// Adds a multiple runtimes with the specified identifiers and returns
+    /// Adds multiple runtimes with the specified identifiers and returns
     /// a modified `Self` object for further chaining.
     pub fn with_external_runtimes(
         mut self,
@@ -88,7 +88,7 @@ impl BlockchainBuilder {
         self
     }
 
-    /// Adds instance specifications of builtin services.
+    /// Adds instance specifications of the built-in services.
     pub fn with_builtin_instances(
         mut self,
         instances: impl IntoIterator<Item = InstanceConfig>,
@@ -138,7 +138,7 @@ pub struct InstanceConfig {
 }
 
 impl InstanceConfig {
-    /// Creates a new instantiation parameters of service instance.
+    /// Creates new instantiation parameters of the service instance.
     pub fn new(
         instance_spec: InstanceSpec,
         artifact_spec: Option<Vec<u8>>,

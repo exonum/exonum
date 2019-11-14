@@ -185,15 +185,15 @@ where
     }
 
     // TODO Write more meaningful description [ECR-3824]
-    /// Returns the accessory `ProofMapIndex` for calculating patches.
+    /// Returns an accessory `ProofMapIndex` for calculating patches.
     ///
     /// The table calculates the "aggregation" of root hashes of individual
     /// service tables, in effect summing the state of various entities,
     /// scattered across distinct services and their tables. Sum is performed by
     /// means of computing the root hash of this table.
     ///
-    /// - Table **key** is normalized coordinates of an index.
-    /// - Table **value** is the root hash of an index, which contributes
+    /// - Table **key** contains normalized coordinates of an index.
+    /// - Table **value** contains a root hash of the index, which contributes
     /// to the `state_hash` of the resulting block.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, IndexCoordinates, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())
@@ -325,9 +325,9 @@ where
 /// Describes the membership for the index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IndexOwner {
-    /// This index is part of core schema.
+    /// This index is a part of the core schema.
     Core,
-    /// This index is a part of runtime schema with the specified ID.
+    /// This index is a part of the runtime schema with the specified ID.
     Runtime(u32),
     /// This index is a part of some service schema with the specified ID.
     Service(InstanceId),
@@ -368,7 +368,7 @@ enum IndexTag {
 }
 
 // TODO Write more meaningful description [ECR-3824]
-/// Normalized coordinates of index in the `state_hash_aggregator` table.
+/// Normalized coordinates of the index in the `state_hash_aggregator` table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct IndexCoordinates {
     tag: u16,
@@ -387,8 +387,8 @@ impl IndexCoordinates {
     }
 
     // TODO Write more meaningful description [ECR-3824]
-    /// For a given index owner, returns a list if index coordinates for the corresponding
-    /// object hashes of the indexes.
+    /// For the given index owner, returns a list of the index coordinates that match the corresponding
+    /// object hashes of the indices.
     pub fn locate(
         owner: IndexOwner,
         object_hashes: impl IntoIterator<Item = Hash>,

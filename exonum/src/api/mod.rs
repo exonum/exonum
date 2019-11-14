@@ -223,7 +223,7 @@ impl ApiAggregator {
         self.endpoints.insert(name.to_owned(), api);
     }
 
-    /// Extends the list of endpoint handlers with the specified ones.
+    /// Extends the list of endpoint handlers with the new specified handlers.
     pub fn extend(&mut self, endpoints: impl IntoIterator<Item = (String, ApiBuilder)>) {
         self.endpoints.extend(endpoints);
     }
