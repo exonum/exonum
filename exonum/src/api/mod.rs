@@ -218,7 +218,7 @@ impl ApiAggregator {
         Self { endpoints }
     }
 
-    /// Inserts an endpoints handler with the given mount point.
+    /// Inserts a handler for a set of endpoints with the given mount point.
     pub fn insert(&mut self, name: &str, api: ApiBuilder) {
         self.endpoints.insert(name.to_owned(), api);
     }
