@@ -192,7 +192,8 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Derives `From<MyError>` conversion to the `ExecutionError` for the given enum.
 ///
 /// Enumeration should have an explicit discriminant for each variant.
-/// Also this macro derives `Display` trait using documentation comments of each variant.
+/// Also this macro derives `Display` and `Fail` traits using documentation comments
+/// of each variant.
 #[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
 pub fn into_execution_error(input: TokenStream) -> TokenStream {
     execution_error::impl_execution_error(input)
