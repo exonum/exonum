@@ -16,15 +16,18 @@ use std::{borrow::Cow, io::Error, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
+use exonum_crypto::Hash;
 use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use super::{IndexAddress, RawAccess, RawAccessMut, View};
+use super::{system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, View};
 use crate::{validation::assert_valid_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
+
+const AGGREGATED_INDEXES_NAME: &str = "__AGGREGATED_INDEXES__";
 
 /// Type of an index supported by Exonum.
 ///
@@ -52,6 +55,16 @@ pub enum IndexType {
     /// Unknown index type.
     #[doc(hidden)]
     Unknown = 255,
+}
+
+impl IndexType {
+    /// Checks if the index of this type is Merkelized.
+    fn is_merkelized(self) -> bool {
+        match self {
+            IndexType::ProofList | IndexType::ProofMap => true,
+            _ => false,
+        }
+    }
 }
 
 /// Index state attribute tag.
@@ -250,14 +263,14 @@ where
 
 /// Persistent pool used to store indexes metadata in the database.
 /// Pool size is used as an identifier of newly created indexes.
-struct IndexesPool<T: RawAccess>(View<T>);
+pub(super) struct IndexesPool<T: RawAccess>(View<T>);
 
 impl<T: RawAccess> IndexesPool<T> {
-    fn new(index_access: T) -> Self {
+    pub(super) fn new(index_access: T) -> Self {
         Self(View::new(index_access, INDEXES_POOL_NAME))
     }
 
-    fn len(&self) -> u64 {
+    pub(super) fn len(&self) -> u64 {
         self.0.get(&()).unwrap_or_default()
     }
 
@@ -290,6 +303,63 @@ impl<T: RawAccess> IndexesPool<T> {
         let is_phantom = !self.0.put_or_forget(index_name, metadata.to_bytes());
         self.set_len(len + 1);
         (metadata, is_phantom)
+    }
+}
+
+/// List with names of Merkelized indexes. The list is automatically updated.
+pub(super) struct AggregatedIndexes<T: RawAccess>(View<T>);
+
+impl<T: RawAccess> AggregatedIndexes<T> {
+    pub(crate) fn new(index_access: T) -> Self {
+        Self(View::new(index_access, AGGREGATED_INDEXES_NAME))
+    }
+
+    fn insert(&mut self, name: &str) {
+        self.0.put_or_forget(name, ());
+    }
+
+    /// Iterates over all aggregated indexes in the storage.
+    ///
+    /// # Panics
+    ///
+    /// This method will access every aggregated index, so it will panic if borrowing rules
+    /// are violated.
+    pub(crate) fn iter<'s>(&'s self) -> impl Iterator<Item = (String, Hash)> + 's {
+        use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
+
+        let access = self.0.index_access.clone();
+        self.0.iter::<_, String, ()>(&()).map(move |(name, ())| {
+            let metadata = IndexesPool::new(access.clone())
+                .index_metadata(name.as_bytes())
+                .unwrap_or_else(|| {
+                    panic!("Metadata absent for aggregated index {}", name);
+                });
+
+            let index_type = metadata.index_type;
+            let mut addr = metadata.index_address();
+            addr.name = name.clone();
+            let view_with_metadata = ViewWithMetadata {
+                view: View::new(access.clone(), addr),
+                metadata,
+                index_full_name: name.as_bytes().to_vec(),
+                is_phantom: false,
+            };
+
+            let hash = match index_type {
+                IndexType::ProofList => {
+                    // We don't access list elements, so the element type doesn't matter.
+                    let list = ProofListIndex::<_, ()>::new(view_with_metadata);
+                    list.object_hash()
+                }
+                IndexType::ProofMap => {
+                    // We don't access map elements, so the key / value types don't matter.
+                    let map = ProofMapIndex::<_, (), ()>::new(view_with_metadata);
+                    map.object_hash()
+                }
+                _ => unreachable!(), // other index types are not aggregated
+            };
+            (name, hash)
+        })
     }
 }
 
@@ -329,6 +399,18 @@ where
         let metadata = pool.index_metadata(&index_full_name).unwrap_or_else(|| {
             let (metadata, phantom_flag) = pool.create_index_metadata(&index_full_name, index_type);
             is_phantom = phantom_flag;
+
+            // Insert the index into the list of Merkelized indexes if it fits
+            // (i.e., has an appropriate type and is not a part of a family).
+            if !is_phantom
+                && index_type.is_merkelized()
+                && index_address.bytes.is_none()
+                && index_address.name != STATE_AGGREGATOR
+            {
+                let mut aggregated = AggregatedIndexes::new(index_access.clone());
+                aggregated.insert(&index_address.name);
+            }
+
             metadata
         });
         let real_index_type = metadata.index_type;

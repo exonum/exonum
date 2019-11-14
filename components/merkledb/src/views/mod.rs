@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::metadata::{BinaryAttribute, IndexState, IndexType, ViewWithMetadata};
+pub use self::{
+    metadata::{BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
+    system_info::SystemInfo,
+};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
@@ -22,6 +25,7 @@ use super::{
 };
 
 mod metadata;
+mod system_info;
 #[cfg(test)]
 mod tests;
 

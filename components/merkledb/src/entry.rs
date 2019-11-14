@@ -52,7 +52,7 @@ where
     T: RawAccess,
     V: BinaryValue,
 {
-    fn new(view: ViewWithMetadata<T>) -> Self {
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
         let base = view.into();
         Self {
             base,

@@ -17,6 +17,7 @@ use url::form_urlencoded::byte_serialize;
 
 use std::{panic, rc::Rc};
 
+use crate::views::metadata::AggregatedIndexes;
 use crate::{
     access::AccessExt,
     db,
@@ -1050,4 +1051,38 @@ fn fork_from_patch() {
 
     db.merge(fork.into_patch())
         .expect("Fork created from patch should be merged successfully");
+}
+
+#[test]
+fn aggregated_indexes_updates() {
+    use crate::access::Prefixed;
+
+    fn get_aggregated_indexes(access: impl RawAccess) -> Vec<String> {
+        AggregatedIndexes::new(access)
+            .iter()
+            .map(|(name, _)| name)
+            .collect()
+    }
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    fork.get_list("foo").push(1_u32);
+    // `ListIndex` is not Merkelized.
+    assert!(get_aggregated_indexes(&fork).is_empty());
+
+    fork.get_proof_list("bar").push(1_u32);
+    assert_eq!(get_aggregated_indexes(&fork), vec!["bar".to_owned()]);
+    Prefixed::new("prefix", &fork)
+        .get_proof_map("baz")
+        .put(&1_u32, "!".to_owned());
+    let aggregated_indexes = vec!["bar".to_owned(), "prefix.baz".to_owned()];
+    assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
+
+    // Index families are not included into aggregation.
+    fork.get_proof_list(("fam", &0_u8)).push(1_u32);
+    assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
+
+    db.merge_sync(fork.into_patch()).unwrap();
+    let snapshot = db.snapshot();
+    assert_eq!(get_aggregated_indexes(&snapshot), aggregated_indexes);
 }

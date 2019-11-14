@@ -193,7 +193,7 @@ where
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
 {
-    fn new(view: ViewWithMetadata<T>) -> Self {
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, state) = view.into_parts();
         Self {
             base,
