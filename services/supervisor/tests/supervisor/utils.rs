@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::Entry;
-use exonum_testkit::{TestKit, TestKitBuilder};
-
-use exonum::runtime::InstanceId;
 use exonum::{
     blockchain::{ConsensusConfig, InstanceCollection},
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, SUPERVISOR_INSTANCE_ID},
+    runtime::{rust::Transaction, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
+use exonum_merkledb::access::AccessExt;
+use exonum_testkit::{TestKit, TestKitBuilder};
 
 use crate::{
     IncService as ConfigChangeService, SERVICE_ID as CONFIG_SERVICE_ID,
@@ -40,8 +38,9 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
-    Schema::new(supervisor_name(), &snapshot)
-        .pending_proposal()
+    let snapshot = snapshot.for_service(supervisor_name()).unwrap();
+    Schema::new(snapshot)
+        .pending_proposal
         .get()
         .map(|entry| entry.config_propose)
 }
@@ -177,21 +176,25 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
 }
 
 pub fn check_service_actual_param(testkit: &TestKit, param: Option<String>) {
-    let actual_params: Option<String> = Entry::new(
-        format!("{}.params", CONFIG_SERVICE_NAME),
-        &testkit.snapshot(),
-    )
-    .get();
-
-    assert_eq!(actual_params, param);
+    let snapshot = testkit.snapshot();
+    let actual_params = snapshot
+        .for_service(CONFIG_SERVICE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params");
+    match param {
+        Some(param) => assert_eq!(actual_params.get().unwrap(), param),
+        None => assert!(!actual_params.exists()),
+    }
 }
 
 pub fn check_second_service_actual_param(testkit: &TestKit, param: Option<String>) {
-    let actual_params: Option<String> = Entry::new(
-        format!("{}.params", SECOND_SERVICE_NAME),
-        &testkit.snapshot(),
-    )
-    .get();
-
-    assert_eq!(actual_params, param);
+    let snapshot = testkit.snapshot();
+    let actual_params = snapshot
+        .for_service(SECOND_SERVICE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params");
+    match param {
+        Some(param) => assert_eq!(actual_params.get().unwrap(), param),
+        None => assert!(!actual_params.exists()),
+    }
 }

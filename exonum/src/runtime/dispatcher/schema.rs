@@ -14,64 +14,113 @@
 
 //! Information schema for the runtime dispatcher.
 
-use exonum_merkledb::{Entry, IndexAccess, MapIndex};
+use exonum_merkledb::{
+    access::{Access, AccessExt},
+    Entry, Fork, MapIndex,
+};
 
 use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
 use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
+
+const ARTIFACTS: &str = "core.dispatcher.artifacts";
+const PENDING_ARTIFACTS: &str = "core.dispatcher.pending_artifacts";
+const SERVICE_INSTANCES: &str = "core.dispatcher.service_instances";
+const PENDING_INSTANCES: &str = "core.dispatcher.pending_service_instances";
+const INSTANCE_IDS: &str = "core.dispatcher.service_instance_ids";
+const PENDING_INSTANCE_IDS: &str = "core.dispatcher.pending_instance_ids";
+const VACANT_INSTANCE_ID: &str = "core.dispatcher.vacant_instance_id";
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
 // TODO: Add information about implemented interfaces [ECR-3747]
 #[derive(Debug, Clone)]
-pub struct Schema<T: IndexAccess> {
+pub struct Schema<T> {
     access: T,
 }
 
-impl<T: IndexAccess> Schema<T> {
+impl<T: Access> Schema<T> {
     /// Constructs information schema for the given `access`.
-    pub fn new(access: T) -> Self {
+    pub(crate) fn new(access: T) -> Self {
         Self { access }
     }
 
     /// Artifacts registry indexed by the artifact name.
-    pub(crate) fn artifacts(&self) -> MapIndex<T, String, ArtifactSpec> {
-        MapIndex::new("core.dispatcher.artifacts", self.access.clone())
+    pub(crate) fn artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
+        self.access.clone().get_map(ARTIFACTS)
     }
 
-    pub(super) fn pending_artifacts(&self) -> MapIndex<T, String, ArtifactSpec> {
-        MapIndex::new("core.dispatcher.pending_artifacts", self.access.clone())
+    pub(super) fn pending_artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
+        self.access.clone().get_map(PENDING_ARTIFACTS)
     }
 
     /// Set of launched service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
-    pub(crate) fn service_instances(&self) -> MapIndex<T, String, InstanceSpec> {
-        MapIndex::new("core.dispatcher.service_instances", self.access.clone())
+    pub(crate) fn service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
+        self.access.clone().get_map(SERVICE_INSTANCES)
     }
 
     /// Set of pending service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
-    pub(super) fn pending_service_instances(&self) -> MapIndex<T, String, InstanceSpec> {
-        MapIndex::new(
-            "core.dispatcher.pending_service_instances",
-            self.access.clone(),
-        )
+    pub(super) fn pending_service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
+        self.access.clone().get_map(PENDING_INSTANCES)
     }
 
     /// Identifiers of launched service instances.
-    fn service_instance_ids(&self) -> MapIndex<T, InstanceId, String> {
-        MapIndex::new("core.dispatcher.service_instance_ids", self.access.clone())
+    fn service_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
+        self.access.clone().get_map(INSTANCE_IDS)
     }
 
     /// Identifiers of pending service instances.
-    fn pending_instance_ids(&self) -> MapIndex<T, InstanceId, String> {
-        MapIndex::new("core.dispatcher.pending_instance_ids", self.access.clone())
+    fn pending_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
+        self.access.clone().get_map(PENDING_INSTANCE_IDS)
     }
 
-    /// Vacant identifier for user service instances.
-    fn vacant_instance_id(&self) -> Entry<T, InstanceId> {
-        Entry::new("core.dispatcher.vacant_instance_id", self.access.clone())
+    /// Returns the information about a service instance by its identifier.
+    pub fn get_instance<'q>(
+        &self,
+        query: impl Into<InstanceQuery<'q>>,
+    ) -> Option<(InstanceSpec, DeployStatus)> {
+        match query.into() {
+            InstanceQuery::Id(id) => {
+                if let Some(instance_name) = self.service_instance_ids().get(&id) {
+                    self.service_instances()
+                        .get(&instance_name)
+                        .map(|spec| (spec, DeployStatus::Active))
+                } else if let Some(instance_name) = self.pending_instance_ids().get(&id) {
+                    self.pending_service_instances()
+                        .get(&instance_name)
+                        .map(|spec| (spec, DeployStatus::Pending))
+                } else {
+                    None
+                }
+            }
+
+            InstanceQuery::Name(instance_name) => self
+                .service_instances()
+                .get(instance_name)
+                .map(|spec| (spec, DeployStatus::Active))
+                .or_else(|| {
+                    self.pending_service_instances()
+                        .get(instance_name)
+                        .map(|spec| (spec, DeployStatus::Pending))
+                }),
+        }
     }
 
+    /// Returns information about an artifact by its identifier.
+    pub fn get_artifact(&self, name: &str) -> Option<(ArtifactSpec, DeployStatus)> {
+        self.artifacts()
+            .get(name)
+            .map(|spec| (spec, DeployStatus::Active))
+            .or_else(|| {
+                self.pending_artifacts()
+                    .get(name)
+                    .map(|spec| (spec, DeployStatus::Pending))
+            })
+    }
+}
+
+impl Schema<&Fork> {
     /// Adds artifact specification to the set of the pending artifacts.
     pub(super) fn add_pending_artifact(
         &mut self,
@@ -146,6 +195,11 @@ impl<T: IndexAccess> Schema<T> {
         Ok(())
     }
 
+    /// Vacant identifier for user service instances.
+    fn vacant_instance_id(&self) -> Entry<&Fork, InstanceId> {
+        self.access.get_entry(VACANT_INSTANCE_ID)
+    }
+
     /// Assign unique identifier for an instance.
     // TODO: could be performed by supervisor [ECR-3746]
     pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
@@ -166,49 +220,5 @@ impl<T: IndexAccess> Schema<T> {
         let name = spec.name.clone();
         self.service_instances().put(&name, spec);
         self.service_instance_ids().put(&id, name);
-    }
-
-    /// Returns the information about a service instance by its identifier.
-    pub fn get_instance<'s>(
-        &'s self,
-        query: impl Into<InstanceQuery<'s>>,
-    ) -> Option<(InstanceSpec, DeployStatus)> {
-        match query.into() {
-            InstanceQuery::Id(id) => {
-                if let Some(instance_name) = self.service_instance_ids().get(&id) {
-                    self.service_instances()
-                        .get(&instance_name)
-                        .map(|spec| (spec, DeployStatus::Active))
-                } else if let Some(instance_name) = self.pending_instance_ids().get(&id) {
-                    self.pending_service_instances()
-                        .get(&instance_name)
-                        .map(|spec| (spec, DeployStatus::Pending))
-                } else {
-                    None
-                }
-            }
-
-            InstanceQuery::Name(instance_name) => self
-                .service_instances()
-                .get(instance_name)
-                .map(|spec| (spec, DeployStatus::Active))
-                .or_else(|| {
-                    self.pending_service_instances()
-                        .get(instance_name)
-                        .map(|spec| (spec, DeployStatus::Pending))
-                }),
-        }
-    }
-
-    /// Returns information about an artifact by its identifier.
-    pub fn get_artifact(&self, name: &str) -> Option<(ArtifactSpec, DeployStatus)> {
-        self.artifacts()
-            .get(name)
-            .map(|spec| (spec, DeployStatus::Active))
-            .or_else(|| {
-                self.pending_artifacts()
-                    .get(name)
-                    .map(|spec| (spec, DeployStatus::Pending))
-            })
     }
 }

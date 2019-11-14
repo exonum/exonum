@@ -23,7 +23,7 @@
 
 use exonum::helpers::{byzantine_quorum, multisig::ValidatorMultisig};
 use exonum_crypto::Hash;
-use exonum_merkledb::IndexAccess;
+use exonum_merkledb::access::Access;
 
 use super::DeployRequest;
 
@@ -41,53 +41,57 @@ pub struct Decentralized;
 /// Trait encapsulating the decision making logic of the supervisor.
 pub trait SupervisorMode: std::fmt::Debug + Send + Sync + Copy + 'static {
     /// Checks whether deploy should be performed within the network.
-    fn deploy_approved<T: IndexAccess>(
+    fn deploy_approved<T: Access>(
         deploy: &DeployRequest,
         deploy_requests: &ValidatorMultisig<T, DeployRequest>,
+        validators: usize,
     ) -> bool;
 
     /// Checks whether config can be applied for the network.
-    fn config_approved<T: IndexAccess>(
+    fn config_approved<T: Access>(
         config_hash: &Hash,
         config_confirms: &ValidatorMultisig<T, Hash>,
+        validators: usize,
     ) -> bool;
 }
 
 impl SupervisorMode for Simple {
-    fn deploy_approved<T: IndexAccess>(
+    fn deploy_approved<T: Access>(
         deploy: &DeployRequest,
         deploy_requests: &ValidatorMultisig<T, DeployRequest>,
+        _validators: usize,
     ) -> bool {
         // For simple supervisor request from 1 validator is enough.
         deploy_requests.confirmations(deploy) >= 1
     }
 
-    fn config_approved<T: IndexAccess>(
+    fn config_approved<T: Access>(
         config_hash: &Hash,
         config_confirms: &ValidatorMultisig<T, Hash>,
+        _validators: usize,
     ) -> bool {
         config_confirms.confirmations(&config_hash) >= 1
     }
 }
 
 impl SupervisorMode for Decentralized {
-    fn deploy_approved<T: IndexAccess>(
+    fn deploy_approved<T: Access>(
         deploy: &DeployRequest,
         deploy_requests: &ValidatorMultisig<T, DeployRequest>,
+        validators: usize,
     ) -> bool {
         let confirmations = deploy_requests.confirmations(&deploy);
-        let validators = deploy_requests.validators_amount();
 
         // Approve deploy in case 2/3+1 validators confirmed it.
         confirmations >= byzantine_quorum(validators)
     }
 
-    fn config_approved<T: IndexAccess>(
+    fn config_approved<T: Access>(
         config_hash: &Hash,
         config_confirms: &ValidatorMultisig<T, Hash>,
+        validators: usize,
     ) -> bool {
         let confirmations = config_confirms.confirmations(&config_hash);
-        let validators = config_confirms.validators_amount();
 
         // Apply pending config in case 2/3+1 validators voted for it.
         confirmations >= byzantine_quorum(validators)

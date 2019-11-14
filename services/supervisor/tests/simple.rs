@@ -20,14 +20,14 @@ use exonum::{
     blockchain::InstanceCollection,
     crypto::Hash,
     helpers::{Height, ValidatorId},
-    merkledb::{Entry, ObjectHash, Snapshot},
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service},
-        ArtifactId, Caller, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
+        ArtifactId, BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -67,7 +67,7 @@ impl From<ConfigChangeService> for InstanceCollection {
         InstanceCollection::new(instance).with_instance(
             ConfigChangeService::INSTANCE_ID,
             ConfigChangeService::INSTANCE_NAME,
-            Vec::default(),
+            vec![],
         )
     }
 }
@@ -78,8 +78,8 @@ impl From<ConfigChangeService> for InstanceCollection {
 pub struct DeployableService;
 
 impl Service for DeployableService {
-    fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -95,8 +95,8 @@ pub trait DeployableServiceInterface {}
 impl DeployableServiceInterface for DeployableService {}
 
 impl Service for ConfigChangeService {
-    fn state_hash(&self, _: InstanceDescriptor<'_>, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -109,10 +109,11 @@ impl Configure for ConfigChangeService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(Caller::as_supervisor)
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        match params.as_ref() {
+        match params.as_str() {
             "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
@@ -124,13 +125,17 @@ impl Configure for ConfigChangeService {
         context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        let (_, fork) = context
-            .verify_caller(Caller::as_supervisor)
+        context
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());
+        context
+            .service_data()
+            .get_entry("params")
+            .set(params.clone());
 
-        match params.as_ref() {
+        match params.as_str() {
             "apply_error" => {
                 Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
             }
@@ -142,9 +147,11 @@ impl Configure for ConfigChangeService {
 
 fn assert_config_change_is_applied(testkit: &TestKit) {
     let snapshot = testkit.snapshot();
-    assert!(!Schema::new(supervisor_name(), &snapshot)
-        .pending_proposal()
-        .exists());
+    assert!(
+        !Schema::new(snapshot.for_service(supervisor_name()).unwrap())
+            .pending_proposal
+            .exists()
+    );
 }
 
 /// Attempts to change consensus config with only one confirmation.
@@ -218,12 +225,13 @@ fn service_config_change() {
     ));
     testkit.create_blocks_until(cfg_change_height);
 
-    let actual_params: String = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get()
-    .unwrap();
+    let actual_params: String = testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry("params")
+        .get()
+        .unwrap();
 
     assert_eq!(actual_params, params);
 }
@@ -336,9 +344,11 @@ fn test_send_proposal_with_api() {
     testkit.api().exonum_api().assert_tx_success(hash);
 
     // Assert that config is now pending.
+    let snapshot = testkit.snapshot();
+    let snapshot = snapshot.for_service(supervisor_name()).unwrap();
     assert_eq!(
-        Schema::new(supervisor_name(), &testkit.snapshot())
-            .pending_proposal()
+        Schema::new(snapshot)
+            .pending_proposal
             .get()
             .unwrap()
             .config_propose,

@@ -31,7 +31,7 @@ use exonum_supervisor::{
 };
 
 use crate::{
-    inc::{IncService, TxInc, SERVICE_ID, SERVICE_NAME},
+    inc::{Inc, IncService, SERVICE_ID, SERVICE_NAME},
     utils::build_confirmation_transactions,
 };
 
@@ -57,7 +57,7 @@ fn assert_count(api: &TestKitApi, service_name: &'static str, expected_count: u6
     assert_eq!(real_count, expected_count);
 }
 
-/// Check that the service's counter isn't started yet (no TxInc txs were received).
+/// Check that the service's counter isn't started yet (no Inc txs were received).
 fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
     let response: api::Result<u64> = api.public(ApiKind::Service(service_name)).get("v1/counter");
     assert!(response.is_err());
@@ -268,11 +268,11 @@ fn test_static_service() {
 
     let (key_pub, key_priv) = crypto::gen_keypair();
 
-    api.send(TxInc { seed: 0 }.sign(SERVICE_ID, key_pub, &key_priv));
+    api.send(Inc { seed: 0 }.sign(SERVICE_ID, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, SERVICE_NAME, 1);
 
-    api.send(TxInc { seed: 1 }.sign(SERVICE_ID, key_pub, &key_priv));
+    api.send(Inc { seed: 1 }.sign(SERVICE_ID, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, SERVICE_NAME, 2);
 }
@@ -290,11 +290,11 @@ fn test_dynamic_service_normal_workflow() {
 
     let (key_pub, key_priv) = crypto::gen_keypair();
 
-    api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+    api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, instance_name, 1);
 
-    api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+    api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
     testkit.create_block();
     assert_count(&api, instance_name, 2);
 }
@@ -580,11 +580,11 @@ fn test_restart_node_and_start_service_instance() {
     {
         assert_count_is_not_set(&api, instance_name);
 
-        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
 
-        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
@@ -602,7 +602,7 @@ fn test_restart_node_and_start_service_instance() {
     {
         assert_count(&api, instance_name, 2);
 
-        api.send(TxInc { seed: 2 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 2 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 3);
     }
@@ -719,11 +719,11 @@ fn test_two_validators() {
     {
         assert_count_is_not_set(&api, instance_name);
         let (key_pub, key_priv) = crypto::gen_keypair();
-        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
 
-        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
@@ -859,10 +859,10 @@ fn test_auditor_normal_workflow() {
     {
         assert_count_is_not_set(&api, instance_name);
         let (key_pub, key_priv) = crypto::gen_keypair();
-        api.send(TxInc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
-        api.send(TxInc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }

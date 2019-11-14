@@ -32,8 +32,8 @@ pub mod config;
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
-    Database, Fork, IndexAccess, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot,
-    TemporaryDB,
+    access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
+    Snapshot, TemporaryDB,
 };
 use failure::{format_err, Error};
 
@@ -260,7 +260,8 @@ impl BlockchainMut {
         let fork = Fork::from(patch);
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
-        self.dispatcher.notify_runtimes_about_commit(fork.as_ref());
+        self.dispatcher
+            .notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
         self.merge(fork.into_patch())?;
 
         info!(
@@ -306,7 +307,7 @@ impl BlockchainMut {
             // Collect all state hashes.
             let state_hashes = self
                 .dispatcher
-                .state_hash(fork.as_ref())
+                .state_hash(fork.snapshot_without_unflushed_changes())
                 .into_iter()
                 // Add state hash of core table.
                 .chain(IndexCoordinates::locate(
@@ -350,10 +351,7 @@ impl BlockchainMut {
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> Result<(), Error> {
-        let fork_ref = &*fork;
-        let snapshot = fork_ref.snapshot();
-        let schema = Schema::new(snapshot);
-
+        let schema = Schema::new(&*fork);
         let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
             .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
         fork.flush();
@@ -379,9 +377,8 @@ impl BlockchainMut {
         schema
             .transaction_results()
             .put(&tx_hash, ExecutionStatus(tx_result));
-        schema.commit_transaction(&tx_hash, transaction);
+        schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
-        schema.block_transactions(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
@@ -422,6 +419,40 @@ impl BlockchainMut {
         self.dispatcher.commit_block_and_notify_runtimes(&mut fork);
         self.merge(fork.into_patch())?;
         Ok(())
+    }
+
+    /// Adds a transaction into pool of uncommitted transactions.
+    ///
+    /// Unlike the corresponding method in the core schema, this method checks if the
+    /// added transactions are already known to the node and does nothing if it is.
+    /// Thus, it is safe to call this method without verifying that the transactions
+    /// are not in the pool and are not committed.
+    #[doc(hidden)] // used by testkit, should not be used anywhere else
+    pub fn add_transactions_into_pool(
+        &mut self,
+        // ^-- mutable reference taken for future compatibility.
+        transactions: impl IntoIterator<Item = Verified<AnyTx>>,
+    ) {
+        Self::add_transactions_into_db_pool(self.inner.db.as_ref(), transactions);
+    }
+
+    /// Same as `add_transactions_into_pool()`, but accepting a database handle instead
+    /// of the `BlockchainMut` instance. Beware that accesses to database need to be synchronized
+    /// across threads.
+    #[doc(hidden)] // used by testkit, should not be used anywhere else
+    pub fn add_transactions_into_db_pool<Db: Database + ?Sized>(
+        db: &Db,
+        transactions: impl IntoIterator<Item = Verified<AnyTx>>,
+    ) {
+        let fork = db.fork();
+        let mut schema = Schema::new(&fork);
+        for transaction in transactions {
+            if !schema.transactions().contains(&transaction.object_hash()) {
+                schema.add_transaction_into_pool(transaction);
+            }
+        }
+        db.merge(fork.into_patch())
+            .expect("Cannot update transaction pool");
     }
 
     /// Shuts down the dispatcher. This should be the last operation performed on this instance.
@@ -467,7 +498,7 @@ impl BlockchainMut {
 
 /// Return transaction from persistent pool. If transaction is not present in pool, try
 /// to return it from transactions cache.
-pub(crate) fn get_transaction<T: IndexAccess>(
+pub(crate) fn get_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
@@ -476,7 +507,7 @@ pub(crate) fn get_transaction<T: IndexAccess>(
 }
 
 /// Check that transaction exists in the persistent pool or in the transaction cache.
-pub(crate) fn contains_transaction<T: IndexAccess>(
+pub(crate) fn contains_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,

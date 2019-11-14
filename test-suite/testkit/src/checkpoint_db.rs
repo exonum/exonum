@@ -169,16 +169,13 @@ impl<T: Database> CheckpointDbInner<T> {
         // NB: make sure that **both** the db and the journal
         // are updated atomically.
         let snapshot = self.db.snapshot();
-
         let patch_changes = patch.changes();
         self.db.merge(patch)?;
 
         let rev_fork = self.db.fork();
-
         // Reverse a patch to get a backup patch.
         for (name, changes) in &patch_changes {
             let mut view = View::new(&rev_fork, name.clone());
-
             for (key, _) in changes.iter() {
                 match snapshot.get(name, key) {
                     Some(value) => {

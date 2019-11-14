@@ -42,7 +42,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{CallContext, Service},
-        DispatcherError, InstanceDescriptor,
+        BlockchainData, DispatcherError,
     },
 };
 
@@ -58,30 +58,28 @@ use crate::{
 pub struct TimestampingService;
 
 impl Service for TimestampingService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        TimestampingApi.wire(builder);
-    }
-
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(descriptor.name, snapshot);
-        schema.state_hash()
-    }
-
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         let config =
             Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
         if context
-            .dispatcher_info()
+            .data()
+            .for_dispatcher()
             .get_instance(&*config.time_service_name)
             .is_none()
         {
             return Err(Error::TimeServiceNotFound.into());
         }
 
-        Schema::new(context.instance().name, context.fork())
-            .config()
-            .set(config);
+        Schema::new(context.service_data()).config.set(config);
         Ok(())
+    }
+
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        TimestampingApi.wire(builder);
     }
 }

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{ConsensusConfig, Schema as CoreSchema},
+    blockchain::ConsensusConfig,
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder, ServiceApiState},
@@ -90,8 +90,7 @@ impl PrivateApi for ApiImpl<'_> {
     }
 
     fn configuration_number(&self) -> Result<u64, Self::Error> {
-        let configuration_number =
-            Schema::new(self.0.instance.name, self.0.snapshot()).get_configuration_number();
+        let configuration_number = Schema::new(self.0.service_data()).get_configuration_number();
 
         Ok(configuration_number)
     }
@@ -101,13 +100,11 @@ impl PublicApi for ApiImpl<'_> {
     type Error = api::Error;
 
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
-        Ok(CoreSchema::new(self.0.snapshot()).consensus_config())
+        Ok(self.0.data().for_core().consensus_config())
     }
 
     fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
-        Ok(Schema::new(self.0.instance.name, self.0.snapshot())
-            .pending_proposal()
-            .get())
+        Ok(Schema::new(self.0.service_data()).pending_proposal.get())
     }
 }
 
