@@ -66,7 +66,8 @@ use crate::{
         TimeoutRequest,
     },
     helpers::{
-        config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
+        config::ConfigManager, create_rust_runtime_and_genesis_config, user_agent, Height,
+        Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
@@ -951,8 +952,14 @@ impl Node {
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
-        let blockchain = BlockchainBuilder::new(blockchain, node_cfg.consensus.clone())
-            .with_rust_runtime(channel.endpoints.0.clone(), services)
+        let (rust_runtime, genesis_config) = create_rust_runtime_and_genesis_config(
+            channel.endpoints.0.clone(),
+            node_cfg.consensus.clone(),
+            services,
+        );
+
+        let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
+            .with_additional_runtime(rust_runtime)
             .with_external_runtimes(external_runtimes)
             .build()
             .expect("Cannot create dispatcher");
