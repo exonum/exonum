@@ -321,8 +321,7 @@ pub struct GenesisConfig {
     pub builtin_instances: Vec<ConfiguredInstanceSpec>,
 }
 
-/// A wrapper for `InstanceSpec` that also stores a constructor argument for the service instance.
-/// Used in `GenesisConfig`.
+/// Represents data that is required for initialization of service instance.
 #[derive(
     Debug,
     Clone,
