@@ -384,10 +384,6 @@ impl InstanceConfig {
         });
         self
     }
-
-    pub fn from_spec(instance_spec: InstanceSpec, constructor: impl BinaryValue) -> Self {
-        Self::new(instance_spec.artifact.clone(), vec![]).with_instance(instance_spec, constructor)
-    }
 }
 
 impl GenesisConfigBuilder {

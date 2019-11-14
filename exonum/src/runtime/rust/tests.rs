@@ -654,8 +654,9 @@ fn instance_configs() -> (InstanceConfig, InstanceConfig) {
     };
 
     (
-        InstanceConfig::from_spec(main_spec, vec![]),
-        InstanceConfig::from_spec(dependent_spec, dependent_constructor),
+        InstanceConfig::new(main_spec.artifact.clone(), vec![]).with_instance(main_spec, vec![]),
+        InstanceConfig::new(dependent_spec.artifact.clone(), vec![])
+            .with_instance(dependent_spec, dependent_constructor),
     )
 }
 
