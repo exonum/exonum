@@ -1,11 +1,11 @@
 //! Extension traits to simplify index instantiation.
 
 use super::{Access, AccessError, FromAccess};
+use crate::proof_map_index::{Raw, ToProofPath};
 use crate::{
     views::IndexType, BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex,
     MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
 };
-use crate::proof_map_index::{Raw, ToProofPath};
 
 /// Extension trait allowing for easy access to indices from any type implementing
 /// `Access`.
@@ -122,11 +122,11 @@ pub trait AccessExt: Access {
     ///
     /// If the index exists, but is not a Merkelized map.
     fn get_raw_proof_map<I, K, V>(self, addr: I) -> ProofMapIndex<Self::Base, K, V, Raw>
-        where
-            I: Into<IndexAddress>,
-            K: BinaryKey + ObjectHash,
-            V: BinaryValue,
-            Raw: ToProofPath<K>,
+    where
+        I: Into<IndexAddress>,
+        K: BinaryKey + ObjectHash,
+        V: BinaryValue,
+        Raw: ToProofPath<K>,
     {
         ProofMapIndex::<_, _, _, Raw>::from_access(self, addr.into()).unwrap()
     }
