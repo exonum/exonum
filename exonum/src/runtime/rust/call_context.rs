@@ -137,7 +137,7 @@ impl<'a> CallContext<'a> {
     /// Provides writeable access to core schema.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
-      #[doc(hidden)]
+    #[doc(hidden)]
     pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`writeable_core_schema` called within a non-supervisor service");
@@ -145,8 +145,6 @@ impl<'a> CallContext<'a> {
         CoreSchema::new(self.inner.fork)
     }
 
-    /// Marks an artifact as *registered*, i.e., one which service instances can be deployed from.
-  
     /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
     ///
     /// If / when a block with this instruction is accepted, artifact deployment becomes
