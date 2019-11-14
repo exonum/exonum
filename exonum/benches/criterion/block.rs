@@ -38,22 +38,24 @@
 //!   Accounts are stored in a `MapIndex`. Transactions are rolled back 50% of the time.
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
-use exonum::{
-    blockchain::{
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection, Schema,
-        ValidatorKeys,
-    },
-    crypto::{self, Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId},
-    messages::{AnyTx, Verified},
-    node::ApiSender,
-};
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempdir::TempDir;
 
 use std::{collections::BTreeMap, iter, sync::Arc};
+
+use exonum::{
+    blockchain::{
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection,
+        ValidatorKeys,
+    },
+    crypto::{self, Hash, PublicKey, SecretKey},
+    helpers::{Height, ValidatorId},
+    messages::{AnyTx, Verified},
+    node::ApiSender,
+    runtime::SnapshotExt,
+};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -113,7 +115,7 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, InstanceDescriptor, InstanceId,
+            AnyTx, BlockchainData, InstanceId,
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
@@ -125,7 +127,7 @@ mod timestamping {
 
     const TIMESTAMPING_SERVICE_ID: InstanceId = 254;
 
-    #[exonum_service]
+    #[exonum_interface]
     pub trait TimestampingInterface {
         fn timestamp(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError>;
 
@@ -136,12 +138,9 @@ mod timestamping {
         ) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
-        artifact_name = "timestamping",
-        proto_sources = "crate::proto",
-        implements("TimestampingInterface")
-    )]
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("TimestampingInterface"))]
+    #[service_factory(artifact_name = "timestamping", proto_sources = "crate::proto")]
     pub struct Timestamping;
 
     impl TimestampingInterface for Timestamping {
@@ -159,11 +158,7 @@ mod timestamping {
     }
 
     impl Service for Timestamping {
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }
@@ -214,10 +209,10 @@ mod cryptocurrency {
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, ErrorKind, InstanceDescriptor, InstanceId,
+            AnyTx, BlockchainData, ErrorKind, InstanceId,
         },
     };
-    use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
+    use exonum_merkledb::{access::AccessExt, Snapshot};
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
@@ -231,7 +226,7 @@ mod cryptocurrency {
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    #[exonum_service]
+    #[exonum_interface]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
         fn transfer(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError>;
@@ -249,19 +244,15 @@ mod cryptocurrency {
         ) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
-        artifact_name = "cryptocurrency",
-        proto_sources = "crate::proto",
-        implements("CryptocurrencyInterface")
-    )]
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("CryptocurrencyInterface"))]
+    #[service_factory(artifact_name = "cryptocurrency", proto_sources = "crate::proto")]
     pub struct Cryptocurrency;
 
     impl CryptocurrencyInterface for Cryptocurrency {
         fn transfer(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-
-            let mut index = ProofMapIndex::new("provable_balances", context.fork());
+            let mut index = context.service_data().get_proof_map("provable_balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -277,8 +268,7 @@ mod cryptocurrency {
             arg: SimpleTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-
-            let mut index = MapIndex::new("balances", context.fork());
+            let mut index = context.service_data().get_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -294,8 +284,7 @@ mod cryptocurrency {
             arg: RollbackTx,
         ) -> Result<(), ExecutionError> {
             let from = context.caller().author().unwrap();
-
-            let mut index = MapIndex::new("balances", context.fork());
+            let mut index = context.service_data().get_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -313,11 +302,7 @@ mod cryptocurrency {
     }
 
     impl Service for Cryptocurrency {
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }
@@ -406,7 +391,7 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             rust::{CallContext, Interface, Service, Transaction},
-            AnyTx, DispatcherError, InstanceDescriptor, InstanceId, MethodId,
+            AnyTx, BlockchainData, DispatcherError, InstanceId, MethodId,
         },
     };
     use exonum_merkledb::Snapshot;
@@ -431,7 +416,7 @@ mod foreign_interface_call {
         data: Hash,
     }
 
-    #[exonum_service]
+    #[exonum_interface]
     pub trait SelfInterface {
         fn timestamp(&self, context: CallContext<'_>, arg: SelfTx) -> Result<(), ExecutionError>;
 
@@ -482,27 +467,24 @@ mod foreign_interface_call {
         }
     }
 
-    #[exonum_service(interface = "Configure")]
+    #[exonum_interface(interface = "Configure")]
     pub trait Configure {}
 
-    #[exonum_service(interface = "Events")]
+    #[exonum_interface(interface = "Events")]
     pub trait Events {}
 
-    #[exonum_service(interface = "ERC30Tokens")]
+    #[exonum_interface(interface = "ERC30Tokens")]
     pub trait ERC30Tokens {}
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
-        artifact_name = "timestamping",
-        proto_sources = "crate::proto",
-        implements(
-            "SelfInterface",
-            "ForeignInterface",
-            "Configure",
-            "Events",
-            "ERC30Tokens"
-        )
-    )]
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements(
+        "SelfInterface",
+        "ForeignInterface",
+        "Configure",
+        "Events",
+        "ERC30Tokens"
+    ))]
+    #[service_factory(artifact_name = "timestamping", proto_sources = "crate::proto")]
     pub struct Timestamping;
 
     impl SelfInterface for Timestamping {
@@ -538,11 +520,7 @@ mod foreign_interface_call {
     impl ERC30Tokens for Timestamping {}
 
     impl Service for Timestamping {
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }
@@ -582,20 +560,10 @@ mod foreign_interface_call {
 
 /// Writes transactions to the pool and returns their hashes.
 fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>>) -> Vec<Hash> {
-    let fork = blockchain.fork();
-    let mut schema = Schema::new(&fork);
-
     // In the case of the block within `Bencher::iter()`, some transactions
     // may already be present in the pool. We don't particularly care about this.
-    let tx_hashes = transactions
-        .into_iter()
-        .map(|tx| {
-            let hash = tx.object_hash();
-            schema.add_transaction_into_pool(tx);
-            hash
-        })
-        .collect();
-    blockchain.merge(fork.into_patch()).unwrap();
+    let tx_hashes = transactions.iter().map(|tx| tx.object_hash()).collect();
+    blockchain.add_transactions_into_pool(transactions);
     tx_hashes
 }
 
@@ -605,7 +573,7 @@ fn prepare_txs(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>
 /// the benchmark and do not influence its timings.
 fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
     let snapshot = blockchain.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = snapshot.for_core();
 
     assert!(tx_hashes
         .iter()

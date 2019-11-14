@@ -21,10 +21,12 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
+    access::{Access, AccessError, FromAccess},
+    views::{
+        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+    },
     BinaryKey, BinaryValue,
 };
-use crate::views::{IndexAddress, IndexState};
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -34,9 +36,8 @@ use crate::views::{IndexAddress, IndexState};
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct MapIndex<T: IndexAccess, K, V> {
+pub struct MapIndex<T: RawAccess, K, V> {
     base: View<T>,
-    state: IndexState<T, ()>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -80,127 +81,30 @@ pub struct MapIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
-impl<T, K, V> AnyObject<T> for MapIndex<T, K, V>
+impl<T, K, V> FromAccess<T> for MapIndex<T::Base, K, V>
 where
-    T: IndexAccess,
+    T: Access,
     K: BinaryKey,
     V: BinaryValue,
 {
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::Map
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::Map)?;
+        Ok(Self::new(view))
     }
 }
 
 impl<T, K, V> MapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
-    ///
-    /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::Map)
-            .index_name(index_name)
-            .build();
-
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let base = view.into();
         Self {
             base,
-            state,
             _v: PhantomData,
             _k: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
-    ///
-    /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
-    where
-        I: BinaryKey + ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::Map)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-            _k: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::Map)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _k: PhantomData,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::Map)
-            .build();
-
-        Self {
-            base,
-            state,
-            _k: PhantomData,
-            _v: PhantomData,
         }
     }
 
@@ -209,12 +113,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.get_map("name");
     /// assert!(index.get(&1).is_none());
     ///
     /// index.put(&1, 2);
@@ -233,16 +136,16 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.get_map("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
+    /// ```
     pub fn contains<Q>(&self, key: &Q) -> bool
     where
         K: Borrow<Q>,
@@ -257,12 +160,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for v in index.iter() {
     ///     println!("{:?}", v);
@@ -280,12 +182,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for key in index.keys() {
     ///     println!("{}", key);
@@ -303,12 +204,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
@@ -326,12 +226,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for v in index.iter_from(&2) {
     ///     println!("{:?}", v);
@@ -353,12 +252,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     ///
     /// for key in index.keys_from(&2) {
     ///     println!("{}", key);
@@ -380,12 +278,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index: MapIndex<_, u8, u8> = fork.get_map("name");
     /// for val in index.values_from(&2) {
     ///     println!("{}", val);
     /// }
@@ -399,21 +296,28 @@ where
             base_iter: self.base.iter_from(&(), from),
         }
     }
+}
 
+impl<T, K, V> MapIndex<T, K, V>
+where
+    T: RawAccessMut,
+    K: BinaryKey,
+    V: BinaryValue,
+{
     /// Inserts a key-value pair into a map.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.get_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
+    /// ```
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value);
     }
@@ -423,18 +327,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.get_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
+    /// ```
     pub fn remove<Q>(&mut self, key: &Q)
     where
         K: Borrow<Q>,
@@ -453,27 +357,26 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
+    /// let mut index = fork.get_map("name");
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     ///
     /// index.clear();
     /// assert!(!index.contains(&1));
+    /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
     }
 }
 
 impl<'a, T, K, V> std::iter::IntoIterator for &'a MapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
     V: BinaryValue,
 {
@@ -521,8 +424,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Database, TemporaryDB};
     use super::*;
+    use crate::{access::AccessExt, Database, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
 
@@ -532,12 +435,10 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, String, _> = MapIndex::new(IDX_NAME, &fork);
+        let mut index: MapIndex<_, String, _> = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
-
         index.put(&KEY.to_owned(), 0);
         assert_eq!(true, index.contains(KEY));
-
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
     }
@@ -548,7 +449,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, Vec<u8>, _> = MapIndex::new(IDX_NAME, &fork);
+        let mut index: MapIndex<_, Vec<u8>, _> = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
 
         index.put(&KEY.to_owned(), 0);
@@ -562,27 +463,23 @@ mod tests {
     fn test_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut map_index = MapIndex::new(IDX_NAME, &fork);
 
+        let mut map_index = fork.get_map(IDX_NAME);
         assert_eq!(map_index.get(&1_u8), None);
         assert!(!map_index.contains(&1_u8));
 
         map_index.put(&1_u8, 1_u8);
-
         assert_eq!(map_index.get(&1_u8), Some(1_u8));
         assert!(map_index.contains(&1_u8));
 
         map_index.remove(&100_u8);
-
         map_index.remove(&1_u8);
-
         assert!(!map_index.contains(&1_u8));
         assert_eq!(map_index.get(&1_u8), None);
 
         map_index.put(&2_u8, 2_u8);
         map_index.put(&3_u8, 3_u8);
         map_index.clear();
-
         assert!(!map_index.contains(&2_u8));
         assert!(!map_index.contains(&3_u8));
     }
@@ -591,7 +488,7 @@ mod tests {
     fn test_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut map_index = MapIndex::new(IDX_NAME, &fork);
+        let mut map_index = fork.get_map(IDX_NAME);
 
         map_index.put(&1_u8, 1_u8);
         map_index.put(&2_u8, 2_u8);
@@ -601,7 +498,6 @@ mod tests {
             map_index.iter().collect::<Vec<(u8, u8)>>(),
             vec![(1, 1), (2, 2), (3, 3)]
         );
-
         assert_eq!(
             map_index.iter_from(&0).collect::<Vec<(u8, u8)>>(),
             vec![(1, 1), (2, 2), (3, 3)]

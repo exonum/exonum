@@ -318,9 +318,21 @@ impl ValidateInput for NodeConfig {
             capacity.internal_events_capacity
         );
         ensure!(
-            capacity.network_requests_capacity != 0,
+            capacity.network_requests_capacity > 0,
             "network_requests_capacity({}) must be strictly larger than 0",
             capacity.network_requests_capacity
+        );
+
+        let backend_config = &self.network.http_backend_config;
+        ensure!(
+            backend_config.server_restart_max_retries > 0,
+            "server_restart_max_retries({}) must be strictly larger than 0",
+            backend_config.server_restart_max_retries
+        );
+        ensure!(
+            backend_config.server_restart_retry_timeout > 0,
+            "server_restart_retry_timeout({}) must be strictly larger than 0",
+            backend_config.server_restart_retry_timeout
         );
 
         // Sanity checks for cases of accidental negative overflows.
@@ -1007,6 +1019,14 @@ impl Node {
                     .collect::<Vec<_>>()
             },
             api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
+            server_restart_retry_timeout: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_retry_timeout,
+            server_restart_max_retries: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_max_retries,
         };
 
         let handler = NodeHandler::new(
@@ -1158,7 +1178,7 @@ mod tests {
         proto::schema::tests::TxSimple,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            ExecutionError, InstanceDescriptor, InstanceId,
+            BlockchainData, ExecutionError, InstanceId,
         },
     };
 
@@ -1168,18 +1188,18 @@ mod tests {
 
     impl_binary_value_for_pb_message! { TxSimple }
 
-    #[exonum_service(crate = "crate")]
+    #[exonum_interface(crate = "crate")]
     pub trait TestInterface {
         fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_dispatcher(crate = "crate", implements("TestInterface"))]
+    #[service_factory(
         crate = "crate",
         artifact_name = "test-service",
         artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema",
-        implements("TestInterface")
+        proto_sources = "crate::proto::schema"
     )]
     struct TestService;
 
@@ -1190,11 +1210,7 @@ mod tests {
     }
 
     impl Service for TestService {
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }

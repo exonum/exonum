@@ -79,7 +79,7 @@ pub struct CreateWallet {
 }
 
 /// Cryptocurrency service transactions.
-#[exonum_service]
+#[exonum_interface]
 pub trait CryptocurrencyInterface {
     /// Transfers `amount` of the currency from one wallet to another.
     fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
@@ -96,19 +96,16 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             .as_transaction()
             .expect("Wrong `Transfer` initiator");
 
-        let mut schema = Schema::new(context.instance().name, context.fork());
+        let mut schema = Schema::new(context.service_data());
 
         let to = arg.to;
         let amount = arg.amount;
-
         if from == to {
             return Err(Error::SenderSameAsReceiver);
         }
 
-        let sender = schema.wallet(&from).ok_or(Error::SenderNotFound)?;
-
-        let receiver = schema.wallet(&to).ok_or(Error::ReceiverNotFound)?;
-
+        let sender = schema.wallets.get(&from).ok_or(Error::SenderNotFound)?;
+        let receiver = schema.wallets.get(&to).ok_or(Error::ReceiverNotFound)?;
         if sender.balance < amount {
             Err(Error::InsufficientCurrencyAmount)
         } else {
@@ -124,9 +121,9 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             .as_transaction()
             .expect("Wrong `Issue` initiator");
 
-        let mut schema = Schema::new(context.instance().name, context.fork());
+        let mut schema = Schema::new(context.service_data());
 
-        if let Some(wallet) = schema.wallet(&from) {
+        if let Some(wallet) = schema.wallets.get(&from) {
             let amount = arg.amount;
             schema.increase_wallet_balance(wallet, amount, tx_hash);
             Ok(())
@@ -141,9 +138,8 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             .as_transaction()
             .expect("Wrong `CreateWallet` initiator");
 
-        let mut schema = Schema::new(context.instance().name, context.fork());
-
-        if schema.wallet(&from).is_none() {
+        let mut schema = Schema::new(context.service_data());
+        if schema.wallets.get(&from).is_none() {
             let name = &arg.name;
             schema.create_wallet(&from, name, tx_hash);
             Ok(())

@@ -20,10 +20,10 @@ use exonum::{
     helpers::Height,
     runtime::{
         rust::{AfterCommitContext, CallContext, Service},
-        InstanceDescriptor, InstanceId,
+        BlockchainData, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::Snapshot;
 use exonum_proto::ProtobufConvert;
 
@@ -43,7 +43,7 @@ pub struct TxAfterCommit {
     pub height: Height,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait AfterCommitInterface {
     fn handle_after_commit(
         &self,
@@ -58,14 +58,14 @@ impl TxAfterCommit {
     }
 }
 
-#[derive(Clone, Default, Debug, ServiceFactory)]
-#[exonum(
+#[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
+#[service_factory(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
     proto_sources = "crate::proto",
-    service_constructor = "Self::new_instance",
-    implements("AfterCommitInterface")
+    service_constructor = "Self::new_instance"
 )]
+#[service_dispatcher(implements("AfterCommitInterface"))]
 pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,
 }
@@ -95,13 +95,13 @@ impl AfterCommitService {
 }
 
 impl Service for AfterCommitService {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
+
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         self.counter.fetch_add(1, Ordering::SeqCst);
         let tx = TxAfterCommit::new(context.height());
         context.broadcast_transaction(tx);
-    }
-
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
     }
 }

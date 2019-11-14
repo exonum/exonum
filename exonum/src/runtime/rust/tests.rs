@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
-use exonum_derive::exonum_service;
-use exonum_merkledb::{BinaryValue, Entry, Fork, Snapshot};
+use exonum_derive::exonum_interface;
+use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 
@@ -30,8 +30,8 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         error::{ErrorKind, ExecutionError},
-        CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError, DispatcherSchema,
-        ExecutionContext, InstanceDescriptor, InstanceId, InstanceSpec, Mailbox, Runtime,
+        BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
+        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
         StateHashAggregator,
     },
 };
@@ -222,19 +222,19 @@ struct TxB {
     value: u64,
 }
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 trait TestService {
     fn method_a(&self, context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError>;
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(crate = "crate", implements("TestService"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "test_service",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements("TestService")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct TestServiceImpl;
 
@@ -255,12 +255,10 @@ impl<'a> TestServiceClient<'a> {
 
 impl TestService for TestServiceImpl {
     fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
-        {
-            let fork = context.fork();
-            let mut entry = Entry::new("method_a_entry", fork);
-            entry.set(arg.value);
-        }
-
+        context
+            .service_data()
+            .get_entry("method_a_entry")
+            .set(arg.value);
         // Test calling one service from another.
         context
             .interface::<TestServiceClient<'_>>(SERVICE_INSTANCE_ID)?
@@ -270,9 +268,10 @@ impl TestService for TestServiceImpl {
     }
 
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
-        let fork = context.fork();
-        let mut entry = Entry::new("method_b_entry", fork);
-        entry.set(arg.value);
+        context
+            .service_data()
+            .get_entry("method_b_entry")
+            .set(arg.value);
         Ok(())
     }
 }
@@ -280,12 +279,14 @@ impl TestService for TestServiceImpl {
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-        let mut entry = Entry::new("constructor_entry", context.fork());
-        entry.set(init.msg);
+        context
+            .service_data()
+            .get_entry("constructor_entry")
+            .set(init.msg);
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -346,7 +347,8 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = Entry::new("constructor_entry", &fork);
+        let idx_name = format!("{}.constructor_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some("constructor_message".to_owned()));
     }
     commit_block(&mut blockchain, fork);
@@ -379,9 +381,11 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = Entry::new("method_a_entry", &fork);
+        let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
-        let entry = Entry::new("method_b_entry", &fork);
+        let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -411,7 +415,8 @@ fn basic_rust_runtime() {
         .unwrap();
 
     {
-        let entry = Entry::new("method_b_entry", &fork);
+        let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -586,13 +591,13 @@ fn conflicting_service_instances() {
         .unwrap_err();
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements())]
+#[service_factory(
     crate = "crate",
     artifact_name = "dependent_service",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements()
+    proto_sources = "crate::proto::schema"
 )]
 pub struct DependentServiceImpl;
 
@@ -600,13 +605,29 @@ impl Service for DependentServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         assert_eq!(*context.caller(), Caller::Blockchain);
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
-        if context.dispatcher_info().get_instance(&*init.msg).is_none() {
+        if context
+            .data()
+            .for_dispatcher()
+            .get_instance(&*init.msg)
+            .is_none()
+        {
             return Err(ExecutionError::new(ErrorKind::service(0), "no dependency"));
         }
+
+        // Check that it is possible to access data of the dependency right away,
+        // even if it is deployed in the same block.
+        let dependency_data = context
+            .data()
+            .for_service(&*init.msg)
+            .expect("Dependency exists, but its data does not");
+        assert!(dependency_data
+            .get_entry::<_, String>("constructor_entry")
+            .exists());
+
         Ok(())
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

@@ -21,11 +21,11 @@ extern crate exonum_derive;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::{ExecutionError, Schema},
+    blockchain::ExecutionError,
     crypto::{gen_keypair, Hash},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        InstanceDescriptor,
+        BlockchainData, SnapshotExt,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
@@ -50,18 +50,18 @@ impl TxTimestamp {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 trait TimestampingInterface {
     fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "timestamping",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto",
-    implements("TimestampingInterface")
+    proto_sources = "crate::proto"
 )]
+#[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 
 impl TimestampingInterface for TimestampingService {
@@ -75,7 +75,7 @@ impl TimestampingInterface for TimestampingService {
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -105,7 +105,7 @@ fn main() {
 
     // Check results with schema.
     let snapshot = testkit.snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = snapshot.for_core();
     assert!(schema.transactions().contains(&tx1.object_hash()));
     assert!(schema.transactions().contains(&tx2.object_hash()));
     assert!(schema.transactions().contains(&tx3.object_hash()));

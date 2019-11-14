@@ -132,23 +132,22 @@ pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
         Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
-        Snapshot,
+        ReadonlyFork, Snapshot,
     },
     entry::Entry,
     error::Error,
+    group::Group,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
     key_set_index::KeySetIndex,
     keys::BinaryKey,
+    lazy::Lazy,
     list_index::ListIndex,
     map_index::MapIndex,
     options::DbOptions,
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{
-        is_allowed_latin1_char, is_valid_index_name, IndexAccess, IndexAddress, IndexBuilder,
-        ObjectAccess, Ref, RefMut, View,
-    },
+    views::{IndexAddress, IndexType, View},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/type.ProofMapIndex.html
 // does not exist!'
@@ -170,18 +169,22 @@ mod backends;
 mod db;
 mod entry;
 mod error;
+mod group;
 mod hash;
 mod keys;
+mod lazy;
 mod options;
 mod values;
 mod views;
 
+pub mod access;
 pub mod key_set_index;
 pub mod list_index;
 pub mod map_index;
 pub mod proof_list_index;
 pub mod proof_map_index;
 pub mod sparse_list_index;
+pub mod validation;
 pub mod value_set_index;
 
 #[cfg(feature = "with-protobuf")]
@@ -189,6 +192,3 @@ pub mod proto;
 
 #[cfg(feature = "with-protobuf")]
 use exonum_proto::ProtobufConvert;
-
-#[cfg(test)]
-mod tests;

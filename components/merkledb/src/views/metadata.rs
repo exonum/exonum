@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, cell::Cell, io::Error, mem};
+use std::{borrow::Cow, io::Error, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
@@ -20,26 +20,37 @@ use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::BinaryValue;
-
-use super::{IndexAccess, IndexAddress, View};
+use super::{IndexAddress, RawAccess, RawAccessMut, View};
+use crate::{validation::assert_valid_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
-/// Type of the index stored in `IndexMetadata`.
+/// Type of an index supported by Exonum.
+///
 /// `IndexType` is used for type checking indexes when they are created/accessed.
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum IndexType {
+    /// Non-merkelized map index.
     Map = 1,
+    /// Non-merkelized list index.
     List = 2,
+    /// Single entry acting like a Rust `Option`.
     Entry = 3,
+    /// Set index with elements stored in a hash table.
     ValueSet = 4,
+    /// Set index with elements stored as keys in the underlying KV storage.
     KeySet = 5,
+    /// Sparse list index.
     SparseList = 6,
+    /// Merkelized list index.
     ProofList = 7,
+    /// Merkelized map index.
     ProofMap = 8,
+
+    /// Unknown index type.
+    #[doc(hidden)]
     Unknown = 255,
 }
 
@@ -51,9 +62,9 @@ pub trait BinaryAttribute: Sized {
     /// Size of the value.
     fn size(&self) -> usize;
     /// Writes value to specified `buffer`.
-    fn write<W: std::io::Write>(&self, buffer: &mut W);
+    fn write(&self, buffer: &mut Vec<u8>);
     /// Reads value from specified `buffer`.
-    fn read<R: std::io::Read>(buffer: &mut R) -> Result<Self, Error>;
+    fn read(buffer: &[u8]) -> Result<Self, Error>;
 }
 
 /// No-op implementation.
@@ -62,9 +73,9 @@ impl BinaryAttribute for () {
         0
     }
 
-    fn write<W: std::io::Write>(&self, _buffer: &mut W) {}
+    fn write(&self, _buffer: &mut Vec<u8>) {}
 
-    fn read<R: std::io::Read>(_buffer: &mut R) -> Result<Self, Error> {
+    fn read(_buffer: &[u8]) -> Result<Self, Error> {
         Ok(())
     }
 }
@@ -74,12 +85,27 @@ impl BinaryAttribute for u64 {
         mem::size_of_val(self)
     }
 
-    fn write<W: std::io::Write>(&self, buffer: &mut W) {
+    fn write(&self, buffer: &mut Vec<u8>) {
         buffer.write_u64::<LittleEndian>(*self).unwrap()
     }
 
-    fn read<R: std::io::Read>(buffer: &mut R) -> Result<Self, Error> {
+    fn read(mut buffer: &[u8]) -> Result<Self, Error> {
         buffer.read_u64::<LittleEndian>()
+    }
+}
+
+/// Used internally to deserialize generic attribute.
+impl BinaryAttribute for Vec<u8> {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(self)
+    }
+
+    fn read(buffer: &[u8]) -> Result<Self, Error> {
+        Ok(buffer.to_vec())
     }
 }
 
@@ -91,12 +117,17 @@ impl Default for IndexType {
 
 /// Metadata associated with each index. Contains `identifier`, `index_type` and `state`.
 /// In metadata one can store any arbitrary data serialized as byte array.
+///
 /// See also `BinaryAttribute`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct IndexMetadata<V> {
+pub struct IndexMetadata<V = Vec<u8>> {
     identifier: u64,
     index_type: IndexType,
-    state: V,
+    // `state` may be empty for any possible type. `None` option usually represents
+    // a "default" value; it is used on index initialization, or after the index
+    // calls `IndexState::unset()`. `None` option does not occupy space in the metadata
+    // and can therefore be preferable to explicit "default" option.
+    state: Option<V>,
 }
 
 impl<V> BinaryValue for IndexMetadata<V>
@@ -104,22 +135,21 @@ where
     V: BinaryAttribute,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        let state_len = self.state.size();
-        let mut buf = Vec::with_capacity(
-            mem::size_of_val(&self.identifier)
-                + mem::size_of_val(&self.index_type)
-                + mem::size_of::<u32>()
-                + mem::size_of_val(&INDEX_STATE_TAG)
-                + state_len,
-        );
+        let mut capacity = mem::size_of_val(&self.identifier) + mem::size_of_val(&self.index_type);
+        if let Some(ref state) = self.state {
+            capacity += mem::size_of_val(&INDEX_STATE_TAG) + mem::size_of::<u32>() + state.size();
+        }
+        let mut buf = Vec::with_capacity(capacity);
 
         buf.write_u64::<LittleEndian>(self.identifier).unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
-        // Writes index state in TLV (tag, length, value) form.
-        buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
-        buf.write_u32::<LittleEndian>(state_len as u32).unwrap();
-        self.state.write(&mut buf);
+        if let Some(ref state) = self.state {
+            // Writes index state in TLV (tag, length, value) form.
+            buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
+            buf.write_u32::<LittleEndian>(state.size() as u32).unwrap();
+            state.write(&mut buf);
+        }
         buf
     }
 
@@ -128,6 +158,18 @@ where
 
         let identifier = bytes.read_u64::<LittleEndian>()?;
         let index_type = bytes.read_u32::<LittleEndian>()?;
+        let index_type = IndexType::from_u32(index_type)
+            .ok_or_else(|| format_err!("Unknown index type: {}", index_type))?;
+
+        if bytes.is_empty() {
+            // There are no tags in the metadata, correspondingly, no index state.
+            return Ok(Self {
+                identifier,
+                index_type,
+                state: None,
+            });
+        }
+
         // Reads index state in TLV (tag, length, value) form.
         let state_tag = bytes.read_u32::<LittleEndian>()?;
         let state_len = bytes.read_u32::<LittleEndian>()? as usize;
@@ -139,71 +181,78 @@ where
         );
         ensure!(bytes.len() >= state_len, "Index state is too short");
 
-        let mut state_bytes = &bytes[0..state_len];
-        let state = V::read(&mut state_bytes);
-        ensure!(state.is_ok(), "Error while reading the index state. Possibly the index type does not match specified one");
+        let state_bytes = &bytes[0..state_len];
         Ok(Self {
             identifier,
-            index_type: IndexType::from_u32(index_type)
-                .ok_or_else(|| format_err!("Unknown index type: {}", index_type))?,
-            state: state.unwrap(),
+            index_type,
+            state: Some(V::read(state_bytes)?),
         })
     }
 }
 
-impl<V> IndexMetadata<V> {
+impl IndexMetadata {
     fn index_address(&self) -> IndexAddress {
         IndexAddress::new().append_bytes(&self.identifier)
     }
+
+    fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
+        let index_type = self.index_type;
+        IndexMetadata {
+            identifier: self.identifier,
+            index_type,
+            state: self.state.map(|state| {
+                V::read(&state).unwrap_or_else(|e| {
+                    panic!(
+                        "Error while reading state for index with type {:?}: {}. \
+                         This can be caused by database corruption",
+                        index_type, e
+                    );
+                })
+            }),
+        }
+    }
 }
 
-/// Returns index metadata based on provided `index_address` and `index_type`.
-///
-/// Creates new metadata if it does not exist.
-///
-/// Input `index_address` is replaced by output `index_address` based on the value
-/// taken from the indexes pool.
-pub fn index_metadata<T, V>(
+#[derive(Debug)]
+pub struct IndexState<T, V> {
+    metadata: IndexMetadata<V>,
     index_access: T,
-    index_address: &IndexAddress,
-    index_type: IndexType,
-) -> (IndexAddress, IndexState<T, V>)
+    index_full_name: Vec<u8>,
+}
+
+impl<T, V> IndexState<T, V>
 where
-    T: IndexAccess,
-    V: BinaryAttribute + Copy + Default,
+    T: RawAccess,
+    V: BinaryAttribute + Copy,
 {
-    // Actual name.
-    let index_name = index_address.name.clone();
-    // Full name for internal usage.
-    let index_full_name = index_address.fully_qualified_name();
+    pub fn get(&self) -> Option<V> {
+        self.metadata.state
+    }
+}
 
-    let mut pool = IndexesPool::new(index_access.clone());
-    let (metadata, is_new) = if let Some(metadata) = pool.index_metadata(&index_full_name) {
-        assert_eq!(
-            metadata.index_type, index_type,
-            "Index type does not match specified one"
-        );
-        (metadata, false)
-    } else {
-        (
-            pool.create_index_metadata(&index_full_name, index_type),
-            true,
-        )
-    };
+impl<T, V> IndexState<T, V>
+where
+    T: RawAccessMut,
+    V: BinaryAttribute,
+{
+    pub fn set(&mut self, state: V) {
+        self.metadata.state = Some(state);
+        View::new(self.index_access.clone(), INDEXES_POOL_NAME)
+            .put(&self.index_full_name, self.metadata.to_bytes());
+    }
 
-    let mut index_address = metadata.index_address();
-    // Set index address name, since metadata itself doesn't know it.
-    index_address.name = index_name;
-
-    let index_state = IndexState::new(index_access, index_full_name, metadata, is_new);
-    (index_address, index_state)
+    pub fn unset(&mut self) {
+        self.metadata.state = None;
+        View::new(self.index_access.clone(), INDEXES_POOL_NAME)
+            .put(&self.index_full_name, self.metadata.to_bytes());
+    }
 }
 
 /// Persistent pool used to store indexes metadata in the database.
 /// Pool size is used as an identifier of newly created indexes.
-struct IndexesPool<T: IndexAccess>(View<T>);
+struct IndexesPool<T: RawAccess>(View<T>);
 
-impl<T: IndexAccess> IndexesPool<T> {
+impl<T: RawAccess> IndexesPool<T> {
     fn new(index_access: T) -> Self {
         Self(View::new(index_access, INDEXES_POOL_NAME))
     }
@@ -212,135 +261,139 @@ impl<T: IndexAccess> IndexesPool<T> {
         self.0.get(&()).unwrap_or_default()
     }
 
-    fn set_len(&mut self, len: u64) {
-        self.0.put(&(), len)
-    }
-
-    fn index_metadata<V>(&self, index_name: &[u8]) -> Option<IndexMetadata<V>>
-    where
-        V: BinaryAttribute + Default + Copy,
-    {
+    fn index_metadata(&self, index_name: &[u8]) -> Option<IndexMetadata> {
         self.0.get(index_name)
     }
 
+    fn set_len(&mut self, len: u64) {
+        self.0.put_or_forget(&(), len);
+    }
+
+    /// # Return value
+    ///
+    /// Index metadata and a flag set to `true` if the index is phantom (i.e., is not in the storage
+    /// and cannot be persisted because the storage is immutable).
     fn create_index_metadata<V>(
         &mut self,
         index_name: &[u8],
         index_type: IndexType,
-    ) -> IndexMetadata<V>
+    ) -> (IndexMetadata<V>, bool)
     where
-        V: BinaryAttribute + Default + Copy,
+        V: BinaryAttribute,
     {
         let len = self.len();
-
         let metadata = IndexMetadata {
-            index_type,
             identifier: len,
-            state: V::default(),
+            index_type,
+            state: None,
         };
-
-        self.0.put(index_name, metadata.to_bytes());
+        let is_phantom = !self.0.put_or_forget(index_name, metadata.to_bytes());
         self.set_len(len + 1);
-        metadata
+        (metadata, is_phantom)
     }
 }
 
 /// Wrapper struct to manipulate `IndexMetadata` for an index with provided `index_name`.
-/// Metadata value is cached for faster access.
-pub struct IndexState<T, V>
-where
-    V: BinaryAttribute + Default + Copy,
-    T: IndexAccess,
-{
-    index_access: T,
-    index_name: Vec<u8>,
-    cache: Cell<IndexMetadata<V>>,
-    is_new: bool,
+#[derive(Debug)]
+pub struct ViewWithMetadata<T: RawAccess> {
+    view: View<T>,
+    metadata: IndexMetadata,
+    index_full_name: Vec<u8>,
+    is_phantom: bool,
 }
 
-impl<T, V> IndexState<T, V>
+impl<T> ViewWithMetadata<T>
 where
-    V: BinaryAttribute + Default + Copy,
-    T: IndexAccess,
+    T: RawAccess,
 {
-    fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>, is_new: bool) -> Self {
-        Self {
-            index_access,
-            index_name,
-            cache: Cell::new(metadata),
-            is_new,
+    /// Gets an index with the specified address and type. Creates an index if it is not present
+    /// in the storage.
+    ///
+    /// # Return value
+    ///
+    /// Returns `Err(Self)` if the index is in the storage and has a type different from
+    /// the one provided as an argument.
+    pub(crate) fn get_or_create(
+        index_access: T,
+        index_address: &IndexAddress,
+        index_type: IndexType,
+    ) -> Result<Self, Self> {
+        assert_valid_name(index_address.name());
+        // Actual name.
+        let index_name = index_address.name.clone();
+        // Full name for internal usage.
+        let index_full_name = index_address.fully_qualified_name();
+
+        let mut pool = IndexesPool::new(index_access.clone());
+        let mut is_phantom = false;
+        let metadata = pool.index_metadata(&index_full_name).unwrap_or_else(|| {
+            let (metadata, phantom_flag) = pool.create_index_metadata(&index_full_name, index_type);
+            is_phantom = phantom_flag;
+            metadata
+        });
+        let real_index_type = metadata.index_type;
+        let mut index_address = metadata.index_address();
+        // Set index address name, since metadata itself doesn't know it.
+        index_address.name = index_name;
+        let this = Self {
+            view: View::new(index_access, index_address),
+            metadata,
+            index_full_name,
+            is_phantom,
+        };
+        if real_index_type == index_type {
+            Ok(this)
+        } else {
+            Err(this)
         }
     }
 
-    /// Returns stored index metadata from cache.
-    pub fn get(&self) -> V {
-        self.cache.get().state
+    pub fn index_type(&self) -> IndexType {
+        self.metadata.index_type
     }
 
-    /// Get stored index metadata.
-    pub fn metadata(&self) -> IndexMetadata<V> {
-        self.cache.get()
+    pub fn is_phantom(&self) -> bool {
+        self.is_phantom
     }
 
-    /// Updates stored index metadata.
-    pub fn set(&mut self, state: V) {
-        let mut cache = self.cache.get_mut();
-        cache.state = state;
-        View::new(self.index_access.clone(), INDEXES_POOL_NAME)
-            .put(&self.index_name, cache.to_bytes());
-    }
-
-    pub fn is_new(&self) -> bool {
-        self.is_new
-    }
-
-    /// Clears stored index metadata.
-    pub fn clear(&mut self) {
-        self.set(V::default());
+    pub fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
+    where
+        V: BinaryAttribute,
+    {
+        let state = IndexState {
+            metadata: self.metadata.convert(),
+            index_access: self.view.index_access.clone(),
+            index_full_name: self.index_full_name,
+        };
+        (self.view, state)
     }
 }
 
-impl<T, V> std::fmt::Debug for IndexState<T, V>
-where
-    T: IndexAccess,
-    V: BinaryAttribute + Default + Copy,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IndexState")
-            .field("index_name", &self.index_name)
-            .field("is_new", &self.is_new)
-            .finish()
+impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
+    fn from(view_with_metadata: ViewWithMetadata<T>) -> Self {
+        view_with_metadata.view
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    use crate::BinaryValue;
-
-    use super::{BinaryAttribute, IndexMetadata, IndexType};
-
-    #[test]
-    fn test_binary_attribute_read_write() {
-        let mut buf = Vec::new();
-        11_u64.write(&mut buf);
-        12_u64.write(&mut buf);
-        assert_eq!(buf.len(), 16);
-
-        let mut reader = Cursor::new(buf);
-        let a = u64::read(&mut reader).unwrap();
-        let b = u64::read(&mut reader).unwrap();
-        assert_eq!(a, 11);
-        assert_eq!(b, 12);
-    }
+    use super::*;
 
     #[test]
     fn test_index_metadata_binary_value() {
         let metadata = IndexMetadata {
             identifier: 12,
             index_type: IndexType::ProofList,
-            state: 16_u64,
+            state: Some(16_u64),
+        };
+
+        let bytes = metadata.to_bytes();
+        assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
+
+        let metadata = IndexMetadata {
+            identifier: 12,
+            index_type: IndexType::ProofList,
+            state: None::<u64>,
         };
 
         let bytes = metadata.to_bytes();
@@ -353,7 +406,7 @@ mod tests {
         let metadata = IndexMetadata {
             identifier: 12,
             index_type: IndexType::ProofList,
-            state: 16_u64,
+            state: Some(16_u64),
         };
 
         let mut bytes = metadata.to_bytes();

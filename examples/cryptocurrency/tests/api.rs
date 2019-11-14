@@ -37,7 +37,7 @@ use exonum_cryptocurrency::{
     api::WalletQuery,
     contracts::CryptocurrencyService,
     schema::Wallet,
-    transactions::{Config, TxCreateWallet, TxTransfer},
+    transactions::{Config, CreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
@@ -245,7 +245,7 @@ impl CryptocurrencyApi {
     fn create_wallet(&self, name: &str) -> (Verified<AnyTx>, SecretKey) {
         let (pubkey, key) = crypto::gen_keypair();
         // Create a pre-signed transaction
-        let tx = TxCreateWallet {
+        let tx = CreateWallet {
             name: name.to_owned(),
         }
         .sign(INSTANCE_ID, pubkey, &key);

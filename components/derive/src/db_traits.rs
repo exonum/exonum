@@ -99,7 +99,7 @@ impl ToTokens for ObjectHashStruct {
     }
 }
 
-pub fn binary_value(input: TokenStream) -> TokenStream {
+pub fn impl_binary_value(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let db_object = BinaryValueStruct::from_derive_input(&input)
@@ -108,7 +108,7 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
     tokens.into()
 }
 
-pub fn object_hash(input: TokenStream) -> TokenStream {
+pub fn impl_object_hash(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let db_object =

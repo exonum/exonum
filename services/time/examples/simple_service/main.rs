@@ -21,7 +21,10 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
-use exonum_merkledb::{IndexAccess, ObjectHash, RawProofMapIndex, Snapshot};
+use exonum_merkledb::{
+    access::{Access, FromAccess},
+    ObjectHash, ProofMapIndex, Snapshot,
+};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
@@ -31,7 +34,7 @@ use exonum::{
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, Transaction},
-        AnyTx, InstanceDescriptor, InstanceId,
+        AnyTx, BlockchainData, InstanceId, SnapshotExt,
     },
 };
 use exonum_proto::ProtobufConvert;
@@ -57,32 +60,20 @@ const SERVICE_NAME: &str = "marker";
 
 /// Marker service database schema.
 #[derive(Debug)]
-pub struct MarkerSchema<'a, T> {
-    access: T,
-    service_name: &'a str,
+pub struct MarkerSchema<T: Access> {
+    marks: ProofMapIndex<T::Base, PublicKey, i32>,
 }
 
-impl<'a, T: IndexAccess> MarkerSchema<'a, T> {
-    /// Constructs schema for the given `snapshot`.
-    pub fn new(service_name: &'a str, access: T) -> Self {
-        MarkerSchema {
-            service_name,
-            access,
+impl<T: Access> MarkerSchema<T> {
+    fn new(access: T) -> Self {
+        Self {
+            marks: FromAccess::from_access(access, "marks".into()).unwrap(),
         }
     }
 
-    fn index_name(&self, name: &str) -> String {
-        [self.service_name, ".", name].concat()
-    }
-
-    /// Returns the table mapping `i32` value to public keys authoring marker transactions.
-    pub fn marks(&self) -> RawProofMapIndex<T, PublicKey, i32> {
-        RawProofMapIndex::new(self.index_name("marks"), self.access.clone())
-    }
-
     /// Returns hashes for stored table.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks().object_hash()]
+    fn state_hash(&self) -> Vec<Hash> {
+        vec![self.marks.object_hash()]
     }
 }
 
@@ -105,35 +96,36 @@ impl TxMarker {
     }
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait MarkerInterface {
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
     artifact_name = "marker",
     artifact_version = "0.1.0",
-    proto_sources = "proto",
-    implements("MarkerInterface")
+    proto_sources = "proto"
 )]
+#[service_dispatcher(implements("MarkerInterface"))]
 struct MarkerService;
 
 impl MarkerInterface for MarkerService {
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError> {
-        let author = context
+        let (_, author) = context
             .caller()
             .as_transaction()
-            .expect("Wrong `TxMarker` initiator")
-            .1;
+            .expect("Wrong `TxMarker` initiator");
 
-        let time = TimeSchema::new(TIME_SERVICE_NAME, context.fork())
-            .time()
-            .get();
+        let data = context.data();
+        let time_service_data = data
+            .for_service(TIME_SERVICE_NAME)
+            .expect("No time service data");
+        let time = TimeSchema::new(time_service_data).time.get();
         match time {
             Some(current_time) if current_time <= arg.time => {
-                let schema = MarkerSchema::new(context.instance().name, context.fork());
-                schema.marks().put(&author, arg.mark);
+                let mut schema = MarkerSchema::new(context.service_data());
+                schema.marks.put(&author, arg.mark);
             }
             _ => {}
         }
@@ -142,8 +134,8 @@ impl MarkerInterface for MarkerService {
 }
 
 impl Service for MarkerService {
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        MarkerSchema::new(descriptor.name, snapshot).state_hash()
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        MarkerSchema::new(data.for_executing_service()).state_hash()
     }
 }
 
@@ -168,9 +160,10 @@ fn main() {
     testkit.create_blocks_until(Height(2));
 
     let snapshot = testkit.snapshot();
-    let time_schema = TimeSchema::new(TIME_SERVICE_NAME, &snapshot);
+    let snapshot = snapshot.for_service(TIME_SERVICE_NAME).unwrap();
+    let time_schema = TimeSchema::new(snapshot);
     assert_eq!(
-        time_schema.time().get().map(|time| time),
+        time_schema.time.get().map(|time| time),
         Some(mock_provider.time())
     );
 
@@ -193,15 +186,15 @@ fn main() {
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(SERVICE_NAME, &snapshot);
-    assert_eq!(schema.marks().get(&keypair1.0), Some(1));
-    assert_eq!(schema.marks().get(&keypair2.0), Some(2));
-    assert_eq!(schema.marks().get(&keypair3.0), None);
+    let schema = MarkerSchema::new(snapshot.for_service(SERVICE_NAME).unwrap());
+    assert_eq!(schema.marks.get(&keypair1.0), Some(1));
+    assert_eq!(schema.marks.get(&keypair2.0), Some(2));
+    assert_eq!(schema.marks.get(&keypair3.0), None);
 
     let tx4 = TxMarker::signed(4, Utc.timestamp(15, 0), &keypair3.0, &keypair3.1);
     testkit.create_block_with_transactions(txvec![tx4]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(SERVICE_NAME, &snapshot);
-    assert_eq!(schema.marks().get(&keypair3.0), Some(4));
+    let schema = MarkerSchema::new(snapshot.for_service(SERVICE_NAME).unwrap());
+    assert_eq!(schema.marks.get(&keypair3.0), Some(4));
 }

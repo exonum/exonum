@@ -32,7 +32,7 @@ use rand::Rng;
 use serde_json::json;
 
 use crate::inflating_cryptocurrency::{
-    CurrencyService, TxCreateWallet, TxTransfer, SERVICE_ID, SERVICE_NAME,
+    CreateWallet, CurrencyService, Transfer, SERVICE_ID, SERVICE_NAME,
 };
 
 mod inflating_cryptocurrency;
@@ -52,7 +52,7 @@ fn init_testkit() -> TestKit {
 fn create_wallet(api: &TestKitApi, name: &str) -> (Verified<AnyTx>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    let tx = TxCreateWallet {
+    let tx = CreateWallet {
         name: name.to_owned(),
     }
     .sign(SERVICE_ID, pubkey, &key);
@@ -101,14 +101,14 @@ fn test_transfer_scenarios() {
     assert_eq!(get_balance(&api, &tx_bob.author()), 9);
 
     // Transfer funds
-    let tx_a_to_b = TxTransfer {
+    let tx_a_to_b = Transfer {
         to: tx_bob.author(),
         amount: 5,
         seed: 0,
     }
     .sign(SERVICE_ID, tx_alice.author(), &key_alice);
 
-    let next_tx_a_to_b = TxTransfer {
+    let next_tx_a_to_b = Transfer {
         to: tx_bob.author(),
         amount: 6,
         seed: 1,
@@ -168,7 +168,7 @@ fn test_fuzz_transfers() {
     let keys_and_txs: Vec<_> = (0..USERS)
         .map(|i| {
             let (pubkey, key) = crypto::gen_keypair();
-            let tx = TxCreateWallet {
+            let tx = CreateWallet {
                 name: format!("User #{}", i),
             }
             .sign(SERVICE_ID, pubkey, &key);
@@ -195,7 +195,7 @@ fn test_fuzz_transfers() {
             let receiver = &pubkeys[rng.gen_range(0, USERS)];
             let amount = rng.gen_range(1, 2 * height);
 
-            TxTransfer {
+            Transfer {
                 to: *receiver,
                 amount,
                 seed: rng.gen::<u64>(),

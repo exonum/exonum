@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Purpose of this module is to keep functions with reusable code used for sandbox tests
+//! Functions with reusable code used for sandbox tests.
 
 use bit_vec::BitVec;
-use exonum_merkledb::{Database, HashTag, ObjectHash, ProofListIndex, TemporaryDB};
+use exonum_merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB};
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
@@ -207,7 +207,7 @@ pub fn empty_hash() -> Hash {
 
 pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
     let fork = TemporaryDB::new().fork();
-    let mut hashes = ProofListIndex::new("name", &fork);
+    let mut hashes = fork.get_proof_list("name");
     hashes.extend(txs.iter().cloned());
     hashes.object_hash()
 }

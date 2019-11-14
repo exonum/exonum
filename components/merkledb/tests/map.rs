@@ -25,7 +25,7 @@ use proptest::{
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 use exonum_merkledb::{
-    BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+    access::AccessExt, BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 
 use crate::{
@@ -118,7 +118,7 @@ where
 
 impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        Self::new("test", fork)
+        fork.get_map("test")
     }
 
     fn clear(&mut self) {
@@ -128,7 +128,7 @@ impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
 
 impl<V: BinaryValue + ObjectHash> FromFork for ProofMapIndex<Rc<Fork>, Key, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        Self::new("test", fork)
+        fork.get_proof_map("test")
     }
 
     fn clear(&mut self) {
