@@ -45,7 +45,7 @@ mod proof_builder;
 mod tests;
 
 // Necessary to allow building proofs.
-impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndexBase<T, K, V, KeyMode>
+impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
     K: BinaryKey + ObjectHash,
@@ -65,8 +65,16 @@ where
     }
 }
 
-#[doc(hidden)]
-pub struct ProofMapIndexBase<T: RawAccess, K, V, KeyMode: ToProofPath<K>> {
+/// A Merkelized version of a map that provides proofs of existence or non-existence for the map
+/// keys.
+///
+/// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
+/// `ProofMapIndex` requires that keys implement the [`BinaryKey`] trait and
+/// values implement the [`BinaryValue`] trait.
+///
+/// [`BinaryKey`]: ../trait.BinaryKey.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
+pub struct ProofMapIndex<T: RawAccess, K, V, KeyMode: ToProofPath<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, ProofPath>,
     _k: PhantomData<K>,
@@ -169,11 +177,12 @@ impl BinaryAttribute for ProofPath {
     }
 }
 
-impl<T, K, V> FromAccess<T> for ProofMapIndex<T::Base, K, V>
+impl<T, K, V, KeyMode> FromAccess<T> for ProofMapIndex<T::Base, K, V, KeyMode>
 where
     T: Access,
     K: BinaryKey + ObjectHash,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::ProofMap)?;
@@ -181,25 +190,14 @@ where
     }
 }
 
-/// A Merkelized version of a map that provides proofs of existence or non-existence for the map
-/// keys.
-///
-/// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
-/// `ProofMapIndex` requires that keys implement the [`BinaryKey`] trait and
-/// values implement the [`BinaryValue`] trait.
-///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryValue`]: ../trait.BinaryValue.html
-pub type ProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Hashed>;
-
 /// Raw variant of the `ProofMapIndex`, useful for keys that mapped directly to
 /// `ProofPath` without hashing. For example `Hash` and `PublicKey`.
 ///
 /// It's possible to use any type that can be represented with byte array of length 32
 /// as a key for this map.
-pub type RawProofMapIndex<T, K, V> = ProofMapIndexBase<T, K, V, Raw>;
+pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
 
-impl<T, K, V, KeyMode> ProofMapIndexBase<T, K, V, KeyMode>
+impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
     K: BinaryKey + ObjectHash,
@@ -483,7 +481,7 @@ where
     }
 }
 
-impl<T, K, V, KeyMode> ProofMapIndexBase<T, K, V, KeyMode>
+impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccessMut,
     K: BinaryKey + ObjectHash,
@@ -785,7 +783,7 @@ where
     }
 }
 
-impl<T, K, V, KeyMode> ObjectHash for ProofMapIndexBase<T, K, V, KeyMode>
+impl<T, K, V, KeyMode> ObjectHash for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
     K: BinaryKey + ObjectHash,
@@ -870,7 +868,7 @@ where
     }
 }
 
-impl<T, K, V, KeyMode> fmt::Debug for ProofMapIndexBase<T, K, V, KeyMode>
+impl<T, K, V, KeyMode> fmt::Debug for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
     K: BinaryKey + ObjectHash,
@@ -879,7 +877,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct Entry<'a, T: RawAccess, K: ObjectHash, V: BinaryValue, KeyMode: ToProofPath<K>> {
-            index: &'a ProofMapIndexBase<T, K, V, KeyMode>,
+            index: &'a ProofMapIndex<T, K, V, KeyMode>,
             path: ProofPath,
             hash: Hash,
             node: Node,
@@ -893,7 +891,7 @@ where
             KeyMode: ToProofPath<K>,
         {
             fn new(
-                index: &'a ProofMapIndexBase<T, K, V, KeyMode>,
+                index: &'a ProofMapIndex<T, K, V, KeyMode>,
                 hash: Hash,
                 path: ProofPath,
             ) -> Self {

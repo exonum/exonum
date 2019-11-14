@@ -16,10 +16,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
-use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
-    Entry, ObjectHash, ProofMapIndex,
-};
+use exonum_merkledb::{access::{Access, FromAccess, RawAccessMut}, Entry, ObjectHash, RawProofMapIndex};
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, transactions::Config};
@@ -73,7 +70,7 @@ impl TimestampEntry {
 #[derive(Debug)]
 pub struct Schema<T: Access> {
     pub config: Entry<T::Base, Config>,
-    pub timestamps: ProofMapIndex<T::Base, Hash, TimestampEntry>,
+    pub timestamps: RawProofMapIndex<T::Base, Hash, TimestampEntry>,
 }
 
 impl<T: Access> Schema<T> {

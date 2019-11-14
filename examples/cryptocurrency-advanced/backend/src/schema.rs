@@ -14,10 +14,7 @@
 
 //! Cryptocurrency database schema.
 
-use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
-    Group, ObjectHash, ProofListIndex, ProofMapIndex,
-};
+use exonum_merkledb::{access::{Access, FromAccess, RawAccessMut}, Group, ObjectHash, ProofListIndex, RawProofMapIndex};
 
 use exonum::crypto::{Hash, PublicKey};
 
@@ -27,7 +24,7 @@ use crate::{wallet::Wallet, INITIAL_BALANCE};
 #[derive(Debug)]
 pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
-    pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
+    pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
     /// History for specific wallets.
     pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
 }
