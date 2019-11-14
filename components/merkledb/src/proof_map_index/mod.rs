@@ -87,9 +87,9 @@ pub struct ProofMapIndex<T: RawAccess, K, V, KeyMode: ToProofPath<K> = Hashed> {
 /// This struct is created by the [`iter`] or
 /// [`iter_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
-/// [`iter`]: type.ProofMapIndex.html#method.iter
-/// [`iter_from`]: type.ProofMapIndex.html#method.iter_from
-/// [`ProofMapIndex`]: type.ProofMapIndex.html
+/// [`iter`]: struct.ProofMapIndex.html#method.iter
+/// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexIter<'a, K, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
@@ -101,9 +101,9 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// This struct is created by the [`keys`] or
 /// [`keys_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
-/// [`keys`]: type.ProofMapIndex.html#method.keys
-/// [`keys_from`]: type.ProofMapIndex.html#method.keys_from
-/// [`ProofMapIndex`]: type.ProofMapIndex.html
+/// [`keys`]: struct.ProofMapIndex.html#method.keys
+/// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
     base_iter: ViewIter<'a, Vec<u8>, ()>,
@@ -115,9 +115,9 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// This struct is created by the [`values`] or
 /// [`values_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
-/// [`values`]: type.ProofMapIndex.html#method.values
-/// [`values_from`]: type.ProofMapIndex.html#method.values_from
-/// [`ProofMapIndex`]: type.ProofMapIndex.html
+/// [`values`]: struct.ProofMapIndex.html#method.values
+/// [`values_from`]: struct.ProofMapIndex.html#method.values_from
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,

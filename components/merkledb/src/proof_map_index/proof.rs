@@ -233,7 +233,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
 /// #    access::AccessExt, Database, TemporaryDB, BinaryValue, MapProof, HashTag,
-/// #    proof_map_index::ProofPath,
+/// #    proof_map_index::{Hashed, ToProofPath},
 /// # };
 /// # use exonum_crypto::hash;
 /// # fn main() {
@@ -264,8 +264,8 @@ impl<K, V> OptionalEntry<K, V> {
 /// (e.g., ordering of `proof`; see [`check()`]) only if these invariants are checked
 /// during proof verification.
 ///
-/// [`get_proof()`]: type.ProofMapIndex.html#method.get_proof
-/// [`get_multiproof()`]: type.ProofMapIndex.html#method.get_multiproof
+/// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
+/// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -547,7 +547,7 @@ where
     /// assert_eq!(checked_proof.index_hash(), map.object_hash());
     /// ```
     ///
-    /// [`ProofMapIndex`]: type.ProofMapIndex.html
+    /// [`ProofMapIndex`]: struct.ProofMapIndex.html
     pub fn check(&self) -> Result<CheckedMapProof<'_, K, V>, MapProofError> {
         self.precheck()?;
 

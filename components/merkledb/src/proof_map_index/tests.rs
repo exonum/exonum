@@ -118,7 +118,6 @@ where
         let db = TemporaryDB::default();
         let fork = db.fork();
         let mut index = fork.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork);
 
         assert_eq!(index.get(&[1; 32]), None);
         assert!(!index.contains(&[1; 32]));
@@ -153,12 +152,10 @@ where
         let fork2 = db2.fork();
 
         let mut index1 = fork1.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork1);
         index1.put(&[255; 32], vec![1]);
         index1.put(&[254; 32], vec![2]);
 
         let mut index2 = fork2.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork2);
         index2.put(&[254; 32], vec![2]);
         index2.put(&[255; 32], vec![1]);
 
@@ -246,7 +243,6 @@ where
 
         let fork2 = db2.fork();
         let mut index2 = fork2.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork2);
         index2.put(&[255; 32], vec![6]);
         index2.remove(&[255; 32]);
 
@@ -259,7 +255,7 @@ where
         let db2 = TemporaryDB::default();
         let fork1 = db1.fork();
         let mut index1 = fork1.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork1);
+
         index1.put(&[255; 32], vec![1]);
         index1.put(&[250; 32], vec![2]);
         index1.put(&[245; 32], vec![3]);
@@ -269,7 +265,6 @@ where
 
         let fork2 = db2.fork();
         let mut index2 = fork2.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork2);
         index2.put(&[250; 32], vec![2]);
         index2.put(&[255; 32], vec![1]);
         index2.put(&[245; 32], vec![3]);
@@ -292,7 +287,7 @@ where
         let db2 = TemporaryDB::default();
         let fork1 = db1.fork();
         let mut index1 = fork1.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork1);
+
         index1.put(&[42; 32], vec![1]);
         index1.put(&[64; 32], vec![2]);
         index1.put(&[240; 32], vec![3]);
@@ -309,7 +304,7 @@ where
 
         let fork2 = db2.fork();
         let mut index2 = fork2.proof_map::<_, _, _, S>(IDX_NAME);
-        (IDX_NAME, &fork2);
+
         index2.put(&[255; 32], vec![6]);
         index2.put(&[250; 32], vec![5]);
         index2.put(&[245; 32], vec![4]);
