@@ -24,24 +24,24 @@ use crate::{
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, Transaction},
-        AnyTx, InstanceDescriptor, InstanceId,
+        AnyTx, BlockchainData, InstanceId,
     },
 };
 
 pub const DATA_SIZE: usize = 64;
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 pub trait TimestampingInterface {
     fn timestamp(&self, context: CallContext<'_>, arg: TimestampTx) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("TimestampingInterface"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "timestamping",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements("TimestampingInterface")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct TimestampingService;
 
@@ -56,7 +56,7 @@ impl TimestampingInterface for TimestampingService {
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 }

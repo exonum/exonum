@@ -27,7 +27,8 @@ use proptest::{
 use std::rc::Rc;
 
 use exonum_merkledb::{
-    BinaryValue, Fork, HashTag, ListIndex, ObjectHash, ProofListIndex, TemporaryDB,
+    access::AccessExt, BinaryValue, Fork, HashTag, ListIndex, ObjectHash, ProofListIndex,
+    TemporaryDB,
 };
 
 mod common;
@@ -156,7 +157,7 @@ where
 
 impl<V: BinaryValue> FromFork for ListIndex<Rc<Fork>, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        Self::new("test", fork)
+        fork.get_list("test")
     }
 
     fn clear(&mut self) {
@@ -166,7 +167,7 @@ impl<V: BinaryValue> FromFork for ListIndex<Rc<Fork>, V> {
 
 impl<V: BinaryValue> FromFork for ProofListIndex<Rc<Fork>, V> {
     fn from_fork(fork: Rc<Fork>) -> Self {
-        Self::new("test", fork)
+        fork.get_proof_list("test")
     }
 
     fn clear(&mut self) {

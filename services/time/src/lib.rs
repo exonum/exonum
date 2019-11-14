@@ -44,11 +44,10 @@ pub mod transactions;
 
 use exonum::{
     crypto::Hash,
-    helpers::validator::validator_id,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, Service},
-        InstanceDescriptor,
+        BlockchainData,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -65,39 +64,42 @@ use crate::{
 // It should be configurable through the configuration service.
 
 /// Define the service.
-#[derive(Debug)]
+#[derive(Debug, ServiceDispatcher)]
+#[service_dispatcher(implements("TimeOracleInterface"))]
 pub struct TimeService {
     /// Current time.
     time: Arc<dyn TimeProvider>,
 }
 
 impl Service for TimeService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi.wire(builder);
-        api::PrivateApi.wire(builder);
-    }
-
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = TimeSchema::new(descriptor.name, snapshot);
-        schema.state_hash()
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        TimeSchema::new(data.for_executing_service()).state_hash()
     }
 
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         // The transaction must be created by the validator.
-        if validator_id(context.snapshot, context.service_keypair.0).is_some() {
+        if context
+            .data()
+            .for_core()
+            .validator_id(context.service_keypair.0)
+            .is_some()
+        {
             context.broadcast_transaction(TxTime::new(self.time.current_time()));
         }
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi.wire(builder);
+        api::PrivateApi.wire(builder);
     }
 }
 
 /// Time oracle service factory implementation.
 #[derive(Debug, ServiceFactory)]
-#[exonum(
+#[service_factory(
     proto_sources = "proto",
-    service_name = "TimeService",
-    service_constructor = "TimeServiceFactory::create_instance",
-    implements("TimeOracleInterface")
+    service_constructor = "TimeServiceFactory::create_instance"
 )]
 pub struct TimeServiceFactory {
     time_provider: Arc<dyn TimeProvider>,

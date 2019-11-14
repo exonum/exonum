@@ -20,11 +20,11 @@ use exonum::{
     crypto::{Hash, PublicKey},
     runtime::{
         rust::{CallContext, Service},
-        CallInfo, Caller, ExecutionError, InstanceDescriptor, InstanceId,
+        BlockchainData, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
-use exonum_merkledb::Snapshot;
+use exonum_derive::*;
+use exonum_merkledb::{access::Access, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -41,40 +41,42 @@ pub struct TxCreateWallet {
     pub name: String,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait WalletInterface {
     fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "wallet-service",
-    proto_sources = "proto",
-    implements("WalletInterface", "IssueReceiver")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("WalletInterface", "IssueReceiver"))]
+#[service_factory(artifact_name = "wallet-service", proto_sources = "proto")]
 pub struct WalletService;
 
 impl WalletService {
     pub const ID: InstanceId = 24;
+
+    pub fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> WalletSchema<impl Access + 'a> {
+        WalletSchema::new(snapshot.for_service(Self::ID).unwrap())
+    }
 }
 
 impl Service for WalletService {
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
 
 impl WalletInterface for WalletService {
     fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError> {
-        let (owner, fork) = context
-            .verify_caller(Caller::author)
+        let owner = context
+            .caller()
+            .author()
             .ok_or(Error::WrongInterfaceCaller)?;
+        let mut schema = WalletSchema::new(context.service_data());
 
-        let mut wallets = WalletSchema::new(fork).wallets();
-        if wallets.contains(&owner) {
+        if schema.wallets.contains(&owner) {
             return Err(Error::WalletAlreadyExists.into());
         }
-        wallets.put(
+        schema.wallets.put(
             &owner,
             Wallet {
                 name: arg.name,
@@ -87,18 +89,18 @@ impl WalletInterface for WalletService {
 
 impl IssueReceiver for WalletService {
     fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError> {
-        let (instance_id, fork) = context
-            .verify_caller(Caller::as_service)
+        let instance_id = context
+            .caller()
+            .as_service()
             .ok_or(Error::WrongInterfaceCaller)?;
-
         if instance_id != DepositService::ID {
             return Err(Error::UnauthorizedIssuer.into());
         }
 
-        let mut wallets = WalletSchema::new(fork).wallets();
-        let mut wallet = wallets.get(&arg.to).ok_or(Error::WalletNotFound)?;
+        let mut schema = WalletSchema::new(context.service_data());
+        let mut wallet = schema.wallets.get(&arg.to).ok_or(Error::WalletNotFound)?;
         wallet.balance += arg.amount;
-        wallets.put(&arg.to, wallet);
+        schema.wallets.put(&arg.to, wallet);
         Ok(())
     }
 }
@@ -110,17 +112,14 @@ pub struct TxIssue {
     pub amount: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait DepositInterface {
     fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "deposit-service",
-    proto_sources = "proto",
-    implements("DepositInterface")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "deposit-service", proto_sources = "proto")]
+#[service_dispatcher(implements("DepositInterface"))]
 pub struct DepositService;
 
 impl DepositService {
@@ -128,7 +127,7 @@ impl DepositService {
 }
 
 impl Service for DepositService {
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
@@ -158,7 +157,7 @@ pub struct TxRecursiveCall {
     pub depth: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait AnyCall {
     fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
 
@@ -169,12 +168,9 @@ pub trait AnyCall {
     ) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
-    artifact_name = "any-call-service",
-    proto_sources = "proto",
-    implements("AnyCall")
-)]
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "any-call-service", proto_sources = "proto")]
+#[service_dispatcher(implements("AnyCall"))]
 pub struct AnyCallService;
 
 impl AnyCallService {
@@ -210,7 +206,7 @@ impl AnyCall for AnyCallService {
 }
 
 impl Service for AnyCallService {
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }

@@ -15,8 +15,7 @@
 //! Exonum-time API.
 
 use chrono::{DateTime, Utc};
-
-use exonum::{blockchain::Schema, crypto::PublicKey, runtime::api};
+use exonum::{crypto::PublicKey, runtime::api};
 
 use crate::TimeSchema;
 
@@ -39,9 +38,7 @@ impl PublicApi {
         state: &api::ServiceApiState<'_>,
         _query: (),
     ) -> api::Result<Option<DateTime<Utc>>> {
-        Ok(TimeSchema::new(state.instance.name, state.snapshot())
-            .time()
-            .get())
+        Ok(TimeSchema::new(state.service_data()).time.get())
     }
 
     /// Extend API.
@@ -61,12 +58,10 @@ impl PrivateApi {
     pub fn all_validators_times(
         state: &api::ServiceApiState<'_>,
     ) -> api::Result<Vec<ValidatorTime>> {
-        let view = state.snapshot();
-        let schema = TimeSchema::new(state.instance.name, view);
-        let idx = schema.validators_times();
-
+        let schema = TimeSchema::new(state.service_data());
         // All available times of the validators.
-        let validators_times = idx
+        let validators_times = schema
+            .validators_times
             .iter()
             .map(|(public_key, time)| ValidatorTime {
                 public_key,
@@ -80,10 +75,8 @@ impl PrivateApi {
     pub fn current_validators_time(
         state: &api::ServiceApiState<'_>,
     ) -> api::Result<Vec<ValidatorTime>> {
-        let view = state.snapshot();
-        let validator_keys = Schema::new(view).consensus_config().validator_keys;
-        let schema = TimeSchema::new(state.instance.name, view);
-        let idx = schema.validators_times();
+        let validator_keys = state.data().for_core().consensus_config().validator_keys;
+        let schema = TimeSchema::new(state.service_data());
 
         // Times of the current validators.
         // `None` if the time of the validator is unknown.
@@ -91,7 +84,7 @@ impl PrivateApi {
             .iter()
             .map(|validator| ValidatorTime {
                 public_key: validator.service_key,
-                time: idx.get(&validator.service_key),
+                time: schema.validators_times.get(&validator.service_key),
             })
             .collect::<Vec<_>>();
         Ok(validators_times)

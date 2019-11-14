@@ -1178,7 +1178,7 @@ mod tests {
         proto::schema::tests::TxSimple,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            ExecutionError, InstanceDescriptor, InstanceId,
+            BlockchainData, ExecutionError, InstanceId,
         },
     };
 
@@ -1188,18 +1188,18 @@ mod tests {
 
     impl_binary_value_for_pb_message! { TxSimple }
 
-    #[exonum_service(crate = "crate")]
+    #[exonum_interface(crate = "crate")]
     pub trait TestInterface {
         fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_dispatcher(crate = "crate", implements("TestInterface"))]
+    #[service_factory(
         crate = "crate",
         artifact_name = "test-service",
         artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema",
-        implements("TestInterface")
+        proto_sources = "crate::proto::schema"
     )]
     struct TestService;
 
@@ -1210,11 +1210,7 @@ mod tests {
     }
 
     impl Service for TestService {
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }

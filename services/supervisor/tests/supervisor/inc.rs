@@ -20,11 +20,14 @@ use exonum::{
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{CallContext, Service},
-        Caller, DispatcherError, InstanceDescriptor, InstanceId,
+        BlockchainData, DispatcherError, InstanceId,
     },
 };
-use exonum_derive::{exonum_service, BinaryValue, ObjectHash, ServiceFactory};
-use exonum_merkledb::{Entry, IndexAccess, Snapshot};
+use exonum_derive::*;
+use exonum_merkledb::{
+    access::{Access, FromAccess, RawAccessMut},
+    Entry, Snapshot,
+};
 use exonum_proto::ProtobufConvert;
 
 use crate::proto;
@@ -34,36 +37,37 @@ pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
 #[derive(Debug)]
-pub struct Schema<'a, T> {
-    name: &'a str,
-    access: T,
+pub struct Schema<T: Access> {
+    count: Entry<T::Base, u64>,
+    params: Entry<T::Base, String>,
 }
 
-impl<'a, T: IndexAccess> Schema<'a, T> {
-    pub fn new(name: &'a str, access: T) -> Self {
-        Schema { name, access }
-    }
-
-    fn index_name(&self, name: &str) -> String {
-        [SERVICE_NAME, ".", name].concat()
-    }
-
-    fn entry(&self) -> Entry<T, u64> {
-        Entry::new(self.index_name("count"), self.access.clone())
+impl<T: Access> Schema<T> {
+    pub fn new(access: T) -> Self {
+        Self {
+            count: FromAccess::from_access(access.clone(), "count".into()).unwrap(),
+            params: FromAccess::from_access(access, "params".into()).unwrap(),
+        }
     }
 
     pub fn count(&self) -> Option<u64> {
-        self.entry().get()
+        self.count.get()
     }
+}
 
+impl<T> Schema<T>
+where
+    T: Access,
+    T::Base: RawAccessMut,
+{
     fn inc(&mut self) -> u64 {
-        let count = self
+        let new_count = self
             .count()
             .unwrap_or(0)
             .checked_add(1)
             .expect("attempt to add with overflow");
-        self.entry().set(count);
-        count
+        self.count.set(new_count);
+        new_count
     }
 }
 
@@ -71,30 +75,29 @@ impl<'a, T: IndexAccess> Schema<'a, T> {
     Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
 )]
 #[protobuf_convert(source = "proto::TxInc")]
-pub struct TxInc {
+pub struct Inc {
     pub seed: u64,
 }
 
-#[exonum_service]
+#[exonum_interface]
 pub trait IncInterface {
-    fn inc(&self, context: CallContext<'_>, arg: TxInc) -> Result<(), ExecutionError>;
+    fn inc(&self, context: CallContext<'_>, arg: Inc) -> Result<(), ExecutionError>;
 }
 
 /// Very simple test service that has one tx and one endpoint.
 /// Basically, it just counts how many time the tx was received.
-#[derive(Clone, Default, Debug, ServiceFactory)]
-#[exonum(
+#[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(implements("IncInterface", "Configure<Params = String>"))]
+#[service_factory(
     artifact_name = "inc",
     artifact_version = "1.0.0",
-    proto_sources = "proto",
-    implements("IncInterface", "Configure<Params = String>")
+    proto_sources = "proto"
 )]
 pub struct IncService;
 
 impl IncInterface for IncService {
-    fn inc(&self, context: CallContext<'_>, _arg: TxInc) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.instance().name, context.fork());
-        schema.inc();
+    fn inc(&self, context: CallContext<'_>, _arg: Inc) -> Result<(), ExecutionError> {
+        Schema::new(context.service_data()).inc();
         Ok(())
     }
 }
@@ -104,9 +107,7 @@ pub struct PublicApi;
 
 impl PublicApi {
     fn counter(state: &api::ServiceApiState<'_>, _query: ()) -> api::Result<u64> {
-        let snapshot = state.snapshot();
-        let schema = Schema::new(&state.instance.name, snapshot);
-        schema
+        Schema::new(state.service_data())
             .count()
             .ok_or_else(|| api::Error::NotFound("Counter is not set yet".to_owned()))
     }
@@ -117,12 +118,12 @@ impl PublicApi {
 }
 
 impl Service for IncService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        PublicApi::wire(builder);
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
 
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        PublicApi::wire(builder);
     }
 }
 
@@ -141,7 +142,8 @@ impl Configure for IncService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(Caller::as_supervisor)
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {
@@ -156,13 +158,16 @@ impl Configure for IncService {
         context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        let (_, fork) = context
-            .verify_caller(Caller::as_supervisor)
+        context
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());
+        Schema::new(context.service_data())
+            .params
+            .set(params.clone());
 
-        match params.as_ref() {
+        match params.as_str() {
             "apply_error" => {
                 Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
             }

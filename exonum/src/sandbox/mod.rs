@@ -14,7 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, HashTag, IndexAccess, MapProof, ObjectHash, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, TemporaryDB};
 use exonum_proto::impl_binary_value_for_pb_message;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -1069,7 +1069,7 @@ impl SandboxBuilder {
     }
 }
 
-impl<T: IndexAccess> Schema<T> {
+impl Schema<&Fork> {
     /// Removes transaction from the persistent pool.
     fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool().contains(hash);
@@ -1265,14 +1265,14 @@ mod tests {
         proto::schema::tests::TxAfterCommit,
         runtime::{
             rust::{AfterCommitContext, CallContext, Service, Transaction},
-            AnyTx, InstanceDescriptor, InstanceId,
+            AnyTx, BlockchainData, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
 
     use super::*;
 
-    #[exonum_service(crate = "crate")]
+    #[exonum_interface(crate = "crate")]
     pub trait AfterCommitInterface {
         fn after_commit(
             &self,
@@ -1281,13 +1281,13 @@ mod tests {
         ) -> Result<(), ExecutionError>;
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_dispatcher(crate = "crate", implements("AfterCommitInterface"))]
+    #[service_factory(
         crate = "crate",
         artifact_name = "after_commit",
         artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema",
-        implements("AfterCommitInterface")
+        proto_sources = "crate::proto::schema"
     )]
     pub struct AfterCommitService;
 
@@ -1302,17 +1302,13 @@ mod tests {
     }
 
     impl Service for AfterCommitService {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+            vec![]
+        }
+
         fn after_commit(&self, context: AfterCommitContext<'_>) {
             let tx = TxAfterCommit::new_with_height(context.height());
             context.broadcast_signed_transaction(tx);
-        }
-
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
-            vec![]
         }
     }
 

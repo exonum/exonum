@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::{blockchain::Schema, crypto::PublicKey, runtime::rust::CallContext};
-use exonum_merkledb::IndexAccess;
+use exonum::runtime::rust::CallContext;
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, schema::TimeSchema, TimeService};
@@ -43,82 +42,8 @@ impl TxTime {
     }
 }
 
-impl TxTime {
-    pub(crate) fn check_signed_by_validator(
-        &self,
-        snapshot: impl IndexAccess,
-        author: &PublicKey,
-    ) -> Result<(), Error> {
-        let keys = Schema::new(snapshot).consensus_config().validator_keys;
-        let signed = keys.iter().any(|k| k.service_key == *author);
-        if !signed {
-            Err(Error::UnknownSender)
-        } else {
-            Ok(())
-        }
-    }
-
-    pub(crate) fn update_validator_time(
-        &self,
-        service_name: &str,
-        fork: impl IndexAccess,
-        author: &PublicKey,
-    ) -> Result<(), Error> {
-        let schema = TimeSchema::new(service_name, fork);
-        let mut validators_times = schema.validators_times();
-        match validators_times.get(author) {
-            // The validator time in the storage should be less than in the transaction.
-            Some(time) if time >= self.time => Err(Error::ValidatorTimeIsGreater),
-            // Write the time for the validator.
-            _ => {
-                validators_times.put(author, self.time);
-                Ok(())
-            }
-        }
-    }
-
-    pub(crate) fn update_consolidated_time(service_name: &str, access: impl IndexAccess) {
-        let keys = Schema::new(access.clone())
-            .consensus_config()
-            .validator_keys;
-        let schema = TimeSchema::new(service_name, access);
-
-        // Find all known times for the validators.
-        let validator_times = {
-            let idx = schema.validators_times();
-            let mut times = idx
-                .iter()
-                .filter_map(|(public_key, time)| {
-                    keys.iter()
-                        .find(|validator| validator.service_key == public_key)
-                        .map(|_| time)
-                })
-                .collect::<Vec<_>>();
-            // Ordering time from highest to lowest.
-            times.sort_by(|a, b| b.cmp(a));
-            times
-        };
-
-        // The largest number of Byzantine nodes.
-        let max_byzantine_nodes = (keys.len() - 1) / 3;
-        if validator_times.len() <= 2 * max_byzantine_nodes {
-            return;
-        }
-
-        let mut time = schema.time();
-        match time.get() {
-            // Selected time should be greater than the time in the storage.
-            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {}
-            _ => {
-                // Change the time in the storage.
-                time.set(validator_times[max_byzantine_nodes]);
-            }
-        }
-    }
-}
-
 /// Time oracle service transaction.
-#[exonum_service]
+#[exonum_interface]
 pub trait TimeOracleInterface {
     /// Receives a new time from one of validators.
     fn time(&self, ctx: CallContext<'_>, arg: TxTime) -> Result<(), Error>;
@@ -126,15 +51,20 @@ pub trait TimeOracleInterface {
 
 impl TimeOracleInterface for TimeService {
     fn time(&self, context: CallContext<'_>, arg: TxTime) -> Result<(), Error> {
-        let author = context
-            .caller()
-            .as_transaction()
-            .expect("Wrong `TxTime` initiator")
-            .1;
+        let author = context.caller().author().ok_or(Error::UnknownSender)?;
+        // Check that the transaction is signed by a validator.
+        let core_schema = context.data().for_core();
+        core_schema
+            .validator_id(author)
+            .ok_or(Error::UnknownSender)?;
 
-        arg.check_signed_by_validator(context.fork(), &author)?;
-        arg.update_validator_time(context.instance().name, context.fork(), &author)?;
-        TxTime::update_consolidated_time(context.instance().name, context.fork());
+        let mut schema = TimeSchema::new(context.service_data());
+        schema
+            .update_validator_time(author, arg.time)
+            .map_err(|()| Error::ValidatorTimeIsGreater)?;
+
+        let validator_keys = core_schema.consensus_config().validator_keys;
+        schema.update_consolidated_time(&validator_keys);
         Ok(())
     }
 }

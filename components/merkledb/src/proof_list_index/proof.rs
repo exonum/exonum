@@ -57,12 +57,12 @@ impl HashedEntry {
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     Database, TemporaryDB, BinaryValue, ListProof, ProofListIndex, ObjectHash,
+/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, ListProof, ObjectHash,
 /// # };
 /// # use failure::Error;
 /// # fn main() -> Result<(), Error> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut list = ProofListIndex::new("index", &fork);
+/// let mut list = fork.get_proof_list("index");
 /// list.extend(vec![100_u32, 200_u32, 300_u32]);
 ///
 /// // Get the proof from the index
@@ -92,10 +92,12 @@ impl HashedEntry {
 ///
 /// ```
 /// # use serde_json::{self, json};
-/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, HashTag, ListProof, ProofListIndex};
+/// # use exonum_merkledb::{
+/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, HashTag, ListProof,
+/// # };
 /// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut list = ProofListIndex::new("index", &fork);
+/// let mut list = fork.get_proof_list("index");
 /// list.extend(vec![1_u32, 2, 3]);
 /// let h1 = HashTag::hash_leaf(&1_u32.to_bytes());
 /// let h3 = HashTag::hash_leaf(&3_u32.to_bytes());
@@ -621,7 +623,7 @@ pub enum ListProofError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Database, ProofListIndex, TemporaryDB};
+    use crate::{access::AccessExt, Database, TemporaryDB};
 
     fn entry(height: u8, index: u64) -> HashedEntry {
         HashedEntry::new(
@@ -792,7 +794,7 @@ mod tests {
 
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list = ProofListIndex::new("test", &fork);
+        let mut list = fork.get_proof_list("test");
         list.extend(0_u32..8);
 
         for len in 1..8 {

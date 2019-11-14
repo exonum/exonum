@@ -18,35 +18,36 @@ use exonum_merkledb::BinaryValue;
 use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
 use crate::{
-    blockchain::{ConsensusConfig, ExecutionError, Schema},
+    blockchain::{ConsensusConfig, ExecutionError},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
     merkledb::Snapshot,
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        InstanceDescriptor, InstanceId,
+        BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
-#[exonum_service(crate = "crate")]
+#[exonum_interface(crate = "crate")]
 pub trait ConfigUpdaterInterface {
     fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
 }
 
-#[derive(Debug, ServiceFactory)]
-#[exonum(
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ConfigUpdaterInterface"))]
+#[service_factory(
     crate = "crate",
     artifact_name = "config_updater",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema",
-    implements("ConfigUpdaterInterface")
+    proto_sources = "crate::proto::schema"
 )]
 pub struct ConfigUpdaterService;
 
 impl ConfigUpdaterInterface for ConfigUpdaterService {
     fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
-        Schema::new(context.fork())
+        context
+            .writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
@@ -54,13 +55,13 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
 }
 
 impl Service for ConfigUpdaterService {
-    fn state_hash(&self, _instance: InstanceDescriptor<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
 }
 
 impl ConfigUpdaterService {
-    pub const ID: InstanceId = 2;
+    pub const ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 }
 
 impl TxConfig {

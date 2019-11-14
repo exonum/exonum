@@ -181,7 +181,7 @@ mod tests {
         messages::{AnyTx, Verified},
         runtime::{
             rust::{CallContext, Service, Transaction},
-            InstanceDescriptor,
+            BlockchainData,
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
@@ -211,15 +211,12 @@ mod tests {
         }
     }
 
-    #[derive(Debug, ServiceFactory)]
-    #[exonum(
-        artifact_name = "sample-service",
-        proto_sources = "crate::proto",
-        implements("SampleServiceInterface")
-    )]
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_factory(artifact_name = "sample-service", proto_sources = "crate::proto")]
+    #[service_dispatcher(implements("SampleServiceInterface"))]
     struct SampleService;
 
-    #[exonum_service]
+    #[exonum_interface]
     trait SampleServiceInterface {
         fn timestamp(
             &self,
@@ -239,11 +236,7 @@ mod tests {
     }
 
     impl Service for SampleService {
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }

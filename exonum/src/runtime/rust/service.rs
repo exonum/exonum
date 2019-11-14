@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::{access::Prefixed, BinaryValue, Snapshot};
 use futures::IntoFuture;
 
 use std::fmt::{self, Debug};
 
 use crate::{
-    blockchain::Schema as CoreSchema,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::Verified,
@@ -30,7 +29,7 @@ use crate::{
     },
 };
 
-use super::{ArtifactProtobufSpec, CallContext, RustArtifactId};
+use super::{ArtifactProtobufSpec, BlockchainData, CallContext, RustArtifactId};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -79,7 +78,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// [1]: ../struct.StateHashAggregator.html
     /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
     /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
-    fn state_hash(&self, instance: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash>;
 
     /// Performs storage operations on behalf of the service before committing the block.
     ///
@@ -166,7 +165,7 @@ pub struct AfterCommitContext<'a> {
     /// Reference to the dispatcher mailbox.
     mailbox: &'a mut Mailbox,
     /// Read-only snapshot of the current blockchain state.
-    pub snapshot: &'a dyn Snapshot,
+    snapshot: &'a dyn Snapshot,
     /// Service key pair of the current node.
     pub service_keypair: &'a (PublicKey, SecretKey),
     /// Channel to send signed transactions to the transactions pool.
@@ -191,10 +190,20 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
+    /// Returns blockchain data for the snapshot associated with this context.
+    pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
+        BlockchainData::new(self.snapshot, self.instance)
+    }
+
+    /// Returns snapshot of the data for the executing service.
+    pub fn service_data(&self) -> Prefixed<&'a dyn Snapshot> {
+        self.data().for_executing_service()
+    }
+
     /// Returns a current blockchain height. This height is "height of the latest committed block".
     pub fn height(&self) -> Height {
         // TODO Perhaps we should optimize this method [ECR-3222]
-        CoreSchema::new(self.snapshot).height()
+        self.data().for_core().height()
     }
 
     /// Signs and broadcasts a transaction to the other nodes in the network.

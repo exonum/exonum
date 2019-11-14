@@ -14,25 +14,26 @@
 
 use exonum::{
     crypto::Hash,
-    merkledb::{Entry, IndexAccess, ObjectHash},
+    merkledb::{
+        access::{Access, FromAccess, Prefixed},
+        Entry, ObjectHash,
+    },
 };
 
 use super::ConfigPropose;
 
-pub struct Schema<T: IndexAccess> {
-    access: T,
+pub struct Schema<T: Access> {
+    pub config_propose: Entry<T::Base, ConfigPropose>,
 }
 
-impl<T: IndexAccess> Schema<T> {
-    pub fn new(access: T) -> Self {
-        Self { access }
-    }
-
-    pub fn config_propose_entry(&self) -> Entry<T, ConfigPropose> {
-        Entry::new("config.propose", self.access.clone())
+impl<'a, T: Access> Schema<Prefixed<'a, T>> {
+    pub fn new(access: Prefixed<'a, T>) -> Self {
+        Self {
+            config_propose: FromAccess::from_access(access, "config_propose".into()).unwrap(),
+        }
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.config_propose_entry().object_hash()]
+        vec![self.config_propose.object_hash()]
     }
 }

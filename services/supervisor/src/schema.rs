@@ -13,76 +13,56 @@
 // limitations under the License.
 
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
-use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{
+    access::{Access, FromAccess, Prefixed},
+    Entry, ObjectHash, ProofMapIndex,
+};
 
 use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
 
 /// Service information schema.
 #[derive(Debug)]
-pub struct Schema<'a, T> {
-    access: T,
-    instance_name: &'a str,
+pub struct Schema<T: Access> {
+    pub deploy_requests: ValidatorMultisig<T, DeployRequest>,
+    pub deploy_confirmations: ValidatorMultisig<T, DeployConfirmation>,
+    pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
+    pub pending_instances: ValidatorMultisig<T, StartService>,
+    pub config_confirms: ValidatorMultisig<T, Hash>,
+    pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
 }
 
-impl<'a, T: IndexAccess> Schema<'a, T> {
+impl<'a, T: Access> Schema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
-    pub fn new(instance_name: &'a str, access: T) -> Self {
+    pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            instance_name,
-            access,
+            deploy_requests: FromAccess::from_access(access.clone(), "deploy_requests".into())
+                .unwrap(),
+            deploy_confirmations: FromAccess::from_access(
+                access.clone(),
+                "deploy_confirmations".into(),
+            )
+            .unwrap(),
+            pending_deployments: FromAccess::from_access(
+                access.clone(),
+                "pending_deployments".into(),
+            )
+            .unwrap(),
+            pending_instances: FromAccess::from_access(access.clone(), "pending_instances".into())
+                .unwrap(),
+            config_confirms: FromAccess::from_access(access.clone(), "config_confirms".into())
+                .unwrap(),
+            pending_proposal: FromAccess::from_access(access, "pending_proposal".into()).unwrap(),
         }
-    }
-
-    pub fn deploy_requests(&self) -> ValidatorMultisig<T, DeployRequest> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".deploy_requests"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn deploy_confirmations(&self) -> ValidatorMultisig<T, DeployConfirmation> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".deploy_confirmations"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn pending_deployments(&self) -> ProofMapIndex<T, ArtifactId, DeployRequest> {
-        ProofMapIndex::new(
-            [self.instance_name, ".pending_deployments"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn pending_instances(&self) -> ValidatorMultisig<T, StartService> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".pending_instances"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn config_confirms(&self) -> ValidatorMultisig<T, Hash> {
-        ValidatorMultisig::new(
-            [self.instance_name, ".config_confirms"].concat(),
-            self.access.clone(),
-        )
-    }
-
-    pub fn pending_proposal(&self) -> Entry<T, ConfigProposalWithHash> {
-        Entry::new(
-            [self.instance_name, ".pending_proposal"].concat(),
-            self.access.clone(),
-        )
     }
 
     /// Returns hashes for tables with proofs.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.deploy_requests().object_hash(),
-            self.deploy_confirmations().object_hash(),
-            self.pending_deployments().object_hash(),
-            self.pending_instances().object_hash(),
-            self.config_confirms().object_hash(),
+            self.deploy_requests.object_hash(),
+            self.deploy_confirmations.object_hash(),
+            self.pending_deployments.object_hash(),
+            self.pending_instances.object_hash(),
+            self.config_confirms.object_hash(),
         ]
     }
 }
