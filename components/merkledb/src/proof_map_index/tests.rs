@@ -1579,6 +1579,15 @@ fn test_fuzz_delete_build_proofs() {
 }
 
 #[test]
+fn restore_after_no_op_initialization() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    fork.get_proof_map::<_, Hash, u32>(IDX_NAME);
+    let map = fork.readonly().get_proof_map::<_, Hash, u32>(IDX_NAME);
+    assert_eq!(map.iter().count(), 0);
+}
+
+#[test]
 fn test_tree_with_hashed_key() {
     use byteorder::{ByteOrder, LittleEndian};
     use exonum_crypto::Hash;
