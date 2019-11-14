@@ -237,6 +237,13 @@ impl BlockchainMut {
             .consensus_config_entry()
             .set(consensus_config);
 
+        for ArtifactSpec { artifact, payload } in artifacts {
+            if !self.dispatcher.is_artifact_deployed(&artifact) {
+                self.dispatcher
+                    .deploy_artifact_sync(&fork, artifact, payload)?;
+            }
+        }
+
         // Add service instances.
         for ConfiguredInstanceSpec {
             instance_spec,

@@ -105,15 +105,8 @@ impl Dispatcher {
         &mut self,
         fork: &mut Fork,
         spec: InstanceSpec,
-        artifact_spec: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        // Register service artifact in the runtime.
-        // TODO Write test for such situations [ECR-3222]
-        if !self.is_artifact_deployed(&spec.artifact) {
-            self.deploy_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
-        }
-
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec, constructor)?;
