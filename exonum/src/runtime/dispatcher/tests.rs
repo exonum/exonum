@@ -631,10 +631,9 @@ impl Runtime for DeploymentRuntime {
 
         let artifacts = Arc::clone(&self.artifacts);
         let task = future::lazy(move || {
-            // This isn't correct way to delay future completion, but the correct way
-            // (`tokio::timer::Delay`) cannot be used since the futures
-            // returned by `Runtime::deploy_artifact()`are not (yet?) run
-            // on the `tokio` runtime.
+            // This isn't a correct way to delay future completion, but the correct way
+            // (`tokio::timer::Delay`) cannot be used since the futures returned by
+            // `Runtime::deploy_artifact()` are not (yet?) run on the `tokio` runtime.
             thread::sleep(delay);
             result
         })
