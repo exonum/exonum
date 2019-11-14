@@ -32,7 +32,7 @@ pub mod wallet;
 
 use exonum::{
     crypto::Hash,
-    runtime::{api::ServiceApiBuilder, rust::Service, InstanceDescriptor},
+    runtime::{api::ServiceApiBuilder, rust::Service, BlockchainData},
 };
 use exonum_merkledb::Snapshot;
 
@@ -48,11 +48,11 @@ pub const INITIAL_BALANCE: u64 = 100;
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        CryptocurrencyApi.wire(builder);
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        Schema::new(descriptor.name, snapshot).state_hash()
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        CryptocurrencyApi.wire(builder);
     }
 }

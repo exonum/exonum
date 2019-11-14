@@ -62,18 +62,20 @@ impl TimestampingInterface for TimestampingService {
             .expect("Wrong `TxTimestamp` initiator")
             .0;
 
-        let schema = Schema::new(context.instance().name, context.fork());
+        let mut schema = Schema::new(context.service_data());
+        let config = schema.config.get().expect("Can't read service config");
 
-        let config = schema.config().get().expect("Can't read service config");
-
-        let time = TimeSchema::new(&config.time_service_name, context.fork())
-            .time()
+        let data = context.data();
+        let time_service_data = data
+            .for_service(config.time_service_name.as_str())
+            .expect("No time service schema");
+        let time = TimeSchema::new(time_service_data)
+            .time
             .get()
             .expect("Can't get the time");
 
         let hash = &arg.content.content_hash;
-
-        if schema.timestamps().get(hash).is_some() {
+        if schema.timestamps.get(hash).is_some() {
             Err(Error::HashAlreadyExists)
         } else {
             trace!("Timestamp added: {:?}", arg);

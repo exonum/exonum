@@ -106,6 +106,7 @@
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 
 pub use self::{
+    blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{ErrorKind, ExecutionError},
     types::{
@@ -131,6 +132,7 @@ use crate::{
     helpers::ValidateInput,
 };
 
+mod blockchain_data;
 mod dispatcher;
 mod types;
 
@@ -475,8 +477,7 @@ pub struct ExecutionContext<'a> {
     pub caller: Caller,
     /// Identifier of the service interface required for the call. Keep in mind that this field in
     /// fact is a part of unfinished "interfaces feature" and will be replaced in future releases.
-    /// At the moment this field can only contains a core interfaces like `Configure` and
-    /// always empty for the common the service interfaces.
+    /// At the moment this field is always empty for the primary the service interface.
     pub interface_name: &'a str,
     /// Reference to the dispatcher.
     dispatcher: &'a Dispatcher,

@@ -22,7 +22,6 @@ use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
 
 use crate::{
     error::Error,
-    schema::WalletSchema,
     services::{
         AnyCallService, DepositService, TxAnyCall, TxCreateWallet, TxIssue, TxRecursiveCall,
         WalletService,
@@ -41,17 +40,17 @@ fn testkit_with_interfaces() -> TestKit {
         .with_rust_service(InstanceCollection::new(WalletService).with_instance(
             WalletService::ID,
             "wallet",
-            Vec::default(),
+            vec![],
         ))
         .with_rust_service(InstanceCollection::new(DepositService).with_instance(
             DepositService::ID,
             "deposit",
-            Vec::default(),
+            vec![],
         ))
         .with_rust_service(InstanceCollection::new(AnyCallService).with_instance(
             AnyCallService::ID,
             "any-call",
-            Vec::default(),
+            vec![],
         ))
         .create()
 }
@@ -103,8 +102,8 @@ fn test_deposit_ok() {
 
     let snapshot = testkit.snapshot();
     assert_eq!(
-        WalletSchema::new(&snapshot)
-            .wallets()
+        WalletService::get_schema(&snapshot)
+            .wallets
             .get(&keypair.0)
             .unwrap()
             .balance,
@@ -164,8 +163,8 @@ fn test_any_call_ok_deposit() {
 
     let snapshot = testkit.snapshot();
     assert_eq!(
-        WalletSchema::new(&snapshot)
-            .wallets()
+        WalletService::get_schema(&snapshot)
+            .wallets
             .get(&keypair.0)
             .unwrap()
             .balance,

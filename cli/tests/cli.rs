@@ -24,7 +24,7 @@ use exonum::{
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
 use exonum_cli::command::{Command, ExonumCommand, StandardResult};
-use serde::{Deserialize, Serialize};
+use serde_derive::*;
 use structopt::StructOpt;
 
 use exonum_cli::password::DEFAULT_MASTER_PASS_ENV_VAR;

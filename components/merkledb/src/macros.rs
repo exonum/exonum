@@ -26,7 +26,7 @@
 macro_rules! concat_keys {
     (@capacity $key:expr) => ( $key.size() );
     (@capacity $key:expr, $($tail:expr),+) => (
-        $key.size() + concat_keys!(@capacity $($tail),+)
+        BinaryKey::size($key) + concat_keys!(@capacity $($tail),+)
     );
     ($($key:expr),+) => ({
         let capacity = concat_keys!(@capacity $($key),+);
@@ -41,7 +41,7 @@ macro_rules! concat_keys {
 
         let mut _pos = 0;
         $(
-            _pos += $key.write(&mut buf[_pos.._pos + $key.size()]);
+            _pos += BinaryKey::write($key, &mut buf[_pos.._pos + BinaryKey::size($key)]);
         )*
         buf
     });

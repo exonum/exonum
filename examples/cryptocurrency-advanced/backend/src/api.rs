@@ -17,10 +17,8 @@
 use exonum_merkledb::{ListProof, MapProof};
 
 use exonum::{
-    blockchain::{self, BlockProof, IndexCoordinates, IndexOwner, TransactionMessage},
+    blockchain::{BlockProof, IndexCoordinates, IndexOwner, TransactionMessage},
     crypto::{Hash, PublicKey},
-    explorer::BlockchainExplorer,
-    helpers::Height,
     runtime::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
@@ -73,38 +71,32 @@ impl PublicApi {
         state: &ServiceApiState<'_>,
         pub_key: PublicKey,
     ) -> api::Result<WalletInfo> {
-        let snapshot = state.snapshot();
-        let blockchain_schema = blockchain::Schema::new(snapshot);
-        let currency_schema = Schema::new(state.instance.name, snapshot);
-
-        let max_height = blockchain_schema.block_hashes_by_height().len() - 1;
+        let blockchain_schema = state.data().for_core();
+        let currency_schema = Schema::new(state.service_data());
+        let current_height = blockchain_schema.height();
 
         let block_proof = blockchain_schema
-            .block_and_precommits(Height(max_height))
+            .block_and_precommits(current_height)
             .unwrap();
-
         let to_table = blockchain_schema
             .state_hash_aggregator()
             .get_proof(IndexOwner::Service(state.instance.id).coordinate_for(0));
-
-        let to_wallet = currency_schema.wallets().get_proof(pub_key);
+        let to_wallet = currency_schema.wallets.get_proof(pub_key);
 
         let wallet_proof = WalletProof {
             to_table,
             to_wallet,
         };
-
-        let wallet = currency_schema.wallet(&pub_key);
-
-        let explorer = BlockchainExplorer::new(snapshot);
+        let wallet = currency_schema.wallets.get(&pub_key);
 
         let wallet_history = wallet.map(|_| {
-            let history = currency_schema.wallet_history(&pub_key);
+            // `history` is always present for existing wallets.
+            let history = currency_schema.wallet_history.get(&pub_key);
             let proof = history.get_range_proof(0..history.len());
 
             let transactions = history
                 .iter()
-                .map(|record| explorer.transaction_without_proof(&record).unwrap())
+                .map(|tx_hash| blockchain_schema.transactions().get(&tx_hash).unwrap())
                 .collect::<Vec<_>>();
 
             WalletHistory {

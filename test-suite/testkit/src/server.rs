@@ -181,7 +181,7 @@ mod tests {
         messages::{AnyTx, Verified},
         runtime::{
             rust::{CallContext, Service, Transaction},
-            InstanceDescriptor,
+            BlockchainData,
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
@@ -236,11 +236,7 @@ mod tests {
     }
 
     impl Service for SampleService {
-        fn state_hash(
-            &self,
-            _instance: InstanceDescriptor<'_>,
-            _snapshot: &dyn Snapshot,
-        ) -> Vec<Hash> {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
             vec![]
         }
     }

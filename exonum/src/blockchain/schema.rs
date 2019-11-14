@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    BinaryKey, Entry, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex,
-    ProofMapIndex,
+    access::{Access, AccessExt, RawAccessMut},
+    BinaryKey, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
 use exonum_proto::ProtobufConvert;
@@ -24,7 +24,7 @@ use std::mem;
 use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 use crate::{
     crypto::{self, Hash, PublicKey},
-    helpers::{Height, Round},
+    helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     proto,
     runtime::InstanceId,
@@ -95,24 +95,24 @@ impl TxLocation {
 /// Indices defined by this schema are present in the blockchain regardless of
 /// the deployed services and store general-purpose information, such as
 /// committed transactions.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Schema<T> {
+    // For performance reasons, we don't use the field-per-index schema pattern.
+    // Indeed, the core schema has many indexes, most of which are never accessed
+    // for any particular `Schema` instance.
     access: T,
 }
 
-impl<T> Schema<T>
-where
-    T: IndexAccess,
-{
-    /// Constructs information schema for the given `snapshot`.
-    pub fn new(access: T) -> Self {
+impl<T: Access> Schema<T> {
+    /// Constructs information schema based on the given `access`.
+    pub(crate) fn new(access: T) -> Self {
         Self { access }
     }
 
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
-    pub fn transactions(&self) -> MapIndex<T, Hash, Verified<AnyTx>> {
-        MapIndex::new(TRANSACTIONS, self.access.clone())
+    pub fn transactions(&self) -> MapIndex<T::Base, Hash, Verified<AnyTx>> {
+        self.access.clone().get_map(TRANSACTIONS)
     }
 
     /// Returns a table that represents a map with a key-value pair of a transaction
@@ -120,13 +120,13 @@ where
     ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
-    pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, ExecutionStatus> {
-        ProofMapIndex::new(TRANSACTION_RESULTS, self.access.clone())
+    pub fn transaction_results(&self) -> ProofMapIndex<T::Base, Hash, ExecutionStatus> {
+        self.access.clone().get_proof_map(TRANSACTION_RESULTS)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
-    pub(crate) fn transactions_len_index(&self) -> Entry<T, u64> {
-        Entry::new(TRANSACTIONS_LEN, self.access.clone())
+    pub(crate) fn transactions_len_index(&self) -> Entry<T::Base, u64> {
+        self.access.clone().get_entry(TRANSACTIONS_LEN)
     }
 
     /// Returns the number of transactions in the blockchain.
@@ -137,13 +137,13 @@ where
     }
 
     /// Returns a table that represents a set of uncommitted transactions hashes.
-    pub fn transactions_pool(&self) -> KeySetIndex<T, Hash> {
-        KeySetIndex::new(TRANSACTIONS_POOL, self.access.clone())
+    pub fn transactions_pool(&self) -> KeySetIndex<T::Base, Hash> {
+        self.access.clone().get_key_set(TRANSACTIONS_POOL)
     }
 
     /// Returns an entry that represents count of uncommitted transactions.
-    pub(crate) fn transactions_pool_len_index(&self) -> Entry<T, u64> {
-        Entry::new(TRANSACTIONS_POOL_LEN, self.access.clone())
+    pub(crate) fn transactions_pool_len_index(&self) -> Entry<T::Base, u64> {
+        self.access.clone().get_entry(TRANSACTIONS_POOL_LEN)
     }
 
     /// Returns the number of transactions in the pool.
@@ -154,34 +154,36 @@ where
 
     /// Returns a table that keeps the block height and transaction position inside the block for every
     /// transaction hash.
-    pub fn transactions_locations(&self) -> MapIndex<T, Hash, TxLocation> {
-        MapIndex::new(TRANSACTIONS_LOCATIONS, self.access.clone())
+    pub fn transactions_locations(&self) -> MapIndex<T::Base, Hash, TxLocation> {
+        self.access.clone().get_map(TRANSACTIONS_LOCATIONS)
     }
 
     /// Returns a table that stores a block object for every block height.
-    pub fn blocks(&self) -> MapIndex<T, Hash, Block> {
-        MapIndex::new(BLOCKS, self.access.clone())
+    pub fn blocks(&self) -> MapIndex<T::Base, Hash, Block> {
+        self.access.clone().get_map(BLOCKS)
     }
 
     /// Returns a table that keeps block hashes for corresponding block heights.
-    pub fn block_hashes_by_height(&self) -> ListIndex<T, Hash> {
-        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.access.clone())
+    pub fn block_hashes_by_height(&self) -> ListIndex<T::Base, Hash> {
+        self.access.clone().get_list(BLOCK_HASHES_BY_HEIGHT)
     }
 
     /// Returns a table that keeps a list of transactions for each block.
-    pub fn block_transactions(&self, height: Height) -> ProofListIndex<T, Hash> {
+    pub fn block_transactions(&self, height: Height) -> ProofListIndex<T::Base, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.access.clone())
+        self.access
+            .clone()
+            .get_proof_list((BLOCK_TRANSACTIONS, &height))
     }
 
     /// Returns a table that keeps a list of precommits for the block with the given hash.
-    pub fn precommits(&self, hash: &Hash) -> ListIndex<T, Verified<Precommit>> {
-        ListIndex::new_in_family(PRECOMMITS, hash, self.access.clone())
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<T::Base, Verified<Precommit>> {
+        self.access.clone().get_list((PRECOMMITS, hash))
     }
 
     /// Returns an actual consensus configuration entry.
-    pub fn consensus_config_entry(&self) -> Entry<T, ConsensusConfig> {
-        Entry::new(CONSENSUS_CONFIG, self.access.clone())
+    pub fn consensus_config_entry(&self) -> Entry<T::Base, ConsensusConfig> {
+        self.access.clone().get_entry(CONSENSUS_CONFIG)
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -198,26 +200,28 @@ where
     ///
     /// Core tables participate in the resulting state_hash with `CORE_ID`
     /// service_id. Their vector is returned by the `core_state_hash` method.
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, IndexCoordinates, Hash> {
-        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())
+    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T::Base, IndexCoordinates, Hash> {
+        self.access.clone().get_proof_map(STATE_HASH_AGGREGATOR)
     }
 
     /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn peers_cache(&self) -> MapIndex<T, PublicKey, Verified<Connect>> {
-        MapIndex::new(PEERS_CACHE, self.access.clone())
+    pub(crate) fn peers_cache(&self) -> MapIndex<T::Base, PublicKey, Verified<Connect>> {
+        self.access.clone().get_map(PEERS_CACHE)
     }
 
     /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<T, Message> {
-        ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.access.clone())
+    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<T::Base, Message> {
+        self.access.clone().get_list(CONSENSUS_MESSAGES_CACHE)
     }
 
     /// Returns the saved value of the consensus round. Returns the first round
     /// if it has not been saved.
     pub(crate) fn consensus_round(&self) -> Round {
-        Entry::new(CONSENSUS_ROUND, self.access.clone())
+        self.access
+            .clone()
+            .get_entry(CONSENSUS_ROUND)
             .get()
             .unwrap_or_else(Round::first)
     }
@@ -229,15 +233,10 @@ where
 
     /// Returns the block for the given height with the proof of its inclusion.
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
-        let block_hash = match self.block_hash_by_height(height) {
-            None => return None,
-            Some(block_hash) => block_hash,
-        };
+        let block_hash = self.block_hash_by_height(height)?;
         let block = self.blocks().get(&block_hash).unwrap();
-        let precommits_table = self.precommits(&block_hash);
-        let precommits = precommits_table.iter().collect();
-        let res = BlockProof { block, precommits };
-        Some(res)
+        let precommits = self.precommits(&block_hash).iter().collect();
+        Some(BlockProof { block, precommits })
     }
 
     /// Returns the latest committed block.
@@ -286,15 +285,27 @@ where
         ]
     }
 
+    /// Attempts to find a `ValidatorId` by the provided service public key.
+    pub fn validator_id(&self, service_public_key: PublicKey) -> Option<ValidatorId> {
+        self.consensus_config()
+            .find_validator(|validator_keys| service_public_key == validator_keys.service_key)
+    }
+}
+
+impl<T: Access> Schema<T>
+where
+    T::Base: RawAccessMut,
+{
     /// Saves the given consensus round value into the storage.
     pub(crate) fn set_consensus_round(&mut self, round: Round) {
-        let mut entry: Entry<T, _> = Entry::new(CONSENSUS_ROUND, self.access.clone());
-        entry.set(round);
+        self.access.clone().get_entry(CONSENSUS_ROUND).set(round);
     }
 
-    /// Adds transaction into the persistent pool.
-    /// This method increment `transactions_pool_len_index`,
-    /// be sure to decrement it when transaction committed.
+    /// Adds a transaction into the persistent pool. The caller must ensure that the transaction
+    /// is not already in the pool.
+    ///
+    /// This method increments the number of transactions in the pool,
+    /// be sure to decrement it when the transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: Verified<AnyTx>) {
         self.transactions_pool().insert(tx.object_hash());
@@ -304,7 +315,7 @@ where
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
-    pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx: Verified<AnyTx>) {
+    pub(crate) fn commit_transaction(&mut self, hash: &Hash, height: Height, tx: Verified<AnyTx>) {
         if !self.transactions().contains(hash) {
             self.transactions().put(hash, tx)
         }
@@ -314,10 +325,12 @@ where
             let txs_pool_len = self.transactions_pool_len_index().get().unwrap();
             self.transactions_pool_len_index().set(txs_pool_len - 1);
         }
+
+        self.block_transactions(height).push(*hash);
     }
 
     /// Updates transaction count of the blockchain.
-    pub fn update_transaction_count(&mut self, count: u64) {
+    pub(crate) fn update_transaction_count(&mut self, count: u64) {
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);

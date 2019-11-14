@@ -48,7 +48,7 @@ impl TimeProvider for SystemTimeProvider {
 /// # extern crate exonum_time;
 /// # extern crate chrono;
 /// use chrono::{Utc, Duration, TimeZone};
-/// use exonum::helpers::Height;
+/// use exonum::{helpers::Height, runtime::SnapshotExt};
 /// use exonum_testkit::TestKit;
 /// use exonum_time::{time_provider::MockTimeProvider, schema::TimeSchema, TimeServiceFactory};
 ///
@@ -68,10 +68,11 @@ impl TimeProvider for SystemTimeProvider {
 ///
 /// // The time reported by the mock time provider is reflected by the service.
 /// let snapshot = testkit.snapshot();
-/// let schema = TimeSchema::new(&service_name, &snapshot);
+/// let snapshot = snapshot.for_service(service_name).unwrap();
+/// let schema = TimeSchema::new(snapshot);
 /// assert_eq!(
-///     Some(Utc.timestamp(15, 0)),
-///     schema.time().get().map(|time| time)
+///     Utc.timestamp(15, 0),
+///     schema.time.get().unwrap()
 /// );
 /// # }
 /// ```

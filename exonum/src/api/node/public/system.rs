@@ -14,13 +14,13 @@
 
 //! Public system API.
 
-use exonum_merkledb::IndexAccess;
+use exonum_merkledb::access::Access;
 
 use crate::{
     api::{node::SharedNodeState, ApiScope},
     blockchain::{Blockchain, Schema},
     helpers::user_agent,
-    runtime::{ArtifactId, DispatcherSchema, InstanceSpec},
+    runtime::{ArtifactId, DispatcherSchema, InstanceSpec, SnapshotExt},
 };
 
 /// Information about the current state of the node memory pool.
@@ -67,8 +67,7 @@ pub struct DispatcherInfo {
 
 impl DispatcherInfo {
     /// Loads dispatcher information from database.
-    pub fn load(access: impl IndexAccess) -> Self {
-        let schema = DispatcherSchema::new(access);
+    pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
         Self {
             artifacts: schema
                 .artifacts()
@@ -137,7 +136,8 @@ impl SystemApi {
     fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_query: ()| {
-            Ok(DispatcherInfo::load(&self_.blockchain.snapshot()))
+            let snapshot = self_.blockchain.snapshot();
+            Ok(DispatcherInfo::load(&snapshot.for_dispatcher()))
         });
         self
     }

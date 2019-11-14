@@ -23,8 +23,9 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    proof_map_index::ProofPath, BinaryKey, Database, IndexAccess, MapProof, ProofMapIndex,
-    TemporaryDB,
+    access::{AccessExt, RawAccess},
+    proof_map_index::ProofPath,
+    BinaryKey, Database, MapProof, ProofMapIndex, TemporaryDB,
 };
 use proptest::{
     prelude::prop::{
@@ -53,7 +54,7 @@ fn check_map_proof<T, K, V>(
     table: &ProofMapIndex<T, K, V>,
 ) -> TestCaseResult
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + PartialEq + Debug,
 {
@@ -74,7 +75,7 @@ fn check_map_multiproof<T, K, V>(
     table: &ProofMapIndex<T, K, V>,
 ) -> TestCaseResult
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + PartialEq + Debug,
 {
@@ -124,7 +125,7 @@ where
 fn write_data(db: &TemporaryDB, data: Data) {
     let fork = db.fork();
     {
-        let mut table = ProofMapIndex::new(INDEX_NAME, &fork);
+        let mut table = fork.get_proof_map(INDEX_NAME);
         table.clear();
         for (key, value) in data {
             table.put(&key, value);
@@ -169,7 +170,7 @@ fn data_for_multiproof(
 
 fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
     let snapshot = db.snapshot();
-    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let table: ProofMapIndex<_, [u8; 32], u64> = snapshot.get_proof_map(INDEX_NAME);
     let proof = table.get_proof(key);
     let expected_key = if table.contains(&key) {
         Some(key)
@@ -181,7 +182,7 @@ fn test_proof(db: &TemporaryDB, key: [u8; 32]) -> TestCaseResult {
 
 fn test_multiproof(db: &TemporaryDB, keys: &[[u8; 32]]) -> TestCaseResult {
     let snapshot = db.snapshot();
-    let table: ProofMapIndex<_, [u8; 32], u64> = ProofMapIndex::new(INDEX_NAME, &snapshot);
+    let table: ProofMapIndex<_, [u8; 32], u64> = snapshot.get_proof_map(INDEX_NAME);
     let proof = table.get_multiproof(keys.to_vec());
     let unique_keys: BTreeSet<_> = keys.iter().collect();
     check_map_multiproof(&proof, unique_keys, &table)

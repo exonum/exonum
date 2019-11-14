@@ -86,7 +86,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # use exonum::{
 /// #     blockchain::InstanceCollection,
 /// #     crypto::Hash,
-/// #     runtime::{InstanceDescriptor, rust::Service},
+/// #     runtime::{BlockchainData, rust::Service},
 /// # };
 /// #
 /// # const SERVICE_ID: u32 = 1;
@@ -101,7 +101,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # pub struct ExampleService;
 /// #
 /// # impl Service for ExampleService {
-/// #     fn state_hash(&self, _: InstanceDescriptor, _: &dyn Snapshot) -> Vec<Hash> { vec![] }
+/// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
 /// # }
 /// #
 /// # #[exonum_interface]

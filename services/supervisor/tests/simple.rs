@@ -16,14 +16,15 @@ use exonum::{
     blockchain::InstanceCollection,
     crypto::{self, Hash},
     helpers::{Height, ValidatorId},
-    merkledb::{Entry, ObjectHash, Snapshot},
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        Caller, DispatcherError, ExecutionError, InstanceDescriptor, InstanceId,
+        BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -64,14 +65,14 @@ impl From<ConfigChangeService> for InstanceCollection {
         InstanceCollection::new(instance).with_instance(
             ConfigChangeService::INSTANCE_ID,
             ConfigChangeService::INSTANCE_NAME,
-            Vec::default(),
+            vec![],
         )
     }
 }
 
 impl Service for ConfigChangeService {
-    fn state_hash(&self, _: InstanceDescriptor<'_>, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
 }
 
@@ -84,10 +85,11 @@ impl Configure for ConfigChangeService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
-            .verify_caller(Caller::as_supervisor)
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        match params.as_ref() {
+        match params.as_str() {
             "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
@@ -99,13 +101,17 @@ impl Configure for ConfigChangeService {
         context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        let (_, fork) = context
-            .verify_caller(Caller::as_supervisor)
+        context
+            .caller()
+            .as_supervisor()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        Entry::new(format!("{}.params", context.instance().name), fork).set(params.clone());
+        context
+            .service_data()
+            .get_entry("params")
+            .set(params.clone());
 
-        match params.as_ref() {
+        match params.as_str() {
             "apply_error" => {
                 Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
             }
@@ -117,7 +123,11 @@ impl Configure for ConfigChangeService {
 
 fn assert_config_change_is_applied(testkit: &TestKit) {
     let snapshot = testkit.snapshot();
-    assert!(!Schema::new(&snapshot).config_propose_entry().exists());
+    assert!(
+        !Schema::new(snapshot.for_service(SUPERVISOR_INSTANCE_ID).unwrap())
+            .config_propose
+            .exists()
+    );
 }
 
 #[test]
@@ -269,12 +279,13 @@ fn service_config_change() {
     ));
     testkit.create_blocks_until(cfg_change_height);
 
-    let actual_params: String = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get()
-    .unwrap();
+    let actual_params: String = testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry("params")
+        .get()
+        .unwrap();
 
     assert_eq!(actual_params, params);
 }
@@ -308,13 +319,12 @@ fn discard_errored_service_config_change() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    let actual_params: Option<String> = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get();
-
-    assert!(actual_params.is_none());
+    assert!(!testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params")
+        .exists());
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(0)));
 }
 
@@ -347,13 +357,12 @@ fn discard_panicked_service_config_change() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    let actual_params: Option<String> = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get();
-
-    assert!(actual_params.is_none());
+    assert!(!testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params")
+        .exists());
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(0)));
 }
 
@@ -419,14 +428,14 @@ fn another_configuration_change_proposal() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    let actual_params: String = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get()
-    .unwrap();
+    let actual_params = testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params")
+        .get();
 
-    assert_eq!(actual_params, params);
+    assert_eq!(actual_params, Some(params));
 }
 
 #[test]
@@ -440,7 +449,7 @@ fn service_config_discard_fake_supervisor() {
         .with_rust_service(InstanceCollection::new(SimpleSupervisor).with_instance(
             FAKE_SUPERVISOR_ID,
             "fake-supervisor",
-            Vec::default(),
+            vec![],
         ))
         .with_rust_service(ConfigChangeService)
         .create();
@@ -535,13 +544,12 @@ fn service_config_rollback_apply_error() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    let actual_params: Option<String> = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get();
-
-    assert!(actual_params.is_none());
+    assert!(!testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params")
+        .exists());
 }
 
 #[test]
@@ -565,13 +573,12 @@ fn service_config_rollback_apply_panic() {
     testkit.create_blocks_until(cfg_change_height);
     assert_config_change_is_applied(&testkit);
 
-    let actual_params: Option<String> = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get();
-
-    assert!(actual_params.is_none());
+    assert!(!testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params")
+        .exists());
 }
 
 #[test]
@@ -596,14 +603,14 @@ fn service_config_apply_multiple_configs() {
     ));
     testkit.create_blocks_until(cfg_change_height);
 
-    let actual_params: String = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get()
-    .unwrap();
+    let actual_params = testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params")
+        .get();
 
-    assert_eq!(actual_params, params);
+    assert_eq!(actual_params, Some(params));
 }
 
 #[test]
@@ -631,14 +638,14 @@ fn several_service_config_changes() {
         assert_config_change_is_applied(&testkit);
     }
 
-    let actual_params: String = Entry::new(
-        format!("{}.params", ConfigChangeService::INSTANCE_NAME),
-        &testkit.snapshot(),
-    )
-    .get()
-    .unwrap();
+    let actual_params = testkit
+        .snapshot()
+        .for_service(ConfigChangeService::INSTANCE_NAME)
+        .unwrap()
+        .get_entry::<_, String>("params")
+        .get();
 
-    assert_eq!(actual_params, "Change 4");
+    assert_eq!(actual_params, Some("Change 4".to_owned()));
 }
 
 #[test]
@@ -721,11 +728,10 @@ fn test_send_proposal_with_api() {
     testkit.api().exonum_api().assert_tx_success(hash);
 
     // Assert that config is now pending.
+    let snapshot = testkit.snapshot();
+    let snapshot = snapshot.for_service(SUPERVISOR_INSTANCE_ID).unwrap();
     assert_eq!(
-        Schema::new(&testkit.snapshot())
-            .config_propose_entry()
-            .get()
-            .unwrap(),
+        Schema::new(snapshot).config_propose.get().unwrap(),
         config_propose
     );
 

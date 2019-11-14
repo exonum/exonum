@@ -24,13 +24,13 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::{self, InstanceCollection},
+    blockchain::InstanceCollection,
     crypto::Hash,
-    helpers::{byzantine_quorum, validator::validator_id},
+    helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
-        InstanceDescriptor, SUPERVISOR_INSTANCE_ID,
+        BlockchainData, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -71,7 +71,8 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
             log::trace!("Updating consensus configuration {:?}", config);
 
             let result = context.isolate(|context| {
-                blockchain::Schema::new(context.fork())
+                context
+                    .writeable_core_schema()
                     .consensus_config_entry()
                     .set(config);
                 Ok(())
@@ -111,68 +112,76 @@ impl Supervisor {
 }
 
 impl Service for Supervisor {
-    fn state_hash(&self, descriptor: InstanceDescriptor<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        Schema::new(descriptor.name, snapshot).state_hash()
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn before_commit(&self, mut context: CallContext<'_>) {
-        let schema = Schema::new(context.instance().name, context.fork());
-        let height = blockchain::Schema::new(context.fork()).height();
+        let mut schema = Schema::new(context.service_data());
+        let core_schema = context.data().for_core();
+        let height = core_schema.height();
 
         // Removes pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema
-            .pending_deployments()
+            .pending_deployments
             .values()
             .filter(|request| request.deadline_height < height)
             .collect::<Vec<_>>();
 
         for request in requests_to_remove {
-            schema.pending_deployments().remove(&request.artifact);
+            schema.pending_deployments.remove(&request.artifact);
             log::trace!("Removed outdated deployment request {:?}", request);
         }
 
-        let entry = schema.pending_proposal().get();
+        let entry = schema.pending_proposal.get();
         if let Some(entry) = entry {
             if entry.config_propose.actual_from <= height {
                 // Remove pending config proposal for which deadline was exceeded.
                 log::trace!("Removed outdated config proposal");
-                schema.pending_proposal().remove();
+                schema.pending_proposal.remove();
             } else {
-                let config_confirms = schema.config_confirms();
-                let confirmations = config_confirms.confirmations(&entry.propose_hash);
-                let validators = config_confirms.validators_amount();
+                let confirmations = schema.config_confirms.confirmations(&entry.propose_hash);
+                let validator_count = core_schema.consensus_config().validator_keys.len();
 
                 // Apply pending config in case 2/3+1 validators voted for it.
-                if confirmations >= byzantine_quorum(validators) {
+                if confirmations >= byzantine_quorum(validator_count) {
                     log::info!(
                         "New configuration has been accepted: {:?}",
                         entry.config_propose
                     );
+                    drop(schema);
                     // Perform the application of configs.
                     update_configs(&mut context, entry.config_propose.changes);
                     // Remove config from proposals. Note that this step is performed even
                     // if applying one or more configs has errored / panicked.
-                    let schema = Schema::new(context.instance().name, context.fork());
-                    schema.pending_proposal().remove();
+                    let mut schema = Schema::new(context.service_data());
+                    schema.pending_proposal.remove();
                 }
             }
         }
     }
 
     fn after_commit(&self, mut context: AfterCommitContext<'_>) {
-        let schema = Schema::new(context.instance.name, context.snapshot);
-        let pending_deployments = schema.pending_deployments();
+        let schema = Schema::new(context.service_data());
         let keypair = context.service_keypair;
         let instance_id = context.instance.id;
-        let is_validator = validator_id(context.snapshot, context.service_keypair.0).is_some();
+        let core_schema = context.data().for_core();
+        let is_validator = core_schema
+            .validator_id(context.service_keypair.0)
+            .is_some();
 
         // Sends confirmation transaction for unconfirmed deployment requests.
-        let deployments = pending_deployments.values().filter(|request| {
-            let confirmation = DeployConfirmation::from(request.clone());
-            !schema
-                .deploy_confirmations()
-                .confirmed_by(&confirmation, &keypair.0)
-        });
+        let deployments: Vec<_> = schema
+            .pending_deployments
+            .values()
+            .filter(|request| {
+                let confirmation = DeployConfirmation::from(request.clone());
+                !schema
+                    .deploy_confirmations
+                    .confirmed_by(&confirmation, &keypair.0)
+            })
+            .collect();
+        drop(schema);
 
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
