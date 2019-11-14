@@ -26,7 +26,9 @@ use crate::{
     blockchain::{
         Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema,
     },
-    helpers::{generate_testnet_config, Height, ValidatorId},
+    helpers::{
+        create_rust_runtime_and_genesis_config, generate_testnet_config, Height, ValidatorId,
+    },
     messages::Verified,
     node::ApiSender,
     proto::schema::tests::*,
@@ -346,11 +348,12 @@ fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> E
 fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> BlockchainMut {
     let config = generate_testnet_config(1, 0)[0].clone();
     let service_keypair = config.service_keypair();
-    let api_notifier = mpsc::channel(0).0;
+    let (rust_runtime, genesis_config) =
+        create_rust_runtime_and_genesis_config(mpsc::channel(0).0, config.consensus, instances);
 
     Blockchain::new(TemporaryDB::new(), service_keypair, ApiSender::closed())
-        .into_mut(config.consensus)
-        .with_rust_runtime(api_notifier, instances)
+        .into_mut(genesis_config)
+        .with_additional_runtime(rust_runtime)
         .build()
         .unwrap()
 }

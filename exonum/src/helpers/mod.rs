@@ -25,12 +25,18 @@ use log::SetLoggerError;
 use std::path::{Component, Path, PathBuf};
 
 use crate::{
-    blockchain::{ConsensusConfig, Schema, ValidatorKeys},
+    api::manager::UpdateEndpoints,
+    blockchain::{
+        config::{GenesisConfig, GenesisConfigBuilder},
+        ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+    },
     crypto::gen_keypair,
     exonum_merkledb::Fork,
     node::{ConnectListConfig, NodeConfig},
+    runtime::rust::RustRuntime,
 };
 use exonum_keys::Keys;
+use futures::sync::mpsc;
 
 mod types;
 
@@ -151,6 +157,29 @@ pub fn clear_consensus_messages_cache(fork: &Fork) {
 /// Returns sufficient number of votes for the given validators number.
 pub fn byzantine_quorum(total: usize) -> usize {
     total * 2 / 3 + 1
+}
+
+/// Creates and initializes RustRuntime and GenesisConfig with information from collection of InstanceCollection.
+pub fn create_rust_runtime_and_genesis_config(
+    api_notifier: mpsc::Sender<UpdateEndpoints>,
+    consensus_config: ConsensusConfig,
+    instances: impl IntoIterator<Item = InstanceCollection>,
+) -> (RustRuntime, GenesisConfig) {
+    let (rust_runtime, genesis_config_builder) = instances.into_iter().fold(
+        (
+            RustRuntime::new(api_notifier),
+            GenesisConfigBuilder::with_consensus_config(consensus_config),
+        ),
+        |(runtime, builder), instance_collection| {
+            let (factory, config) = instance_collection.into();
+            (
+                runtime.with_available_service(factory),
+                builder.with_builtin_instance(config),
+            )
+        },
+    );
+
+    (rust_runtime, genesis_config_builder.build())
 }
 
 #[test]
