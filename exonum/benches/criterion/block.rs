@@ -47,14 +47,14 @@ use std::{collections::BTreeMap, iter, sync::Arc};
 
 use exonum::{
     blockchain::{
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection,
-        ValidatorKeys,
+        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig, InstanceCollection,  ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId},
+    helpers::{create_rust_runtime_and_genesis_config, Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::SnapshotExt,
+    runtime::{rust::RustRuntime}, SnapshotExt,
 };
 
 /// Number of transactions added to the blockchain before the bench begins.
@@ -83,7 +83,7 @@ fn create_blockchain(
 ) -> BlockchainMut {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
-    let genesis_config = ConsensusConfig {
+    let consensus_config = ConsensusConfig {
         validator_keys: vec![ValidatorKeys {
             consensus_key: consensus_keypair.0,
             service_key: service_keypair.0,
@@ -93,8 +93,10 @@ fn create_blockchain(
 
     let api_sender = ApiSender::new(mpsc::channel(0).0);
     let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
+    let (rust_runtime, genesis_config) =
+        create_rust_runtime_and_genesis_config(mpsc::channel(0).0, consensus_config, services);
     BlockchainBuilder::new(blockchain_base, genesis_config)
-        .with_rust_runtime(mpsc::channel(0).0, services)
+        .with_additional_runtime(rust_runtime)
         .build()
         .unwrap()
 }
