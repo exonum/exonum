@@ -44,12 +44,14 @@
 //! 3. For each node, an artifact may be deployed either asynchronously or synchronously /
 //!   in a blocking manner. The supervisor usually first commands a node to deploy the artifact
 //!   asynchronously via [`Mailbox`] once the decision to start deployment is reached
-//!   by the blockchain administrators.
+//!   by the blockchain administrators. Async deployment speed and outcome may differ among nodes.
 //!
-//! 4. Async deployment usually has a deadline and/or success and failure conditions. As an example,
-//!   the supervisor may collect confirmations from the validator nodes that have
+//! 4. The supervisor translates local deployment outcomes into a consensus-agreed result.
+//!   For example, the supervisor may collect confirmations from the validator nodes that have
 //!   successfully deployed the artifact, and once all the validator nodes have sent
-//!   their confirmations, the artifact is *committed*.
+//!   their confirmations, the artifact is *committed*. Being part of the service logic,
+//!   artifact commitment is completely deterministic, agreed via consensus,
+//!   and occurs at the same blockchain height for all nodes in the network.
 //!
 //! 5. Once the artifact is committed, every node in the network is required to have it deployed
 //!   in order to continue functioning.
