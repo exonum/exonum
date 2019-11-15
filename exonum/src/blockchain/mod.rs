@@ -226,18 +226,13 @@ impl BlockchainMut {
 
     /// Creates and commits the genesis block with the given genesis configuration.
     fn create_genesis_block(&mut self, genesis_config: GenesisConfig) -> Result<(), Error> {
-        let GenesisConfig {
-            consensus_config,
-            artifacts,
-            builtin_instances,
-        } = genesis_config;
-        consensus_config.validate()?;
+        genesis_config.consensus_config.validate()?;
         let mut fork = self.fork();
         Schema::new(&fork)
             .consensus_config_entry()
-            .set(consensus_config);
+            .set(genesis_config.consensus_config);
 
-        for ArtifactSpec { artifact, payload } in artifacts {
+        for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
             if !self.dispatcher.is_artifact_deployed(&artifact) {
                 self.dispatcher
                     .deploy_artifact_sync(&fork, artifact, payload)?;
@@ -248,7 +243,7 @@ impl BlockchainMut {
         for ConfiguredInstanceSpec {
             instance_spec,
             constructor,
-        } in builtin_instances
+        } in genesis_config.builtin_instances
         {
             self.dispatcher
                 .add_builtin_service(&mut fork, instance_spec, constructor)?;

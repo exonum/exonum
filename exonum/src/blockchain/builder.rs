@@ -135,16 +135,15 @@ impl InstanceCollection {
 }
 
 impl From<InstanceCollection> for (Box<dyn ServiceFactory>, InstanceConfig) {
-    fn from(other: InstanceCollection) -> Self {
-        let InstanceCollection { factory, instances } = other;
-        let artifact_id = factory.artifact_id().into();
-        let resulting_config = instances
+    fn from(inst: InstanceCollection) -> Self {
+        let artifact_id = inst.factory.artifact_id().into();
+        let resulting_config = inst.instances
             .into_iter()
             .fold(InstanceConfig::new(artifact_id, vec![]), |cfg, spec| {
                 cfg.with_instance(spec.instance_spec, spec.constructor)
             });
 
-        (factory, resulting_config)
+        (inst.factory, resulting_config)
     }
 }
 
