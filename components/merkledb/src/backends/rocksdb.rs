@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(unsafe_code)]
-
 //! An implementation of `RocksDB` database.
 
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
@@ -149,8 +147,12 @@ impl RocksDB {
         Ok(())
     }
 
+    #[allow(unsafe_code)]
     fn typed_snapshot(&self) -> RocksDBSnapshot {
         RocksDBSnapshot {
+            // SAFETY:
+            // The snapshot carries an `Arc` to the database to make sure that database
+            // is not dropped before the snapshot.
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             db: Arc::clone(&self.db),
         }
