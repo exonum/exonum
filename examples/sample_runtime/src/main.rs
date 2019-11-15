@@ -316,11 +316,9 @@ fn main() {
             config: 10_u64.into_bytes(),
         };
 
-        // `Height(0)` means that config will be applied in the next block.
-        let start_height = Height(0);
         api_sender
             .broadcast_transaction(
-                ConfigPropose::new(0, start_height)
+                ConfigPropose::immediate(0)
                     .start_service(start_service)
                     .sign_for_supervisor(service_keypair.0, &service_keypair.1),
             )

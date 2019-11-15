@@ -967,7 +967,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
 
     let expected_status = Err(ExecutionError {
         kind: ExecutionErrorKind::Service { code: 5 },
-        description: "Deploy request has not been registered.".into(),
+        description: "Deploy request has not been registered or accepted.".into(),
     });
     api.exonum_api()
         .assert_tx_status(confirmation.object_hash(), &expected_status.into());

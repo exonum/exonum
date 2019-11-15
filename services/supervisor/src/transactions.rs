@@ -108,10 +108,10 @@ impl StartService {
             .map_err(|e| (Error::InvalidInstanceName, e))
             .map_err(ExecutionError::from)?;
 
+        let dispatcher_data = context.data().for_dispatcher();
+
         // Check that artifact is deployed.
-        if context
-            .data()
-            .for_dispatcher()
+        if dispatcher_data
             .get_artifact(self.artifact.name.as_str())
             .is_none()
         {
@@ -125,12 +125,7 @@ impl StartService {
         }
 
         // Check that there is no instance with the same name.
-        if context
-            .data()
-            .for_dispatcher()
-            .get_instance(self.name.as_str())
-            .is_some()
-        {
+        if dispatcher_data.get_instance(self.name.as_str()).is_some() {
             log::trace!(
                 "Discarded start of the already running instance {}.",
                 &self.name
@@ -365,9 +360,9 @@ where
         // To prevent multiple consensus change proposition in one request
         let mut consensus_propose_added = false;
         // To prevent multiple service change proposition in one request
-        let mut service_ids = UniqueSet::new();
+        let mut service_ids = HashSet::new();
         // To prevent multiple services start in one request.
-        let mut services_to_start = UniqueSet::new();
+        let mut services_to_start = HashSet::new();
 
         // Perform config verification.
         for change in changes {
@@ -386,7 +381,7 @@ where
                 }
 
                 ConfigChange::Service(config) => {
-                    if !service_ids.check_unique(config.instance_id) {
+                    if !service_ids.insert(config.instance_id) {
                         log::trace!("Discarded multiple service change proposals in one request.");
                         return Err(Error::MalformedConfigPropose.into());
                     }
@@ -398,7 +393,7 @@ where
                 }
 
                 ConfigChange::StartService(start_service) => {
-                    if !services_to_start.check_unique(start_service.name.clone()) {
+                    if !services_to_start.insert(start_service.name.clone()) {
                         log::trace!(
                             "Discarded multiple instances with the same name in one request."
                         );
@@ -410,30 +405,5 @@ where
             }
         }
         Ok(())
-    }
-}
-
-/// A helper structure designed to check whether a newly
-/// introduced element is unique among others.
-#[derive(Debug, Default)]
-struct UniqueSet<T: std::hash::Hash + Eq + Default> {
-    inner: HashSet<T>,
-}
-
-impl<T: std::hash::Hash + Eq + Default> UniqueSet<T> {
-    /// Creates a new `UniqueSet` object.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Checks whether element is unique, and if so
-    /// adds it to the collection.
-    pub fn check_unique(&mut self, element: T) -> bool {
-        if self.inner.contains(&element) {
-            return false;
-        }
-
-        self.inner.insert(element);
-        true
     }
 }

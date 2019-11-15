@@ -27,7 +27,7 @@ pub enum Error {
     InstanceExists = 3,
     /// Deploy request has been already registered.
     DeployRequestAlreadyRegistered = 4,
-    /// Deploy request has not been registered.
+    /// Deploy request has not been registered or accepted.
     DeployRequestNotRegistered = 5,
     /// Artifact identifier has incorrect format.
     InvalidArtifactId = 6,

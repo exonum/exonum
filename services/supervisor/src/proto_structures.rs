@@ -142,6 +142,11 @@ impl ConfigPropose {
         }
     }
 
+    /// Creates a new proposal which should be activated at the next height.
+    pub fn immediate(configuration_number: u64) -> Self {
+        Self::new(configuration_number, Height(0))
+    }
+
     /// Adds a change of consensus configuration to this proposal.
     pub fn consensus_config(mut self, config: ConsensusConfig) -> Self {
         self.changes.push(ConfigChange::Consensus(config));

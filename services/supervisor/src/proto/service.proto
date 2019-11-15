@@ -75,6 +75,9 @@ message ConfigPropose {
   // New configuration proposition.
   repeated ConfigChange changes = 2;
   // Configuration proposal number to avoid conflicting proposals.
+  // For every proposal, this field should be equal to the amount of
+  // valid processed proposals (no matter accepted or not).
+  // Appropriate value for this field can be obtained via "configuration-number" API endpoint.
   uint64 configuration_number = 3;
 }
 

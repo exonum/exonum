@@ -75,7 +75,7 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
     }
 }
 
-impl<'a> Schema<Prefixed<'a, &Fork>> {
+impl Schema<Prefixed<'_, &Fork>> {
     pub fn increase_configuration_number(&mut self) {
         let new_configuration_number = self.configuration_number.get().unwrap_or(0) + 1;
         self.configuration_number.set(new_configuration_number);

@@ -382,15 +382,12 @@ fn deploy_service() {
     };
 
     // Create deploy request
-    let hash = {
-        let hash: Hash = testkit
-            .api()
-            .private(exonum_testkit::ApiKind::Service("supervisor"))
-            .query(&deploy_request)
-            .post("deploy-artifact")
-            .unwrap();
-        hash
-    };
+    let hash = testkit
+        .api()
+        .private(exonum_testkit::ApiKind::Service("supervisor"))
+        .query(&deploy_request)
+        .post("deploy-artifact")
+        .unwrap();
     testkit.create_block();
 
     testkit.create_blocks_until(deadline_height);
