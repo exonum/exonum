@@ -401,15 +401,6 @@ impl GenesisConfigBuilder {
         self
     }
 
-    pub fn with_builtin_instances(
-        self,
-        instance_configs: impl IntoIterator<Item = InstanceConfig>,
-    ) -> Self {
-        instance_configs
-            .into_iter()
-            .fold(self, |s, instance| s.with_service(instance))
-    }
-
     pub fn build(self) -> GenesisConfig {
         GenesisConfig {
             consensus_config: self.consensus_config,

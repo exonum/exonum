@@ -224,8 +224,13 @@ impl TestKitBuilder {
         let (id, runtime) = self.rust_runtime.into();
         self.additional_runtimes.insert(id, runtime);
 
-        let genesis_config = GenesisConfigBuilder::with_consensus_config(genesis)
-            .with_builtin_instances(self.instances)
+        let genesis_config = self
+            .instances
+            .into_iter()
+            .fold(
+                GenesisConfigBuilder::with_consensus_config(genesis),
+                |builder, service| builder.with_service(service),
+            )
             .build();
 
         TestKit::assemble(
