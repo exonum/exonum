@@ -14,17 +14,11 @@
 
 use std::{
     cell::RefCell,
-    cmp::Ordering::{Equal, Greater, Less},
-    collections::{
-        btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter},
-        hash_map::{IntoIter as HmIntoIter, Iter as HmIter},
-        Bound::{Included, Unbounded},
-        HashMap,
-    },
+    collections::{BTreeMap, HashMap},
     fmt,
     iter::{Iterator as StdIterator, Peekable},
     mem,
-    ops::{Deref, DerefMut},
+    ops::{Bound, Deref, DerefMut},
     rc::Rc,
 };
 
@@ -85,9 +79,8 @@ impl Changes {
         }
     }
 
-    /// Returns an iterator over the changes.
-    pub fn iter(&self) -> BtmIter<'_, Vec<u8>, Change> {
-        self.data.iter()
+    pub fn into_data(self) -> BTreeMap<Vec<u8>, Change> {
+        self.data
     }
 
     /// Returns prefixes of keys that should be removed from the database.
@@ -114,37 +107,12 @@ impl ViewChanges {
     }
 }
 
-/// Iterator over the `Changes` data.
-#[derive(Debug)]
-pub struct ChangesIterator {
-    inner: BtmIntoIter<Vec<u8>, Change>,
-}
-
-impl StdIterator for ChangesIterator {
-    type Item = (Vec<u8>, Change);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
-
-impl IntoIterator for Changes {
-    type Item = (Vec<u8>, Change);
-    type IntoIter = ChangesIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
-            inner: self.data.into_iter(),
-        }
-    }
-}
-
 /// Cell holding changes for a specific view. Mutable view borrows take changes out
 /// of the `Option` and unwraps `Rc` into inner data, while immutable borrows clone inner `Rc`.
 type ChangesCell = Option<Rc<ViewChanges>>;
 
 #[derive(Debug, Default)]
-pub struct WorkingPatch {
+struct WorkingPatch {
     changes: RefCell<HashMap<IndexAddress, ChangesCell>>,
 }
 
@@ -224,10 +192,6 @@ impl WorkingPatch {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        self.changes.borrow().is_empty()
-    }
-
     /// Takes a cell with changes for a specific `View` out of the patch.
     /// The returned cell is guaranteed to contain an `Rc` with an exclusive ownership.
     fn take_view_changes(&self, address: &IndexAddress) -> ChangesCell {
@@ -276,17 +240,6 @@ impl WorkingPatch {
             .clone()
     }
 
-    /// Returns an immutable reference to the changes corresponding to a certain index.
-    ///
-    /// # Panics
-    ///
-    /// If an index with the `address` is already mutably borrowed.
-    pub fn changes(&self, address: &IndexAddress) -> ChangesRef {
-        ChangesRef {
-            inner: self.clone_view_changes(address),
-        }
-    }
-
     /// Returns a mutable reference to the changes corresponding to a certain index.
     ///
     /// # Panics
@@ -298,12 +251,6 @@ impl WorkingPatch {
             key: address.to_owned(),
             parent: WorkingPatchRef::Borrowed(self),
         }
-    }
-
-    pub fn clear(&self, address: &IndexAddress) {
-        let mut changes = self.changes.borrow_mut();
-        let change = changes.entry(address.clone());
-        change.and_modify(|v| *v = None);
     }
 
     // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
@@ -358,36 +305,12 @@ impl WorkingPatch {
     }
 }
 
-/// Iterator over the `Patch` data.
-#[derive(Debug)]
-pub struct PatchIterator {
-    inner: HmIntoIter<String, Changes>,
-}
-
-impl StdIterator for PatchIterator {
-    type Item = (String, Changes);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
-
-impl IntoIterator for Patch {
-    type Item = (String, Changes);
-    type IntoIter = PatchIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
-            inner: self.changes.into_iter(),
-        }
-    }
-}
-
 /// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<dyn Iterator + 'a>;
 
 /// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(Eq, Hash))] // needed for patch equality comparison
 pub enum Change {
     /// Put the specified value into the storage for the corresponding key.
     Put(Vec<u8>),
@@ -570,6 +493,63 @@ pub trait Database: Send + Sync + 'static {
     fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
 
+/// Extension trait for `Database`.
+pub trait DatabaseExt: Database {
+    /// Merges a patch into the database and creates a rollback patch that reverses all the merged
+    /// changes.
+    ///
+    /// # Performance notes
+    ///
+    /// This method is linear w.r.t. patch size (i.e., the total number of changes in it) plus,
+    /// for each clear operation, the corresponding index size before clearing. As such,
+    /// the method may be inappropriate to use with large patches.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in the same situations as `Database::merge()`.
+    fn merge_with_backup(&self, patch: Patch) -> Result<Patch> {
+        let snapshot = self.snapshot();
+        let mut rev_changes = HashMap::with_capacity(patch.changes.len());
+        for (name, changes) in &patch.changes {
+            let mut view_changes = changes.data.clone();
+            for (key, change) in &mut view_changes {
+                *change = if let Some(value) = snapshot.get(name, key) {
+                    Change::Put(value)
+                } else {
+                    Change::Delete
+                };
+            }
+
+            // Remember all elements that will be deleted by a prefix.
+            for prefix in changes.prefixes_to_remove() {
+                let mut iter = snapshot.iter(name, prefix);
+                while let Some((key, value)) = iter.next() {
+                    if !key.starts_with(prefix) {
+                        break;
+                    }
+                    view_changes.insert(key.to_vec(), Change::Put(value.to_vec()));
+                }
+            }
+
+            rev_changes.insert(
+                name.to_owned(),
+                Changes {
+                    data: view_changes,
+                    prefixes_to_remove: vec![],
+                },
+            );
+        }
+
+        self.merge(patch)?;
+        Ok(Patch {
+            snapshot: self.snapshot(),
+            changes: rev_changes,
+        })
+    }
+}
+
+impl<T: Database> DatabaseExt for T {}
+
 /// A read-only snapshot of a storage backend.
 ///
 /// A `Snapshot` instance is an immutable representation of a certain storage state.
@@ -607,14 +587,9 @@ pub trait Iterator {
 }
 
 impl Patch {
-    /// Return changes keyed by the index address.
-    pub fn changes(&self) -> HashMap<String, Changes> {
-        self.changes.clone()
-    }
-
-    /// Return an iterator over the underlying changes.
-    pub fn iter(&self) -> HmIter<'_, String, Changes> {
-        self.changes.iter()
+    /// Iterates over changes in this patch.
+    pub(crate) fn into_changes(self) -> HashMap<String, Changes> {
+        self.changes
     }
 }
 
@@ -644,7 +619,7 @@ impl Snapshot for Patch {
     }
 
     fn iter(&self, name: &str, from: &[u8]) -> Iter<'_> {
-        let range = (Included(from), Unbounded);
+        let range = (Bound::Included(from), Bound::Unbounded);
         let changes = match self.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
             None => None,
@@ -655,6 +630,16 @@ impl Snapshot for Patch {
             changes,
         })
     }
+}
+
+impl RawAccess for &'_ Patch {
+    type Changes = ();
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        *self as &dyn Snapshot
+    }
+
+    fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
 }
 
 impl Fork {
@@ -676,39 +661,6 @@ impl Fork {
     pub fn into_patch(mut self) -> Patch {
         self.flush();
         self.patch
-    }
-
-    /// Merges a patch from another fork to this fork.
-    ///
-    /// If both forks have changed the same data, this can lead to an inconsistent state. Hence,
-    /// this method is useful only if you are sure that forks interacted with different indices.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a target `Fork` contains unflushed changes.
-    pub fn merge(&mut self, patch: Patch) {
-        assert!(!self.is_dirty(), "cannot merge a dirty fork");
-
-        for (name, changes) in patch {
-            if let Some(in_changes) = self.patch.changes.get_mut(&name) {
-                in_changes.data.extend(changes.into_iter());
-                continue;
-            }
-
-            {
-                self.patch.changes.insert(name.to_owned(), changes);
-            }
-        }
-    }
-
-    /// Checks if a fork has any unflushed changes.
-    pub fn is_dirty(&self) -> bool {
-        !self.working_patch.is_empty()
-    }
-
-    /// Patch containing current changes made in this fork.
-    pub fn working_patch(&self) -> &WorkingPatch {
-        &self.working_patch
     }
 
     /// Returns snapshot that also captures flushed changes in the fork,
@@ -834,12 +786,6 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
     }
 }
 
-impl AsRef<Fork> for Fork {
-    fn as_ref(&self) -> &Fork {
-        self
-    }
-}
-
 impl AsRef<dyn Snapshot> for dyn Snapshot {
     fn as_ref(&self) -> &dyn Snapshot {
         self
@@ -872,6 +818,8 @@ where
     }
 
     fn step(&mut self) -> NextIterValue {
+        use std::cmp::Ordering::*;
+
         if let Some(ref mut changes) = self.changes {
             match changes.peek() {
                 Some(&(k, change)) => match self.snapshot.peek() {
@@ -1021,4 +969,163 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
         }
     }
     db.merge(fork.into_patch())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TemporaryDB;
+
+    use std::collections::HashSet;
+
+    /// Asserts that a patch contains only the specified changes.
+    fn check_patch<'a, I>(patch: &Patch, changes: I)
+    where
+        I: IntoIterator<Item = (&'a str, &'a [u8], Change)>,
+    {
+        let mut patch_set: HashSet<(&str, _, _)> = HashSet::new();
+        for (name, changes) in &patch.changes {
+            for (key, value) in &changes.data {
+                patch_set.insert((name, key.as_slice(), value.to_owned()));
+            }
+        }
+        let expected_set: HashSet<_> = changes.into_iter().collect();
+        assert_eq!(patch_set, expected_set);
+    }
+
+    #[test]
+    fn backup_data_is_correct() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![2]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        check_patch(&backup, vec![("foo", &[] as &[u8], Change::Delete)]);
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![3]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![4]);
+            let mut view = View::new(&fork, "bar2");
+            view.put(&vec![5], vec![6]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        check_patch(
+            &backup,
+            vec![
+                ("bar2", &[5_u8] as &[u8], Change::Delete),
+                ("bar", &[1], Change::Delete),
+                ("foo", &[], Change::Put(vec![2])),
+            ],
+        );
+
+        // Check that the old snapshot still corresponds to the same DB state.
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
+    }
+
+    #[test]
+    fn rollback_via_backup_patches() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![2]);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![3]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![4]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
+        assert_eq!(backup.get("foo", &[]), Some(vec![2]));
+        assert_eq!(backup.get("bar", &[1]), None);
+
+        db.merge(backup).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
+        assert_eq!(snapshot.get("bar", &[1]), None);
+
+        // Check that DB continues working as usual after a rollback.
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![4]);
+            view.put(&vec![0, 0], vec![255]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![253]);
+        }
+        let backup1 = db.merge_with_backup(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![4]));
+        assert_eq!(snapshot.get("foo", &[0, 0]), Some(vec![255]));
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![254]);
+        }
+        let backup2 = db.merge_with_backup(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![4]));
+        assert_eq!(snapshot.get("foo", &[0, 0]), Some(vec![255]));
+        assert_eq!(snapshot.get("bar", &[1]), Some(vec![254]));
+
+        // Check patches used as `Snapshot`s.
+        assert_eq!(backup1.get("bar", &[1]), None);
+        assert_eq!(backup2.get("bar", &[1]), Some(vec![253]));
+        assert_eq!(backup1.get("foo", &[]), Some(vec![2]));
+        assert_eq!(backup2.get("foo", &[]), Some(vec![4]));
+
+        // Backups should be applied in the reverse order.
+        db.merge(backup2).unwrap();
+        db.merge(backup1).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
+        assert_eq!(snapshot.get("foo", &[0, 0]), None);
+        assert_eq!(snapshot.get("bar", &[1]), None);
+    }
+
+    #[test]
+    fn backup_after_clearing_view() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![1]);
+            view.put(&vec![1], vec![2]);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.clear();
+            view.put(&vec![1], vec![3]);
+            view.put(&vec![2], vec![4]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        assert_eq!(backup.get("foo", &[]), Some(vec![1]));
+        assert_eq!(backup.get("foo", &[1]), Some(vec![2]));
+        assert_eq!(backup.get("foo", &[2]), None);
+        db.merge(backup).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get("foo", &[]), Some(vec![1]));
+        assert_eq!(snapshot.get("foo", &[1]), Some(vec![2]));
+        assert_eq!(snapshot.get("foo", &[2]), None);
+    }
 }

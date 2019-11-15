@@ -737,10 +737,8 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let mut fork_with_new_block = blockchain.fork();
         let (_, patch) =
             blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
-        fork_with_new_block.merge(patch);
 
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
@@ -748,7 +746,7 @@ impl Sandbox {
             schema.reject_transaction(&hash).unwrap();
         }
         blockchain.merge(fork.into_patch()).unwrap();
-        *Schema::new(&fork_with_new_block).last_block().state_hash()
+        *Schema::new(&patch).last_block().state_hash()
     }
 
     pub fn get_proof_to_index(

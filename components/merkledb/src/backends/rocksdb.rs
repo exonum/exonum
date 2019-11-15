@@ -92,7 +92,7 @@ impl RocksDB {
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
-        for (cf_name, changes) in patch {
+        for (cf_name, changes) in patch.into_changes() {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
                 None => self.db.create_cf(&cf_name, &self.options.into()).unwrap(),
@@ -102,7 +102,7 @@ impl RocksDB {
                 self.remove_with_prefix(&mut batch, cf, &cf_name, prefix)?;
             }
 
-            for (key, change) in changes {
+            for (key, change) in changes.into_data() {
                 match change {
                     Change::Put(ref value) => batch.put_cf(cf, key, value)?,
                     Change::Delete => batch.delete_cf(cf, &key)?,
