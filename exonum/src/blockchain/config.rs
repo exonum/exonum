@@ -318,7 +318,7 @@ pub struct GenesisConfig {
 
     /// List of the privileged services with the configuration parameters that are created directly
     /// in the genesis block.
-    pub builtin_instances: Vec<ConfiguredInstanceSpec>,
+    pub builtin_instances: Vec<InstanceInitParams>,
 }
 
 /// Represents data that is required for initialization of service instance.
@@ -334,9 +334,8 @@ pub struct GenesisConfig {
     BinaryValue,
     ObjectHash,
 )]
-#[protobuf_convert(source = "runtime::ConfiguredInstanceSpec")]
-// TODO: Think about better name and/or substitution the `InstanceSpec`
-pub struct ConfiguredInstanceSpec {
+#[protobuf_convert(source = "runtime::InstanceInitParams")]
+pub struct InstanceInitParams {
     /// Wrapped `InstanceSpec`.
     pub instance_spec: InstanceSpec,
     /// Constructor argument for specific `InstanceSpec`.
@@ -350,13 +349,13 @@ pub struct GenesisConfigBuilder {
     /// Artifacts specifications for builtin services.
     artifacts: Vec<ArtifactSpec>,
     /// Instances of builtin services.
-    builtin_instances: Vec<ConfiguredInstanceSpec>,
+    builtin_instances: Vec<InstanceInitParams>,
 }
 
 #[derive(Debug)]
 pub struct InstanceConfig {
     pub artifact_spec: ArtifactSpec,
-    pub instances: Vec<ConfiguredInstanceSpec>,
+    pub instances: Vec<InstanceInitParams>,
 }
 
 impl InstanceConfig {
@@ -377,7 +376,7 @@ impl InstanceConfig {
         constructor: impl BinaryValue,
     ) -> Self {
         assert_eq!(self.artifact_spec.artifact, instance_spec.artifact);
-        self.instances.push(ConfiguredInstanceSpec {
+        self.instances.push(InstanceInitParams {
             instance_spec,
             constructor: constructor.into_bytes(),
         });

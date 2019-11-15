@@ -16,7 +16,7 @@
 
 use crate::{
     blockchain::{
-        config::{ConfiguredInstanceSpec, GenesisConfig, InstanceConfig},
+        config::{GenesisConfig, InstanceConfig, InstanceInitParams},
         Blockchain, BlockchainMut, Schema,
     },
     merkledb::BinaryValue,
@@ -101,7 +101,7 @@ pub struct InstanceCollection {
     /// Rust services factory as a special case of an artifact.
     pub factory: Box<dyn ServiceFactory>,
     /// List of service instances with the initial configuration parameters.
-    pub instances: Vec<ConfiguredInstanceSpec>,
+    pub instances: Vec<InstanceInitParams>,
 }
 
 impl InstanceCollection {
@@ -125,7 +125,7 @@ impl InstanceCollection {
             id,
             name: name.into(),
         };
-        let instance_config = ConfiguredInstanceSpec {
+        let instance_config = InstanceInitParams {
             instance_spec: spec,
             constructor: params.into_bytes(),
         };
@@ -137,7 +137,8 @@ impl InstanceCollection {
 impl From<InstanceCollection> for (Box<dyn ServiceFactory>, InstanceConfig) {
     fn from(inst: InstanceCollection) -> Self {
         let artifact_id = inst.factory.artifact_id().into();
-        let resulting_config = inst.instances
+        let resulting_config = inst
+            .instances
             .into_iter()
             .fold(InstanceConfig::new(artifact_id, vec![]), |cfg, spec| {
                 cfg.with_instance(spec.instance_spec, spec.constructor)

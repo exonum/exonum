@@ -23,7 +23,7 @@ pub use self::schema::{
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
         TransactionsResponse,
     },
-    runtime::{AnyTx, CallInfo, ConfiguredInstanceSpec, GenesisConfig},
+    runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
 use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;

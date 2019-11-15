@@ -44,7 +44,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::config::{ConfiguredInstanceSpec, GenesisConfig},
+    blockchain::config::{GenesisConfig, InstanceInitParams},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
@@ -240,7 +240,7 @@ impl BlockchainMut {
         }
 
         // Add service instances.
-        for ConfiguredInstanceSpec {
+        for InstanceInitParams {
             instance_spec,
             constructor,
         } in genesis_config.builtin_instances

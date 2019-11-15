@@ -50,7 +50,7 @@ message InstanceSpec {
   ArtifactId artifact = 3;
 }
 
-message ConfiguredInstanceSpec {
+message InstanceInitParams {
   InstanceSpec instance_spec = 1;
   bytes constructor = 2;
 }
@@ -58,7 +58,7 @@ message ConfiguredInstanceSpec {
 message GenesisConfig {
   exonum.Config consensus_config = 1;
   repeated ArtifactSpec artifacts = 2;
-  repeated ConfiguredInstanceSpec builtin_instances = 3;
+  repeated InstanceInitParams builtin_instances = 3;
 }
 
 // The kind of ExecutionError.
