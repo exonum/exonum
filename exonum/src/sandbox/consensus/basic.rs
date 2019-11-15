@@ -22,7 +22,7 @@ use rand::{thread_rng, Rng};
 use std::collections::BTreeMap;
 
 use crate::{
-    blockchain::{IndexCoordinates, IndexOwner, Schema},
+    blockchain::{IndexCoordinates, Schema, SchemaOrigin},
     crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Verified},
@@ -185,13 +185,13 @@ fn test_query_state_hash() {
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
-        let configs_key = IndexCoordinates::new(IndexOwner::Core, 0);
+        let configs_key = IndexCoordinates::new(SchemaOrigin::Core, 0);
         let timestamp_t1_key =
-            IndexCoordinates::new(IndexOwner::Service(TimestampingService::ID), 0);
+            IndexCoordinates::new(SchemaOrigin::Service(TimestampingService::ID), 0);
         let timestamp_t2_key =
-            IndexCoordinates::new(IndexOwner::Service(TimestampingService::ID), 1);
+            IndexCoordinates::new(SchemaOrigin::Service(TimestampingService::ID), 1);
 
-        let proof_configs = sandbox.get_proof_to_index(IndexOwner::Core, 0);
+        let proof_configs = sandbox.get_proof_to_index(SchemaOrigin::Core, 0);
         let proof = proof_configs.check_against_hash(state_hash).unwrap();
         assert_ne!(configs_rh, Hash::zero());
         assert_eq!(
@@ -200,7 +200,7 @@ fn test_query_state_hash() {
         );
 
         let proof_configs =
-            sandbox.get_proof_to_index(IndexOwner::Service(TimestampingService::ID), 0);
+            sandbox.get_proof_to_index(SchemaOrigin::Service(TimestampingService::ID), 0);
         let proof = proof_configs.check_against_hash(state_hash).unwrap();
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),
@@ -208,7 +208,7 @@ fn test_query_state_hash() {
         );
 
         let proof_configs =
-            sandbox.get_proof_to_index(IndexOwner::Service(TimestampingService::ID), 1);
+            sandbox.get_proof_to_index(SchemaOrigin::Service(TimestampingService::ID), 1);
         let proof = proof_configs.check_against_hash(state_hash).unwrap();
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),

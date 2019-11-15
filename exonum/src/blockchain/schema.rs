@@ -335,46 +335,46 @@ where
 }
 
 // TODO Write more meaningful description [ECR-3824]
-/// Describes the membership for the index.
+/// Describes the origin of the schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum IndexOwner {
-    /// This index is a part of the core schema.
+pub enum SchemaOrigin {
+    /// This is a Core schema.
     Core,
-    /// This index is a part of the runtime schema with the specified ID.
+    /// This is a runtime schema with the specified ID.
     Runtime(u32),
-    /// This index is a part of some service schema with the specified ID.
+    /// This is a service schema with the specified instance ID.
     Service(InstanceId),
 }
 
-impl IndexOwner {
-    /// Creates index coordinate for the current owner.
+impl SchemaOrigin {
+    /// Computes the index coordinates inside the schema.
     pub fn coordinate_for(self, index_id: u16) -> IndexCoordinates {
         IndexCoordinates::new(self, index_id)
     }
 
-    /// Returns the corresponding tag.
-    fn tag(self) -> IndexTag {
+    /// Returns the corresponding origin binary value.
+    fn origin(self) -> Origin {
         match self {
-            IndexOwner::Core => IndexTag::Core,
-            IndexOwner::Runtime { .. } => IndexTag::Runtime,
-            IndexOwner::Service { .. } => IndexTag::Service,
+            SchemaOrigin::Core => Origin::Core,
+            SchemaOrigin::Runtime { .. } => Origin::Runtime,
+            SchemaOrigin::Service { .. } => Origin::Service,
         }
     }
 
-    /// Returns the corresponding group id.
-    fn group_id(self) -> u32 {
+    /// Returns the corresponding schema ID.
+    fn schema_id(self) -> u32 {
         match self {
-            IndexOwner::Service(instance_id) => instance_id,
-            IndexOwner::Runtime(runtime_id) => runtime_id,
-            IndexOwner::Core => 0,
+            SchemaOrigin::Service(instance_id) => instance_id,
+            SchemaOrigin::Runtime(runtime_id) => runtime_id,
+            SchemaOrigin::Core => 0,
         }
     }
 }
 
-/// Binary value for the corresponding index owner.
+/// Binary value for the corresponding schema origin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(u16)]
-enum IndexTag {
+enum Origin {
     Core = 0,
     Runtime = 2,
     Service = 3,
@@ -384,40 +384,41 @@ enum IndexTag {
 /// Normalized coordinates of the index in the `state_hash_aggregator` table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct IndexCoordinates {
-    tag: u16,
-    group_id: u32,
+    origin: u16,
+    schema_id: u32,
     index_id: u16,
 }
 
 impl IndexCoordinates {
-    /// Creates index coordinated for the index with the specified owner and identifier.
-    pub fn new(owner: IndexOwner, index_id: u16) -> Self {
+    /// Creates index coordinates for the index with the specified schema origin
+    /// and index identifier.
+    pub fn new(schema_origin: SchemaOrigin, index_id: u16) -> Self {
         Self {
-            tag: owner.tag() as u16,
-            group_id: owner.group_id(),
+            origin: schema_origin.origin() as u16,
+            schema_id: schema_origin.schema_id(),
             index_id,
         }
     }
 
     // TODO Write more meaningful description [ECR-3824]
-    /// For the given index owner, returns a list of the index coordinates that match the corresponding
-    /// object hashes of the indices.
+    /// For the given index owner, returns a list of the index coordinates that match the
+    /// corresponding object hashes of the indices.
     pub fn locate(
-        owner: IndexOwner,
+        schema_origin: SchemaOrigin,
         object_hashes: impl IntoIterator<Item = Hash>,
     ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
         object_hashes
             .into_iter()
             .enumerate()
-            .map(move |(id, hash)| (owner.coordinate_for(id as u16), hash))
+            .map(move |(id, hash)| (schema_origin.coordinate_for(id as u16), hash))
     }
 
-    /// Returns a membership for this index.
-    pub fn owner(self) -> IndexOwner {
-        match self.tag {
-            0 => IndexOwner::Core,
-            2 => IndexOwner::Runtime(self.group_id),
-            3 => IndexOwner::Service(self.group_id),
+    /// Returns a schema origin for this index.
+    pub fn schema_origin(self) -> SchemaOrigin {
+        match self.origin {
+            0 => SchemaOrigin::Core,
+            2 => SchemaOrigin::Runtime(self.schema_id),
+            3 => SchemaOrigin::Service(self.schema_id),
             other => panic!("Unknown index owner: {}!", other),
         }
     }
@@ -430,19 +431,19 @@ impl BinaryKey for IndexCoordinates {
 
     fn write(&self, buffer: &mut [u8]) -> usize {
         let mut pos = 0;
-        pos += self.tag.write(&mut buffer[pos..]);
-        pos += self.group_id.write(&mut buffer[pos..]);
+        pos += self.origin.write(&mut buffer[pos..]);
+        pos += self.schema_id.write(&mut buffer[pos..]);
         pos += self.index_id.write(&mut buffer[pos..]);
         pos
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        let tag = u16::read(&buffer[0..2]);
-        let group_id = u32::read(&buffer[2..6]);
+        let origin = u16::read(&buffer[0..2]);
+        let schema_id = u32::read(&buffer[2..6]);
         let index_id = u16::read(&buffer[6..8]);
         Self {
-            tag,
-            group_id,
+            origin,
+            schema_id,
             index_id,
         }
     }
@@ -457,25 +458,25 @@ impl ObjectHash for IndexCoordinates {
 }
 
 #[test]
-fn test_index_coordinates_binary_key_round_trip() {
-    let index_owners = vec![
-        (IndexOwner::Runtime(0), 0),
-        (IndexOwner::Runtime(0), 5),
-        (IndexOwner::Runtime(1), 0),
-        (IndexOwner::Runtime(1), 2),
-        (IndexOwner::Service(2), 0),
-        (IndexOwner::Service(2), 1),
-        (IndexOwner::Service(0), 0),
-        (IndexOwner::Service(0), 1),
+fn index_coordinates_binary_key_round_trip() {
+    let schema_origins = vec![
+        (SchemaOrigin::Runtime(0), 0),
+        (SchemaOrigin::Runtime(0), 5),
+        (SchemaOrigin::Runtime(1), 0),
+        (SchemaOrigin::Runtime(1), 2),
+        (SchemaOrigin::Service(2), 0),
+        (SchemaOrigin::Service(2), 1),
+        (SchemaOrigin::Service(0), 0),
+        (SchemaOrigin::Service(0), 1),
     ];
 
-    for (owner, id) in index_owners {
-        let coordinate = IndexCoordinates::new(owner, id);
+    for (schema_origin, index_id) in schema_origins {
+        let coordinate = IndexCoordinates::new(schema_origin, index_id);
         let mut buf = vec![0; coordinate.size()];
         coordinate.write(&mut buf);
 
         let coordinate2 = IndexCoordinates::read(&buf);
         assert_eq!(coordinate, coordinate2);
-        assert_eq!(coordinate2.owner(), owner);
+        assert_eq!(coordinate2.schema_origin(), schema_origin);
     }
 }

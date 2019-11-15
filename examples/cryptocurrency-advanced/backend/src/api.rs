@@ -17,7 +17,7 @@
 use exonum_merkledb::{ListProof, MapProof};
 
 use exonum::{
-    blockchain::{BlockProof, IndexCoordinates, IndexOwner, TransactionMessage},
+    blockchain::{BlockProof, IndexCoordinates, SchemaOrigin, TransactionMessage},
     crypto::{Hash, PublicKey},
     runtime::api::{self, ServiceApiBuilder, ServiceApiState},
 };
@@ -80,7 +80,7 @@ impl PublicApi {
             .unwrap();
         let to_table = blockchain_schema
             .state_hash_aggregator()
-            .get_proof(IndexOwner::Service(state.instance.id).coordinate_for(0));
+            .get_proof(SchemaOrigin::Service(state.instance.id).coordinate_for(0));
         let to_wallet = currency_schema.wallets.get_proof(pub_key);
 
         let wallet_proof = WalletProof {
