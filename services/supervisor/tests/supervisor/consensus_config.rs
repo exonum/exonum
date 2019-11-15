@@ -18,13 +18,13 @@ use exonum_testkit::TestKitBuilder;
 use exonum::helpers::ValidatorId;
 
 use crate::utils::*;
-use exonum_supervisor::Supervisor;
+use exonum_supervisor::DecentralizedSupervisor;
 
 #[test]
 fn test_add_nodes_to_validators() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(1)
-        .with_rust_service(Supervisor)
+        .with_rust_service(DecentralizedSupervisor::new())
         .create();
 
     let new_node_keys = testkit.network_mut().add_node().public_keys();

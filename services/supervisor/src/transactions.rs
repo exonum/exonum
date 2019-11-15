@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    helpers::ValidateInput,
+    helpers::{Height, ValidateInput},
     runtime::{rust::CallContext, DispatcherError, ExecutionError, InstanceSpec},
 };
 use exonum_derive::*;
@@ -22,7 +22,7 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
+    mode, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
     DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor,
 };
 
@@ -31,7 +31,9 @@ use super::{
 pub trait SupervisorInterface {
     /// Requests artifact deploy.
     ///
-    /// This request should be sent by the each of validators.
+    /// This request should be initiated by the validator (and depending on the `Supervisor`
+    /// mode several other actions can be required, e.g. sending the same request by majority
+    /// of other validators as well).
     /// After that, the supervisor will try to deploy the artifact, and if this procedure
     /// will be successful it will send `confirm_artifact_deploy` transaction.
     fn request_artifact_deploy(
@@ -49,20 +51,14 @@ pub trait SupervisorInterface {
         artifact: DeployConfirmation,
     ) -> Result<(), ExecutionError>;
 
-    /// Requests start service.
-    ///
-    /// Service will be started if all of validators will send this confirmation.
-    fn start_service(
-        &self,
-        context: CallContext<'_>,
-        service: StartService,
-    ) -> Result<(), ExecutionError>;
-
     /// Propose config change
     ///
     /// This request should be sent by one of validators as the proposition to change
-    /// current configuration to new one. All another validators able to vote for this
+    /// current configuration to new one. All another validators are able to vote for this
     /// configuration by sending `confirm_config_change` transaction.
+    /// The configuration application rules depend on the `Supervisor` mode, e.g. confirmations
+    /// are not required for the `Simple` mode, and for `Decentralized` mode (2/3+1) confirmations
+    /// are required.
     /// Note: only one proposal at time is possible.
     fn propose_config_change(
         &self,
@@ -73,9 +69,9 @@ pub trait SupervisorInterface {
     /// Confirm config change
     ///
     /// This confirm should be sent by validators to vote for proposed configuration.
-    /// Vote of the author of the propose_config_change transaction is taken into
+    /// Vote of the author of the `propose_config_change` transaction is taken into
     /// account automatically.
-    /// The configuration will be applied if 2/3+1 validators voted for it.
+    /// The configuration application rules depend on the `Supervisor` mode.
     fn confirm_config_change(
         &self,
         context: CallContext<'_>,
@@ -103,24 +99,52 @@ impl ValidateInput for DeployConfirmation {
     }
 }
 
-impl ValidateInput for StartService {
-    type Error = ExecutionError;
-
-    fn validate(&self) -> Result<(), Self::Error> {
+impl StartService {
+    fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
         self.artifact
             .validate()
             .map_err(|e| (Error::InvalidArtifactId, e))?;
         InstanceSpec::is_valid_name(&self.name)
             .map_err(|e| (Error::InvalidInstanceName, e))
-            .map_err(Self::Error::from)
+            .map_err(ExecutionError::from)?;
+
+        let dispatcher_data = context.data().for_dispatcher();
+
+        // Check that artifact is deployed.
+        if dispatcher_data
+            .get_artifact(self.artifact.name.as_str())
+            .is_none()
+        {
+            log::trace!(
+                "Discarded start of service {} from the unknown artifact {}.",
+                &self.name,
+                &self.artifact.name,
+            );
+
+            return Err(Error::UnknownArtifact.into());
+        }
+
+        // Check that there is no instance with the same name.
+        if dispatcher_data.get_instance(self.name.as_str()).is_some() {
+            log::trace!(
+                "Discarded start of the already running instance {}.",
+                &self.name
+            );
+            return Err(Error::InstanceExists.into());
+        }
+
+        Ok(())
     }
 }
 
-impl SupervisorInterface for Supervisor {
+impl<Mode> SupervisorInterface for Supervisor<Mode>
+where
+    Mode: mode::SupervisorMode,
+{
     fn propose_config_change(
         &self,
         mut context: CallContext<'_>,
-        propose: ConfigPropose,
+        mut propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
         let (_, author) = context
             .caller()
@@ -134,8 +158,14 @@ impl SupervisorInterface for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        // Verifies that the `actual_from` height is in the future.
-        if context.data().for_core().height() >= propose.actual_from {
+        let current_height = context.data().for_core().height();
+
+        // If `actual_from` field is not set, set it to the next height.
+        if propose.actual_from == Height(0) {
+            propose.actual_from = current_height.next();
+        }
+        // Otherwise verify that the `actual_from` height is in the future.
+        else if current_height >= propose.actual_from {
             return Err(Error::ActualFromIsPast.into());
         }
 
@@ -147,44 +177,17 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::ConfigProposeExists.into());
         }
 
-        // To prevent multiple consensus change proposition in one request
-        let mut consensus_propose_added = false;
-        // To prevent multiple service change proposition in one request
-        let mut service_ids = HashSet::new();
-
-        // Perform config verification.
-        for change in &propose.changes {
-            match change {
-                ConfigChange::Consensus(config) => {
-                    if consensus_propose_added {
-                        log::trace!(
-                            "Discarded multiple consensus change proposals in one request."
-                        );
-                        return Err(Error::MalformedConfigPropose.into());
-                    }
-                    consensus_propose_added = true;
-
-                    config
-                        .validate()
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
-                }
-
-                ConfigChange::Service(config) => {
-                    if service_ids.contains(&config.instance_id) {
-                        log::trace!("Discarded multiple service change proposals in one request.");
-                        return Err(Error::MalformedConfigPropose.into());
-                    }
-                    service_ids.insert(config.instance_id);
-
-                    context
-                        .interface::<ConfigureCall<'_>>(config.instance_id)?
-                        .verify_config(config.params.clone())
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
-                }
-            }
-        }
+        // Verify changes in the proposal.
+        self.verify_config_changeset(&mut context, &propose.changes)?;
 
         let mut schema = Schema::new(context.service_data());
+
+        // After all the checks verify that configuration number is expected one.
+        if propose.configuration_number != schema.get_configuration_number() {
+            return Err(Error::IncorrectConfigurationNumber.into());
+        }
+        schema.increase_configuration_number();
+
         let propose_hash = propose.object_hash();
         schema.config_confirms.confirm(&propose_hash, author);
 
@@ -253,16 +256,12 @@ impl SupervisorInterface for Supervisor {
     ) -> Result<(), ExecutionError> {
         deploy.validate()?;
         let core_schema = context.data().for_core();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < core_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
+            return Err(Error::ActualFromIsPast.into());
         }
         let mut schema = Schema::new(context.service_data());
-
-        // Verifies that the deployment request is not yet registered.
-        if schema.pending_deployments.contains(&deploy.artifact) {
-            return Err(Error::DeployRequestAlreadyRegistered.into());
-        }
 
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
@@ -280,9 +279,22 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::AlreadyDeployed.into());
         }
 
-        let confirmations = schema.deploy_requests.confirm(&deploy, author);
-        let validator_count = core_schema.consensus_config().validator_keys.len();
-        if confirmations == validator_count {
+        // If deployment is already registered, check whether request is initiated
+        if schema.pending_deployments.contains(&deploy.artifact) {
+            let new_confirmation = !schema.deploy_requests.confirmed_by(&deploy, &author);
+            if new_confirmation {
+                // It's OK, just an additional confirmation.
+                schema.deploy_requests.confirm(&deploy, author);
+                return Ok(());
+            } else {
+                // Author already confirmed deployment of this artifact,
+                // so it's a duplicate.
+                return Err(Error::DeployRequestAlreadyRegistered.into());
+            }
+        }
+
+        schema.deploy_requests.confirm(&deploy, author);
+        if Mode::deploy_approved(&deploy, &schema.deploy_requests, validator_count) {
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
             schema.pending_deployments.put(&artifact, deploy);
@@ -333,49 +345,65 @@ impl SupervisorInterface for Supervisor {
 
         Ok(())
     }
+}
 
-    fn start_service(
+impl<Mode> Supervisor<Mode>
+where
+    Mode: mode::SupervisorMode,
+{
+    /// Verifies that each change introduced within config proposal is valid.
+    fn verify_config_changeset(
         &self,
-        mut context: CallContext<'_>,
-        service: StartService,
+        context: &mut CallContext<'_>,
+        changes: &[ConfigChange],
     ) -> Result<(), ExecutionError> {
-        service.validate()?;
-        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
-        let core_schema = context.data().for_core();
-        core_schema
-            .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+        // To prevent multiple consensus change proposition in one request
+        let mut consensus_propose_added = false;
+        // To prevent multiple service change proposition in one request
+        let mut service_ids = HashSet::new();
+        // To prevent multiple services start in one request.
+        let mut services_to_start = HashSet::new();
 
-        // Verifies that we doesn't reach deadline height.
-        if service.deadline_height < core_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
+        // Perform config verification.
+        for change in changes {
+            match change {
+                ConfigChange::Consensus(config) => {
+                    if consensus_propose_added {
+                        log::trace!(
+                            "Discarded multiple consensus change proposals in one request."
+                        );
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+                    consensus_propose_added = true;
+                    config
+                        .validate()
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+
+                ConfigChange::Service(config) => {
+                    if !service_ids.insert(config.instance_id) {
+                        log::trace!("Discarded multiple service change proposals in one request.");
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+
+                    context
+                        .interface::<ConfigureCall<'_>>(config.instance_id)?
+                        .verify_config(config.params.clone())
+                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                }
+
+                ConfigChange::StartService(start_service) => {
+                    if !services_to_start.insert(start_service.name.clone()) {
+                        log::trace!(
+                            "Discarded multiple instances with the same name in one request."
+                        );
+                        return Err(Error::MalformedConfigPropose.into());
+                    }
+
+                    start_service.validate(&context)?;
+                }
+            }
         }
-
-        // Verifies that the instance name does not exist.
-        if context
-            .data()
-            .for_dispatcher()
-            .get_instance(service.name.as_str())
-            .is_some()
-        {
-            return Err(Error::InstanceExists.into());
-        }
-
-        let confirmations = Schema::new(context.service_data())
-            .pending_instances
-            .confirm(&service, author);
-        let validator_count = core_schema.consensus_config().validator_keys.len();
-        if confirmations == validator_count {
-            log::trace!(
-                "Request add service with name {:?} from artifact {:?}",
-                service.name,
-                service.artifact
-            );
-            // We have enough confirmations to add a new service instance;
-            // if this action fails this transaction will be canceled.
-            context.start_adding_service(service.artifact, service.name, service.config)?;
-        }
-
         Ok(())
     }
 }

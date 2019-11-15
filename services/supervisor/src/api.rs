@@ -25,7 +25,7 @@ use failure::Fail;
 
 use super::{
     schema::Schema, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
-    ConfigVote, DeployRequest, StartService,
+    ConfigVote, DeployRequest,
 };
 
 /// Private API specification of the supervisor service.
@@ -37,10 +37,6 @@ pub trait PrivateApi {
     /// by the current node, and returns its hash.
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
 
-    /// Creates and broadcasts the `StartService` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn start_service(&self, service: StartService) -> Result<Hash, Self::Error>;
-
     /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
     /// by the current node, and returns its hash.
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error>;
@@ -48,6 +44,9 @@ pub trait PrivateApi {
     /// Creates and broadcasts the `ConfigVote` transaction, which is signed
     /// by the current node, and returns its hash.
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
+
+    /// Returns the number of processed configurations.
+    fn configuration_number(&self) -> Result<u64, Self::Error>;
 }
 
 pub trait PublicApi {
@@ -82,16 +81,18 @@ impl PrivateApi for ApiImpl<'_> {
         self.broadcast_transaction(artifact).map_err(From::from)
     }
 
-    fn start_service(&self, service: StartService) -> Result<Hash, Self::Error> {
-        self.broadcast_transaction(service).map_err(From::from)
-    }
-
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         self.broadcast_transaction(proposal).map_err(From::from)
     }
 
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
         self.broadcast_transaction(vote).map_err(From::from)
+    }
+
+    fn configuration_number(&self) -> Result<u64, Self::Error> {
+        let configuration_number = Schema::new(self.0.service_data()).get_configuration_number();
+
+        Ok(configuration_number)
     }
 }
 
@@ -113,14 +114,14 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         .endpoint_mut("deploy-artifact", |state, query| {
             ApiImpl(state).deploy_artifact(query)
         })
-        .endpoint_mut("start-service", |state, query| {
-            ApiImpl(state).start_service(query)
-        })
         .endpoint_mut("propose-config", |state, query| {
             ApiImpl(state).propose_config(query)
         })
         .endpoint_mut("confirm-config", |state, query| {
             ApiImpl(state).confirm_config(query)
+        })
+        .endpoint("configuration-number", |state, _query: ()| {
+            ApiImpl(state).configuration_number()
         });
     builder
         .public_scope()

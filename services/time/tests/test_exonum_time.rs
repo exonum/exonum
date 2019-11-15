@@ -25,7 +25,7 @@ use exonum::{
     runtime::{rust::Transaction, InstanceId, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, Snapshot};
-use exonum_supervisor::{simple::SimpleSupervisor, ConfigPropose};
+use exonum_supervisor::{ConfigPropose, SimpleSupervisor};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 
 use std::{collections::HashMap, iter::FromIterator};
@@ -339,7 +339,7 @@ fn test_selected_time_less_than_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(SimpleSupervisor::new())
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -354,9 +354,9 @@ fn test_selected_time_less_than_time_in_storage() {
     };
 
     testkit.create_block_with_transaction(
-        ConfigPropose::actual_from(cfg_change_height)
+        ConfigPropose::new(0, cfg_change_height)
             .consensus_config(new_cfg)
-            .sign_for_simple_supervisor(pub_key_0, &sec_key_0),
+            .sign_for_supervisor(pub_key_0, &sec_key_0),
     );
     testkit.create_blocks_until(cfg_change_height);
 
@@ -495,7 +495,7 @@ fn test_endpoint_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(SimpleSupervisor)
+        .with_rust_service(SimpleSupervisor::new())
         .create();
 
     let mut api = testkit.api();
@@ -564,9 +564,9 @@ fn test_endpoint_api() {
         cfg
     };
     testkit.create_block_with_transaction(
-        ConfigPropose::actual_from(cfg_change_height)
+        ConfigPropose::new(0, cfg_change_height)
             .consensus_config(new_cfg)
-            .sign_for_simple_supervisor(public_key_0, &secret_key_0),
+            .sign_for_supervisor(public_key_0, &secret_key_0),
     );
     testkit.create_blocks_until(cfg_change_height);
 

@@ -95,7 +95,7 @@ use exonum::{
     node::Node,
     runtime::{rust::ServiceFactory, Runtime},
 };
-use exonum_supervisor::Supervisor;
+use exonum_supervisor::SimpleSupervisor;
 
 use std::sync::Arc;
 
@@ -128,7 +128,7 @@ impl NodeBuilder {
 
     fn builtin_services(&self) -> Vec<InstanceCollection> {
         // Supervisor service is enabled by default.
-        vec![InstanceCollection::from(Supervisor)]
+        vec![InstanceCollection::from(SimpleSupervisor::new())]
     }
 
     /// Adds a new Runtime to the list of available runtimes.

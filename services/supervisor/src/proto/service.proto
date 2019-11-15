@@ -46,8 +46,6 @@ message StartService {
   string name = 2;
   // Instance configuration.
   bytes config = 3;
-  // The height until which the start service procedure should be completed.
-  uint64 deadline_height = 4;
 }
 
 // Configuration parameters of the certain service instance.
@@ -65,6 +63,8 @@ message ConfigChange {
     exonum.Config consensus = 1;
     // New service instance config.
     ServiceConfig service = 2;
+    // New service instance start request.
+    StartService start_service = 3;
   }
 }
 
@@ -74,6 +74,11 @@ message ConfigPropose {
   uint64 actual_from = 1;
   // New configuration proposition.
   repeated ConfigChange changes = 2;
+  // Configuration proposal number to avoid conflicting proposals.
+  // For every proposal, this field should be equal to the amount of
+  // valid processed proposals (no matter accepted or not).
+  // Appropriate value for this field can be obtained via "configuration-number" API endpoint.
+  uint64 configuration_number = 3;
 }
 
 // Confirmation vote for the configuration change
