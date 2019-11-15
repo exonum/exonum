@@ -139,7 +139,7 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
 }
 
 /// Mark trait as an Exonum service interface.
-/// 
+///
 /// TODO add more documentation.
 #[proc_macro_attribute]
 pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
