@@ -165,21 +165,16 @@ pub fn create_rust_runtime_and_genesis_config(
     consensus_config: ConsensusConfig,
     instances: impl IntoIterator<Item = InstanceCollection>,
 ) -> (RustRuntime, GenesisConfig) {
-    let (rust_runtime, genesis_config_builder) = instances.into_iter().fold(
-        (
-            RustRuntime::new(api_notifier),
-            GenesisConfigBuilder::with_consensus_config(consensus_config),
-        ),
-        |(runtime, builder), instance_collection| {
-            let (factory, config) = instance_collection.into();
-            (
-                runtime.with_available_service(factory),
-                builder.with_builtin_instance(config),
-            )
-        },
-    );
+    let mut rust_runtime = RustRuntime::new(api_notifier);
+    let mut config_builder = GenesisConfigBuilder::with_consensus_config(consensus_config);
 
-    (rust_runtime, genesis_config_builder.build())
+    for instance_collection in instances {
+        let (factory, config) = instance_collection.into();
+        rust_runtime = rust_runtime.with_available_service(factory);
+        config_builder = config_builder.with_builtin_instance(config);
+    }
+
+    (rust_runtime, config_builder.build())
 }
 
 #[test]
