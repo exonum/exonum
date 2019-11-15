@@ -30,7 +30,7 @@
 //!
 //! # Examples
 //!
-//! ## Minimum complete example of an Exonum service definition.
+//! ## Minimal complete example of an Exonum service definition.
 //!
 //! ```
 //! use exonum::{
@@ -128,6 +128,56 @@
 //!         Vec::new()
 //!     }
 //! }
+//! ```
+//!
+//! ## Stateful service definition
+//!
+//! Beware of stateful services in production, use this functionality only for debugging and
+//! prototyping.
+//!
+//! ```
+//! use exonum::runtime::{rust::Service, BlockchainData};
+//! use exonum_crypto::Hash;
+//! use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+//! use exonum_merkledb::Snapshot;
+//!
+//! #  #[exonum_interface]
+//! #  pub trait Transactions {}
+//!
+//! // If your service has a state, for example for debugging purposes, then you can
+//! // use a separate structure for the service.
+//!
+//! #[derive(Debug, Default, ServiceDispatcher)]
+//! #[service_dispatcher(implements("Transactions"))]
+//! pub struct StatefulService {
+//!     state: u64,
+//! }
+//!
+//! #[derive(Debug, ServiceFactory)]
+//! #[service_factory(
+//!     // In this case you have to specify service constructor explicitly.
+//!     service_constructor = "Self::new_instance",
+//!     proto_sources = "exonum::proto::schema",
+//!     // To specify artifact name and/or version explicitly you have to use the
+//!     // following attributes.
+//!     artifact_name = "stateful",
+//!     artifact_version = "1.0.0",
+//! )]
+//! pub struct StatefulServiceFactory;
+//!
+//! impl StatefulServiceFactory {
+//!     fn new_instance(&self) -> Box<dyn Service> {
+//!         Box::new(StatefulService::default())
+//!     }
+//! }
+//!
+//! # impl Transactions for StatefulService {}
+//! #
+//! #  impl Service for StatefulService {
+//! #      fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+//! #          Vec::new()
+//! #      }
+//! #  }
 //! ```
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html
