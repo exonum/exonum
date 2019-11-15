@@ -20,6 +20,7 @@ pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksD
 
 use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
+use smallvec::SmallVec;
 use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
 
 use crate::{
@@ -107,14 +108,28 @@ impl RocksDB {
                 self.clear_ref(&mut batch, cf, &resolved)?;
             }
 
-            for (key, change) in changes.into_data() {
-                let key = resolved.keyed(&key);
-                match change {
-                    Change::Put(ref value) => batch.put_cf(cf, key, value)?,
-                    Change::Delete => batch.delete_cf(cf, &key)?,
+            if let Some(id_bytes) = resolved.id_to_bytes() {
+                let mut buffer: SmallVec<[u8; 64]> = SmallVec::new();
+                buffer.extend_from_slice(&id_bytes);
+
+                for (key, change) in changes.into_data() {
+                    buffer.truncate(8);
+                    buffer.extend_from_slice(&key);
+                    match change {
+                        Change::Put(ref value) => batch.put_cf(cf, &buffer, value)?,
+                        Change::Delete => batch.delete_cf(cf, &buffer)?,
+                    }
+                }
+            } else {
+                for (key, change) in changes.into_data() {
+                    match change {
+                        Change::Put(ref value) => batch.put_cf(cf, &key, value)?,
+                        Change::Delete => batch.delete_cf(cf, &key)?,
+                    }
                 }
             }
         }
+
         self.db.write_opt(batch, w_opts).map_err(Into::into)
     }
 

@@ -168,7 +168,7 @@ pub struct ResolvedRef {
 #[cfg(test)] // All user-created indexes should have an ID set.
 impl From<&str> for ResolvedRef {
     fn from(name: &str) -> Self {
-        Self::unprefixed(name)
+        Self::not_prefixed(name)
     }
 }
 
@@ -183,7 +183,7 @@ impl From<(&str, u64)> for ResolvedRef {
 }
 
 impl ResolvedRef {
-    pub(crate) fn unprefixed(name: impl Into<String>) -> Self {
+    pub(crate) fn not_prefixed(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             id: None,

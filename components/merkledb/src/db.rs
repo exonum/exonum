@@ -886,7 +886,7 @@ pub const VERSION_NAME: &str = "version";
 pub fn check_database(db: &mut dyn Database) -> Result<()> {
     let fork = db.fork();
     {
-        let addr = ResolvedRef::unprefixed(DB_METADATA);
+        let addr = ResolvedRef::not_prefixed(DB_METADATA);
         let mut view = View::new(&fork, addr);
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
             if saved_version != DB_VERSION {
@@ -924,7 +924,7 @@ mod tests {
         }
         let expected_set: HashSet<_> = changes
             .into_iter()
-            .map(|(name, key, change)| (ResolvedRef::unprefixed(name), key, change))
+            .map(|(name, key, change)| (ResolvedRef::not_prefixed(name), key, change))
             .collect();
         assert_eq!(patch_set, expected_set);
     }

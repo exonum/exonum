@@ -360,7 +360,7 @@ fn test_database_check_correct_version() {
     let db = TemporaryDB::default();
     let snapshot = db.snapshot();
 
-    let view = View::new(&snapshot, ResolvedRef::unprefixed(db::DB_METADATA));
+    let view = View::new(&snapshot, ResolvedRef::not_prefixed(db::DB_METADATA));
     let version: u8 = view.get(db::VERSION_NAME).unwrap();
     assert_eq!(version, db::DB_VERSION);
 }
@@ -375,7 +375,7 @@ fn test_database_check_incorrect_version() {
         let db = RocksDB::open(&dir, &opts).unwrap();
         let fork = db.fork();
         {
-            let mut view = View::new(&fork, ResolvedRef::unprefixed(db::DB_METADATA));
+            let mut view = View::new(&fork, ResolvedRef::not_prefixed(db::DB_METADATA));
             view.put(db::VERSION_NAME, 2_u8);
         }
         db.merge(fork.into_patch()).unwrap();

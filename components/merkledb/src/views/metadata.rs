@@ -250,7 +250,7 @@ where
         self.metadata.state = Some(state);
         View::new(
             self.index_access.clone(),
-            ResolvedRef::unprefixed(INDEXES_POOL_NAME),
+            ResolvedRef::not_prefixed(INDEXES_POOL_NAME),
         )
         .put(&self.index_full_name, self.metadata.to_bytes());
     }
@@ -259,7 +259,7 @@ where
         self.metadata.state = None;
         View::new(
             self.index_access.clone(),
-            ResolvedRef::unprefixed(INDEXES_POOL_NAME),
+            ResolvedRef::not_prefixed(INDEXES_POOL_NAME),
         )
         .put(&self.index_full_name, self.metadata.to_bytes());
     }
@@ -273,7 +273,7 @@ impl<T: RawAccess> IndexesPool<T> {
     pub(super) fn new(index_access: T) -> Self {
         Self(View::new(
             index_access,
-            ResolvedRef::unprefixed(INDEXES_POOL_NAME),
+            ResolvedRef::not_prefixed(INDEXES_POOL_NAME),
         ))
     }
 
@@ -321,7 +321,7 @@ impl<T: RawAccess> AggregatedIndexes<T> {
     pub(crate) fn new(index_access: T) -> Self {
         Self(View::new(
             index_access,
-            ResolvedRef::unprefixed(AGGREGATED_INDEXES_NAME),
+            ResolvedRef::not_prefixed(AGGREGATED_INDEXES_NAME),
         ))
     }
 
