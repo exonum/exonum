@@ -224,7 +224,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// to the storage via provided `ExecutionContext`. Discrepancy in node behavior within
 /// these methods may lead to a consensus failure.
 ///
-/// The other methods may execute logic specific to the node.
+/// The other `Runtime` methods may execute logic specific to the node.
 ///
 /// # Handling Panics
 ///
@@ -297,9 +297,14 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// # Return value
     ///
     /// The `Runtime` should catch all panics except for `FatalError`s and convert
-    /// them into an `ExecutionError`. A returned error or panic implies that service instantiation
-    /// has failed; as a rule of a thumb, changes made by the method will be rolled back
-    /// (the exact logic is determined by the supervisor).
+    /// them into an `ExecutionError`.
+    ///
+    /// Returning an error or panicking provides a way for the `Runtime` to signal that
+    /// service instantiation has failed. As a rule of a thumb, changes made by the method
+    /// will be rolled back after such a signal (the exact logic is determined by the supervisor).
+    /// Because an error is one of expected / handled outcomes, verifying prerequisites
+    /// for instantiation and reporting corresponding failures should be performed at this stage
+    /// rather than in `commit_service`.
     fn start_adding_service(
         &self,
         context: ExecutionContext<'_>,
@@ -337,10 +342,10 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// An error or panic returned from this method will not be processed and will lead
     /// to the node stopping. A runtime should only return an error / panic if the error is local
-    /// to the node, rather than common to all nodes in the network. All consensus-related errors
-    /// should be reported during the preceding `start_adding_service` call. The error should
-    /// contain a description allowing the node administrator to determine the root cause
-    /// of the error and (ideally) recover the node by eliminating it.
+    /// to the node with reasonable certainty, rather than common to all nodes in the network.
+    /// (The latter kind of errors should be produced during the preceding `start_adding_service`
+    /// call.) The error should contain a description allowing the node administrator to determine
+    /// the root cause of the error and (ideally) recover the node by eliminating it.
     fn commit_service(
         &mut self,
         snapshot: &dyn Snapshot,
