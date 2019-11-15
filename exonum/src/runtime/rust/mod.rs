@@ -73,6 +73,8 @@
 //!
 //! // Define the transactions interface for your service by creating a trait with
 //! // the following attribute and method signatures.
+//! // This attribute implements `Interface` trait for this trait and `Transaction`
+//! // trait for each arg.
 //! #[exonum_interface]
 //! pub trait Transactions {
 //!     // You may use `ExecutionError` directly.
