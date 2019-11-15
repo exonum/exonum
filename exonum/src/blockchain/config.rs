@@ -393,7 +393,7 @@ impl GenesisConfigBuilder {
         }
     }
 
-    pub fn with_builtin_instance(mut self, instance_config: InstanceConfig) -> Self {
+    pub fn with_service(mut self, instance_config: InstanceConfig) -> Self {
         if !instance_config.instances.is_empty() {
             self.artifacts.push(instance_config.artifact_spec);
         }
@@ -407,7 +407,7 @@ impl GenesisConfigBuilder {
     ) -> Self {
         instance_configs
             .into_iter()
-            .fold(self, |s, instance| s.with_builtin_instance(instance))
+            .fold(self, |s, instance| s.with_service(instance))
     }
 
     pub fn build(self) -> GenesisConfig {

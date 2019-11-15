@@ -451,7 +451,7 @@ fn rust_runtime_with_builtin_services() {
         .with_instance(spec.clone(), constructor.clone().into_bytes());
 
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
-        .with_builtin_instance(instance_cfg)
+        .with_service(instance_cfg)
         .build();
 
     let mut blockchain = Blockchain::build_for_tests()
@@ -800,7 +800,7 @@ fn dependent_service_in_successive_block() {
 
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
-        .with_builtin_instance(main_service)
+        .with_service(main_service)
         .build();
 
     let mut blockchain = Blockchain::build_for_tests()

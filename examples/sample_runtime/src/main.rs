@@ -280,7 +280,7 @@ fn main() {
     let rust_runtime =
         RustRuntime::new(channel.endpoints.0.clone()).with_available_service(factory);
     let genesis_config = GenesisConfigBuilder::with_consensus_config(genesis)
-        .with_builtin_instance(cfg)
+        .with_service(cfg)
         .build();
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)

@@ -54,7 +54,7 @@ use exonum::{
     helpers::{create_rust_runtime_and_genesis_config, Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::{rust::RustRuntime}, SnapshotExt,
+    runtime::{rust::RustRuntime}, SnapshotExt},
 };
 
 /// Number of transactions added to the blockchain before the bench begins.

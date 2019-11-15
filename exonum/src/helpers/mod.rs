@@ -171,7 +171,7 @@ pub fn create_rust_runtime_and_genesis_config(
     for instance_collection in instances {
         let (factory, config) = instance_collection.into();
         rust_runtime = rust_runtime.with_available_service(factory);
-        config_builder = config_builder.with_builtin_instance(config);
+        config_builder = config_builder.with_service(config);
     }
 
     (rust_runtime, config_builder.build())
