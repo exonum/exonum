@@ -133,57 +133,14 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 /// * `#[service_factory(service_name = "string")]`
 ///
 /// Use the specified service name for the ServiceDispatcher derivation instead of the struct name.
-///
-///
-/// # Examples TODO Move to ServiceFactory documentation [ECR-3275]
-///
-/// Typical usage.
-/// ```ignore
-/// #[derive(ServiceFactory, ServiceDispatcher)]
-/// #[service_dispatcher(implements("MyServiceInterface"))]
-/// #[service_factory(proto_sources = "crate::proto")]
-/// pub struct MyService;
-/// ```
-///
-/// But if you have complex logic in service factory you can use custom constructor to create a
-/// new service instances.
-/// ```ignore
-/// // Imagine that you have a stateful service like this
-/// #[derive(Debug)]
-/// pub struct TimeService {
-///     /// Current time.
-///     time: Arc<dyn TimeProvider>,
-/// }
-///
-/// // You can implement service factory, but you cannot just derive `ServiceFactory`
-/// // like in example bellow.
-/// // To resolve this problem you can specify your own constructor for the service instance.
-/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-/// #[service_dispatcher(implements("TimeServiceInterface"))]
-/// #[service_factory(
-///     proto_sources = "proto",
-///     service_constructor = "TimeServiceFactory::create_instance",
-///     service_name = "TimeService",
-/// )]
-/// pub struct TimeServiceFactory {
-///     time_provider: Arc<dyn TimeProvider>,
-/// }
-///
-/// // Arbitrary constructor implementation.
-/// impl TimeServiceFactory {
-///     fn create_instance(&self) -> Box<dyn Service> {
-///         Box::new(TimeService {
-///             time: self.time_provider.clone(),
-///         })
-///     }
-/// }
-/// ```
 #[proc_macro_derive(ServiceFactory, attributes(service_factory))]
 pub fn service_factory(input: TokenStream) -> TokenStream {
     service_factory::impl_service_factory(input)
 }
 
 /// Mark trait as an Exonum service interface.
+/// 
+/// TODO add more documentation.
 #[proc_macro_attribute]
 pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_interface::impl_exonum_interface(attr, item)
