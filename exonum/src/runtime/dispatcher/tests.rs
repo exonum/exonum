@@ -787,7 +787,7 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
     let mut fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact, spec).unwrap();
     dispatcher.commit_block_and_notify_runtimes(&mut fork); // << should panic
 }
 
