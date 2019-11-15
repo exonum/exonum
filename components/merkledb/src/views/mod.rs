@@ -13,30 +13,30 @@
 // limitations under the License.
 
 pub use self::{
+    address::{IndexAddress, ResolvedRef},
     metadata::{BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
     system_info::SystemInfo,
 };
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
+use self::address::key_bytes;
 use super::{
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
     BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
+mod address;
 mod metadata;
 mod system_info;
 #[cfg(test)]
 mod tests;
 
-/// Separator between the name and the additional bytes in family indexes.
-const INDEX_NAME_SEPARATOR: &[u8] = &[0];
-
 /// Represents current view of the database by specified `address` and
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
 pub struct View<T: RawAccess> {
-    address: IndexAddress,
+    address: ResolvedRef, // TODO: remove?
     index_access: T,
     changes: T::Changes,
 }
@@ -98,7 +98,7 @@ pub trait RawAccess: Clone {
     /// Reference to a `Snapshot`.
     fn snapshot(&self) -> &dyn Snapshot;
     /// Returns changes related to specific `address` compared to the `snapshot()`.
-    fn changes(&self, address: &IndexAddress) -> Self::Changes;
+    fn changes(&self, address: &ResolvedRef) -> Self::Changes;
 }
 
 /// Allows to mutate data in indexes.
@@ -137,169 +137,6 @@ pub trait AsReadonly: RawAccess {
     fn as_readonly(&self) -> Self::Readonly;
 }
 
-/// Represents address of the index in the database.
-///
-/// # Examples
-///
-/// `IndexAddress` can be used implicitly, since `&str` and `(&str, &impl BinaryKey)` can both
-/// be converted into an address.
-///
-/// ```
-/// use exonum_merkledb::{access::AccessExt, IndexAddress, TemporaryDB, Database};
-///
-/// let db = TemporaryDB::new();
-/// let fork = db.fork();
-///
-/// // Using a string address:
-/// let map = fork.get_map::<_, String, u8>("map");
-/// // Using an address within an index family:
-/// let list = fork.get_list::<_, String>(("index", &3_u32));
-/// // Using `IndexAddress` explicitly:
-/// let addr = IndexAddress::with_root("data").append_bytes(&vec![1, 2, 3]);
-/// let set = fork.get_value_set::<_, u64>(addr);
-/// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
-pub struct IndexAddress {
-    pub(super) name: String,
-    pub(super) bytes: Option<Vec<u8>>,
-}
-
-impl IndexAddress {
-    /// Creates empty `IndexAddress`.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Creates new `IndexAddress` with specified `root` name.
-    pub fn with_root<S: Into<String>>(root: S) -> Self {
-        Self {
-            name: root.into(),
-            bytes: None,
-        }
-    }
-
-    /// Returns name part of `IndexAddress`.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Returns bytes part of `IndexAddress`.
-    pub fn bytes(&self) -> Option<&[u8]> {
-        self.bytes.as_ref().map(Vec::as_slice)
-    }
-
-    /// Returns tuple consists of `name` and `bytes` concatenated with provided `key`.
-    /// This is used to obtain single value(serialized as byte array) from the database.
-    pub(crate) fn keyed<'a>(&self, key: &'a [u8]) -> (&str, Cow<'a, [u8]>) {
-        (
-            &self.name,
-            match self.bytes {
-                None => Cow::Borrowed(key),
-                Some(ref bytes) => {
-                    let bytes = concat_keys!(bytes, key);
-                    bytes.into()
-                }
-            },
-        )
-    }
-
-    /// Prepends a name part to `IndexAddress`. The name is separated from the existing name
-    /// by a dot `.`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use exonum_merkledb::IndexAddress;
-    /// let addr = IndexAddress::with_root("foo");
-    /// let prefixed = addr.prepend_name("prefix");
-    /// assert_eq!(prefixed.name(), "prefix.foo");
-    /// ```
-    pub fn prepend_name<'a>(self, prefix: impl Into<Cow<'a, str>>) -> Self {
-        let prefix = prefix.into();
-        Self {
-            name: if self.name.is_empty() {
-                prefix.into_owned()
-            } else {
-                // Because `concat` is faster than `format!("...")` in all cases.
-                [prefix.as_ref(), ".", self.name()].concat()
-            },
-
-            bytes: self.bytes,
-        }
-    }
-
-    /// Appends a name part to `IndexAddress`. The name is separated from the existing name
-    /// by a dot `.`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use exonum_merkledb::IndexAddress;
-    /// let addr = IndexAddress::with_root("foo");
-    /// let suffixed = addr.append_name("suffix");
-    /// assert_eq!(suffixed.name(), "foo.suffix");
-    /// ```
-    pub fn append_name<'a>(self, suffix: impl Into<Cow<'a, str>>) -> Self {
-        let suffix = suffix.into();
-        Self {
-            name: if self.name.is_empty() {
-                suffix.into_owned()
-            } else {
-                // Because `concat` is faster than `format!("...")` in all cases.
-                [self.name(), ".", suffix.as_ref()].concat()
-            },
-
-            bytes: self.bytes,
-        }
-    }
-
-    /// Appends a bytes part to `IndexAddress`.
-    pub fn append_bytes<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
-        let name = self.name;
-        let bytes = if let Some(ref bytes) = self.bytes {
-            concat_keys!(bytes, suffix)
-        } else {
-            concat_keys!(suffix)
-        };
-
-        Self {
-            name,
-            bytes: Some(bytes),
-        }
-    }
-
-    /// Full address with a separator between `name` and `bytes` represented as byte array.
-    pub fn fully_qualified_name(&self) -> Vec<u8> {
-        if let Some(bytes) = self.bytes() {
-            concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes)
-        } else {
-            concat_keys!(self.name())
-        }
-    }
-}
-
-impl<'a> From<&'a str> for IndexAddress {
-    fn from(name: &'a str) -> Self {
-        Self::with_root(name)
-    }
-}
-
-impl From<String> for IndexAddress {
-    fn from(name: String) -> Self {
-        Self::with_root(name)
-    }
-}
-
-// TODO should we have this impl in public interface? ECR-2834
-impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
-    fn from((name, key): (&'a str, &'a K)) -> Self {
-        Self {
-            name: name.to_owned(),
-            bytes: Some(key_bytes(key)),
-        }
-    }
-}
-
 macro_rules! impl_snapshot_access {
     ($typ:ty) => {
         impl RawAccess for $typ {
@@ -309,7 +146,7 @@ macro_rules! impl_snapshot_access {
                 self.as_ref()
             }
 
-            fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
+            fn changes(&self, _address: &ResolvedRef) -> Self::Changes {}
         }
 
         impl AsReadonly for $typ {
@@ -327,13 +164,9 @@ impl_snapshot_access!(&'_ Box<dyn Snapshot>);
 impl_snapshot_access!(std::rc::Rc<dyn Snapshot>);
 impl_snapshot_access!(std::sync::Arc<dyn Snapshot>);
 
-fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
-    concat_keys!(key)
-}
-
 impl<T: RawAccess> View<T> {
     /// Creates a new view for an index with the specified address.
-    pub(crate) fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
+    pub(crate) fn new(index_access: T, address: impl Into<ResolvedRef>) -> Self {
         let address = address.into();
         let changes = index_access.changes(&address);
         Self {
@@ -356,13 +189,12 @@ impl<T: RawAccess> View<T> {
                 }
             }
 
-            if changes.is_empty() {
+            if changes.is_cleared() {
                 return None;
             }
         }
 
-        let (name, key) = self.address.keyed(key);
-        self.snapshot().get(name, &key)
+        self.snapshot().get(&self.address, key)
     }
 
     fn contains_raw_key(&self, key: &[u8]) -> bool {
@@ -374,34 +206,29 @@ impl<T: RawAccess> View<T> {
                 }
             }
 
-            if changes.is_empty() {
+            if changes.is_cleared() {
                 return false;
             }
         }
 
-        let (name, key) = self.address.keyed(key);
-        self.snapshot().contains(name, &key)
+        self.snapshot().contains(&self.address, &key)
     }
 
     fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
         use std::collections::Bound::*;
-
-        let (name, key) = self.address.keyed(from);
-        let prefix = self.address.bytes.clone().unwrap_or_else(|| vec![]);
 
         let changes_iter = self
             .changes
             .as_ref()
             .map(|changes| changes.data.range::<[u8], _>((Included(from), Unbounded)));
 
-        let is_empty = self.changes.as_ref().map_or(false, ViewChanges::is_empty);
-
-        if is_empty {
-            // Ignore all changes from the snapshot
+        let is_cleared = self.changes.as_ref().map_or(false, ViewChanges::is_cleared);
+        if is_cleared {
+            // Ignore all changes from the snapshot.
             Box::new(ChangesIter::new(changes_iter.unwrap()))
         } else {
             Box::new(ForkIter::new(
-                Box::new(SnapshotIter::new(self.snapshot(), name, prefix, &key)),
+                self.snapshot().iter(&self.address, from),
                 changes_iter,
             ))
         }
@@ -517,66 +344,6 @@ impl<T: RawAccessMut> View<T> {
     /// Clears the view removing all its elements.
     pub fn clear(&mut self) {
         self.changes.as_mut().unwrap().clear();
-    }
-}
-
-/// Iterator over entries in a snapshot limited to a specific view.
-struct SnapshotIter<'a> {
-    inner: BytesIter<'a>,
-    prefix: Vec<u8>,
-    ended: bool,
-}
-
-impl<'a> fmt::Debug for SnapshotIter<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SnapshotIter")
-            .field("prefix", &self.prefix)
-            .field("ended", &self.ended)
-            .finish()
-    }
-}
-
-impl<'a> SnapshotIter<'a> {
-    fn new(snapshot: &'a dyn Snapshot, name: &str, prefix: Vec<u8>, from: &[u8]) -> Self {
-        debug_assert!(from.starts_with(&prefix));
-
-        SnapshotIter {
-            inner: snapshot.iter(name, from),
-            prefix,
-            ended: false,
-        }
-    }
-}
-
-impl BytesIterator for SnapshotIter<'_> {
-    fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        if self.ended {
-            return None;
-        }
-
-        let next = self.inner.next();
-        match next {
-            Some((k, v)) if k.starts_with(&self.prefix) => Some((&k[self.prefix.len()..], v)),
-            _ => {
-                self.ended = true;
-                None
-            }
-        }
-    }
-
-    fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        if self.ended {
-            return None;
-        }
-
-        let peeked = self.inner.peek();
-        match peeked {
-            Some((k, v)) if k.starts_with(&self.prefix) => Some((&k[self.prefix.len()..], v)),
-            _ => {
-                self.ended = true;
-                None
-            }
-        }
     }
 }
 

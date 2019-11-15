@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, io::Error, mem};
+use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
@@ -21,7 +21,9 @@ use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use super::{system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, View};
+use super::{
+    system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedRef, View,
+};
 use crate::{validation::assert_valid_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
@@ -204,10 +206,6 @@ where
 }
 
 impl IndexMetadata {
-    fn index_address(&self) -> IndexAddress {
-        IndexAddress::new().append_bytes(&self.identifier)
-    }
-
     fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
         let index_type = self.index_type;
         IndexMetadata {
@@ -250,14 +248,20 @@ where
 {
     pub fn set(&mut self, state: V) {
         self.metadata.state = Some(state);
-        View::new(self.index_access.clone(), INDEXES_POOL_NAME)
-            .put(&self.index_full_name, self.metadata.to_bytes());
+        View::new(
+            self.index_access.clone(),
+            ResolvedRef::unprefixed(INDEXES_POOL_NAME),
+        )
+        .put(&self.index_full_name, self.metadata.to_bytes());
     }
 
     pub fn unset(&mut self) {
         self.metadata.state = None;
-        View::new(self.index_access.clone(), INDEXES_POOL_NAME)
-            .put(&self.index_full_name, self.metadata.to_bytes());
+        View::new(
+            self.index_access.clone(),
+            ResolvedRef::unprefixed(INDEXES_POOL_NAME),
+        )
+        .put(&self.index_full_name, self.metadata.to_bytes());
     }
 }
 
@@ -267,7 +271,10 @@ pub(super) struct IndexesPool<T: RawAccess>(View<T>);
 
 impl<T: RawAccess> IndexesPool<T> {
     pub(super) fn new(index_access: T) -> Self {
-        Self(View::new(index_access, INDEXES_POOL_NAME))
+        Self(View::new(
+            index_access,
+            ResolvedRef::unprefixed(INDEXES_POOL_NAME),
+        ))
     }
 
     pub(super) fn len(&self) -> u64 {
@@ -296,7 +303,8 @@ impl<T: RawAccess> IndexesPool<T> {
     {
         let len = self.len();
         let metadata = IndexMetadata {
-            identifier: len,
+            identifier: len + 1,
+            // ^-- Identifier should be non-zero to translate to a correct id in `ResolvedRef`
             index_type,
             state: None,
         };
@@ -311,7 +319,10 @@ pub(super) struct AggregatedIndexes<T: RawAccess>(View<T>);
 
 impl<T: RawAccess> AggregatedIndexes<T> {
     pub(crate) fn new(index_access: T) -> Self {
-        Self(View::new(index_access, AGGREGATED_INDEXES_NAME))
+        Self(View::new(
+            index_access,
+            ResolvedRef::unprefixed(AGGREGATED_INDEXES_NAME),
+        ))
     }
 
     fn insert(&mut self, name: &str) {
@@ -336,8 +347,10 @@ impl<T: RawAccess> AggregatedIndexes<T> {
                 });
 
             let index_type = metadata.index_type;
-            let mut addr = metadata.index_address();
-            addr.name = name.clone();
+            let addr = ResolvedRef {
+                name: name.clone(),
+                id: NonZeroU64::new(metadata.identifier),
+            };
             let view_with_metadata = ViewWithMetadata {
                 view: View::new(access.clone(), addr),
                 metadata,
@@ -414,15 +427,17 @@ where
             metadata
         });
         let real_index_type = metadata.index_type;
-        let mut index_address = metadata.index_address();
-        // Set index address name, since metadata itself doesn't know it.
-        index_address.name = index_name;
+        let addr = ResolvedRef {
+            name: index_name,
+            id: NonZeroU64::new(metadata.identifier),
+        };
         let this = Self {
-            view: View::new(index_access, index_address),
+            view: View::new(index_access, addr),
             metadata,
             index_full_name,
             is_phantom,
         };
+
         if real_index_type == index_type {
             Ok(this)
         } else {

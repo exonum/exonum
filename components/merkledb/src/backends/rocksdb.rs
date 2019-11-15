@@ -24,7 +24,7 @@ use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBa
 
 use crate::{
     db::{check_database, Change},
-    Database, DbOptions, Iter, Iterator, Patch, Snapshot,
+    Database, DbOptions, Iter, Iterator, Patch, ResolvedRef, Snapshot,
 };
 
 /// Database implementation on top of [`RocksDB`](https://rocksdb.org)
@@ -65,6 +65,8 @@ struct RocksDBIterator<'a> {
     iter: Peekable<DBIterator<'a>>,
     key: Option<Box<[u8]>>,
     value: Option<Box<[u8]>>,
+    prefix: Option<[u8; 8]>,
+    ended: bool,
 }
 
 impl RocksDB {
@@ -92,17 +94,21 @@ impl RocksDB {
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
-        for (cf_name, changes) in patch.into_changes() {
-            let cf = match self.db.cf_handle(&cf_name) {
+        for (resolved, changes) in patch.into_changes() {
+            let cf = match self.db.cf_handle(&resolved.name) {
                 Some(cf) => cf,
-                None => self.db.create_cf(&cf_name, &self.options.into()).unwrap(),
+                None => self
+                    .db
+                    .create_cf(&resolved.name, &self.options.into())
+                    .unwrap(),
             };
 
-            for prefix in changes.prefixes_to_remove() {
-                self.remove_with_prefix(&mut batch, cf, &cf_name, prefix)?;
+            if changes.is_cleared() {
+                self.clear_ref(&mut batch, cf, &resolved)?;
             }
 
             for (key, change) in changes.into_data() {
+                let key = resolved.keyed(&key);
                 match change {
                     Change::Put(ref value) => batch.put_cf(cf, key, value)?,
                     Change::Delete => batch.delete_cf(cf, &key)?,
@@ -113,33 +119,54 @@ impl RocksDB {
     }
 
     // Removes all keys with a specified prefix from a column family.
-    fn remove_with_prefix(
+    fn clear_ref(
         &self,
         batch: &mut WriteBatch,
         cf: ColumnFamily<'_>,
-        cf_name: &str,
-        prefix: &[u8],
+        resolved: &ResolvedRef,
     ) -> crate::Result<()> {
-        let snapshot = self.snapshot();
-        let mut iterator = snapshot.iter(cf_name, prefix);
-        while let Some((key, ..)) = iterator.next() {
-            if !key.starts_with(prefix) {
-                break;
-            }
-
-            batch.delete_cf(cf, key)?;
+        let snapshot = self.typed_snapshot();
+        let mut iterator = snapshot.typed_iter(resolved, &[]);
+        while iterator.next().is_some() {
+            // We've already got the full key inside the iterator!
+            batch.delete_cf(cf, iterator.key.as_ref().unwrap())?;
         }
-
         Ok(())
+    }
+
+    fn typed_snapshot(&self) -> RocksDBSnapshot {
+        RocksDBSnapshot {
+            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+            db: Arc::clone(&self.db),
+        }
+    }
+}
+
+impl RocksDBSnapshot {
+    fn typed_iter(&self, name: &ResolvedRef, from: &[u8]) -> RocksDBIterator<'_> {
+        use rocksdb::{Direction, IteratorMode};
+
+        let from = name.keyed(from);
+        let iter = match self.db.cf_handle(&name.name) {
+            Some(cf) => self
+                .snapshot
+                .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward))
+                .unwrap(),
+            None => self.snapshot.iterator(IteratorMode::Start),
+        };
+        RocksDBIterator {
+            iter: iter.peekable(),
+            prefix: name.id_to_bytes(),
+            key: None,
+            value: None,
+            ended: false,
+        }
     }
 }
 
 impl Database for RocksDB {
     fn snapshot(&self) -> Box<dyn Snapshot> {
-        Box::new(RocksDBSnapshot {
-            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-            db: Arc::clone(&self.db),
-        })
+        Box::new(self.typed_snapshot())
     }
 
     fn merge(&self, patch: Patch) -> crate::Result<()> {
@@ -155,9 +182,9 @@ impl Database for RocksDB {
 }
 
 impl Snapshot for RocksDBSnapshot {
-    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(cf) = self.db.cf_handle(name) {
-            match self.snapshot.get_cf(cf, key) {
+    fn get(&self, name: &ResolvedRef, key: &[u8]) -> Option<Vec<u8>> {
+        if let Some(cf) = self.db.cf_handle(&name.name) {
+            match self.snapshot.get_cf(cf, name.keyed(key)) {
                 Ok(value) => value.map(|v| v.to_vec()),
                 Err(e) => panic!(e),
             }
@@ -166,38 +193,54 @@ impl Snapshot for RocksDBSnapshot {
         }
     }
 
-    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
-        use rocksdb::{Direction, IteratorMode};
-        let iter = match self.db.cf_handle(name) {
-            Some(cf) => self
-                .snapshot
-                .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
-                .unwrap(),
-            None => self.snapshot.iterator(IteratorMode::Start),
-        };
-        Box::new(RocksDBIterator {
-            iter: iter.peekable(),
-            key: None,
-            value: None,
-        })
+    fn iter(&self, name: &ResolvedRef, from: &[u8]) -> Iter<'_> {
+        Box::new(self.typed_iter(name, from))
     }
 }
 
 impl<'a> Iterator for RocksDBIterator<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
+        if self.ended {
+            return None;
+        }
+
         if let Some((key, value)) = self.iter.next() {
+            if let Some(ref prefix) = self.prefix {
+                if &key[..8] != prefix {
+                    self.ended = true;
+                    return None;
+                }
+            }
+
             self.key = Some(key);
+            let key = if self.prefix.is_some() {
+                &self.key.as_ref()?[8..]
+            } else {
+                &self.key.as_ref()?[..]
+            };
             self.value = Some(value);
-            Some((self.key.as_ref()?.as_ref(), self.value.as_ref()?.as_ref()))
+            Some((key, self.value.as_ref()?))
         } else {
             None
         }
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter
-            .peek()
-            .map(|(key, value)| (key.as_ref(), value.as_ref()))
+        if self.ended {
+            return None;
+        }
+
+        let (key, value) = self.iter.peek()?;
+        let key = if let Some(prefix) = self.prefix {
+            if key[..8] != prefix {
+                self.ended = true;
+                return None;
+            }
+            &key[8..]
+        } else {
+            &key[..]
+        };
+        Some((key, &value[..]))
     }
 }
 

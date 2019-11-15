@@ -15,19 +15,20 @@
 use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
-use std::{panic, rc::Rc};
+use std::{num::NonZeroU64, panic, rc::Rc};
 
-use crate::views::metadata::AggregatedIndexes;
 use crate::{
     access::AccessExt,
     db,
     validation::is_valid_index_name,
-    views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
-    Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
+    views::{
+        metadata::AggregatedIndexes, IndexAddress, IndexType, RawAccess, View, ViewWithMetadata,
+    },
+    Database, DbOptions, Fork, ListIndex, MapIndex, ResolvedRef, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
-const PREFIXED_IDX: (&str, &[u8]) = ("idx", &[1_u8, 2, 3] as &[u8]);
+const PREFIXED_IDX: (&str, u64) = ("idx", 42);
 
 fn assert_iter<T: RawAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     let mut iter = view.iter_bytes(&[from]);
@@ -49,7 +50,7 @@ fn assert_initial_state<T: RawAccess>(view: &View<T>) {
 fn test_changelog<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<IndexAddress> + Copy,
+    I: Into<ResolvedRef> + Copy,
 {
     let mut fork = db.fork();
     {
@@ -116,8 +117,8 @@ where
 }
 
 fn _views_in_same_family<T: Database>(db: &T) {
-    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
-    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
+    const IDX_1: (&str, u64) = ("foo", 23);
+    const IDX_2: (&str, u64) = ("foo", 42);
 
     let mut fork = db.fork();
     {
@@ -173,7 +174,7 @@ fn _views_in_same_family<T: Database>(db: &T) {
 fn test_two_mutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<IndexAddress> + Copy,
+    I: Into<ResolvedRef> + Copy,
 {
     let fork = db.fork();
 
@@ -186,7 +187,7 @@ where
 fn test_mutable_and_immutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<IndexAddress> + Copy,
+    I: Into<ResolvedRef> + Copy,
 {
     let fork = db.fork();
 
@@ -199,7 +200,7 @@ where
 fn test_clear_view<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<IndexAddress> + Copy,
+    I: Into<ResolvedRef> + Copy,
 {
     let fork = db.fork();
     {
@@ -262,7 +263,7 @@ where
 fn test_fork_iter<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<IndexAddress> + Copy,
+    I: Into<ResolvedRef> + Copy,
 {
     let fork = db.fork();
     {
@@ -359,7 +360,7 @@ fn test_database_check_correct_version() {
     let db = TemporaryDB::default();
     let snapshot = db.snapshot();
 
-    let view = View::new(&snapshot, IndexAddress::with_root(db::DB_METADATA));
+    let view = View::new(&snapshot, ResolvedRef::unprefixed(db::DB_METADATA));
     let version: u8 = view.get(db::VERSION_NAME).unwrap();
     assert_eq!(version, db::DB_VERSION);
 }
@@ -374,7 +375,7 @@ fn test_database_check_incorrect_version() {
         let db = RocksDB::open(&dir, &opts).unwrap();
         let fork = db.fork();
         {
-            let mut view = View::new(&fork, IndexAddress::with_root(db::DB_METADATA));
+            let mut view = View::new(&fork, ResolvedRef::unprefixed(db::DB_METADATA));
             view.put(db::VERSION_NAME, 2_u8);
         }
         db.merge(fork.into_patch()).unwrap();
@@ -488,8 +489,8 @@ fn multiple_indexes() {
 
 #[test]
 fn views_in_same_family() {
-    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
-    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
+    const IDX_1: (&str, u64) = ("foo", 23);
+    const IDX_2: (&str, u64) = ("foo", 42);
 
     let db = TemporaryDB::new();
 
@@ -605,8 +606,8 @@ fn clear_prefixed_view() {
 
 #[test]
 fn clear_sibling_views() {
-    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
-    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
+    const IDX_1: (&str, u64) = ("foo", 23);
+    const IDX_2: (&str, u64) = ("foo", 42);
 
     fn assert_view_states<I: RawAccess + Copy>(db_view: I) {
         let view1 = View::new(db_view, IDX_1);
@@ -768,8 +769,8 @@ fn mutable_and_immutable_borrows_for_different_views() {
 fn views_based_on_rc_fork() {
     fn test_lifetime<T: 'static>(_: T) {}
 
-    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
-    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
+    const IDX_1: (&str, u64) = ("foo", 23);
+    const IDX_2: (&str, u64) = ("foo", 42);
 
     let db = TemporaryDB::new();
     let fork = Rc::new(db.fork());
@@ -863,9 +864,9 @@ fn test_metadata_index_identifiers() {
             .into();
     assert_eq!(
         view.address,
-        IndexAddress {
+        ResolvedRef {
             name: "simple".to_owned(),
-            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+            id: NonZeroU64::new(1),
         }
     );
     drop(view); // Prevent "multiple mutable borrows" error later
@@ -878,9 +879,9 @@ fn test_metadata_index_identifiers() {
             .into();
     assert_eq!(
         view.address,
-        IndexAddress {
+        ResolvedRef {
             name: "second".to_owned(),
-            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 1]),
+            id: NonZeroU64::new(2),
         }
     );
 
@@ -892,9 +893,9 @@ fn test_metadata_index_identifiers() {
             .into();
     assert_eq!(
         view.address,
-        IndexAddress {
+        ResolvedRef {
             name: "simple".to_owned(),
-            bytes: Some(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+            id: NonZeroU64::new(1),
         }
     );
 }
