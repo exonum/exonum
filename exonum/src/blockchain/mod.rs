@@ -248,8 +248,8 @@ impl BlockchainMut {
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
-        self.dispatcher.commit_block(&mut fork);
-        self.merge(fork.into_patch())?;
+        let patch = self.dispatcher.commit_block(fork);
+        self.merge(patch)?;
 
         let (_, patch) = self.create_patch(
             ValidatorId::zero(),
@@ -257,12 +257,10 @@ impl BlockchainMut {
             &[],
             &mut BTreeMap::new(),
         );
-        let fork = Fork::from(patch);
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
-        self.dispatcher
-            .notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
-        self.merge(fork.into_patch())?;
+        self.dispatcher.notify_runtimes_about_commit(&patch);
+        self.merge(patch)?;
 
         info!(
             "GENESIS_BLOCK ====== hash={}",
@@ -398,7 +396,7 @@ impl BlockchainMut {
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {
-        let mut fork: Fork = patch.into();
+        let fork: Fork = patch.into();
         let mut schema = Schema::new(&fork);
         schema.precommits(&block_hash).extend(precommits);
         // Consensus messages cache is useful only during one height, so it should be
@@ -416,8 +414,8 @@ impl BlockchainMut {
             }
         }
 
-        self.dispatcher.commit_block_and_notify_runtimes(&mut fork);
-        self.merge(fork.into_patch())?;
+        let patch = self.dispatcher.commit_block_and_notify_runtimes(fork);
+        self.merge(patch)?;
         Ok(())
     }
 

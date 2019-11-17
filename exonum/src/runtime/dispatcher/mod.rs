@@ -14,7 +14,7 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Patch, Snapshot};
 use futures::{
     future::{self, Either},
     Future,
@@ -259,32 +259,31 @@ impl Dispatcher {
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
+    /// Returns a patch corresponding to the fork.
     ///
     /// **NB.** Changes made to the `fork` in this method MUST be the same for all nodes.
     /// This is not checked by the consensus algorithm as usual.
-    pub(crate) fn commit_block(&mut self, fork: &mut Fork) {
-        // If the fork is dirty, `snapshot` will be outdated, which can trip
-        // `Runtime::start_service()` calls.
-        fork.flush();
-        let snapshot = fork.snapshot_without_unflushed_changes();
-        let mut schema = Schema::new(&*fork);
+    pub(crate) fn commit_block(&mut self, fork: Fork) -> Patch {
+        let mut schema = Schema::new(&fork);
+        let artifacts: Vec<_> = schema.pending_artifacts().values().collect();
+        let services: Vec<_> = schema.pending_service_instances().values().collect();
+        // Since the pending changes in artifacts / services are applied atomically,
+        // we first commit all changes in the dispatcher schema, and *then* perform
+        // the corresponding actions.
+        schema.commit_pending_changes();
+        let patch = fork.into_patch();
 
         // Deploy pending artifacts.
-        let mut artifacts = schema.pending_artifacts();
-        for spec in artifacts.values() {
+        for spec in artifacts {
             self.block_until_deployed(spec.artifact.clone(), spec.payload.clone());
-            schema.add_artifact(spec.artifact, spec.payload);
         }
 
         // Start pending services.
-        let mut services = schema.pending_service_instances();
-        for spec in services.values() {
-            self.start_service(snapshot, &spec)
+        for spec in services {
+            self.start_service(&patch, &spec)
                 .expect("Cannot add service");
-            schema.add_service(spec);
         }
-        artifacts.clear();
-        services.clear();
+        patch
     }
 
     /// Notifies runtimes about a committed block.
@@ -298,14 +297,16 @@ impl Dispatcher {
         }
     }
 
-    /// Performs the complete set of operations after committing a block.
+    /// Performs the complete set of operations after committing a block. Returns a patch
+    /// corresponding to the fork.
     ///
     /// This method should be called for all blocks except for the genesis block. For reasons
     /// described in `BlockchainMut::create_genesis_block()`, the processing of the genesis
     /// block is split into 2 parts.
-    pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: &mut Fork) {
-        self.commit_block(fork);
-        self.notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
+    pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: Fork) -> Patch {
+        let patch = self.commit_block(fork);
+        self.notify_runtimes_about_commit(&patch);
+        patch
     }
 
     /// Return true if the artifact with the given identifier is deployed.

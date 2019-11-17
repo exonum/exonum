@@ -146,7 +146,7 @@ impl Schema<&Fork> {
     }
 
     /// Add artifact specification to the set of the deployed artifacts.
-    pub(super) fn add_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
+    fn add_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
         // We use an assertion here since `add_pending_artifact` should have been called
         // with the same params before.
         debug_assert!(!self.artifacts().contains(&artifact.name));
@@ -195,6 +195,20 @@ impl Schema<&Fork> {
         Ok(())
     }
 
+    pub(super) fn commit_pending_changes(&mut self) {
+        let mut pending_artifacts = self.pending_artifacts();
+        for spec in pending_artifacts.values() {
+            self.add_artifact(spec.artifact, spec.payload);
+        }
+        pending_artifacts.clear();
+
+        let mut pending_services = self.pending_service_instances();
+        for spec in pending_services.values() {
+            self.add_service(spec);
+        }
+        pending_services.clear();
+    }
+
     /// Vacant identifier for user service instances.
     fn vacant_instance_id(&self) -> Entry<&Fork, InstanceId> {
         self.access.get_entry(VACANT_INSTANCE_ID)
@@ -202,7 +216,7 @@ impl Schema<&Fork> {
 
     /// Assign unique identifier for an instance.
     // TODO: could be performed by supervisor [ECR-3746]
-    pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
+    pub(super) fn assign_instance_id(&mut self) -> InstanceId {
         let id = self
             .vacant_instance_id()
             .get()
@@ -212,7 +226,7 @@ impl Schema<&Fork> {
     }
 
     /// Adds information about started service instance to the schema.
-    pub(super) fn add_service(&mut self, spec: InstanceSpec) {
+    fn add_service(&mut self, spec: InstanceSpec) {
         debug_assert!(!self.service_instances().contains(&spec.name));
         debug_assert!(!self.service_instance_ids().contains(&spec.id));
 

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_crypto::{gen_keypair, Hash};
-use exonum_merkledb::{Database, Fork, ObjectHash, Snapshot, TemporaryDB};
+use exonum_merkledb::{Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, IntoFuture};
 
 use std::{
@@ -40,10 +40,9 @@ use crate::{
 /// We guarantee that the genesis block will be committed by the time
 /// `Runtime::after_commit()` is called. Thus, we need to perform this commitment
 /// manually here, emulating the relevant part of `BlockchainMut::create_genesis_block()`.
-fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
-    let is_genesis_block = CoreSchema::new(&*fork).block_hashes_by_height().is_empty();
+fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
+    let is_genesis_block = CoreSchema::new(&fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
-    dispatcher.commit_block(fork);
 
     let block = Block::new(
         ValidatorId(0),
@@ -54,11 +53,13 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
         Hash::zero(),
     );
     let block_hash = block.object_hash();
-    let schema = CoreSchema::new(&*fork);
+    let schema = CoreSchema::new(&fork);
     schema.block_hashes_by_height().push(block_hash);
     schema.blocks().put(&block_hash, block);
-    fork.flush();
-    dispatcher.notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
+
+    let patch = dispatcher.commit_block(fork);
+    dispatcher.notify_runtimes_about_commit(&patch);
+    patch
 }
 
 impl Dispatcher {
@@ -362,7 +363,9 @@ fn test_dispatcher_simple() {
     assert_eq!(err, DispatcherError::ServiceNameExists.into());
 
     // Activate services / artifacts.
-    create_genesis_block(&mut dispatcher, &mut fork);
+    let patch = create_genesis_block(&mut dispatcher, fork);
+    db.merge(patch).unwrap();
+    let mut fork = db.fork();
 
     // Check if transactions are ready for execution.
     dispatcher
@@ -468,8 +471,8 @@ fn test_dispatcher_rust_runtime_no_service() {
         DispatcherError::ArtifactNotDeployed.into()
     );
 
-    create_genesis_block(&mut dispatcher, &mut fork);
-    db.merge(fork.into_patch()).unwrap();
+    let patch = create_genesis_block(&mut dispatcher, fork);
+    db.merge(patch).unwrap();
 
     let mut fork = db.fork();
     let tx_payload = [0x00_u8; 1];
