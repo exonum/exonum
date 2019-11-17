@@ -15,15 +15,13 @@
 use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
-use std::{num::NonZeroU64, panic, rc::Rc};
+use std::{panic, rc::Rc};
 
 use crate::{
     access::AccessExt,
     db,
     validation::is_valid_index_name,
-    views::{
-        metadata::AggregatedIndexes, IndexAddress, IndexType, RawAccess, View, ViewWithMetadata,
-    },
+    views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
     Database, DbOptions, Fork, ListIndex, MapIndex, ResolvedRef, RocksDB, TemporaryDB,
 };
 
@@ -360,7 +358,7 @@ fn test_database_check_correct_version() {
     let db = TemporaryDB::default();
     let snapshot = db.snapshot();
 
-    let view = View::new(&snapshot, ResolvedRef::not_prefixed(db::DB_METADATA));
+    let view = View::new(&snapshot, ResolvedRef::system(db::DB_METADATA));
     let version: u8 = view.get(db::VERSION_NAME).unwrap();
     assert_eq!(version, db::DB_VERSION);
 }
@@ -375,7 +373,7 @@ fn test_database_check_incorrect_version() {
         let db = RocksDB::open(&dir, &opts).unwrap();
         let fork = db.fork();
         {
-            let mut view = View::new(&fork, ResolvedRef::not_prefixed(db::DB_METADATA));
+            let mut view = View::new(&fork, ResolvedRef::system(db::DB_METADATA));
             view.put(db::VERSION_NAME, 2_u8);
         }
         db.merge(fork.into_patch()).unwrap();
@@ -862,13 +860,8 @@ fn test_metadata_index_identifiers() {
             .map_err(drop)
             .unwrap()
             .into();
-    assert_eq!(
-        view.address,
-        ResolvedRef {
-            name: "simple".to_owned(),
-            id: NonZeroU64::new(1),
-        }
-    );
+    assert_eq!(view.address.name, "simple");
+    let id = view.address.id.unwrap().get();
     drop(view); // Prevent "multiple mutable borrows" error later
 
     // Creates the second index metadata.
@@ -877,13 +870,8 @@ fn test_metadata_index_identifiers() {
             .map_err(drop)
             .unwrap()
             .into();
-    assert_eq!(
-        view.address,
-        ResolvedRef {
-            name: "second".to_owned(),
-            id: NonZeroU64::new(2),
-        }
-    );
+    assert_eq!(view.address.name, "second");
+    assert_eq!(view.address.id.unwrap().get(), id + 1);
 
     // Recreates the first index instance.
     let view: View<_> =
@@ -891,13 +879,8 @@ fn test_metadata_index_identifiers() {
             .map_err(drop)
             .unwrap()
             .into();
-    assert_eq!(
-        view.address,
-        ResolvedRef {
-            name: "simple".to_owned(),
-            id: NonZeroU64::new(1),
-        }
-    );
+    assert_eq!(view.address.name, "simple");
+    assert_eq!(view.address.id.unwrap().get(), id);
 }
 
 #[test]
@@ -1052,38 +1035,4 @@ fn fork_from_patch() {
 
     db.merge(fork.into_patch())
         .expect("Fork created from patch should be merged successfully");
-}
-
-#[test]
-fn aggregated_indexes_updates() {
-    use crate::access::Prefixed;
-
-    fn get_aggregated_indexes(access: impl RawAccess) -> Vec<String> {
-        AggregatedIndexes::new(access)
-            .iter()
-            .map(|(name, _)| name)
-            .collect()
-    }
-
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    fork.get_list("foo").push(1_u32);
-    // `ListIndex` is not Merkelized.
-    assert!(get_aggregated_indexes(&fork).is_empty());
-
-    fork.get_proof_list("bar").push(1_u32);
-    assert_eq!(get_aggregated_indexes(&fork), vec!["bar".to_owned()]);
-    Prefixed::new("prefix", &fork)
-        .get_proof_map("baz")
-        .put(&1_u32, "!".to_owned());
-    let aggregated_indexes = vec!["bar".to_owned(), "prefix.baz".to_owned()];
-    assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
-
-    // Index families are not included into aggregation.
-    fork.get_proof_list(("fam", &0_u8)).push(1_u32);
-    assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
-
-    db.merge_sync(fork.into_patch()).unwrap();
-    let snapshot = db.snapshot();
-    assert_eq!(get_aggregated_indexes(&snapshot), aggregated_indexes);
 }

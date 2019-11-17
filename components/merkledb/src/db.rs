@@ -14,7 +14,7 @@
 
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt,
     iter::{Iterator as StdIterator, Peekable},
     mem,
@@ -23,32 +23,38 @@ use std::{
 };
 
 use crate::{
-    views::{AsReadonly, RawAccess, ResolvedRef, View},
-    Error, Result,
+    views::{get_object_hash, AsReadonly, RawAccess, ResolvedRef, View},
+    Error, Result, SystemInfo,
 };
 
 /// Map containing changes with a corresponding key.
 #[derive(Debug, Clone)]
 pub struct ViewChanges {
     pub(super) data: BTreeMap<Vec<u8>, Change>,
-    empty: bool,
+    is_cleared: bool,
+    is_aggregated: bool,
 }
 
 impl ViewChanges {
     fn new() -> Self {
         Self {
             data: BTreeMap::new(),
-            empty: false,
+            is_cleared: false,
+            is_aggregated: false,
         }
     }
 
     pub fn is_cleared(&self) -> bool {
-        self.empty
+        self.is_cleared
     }
 
     pub fn clear(&mut self) {
         self.data.clear();
-        self.empty = true;
+        self.is_cleared = true;
+    }
+
+    pub fn set_aggregation(&mut self, is_aggregated: bool) {
+        self.is_aggregated = is_aggregated;
     }
 
     pub fn into_data(self) -> BTreeMap<Vec<u8>, Change> {
@@ -189,19 +195,6 @@ impl WorkingPatch {
             .clone()
     }
 
-    /// Returns a mutable reference to the changes corresponding to a certain index.
-    ///
-    /// # Panics
-    ///
-    /// If an index with the `address` is already borrowed either immutably or mutably.
-    pub fn changes_mut(&self, address: &ResolvedRef) -> ChangesMut<'_> {
-        ChangesMut {
-            changes: self.take_view_changes(address),
-            key: address.to_owned(),
-            parent: WorkingPatchRef::Borrowed(self),
-        }
-    }
-
     // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
@@ -227,9 +220,13 @@ impl WorkingPatch {
                 );
             });
 
+            if changes.is_aggregated {
+                patch.changed_aggregated_refs.insert(address.clone());
+            }
+
             let patch_changes = patch
                 .changes
-                .entry(address.to_owned())
+                .entry(address)
                 .or_insert_with(ViewChanges::new);
             if changes.is_cleared() {
                 *patch_changes = changes;
@@ -341,6 +338,7 @@ pub struct Fork {
 pub struct Patch {
     snapshot: Box<dyn Snapshot>,
     changes: HashMap<ResolvedRef, ViewChanges>,
+    changed_aggregated_refs: HashSet<ResolvedRef>,
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
@@ -398,6 +396,7 @@ pub trait Database: Send + Sync + 'static {
             patch: Patch {
                 snapshot: self.snapshot(),
                 changes: HashMap::new(),
+                changed_aggregated_refs: HashSet::new(),
             },
             working_patch: WorkingPatch::new(),
         }
@@ -444,7 +443,9 @@ pub trait DatabaseExt: Database {
     /// Returns an error in the same situations as `Database::merge()`.
     fn merge_with_backup(&self, patch: Patch) -> Result<Patch> {
         let snapshot = self.snapshot();
+        let changed_aggregated_refs = patch.changed_aggregated_refs.clone();
         let mut rev_changes = HashMap::with_capacity(patch.changes.len());
+
         for (name, changes) in &patch.changes {
             let mut view_changes = changes.data.clone();
             for (key, change) in &mut view_changes {
@@ -467,7 +468,8 @@ pub trait DatabaseExt: Database {
                 name.to_owned(),
                 ViewChanges {
                     data: view_changes,
-                    empty: false,
+                    is_cleared: false,
+                    is_aggregated: changes.is_aggregated,
                 },
             );
         }
@@ -476,6 +478,7 @@ pub trait DatabaseExt: Database {
         Ok(Patch {
             snapshot: self.snapshot(),
             changes: rev_changes,
+            changed_aggregated_refs,
         })
     }
 }
@@ -574,6 +577,14 @@ impl RawAccess for &'_ Patch {
     fn changes(&self, _address: &ResolvedRef) -> Self::Changes {}
 }
 
+impl AsReadonly for &'_ Patch {
+    type Readonly = Self;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        self
+    }
+}
+
 impl Fork {
     /// Finalizes all changes that were made after previous execution of the `flush` method.
     /// If no `flush` method had been called before, finalizes all changes that were
@@ -592,6 +603,15 @@ impl Fork {
     /// Converts the fork into `Patch` consuming the fork instance.
     pub fn into_patch(mut self) -> Patch {
         self.flush();
+
+        let changed_aggregated_refs =
+            mem::replace(&mut self.patch.changed_aggregated_refs, HashSet::new());
+        let updated_entries = changed_aggregated_refs
+            .into_iter()
+            .map(|addr| (addr.name.clone(), get_object_hash(&self.patch, addr)));
+
+        SystemInfo::new(&self).update_state_aggregator(updated_entries);
+        self.flush(); // flushes changes in the state aggregator
         self.patch
     }
 
@@ -631,7 +651,12 @@ impl<'a> RawAccess for &'a Fork {
     }
 
     fn changes(&self, address: &ResolvedRef) -> Self::Changes {
-        self.working_patch.changes_mut(address)
+        let changes = self.working_patch.take_view_changes(address);
+        ChangesMut {
+            changes,
+            key: address.clone(),
+            parent: WorkingPatchRef::Borrowed(&self.working_patch),
+        }
     }
 }
 
@@ -886,7 +911,7 @@ pub const VERSION_NAME: &str = "version";
 pub fn check_database(db: &mut dyn Database) -> Result<()> {
     let fork = db.fork();
     {
-        let addr = ResolvedRef::not_prefixed(DB_METADATA);
+        let addr = ResolvedRef::system(DB_METADATA);
         let mut view = View::new(&fork, addr);
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
             if saved_version != DB_VERSION {
@@ -924,7 +949,7 @@ mod tests {
         }
         let expected_set: HashSet<_> = changes
             .into_iter()
-            .map(|(name, key, change)| (ResolvedRef::not_prefixed(name), key, change))
+            .map(|(name, key, change)| (ResolvedRef::system(name), key, change))
             .collect();
         assert_eq!(patch_set, expected_set);
     }

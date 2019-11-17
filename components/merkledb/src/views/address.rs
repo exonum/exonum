@@ -156,10 +156,10 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     }
 }
 
-/// Reference to a resolved address of an index.
+/// Reference to a resolved address of a view.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ResolvedRef {
-    /// Name of the column family where index is stored.
+    /// Name of the column family where the view is stored.
     pub name: String,
     /// Index identifier within a column family.
     pub id: Option<NonZeroU64>,
@@ -168,7 +168,7 @@ pub struct ResolvedRef {
 #[cfg(test)] // All user-created indexes should have an ID set.
 impl From<&str> for ResolvedRef {
     fn from(name: &str) -> Self {
-        Self::not_prefixed(name)
+        Self::system(name)
     }
 }
 
@@ -183,7 +183,8 @@ impl From<(&str, u64)> for ResolvedRef {
 }
 
 impl ResolvedRef {
-    pub(crate) fn not_prefixed(name: impl Into<String>) -> Self {
+    /// Creates a system view. System views are low-level (i.e., they are not wrapped in indexes).
+    pub(crate) fn system(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             id: None,

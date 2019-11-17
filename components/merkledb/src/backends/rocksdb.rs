@@ -18,8 +18,8 @@ pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksD
 
 use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use smallvec::SmallVec;
 use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
+use smallvec::SmallVec;
 
 use crate::{
     db::{check_database, Change},

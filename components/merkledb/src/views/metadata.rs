@@ -250,7 +250,7 @@ where
         self.metadata.state = Some(state);
         View::new(
             self.index_access.clone(),
-            ResolvedRef::not_prefixed(INDEXES_POOL_NAME),
+            ResolvedRef::system(INDEXES_POOL_NAME),
         )
         .put(&self.index_full_name, self.metadata.to_bytes());
     }
@@ -259,7 +259,7 @@ where
         self.metadata.state = None;
         View::new(
             self.index_access.clone(),
-            ResolvedRef::not_prefixed(INDEXES_POOL_NAME),
+            ResolvedRef::system(INDEXES_POOL_NAME),
         )
         .put(&self.index_full_name, self.metadata.to_bytes());
     }
@@ -273,7 +273,7 @@ impl<T: RawAccess> IndexesPool<T> {
     pub(super) fn new(index_access: T) -> Self {
         Self(View::new(
             index_access,
-            ResolvedRef::not_prefixed(INDEXES_POOL_NAME),
+            ResolvedRef::system(INDEXES_POOL_NAME),
         ))
     }
 
@@ -321,58 +321,44 @@ impl<T: RawAccess> AggregatedIndexes<T> {
     pub(crate) fn new(index_access: T) -> Self {
         Self(View::new(
             index_access,
-            ResolvedRef::not_prefixed(AGGREGATED_INDEXES_NAME),
+            ResolvedRef::system(AGGREGATED_INDEXES_NAME),
         ))
     }
 
     fn insert(&mut self, name: &str) {
         self.0.put_or_forget(name, ());
     }
+}
 
-    /// Iterates over all aggregated indexes in the storage.
-    ///
-    /// # Panics
-    ///
-    /// This method will access every aggregated index, so it will panic if borrowing rules
-    /// are violated.
-    pub(crate) fn iter<'s>(&'s self) -> impl Iterator<Item = (String, Hash)> + 's {
-        use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
+pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedRef) -> Hash {
+    use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
-        let access = self.0.index_access.clone();
-        self.0.iter::<_, String, ()>(&()).map(move |(name, ())| {
-            let metadata = IndexesPool::new(access.clone())
-                .index_metadata(name.as_bytes())
-                .unwrap_or_else(|| {
-                    panic!("Metadata absent for aggregated index {}", name);
-                });
+    let index_full_name = addr.name.as_bytes().to_vec();
+    let metadata = IndexesPool::new(access.clone())
+        .index_metadata(&index_full_name)
+        .unwrap_or_else(|| {
+            panic!("Metadata absent for aggregated index {:?}", addr);
+        });
+    let index_type = metadata.index_type;
 
-            let index_type = metadata.index_type;
-            let addr = ResolvedRef {
-                name: name.clone(),
-                id: NonZeroU64::new(metadata.identifier),
-            };
-            let view_with_metadata = ViewWithMetadata {
-                view: View::new(access.clone(), addr),
-                metadata,
-                index_full_name: name.as_bytes().to_vec(),
-                is_phantom: false,
-            };
-
-            let hash = match index_type {
-                IndexType::ProofList => {
-                    // We don't access list elements, so the element type doesn't matter.
-                    let list = ProofListIndex::<_, ()>::new(view_with_metadata);
-                    list.object_hash()
-                }
-                IndexType::ProofMap => {
-                    // We don't access map elements, so the key / value types don't matter.
-                    let map = ProofMapIndex::<_, (), ()>::new(view_with_metadata);
-                    map.object_hash()
-                }
-                _ => unreachable!(), // other index types are not aggregated
-            };
-            (name, hash)
-        })
+    let view_with_metadata = ViewWithMetadata {
+        view: View::new(access, addr),
+        metadata,
+        index_full_name,
+        is_phantom: false,
+    };
+    match index_type {
+        IndexType::ProofList => {
+            // We don't access list elements, so the element type doesn't matter.
+            let list = ProofListIndex::<_, ()>::new(view_with_metadata);
+            list.object_hash()
+        }
+        IndexType::ProofMap => {
+            // We don't access map elements, so the key / value types don't matter.
+            let map = ProofMapIndex::<_, (), ()>::new(view_with_metadata);
+            map.object_hash()
+        }
+        _ => unreachable!(), // other index types are not aggregated
     }
 }
 
@@ -409,21 +395,11 @@ where
 
         let mut pool = IndexesPool::new(index_access.clone());
         let mut is_phantom = false;
+        let mut is_new = false;
         let metadata = pool.index_metadata(&index_full_name).unwrap_or_else(|| {
             let (metadata, phantom_flag) = pool.create_index_metadata(&index_full_name, index_type);
             is_phantom = phantom_flag;
-
-            // Insert the index into the list of Merkelized indexes if it fits
-            // (i.e., has an appropriate type and is not a part of a family).
-            if !is_phantom
-                && index_type.is_merkelized()
-                && index_address.bytes.is_none()
-                && index_address.name != STATE_AGGREGATOR
-            {
-                let mut aggregated = AggregatedIndexes::new(index_access.clone());
-                aggregated.insert(&index_address.name);
-            }
-
+            is_new = true;
             metadata
         });
         let real_index_type = metadata.index_type;
@@ -431,8 +407,20 @@ where
             name: index_name,
             id: NonZeroU64::new(metadata.identifier),
         };
+
+        let is_aggregated = !is_phantom
+            && index_type.is_merkelized()
+            && index_address.bytes.is_none()
+            && index_address.name != STATE_AGGREGATOR;
+        if is_new && is_aggregated {
+            let mut aggregated = AggregatedIndexes::new(index_access.clone());
+            aggregated.insert(&index_address.name);
+        }
+
+        let mut view = View::new(index_access, addr);
+        view.set_or_forget_aggregation(is_aggregated);
         let this = Self {
-            view: View::new(index_access, addr),
+            view,
             metadata,
             index_full_name,
             is_phantom,
@@ -475,6 +463,10 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        access::{AccessExt, Prefixed},
+        Database, TemporaryDB,
+    };
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -509,5 +501,38 @@ mod tests {
         let mut bytes = metadata.to_bytes();
         bytes[13] = 1; // Modifies index state tag.
         assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
+    }
+
+    #[test]
+    fn aggregated_indexes_updates() {
+        fn get_aggregated_indexes(access: impl RawAccess) -> Vec<String> {
+            AggregatedIndexes::new(access)
+                .0
+                .iter::<_, String, ()>(&())
+                .map(|(name, ())| name)
+                .collect()
+        }
+
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_list("foo").push(1_u32);
+        // `ListIndex` is not Merkelized.
+        assert!(get_aggregated_indexes(&fork).is_empty());
+
+        fork.get_proof_list("bar").push(1_u32);
+        assert_eq!(get_aggregated_indexes(&fork), vec!["bar".to_owned()]);
+        Prefixed::new("prefix", &fork)
+            .get_proof_map("baz")
+            .put(&1_u32, "!".to_owned());
+        let aggregated_indexes = vec!["bar".to_owned(), "prefix.baz".to_owned()];
+        assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
+
+        // Index families are not included into aggregation.
+        fork.get_proof_list(("fam", &0_u8)).push(1_u32);
+        assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
+
+        db.merge_sync(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(get_aggregated_indexes(&snapshot), aggregated_indexes);
     }
 }

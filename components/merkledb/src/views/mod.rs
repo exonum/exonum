@@ -14,7 +14,7 @@
 
 pub use self::{
     address::{IndexAddress, ResolvedRef},
-    metadata::{BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
+    metadata::{get_object_hash, BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
     system_info::SystemInfo,
 };
 
@@ -294,7 +294,8 @@ impl<T: RawAccess> View<T> {
         }
     }
 
-    /// Crutch to be able to create metadata for indexes not present in the storage.
+    /// Sets a key / value pair in the view storage, unless the view is backed by a readonly access
+    /// (in which case, the changes are forgotten).
     ///
     /// # Return value
     ///
@@ -311,6 +312,14 @@ impl<T: RawAccess> View<T> {
             true
         } else {
             false
+        }
+    }
+
+    /// Sets aggregated flag for the view, unless the view is backed by a readonly access
+    /// (in which case, the changes are forgotten).
+    pub(crate) fn set_or_forget_aggregation(&mut self, is_aggregated: bool) {
+        if let Some(changes) = self.changes.as_mut() {
+            changes.set_aggregation(is_aggregated);
         }
     }
 }
