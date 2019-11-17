@@ -92,6 +92,7 @@ mod tests {
     fn initial_changes(fork: &Fork) {
         fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
         fork.get_list("non_hashed_list").push(1_u64);
+        fork.get_proof_entry("entry").set("oops!".to_owned());
         {
             let mut map = fork.get_proof_map("map");
             for i in 0..5 {
@@ -120,7 +121,11 @@ mod tests {
         let aggregator = info.state_aggregator();
         assert_eq!(
             aggregator.keys().collect::<Vec<_>>(),
-            vec!["list".to_owned(), "map".to_owned()]
+            vec!["entry".to_owned(), "list".to_owned(), "map".to_owned()]
+        );
+        assert_eq!(
+            aggregator.get(&"entry".to_owned()).unwrap(),
+            patch.get_proof_entry::<_, String>("entry").object_hash()
         );
         assert_eq!(
             aggregator.get(&"list".to_owned()).unwrap(),
@@ -145,14 +150,13 @@ mod tests {
         let patch = fork.into_patch();
         let info = SystemInfo::new(&patch);
         let aggregator = info.state_aggregator();
-        assert_eq!(
-            aggregator.keys().collect::<Vec<_>>(),
-            vec![
-                "another_map".to_owned(),
-                "list".to_owned(),
-                "map".to_owned(),
-            ]
-        );
+        let expected_index_names = vec![
+            "another_map".to_owned(),
+            "entry".to_owned(),
+            "list".to_owned(),
+            "map".to_owned(),
+        ];
+        assert_eq!(aggregator.keys().collect::<Vec<_>>(), expected_index_names);
         assert_eq!(
             aggregator.get(&"list".to_owned()).unwrap(),
             patch.get_proof_list::<_, u32>("list").object_hash()
@@ -167,14 +171,7 @@ mod tests {
         let snapshot = db.snapshot();
         let info = SystemInfo::new(&snapshot);
         let aggregator = info.state_aggregator();
-        assert_eq!(
-            aggregator.keys().collect::<Vec<_>>(),
-            vec![
-                "another_map".to_owned(),
-                "list".to_owned(),
-                "map".to_owned(),
-            ]
-        );
+        assert_eq!(aggregator.keys().collect::<Vec<_>>(), expected_index_names);
         assert_eq!(
             aggregator.get(&"list".to_owned()).unwrap(),
             snapshot.get_proof_list::<_, u32>("list").object_hash()

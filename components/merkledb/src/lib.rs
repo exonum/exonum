@@ -141,6 +141,7 @@ pub use self::{
     list_index::ListIndex,
     map_index::MapIndex,
     options::DbOptions,
+    proof_entry::ProofEntry,
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
@@ -171,6 +172,7 @@ mod hash;
 mod keys;
 mod lazy;
 mod options;
+mod proof_entry;
 mod values;
 mod views;
 

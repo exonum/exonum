@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
-
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
 use exonum_crypto::Hash;
 use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
+
+use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
 use super::{
     system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedRef, View,
@@ -53,6 +53,8 @@ pub enum IndexType {
     ProofList = 7,
     /// Merkelized map index.
     ProofMap = 8,
+    /// Merkelized entry.
+    ProofEntry = 9,
 
     /// Unknown index type.
     #[doc(hidden)]
@@ -63,7 +65,7 @@ impl IndexType {
     /// Checks if the index of this type is Merkelized.
     fn is_merkelized(self) -> bool {
         match self {
-            IndexType::ProofList | IndexType::ProofMap => true,
+            IndexType::ProofList | IndexType::ProofMap | IndexType::ProofEntry => true,
             _ => false,
         }
     }
@@ -106,6 +108,29 @@ impl BinaryAttribute for u64 {
 
     fn read(mut buffer: &[u8]) -> Result<Self, Error> {
         buffer.read_u64::<LittleEndian>()
+    }
+}
+
+impl BinaryAttribute for Hash {
+    fn size(&self) -> usize {
+        exonum_crypto::HASH_SIZE
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(self.as_ref())
+    }
+
+    fn read(buffer: &[u8]) -> Result<Self, Error> {
+        Hash::from_slice(buffer).ok_or_else(|| {
+            Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "Invalid hash length ({}; {} expected)",
+                    buffer.len(),
+                    exonum_crypto::HASH_SIZE
+                ),
+            )
+        })
     }
 }
 
@@ -341,22 +366,28 @@ pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedRef) -> Hash {
         });
     let index_type = metadata.index_type;
 
-    let view_with_metadata = ViewWithMetadata {
-        view: View::new(access, addr),
-        metadata,
-        index_full_name,
-        is_phantom: false,
-    };
     match index_type {
-        IndexType::ProofList => {
-            // We don't access list elements, so the element type doesn't matter.
-            let list = ProofListIndex::<_, ()>::new(view_with_metadata);
-            list.object_hash()
+        IndexType::ProofEntry => {
+            // Hash is stored directly in the metadata.
+            metadata.convert::<Hash>().state.unwrap_or_default()
         }
-        IndexType::ProofMap => {
-            // We don't access map elements, so the key / value types don't matter.
-            let map = ProofMapIndex::<_, (), ()>::new(view_with_metadata);
-            map.object_hash()
+        IndexType::ProofList | IndexType::ProofMap => {
+            let view_with_metadata = ViewWithMetadata {
+                view: View::new(access, addr),
+                metadata,
+                index_full_name,
+                is_phantom: false,
+            };
+
+            if index_type == IndexType::ProofList {
+                // We don't access list elements, so the element type doesn't matter.
+                let list = ProofListIndex::<_, ()>::new(view_with_metadata);
+                list.object_hash()
+            } else {
+                // We don't access map elements, so the key / value types don't matter.
+                let map = ProofMapIndex::<_, (), ()>::new(view_with_metadata);
+                map.object_hash()
+            }
         }
         _ => unreachable!(), // other index types are not aggregated
     }

@@ -16,44 +16,52 @@
 
 use std::marker::PhantomData;
 
+use exonum_crypto::Hash;
+
 use crate::{
     access::{Access, AccessError, FromAccess},
-    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
+    views::{IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, ObjectHash,
 };
 
-/// An index that may only contain one element.
+/// A Merkelized index that may only contain one element.
 ///
 /// You can add an element to this index and check whether it exists. A value
-/// should implement [`BinaryValue`] trait.
+/// should implement [`BinaryValue`] and [`ObjectHash`] traits. Unlike [`Entry`],
+/// hashed entries are eagerly hashed and may participate in [state hash aggregation].
 ///
 /// [`BinaryValue`]: trait.BinaryValue.html
+/// [`ObjectHash`]: trait.ObjectHash.html
+/// [`Entry`]: struct.Entry.html
+/// [state hash aggregation]: TODO
 #[derive(Debug)]
-pub struct Entry<T: RawAccess, V> {
+pub struct ProofEntry<T: RawAccess, V> {
     base: View<T>,
+    state: IndexState<T, Hash>,
     _v: PhantomData<V>,
 }
 
-impl<T, V> FromAccess<T> for Entry<T::Base, V>
+impl<T, V> FromAccess<T> for ProofEntry<T::Base, V>
 where
     T: Access,
-    V: BinaryValue,
+    V: BinaryValue + ObjectHash,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
-        let view = access.get_or_create_view(addr, IndexType::Entry)?;
+        let view = access.get_or_create_view(addr, IndexType::ProofEntry)?;
         Ok(Self::new(view))
     }
 }
 
-impl<T, V> Entry<T, V>
+impl<T, V> ProofEntry<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
-    fn new(view: ViewWithMetadata<T>) -> Self {
-        let base = view.into();
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
+        let (base, state) = view.into_parts();
         Self {
             base,
+            state,
             _v: PhantomData,
         }
     }
@@ -67,7 +75,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.get_entry("name");
+    /// let mut index = fork.get_proof_entry("name");
     /// assert_eq!(None, index.get());
     ///
     /// index.set(10);
@@ -86,7 +94,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.get_entry("name");
+    /// let mut index = fork.get_proof_entry("name");
     /// assert!(!index.exists());
     ///
     /// index.set(10);
@@ -97,7 +105,7 @@ where
     }
 }
 
-impl<T, V> Entry<T, V>
+impl<T, V> ProofEntry<T, V>
 where
     T: RawAccessMut,
     V: BinaryValue + ObjectHash,
@@ -111,13 +119,14 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.get_entry("name");
+    /// let mut index = fork.get_proof_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
     /// ```
     pub fn set(&mut self, value: V) {
-        self.base.put(&(), value)
+        self.state.set(value.object_hash());
+        self.base.put(&(), value);
     }
 
     /// Removes a value of the entry.
@@ -129,7 +138,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.get_entry("name");
+    /// let mut index = fork.get_proof_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -138,7 +147,8 @@ where
     /// assert_eq!(None, index.get());
     /// ```
     pub fn remove(&mut self) {
-        self.base.remove(&())
+        self.state.unset();
+        self.base.remove(&());
     }
 
     /// Takes the value out of the entry, leaving a None in its place.
@@ -150,7 +160,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.get_entry("name");
+    /// let mut index = fork.get_proof_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -176,7 +186,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = fork.get_entry("name");
+    /// let mut index = fork.get_proof_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -189,5 +199,98 @@ where
         let previous = self.get();
         self.set(value);
         previous
+    }
+}
+
+impl<T, V> ObjectHash for ProofEntry<T, V>
+where
+    T: RawAccess,
+    V: BinaryValue + ObjectHash,
+{
+    /// Returns hash of the entry or default hash value if does not exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry, ObjectHash};
+    /// use exonum_crypto::{self, Hash};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = fork.get_proof_entry("name");
+    /// assert_eq!(Hash::default(), index.object_hash());
+    ///
+    /// let value = 10;
+    /// index.set(value);
+    /// assert_eq!(exonum_crypto::hash(&[value]), index.object_hash());
+    /// ```
+    fn object_hash(&self) -> Hash {
+        self.state.get().unwrap_or_default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{access::AccessExt, Database, TemporaryDB};
+    use std::borrow::Cow;
+
+    #[test]
+    fn basics() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut entry = fork.get_proof_entry("test");
+            assert!(!entry.exists());
+            entry.set(25_u64);
+            assert!(entry.exists());
+            assert_eq!(entry.get(), Some(25));
+            assert_eq!(entry.swap(42), Some(25));
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let entry = snapshot.get_proof_entry::<_, u64>("test");
+        assert_eq!(entry.get(), Some(42));
+        assert_eq!(entry.object_hash(), 42_u64.object_hash());
+    }
+
+    #[test]
+    fn entry_with_custom_hashing() {
+        #[derive(Debug, PartialEq)]
+        struct CustomHash(u8);
+
+        impl BinaryValue for CustomHash {
+            fn to_bytes(&self) -> Vec<u8> {
+                vec![self.0]
+            }
+
+            fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+                u8::from_bytes(bytes).map(CustomHash)
+            }
+        }
+
+        impl ObjectHash for CustomHash {
+            fn object_hash(&self) -> Hash {
+                Hash::new([self.0; exonum_crypto::HASH_SIZE])
+            }
+        }
+
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut entry = fork.get_proof_entry("test");
+            entry.set(CustomHash(11));
+            assert!(entry.exists());
+            assert_eq!(entry.get(), Some(CustomHash(11)));
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let entry = snapshot.get_proof_entry::<_, ()>("test");
+        assert_eq!(
+            entry.object_hash(),
+            Hash::new([11; exonum_crypto::HASH_SIZE])
+        );
     }
 }

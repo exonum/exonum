@@ -932,9 +932,9 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TemporaryDB;
+    use crate::{access::AccessExt, ObjectHash, TemporaryDB};
 
-    use std::collections::HashSet;
+    use std::{collections::HashSet, iter::FromIterator};
 
     /// Asserts that a patch contains only the specified changes.
     fn check_patch<'a, I>(patch: &Patch, changes: I)
@@ -1088,5 +1088,57 @@ mod tests {
         assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![1]));
         assert_eq!(snapshot.get(&"foo".into(), &[1]), Some(vec![2]));
         assert_eq!(snapshot.get(&"foo".into(), &[2]), None);
+    }
+
+    #[test]
+    fn updated_refs_are_efficiently_updated() {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+        fork.get_proof_list("foo").push(1_u64);
+        fork.get_proof_map("bar").put(&1_u64, 2_u64);
+        fork.get_list("baz").push(3_u64);
+        fork.flush();
+
+        let changed_refs: HashSet<_> = fork
+            .patch
+            .changed_aggregated_refs
+            .iter()
+            .map(|addr| addr.name.as_str())
+            .collect();
+        assert_eq!(changed_refs, HashSet::from_iter(vec!["foo", "bar"]));
+
+        let patch = fork.into_patch();
+        assert!(patch.changed_aggregated_refs.is_empty());
+        let mut fork = Fork::from(patch);
+        fork.get_list("baz").push(3_u64);
+        fork.flush();
+        assert!(fork.patch.changed_aggregated_refs.is_empty());
+
+        fork.get_proof_list("other_list").push(42_i32);
+        fork.get_proof_map::<_, u64, u64>("bar").clear();
+        fork.flush();
+
+        let changed_refs: HashSet<_> = fork
+            .patch
+            .changed_aggregated_refs
+            .iter()
+            .map(|addr| addr.name.as_str())
+            .collect();
+        assert_eq!(changed_refs, HashSet::from_iter(vec!["bar", "other_list"]));
+
+        let patch = fork.into_patch();
+        let aggregator = SystemInfo::new(&patch).state_aggregator();
+        assert_eq!(
+            aggregator.get(&"foo".to_owned()).unwrap(),
+            patch.get_proof_list::<_, u64>("foo").object_hash()
+        );
+        assert_eq!(
+            aggregator.get(&"bar".to_owned()).unwrap(),
+            patch.get_proof_map::<_, u64, u64>("bar").object_hash()
+        );
+        assert_eq!(
+            aggregator.get(&"other_list".to_owned()).unwrap(),
+            patch.get_proof_list::<_, u64>("other_list").object_hash()
+        );
     }
 }

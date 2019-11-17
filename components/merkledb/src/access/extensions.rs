@@ -3,7 +3,8 @@
 use super::{Access, AccessError, FromAccess};
 use crate::{
     views::IndexType, BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex,
-    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
+    MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex, SparseListIndex,
+    ValueSetIndex,
 };
 
 /// Extension trait allowing for easy access to indices from any type implementing
@@ -59,6 +60,19 @@ pub trait AccessExt: Access {
         V: BinaryValue,
     {
         Entry::from_access(self, addr.into()).unwrap()
+    }
+
+    /// Gets a hashed entry index with the specified address.
+    ///
+    /// # Panics
+    ///
+    /// If the index exists, but is not a hashed entry.
+    fn get_proof_entry<I, V>(self, addr: I) -> ProofEntry<Self::Base, V>
+    where
+        I: Into<IndexAddress>,
+        V: BinaryValue + ObjectHash,
+    {
+        ProofEntry::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a list index with the specified address.
