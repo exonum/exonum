@@ -88,7 +88,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   It is used for keys that maps directly to `ProofPath`, for example `Hash` and
   `PublicKey`. (#1531)
 
-  - By default `ProofMapIndex` is used for keys that implements `ObjectsHash`.
+  - By default `ProofMapIndex` is used for keys that implement `ObjectHash`.
 
   - For `Hash` keys both map variants works the same, because `ObjectHash`
   implementation for `Hash` returns the hash itself.
