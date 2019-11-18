@@ -79,24 +79,24 @@ impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
     }
 }
 
-pub struct ValidatorMultisig<T: Access, V> {
+pub struct MultisigIndex<T: Access, V> {
     index: ProofMapIndex<T::Base, V, BinarySet<PublicKey>>,
 }
 
-impl<T, V> fmt::Debug for ValidatorMultisig<T, V>
+impl<T, V> fmt::Debug for MultisigIndex<T, V>
 where
     T: Access,
     V: BinaryKey + ObjectHash,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ValidatorMultisig")
+            .debug_struct("MultisigIndex")
             .field("index", &self.index)
             .finish()
     }
 }
 
-impl<T, V> FromAccess<T> for ValidatorMultisig<T, V>
+impl<T, V> FromAccess<T> for MultisigIndex<T, V>
 where
     T: Access,
     V: BinaryKey + ObjectHash,
@@ -108,7 +108,7 @@ where
     }
 }
 
-impl<T, V> ValidatorMultisig<T, V>
+impl<T, V> MultisigIndex<T, V>
 where
     T: Access,
     V: BinaryKey + ObjectHash,
@@ -131,7 +131,7 @@ where
     }
 }
 
-impl<T, V> ValidatorMultisig<T, V>
+impl<T, V> MultisigIndex<T, V>
 where
     T: Access,
     T::Base: RawAccessMut,
@@ -146,7 +146,7 @@ where
     }
 }
 
-impl<T, V> ObjectHash for ValidatorMultisig<T, V>
+impl<T, V> ObjectHash for MultisigIndex<T, V>
 where
     T: Access,
     V: BinaryKey + ObjectHash,
@@ -157,7 +157,7 @@ where
 }
 
 #[test]
-fn test_validator_values_binary_value() {
+fn test_multisig_values_binary_value() {
     let mut set = BinarySet::default();
     let data = vec![
         b"abacaba1224634abcfdfdfca353".to_vec(),

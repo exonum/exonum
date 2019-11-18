@@ -19,18 +19,18 @@ use exonum_merkledb::{
 };
 
 use super::{
-    multisig::ValidatorMultisig, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
+    multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
     StartService,
 };
 
 /// Service information schema.
 #[derive(Debug)]
 pub struct Schema<T: Access> {
-    pub deploy_requests: ValidatorMultisig<T, DeployRequest>,
-    pub deploy_confirmations: ValidatorMultisig<T, DeployConfirmation>,
+    pub deploy_requests: MultisigIndex<T, DeployRequest>,
+    pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
-    pub pending_instances: ValidatorMultisig<T, StartService>,
-    pub config_confirms: ValidatorMultisig<T, Hash>,
+    pub pending_instances: MultisigIndex<T, StartService>,
+    pub config_confirms: MultisigIndex<T, Hash>,
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
     pub configuration_number: Entry<T::Base, u64>,
 }
