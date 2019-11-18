@@ -31,55 +31,11 @@ use exonum::{
     },
 };
 
-/// A set of binary values.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BinarySet<T: Ord>(pub BTreeSet<T>);
-
-impl<T: Ord> BinarySet<T> {
-    pub fn new() -> Self {
-        Self(BTreeSet::default())
-    }
-}
-
-impl<T: Ord> Default for BinarySet<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = Cursor::new(Vec::new());
-        for value in &self.0 {
-            let bytes = value.to_bytes();
-            buf.write_u64::<LittleEndian>(bytes.len() as u64).unwrap();
-            buf.write_all(&bytes).unwrap();
-        }
-        buf.into_inner()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        let mut values = BTreeSet::new();
-
-        let mut reader = bytes.as_ref();
-        while !reader.is_empty() {
-            let bytes_len = LittleEndian::read_u64(reader) as usize;
-            reader = &reader[8..];
-            let value = T::from_bytes(Cow::Borrowed(&reader[0..bytes_len]))?;
-            reader = &reader[bytes_len..];
-            values.insert(value);
-        }
-
-        Ok(Self(values))
-    }
-}
-
-impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
-    fn object_hash(&self) -> Hash {
-        crypto::hash(&self.to_bytes())
-    }
-}
-
+/// Wrapper over a `ProofMapIndex` representing a set of values with 0 or more
+/// votes for every value.
+///
+/// Votes are represented as public keys of authors and no verification for
+/// ownership is performed within this index.
 pub struct MultisigIndex<T: Access, V> {
     index: ProofMapIndex<T::Base, V, BinarySet<PublicKey>>,
 }
@@ -157,18 +113,72 @@ where
     }
 }
 
-#[test]
-fn test_multisig_values_binary_value() {
-    let mut set = BinarySet::default();
-    let data = vec![
-        b"abacaba1224634abcfdfdfca353".to_vec(),
-        b"abacaba1224634abcfdfdfca353ee2224774".to_vec(),
-    ];
-    set.0.insert(data[1].clone());
-    set.0.insert(data[0].clone());
-    assert_eq!(set.0.len(), 2);
+/// A set of binary values.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BinarySet<T: Ord>(pub BTreeSet<T>);
 
-    let bytes = set.clone().into_bytes();
-    let set2 = BinarySet::from_bytes(bytes.into()).unwrap();
-    assert_eq!(set, set2);
+impl<T: Ord> BinarySet<T> {
+    pub fn new() -> Self {
+        Self(BTreeSet::default())
+    }
+}
+
+impl<T: Ord> Default for BinarySet<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Cursor::new(Vec::new());
+        for value in &self.0 {
+            let bytes = value.to_bytes();
+            buf.write_u64::<LittleEndian>(bytes.len() as u64).unwrap();
+            buf.write_all(&bytes).unwrap();
+        }
+        buf.into_inner()
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        let mut values = BTreeSet::new();
+
+        let mut reader = bytes.as_ref();
+        while !reader.is_empty() {
+            let bytes_len = LittleEndian::read_u64(reader) as usize;
+            reader = &reader[8..];
+            let value = T::from_bytes(Cow::Borrowed(&reader[0..bytes_len]))?;
+            reader = &reader[bytes_len..];
+            values.insert(value);
+        }
+
+        Ok(Self(values))
+    }
+}
+
+impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
+    fn object_hash(&self) -> Hash {
+        crypto::hash(&self.to_bytes())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_multisig_values_binary_value() {
+        let mut set = BinarySet::default();
+        let data = vec![
+            b"abacaba1224634abcfdfdfca353".to_vec(),
+            b"abacaba1224634abcfdfdfca353ee2224774".to_vec(),
+        ];
+        set.0.insert(data[1].clone());
+        set.0.insert(data[0].clone());
+        assert_eq!(set.0.len(), 2);
+
+        let bytes = set.clone().into_bytes();
+        let set2 = BinarySet::from_bytes(bytes.into()).unwrap();
+        assert_eq!(set, set2);
+    }
 }
