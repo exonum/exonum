@@ -517,8 +517,6 @@ impl NodeHandler {
         let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();
 
-        metric!("node.mempool", pool_len);
-
         let height = self.state.height();
         info!(
             "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
