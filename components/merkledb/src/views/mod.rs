@@ -315,8 +315,10 @@ impl<T: RawAccess> View<T> {
         }
     }
 
-    /// Sets aggregated flag for the view, unless the view is backed by a readonly access
-    /// (in which case, the changes are forgotten).
+    /// Sets the aggregation flag for the view, unless the view is backed by a readonly access
+    /// (in which case, the flag is forgotten).
+    ///
+    /// The aggregation flag is used by `Fork::into_patch()` to update the state aggregator.
     pub(crate) fn set_or_forget_aggregation(&mut self, is_aggregated: bool) {
         if let Some(changes) = self.changes.as_mut() {
             changes.set_aggregation(is_aggregated);
