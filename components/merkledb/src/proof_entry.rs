@@ -28,12 +28,12 @@ use crate::{
 ///
 /// You can add an element to this index and check whether it exists. A value
 /// should implement [`BinaryValue`] and [`ObjectHash`] traits. Unlike [`Entry`],
-/// hashed entries are eagerly hashed and may participate in [state hash aggregation].
+/// hashed entries are eagerly hashed and may participate in [state aggregation].
 ///
 /// [`BinaryValue`]: trait.BinaryValue.html
 /// [`ObjectHash`]: trait.ObjectHash.html
 /// [`Entry`]: struct.Entry.html
-/// [state hash aggregation]: TODO
+/// [state aggregation]: index.html#state-aggregation
 #[derive(Debug)]
 pub struct ProofEntry<T: RawAccess, V> {
     base: View<T>,

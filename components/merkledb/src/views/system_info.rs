@@ -7,6 +7,42 @@ use crate::{access::AccessExt, Fork, ObjectHash, ProofMapIndex};
 pub(super) const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
 
 /// System-wide information about the database.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, Database, ObjectHash, TemporaryDB, SystemInfo};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
+/// fork.get_map(("plain_map", &1)).put(&1_u8, "so plain".to_owned());
+/// fork.get_map(("plain_map", &2)).put(&2_u8, "s0 plane".to_owned());
+///
+/// let system_info = SystemInfo::new(&fork);
+/// assert!(system_info.index_count() >= 3);
+/// // ^-- The database may also contain system indexes.
+///
+/// let patch = fork.into_patch();
+/// let state_hash = SystemInfo::new(&patch).state_hash();
+/// // ^-- State hash of the entire database including changes in the `patch`.
+/// db.merge(patch).unwrap();
+///
+/// let snapshot = db.snapshot();
+/// let aggregator = SystemInfo::new(&snapshot).state_aggregator();
+/// assert_eq!(aggregator.object_hash(), state_hash);
+/// assert_eq!(aggregator.keys().collect::<Vec<_>>(), vec!["list".to_owned()]);
+/// // ^-- No other aggregated indexes so far.
+/// let index_hash = aggregator.get(&"list".to_owned()).unwrap();
+/// assert_eq!(
+///     index_hash,
+///     snapshot.get_proof_list::<_, u32>("list").object_hash()
+/// );
+///
+/// // It is possible to prove that an index has a specific state
+/// // given `state_hash`:
+/// let proof = aggregator.get_proof("list".to_owned());
+/// proof.check_against_hash(state_hash).unwrap();
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct SystemInfo<T>(T);
 
@@ -16,12 +52,20 @@ impl<T: RawAccess> SystemInfo<T> {
         SystemInfo(access)
     }
 
-    /// Returns the total number of indexes in the storage.
+    /// Returns the total number of indexes in the storage. This information is always up to date
+    /// (even for `Fork`s).
+    ///
+    /// System-defined indexes (e.g., `state_aggregator`) are *included* into this count.
     pub fn index_count(&self) -> u64 {
         IndexesPool::new(self.0.clone()).len() - 1
     }
 
-    /// Returns the state hash of the database.
+    /// Returns the state hash of the database. The state hash is up to date for `Snapshot`s
+    /// (including `Patch`es), but is generally stale for `Fork`s.
+    ///
+    /// See [state aggregation] for details how the database state is aggregated.
+    ///
+    /// [state aggregation]: index.html#state-aggregation
     pub fn state_hash(&self) -> Hash {
         self.0
             .clone()
@@ -31,7 +75,12 @@ impl<T: RawAccess> SystemInfo<T> {
 }
 
 impl<T: RawAccess + AsReadonly> SystemInfo<T> {
-    /// Returns the state aggregator of the database.
+    /// Returns the state aggregator of the database. The aggregator is up to date for `Snapshot`s
+    /// (including `Patch`es), but is generally stale for `Fork`s.
+    ///
+    /// See [state aggregation] for details how the database state is aggregated.
+    ///
+    /// [state aggregation]: index.html#state-aggregati
     pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
         self.0.as_readonly().get_proof_map(STATE_AGGREGATOR)
     }

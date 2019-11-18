@@ -207,7 +207,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// COMMIT ::= deploy_artifact* commit_service* after_commit
 /// ```
 ///
-/// The ordering for the "readonly" methods `is_artifact_deployed` and `state_hashes` in relation
+/// The ordering for the "readonly" method `is_artifact_deployed` in relation
 /// to the lifecycle above is not specified.
 ///
 /// # Consensus and Local Methods
@@ -218,9 +218,8 @@ impl From<RuntimeIdentifier> for u32 {
 /// - `execute`
 /// - `before_commit`
 /// - `start_adding_service`
-/// - `state_hashes`
 ///
-/// All these methods except for `state_hashes` should also produce the same changes
+/// All these methods should also produce the same changes
 /// to the storage via provided `ExecutionContext`. Discrepancy in node behavior within
 /// these methods may lead to a consensus failure.
 ///
