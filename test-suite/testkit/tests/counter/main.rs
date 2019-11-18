@@ -19,7 +19,7 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
-    blockchain::{ExecutionError, ExecutionErrorKind},
+    blockchain::{ExecutionError, ExecutionErrorKind, ValidatorKeys},
     crypto::{self, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
@@ -29,13 +29,14 @@ use exonum::{
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{
     txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
+    TestNode,
 };
 use hex::FromHex;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, Increment, Reset, TransactionResponse, ADMIN_KEY, SERVICE_ID,
-    SERVICE_NAME,
+    CounterSchema, CounterService, CounterWithProof, Increment, Reset, TransactionResponse,
+    ADMIN_KEY, SERVICE_ID, SERVICE_NAME,
 };
 
 mod counter;
@@ -45,6 +46,15 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKit::for_rust_service(CounterService, SERVICE_NAME, SERVICE_ID, ());
     let api = testkit.api();
     (testkit, api)
+}
+
+fn get_validator_keys(testkit: &TestKit) -> Vec<ValidatorKeys> {
+    testkit
+        .network()
+        .validators()
+        .iter()
+        .map(TestNode::public_keys)
+        .collect()
 }
 
 fn inc_count(api: &TestKitApi, by: u64) -> Verified<AnyTx> {
@@ -80,6 +90,13 @@ fn test_inc_count_create_block() {
         .unwrap();
     assert_eq!(counter, 5);
 
+    let counter_with_proof: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    let validator_keys = get_validator_keys(&testkit);
+    assert_eq!(counter_with_proof.verify(&validator_keys), 5);
+
     testkit.create_block_with_transactions(txvec![
         Increment::new(4).sign(SERVICE_ID, pubkey, &key),
         Increment::new(1).sign(SERVICE_ID, pubkey, &key),
@@ -90,6 +107,11 @@ fn test_inc_count_create_block() {
         .get("count")
         .unwrap();
     assert_eq!(counter, 10);
+    let counter_with_proof: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    assert_eq!(counter_with_proof.verify(&validator_keys), 10);
 }
 
 #[should_panic(expected = "Transaction is already committed")]
@@ -120,6 +142,7 @@ fn test_inc_count_api() {
 #[test]
 fn test_inc_count_with_multiple_transactions() {
     let (mut testkit, api) = init_testkit();
+    let validator_keys = get_validator_keys(&testkit);
 
     for _ in 0..100 {
         inc_count(&api, 1);
@@ -128,6 +151,11 @@ fn test_inc_count_with_multiple_transactions() {
         inc_count(&api, 4);
 
         testkit.create_block();
+        let counter_with_proof: CounterWithProof = api
+            .public(ApiKind::Service("counter"))
+            .get("count-with-proof")
+            .unwrap();
+        counter_with_proof.verify(&validator_keys);
     }
 
     assert_eq!(testkit.height(), Height(100));
@@ -152,12 +180,20 @@ fn test_inc_count_with_manual_tx_control() {
         .unwrap();
     assert_eq!(counter, 0);
 
-    testkit.create_block_with_tx_hashes(&[tx_b.object_hash()]);
-    let counter: u64 = api
+    // Since the counter is not initialized, the relevant endpoint cannot return a proof,
+    // and instead returns a 404 error.
+    let err = api
         .public(ApiKind::Service("counter"))
-        .get("count")
+        .get::<CounterWithProof>("count-with-proof")
+        .unwrap_err();
+    assert_matches!(err, ApiError::NotFound(ref s) if s.contains("counter not initialized"));
+
+    testkit.create_block_with_tx_hashes(&[tx_b.object_hash()]);
+    let counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
         .unwrap();
-    assert_eq!(counter, 3);
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), 3);
 
     testkit.create_block_with_tx_hashes(&[tx_a.object_hash()]);
     let counter: u64 = api
@@ -194,11 +230,41 @@ fn test_private_api() {
     assert_eq!(tx_info.tx_hash, tx.object_hash());
 
     testkit.create_block();
-    let counter: u64 = api
-        .private(ApiKind::Service("counter"))
-        .get("count")
+    let counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
         .unwrap();
-    assert_eq!(counter, 0);
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), 0);
+}
+
+#[test]
+#[should_panic(expected = "Insufficient number of precommits")]
+fn counter_proof_without_precommits() {
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
+    testkit.create_block();
+
+    let mut counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    counter.remove_precommits();
+    counter.verify(&get_validator_keys(&testkit));
+}
+
+#[test]
+#[should_panic(expected = "Invalid counter value in proof")]
+fn counter_proof_with_mauled_value() {
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
+    testkit.create_block();
+
+    let mut counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    counter.maul_value();
+    counter.verify(&get_validator_keys(&testkit));
 }
 
 #[test]

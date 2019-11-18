@@ -20,6 +20,7 @@ use exonum::{
         backends::actix::{HttpRequest, RawHandler, RequestHandler},
         ApiBackend,
     },
+    blockchain::{IndexProof, ValidatorKeys},
     crypto::Hash,
     messages::{AnyTx, Verified},
     runtime::{
@@ -31,14 +32,14 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
-    Entry, ObjectHash,
+    ObjectHash, ProofEntry,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use super::proto;
 
@@ -48,7 +49,7 @@ pub const SERVICE_ID: InstanceId = 2;
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 
 pub struct CounterSchema<T: Access> {
-    pub counter: Entry<T::Base, u64>,
+    pub counter: ProofEntry<T::Base, u64>,
 }
 
 impl<T: Access> CounterSchema<T> {
@@ -134,6 +135,66 @@ pub struct TransactionResponse {
     pub tx_hash: Hash,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CounterWithProof {
+    counter: u64,
+    proof: IndexProof,
+}
+
+impl CounterWithProof {
+    /// Verifies the proof against the known set of validators. Panics on an error.
+    pub fn verify(&self, validators: &[ValidatorKeys]) -> u64 {
+        let block_hash = self.proof.block_proof.block.object_hash();
+
+        // Check precommits.
+        let mut validator_ids = HashSet::new();
+        for precommit in &self.proof.block_proof.precommits {
+            assert_eq!(*precommit.payload().block_hash(), block_hash);
+            let validator_id = validators
+                .iter()
+                .position(|keys| precommit.author() == keys.consensus_key)
+                .expect("Precommit not from a validator");
+            validator_ids.insert(validator_id);
+        }
+        assert!(
+            validator_ids.len() > 2 * validators.len() / 3,
+            "Insufficient number of precommits"
+        );
+
+        let state_hash = *self.proof.block_proof.block.state_hash();
+        let index_proof = self
+            .proof
+            .index_proof
+            .check_against_hash(state_hash)
+            .expect("`index_proof` is invalid");
+        let (key, value_hash) = index_proof
+            .entries()
+            .next()
+            .expect("`index_proof` does not contain entries");
+        assert_eq!(
+            *key,
+            format!("{}.counter", SERVICE_NAME),
+            "Invalid index name in proof"
+        );
+        assert_eq!(
+            *value_hash,
+            self.counter.object_hash(),
+            "Invalid counter value in proof"
+        );
+        self.counter
+    }
+
+    /// Mauls the proof by removing precommits.
+    pub fn remove_precommits(&mut self) {
+        self.proof.block_proof.precommits.clear();
+    }
+
+    /// Mauls the proof by mutating the value.
+    pub fn maul_value(&mut self) {
+        self.counter += 1;
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct CounterApi;
 
@@ -152,6 +213,18 @@ impl CounterApi {
     fn count(snapshot: impl Access) -> api::Result<u64> {
         let schema = CounterSchema::new(snapshot);
         Ok(schema.counter.get().unwrap_or_default())
+    }
+
+    fn count_with_proof(state: &ServiceApiState<'_>) -> api::Result<CounterWithProof> {
+        let proof = state
+            .data()
+            .proof_for_service_index("counter")
+            .ok_or_else(|| api::Error::NotFound("counter not initialized".to_owned()))?;
+        let schema = CounterSchema::new(state.service_data());
+        Ok(CounterWithProof {
+            counter: schema.counter.get().unwrap_or_default(),
+            proof,
+        })
     }
 
     fn reset(
@@ -176,6 +249,12 @@ impl CounterApi {
             .public_scope()
             .endpoint("count", |state, _query: ()| {
                 Self::count(state.service_data())
+            })
+            .endpoint_mut("count", Self::increment);
+        builder
+            .public_scope()
+            .endpoint("count-with-proof", |state, _query: ()| {
+                Self::count_with_proof(state)
             })
             .endpoint_mut("count", Self::increment);
 
