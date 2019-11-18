@@ -547,7 +547,7 @@ fn test_service_config_discard_single_apply_error() {
     let params = "apply_error".to_owned();
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_service_config_propose(params.clone())
+        .extend_service_config_propose(params)
         .build();
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
@@ -560,6 +560,10 @@ fn test_service_config_discard_single_apply_error() {
         .expect("Transaction with change propose discarded.");
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+
+    // Create one more block for supervisor to remove failed config.
+    testkit.create_block();
+
     assert_eq!(config_propose_entry(&testkit), None);
     check_service_actual_param(&testkit, None);
 }
@@ -571,7 +575,7 @@ fn test_service_config_discard_single_apply_panic() {
     let params = "apply_panic".to_owned();
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_service_config_propose(params.clone())
+        .extend_service_config_propose(params)
         .build();
 
     testkit
@@ -584,8 +588,52 @@ fn test_service_config_discard_single_apply_panic() {
         .status()
         .expect("Transaction with change propose discarded.");
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+
+    // Create one more block for supervisor to remove failed config.
+    testkit.create_block();
+
     assert_eq!(config_propose_entry(&testkit), None);
     check_service_actual_param(&testkit, None);
+}
+
+// This test checks that we can send a new config proposal right after
+// the failure of the previous config applying.
+#[test]
+fn test_send_config_right_after_error() {
+    let mut testkit = testkit_with_supervisor_and_service(1);
+    let initiator_id = testkit.network().us().validator_id().unwrap();
+
+    let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+        .extend_service_config_propose("apply_panic".into())
+        .build();
+
+    testkit
+        .create_block_with_transaction(sign_config_propose_transaction(
+            &testkit,
+            propose,
+            initiator_id,
+        ))
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
+    testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+
+    // Send a new config right after the failure.
+    let new_height = Height(100); // We don't really care about height, we're checking the tx approval only.
+    let propose = ConfigProposeBuilder::new(new_height)
+        .configuration_number(1)
+        .extend_service_config_propose("good_config".into())
+        .build();
+
+    testkit
+        .create_block_with_transaction(sign_config_propose_transaction(
+            &testkit,
+            propose,
+            initiator_id,
+        ))
+        .transactions[0]
+        .status()
+        .expect("Transaction with change propose discarded.");
 }
 
 #[test]

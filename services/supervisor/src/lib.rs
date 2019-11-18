@@ -75,60 +75,57 @@ const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged 
 ///   by a panic / error *before* hitting the call; if this happens, the usual rules apply.
 ///
 /// These restrictions are the result of `Fork` not having multi-layered checkpoints.
-fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
+fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> Result<(), ()> {
     // An error while configuring one of the service instances should not affect others.
-    changes.into_iter().for_each(|change| match change {
-        ConfigChange::Consensus(config) => {
-            log::trace!("Updating consensus configuration {:?}", config);
+    for change in changes.into_iter() {
+        match change {
+            ConfigChange::Consensus(config) => {
+                log::trace!("Updating consensus configuration {:?}", config);
 
-            let result = context.isolate(|context| {
                 context
                     .writeable_core_schema()
                     .consensus_config_entry()
                     .set(config);
-                Ok(())
-            });
-            assert!(result.is_ok());
-        }
+            }
 
-        ConfigChange::Service(config) => {
-            log::trace!(
-                "Updating service instance configuration, instance ID is {}",
-                config.instance_id
-            );
-
-            let configure_result = context.isolate(|mut context| {
-                context
-                    .interface::<ConfigureCall<'_>>(config.instance_id)?
-                    .apply_config(config.params.clone())
-            });
-            if let Err(e) = configure_result {
-                log::error!(
-                    "An error occurred while applying service configuration. {}",
-                    e
+            ConfigChange::Service(config) => {
+                log::trace!(
+                    "Updating service instance configuration, instance ID is {}",
+                    config.instance_id
                 );
+
+                let configure_result = context
+                    .interface::<ConfigureCall<'_>>(config.instance_id)
+                    .expect("Obtaining Configure interface failed")
+                    .apply_config(config.params.clone());
+
+                if let Err(e) = configure_result {
+                    log::error!(
+                        "An error occurred while applying service configuration. {}",
+                        e
+                    );
+                    return Err(());
+                }
+            }
+
+            ConfigChange::StartService(start_service) => {
+                log::trace!(
+                    "Request add service with name {:?} from artifact {:?}",
+                    start_service.name,
+                    start_service.artifact
+                );
+                if let Err(e) = context.start_adding_service(
+                    start_service.artifact,
+                    start_service.name,
+                    start_service.config,
+                ) {
+                    log::error!("Service start request failed. {}", e);
+                    return Err(());
+                }
             }
         }
-
-        ConfigChange::StartService(start_service) => {
-            log::trace!(
-                "Request add service with name {:?} from artifact {:?}",
-                start_service.name,
-                start_service.artifact
-            );
-            if let Err(e) = context.start_adding_service(
-                start_service.artifact,
-                start_service.name,
-                start_service.config,
-            ) {
-                // Panic will cause changes to be rolled back.
-                panic!(
-                    "An error occurred while starting the service instance: {:?}",
-                    e
-                );
-            }
-        }
-    })
+    }
+    Ok(())
 }
 
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
@@ -206,13 +203,22 @@ where
                         "New configuration has been accepted: {:?}",
                         entry.config_propose
                     );
-                    drop(schema);
-                    // Perform the application of configs.
-                    update_configs(&mut context, entry.config_propose.changes);
-                    // Remove config from proposals. Note that this step is performed even
-                    // if applying one or more configs has errored / panicked.
-                    let mut schema = Schema::new(context.service_data());
+
+                    // Remove config from proposals.
+                    // If the config update will fail, this entry will be restored due to rollback.
+                    // However, it won't be actual anymore and will be removed at the next height.
                     schema.pending_proposal.remove();
+                    drop(schema);
+
+                    // Perform the application of configs.
+                    let update_result = update_configs(&mut context, entry.config_propose.changes);
+
+                    if update_result.is_err() {
+                        // Panic will cause changes to be rolled back.
+                        // TODO: Return error instead of panic once the signature
+                        // of `before_commit` will allow it. [ECR-3811]
+                        panic!("Config update failed")
+                    }
                 }
             }
         }
