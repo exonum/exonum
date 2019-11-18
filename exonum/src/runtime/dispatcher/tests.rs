@@ -12,17 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{Database, Fork, ObjectHash, Snapshot, TemporaryDB};
-use futures::{sync::mpsc, Future, IntoFuture};
+use futures::{future, sync::mpsc, Future, IntoFuture};
 
 use std::{
-    mem,
+    collections::HashMap,
+    mem, panic,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{channel, Sender},
-        Arc,
+        Arc, Mutex,
     },
+    thread,
+    time::Duration,
 };
 
 use crate::{
@@ -30,10 +34,11 @@ use crate::{
     helpers::{Height, ValidatorId},
     node::ApiSender,
     runtime::{
-        dispatcher::{Dispatcher, Mailbox},
+        dispatcher::{Action, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, CallInfo, Caller, DispatcherError, ExecutionContext, ExecutionError,
-        InstanceId, InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
+        ArtifactId, CallInfo, Caller, DeployStatus, DispatcherError, DispatcherSchema, ErrorKind,
+        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
+        RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -567,4 +572,306 @@ fn test_shutdown() {
 
     assert_eq!(turned_off_a.load(Ordering::Relaxed), true);
     assert_eq!(turned_off_b.load(Ordering::Relaxed), true);
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct ArtifactStatus {
+    attempts: usize,
+    is_deployed: bool,
+}
+
+#[derive(Debug, Default, Clone)]
+struct DeploymentRuntime {
+    // Map of artifact names to deploy attempts and the flag for successful deployment.
+    artifacts: Arc<Mutex<HashMap<String, ArtifactStatus>>>,
+    mailbox_actions: Arc<Mutex<Vec<Action>>>,
+}
+
+impl DeploymentRuntime {
+    /// Artifact deploy spec. This is u64-LE encoding of the deploy delay in milliseconds.
+    const SPEC: [u8; 8] = [100, 0, 0, 0, 0, 0, 0, 0];
+
+    fn deploy_attempts(&self, artifact: &ArtifactId) -> usize {
+        self.artifacts
+            .lock()
+            .unwrap()
+            .get(&artifact.name)
+            .copied()
+            .unwrap_or_default()
+            .attempts
+    }
+
+    /// Deploys a test artifact. Returns artifact ID and the deploy argument.
+    fn deploy_test_artifact(
+        &self,
+        name: &str,
+        dispatcher: &mut Dispatcher,
+        db: &Arc<TemporaryDB>,
+    ) -> (ArtifactId, Vec<u8>) {
+        let artifact = ArtifactId {
+            runtime_id: 2,
+            name: name.to_owned(),
+        };
+        self.mailbox_actions
+            .lock()
+            .unwrap()
+            .push(Action::StartDeploy {
+                artifact: artifact.clone(),
+                spec: Self::SPEC.to_vec(),
+                and_then: Box::new(|| Box::new(Ok(()).into_future())),
+            });
+        let mut fork = db.fork();
+        dispatcher.commit_block_and_notify_runtimes(&mut fork);
+        db.merge_sync(fork.into_patch()).unwrap();
+        (artifact, Self::SPEC.to_vec())
+    }
+}
+
+impl Runtime for DeploymentRuntime {
+    fn deploy_artifact(
+        &mut self,
+        artifact: ArtifactId,
+        spec: Vec<u8>,
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        let delay = LittleEndian::read_u64(&spec);
+        let delay = Duration::from_millis(delay);
+
+        let error_kind = ErrorKind::runtime(0);
+        let result = match artifact.name.as_str() {
+            "good" => Ok(()),
+            "bad" => Err(ExecutionError::new(error_kind, "bad artifact!")),
+            "recoverable" => {
+                if self.deploy_attempts(&artifact) > 0 {
+                    Ok(())
+                } else {
+                    Err(ExecutionError::new(error_kind, "bad artifact!"))
+                }
+            }
+            "recoverable_after_restart" => {
+                if self.deploy_attempts(&artifact) > 1 {
+                    Ok(())
+                } else {
+                    Err(ExecutionError::new(error_kind, "bad artifact!"))
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        let artifacts = Arc::clone(&self.artifacts);
+        let task = future::lazy(move || {
+            // This isn't a correct way to delay future completion, but the correct way
+            // (`tokio::timer::Delay`) cannot be used since the futures returned by
+            // `Runtime::deploy_artifact()` are not (yet?) run on the `tokio` runtime.
+            // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
+            thread::sleep(delay);
+            result
+        })
+        .then(move |res| {
+            let mut artifacts = artifacts.lock().unwrap();
+            let status = artifacts.entry(artifact.name).or_default();
+            status.attempts += 1;
+            if res.is_ok() {
+                status.is_deployed = true;
+            }
+            res
+        });
+        Box::new(task)
+    }
+
+    fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
+        self.artifacts
+            .lock()
+            .unwrap()
+            .get(&id.name)
+            .copied()
+            .unwrap_or_default()
+            .is_deployed
+    }
+
+    fn start_adding_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _spec: &InstanceSpec,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        _spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn execute(
+        &self,
+        _context: ExecutionContext<'_>,
+        _call_info: &CallInfo,
+        _parameters: &[u8],
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
+        StateHashAggregator::default()
+    }
+
+    fn before_commit(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn after_commit(&mut self, _snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
+        for action in mem::replace(&mut *self.mailbox_actions.lock().unwrap(), vec![]) {
+            mailbox.push(action);
+        }
+    }
+}
+
+#[test]
+fn delayed_deployment() {
+    let db = Arc::new(TemporaryDB::new());
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender(mpsc::channel(1).0),
+    );
+    let runtime = DeploymentRuntime::default();
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(2, runtime.clone())
+        .finalize(&blockchain);
+
+    let mut fork = db.fork();
+    create_genesis_block(&mut dispatcher, &mut fork);
+    db.merge_sync(fork.into_patch()).unwrap();
+
+    // Queue an artifact for deployment.
+    let (artifact, spec) = runtime.deploy_test_artifact("good", &mut dispatcher, &db);
+    // Note that deployment via `Mailbox` is currently blocking, so after the method completion
+    // the artifact should be immediately marked as deployed.
+    assert!(dispatcher.is_artifact_deployed(&artifact));
+    assert_eq!(runtime.deploy_attempts(&artifact), 1);
+
+    // Check that we don't require the runtime to deploy the artifact again if we mark it
+    // as committed.
+    let mut fork = db.fork();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    dispatcher.commit_block_and_notify_runtimes(&mut fork);
+    db.merge_sync(fork.into_patch()).unwrap();
+    assert_eq!(runtime.deploy_attempts(&artifact), 1);
+}
+
+fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, artifact_name: &str) {
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender(mpsc::channel(1).0),
+    );
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(2, runtime.clone())
+        .finalize(&blockchain);
+
+    let mut fork = db.fork();
+    create_genesis_block(&mut dispatcher, &mut fork);
+    db.merge_sync(fork.into_patch()).unwrap();
+
+    // Queue an artifact for deployment.
+    let (artifact, spec) = runtime.deploy_test_artifact(artifact_name, &mut dispatcher, &db);
+    // We should not panic during async deployment.
+    assert!(!dispatcher.is_artifact_deployed(&artifact));
+    assert_eq!(runtime.deploy_attempts(&artifact), 1);
+
+    let mut fork = db.fork();
+    Dispatcher::commit_artifact(&fork, artifact, spec).unwrap();
+    dispatcher.commit_block_and_notify_runtimes(&mut fork); // << should panic
+}
+
+#[test]
+#[should_panic(expected = "Unable to deploy registered artifact")]
+fn failed_deployment() {
+    let db = Arc::new(TemporaryDB::new());
+    let runtime = DeploymentRuntime::default();
+    test_failed_deployment(db, runtime, "bad");
+}
+
+#[test]
+fn failed_deployment_with_node_restart() {
+    let db = Arc::new(TemporaryDB::new());
+    let runtime = DeploymentRuntime::default();
+    let db_ = Arc::clone(&db);
+    let runtime_ = runtime.clone();
+    panic::catch_unwind(|| test_failed_deployment(db_, runtime_, "recoverable_after_restart"))
+        .expect_err("Node didn't stop after unsuccessful sync deployment");
+
+    let snapshot = db.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.get_artifact("recoverable_after_restart").is_none());
+    // ^-- Since the node panicked before merging the block, the artifact is forgotten.
+
+    // Emulate node restart. The node will obtain the same block with the `commit_artifact`
+    // instruction, which has tripped it the last time, and try to commit it again. This time,
+    // the commitment will be successful (e.g., the node couldn't download the artifact before,
+    // but its admin has fixed the issue).
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender(mpsc::channel(1).0),
+    );
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(2, runtime)
+        .finalize(&blockchain);
+
+    let artifact = ArtifactId {
+        runtime_id: 2,
+        name: "recoverable_after_restart".to_owned(),
+    };
+    let mut spec = vec![0_u8; 8];
+    LittleEndian::write_u64(&mut spec, 100);
+
+    let mut fork = db.fork();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    dispatcher.commit_block_and_notify_runtimes(&mut fork);
+    db.merge_sync(fork.into_patch()).unwrap();
+    assert!(dispatcher.is_artifact_deployed(&artifact));
+
+    let snapshot = db.snapshot();
+    let (_, status) = DispatcherSchema::new(&snapshot)
+        .get_artifact(&artifact.name)
+        .unwrap();
+    assert_eq!(status, DeployStatus::Active);
+}
+
+#[test]
+fn recoverable_error_during_deployment() {
+    let db = Arc::new(TemporaryDB::new());
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender(mpsc::channel(1).0),
+    );
+    let runtime = DeploymentRuntime::default();
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(2, runtime.clone())
+        .finalize(&blockchain);
+
+    let mut fork = db.fork();
+    create_genesis_block(&mut dispatcher, &mut fork);
+    db.merge_sync(fork.into_patch()).unwrap();
+
+    // Queue an artifact for deployment.
+    let (artifact, spec) = runtime.deploy_test_artifact("recoverable", &mut dispatcher, &db);
+    assert!(!dispatcher.is_artifact_deployed(&artifact));
+    assert_eq!(runtime.deploy_attempts(&artifact), 1);
+
+    let mut fork = db.fork();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    dispatcher.commit_block_and_notify_runtimes(&mut fork);
+    // The dispatcher should try to deploy the artifact again despite a previous failure.
+    assert!(dispatcher.is_artifact_deployed(&artifact));
+    assert_eq!(runtime.deploy_attempts(&artifact), 2);
 }
