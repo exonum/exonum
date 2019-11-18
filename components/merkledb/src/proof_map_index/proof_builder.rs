@@ -8,7 +8,6 @@ use super::{
     node::{BranchNode, Node},
     MapProof, ToProofPath,
 };
-use crate::ObjectHash;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -171,7 +170,6 @@ pub trait BuildProof<K, V, KeyMode> {
 
 impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
-    K: ObjectHash,
     T: MerklePatriciaTree<K, V>,
     KeyMode: ToProofPath<K>,
 {

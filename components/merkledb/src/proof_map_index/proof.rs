@@ -27,7 +27,7 @@ use super::{
 };
 use crate::{BinaryValue, HashTag, ObjectHash};
 
-use crate::proof_map_index::key::{Hashed, Raw, ToProofPath};
+use crate::proof_map_index::key::{Hashed, ToProofPath};
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -275,13 +275,6 @@ pub struct MapProof<K, V, KeyMode = Hashed> {
     #[serde(skip)]
     _key_mode: PhantomData<KeyMode>,
 }
-
-/// Variant of [`MapProof`] with raw keys, in other words with keys that mapped
-/// directly to [`ProofPath`].
-///
-/// [`MapProof`]: struct.MapProof.html
-/// [`ProofPath`]: struct.ProofPath.html
-pub type RawMapProof<K, V> = MapProof<K, V, Raw>;
 
 /// Version of `MapProof` obtained after verification.
 ///

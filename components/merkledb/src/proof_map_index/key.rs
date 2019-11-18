@@ -57,15 +57,15 @@ fn reset_bits(value: &mut u8, pos: u16) {
     *value &= reset_bits_mask;
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
 /// Hashed variant of proof map key.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Hashed;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
 /// Raw variant of proof map key.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Raw;
 
-/// Trait defines key transforming function used to transform key to `ProofPath`.
+/// Trait defining key transforming function used to transform key to `ProofPath`.
 pub trait ToProofPath<K> {
     /// Transforms key to `ProofPath`.
     fn transform_key(key: &K) -> ProofPath;

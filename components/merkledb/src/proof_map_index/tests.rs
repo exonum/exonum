@@ -1171,7 +1171,7 @@ fn test_build_proof_in_single_node_tree_hashed() {
 fn test_insert_same_key() {
     let db = TemporaryDB::default();
     let fork = db.fork();
-    let mut table = fork.get_generic_proof_map::<_, _, _, Raw>(IDX_NAME);
+    let mut table = fork.get_raw_proof_map(IDX_NAME);
     assert_eq!(table.object_hash(), HashTag::empty_map_hash());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
     let hash = HashStream::new()

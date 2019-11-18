@@ -17,7 +17,7 @@
 pub use self::node::{BranchNode, Node};
 pub use self::{
     key::{Hashed, ProofPath, Raw, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
-    proof::{CheckedMapProof, MapProof, MapProofError, RawMapProof, ValidationError},
+    proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
 use std::{fmt, io, marker::PhantomData};
@@ -48,7 +48,7 @@ mod tests;
 impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -180,7 +180,7 @@ impl BinaryAttribute for ProofPath {
 impl<T, K, V, KeyMode> FromAccess<T> for ProofMapIndex<T::Base, K, V, KeyMode>
 where
     T: Access,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -200,7 +200,7 @@ pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
 impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -484,7 +484,7 @@ where
 impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccessMut,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -786,7 +786,7 @@ where
 impl<T, K, V, KeyMode> ObjectHash for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -871,12 +871,12 @@ where
 impl<T, K, V, KeyMode> fmt::Debug for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue + fmt::Debug,
     KeyMode: ToProofPath<K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Entry<'a, T: RawAccess, K: ObjectHash, V: BinaryValue, KeyMode: ToProofPath<K>> {
+        struct Entry<'a, T: RawAccess, K, V: BinaryValue, KeyMode: ToProofPath<K>> {
             index: &'a ProofMapIndex<T, K, V, KeyMode>,
             path: ProofPath,
             hash: Hash,
@@ -886,7 +886,7 @@ where
         impl<'a, T, K, V, KeyMode> Entry<'a, T, K, V, KeyMode>
         where
             T: RawAccess,
-            K: BinaryKey + ObjectHash,
+            K: BinaryKey,
             V: BinaryValue,
             KeyMode: ToProofPath<K>,
         {
@@ -915,7 +915,7 @@ where
         impl<T, K, V, KeyMode> fmt::Debug for Entry<'_, T, K, V, KeyMode>
         where
             T: RawAccess,
-            K: BinaryKey + ObjectHash,
+            K: BinaryKey,
             V: BinaryValue + fmt::Debug,
             KeyMode: ToProofPath<K>,
         {
