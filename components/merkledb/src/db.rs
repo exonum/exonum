@@ -609,6 +609,9 @@ impl Fork {
     pub fn into_patch(mut self) -> Patch {
         self.flush();
 
+        // Replacing `changed_aggregated_refs` has a beneficial side-effect: if the patch
+        // returned by this method is converted back to a `Fork`, we won't need to update
+        // its state aggregator unless the *new* changes in the `Fork` concern aggregated indexes.
         let changed_aggregated_refs =
             mem::replace(&mut self.patch.changed_aggregated_refs, HashSet::new());
         let updated_entries = changed_aggregated_refs

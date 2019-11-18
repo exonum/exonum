@@ -337,6 +337,7 @@ impl<T: RawAccess> IndexesPool<T> {
     }
 }
 
+/// Obtains `object_hash` for an aggregated index.
 pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedRef) -> Hash {
     use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
