@@ -89,7 +89,7 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
 ///
 /// * `#[service_dispatcher(crate = "path")]`
 ///
-/// Prefix of the `exonum` crate (usually it's "crate" or "exonum").
+/// Prefix of the `exonum` crate (usually it's "crate" or "exonum"). By default is "exonum".
 #[proc_macro_derive(ServiceDispatcher, attributes(service_dispatcher))]
 pub fn service_dispatcher(input: TokenStream) -> TokenStream {
     service_dispatcher::impl_service_dispatcher(input)
@@ -114,7 +114,7 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 ///
 /// * `#[service_factory(crate = "path")]`
 ///
-/// Prefix of the `exonum` crate(usually "crate" or "exonum").
+/// Prefix of the `exonum` crate(usually "crate" or "exonum"). By default is "exonum".
 ///
 /// * `#[service_factory(artifact_name = "string")]`
 ///   
@@ -138,19 +138,38 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
     service_factory::impl_service_factory(input)
 }
 
-/// Mark trait as an Exonum service interface.
+/// Derives an Exonum service interface for the specified trait.
 ///
-/// TODO add more documentation.
+/// See the documentation of the Exonum crate for more information.
+///
+/// # Attributes:
+///
+/// ## Optional
+///
+/// * `#[exonum_interface(crate = "path")]`
+///
+/// Prefix of the `exonum` crate(usually "crate" or "exonum"). By default is "exonum".
 #[proc_macro_attribute]
 pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_interface::impl_exonum_interface(attr, item)
 }
 
-/// Derives `From<MyError>` conversion to the `ExecutionError` for the given enum.
+/// Implements `From<MyError>` conversion to the `ExecutionError` for the given enum.
 ///
 /// Enumeration should have an explicit discriminant for each variant.
-/// Also this macro derives `Display` and `Fail` traits using documentation comments
-/// of each variant.
+/// Derives `Display` and `Fail` traits using documentation comments of each variant.
+///
+/// # Attributes:
+///
+/// ## Optional
+///
+/// * `#[execution_error(crate = "path")]`
+///
+/// Prefix of the `exonum` crate(usually "crate" or "exonum"). By default is "exonum".
+///
+/// * `#[execution_error(kind = "runtime")]`
+///
+/// Error kind with possible values: `service`, `runtime`. By default is `service`.
 #[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
 pub fn into_execution_error(input: TokenStream) -> TokenStream {
     execution_error::impl_execution_error(input)

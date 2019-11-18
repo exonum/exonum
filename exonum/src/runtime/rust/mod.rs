@@ -77,12 +77,13 @@
 //! // trait for each arg.
 //! #[exonum_interface]
 //! pub trait Transactions {
-//!     // You may use `ExecutionError` directly.
+//!     // Each method of trait should have signature like the following. Argument
+//!     // should implement `BinaryValue` trait.
 //!     fn create_wallet(
 //!         &self,
 //!         context: CallContext<'_>,
 //!         arg: CreateWallet,
-//!     ) -> Result<(), ExecutionError>;
+//!     ) -> Result<(), ExecutionError>; // You may use `ExecutionError` directly.
 //!     // Also you can use for error any type which implements `Into<ExecutionError>`.
 //!     fn add_point(
 //!         &self,
