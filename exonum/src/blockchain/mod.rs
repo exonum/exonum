@@ -57,10 +57,6 @@ mod schema;
 #[cfg(test)]
 pub mod tests;
 
-/// Transaction message shortcut.
-// TODO It seems that this shortcut should be removed [ECR-3222]
-pub type TransactionMessage = Verified<AnyTx>;
-
 /// Shared Exonum blockchain instance.
 ///
 /// This is essentially a smart pointer to shared blockchain resources (storage,
