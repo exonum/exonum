@@ -45,7 +45,7 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-/// Max instance identifier for builtin service.
+/// Instance identifier for first deployed service.
 ///
 /// By analogy with the privileged ports of the network, we use a range 0..1023 of instance
 /// identifiers for built-in services which can be created only during the blockchain genesis
