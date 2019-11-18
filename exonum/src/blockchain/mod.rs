@@ -70,11 +70,9 @@ pub type TransactionMessage = Verified<AnyTx>;
 /// [`BlockchainMut`]: struct.BlockchainMut.html
 #[derive(Debug, Clone)]
 pub struct Blockchain {
-    pub(crate) db: Arc<dyn Database>,
-    // FIXME fix visibility [ECR-3222]
-    #[doc(hidden)]
-    pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
+    db: Arc<dyn Database>,
+    service_keypair: (PublicKey, SecretKey),
 }
 
 impl Blockchain {
