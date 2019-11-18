@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //! Helper module for multisignature transactions.
-// TODO move out from helpers [ECR-3222]
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
 use exonum_merkledb::{
@@ -28,11 +27,11 @@ use std::{
     io::{Cursor, Write},
 };
 
-use crate::crypto::{self, Hash, PublicKey};
+use exonum::crypto::{self, Hash, PublicKey};
 use exonum_merkledb::access::AccessError;
 
 /// A set of binary values.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BinarySet<T: Ord>(pub BTreeSet<T>);
 
 impl<T: Ord> BinarySet<T> {

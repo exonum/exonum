@@ -21,11 +21,11 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
-use exonum::helpers::{byzantine_quorum, multisig::ValidatorMultisig};
+use exonum::helpers::byzantine_quorum;
 use exonum_crypto::Hash;
 use exonum_merkledb::access::Access;
 
-use super::DeployRequest;
+use super::{multisig::ValidatorMultisig, DeployRequest};
 
 /// Simple supervisor mode: to deploy service one have to send
 /// one request to any of the validators.
