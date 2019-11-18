@@ -66,9 +66,8 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
 }
 
 fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {
-    let mut runtime = RustRuntime::new(mpsc::channel(1).0);
     let service_factory = Box::new(TestServiceImpl);
-    runtime.add_service_factory(service_factory);
+    let runtime = RustRuntime::new(mpsc::channel(1).0).with_available_service(service_factory);
     let event_handle = Arc::default();
     let runtime = Inspected {
         inner: runtime,
@@ -670,7 +669,8 @@ fn dependent_builtin_service() {
     // Create a blockchain with both main and dependent services initialized in the genesis block.
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
-        .with_builtin_instances(vec![main_service, dep_service])
+        .with_service(main_service)
+        .with_service(dep_service)
         .build();
 
     let blockchain = Blockchain::build_for_tests()
@@ -702,8 +702,8 @@ fn dependent_builtin_service_with_incorrect_order() {
 
     // Error in the service instantiation in the genesis block bubbles up.
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
-        .with_builtin_instances(vec![dep_service, main_service])
-        // ^-- Incorrect service ordering
+        .with_service(dep_service) // <-- Incorrect service ordering
+        .with_service(main_service)
         .build();
 
     let err = Blockchain::build_for_tests()
