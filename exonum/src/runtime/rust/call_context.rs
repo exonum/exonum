@@ -176,19 +176,13 @@ impl<'a> CallContext<'a> {
     #[doc(hidden)]
     pub fn start_adding_service(
         &mut self,
-        artifact: ArtifactId,
-        instance_name: String,
+        instance_spec: InstanceSpec,
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`start_adding_service` called within a non-supervisor service");
         }
 
-        let instance_spec = InstanceSpec {
-            artifact,
-            name: instance_name,
-            id: Dispatcher::assign_instance_id(self.inner.fork),
-        };
         self.inner
             .child_context(self.instance.id)
             .start_adding_service(instance_spec, constructor)

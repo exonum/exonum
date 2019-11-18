@@ -21,7 +21,7 @@ use exonum::{
     helpers::Height,
     impl_serde_hex_for_binary_value,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, ArtifactId, InstanceId, SUPERVISOR_INSTANCE_ID},
+    runtime::{rust::Transaction, ArtifactId, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
@@ -60,6 +60,20 @@ pub struct StartService {
     pub name: String,
     /// Instance configuration.
     pub config: Vec<u8>,
+}
+
+impl StartService {
+    /// Given the instance ID, splits the `StartService` request into `InstanceSpec`
+    /// and config value.
+    pub fn into_parts(self, id: InstanceId) -> (InstanceSpec, Vec<u8>) {
+        let spec = InstanceSpec {
+            id,
+            name: self.name,
+            artifact: self.artifact,
+        };
+
+        (spec, self.config)
+    }
 }
 
 /// Configuration parameters of the certain service instance.

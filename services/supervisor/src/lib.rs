@@ -29,7 +29,7 @@ use exonum::{
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
-        BlockchainData, SUPERVISOR_INSTANCE_ID,
+        BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -44,6 +44,14 @@ mod proto;
 mod proto_structures;
 mod schema;
 mod transactions;
+
+/// Max instance identifier for builtin service.
+///
+/// By analogy with the privileged ports of the network, we use a range 0..1023 of instance
+/// identifiers for built-in services which can be created only during the blockchain genesis
+/// block creation.
+// TODO: remove [ECR-3851]
+const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
 
 /// Decentralized supervisor.
 pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
@@ -116,11 +124,10 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
                 start_service.name,
                 start_service.artifact
             );
-            if let Err(e) = context.start_adding_service(
-                start_service.artifact,
-                start_service.name,
-                start_service.config,
-            ) {
+            let id = Schema::new(context.service_data()).assign_instance_id();
+            let (instance_spec, config) = start_service.into_parts(id);
+
+            if let Err(e) = context.start_adding_service(instance_spec, config) {
                 // Panic will cause changes to be rolled back.
                 panic!(
                     "An error occurred while starting the service instance: {:?}",
