@@ -37,7 +37,6 @@ pub struct WalletProof {
     /// Proof of the whole database table.
     pub to_table: MapProof<IndexCoordinates, Hash>,
     /// Proof of the specific wallet in this table.
-    //TODO: revert change to Raw
     pub to_wallet: MapProof<PublicKey, Wallet, Raw>,
 }
 

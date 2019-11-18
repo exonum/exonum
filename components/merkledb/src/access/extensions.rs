@@ -1,7 +1,7 @@
 //! Extension traits to simplify index instantiation.
 
 use super::{Access, AccessError, FromAccess};
-use crate::proof_map_index::{Raw, ToProofPath};
+use crate::proof_map_index::ToProofPath;
 use crate::{
     views::IndexType, BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex,
     MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
@@ -116,19 +116,38 @@ pub trait AccessExt: Access {
         ProofMapIndex::from_access(self, addr.into()).unwrap()
     }
 
-    /// Variant of the proof map with keys that can be mapped directly to `ProofPath`.
+    /// Generic variant of the proof map. Requires implicit `KeyMode` to be constructed.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{access::AccessExt, Fork, Database, ListIndex, TemporaryDB, ProofMapIndex,
+    /// proof_map_index::{Raw, Hashed}};
+    /// use exonum_crypto::PublicKey;
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    ///
+    /// // Hashed variant for keys implementing `ObjectHash`.
+    /// let hashed_map: ProofMapIndex<&Fork, u32, u32, Hashed> = fork.get_gen_proof_map("hashed");
+    ///
+    /// // Raw variant for keys that maps directly to `ProofPath`.
+    /// let raw_map: ProofMapIndex<&Fork, PublicKey, u32, Raw> = fork.get_gen_proof_map("raw");
+    /// ```
     /// # Panics
     ///
     /// If the index exists, but is not a Merkelized map.
-    fn get_raw_proof_map<I, K, V>(self, addr: I) -> ProofMapIndex<Self::Base, K, V, Raw>
+    fn get_gen_proof_map<I, K, V, KeyMode>(
+        self,
+        addr: I,
+    ) -> ProofMapIndex<Self::Base, K, V, KeyMode>
     where
         I: Into<IndexAddress>,
         K: BinaryKey + ObjectHash,
         V: BinaryValue,
-        Raw: ToProofPath<K>,
+        KeyMode: ToProofPath<K>,
     {
-        ProofMapIndex::<_, _, _, Raw>::from_access(self, addr.into()).unwrap()
+        ProofMapIndex::<_, _, _, KeyMode>::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a sparse list index with the specified address.

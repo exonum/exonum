@@ -154,9 +154,8 @@ fn index_data(
     btree_map(array::uniform32(key_bytes), any::<u64>(), sizes)
 }
 
-fn data_for_absent(key_bytes: RangeInclusive<u8>) -> impl Strategy<Value = Vec<Key>> {
-    vec(array::uniform32(key_bytes), 20)
-        .prop_map(|keys| keys.into_iter().map(|key| Key(key)).collect())
+fn absent_keys(key_bytes: RangeInclusive<u8>) -> impl Strategy<Value = Vec<Key>> {
+    vec(array::uniform32(key_bytes).prop_map(Key), 20)
 }
 
 /// Generates data to test a proof of presence.
@@ -181,7 +180,7 @@ fn data_for_multiproof(
             let keys: Vec<Key> = indexes
                 .into_iter()
                 .map(|i| *data.keys().nth(i).unwrap())
-                .map(|key| key.into())
+                .map(Key)
                 .collect();
             (keys, data)
         })
@@ -238,11 +237,11 @@ impl TestParams {
 
     fn proof_of_absence(&self) {
         let db = TemporaryDB::new();
-        let key_strategy = array::uniform32(self.key_bytes());
+        let key_strategy = array::uniform32(self.key_bytes()).prop_map(Key);
         let data_strategy = index_data(self.key_bytes(), self.index_sizes());
         proptest!(self.config(), |(key in key_strategy, data in data_strategy)| {
             write_data(&db, data);
-            test_proof(&db, key.into())?;
+            test_proof(&db, key)?;
         });
     }
 
@@ -257,7 +256,7 @@ impl TestParams {
 
     fn multiproof_of_absent_elements(&self) {
         let db = TemporaryDB::new();
-        let keys_strategy = data_for_absent(self.key_bytes());
+        let keys_strategy = absent_keys(self.key_bytes());
         let data_strategy = index_data(self.key_bytes(), self.index_sizes());
         proptest!(self.config(), |(keys in keys_strategy, data in data_strategy)| {
             write_data(&db, data);
@@ -268,7 +267,7 @@ impl TestParams {
     fn mixed_multiproof(&self) {
         let db = TemporaryDB::new();
         let strategy = data_for_multiproof(self.key_bytes(), self.index_sizes());
-        let absent_keys_strategy = data_for_absent(self.key_bytes());
+        let absent_keys_strategy = absent_keys(self.key_bytes());
         proptest!(
             self.config(),
             |((mut keys, data) in strategy, absent_keys in absent_keys_strategy)| {

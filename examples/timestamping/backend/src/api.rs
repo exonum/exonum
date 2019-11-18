@@ -45,7 +45,6 @@ pub struct TimestampProof {
     /// Actual state hashes of the timestamping service with their proofs.
     pub state_proof: MapProof<IndexCoordinates, Hash>,
     /// Actual state of the timestamping database with proofs.
-    //TODO: revert change to Raw after refactoring
     pub timestamp_proof: MapProof<Hash, TimestampEntry, Raw>,
 }
 
