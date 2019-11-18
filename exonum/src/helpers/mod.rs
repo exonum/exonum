@@ -17,10 +17,9 @@
 pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
 
 pub mod config;
+#[doc(hidden)] // TODO Reimplement as part of the Supervisor service [ECR-3823]
 pub mod multisig;
 pub mod user_agent;
-#[macro_use]
-pub mod metrics;
 
 use env_logger::Builder;
 use log::SetLoggerError;

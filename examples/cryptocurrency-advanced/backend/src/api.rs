@@ -17,8 +17,9 @@
 use exonum_merkledb::{ListProof, MapProof};
 
 use exonum::{
-    blockchain::{BlockProof, IndexProof, TransactionMessage},
+    blockchain::{BlockProof, IndexProof},
     crypto::{Hash, PublicKey},
+    messages::{AnyTx, Verified},
     runtime::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
@@ -46,7 +47,7 @@ pub struct WalletHistory {
     /// Proof of the list of transaction hashes.
     pub proof: ListProof<Hash>,
     /// List of above transactions.
-    pub transactions: Vec<TransactionMessage>,
+    pub transactions: Vec<Verified<AnyTx>>,
 }
 
 /// Wallet information.

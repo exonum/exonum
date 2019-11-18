@@ -43,6 +43,8 @@ impl fmt::Debug for ApiManager {
 }
 
 impl ApiManager {
+    /// Creates a new API manager instance with the specified runtime configuration and
+    /// the receiver of the `UpdateEndpoints` events.
     pub fn new(
         runtime_config: SystemRuntimeConfig,
         endpoints_rx: mpsc::Receiver<UpdateEndpoints>,

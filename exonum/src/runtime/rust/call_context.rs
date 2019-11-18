@@ -44,6 +44,7 @@ impl<'a> CallContext<'a> {
         &self.inner.caller
     }
 
+    /// Returns a descriptor of the executing service instance.
     pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
     }
@@ -145,7 +146,12 @@ impl<'a> CallContext<'a> {
         CoreSchema::new(self.inner.fork)
     }
 
-    /// Marks an artifact as *registered*, i.e., one which service instances can be deployed from.
+    /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
+    ///
+    /// If / when a block with this instruction is accepted, artifact deployment becomes
+    /// a requirement for all nodes in the network. A node that did not successfully
+    /// deploy the artifact previously blocks until the artifact is deployed successfully.
+    /// If a node cannot deploy the artifact, it panics.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]

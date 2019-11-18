@@ -302,6 +302,7 @@ impl NodeConfig {
         }
     }
 
+    /// Returns a service key pair of the node.
     pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
         (self.keys.service_pk(), self.keys.service_sk().clone())
     }
@@ -958,6 +959,7 @@ impl Node {
         Self::with_blockchain(blockchain, channel, node_cfg, config_file_path)
     }
 
+    /// Creates a node for the given blockchain and node configuration.
     pub fn with_blockchain(
         blockchain: BlockchainMut,
         channel: NodeChannel,

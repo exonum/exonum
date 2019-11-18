@@ -19,12 +19,13 @@ use exonum::{
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
+    node::ApiSender,
     runtime::{
         rust::{CallContext, Service},
         AnyTx, InstanceId,
     },
 };
-use exonum_merkledb::ObjectHash;
+use exonum_merkledb::{ObjectHash, TemporaryDB};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
 
@@ -114,9 +115,12 @@ pub fn consensus_keys() -> (PublicKey, SecretKey) {
 
 /// Creates a blockchain with no blocks.
 pub fn create_blockchain() -> BlockchainMut {
-    let mut blockchain = Blockchain::build_for_tests();
     let config = generate_testnet_config(1, 0)[0].clone();
-    blockchain.service_keypair = config.service_keypair();
+    let blockchain = Blockchain::new(
+        TemporaryDB::new(),
+        config.service_keypair(),
+        ApiSender::closed(),
+    );
 
     let services =
         vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];

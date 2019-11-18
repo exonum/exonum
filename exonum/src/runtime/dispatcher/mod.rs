@@ -23,7 +23,7 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    blockchain::{Blockchain, FatalError},
+    blockchain::Blockchain,
     crypto::Hash,
     helpers::ValidateInput,
     merkledb::BinaryValue,
@@ -178,10 +178,7 @@ impl Dispatcher {
                 .unwrap_or_else(|e| {
                     // In this case artifact deployment error is fatal because there are
                     // confirmation that this node can deploy this artifact.
-                    panic!(FatalError::new(format!(
-                        "Unable to deploy registered artifact. {}",
-                        e
-                    )))
+                    panic!("Unable to deploy registered artifact. {}", e)
                 });
         }
     }
@@ -376,13 +373,13 @@ impl Mailbox {
     }
 }
 
-type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError>>;
+type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError> + Send>;
 
 pub enum Action {
     StartDeploy {
         artifact: ArtifactId,
         spec: Vec<u8>,
-        and_then: Box<dyn FnOnce() -> ExecutionFuture>,
+        and_then: Box<dyn FnOnce() -> ExecutionFuture + Send>,
     },
 }
 

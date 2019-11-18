@@ -30,7 +30,7 @@
 //! The format of an artifact ID is uniform across runtimes (it is essentially a string),
 //! but the runtime may customize artifact deployment via runtime-specific deployment arguments.
 //!
-//! # Service Lifecycle
+//! # Artifact Lifecycle
 //!
 //! 1. An artifact is assembled in a way specific to the runtime. For example, the artifact may
 //!   be compiled from sources and packaged using an automated build system.
@@ -41,19 +41,42 @@
 //!   What deployment entails depends on the runtime; e.g., the artifact may be downloaded
 //!   by each Exonum node, verified for integrity and then added into the execution environment.
 //!
-//! 3. Once the artifact is deployed, it is possible to instantiate a corresponding service.
+//! 3. For each node, an artifact may be deployed either asynchronously or synchronously /
+//!   in a blocking manner. The supervisor usually first commands a node to deploy the artifact
+//!   asynchronously via [`Mailbox`] once the decision to start deployment is reached
+//!   by the blockchain administrators. Async deployment speed and outcome may differ among nodes.
+//!
+//! 4. The supervisor translates local deployment outcomes into a consensus-agreed result.
+//!   For example, the supervisor may collect confirmations from the validator nodes that have
+//!   successfully deployed the artifact, and once all the validator nodes have sent
+//!   their confirmations, the artifact is *committed*. Being part of the service logic,
+//!   artifact commitment is completely deterministic, agreed via consensus,
+//!   and occurs at the same blockchain height for all nodes in the network.
+//!
+//! 5. Once the artifact is committed, every node in the network is required to have it deployed
+//!   in order to continue functioning.
+//!   If a node has not deployed the artifact previously, deployment becomes blocking; the node
+//!   does not participate in consensus or block processing until the deployment is completed
+//!   successfully. If the deployment is unsuccessful, the node stops indefinitely.
+//!   Due to deployment confirmation mechanics built into the supervisor, it is reasonable
+//!   to assume that a deployment failure at this stage is local to the node and
+//!   could be fixed by the node admin.
+//!
+//! # Service Lifecycle
+//!
+//! 1. Once the artifact is committed, it is possible to instantiate a corresponding service.
 //!   Each instantiation request contains an ID of a previously deployed artifact,
 //!   a string instance ID, and instantiation arguments in a binary encoding
 //!   (by convention, Protobuf). As with the artifacts, the logic controlling instantiation
 //!   is encapsulated in the supervisor service.
 //!
-//! 4. During instantiation, the service is assigned a numeric ID, which is used to reference
+//! 2. During instantiation, the service is assigned a numeric ID, which is used to reference
 //!   the service in transactions. The runtime can execute initialization logic defined
 //!   in the service artifact; e.g., the service may store some initial data in the storage,
 //!   check service dependencies, etc. The service (or the enclosing runtime) may signal that
 //!   the initialization failed, in which case the service is considered not instantiated.
 //!
-//! 5. Once the service is instantiated, it can process transactions and interact with the
+//! 3. Once the service is instantiated, it can process transactions and interact with the
 //!   external users in other ways. Different services instantiated from the same artifact
 //!   are independent and have separate blockchain storages. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
@@ -104,6 +127,7 @@
 //! [execution status]: error/struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
+//! [`Mailbox`]: struct.Mailbox.html
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
@@ -186,6 +210,22 @@ impl From<RuntimeIdentifier> for u32 {
 /// The ordering for the "readonly" methods `is_artifact_deployed` and `state_hashes` in relation
 /// to the lifecycle above is not specified.
 ///
+/// # Consensus and Local Methods
+///
+/// The following methods should return the same result given the same arguments for all nodes
+/// in the blockchain network:
+///
+/// - `execute`
+/// - `before_commit`
+/// - `start_adding_service`
+/// - `state_hashes`
+///
+/// All these methods except for `state_hashes` should also produce the same changes
+/// to the storage via provided `ExecutionContext`. Discrepancy in node behavior within
+/// these methods may lead to a consensus failure.
+///
+/// The other `Runtime` methods may execute logic specific to the node.
+///
 /// # Handling Panics
 ///
 /// Unless specified in the method docs, a panic in the `Runtime` methods will **not** be caught
@@ -219,6 +259,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - For newly added artifacts, the method is called as the decision to deploy the artifact
     ///   is made by the supervisor service.
     /// - After a node restart, the method is called for all previously deployed artifacts.
+    // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
@@ -256,9 +297,14 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// # Return value
     ///
     /// The `Runtime` should catch all panics except for `FatalError`s and convert
-    /// them into an `ExecutionError`. A returned error or panic implies that service instantiation
-    /// has failed; as a rule of a thumb, changes made by the method will be rolled back
-    /// (the exact logic is determined by the supervisor).
+    /// them into an `ExecutionError`.
+    ///
+    /// Returning an error or panicking provides a way for the `Runtime` to signal that
+    /// service instantiation has failed. As a rule of a thumb, changes made by the method
+    /// will be rolled back after such a signal (the exact logic is determined by the supervisor).
+    /// Because an error is one of expected / handled outcomes, verifying prerequisites
+    /// for instantiation and reporting corresponding failures should be performed at this stage
+    /// rather than in `commit_service`.
     fn start_adding_service(
         &self,
         context: ExecutionContext<'_>,
@@ -294,10 +340,12 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// # Return value
     ///
-    /// Any error or panic returned from this method should be considered fatal. There are edge
-    /// cases where the returned error does not stop the enclosing process (e.g.,
-    /// if several alternative initial service configurations are tried), but as a rule of thumb,
-    /// a `Runtime` should not return an error or panic here unless it wants the node to stop forever.
+    /// An error or panic returned from this method will not be processed and will lead
+    /// to the node stopping. A runtime should only return an error / panic if the error is local
+    /// to the node with reasonable certainty, rather than common to all nodes in the network.
+    /// (The latter kind of errors should be produced during the preceding `start_adding_service`
+    /// call.) The error should contain a description allowing the node administrator to determine
+    /// the root cause of the error and (ideally) recover the node by eliminating it.
     fn commit_service(
         &mut self,
         snapshot: &dyn Snapshot,

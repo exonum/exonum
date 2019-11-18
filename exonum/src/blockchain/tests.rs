@@ -23,8 +23,7 @@ use std::{collections::BTreeMap, panic, sync::Mutex};
 
 use crate::{
     blockchain::{
-        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, FatalError,
-        InstanceCollection, Schema,
+        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
@@ -556,6 +555,7 @@ fn test_dispatcher_already_deployed() {
 }
 
 #[test]
+#[should_panic(expected = "Unable to deploy registered artifact")]
 fn test_dispatcher_register_unavailable() {
     let keypair = crypto::gen_keypair();
     let mut blockchain = create_blockchain(vec![
@@ -584,19 +584,10 @@ fn test_dispatcher_register_unavailable() {
         .contains(&artifact_id.name));
     assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
     // Tests that an unavailable artifact will not be registered.
-    let error_string = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        execute_transaction(
-            &mut blockchain,
-            TestDeploy { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
-        )
-        .0
-    }))
-    .unwrap_err()
-    .downcast_ref::<FatalError>()
-    .unwrap()
-    .to_string();
-
-    assert!(error_string.contains("Unable to deploy registered artifact"));
+    execute_transaction(
+        &mut blockchain,
+        TestDeploy { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
 }
 
 #[test]

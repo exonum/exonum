@@ -15,7 +15,7 @@
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{DeriveInput, Ident, Lit, NestedMeta, Path};
+use syn::{DeriveInput, Generics, Ident, Lit, NestedMeta, Path};
 
 use super::CratePath;
 
@@ -52,12 +52,16 @@ struct ServiceDispatcher {
     #[darling(rename = "crate", default)]
     cr: CratePath,
     implements: ServiceInterfaces,
+    #[darling(default)]
+    generics: Generics,
 }
 
 impl ToTokens for ServiceDispatcher {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let service_name = &self.ident;
         let cr = &self.cr;
+
+        let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
         let match_arms = self.implements.0.iter().map(|trait_name| {
             let interface_trait = quote! {
@@ -72,7 +76,7 @@ impl ToTokens for ServiceDispatcher {
         });
 
         let expanded = quote! {
-            impl #cr::runtime::rust::ServiceDispatcher for #service_name {
+            impl #impl_generics #cr::runtime::rust::ServiceDispatcher for #service_name #ty_generics #where_clause  {
                 fn call(
                     &self,
                     interface_name: &str,

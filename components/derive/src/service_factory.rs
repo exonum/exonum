@@ -16,7 +16,7 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use semver::Version;
-use syn::{DeriveInput, Ident, Path};
+use syn::{DeriveInput, Generics, Ident, Path};
 
 use super::CratePath;
 
@@ -56,6 +56,8 @@ struct ServiceFactory {
     proto_sources: Option<Path>,
     #[darling(default)]
     service_constructor: Option<Path>,
+    #[darling(default)]
+    generics: Generics,
 }
 
 impl ServiceFactory {
@@ -124,9 +126,10 @@ impl ToTokens for ServiceFactory {
         let artifact_id = self.artifact_id();
         let artifact_protobuf_spec = self.artifact_protobuf_spec();
         let service_constructor = self.service_constructor();
+        let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
         let expanded = quote! {
-            impl #cr::runtime::rust::ServiceFactory for #name {
+            impl #impl_generics #cr::runtime::rust::ServiceFactory for #name #ty_generics #where_clause {
                 fn artifact_id(&self) -> #cr::runtime::rust::RustArtifactId {
                     #artifact_id.parse().unwrap()
                 }

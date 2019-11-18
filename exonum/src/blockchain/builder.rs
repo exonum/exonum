@@ -33,6 +33,7 @@ use crate::{
 // TODO: refine interface [ECR-3744]
 #[derive(Debug)]
 pub struct BlockchainBuilder {
+    /// Underlying shared blockchain instance.
     pub blockchain: Blockchain,
     /// List of the supported runtimes.
     pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
@@ -54,7 +55,7 @@ impl BlockchainBuilder {
         }
     }
 
-    /// Add the built-in Rust runtime with the specified built-in services.
+    /// Adds the built-in Rust runtime with the specified built-in services.
     pub fn with_rust_runtime(
         mut self,
         api_notifier: mpsc::Sender<UpdateEndpoints>,
@@ -68,6 +69,8 @@ impl BlockchainBuilder {
         self.with_additional_runtime(runtime)
     }
 
+    /// Adds multiple runtimes with the specified identifiers and returns
+    /// a modified `Self` object for further chaining.
     pub fn with_external_runtimes(
         mut self,
         runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
@@ -78,13 +81,14 @@ impl BlockchainBuilder {
         self
     }
 
-    /// Add an additional runtime with the specified identifier.
+    /// Adds an additional runtime with the specified identifier and returns
+    /// a modified `Self` object for further chaining.
     pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
     }
 
-    /// Add instance specifications of builtin services.
+    /// Adds instance specifications of the built-in services.
     pub fn with_builtin_instances(
         mut self,
         instances: impl IntoIterator<Item = InstanceConfig>,
@@ -134,6 +138,7 @@ pub struct InstanceConfig {
 }
 
 impl InstanceConfig {
+    /// Creates new instantiation parameters of the service instance.
     pub fn new(
         instance_spec: InstanceSpec,
         artifact_spec: Option<Vec<u8>>,

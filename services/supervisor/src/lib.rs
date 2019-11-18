@@ -25,7 +25,6 @@ pub use self::{
 
 use exonum::{
     blockchain::InstanceCollection,
-    helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
@@ -34,14 +33,26 @@ use exonum::{
 };
 use exonum_derive::*;
 
+pub mod mode;
+
 mod api;
 mod configure;
 mod errors;
 mod proto;
 mod proto_structures;
 mod schema;
-pub mod simple;
 mod transactions;
+
+/// Decentralized supervisor.
+pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
+
+/// Simple supervisor.
+pub type SimpleSupervisor = Supervisor<mode::Simple>;
+
+/// Returns the `Supervisor` entity name.
+pub const fn supervisor_name() -> &'static str {
+    Supervisor::<mode::Decentralized>::NAME
+}
 
 /// Error message emitted when the `Supervisor` is installed as a non-privileged service.
 const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged service. \
@@ -96,23 +107,68 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) {
                 );
             }
         }
+
+        ConfigChange::StartService(start_service) => {
+            log::trace!(
+                "Request add service with name {:?} from artifact {:?}",
+                start_service.name,
+                start_service.artifact
+            );
+            if let Err(e) = context.start_adding_service(
+                start_service.artifact,
+                start_service.name,
+                start_service.config,
+            ) {
+                // Panic will cause changes to be rolled back.
+                panic!(
+                    "An error occurred while starting the service instance: {:?}",
+                    e
+                );
+            }
+        }
     })
 }
 
-#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements("transactions::SupervisorInterface"))]
-#[service_factory(proto_sources = "proto", artifact_name = "exonum-supervisor")]
-pub struct Supervisor;
-
-impl Supervisor {
-    /// Name of the supervisor service.
-    pub const NAME: &'static str = "supervisor";
+#[service_factory(
+    proto_sources = "proto",
+    artifact_name = "exonum-supervisor",
+    service_constructor = "Self::construct"
+)]
+pub struct Supervisor<Mode>
+where
+    Mode: mode::SupervisorMode,
+{
+    phantom: std::marker::PhantomData<Mode>,
 }
 
-impl Service for Supervisor {
+impl<Mode> Supervisor<Mode>
+where
+    Mode: mode::SupervisorMode,
+{
+    /// Name of the supervisor service.
+    pub const NAME: &'static str = "supervisor";
+
+    pub fn new() -> Supervisor<Mode> {
+        Supervisor {
+            phantom: std::marker::PhantomData::<Mode>::default(),
+        }
+    }
+
+    pub fn construct(&self) -> Box<Self> {
+        Box::new(Self::new())
+    }
+}
+
+impl<Mode> Service for Supervisor<Mode>
+where
+    Mode: mode::SupervisorMode,
+{
     fn before_commit(&self, mut context: CallContext<'_>) {
         let mut schema = Schema::new(context.service_data());
         let core_schema = context.data().for_core();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
         let height = core_schema.height();
 
         // Removes pending deploy requests for which deadline was exceeded.
@@ -133,12 +189,13 @@ impl Service for Supervisor {
                 // Remove pending config proposal for which deadline was exceeded.
                 log::trace!("Removed outdated config proposal");
                 schema.pending_proposal.remove();
-            } else {
-                let confirmations = schema.config_confirms.confirmations(&entry.propose_hash);
-                let validator_count = core_schema.consensus_config().validator_keys.len();
-
-                // Apply pending config in case 2/3+1 validators voted for it.
-                if confirmations >= byzantine_quorum(validator_count) {
+            } else if entry.config_propose.actual_from == height.next() {
+                // Config should be applied at the next height.
+                if Mode::config_approved(
+                    &entry.propose_hash,
+                    &schema.config_confirms,
+                    validator_count,
+                ) {
                     log::info!(
                         "New configuration has been accepted: {:?}",
                         entry.config_propose
@@ -207,11 +264,14 @@ impl Service for Supervisor {
     }
 }
 
-impl From<Supervisor> for InstanceCollection {
-    fn from(service: Supervisor) -> Self {
+impl<Mode> From<Supervisor<Mode>> for InstanceCollection
+where
+    Mode: mode::SupervisorMode,
+{
+    fn from(service: Supervisor<Mode>) -> Self {
         InstanceCollection::new(service).with_instance(
             SUPERVISOR_INSTANCE_ID,
-            Supervisor::NAME,
+            Supervisor::<Mode>::NAME,
             Vec::default(),
         )
     }
