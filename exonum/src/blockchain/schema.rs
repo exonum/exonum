@@ -340,14 +340,14 @@ where
 pub enum SchemaOrigin {
     /// This is a Core schema.
     Core,
-    /// This is a runtime schema with the specified ID.
+    /// Schema belongs to the runtime with the specified ID.
     Runtime(u32),
     /// This is a service schema with the specified instance ID.
     Service(InstanceId),
 }
 
 impl SchemaOrigin {
-    /// Computes the index coordinates inside the schema.
+    /// Computes coordinates for a given schema index.
     pub fn coordinate_for(self, index_id: u16) -> IndexCoordinates {
         IndexCoordinates::new(self, index_id)
     }
@@ -401,8 +401,8 @@ impl IndexCoordinates {
     }
 
     // TODO Write more meaningful description [ECR-3824]
-    /// For the given index owner, returns a list of the index coordinates that match the
-    /// corresponding object hashes of the indices.
+    /// For the given schema origin, returns a list of the index coordinates that match the
+    /// corresponding hashes of the indices.
     pub fn locate(
         schema_origin: SchemaOrigin,
         object_hashes: impl IntoIterator<Item = Hash>,
