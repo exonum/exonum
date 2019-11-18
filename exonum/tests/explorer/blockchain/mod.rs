@@ -16,15 +16,15 @@
 
 use exonum::{
     blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, InstanceCollection},
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
     runtime::{
         rust::{CallContext, Service},
-        AnyTx, BlockchainData, InstanceId,
+        AnyTx, InstanceId,
     },
 };
-use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
 
@@ -103,11 +103,7 @@ impl ExplorerTransactions for MyService {
     }
 }
 
-impl Service for MyService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for MyService {}
 
 /// Generates a keypair from a fixed passphrase.
 pub fn consensus_keys() -> (PublicKey, SecretKey) {

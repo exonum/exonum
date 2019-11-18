@@ -14,7 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, SystemInfo, TemporaryDB};
 use exonum_proto::impl_binary_value_for_pb_message;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -34,7 +34,7 @@ use crate::{
     api::node::SharedNodeState,
     blockchain::{
         contains_transaction, Block, BlockProof, Blockchain, BlockchainMut, ConsensusConfig,
-        IndexCoordinates, IndexOwner, InstanceCollection, Schema, ValidatorKeys,
+        InstanceCollection, Schema, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -749,16 +749,11 @@ impl Sandbox {
         *Schema::new(&patch).last_block().state_hash()
     }
 
-    pub fn get_proof_to_index(
-        &self,
-        kind: IndexOwner,
-        id: u16,
-    ) -> MapProof<IndexCoordinates, Hash> {
+    pub fn get_proof_to_index(&self, index_name: &str) -> MapProof<String, Hash> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
-        schema
-            .state_hash_aggregator()
-            .get_proof(IndexCoordinates::new(kind, id))
+        SystemInfo::new(&snapshot)
+            .state_aggregator()
+            .get_proof(index_name.to_owned())
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {
@@ -1255,15 +1250,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::{BinaryValue, Snapshot};
+    use exonum_merkledb::BinaryValue;
 
     use crate::{
         blockchain::ExecutionError,
-        crypto::{gen_keypair_from_seed, Hash, Seed},
+        crypto::{gen_keypair_from_seed, Seed},
         proto::schema::tests::TxAfterCommit,
         runtime::{
             rust::{AfterCommitContext, CallContext, Service, Transaction},
-            AnyTx, BlockchainData, InstanceId,
+            AnyTx, InstanceId,
         },
         sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
     };
@@ -1300,10 +1295,6 @@ mod tests {
     }
 
     impl Service for AfterCommitService {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-
         fn after_commit(&self, context: AfterCommitContext<'_>) {
             let tx = TxAfterCommit::new_with_height(context.height());
             context.broadcast_signed_transaction(tx);

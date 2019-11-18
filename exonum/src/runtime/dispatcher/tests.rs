@@ -33,7 +33,7 @@ use crate::{
         dispatcher::{Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
         ArtifactId, CallInfo, Caller, DispatcherError, ExecutionContext, ExecutionError,
-        InstanceId, InstanceSpec, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
+        InstanceId, InstanceSpec, MethodId, Runtime, RuntimeIdentifier,
     },
 };
 
@@ -214,10 +214,6 @@ impl Runtime for SampleRuntime {
         } else {
             Err(SampleError::Foo.into())
         }
-    }
-
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
     }
 
     fn before_commit(
@@ -534,10 +530,6 @@ impl Runtime for ShutdownRuntime {
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
-    }
-
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
     }
 
     fn before_commit(

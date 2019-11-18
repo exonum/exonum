@@ -338,9 +338,6 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
-    /// Gets the state hashes of the every available service in the runtime.
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
-
     /// Notifies a service stored in this runtime about the end of the block, allowing it
     /// to modify the blockchain state after all transactions in the block are processed.
     ///
@@ -389,16 +386,6 @@ impl<T: Runtime> From<T> for Box<dyn Runtime> {
     fn from(value: T) -> Self {
         Box::new(value)
     }
-}
-
-/// An accessory structure that aggregates root object hashes of the service
-/// information schemas of the runtime with the root hash of the runtime information schema itself.
-#[derive(Debug, PartialEq, Default)]
-pub struct StateHashAggregator {
-    /// List of hashes of the root objects of the runtime information schemas.
-    pub runtime: Vec<Hash>,
-    /// List of hashes of the root objects of the service instances schemas.
-    pub instances: Vec<(InstanceId, Vec<Hash>)>,
 }
 
 /// The initiator of the method execution.

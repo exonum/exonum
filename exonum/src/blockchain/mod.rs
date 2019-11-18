@@ -25,7 +25,7 @@ pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection, InstanceConfig},
     config::{ConsensusConfig, ValidatorKeys},
-    schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
+    schema::{Schema, TxLocation},
 };
 
 pub mod config;
@@ -33,7 +33,7 @@ pub mod config;
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
-    Snapshot, TemporaryDB,
+    Snapshot, SystemInfo, TemporaryDB,
 };
 use failure::{format_err, Error};
 
@@ -297,28 +297,9 @@ impl BlockchainMut {
         }
 
         // Get tx & state hash.
-        let schema = Schema::new(&fork);
-        let state_hash = {
-            let mut sum_table = schema.state_hash_aggregator();
-            // Clear old state hash.
-            sum_table.clear();
-            // Collect all state hashes.
-            let state_hashes = self
-                .dispatcher
-                .state_hash(fork.snapshot_without_unflushed_changes())
-                .into_iter()
-                // Add state hash of core table.
-                .chain(IndexCoordinates::locate(
-                    IndexOwner::Core,
-                    schema.state_hash(),
-                ));
-            // Insert state hashes into the aggregator table.
-            for (coordinate, hash) in state_hashes {
-                sum_table.put(&coordinate, hash);
-            }
-            sum_table.object_hash()
-        };
-        let tx_hash = schema.block_transactions(height).object_hash();
+        let tx_hash = Schema::new(&fork).block_transactions(height).object_hash();
+        let patch = fork.into_patch();
+        let state_hash = SystemInfo::new(&patch).state_hash();
 
         // Create block.
         let block = Block::new(
@@ -334,6 +315,7 @@ impl BlockchainMut {
         // Calculate block hash.
         let block_hash = block.object_hash();
         // Update height.
+        let fork = Fork::from(patch);
         let schema = Schema::new(&fork);
         schema.block_hashes_by_height().push(block_hash);
         // Save block.

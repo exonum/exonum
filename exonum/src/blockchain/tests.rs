@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{self as crypto, Hash};
+use exonum_crypto as crypto;
 use exonum_merkledb::{
-    access::AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, Snapshot,
-    TemporaryDB,
+    access::AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, TemporaryDB,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
@@ -34,8 +33,8 @@ use crate::{
     runtime::{
         error::ErrorKind,
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
-        InstanceId, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ExecutionError, InstanceId,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -103,10 +102,6 @@ impl Service for TestDispatcherService {
             }
         }
         Ok(())
-    }
-
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
     }
 }
 
@@ -177,10 +172,6 @@ pub struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn before_commit(&self, context: CallContext<'_>) {
         let mut index = context.service_data().get_list("val");
         index.push(1);
@@ -203,10 +194,6 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn before_commit(&self, _context: CallContext<'_>) {
         panic!("42");
     }
@@ -228,10 +215,6 @@ struct ServicePanicStorageErrorImpl;
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn before_commit(&self, _context: CallContext<'_>) {
         panic!(StorageError::new("42"));
     }
@@ -272,11 +255,7 @@ impl TxResultCheckInterface for TxResultCheckService {
     }
 }
 
-impl Service for TxResultCheckService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for TxResultCheckService {}
 
 fn assert_service_execute(blockchain: &mut BlockchainMut) {
     let (_, patch) =

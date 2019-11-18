@@ -20,13 +20,10 @@ use futures::{
     Future,
 };
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt, panic,
-};
+use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    blockchain::{Blockchain, FatalError, IndexCoordinates, IndexOwner},
+    blockchain::{Blockchain, FatalError},
     crypto::Hash,
     helpers::ValidateInput,
     merkledb::BinaryValue,
@@ -135,28 +132,6 @@ impl Dispatcher {
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec, constructor)?;
         Ok(())
-    }
-
-    pub(crate) fn state_hash(
-        &self,
-        access: &dyn Snapshot,
-    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
-        let mut aggregator = HashMap::new();
-        // Inserts state hashes for the runtimes.
-        for (runtime_id, runtime) in &self.runtimes {
-            let state = runtime.state_hashes(access);
-            aggregator.extend(
-                // Runtime state hash.
-                IndexCoordinates::locate(IndexOwner::Runtime(*runtime_id), state.runtime),
-            );
-            for (instance_id, instance_hashes) in state.instances {
-                aggregator.extend(
-                    // Instance state hashes.
-                    IndexCoordinates::locate(IndexOwner::Service(instance_id), instance_hashes),
-                );
-            }
-        }
-        aggregator
     }
 
     /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy

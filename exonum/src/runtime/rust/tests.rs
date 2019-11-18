@@ -30,9 +30,8 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         error::{ErrorKind, ExecutionError},
-        BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
-        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
-        StateHashAggregator,
+        CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError, DispatcherSchema,
+        ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
     },
 };
 
@@ -166,10 +165,6 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.inner.execute(context, call_info, arguments)
     }
 
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
-        self.inner.state_hashes(snapshot)
-    }
-
     fn before_commit(
         &self,
         context: ExecutionContext<'_>,
@@ -284,10 +279,6 @@ impl Service for TestServiceImpl {
             .get_entry("constructor_entry")
             .set(init.msg);
         Ok(())
-    }
-
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
     }
 }
 
@@ -625,10 +616,6 @@ impl Service for DependentServiceImpl {
             .exists());
 
         Ok(())
-    }
-
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
     }
 }
 

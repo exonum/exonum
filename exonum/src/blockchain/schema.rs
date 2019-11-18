@@ -14,20 +14,17 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
-    BinaryKey, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
+    Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
 };
 
 use exonum_proto::ProtobufConvert;
 
-use std::mem;
-
 use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 use crate::{
-    crypto::{self, Hash, PublicKey},
+    crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     proto,
-    runtime::InstanceId,
 };
 
 /// Defines `&str` constants with given name and value.
@@ -52,7 +49,6 @@ define_names!(
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
     PRECOMMITS => "precommits";
-    STATE_HASH_AGGREGATOR => "state_hash_aggregator";
     PEERS_CACHE => "peers_cache";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
@@ -182,26 +178,8 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an actual consensus configuration entry.
-    pub fn consensus_config_entry(&self) -> Entry<T::Base, ConsensusConfig> {
-        self.access.clone().get_entry(CONSENSUS_CONFIG)
-    }
-
-    /// Returns the accessory `ProofMapIndex` for calculating
-    /// patches in the DBView layer.
-    ///
-    /// The table calculates the "aggregation" of root hashes of individual
-    /// service tables, in effect summing the state of various entities,
-    /// scattered across distinct services and their tables. Sum is performed by
-    /// means of computing the root hash of this table.
-    ///
-    /// - Table **key** is  normalized coordinates of a service.
-    /// - Table **value** is the root hash of a service table, which contributes
-    /// to the `state_hash` of the resulting block.
-    ///
-    /// Core tables participate in the resulting state_hash with `CORE_ID`
-    /// service_id. Their vector is returned by the `core_state_hash` method.
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T::Base, IndexCoordinates, Hash> {
-        self.access.clone().get_proof_map(STATE_HASH_AGGREGATOR)
+    pub fn consensus_config_entry(&self) -> ProofEntry<T::Base, ConsensusConfig> {
+        self.access.clone().get_proof_entry(CONSENSUS_CONFIG)
     }
 
     /// Returns peers that have to be recovered in case of process restart
@@ -334,143 +312,5 @@ where
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum IndexOwner {
-    /// This index is part of core schema.
-    Core,
-    /// This index is a part of runtime schema.
-    Runtime(u32),
-    /// This index is a part of some service schema.
-    Service(InstanceId),
-}
-
-impl IndexOwner {
-    /// Creates index coordinate for the current owner.
-    pub fn coordinate_for(self, index_id: u16) -> IndexCoordinates {
-        IndexCoordinates::new(self, index_id)
-    }
-
-    /// Returns the corresponding tag.
-    fn tag(self) -> IndexTag {
-        match self {
-            IndexOwner::Core => IndexTag::Core,
-            IndexOwner::Runtime { .. } => IndexTag::Runtime,
-            IndexOwner::Service { .. } => IndexTag::Service,
-        }
-    }
-
-    /// Returns the corresponding group id.
-    fn group_id(self) -> u32 {
-        match self {
-            IndexOwner::Service(instance_id) => instance_id,
-            IndexOwner::Runtime(runtime_id) => runtime_id,
-            IndexOwner::Core => 0,
-        }
-    }
-}
-
-/// Binary value for the corresponding index owner.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[repr(u16)]
-enum IndexTag {
-    Core = 0,
-    Runtime = 2,
-    Service = 3,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct IndexCoordinates {
-    tag: u16,
-    group_id: u32,
-    index_id: u16,
-}
-
-impl IndexCoordinates {
-    /// Creates index coordinated for the index with the specified owner and identifier.
-    pub fn new(owner: IndexOwner, index_id: u16) -> Self {
-        Self {
-            tag: owner.tag() as u16,
-            group_id: owner.group_id(),
-            index_id,
-        }
-    }
-
-    pub fn locate(
-        owner: IndexOwner,
-        object_hashes: impl IntoIterator<Item = Hash>,
-    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
-        object_hashes
-            .into_iter()
-            .enumerate()
-            .map(move |(id, hash)| (owner.coordinate_for(id as u16), hash))
-    }
-
-    pub fn owner(self) -> IndexOwner {
-        match self.tag {
-            0 => IndexOwner::Core,
-            2 => IndexOwner::Runtime(self.group_id),
-            3 => IndexOwner::Service(self.group_id),
-            other => panic!("Unknown index owner: {}!", other),
-        }
-    }
-}
-
-impl BinaryKey for IndexCoordinates {
-    fn size(&self) -> usize {
-        mem::size_of_val(self)
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        let mut pos = 0;
-        pos += self.tag.write(&mut buffer[pos..]);
-        pos += self.group_id.write(&mut buffer[pos..]);
-        pos += self.index_id.write(&mut buffer[pos..]);
-        pos
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        let tag = u16::read(&buffer[0..2]);
-        let group_id = u32::read(&buffer[2..6]);
-        let index_id = u16::read(&buffer[6..8]);
-        Self {
-            tag,
-            group_id,
-            index_id,
-        }
-    }
-}
-
-impl ObjectHash for IndexCoordinates {
-    fn object_hash(&self) -> Hash {
-        let mut bytes = vec![0; self.size()];
-        self.write(&mut bytes);
-        crypto::hash(&bytes)
-    }
-}
-
-#[test]
-fn test_index_coordinates_binary_key_round_trip() {
-    let index_owners = vec![
-        (IndexOwner::Runtime(0), 0),
-        (IndexOwner::Runtime(0), 5),
-        (IndexOwner::Runtime(1), 0),
-        (IndexOwner::Runtime(1), 2),
-        (IndexOwner::Service(2), 0),
-        (IndexOwner::Service(2), 1),
-        (IndexOwner::Service(0), 0),
-        (IndexOwner::Service(0), 1),
-    ];
-
-    for (owner, id) in index_owners {
-        let coordinate = IndexCoordinates::new(owner, id);
-        let mut buf = vec![0; coordinate.size()];
-        coordinate.write(&mut buf);
-
-        let coordinate2 = IndexCoordinates::read(&buf);
-        assert_eq!(coordinate, coordinate2);
-        assert_eq!(coordinate2.owner(), owner);
     }
 }

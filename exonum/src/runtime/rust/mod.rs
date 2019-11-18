@@ -54,7 +54,6 @@ use std::{
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{Blockchain, Schema as CoreSchema},
-    crypto::Hash,
     helpers::Height,
 };
 
@@ -63,7 +62,7 @@ use super::{
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    InstanceSpec, Runtime, RuntimeIdentifier,
 };
 
 mod api;
@@ -103,11 +102,6 @@ impl Instance {
             id: self.id,
             name: &self.name,
         }
-    }
-
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
-        let blockchain_data = BlockchainData::new(snapshot, self.descriptor());
-        (self.id, self.service.state_hash(blockchain_data))
     }
 }
 
@@ -401,17 +395,6 @@ impl Runtime for RustRuntime {
             CallContext::new(context, descriptor),
             payload,
         )
-    }
-
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator {
-            runtime: Vec::new(),
-            instances: self
-                .started_services
-                .values()
-                .map(|service| service.state_hash(snapshot))
-                .collect(),
-        }
     }
 
     fn before_commit(

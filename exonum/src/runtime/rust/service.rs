@@ -18,7 +18,7 @@ use futures::IntoFuture;
 use std::fmt::{self, Debug};
 
 use crate::{
-    crypto::{Hash, PublicKey, SecretKey},
+    crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::Verified,
     node::ApiSender,
@@ -64,21 +64,6 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
-
-    /// Returns a list of root hashes of the Merkelized tables defined by the provided instance,
-    /// based on the given snapshot of the blockchain state.
-    ///
-    /// The core uses this list to [aggregate][1] hashes of tables defined by every service into a
-    /// single Merkelized meta-map.
-    /// The hash of this meta-map is considered as the hash of the entire blockchain [state][2] and
-    /// is recorded as such in blocks and Precommit messages.
-    ///
-    /// [See also.][3]
-    ///
-    /// [1]: ../struct.StateHashAggregator.html
-    /// [2]: ../../blockchain/struct.Block.html#structfield.state_hash
-    /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash>;
 
     /// Performs storage operations on behalf of the service before committing the block.
     ///
