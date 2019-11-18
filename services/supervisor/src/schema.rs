@@ -15,7 +15,7 @@
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
 use exonum_merkledb::{
     access::{Access, FromAccess, Prefixed},
-    Entry, ObjectHash, ProofMapIndex,
+    Entry, Fork, ObjectHash, ProofMapIndex,
 };
 
 use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
@@ -29,6 +29,7 @@ pub struct Schema<T: Access> {
     pub pending_instances: ValidatorMultisig<T, StartService>,
     pub config_confirms: ValidatorMultisig<T, Hash>,
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
+    pub configuration_number: Entry<T::Base, u64>,
 }
 
 impl<'a, T: Access> Schema<Prefixed<'a, T>> {
@@ -51,8 +52,15 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
                 .unwrap(),
             config_confirms: FromAccess::from_access(access.clone(), "config_confirms".into())
                 .unwrap(),
-            pending_proposal: FromAccess::from_access(access, "pending_proposal".into()).unwrap(),
+            pending_proposal: FromAccess::from_access(access.clone(), "pending_proposal".into())
+                .unwrap(),
+            configuration_number: FromAccess::from_access(access, "configuration_number".into())
+                .unwrap(),
         }
+    }
+
+    pub fn get_configuration_number(&self) -> u64 {
+        self.configuration_number.get().unwrap_or(0)
     }
 
     /// Returns hashes for tables with proofs.
@@ -64,5 +72,12 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
             self.pending_instances.object_hash(),
             self.config_confirms.object_hash(),
         ]
+    }
+}
+
+impl Schema<Prefixed<'_, &Fork>> {
+    pub fn increase_configuration_number(&mut self) {
+        let new_configuration_number = self.configuration_number.get().unwrap_or(0) + 1;
+        self.configuration_number.set(new_configuration_number);
     }
 }

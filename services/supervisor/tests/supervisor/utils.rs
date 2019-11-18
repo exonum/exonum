@@ -27,7 +27,8 @@ use crate::{
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
 use exonum_supervisor::{
-    ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
+    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, DecentralizedSupervisor, Schema,
+    ServiceConfig,
 };
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(2);
@@ -37,7 +38,7 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
-    let snapshot = snapshot.for_service(Supervisor::NAME).unwrap();
+    let snapshot = snapshot.for_service(supervisor_name()).unwrap();
     Schema::new(snapshot)
         .pending_proposal
         .get()
@@ -83,8 +84,16 @@ impl ConfigProposeBuilder {
             config_propose: ConfigPropose {
                 actual_from: cfg_change_height,
                 changes: vec![],
+                // As in the common cases we test only one config, it's ok
+                // to have default value of 0 for test purposes.
+                configuration_number: 0,
             },
         }
+    }
+
+    pub fn configuration_number(mut self, configuration_number: u64) -> Self {
+        self.config_propose.configuration_number = configuration_number;
+        self
     }
 
     pub fn extend_consensus_config_propose(mut self, consensus_config: ConsensusConfig) -> Self {
@@ -139,7 +148,7 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
+        .with_rust_service(DecentralizedSupervisor::new())
         .create()
 }
 
@@ -149,7 +158,7 @@ pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
         InstanceCollection::new(service).with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
+        .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(collection)
         .create()
 }
@@ -161,7 +170,7 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
         .with_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
+        .with_rust_service(DecentralizedSupervisor::new())
         .with_rust_service(collection)
         .create()
 }

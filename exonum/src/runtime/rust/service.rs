@@ -233,7 +233,9 @@ impl<'a> AfterCommitContext<'a> {
         self.tx_sender.clone()
     }
 
-    /// Provides a supervisor interface to an authorized instance.
+    /// Provides a privileged interface to the supervisor service.
+    ///
+    /// `None` will be returned if the caller is not a supervisor.
     #[doc(hidden)]
     pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions<'_>> {
         if !is_supervisor(self.instance.id) {
@@ -258,9 +260,10 @@ impl SupervisorExtensions<'_> {
         &mut self,
         artifact: ArtifactId,
         spec: impl BinaryValue,
-        and_then: impl FnOnce() -> F + 'static,
+        and_then: impl FnOnce() -> F + 'static + Send,
     ) where
-        F: IntoFuture<Item = (), Error = ExecutionError> + 'static,
+        F: IntoFuture<Item = (), Error = ExecutionError>,
+        F::Future: 'static + Send,
     {
         let action = Action::StartDeploy {
             artifact,

@@ -57,10 +57,6 @@ mod schema;
 #[cfg(test)]
 pub mod tests;
 
-/// Transaction message shortcut.
-// TODO It seems that this shortcut should be removed [ECR-3222]
-pub type TransactionMessage = Verified<AnyTx>;
-
 /// Shared Exonum blockchain instance.
 ///
 /// This is essentially a smart pointer to shared blockchain resources (storage,
@@ -70,11 +66,9 @@ pub type TransactionMessage = Verified<AnyTx>;
 /// [`BlockchainMut`]: struct.BlockchainMut.html
 #[derive(Debug, Clone)]
 pub struct Blockchain {
-    pub(crate) db: Arc<dyn Database>,
-    // FIXME fix visibility [ECR-3222]
-    #[doc(hidden)]
-    pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
+    db: Arc<dyn Database>,
+    service_keypair: (PublicKey, SecretKey),
 }
 
 impl Blockchain {

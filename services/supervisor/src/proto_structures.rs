@@ -28,7 +28,7 @@ use exonum_derive::*;
 use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
 use exonum_proto::ProtobufConvert;
 
-use super::{proto, simple::SimpleSupervisorInterface, transactions::SupervisorInterface};
+use super::{proto, transactions::SupervisorInterface};
 
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
@@ -52,7 +52,7 @@ pub struct DeployConfirmation {
 
 /// Request for the artifact deployment.
 #[protobuf_convert(source = "proto::StartService")]
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, ProtobufConvert, Hash, BinaryValue, ObjectHash)]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -60,8 +60,6 @@ pub struct StartService {
     pub name: String,
     /// Instance configuration.
     pub config: Vec<u8>,
-    /// The height until which the start service procedure should be completed.
-    pub deadline_height: Height,
 }
 
 /// Configuration parameters of the certain service instance.
@@ -104,6 +102,8 @@ pub enum ConfigChange {
     Consensus(ConsensusConfig),
     /// New service instance config.
     Service(ServiceConfig),
+    /// New service instance start request.
+    StartService(StartService),
 }
 
 /// Request for the configuration change
@@ -114,6 +114,8 @@ pub struct ConfigPropose {
     pub actual_from: Height,
     /// New configuration proposition.
     pub changes: Vec<ConfigChange>,
+    /// Configuration proposal number to avoid conflicting proposals.
+    pub configuration_number: u64,
 }
 
 impl ConfigPropose {
@@ -131,26 +133,18 @@ impl ConfigPropose {
         )
     }
 
-    /// Signs the proposal for a simple supervisor with a randomly generated keypair.
-    pub fn sign_for_simple_supervisor(
-        self,
-        public_key: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
-        Transaction::<dyn SimpleSupervisorInterface>::sign(
-            self,
-            SUPERVISOR_INSTANCE_ID,
-            public_key,
-            secret_key,
-        )
+    /// Creates a new proposal which activates at the specified height.
+    pub fn new(configuration_number: u64, actual_from: Height) -> Self {
+        Self {
+            actual_from,
+            changes: Vec::default(),
+            configuration_number,
+        }
     }
 
-    /// Creates a new proposal which activates at the specified height.
-    pub fn actual_from(height: Height) -> Self {
-        Self {
-            actual_from: height,
-            changes: Vec::default(),
-        }
+    /// Creates a new proposal which should be activated at the next height.
+    pub fn immediate(configuration_number: u64) -> Self {
+        Self::new(configuration_number, Height(0))
     }
 
     /// Adds a change of consensus configuration to this proposal.
@@ -165,6 +159,12 @@ impl ConfigPropose {
             instance_id,
             params: config.into_bytes(),
         }));
+        self
+    }
+
+    /// Adds service start request to this proposal.
+    pub fn start_service(mut self, start_service: StartService) -> Self {
+        self.changes.push(ConfigChange::StartService(start_service));
         self
     }
 }
