@@ -14,11 +14,11 @@
 
 use exonum_merkledb::{
     access::{AsReadonly, Prefixed, RawAccess},
-    Snapshot,
+    Snapshot, SystemInfo,
 };
 
 use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery};
-use crate::blockchain::Schema as CoreSchema;
+use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
 /// Provides access to blockchain data for the executing service.
 #[derive(Debug, Clone, Copy)]
@@ -65,6 +65,33 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// wraps a `Fork`.
     pub fn for_executing_service(&self) -> Prefixed<'a, T> {
         Prefixed::new(self.service_instance.name, self.access.clone())
+    }
+}
+
+impl BlockchainData<'_, &dyn Snapshot> {
+    /// Returns a proof for a Merkelized index with the specified name
+    /// in the currently executing service.
+    ///
+    /// # Return value
+    ///
+    /// If the index does not exist or is not Merkelized, returns `None`. Note that this may
+    /// occur before the index is accessed the first time, which, depending on the service logic,
+    /// may happen indefinitely after the service has been initialized. Thus, `unwrap`ping the
+    /// returned value may unexpectedly lead to a panic unless the index is initialized early
+    /// (e.g., during service initialization).
+    pub fn proof_for_service_index(&self, index_name: &str) -> Option<IndexProof> {
+        let core_schema = self.for_core();
+        let height = core_schema.height();
+        let block_proof = core_schema.block_and_precommits(height).unwrap();
+
+        let full_index_name = [self.service_instance.name, ".", index_name].concat();
+        let aggregator = SystemInfo::new(self.access).state_aggregator();
+        aggregator.get(&full_index_name)?;
+        let index_proof = aggregator.get_proof(full_index_name);
+        Some(IndexProof {
+            block_proof,
+            index_proof,
+        })
     }
 }
 

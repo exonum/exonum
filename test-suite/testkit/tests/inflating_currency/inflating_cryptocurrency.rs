@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use exonum::{
-    crypto::{Hash, PublicKey},
+    crypto::PublicKey,
     helpers::Height,
     runtime::{
         api::{self, ServiceApiBuilder},
         rust::{CallContext, Service},
-        BlockchainData, InstanceId,
+        InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess},
-    MapIndex, Snapshot,
+    MapIndex,
 };
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
@@ -211,10 +211,6 @@ pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
     }

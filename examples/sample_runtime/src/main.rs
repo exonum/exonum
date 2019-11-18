@@ -27,7 +27,7 @@ use exonum::{
     runtime::{
         rust::Transaction, AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
-        StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -192,10 +192,6 @@ impl Runtime for SampleRuntime {
                 Err(err.into())
             }
         }
-    }
-
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
     }
 
     fn before_commit(

@@ -30,11 +30,11 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::{
-    crypto::Hash,
-    runtime::{api::ServiceApiBuilder, rust::Service, BlockchainData},
+use exonum::runtime::{
+    api::ServiceApiBuilder,
+    rust::{CallContext, Service},
+    ExecutionError,
 };
-use exonum_merkledb::Snapshot;
 
 use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
 
@@ -48,8 +48,11 @@ pub const INITIAL_BALANCE: u64 = 100;
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        Schema::new(data.for_executing_service()).state_hash()
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        // Initialize indexes. Not doing this may lead to errors in HTTP API, since it relies on
+        // `wallets` indexes being initialized for returning corresponding proofs.
+        Schema::new(context.service_data());
+        Ok(())
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

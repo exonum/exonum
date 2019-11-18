@@ -16,13 +16,11 @@
 
 use exonum::{
     blockchain::InstanceCollection,
-    crypto::Hash,
     helpers::ValidateInput,
-    merkledb::Snapshot,
     runtime::{
         api::ServiceApiBuilder,
         rust::{CallContext, Service},
-        BlockchainData, DispatcherError, ExecutionError, SUPERVISOR_INSTANCE_ID,
+        DispatcherError, ExecutionError, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, IntoExecutionError, ServiceDispatcher, ServiceFactory};
@@ -115,10 +113,6 @@ impl SimpleSupervisorInterface for SimpleSupervisor {
 }
 
 impl Service for SimpleSupervisor {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        Schema::new(data.for_executing_service()).state_hash()
-    }
-
     fn before_commit(&self, mut context: CallContext<'_>) {
         let proposal = Schema::new(context.service_data())
             .config_propose

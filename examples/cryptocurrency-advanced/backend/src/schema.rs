@@ -40,11 +40,6 @@ impl<T: Access> Schema<T> {
             wallet_history: FromAccess::from_access(access, "wallet_history".into()).unwrap(),
         }
     }
-
-    /// Returns the state hash of cryptocurrency service.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.wallets.object_hash()]
-    }
 }
 
 impl<T> Schema<T>

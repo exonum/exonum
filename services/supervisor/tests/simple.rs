@@ -19,12 +19,11 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
-        SUPERVISOR_INSTANCE_ID,
+        DispatcherError, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
+use exonum_merkledb::{access::AccessExt, ObjectHash};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -70,11 +69,7 @@ impl From<ConfigChangeService> for InstanceCollection {
     }
 }
 
-impl Service for ConfigChangeService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for ConfigChangeService {}
 
 impl Configure for ConfigChangeService {
     type Params = String;

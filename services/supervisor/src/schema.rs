@@ -15,7 +15,7 @@
 use exonum::{crypto::Hash, helpers::multisig::ValidatorMultisig, runtime::ArtifactId};
 use exonum_merkledb::{
     access::{Access, FromAccess, Prefixed},
-    Entry, ObjectHash, ProofMapIndex,
+    Entry, ProofMapIndex,
 };
 
 use super::{ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService};
@@ -53,16 +53,5 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
                 .unwrap(),
             pending_proposal: FromAccess::from_access(access, "pending_proposal".into()).unwrap(),
         }
-    }
-
-    /// Returns hashes for tables with proofs.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.deploy_requests.object_hash(),
-            self.deploy_confirmations.object_hash(),
-            self.pending_deployments.object_hash(),
-            self.pending_instances.object_hash(),
-            self.config_confirms.object_hash(),
-        ]
     }
 }

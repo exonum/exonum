@@ -25,16 +25,14 @@ pub use self::{
 
 use exonum::{
     blockchain::InstanceCollection,
-    crypto::Hash,
     helpers::byzantine_quorum,
     runtime::{
         api::ServiceApiBuilder,
         rust::{AfterCommitContext, CallContext, Service, Transaction},
-        BlockchainData, SUPERVISOR_INSTANCE_ID,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::Snapshot;
 
 mod api;
 mod configure;
@@ -112,10 +110,6 @@ impl Supervisor {
 }
 
 impl Service for Supervisor {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        Schema::new(data.for_executing_service()).state_hash()
-    }
-
     fn before_commit(&self, mut context: CallContext<'_>) {
         let mut schema = Schema::new(context.service_data());
         let core_schema = context.data().for_core();

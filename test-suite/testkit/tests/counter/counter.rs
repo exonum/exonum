@@ -25,13 +25,13 @@ use exonum::{
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
         rust::{CallContext, Service},
-        BlockchainData, InstanceId,
+        InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
-    Entry, ObjectHash, Snapshot,
+    Entry, ObjectHash,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
@@ -229,10 +229,6 @@ impl CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CounterApi::wire(builder)
     }

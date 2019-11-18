@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
-    Entry, ObjectHash, ProofMapIndex,
+    Entry, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
 
@@ -83,11 +83,6 @@ impl<T: Access> Schema<T> {
             config: FromAccess::from_access(access.clone(), "config".into()).unwrap(),
             timestamps: FromAccess::from_access(access, "timestamps".into()).unwrap(),
         }
-    }
-
-    /// Returns the state hash of the timestamping service.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.timestamps.object_hash()]
     }
 }
 

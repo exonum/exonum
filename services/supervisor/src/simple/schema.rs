@@ -12,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    crypto::Hash,
-    merkledb::{
-        access::{Access, FromAccess, Prefixed},
-        Entry, ObjectHash,
-    },
+use exonum::merkledb::{
+    access::{Access, FromAccess, Prefixed},
+    ProofEntry,
 };
 
 use super::ConfigPropose;
 
 pub struct Schema<T: Access> {
-    pub config_propose: Entry<T::Base, ConfigPropose>,
+    pub config_propose: ProofEntry<T::Base, ConfigPropose>,
 }
 
 impl<'a, T: Access> Schema<Prefixed<'a, T>> {
@@ -31,9 +28,5 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
         Self {
             config_propose: FromAccess::from_access(access, "config_propose".into()).unwrap(),
         }
-    }
-
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.config_propose.object_hash()]
     }
 }

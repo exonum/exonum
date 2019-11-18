@@ -23,18 +23,18 @@ extern crate exonum_derive;
 
 use exonum_merkledb::{
     access::{Access, FromAccess},
-    ObjectHash, ProofMapIndex, Snapshot,
+    ProofMapIndex,
 };
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::ExecutionError,
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
+    crypto::{gen_keypair, PublicKey, SecretKey},
     helpers::Height,
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, Transaction},
-        AnyTx, BlockchainData, InstanceId, SnapshotExt,
+        AnyTx, InstanceId, SnapshotExt,
     },
 };
 use exonum_proto::ProtobufConvert;
@@ -69,11 +69,6 @@ impl<T: Access> MarkerSchema<T> {
         Self {
             marks: FromAccess::from_access(access, "marks".into()).unwrap(),
         }
-    }
-
-    /// Returns hashes for stored table.
-    fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks.object_hash()]
     }
 }
 
@@ -133,11 +128,7 @@ impl MarkerInterface for MarkerService {
     }
 }
 
-impl Service for MarkerService {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        MarkerSchema::new(data.for_executing_service()).state_hash()
-    }
-}
+impl Service for MarkerService {}
 
 fn main() {
     let mock_provider = Arc::new(MockTimeProvider::default());

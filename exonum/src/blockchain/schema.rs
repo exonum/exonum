@@ -255,14 +255,6 @@ impl<T: Access> Schema<T> {
             .expect("Consensus configuration is absent")
     }
 
-    /// Returns the `state_hash` table for core tables.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.consensus_config_entry().object_hash(),
-            self.transaction_results().object_hash(),
-        ]
-    }
-
     /// Attempts to find a `ValidatorId` by the provided service public key.
     pub fn validator_id(&self, service_public_key: PublicKey) -> Option<ValidatorId> {
         self.consensus_config()

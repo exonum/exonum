@@ -39,7 +39,7 @@ pub mod proto;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::crypto::{Hash, PublicKey};
+    use exonum::crypto::PublicKey;
     use exonum_merkledb::{
         access::{Access, FromAccess, Prefixed},
         MapIndex,
@@ -107,12 +107,6 @@ pub mod schema {
             Self {
                 wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
             }
-        }
-
-        /// Returns the state hash of cryptocurrency service.
-        pub fn state_hash(&self) -> Vec<Hash> {
-            // Since wallets are stored in MapIndex, there is no state hash.
-            vec![]
         }
     }
 }
@@ -188,15 +182,9 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum_merkledb::Snapshot;
-
-    use exonum::{
-        crypto::Hash,
-        runtime::{
-            api::ServiceApiBuilder,
-            rust::{CallContext, Service},
-            BlockchainData,
-        },
+    use exonum::runtime::{
+        api::ServiceApiBuilder,
+        rust::{CallContext, Service},
     };
 
     use crate::{
@@ -270,10 +258,6 @@ pub mod contracts {
     }
 
     impl Service for CryptocurrencyService {
-        fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            CurrencySchema::new(data.for_executing_service()).state_hash()
-        }
-
         fn wire_api(&self, builder: &mut ServiceApiBuilder) {
             CryptocurrencyApi.wire(builder);
         }
