@@ -29,8 +29,6 @@ use crate::{validation::assert_valid_name, BinaryValue};
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
-const AGGREGATED_INDEXES_NAME: &str = "__AGGREGATED_INDEXES__";
-
 /// Type of an index supported by Exonum.
 ///
 /// `IndexType` is used for type checking indexes when they are created/accessed.
@@ -339,22 +337,6 @@ impl<T: RawAccess> IndexesPool<T> {
     }
 }
 
-/// List with names of Merkelized indexes. The list is automatically updated.
-pub(super) struct AggregatedIndexes<T: RawAccess>(View<T>);
-
-impl<T: RawAccess> AggregatedIndexes<T> {
-    pub(crate) fn new(index_access: T) -> Self {
-        Self(View::new(
-            index_access,
-            ResolvedRef::system(AGGREGATED_INDEXES_NAME),
-        ))
-    }
-
-    fn insert(&mut self, name: &str) {
-        self.0.put_or_forget(name, ());
-    }
-}
-
 pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedRef) -> Hash {
     use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
@@ -426,11 +408,9 @@ where
 
         let mut pool = IndexesPool::new(index_access.clone());
         let mut is_phantom = false;
-        let mut is_new = false;
         let metadata = pool.index_metadata(&index_full_name).unwrap_or_else(|| {
             let (metadata, phantom_flag) = pool.create_index_metadata(&index_full_name, index_type);
             is_phantom = phantom_flag;
-            is_new = true;
             metadata
         });
         let real_index_type = metadata.index_type;
@@ -443,10 +423,6 @@ where
             && index_type.is_merkelized()
             && index_address.bytes.is_none()
             && index_address.name != STATE_AGGREGATOR;
-        if is_new && is_aggregated {
-            let mut aggregated = AggregatedIndexes::new(index_access.clone());
-            aggregated.insert(&index_address.name);
-        }
 
         let mut view = View::new(index_access, addr);
         view.set_or_forget_aggregation(is_aggregated);
@@ -494,10 +470,7 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        access::{AccessExt, Prefixed},
-        Database, TemporaryDB,
-    };
+    use crate::{Database, TemporaryDB};
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -536,34 +509,25 @@ mod tests {
 
     #[test]
     fn aggregated_indexes_updates() {
-        fn get_aggregated_indexes(access: impl RawAccess) -> Vec<String> {
-            AggregatedIndexes::new(access)
-                .0
-                .iter::<_, String, ()>(&())
-                .map(|(name, ())| name)
-                .collect()
-        }
-
         let db = TemporaryDB::new();
         let fork = db.fork();
-        fork.get_list("foo").push(1_u32);
+
         // `ListIndex` is not Merkelized.
-        assert!(get_aggregated_indexes(&fork).is_empty());
+        let view = ViewWithMetadata::get_or_create(&fork, &"foo".into(), IndexType::List)
+            .unwrap()
+            .view;
+        assert!(!view.changes.is_aggregated());
 
-        fork.get_proof_list("bar").push(1_u32);
-        assert_eq!(get_aggregated_indexes(&fork), vec!["bar".to_owned()]);
-        Prefixed::new("prefix", &fork)
-            .get_proof_map("baz")
-            .put(&1_u32, "!".to_owned());
-        let aggregated_indexes = vec!["bar".to_owned(), "prefix.baz".to_owned()];
-        assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
-
-        // Index families are not included into aggregation.
-        fork.get_proof_list(("fam", &0_u8)).push(1_u32);
-        assert_eq!(get_aggregated_indexes(&fork), aggregated_indexes);
-
-        db.merge_sync(fork.into_patch()).unwrap();
-        let snapshot = db.snapshot();
-        assert_eq!(get_aggregated_indexes(&snapshot), aggregated_indexes);
+        // Single `ProofListIndex` is aggregated.
+        let view = ViewWithMetadata::get_or_create(&fork, &"bar".into(), IndexType::ProofList)
+            .unwrap()
+            .view;
+        assert!(view.changes.is_aggregated());
+        // ...but a `ProofListIndex` in a family isn't.
+        let view =
+            ViewWithMetadata::get_or_create(&fork, &("baz", &0_u8).into(), IndexType::ProofList)
+                .unwrap()
+                .view;
+        assert!(!view.changes.is_aggregated());
     }
 }

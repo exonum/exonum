@@ -36,7 +36,7 @@ mod tests;
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
 pub struct View<T: RawAccess> {
-    address: ResolvedRef, // TODO: remove?
+    address: ResolvedRef,
     index_access: T,
     changes: T::Changes,
 }

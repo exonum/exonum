@@ -48,6 +48,11 @@ impl ViewChanges {
         self.is_cleared
     }
 
+    #[cfg(test)]
+    pub fn is_aggregated(&self) -> bool {
+        self.is_aggregated
+    }
+
     pub fn clear(&mut self) {
         self.data.clear();
         self.is_cleared = true;

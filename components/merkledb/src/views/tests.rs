@@ -15,7 +15,7 @@
 use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
-use std::{panic, rc::Rc};
+use std::{num::NonZeroU64, panic, rc::Rc};
 
 use crate::{
     access::AccessExt,
@@ -27,6 +27,17 @@ use crate::{
 
 const IDX_NAME: &str = "idx_name";
 const PREFIXED_IDX: (&str, u64) = ("idx", 42);
+
+// Conversion to simplify `ResolvedRef` instantiation for tests. This conversion
+// is not used in the main code, so it's intentionally placed here.
+impl From<(&str, u64)> for ResolvedRef {
+    fn from((name, id): (&str, u64)) -> Self {
+        Self {
+            name: name.to_owned(),
+            id: NonZeroU64::new(id),
+        }
+    }
+}
 
 fn assert_iter<T: RawAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     let mut iter = view.iter_bytes(&[from]);

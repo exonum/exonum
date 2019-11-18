@@ -165,20 +165,11 @@ pub struct ResolvedRef {
     pub id: Option<NonZeroU64>,
 }
 
-#[cfg(test)] // All user-created indexes should have an ID set.
+// This conversion is only useful for tests, since all user-created indexes should have an ID set.
+#[cfg(test)]
 impl From<&str> for ResolvedRef {
     fn from(name: &str) -> Self {
         Self::system(name)
-    }
-}
-
-#[cfg(test)]
-impl From<(&str, u64)> for ResolvedRef {
-    fn from((name, id): (&str, u64)) -> Self {
-        Self {
-            name: name.to_owned(),
-            id: NonZeroU64::new(id),
-        }
     }
 }
 

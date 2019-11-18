@@ -80,7 +80,7 @@ impl<T: RawAccess + AsReadonly> SystemInfo<T> {
     ///
     /// See [state aggregation] for details how the database state is aggregated.
     ///
-    /// [state aggregation]: index.html#state-aggregati
+    /// [state aggregation]: index.html#state-aggregation
     pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
         self.0.as_readonly().get_proof_map(STATE_AGGREGATOR)
     }
