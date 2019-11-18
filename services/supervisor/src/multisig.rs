@@ -15,10 +15,6 @@
 //! Helper module for multisignature transactions.
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
-    BinaryKey, BinaryValue, IndexAddress, ObjectHash, ProofMapIndex,
-};
 
 use std::{
     borrow::Cow,
@@ -27,8 +23,13 @@ use std::{
     io::{Cursor, Write},
 };
 
-use exonum::crypto::{self, Hash, PublicKey};
-use exonum_merkledb::access::AccessError;
+use exonum::{
+    crypto::{self, Hash, PublicKey},
+    merkledb::{
+        access::{Access, AccessError, FromAccess, RawAccessMut},
+        BinaryKey, BinaryValue, IndexAddress, ObjectHash, ProofMapIndex,
+    },
+};
 
 /// A set of binary values.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
