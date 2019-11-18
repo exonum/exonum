@@ -131,7 +131,7 @@ pub trait AccessExt: Access {
     /// // Hashed variant for keys implementing `ObjectHash`.
     /// let hashed_map: ProofMapIndex<&Fork, u32, u32, Hashed> = fork.get_generic_proof_map("hashed");
     ///
-    /// // Raw variant for keys that maps directly to `ProofPath`.
+    /// // Raw variant for keys that can be mapped directly to `ProofPath`.
     /// let raw_map: ProofMapIndex<&Fork, PublicKey, u32, Raw> = fork.get_generic_proof_map("raw");
     /// ```
     /// # Panics
