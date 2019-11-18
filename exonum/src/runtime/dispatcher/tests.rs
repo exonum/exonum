@@ -418,10 +418,7 @@ fn test_dispatcher_simple() {
         .with_runtime(runtime_a.runtime_type, runtime_a)
         .with_runtime(runtime_b.runtime_type, runtime_b)
         .finalize(&blockchain);
-    let fork = db.fork();
-    dispatcher
-        .restore_state(fork.snapshot_without_unflushed_changes())
-        .unwrap();
+    dispatcher.restore_state(&db.snapshot()).unwrap();
 
     assert_eq!(
         expected_new_services,
