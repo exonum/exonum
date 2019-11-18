@@ -84,7 +84,6 @@ path = "benches/criterion/lib.rs"
 default = ["sodiumoxide-crypto", "with-serde", "rocksdb_snappy", "with-protobuf"]
 float_serialize = []
 long_benchmarks = []
-metrics-log = []
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
 with-serde = []
 with-protobuf = []
