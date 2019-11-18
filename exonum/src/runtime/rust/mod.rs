@@ -299,7 +299,7 @@ impl RustRuntime {
 
     /// Adds a new service factory to the runtime and returns
     /// a modified `RustRuntime` object for further chaining.
-    pub fn with_available_service(
+    pub fn with_factory(
         mut self,
         service_factory: impl Into<Box<dyn ServiceFactory>>,
     ) -> Self {

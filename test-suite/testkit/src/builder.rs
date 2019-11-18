@@ -175,7 +175,7 @@ impl TestKitBuilder {
     /// Adds a Rust service to the testkit.
     pub fn with_rust_service(mut self, service: impl Into<InstanceCollection>) -> Self {
         let (factory, instances) = service.into().into();
-        self.rust_runtime = self.rust_runtime.with_available_service(factory);
+        self.rust_runtime = self.rust_runtime.with_factory(factory);
         self.instances.push(instances);
         self
     }

@@ -812,7 +812,7 @@ impl TestKit {
 /// let runtime = stopped.rust_runtime();
 /// let service = AfterCommitService::new();
 /// let mut testkit = stopped.resume(vec![
-///     runtime.with_available_service(service.clone())
+///     runtime.with_factory(service.clone())
 /// ]);
 /// testkit.create_blocks_until(Height(8));
 /// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.

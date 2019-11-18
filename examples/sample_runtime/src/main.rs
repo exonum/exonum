@@ -278,7 +278,7 @@ fn main() {
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
     let (factory, cfg) = InstanceCollection::from(SimpleSupervisor::new()).into();
     let rust_runtime =
-        RustRuntime::new(channel.endpoints.0.clone()).with_available_service(factory);
+        RustRuntime::new(channel.endpoints.0.clone()).with_factory(factory);
     let genesis_config = GenesisConfigBuilder::with_consensus_config(genesis)
         .with_service(cfg)
         .build();

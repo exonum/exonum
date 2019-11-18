@@ -66,8 +66,8 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
 }
 
 fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {
-    let service_factory = Box::new(TestServiceImpl);
-    let runtime = RustRuntime::new(mpsc::channel(1).0).with_available_service(service_factory);
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_factory(TestServiceImpl);
     let event_handle = Arc::default();
     let runtime = Inspected {
         inner: runtime,
@@ -662,8 +662,8 @@ fn instance_configs() -> (InstanceConfig, InstanceConfig) {
 #[test]
 fn dependent_builtin_service() {
     let runtime = RustRuntime::new(mpsc::channel(1).0)
-        .with_available_service(TestServiceImpl)
-        .with_available_service(DependentServiceImpl);
+        .with_factory(TestServiceImpl)
+        .with_factory(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     // Create a blockchain with both main and dependent services initialized in the genesis block.
@@ -694,8 +694,8 @@ fn dependent_builtin_service() {
 #[test]
 fn dependent_builtin_service_with_incorrect_order() {
     let runtime = RustRuntime::new(mpsc::channel(1).0)
-        .with_available_service(TestServiceImpl)
-        .with_available_service(DependentServiceImpl);
+        .with_factory(TestServiceImpl)
+        .with_factory(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();
@@ -717,8 +717,8 @@ fn dependent_builtin_service_with_incorrect_order() {
 #[test]
 fn dependent_service_with_no_dependency() {
     let runtime = RustRuntime::new(mpsc::channel(1).0)
-        .with_available_service(TestServiceImpl)
-        .with_available_service(DependentServiceImpl);
+        .with_factory(TestServiceImpl)
+        .with_factory(DependentServiceImpl);
     let (_, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();
@@ -753,8 +753,8 @@ fn dependent_service_with_no_dependency() {
 #[test]
 fn dependent_service_in_same_block() {
     let runtime = RustRuntime::new(mpsc::channel(1).0)
-        .with_available_service(TestServiceImpl)
-        .with_available_service(DependentServiceImpl);
+        .with_factory(TestServiceImpl)
+        .with_factory(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();
@@ -794,8 +794,8 @@ fn dependent_service_in_same_block() {
 #[test]
 fn dependent_service_in_successive_block() {
     let runtime = RustRuntime::new(mpsc::channel(1).0)
-        .with_available_service(TestServiceImpl)
-        .with_available_service(DependentServiceImpl);
+        .with_factory(TestServiceImpl)
+        .with_factory(DependentServiceImpl);
     let (main_service, dep_service) = instance_configs();
 
     let config = generate_testnet_config(1, 0)[0].clone();

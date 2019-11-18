@@ -75,7 +75,7 @@ fn restart_testkit() {
     let service = AfterCommitService::new();
     let runtime = stopped
         .rust_runtime()
-        .with_available_service(service.clone());
+        .with_factory(service.clone());
     let mut testkit = stopped.resume(vec![runtime]);
     for _ in 0..3 {
         testkit.create_block();
@@ -126,7 +126,7 @@ fn tx_pool_is_retained_on_restart() {
     let stopped = testkit.stop();
     let runtime = stopped
         .rust_runtime()
-        .with_available_service(AfterCommitService::new());
+        .with_factory(AfterCommitService::new());
     let testkit = stopped.resume(vec![runtime]);
     assert!(tx_hashes
         .iter()

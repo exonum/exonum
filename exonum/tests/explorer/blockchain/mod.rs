@@ -132,7 +132,7 @@ pub fn create_blockchain() -> BlockchainMut {
     let (factory, cfg) = InstanceCollection::new(MyService)
         .with_instance(SERVICE_ID, "my-service", ())
         .into();
-    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_available_service(factory);
+    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
         .with_service(cfg)
         .build();
