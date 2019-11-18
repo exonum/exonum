@@ -129,15 +129,15 @@ pub trait AccessExt: Access {
     /// let fork = db.fork();
     ///
     /// // Hashed variant for keys implementing `ObjectHash`.
-    /// let hashed_map: ProofMapIndex<&Fork, u32, u32, Hashed> = fork.get_gen_proof_map("hashed");
+    /// let hashed_map: ProofMapIndex<&Fork, u32, u32, Hashed> = fork.get_generic_proof_map("hashed");
     ///
     /// // Raw variant for keys that maps directly to `ProofPath`.
-    /// let raw_map: ProofMapIndex<&Fork, PublicKey, u32, Raw> = fork.get_gen_proof_map("raw");
+    /// let raw_map: ProofMapIndex<&Fork, PublicKey, u32, Raw> = fork.get_generic_proof_map("raw");
     /// ```
     /// # Panics
     ///
     /// If the index exists, but is not a Merkelized map.
-    fn get_gen_proof_map<I, K, V, KeyMode>(
+    fn get_generic_proof_map<I, K, V, KeyMode>(
         self,
         addr: I,
     ) -> ProofMapIndex<Self::Base, K, V, KeyMode>
