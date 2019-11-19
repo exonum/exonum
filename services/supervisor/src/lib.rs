@@ -60,23 +60,9 @@ pub const fn supervisor_name() -> &'static str {
 const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged service. \
                                   For correct operation, `Supervisor` needs to have numeric ID 0.";
 
-/// Applies configuration changes, isolating each of them with by using `Fork` checkpoints.
-///
-/// # Safety
-///
-/// This function should be used with extreme care. It makes the following assumptions:
-///
-/// - The function must be called at the end of the transaction or `before_commit` execution.
-///   If the transaction errors / panics afterwards, the changes to the configs will not
-///   be rolled back.
-/// - No changes to the blockchain state should be introduced before the call to this function.
-///   Any changes that are introduced will be committed regardless of the execution status,
-///   or the status of application of any config change. This is if the execution wasn't interrupted
-///   by a panic / error *before* hitting the call; if this happens, the usual rules apply.
-///
-/// These restrictions are the result of `Fork` not having multi-layered checkpoints.
+/// Applies configuration changes.
+/// Upon any failure, execution of this method stops and `Err(())` is returned.
 fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> Result<(), ()> {
-    // An error while configuring one of the service instances should not affect others.
     for change in changes.into_iter() {
         match change {
             ConfigChange::Consensus(config) => {
@@ -94,6 +80,8 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
                     config.instance_id
                 );
 
+                // `ConfigureCall` interface was checked during the config verifying
+                // so panic on `expect` here is unlikely and means a bug in the implementation.
                 let configure_result = context
                     .interface::<ConfigureCall<'_>>(config.instance_id)
                     .expect("Obtaining Configure interface failed")
@@ -114,14 +102,15 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
                     start_service.name,
                     start_service.artifact
                 );
-                if let Err(e) = context.start_adding_service(
-                    start_service.artifact,
-                    start_service.name,
-                    start_service.config,
-                ) {
-                    log::error!("Service start request failed. {}", e);
-                    return Err(());
-                }
+                context
+                    .start_adding_service(
+                        start_service.artifact,
+                        start_service.name,
+                        start_service.config,
+                    )
+                    .map_err(|e| {
+                        log::error!("Service start request failed. {}", e);
+                    })?;
             }
         }
     }
