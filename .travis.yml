@@ -108,12 +108,10 @@ jobs:
 
     # Run coverage.
   - name: coverage
-    before_install:
-    - unset RUSTC_WRAPPER # do not use sccache
     script:
     - cargo install cargo-travis --debug || echo "cargo-travis has been already installed"
     - mkdir target # fix for cargo-coveralls
-    - cargo coveralls
+    - cargo coveralls --all
 
   # Unit tests.
   - name: unit-test
