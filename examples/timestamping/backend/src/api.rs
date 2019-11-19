@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! REST API.
-use exonum_merkledb::MapProof;
+use exonum_merkledb::{proof_map_index::Raw, MapProof};
 
 use exonum::{
     blockchain::{BlockProof, IndexProof},
@@ -45,7 +45,7 @@ pub struct TimestampProof {
     /// Actual state hashes of the timestamping service with their proofs.
     pub state_proof: MapProof<String, Hash>,
     /// Actual state of the timestamping database with proofs.
-    pub timestamp_proof: MapProof<Hash, TimestampEntry>,
+    pub timestamp_proof: MapProof<Hash, TimestampEntry, Raw>,
 }
 
 /// Public service API.

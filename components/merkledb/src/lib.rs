@@ -177,7 +177,7 @@ pub use self::{
 #[doc(no_inline)]
 pub use self::{
     proof_list_index::{ListProof, ProofListIndex},
-    proof_map_index::{MapProof, ProofMapIndex},
+    proof_map_index::{MapProof, ProofMapIndex, RawProofMapIndex},
 };
 
 #[macro_use]

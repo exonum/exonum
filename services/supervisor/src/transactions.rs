@@ -169,17 +169,23 @@ where
             return Err(Error::ActualFromIsPast.into());
         }
 
+        let mut schema = Schema::new(context.service_data());
+
         // Verifies that there are no pending config changes.
-        if Schema::new(context.service_data())
-            .pending_proposal
-            .exists()
-        {
-            return Err(Error::ConfigProposeExists.into());
+        if let Some(proposal) = schema.pending_proposal.get() {
+            // We have a proposal, check that it's actual.
+            if current_height < proposal.config_propose.actual_from {
+                return Err(Error::ConfigProposeExists.into());
+            } else {
+                // Proposal is outdated but was not removed (e.g. because of the panic
+                // during config applying), clean it.
+                schema.pending_proposal.remove();
+            }
         }
+        drop(schema);
 
         // Verify changes in the proposal.
         self.verify_config_changeset(&mut context, &propose.changes)?;
-
         let mut schema = Schema::new(context.service_data());
 
         // After all the checks verify that configuration number is expected one.

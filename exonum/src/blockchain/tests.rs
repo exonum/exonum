@@ -33,7 +33,7 @@ use crate::{
         error::ErrorKind,
         rust::{CallContext, Service, ServiceFactory, Transaction},
         AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ExecutionError, InstanceId,
-        SUPERVISOR_INSTANCE_ID,
+        InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -136,9 +136,18 @@ impl TestDispatcherInterface for TestDispatcherService {
     }
 
     fn test_add(&self, mut context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError> {
-        let mut index = context.service_data().get_entry("val");
-        index.set(arg.value);
-        drop(index);
+        {
+            let mut index = context.service_data().get_entry("val");
+            index.set(arg.value);
+        }
+
+        let instance_id = {
+            let mut instance_id_entry = context.service_data().get_entry("instance_ids");
+            let instance_id = instance_id_entry.get().unwrap_or(TEST_SERVICE_ID + 1);
+            instance_id_entry.set(instance_id + 1);
+
+            instance_id
+        };
 
         let config = match arg.value {
             42 => TestExecute { value: 42 }.into_bytes(),
@@ -151,7 +160,15 @@ impl TestDispatcherInterface for TestDispatcherService {
         } else {
             TestDispatcherService.artifact_id().into()
         };
-        context.start_adding_service(artifact, format!("good-service-{}", arg.value), config)
+
+        let instance_name = format!("good-service-{}", arg.value);
+        let spec = InstanceSpec {
+            id: instance_id,
+            name: instance_name,
+            artifact,
+        };
+
+        context.start_adding_service(spec, config)
     }
 }
 
@@ -473,14 +490,6 @@ fn error_discards_transaction_changes() {
             assert_eq!(Some(index), entry);
         }
     }
-}
-
-#[test]
-#[should_panic(expected = "Instance identifier for builtin service should be lesser than")]
-fn test_dispatcher_incorrect_builtin_service_id() {
-    create_blockchain(vec![
-        InstanceCollection::new(TestDispatcherService).with_instance(1024, IDX_NAME, ())
-    ]);
 }
 
 #[test]

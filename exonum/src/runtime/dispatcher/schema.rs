@@ -16,10 +16,10 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Entry, Fork, MapIndex,
+    Fork, MapIndex,
 };
 
-use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec, MAX_BUILTIN_INSTANCE_ID};
+use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec};
 use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
 
 const ARTIFACTS: &str = "core.dispatcher.artifacts";
@@ -28,7 +28,6 @@ const SERVICE_INSTANCES: &str = "core.dispatcher.service_instances";
 const PENDING_INSTANCES: &str = "core.dispatcher.pending_service_instances";
 const INSTANCE_IDS: &str = "core.dispatcher.service_instance_ids";
 const PENDING_INSTANCE_IDS: &str = "core.dispatcher.pending_instance_ids";
-const VACANT_INSTANCE_ID: &str = "core.dispatcher.vacant_instance_id";
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
@@ -207,22 +206,6 @@ impl Schema<&Fork> {
             self.add_service(spec);
         }
         pending_services.clear();
-    }
-
-    /// Vacant identifier for user service instances.
-    fn vacant_instance_id(&self) -> Entry<&Fork, InstanceId> {
-        self.access.get_entry(VACANT_INSTANCE_ID)
-    }
-
-    /// Assign unique identifier for an instance.
-    // TODO: could be performed by supervisor [ECR-3746]
-    pub(super) fn assign_instance_id(&mut self) -> InstanceId {
-        let id = self
-            .vacant_instance_id()
-            .get()
-            .unwrap_or(MAX_BUILTIN_INSTANCE_ID);
-        self.vacant_instance_id().set(id + 1);
-        id
     }
 
     /// Adds information about started service instance to the schema.

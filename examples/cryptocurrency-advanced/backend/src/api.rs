@@ -14,7 +14,7 @@
 
 //! Cryptocurrency API.
 
-use exonum_merkledb::{ListProof, MapProof};
+use exonum_merkledb::{proof_map_index::Raw, ListProof, MapProof};
 
 use exonum::{
     blockchain::{BlockProof, IndexProof},
@@ -38,7 +38,7 @@ pub struct WalletProof {
     /// Proof of the whole wallets table.
     pub to_table: MapProof<String, Hash>,
     /// Proof of the specific wallet in this table.
-    pub to_wallet: MapProof<PublicKey, Wallet>,
+    pub to_wallet: MapProof<PublicKey, Wallet, Raw>,
 }
 
 /// Wallet history.
