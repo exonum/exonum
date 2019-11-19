@@ -798,3 +798,53 @@ fn test_discard_incorrect_configuration_number() {
     assert_eq!(status, Err(&Error::IncorrectConfigurationNumber.into()));
     assert_eq!(config_propose_entry(&testkit), None);
 }
+
+/// Checks that if config applying error, none of changes from the proposal are applied.
+#[test]
+fn test_all_changes_are_discarded_on_panic() {
+    let mut testkit = testkit_with_supervisor_and_service(4);
+    let initiator_id = testkit.network().us().validator_id().unwrap();
+
+    let erroneous_config_params = ["apply_error", "apply_panic"];
+
+    for (i, params) in erroneous_config_params.iter().enumerate() {
+        let cfg_change_height = Height(3 * (i + 1) as u64);
+        let mut propose =
+            ConfigProposeBuilder::new(cfg_change_height).configuration_number(i as u64);
+
+        // Add a valid config entry.
+        let old_consensus_config = testkit.consensus_config();
+        let consensus_config = consensus_config_propose_first_variant(&testkit);
+        propose = propose.extend_consensus_config_propose(consensus_config.clone());
+
+        // Add an erroneous config entry.
+        propose = propose.extend_service_config_propose((*params).to_owned());
+
+        // Send config proposal.
+        let propose = propose.build();
+
+        let proposal_hash = propose.object_hash();
+
+        testkit
+            .create_block_with_transaction(sign_config_propose_transaction(
+                &testkit,
+                propose,
+                initiator_id,
+            ))
+            .transactions[0]
+            .status()
+            .expect("Transaction with change propose discarded.");
+
+        let signed_txs = build_confirmation_transactions(&testkit, proposal_hash, initiator_id);
+        testkit.create_block_with_transactions(signed_txs)[0]
+            .status()
+            .unwrap();
+
+        testkit.create_blocks_until(cfg_change_height);
+        testkit.create_block();
+
+        // Check that config didn't change.
+        assert_eq!(config_propose_entry(&testkit), None);
+        assert_eq!(testkit.consensus_config(), old_consensus_config);
+    }
+}
