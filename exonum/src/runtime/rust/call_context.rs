@@ -3,7 +3,6 @@ use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError},
-    error::catch_panic,
     ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
     InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
@@ -94,47 +93,6 @@ impl<'a> CallContext<'a> {
         })
     }
 
-    /// Isolates execution of the provided closure.
-    ///
-    /// This method should be used with extreme care, since it subverts the usual rules
-    /// of transaction roll-back provided by Exonum. Namely:
-    ///
-    /// - If the execution of the closure is successful, all changes to the blockchain state
-    ///   preceding the `isolate()` call are permanently committed. These changes **will not**
-    ///   be rolled back if the following transaction code exits with an error.
-    /// - If the execution of the closure errors, all changes to the blockchain state
-    ///   preceding the `isolate()` call are rolled back right away. That is, they are not
-    ///   persisted even if the following transaction code executes successfully.
-    ///
-    /// If there are several `isolate()` calls within the same execution context,
-    /// commitment / rollback rules are applied to changes since the last call.
-    ///
-    /// For these reasons, it is strongly advised to:
-    ///
-    /// - Make `isolate()` call(s) the last logic executed by a transaction, or at least
-    ///   not have failure cases after the call(s).
-    /// - Propagate errors returned by this method as a result of the transaction execution.
-    // TODO: Finalize interface and test [ECR-3740]
-    #[doc(hidden)]
-    pub fn isolate(
-        &mut self,
-        f: impl FnOnce(CallContext<'_>) -> Result<(), ExecutionError>,
-    ) -> Result<(), ExecutionError> {
-        let result = catch_panic(|| f(self.reborrow()));
-        match result {
-            Ok(()) => self.inner.fork.flush(),
-            Err(_) => self.inner.fork.rollback(),
-        }
-        result
-    }
-
-    fn reborrow(&mut self) -> CallContext<'_> {
-        CallContext {
-            inner: self.inner.reborrow(),
-            instance: self.instance,
-        }
-    }
-
     /// Provides writeable access to core schema.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
@@ -146,7 +104,12 @@ impl<'a> CallContext<'a> {
         CoreSchema::new(self.inner.fork)
     }
 
-    /// Marks an artifact as *registered*, i.e., one which service instances can be deployed from.
+    /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
+    ///
+    /// If / when a block with this instruction is accepted, artifact deployment becomes
+    /// a requirement for all nodes in the network. A node that did not successfully
+    /// deploy the artifact previously blocks until the artifact is deployed successfully.
+    /// If a node cannot deploy the artifact, it panics.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]

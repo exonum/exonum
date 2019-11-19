@@ -18,8 +18,6 @@ pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
 
 pub mod config;
 pub mod user_agent;
-#[macro_use]
-pub mod metrics;
 
 use env_logger::Builder;
 use log::SetLoggerError;

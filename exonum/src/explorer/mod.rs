@@ -31,10 +31,10 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Block, ExecutionError, ExecutionStatus, Schema, TransactionMessage, TxLocation},
+    blockchain::{Block, ExecutionError, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
-    messages::{Precommit, Verified},
+    messages::{AnyTx, Precommit, Verified},
 };
 
 /// Ending height of the range (exclusive), given the a priori max height.
@@ -338,7 +338,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// TODO [ECR-3275]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
-    content: TransactionMessage,
+    content: Verified<AnyTx>,
     location: TxLocation,
     location_proof: ListProof<Hash>,
     status: ExecutionStatus,
@@ -347,7 +347,7 @@ pub struct CommittedTransaction {
 
 impl CommittedTransaction {
     /// Returns the content of the transaction.
-    pub fn content(&self) -> &TransactionMessage {
+    pub fn content(&self) -> &Verified<AnyTx> {
         &self.content
     }
 
@@ -454,7 +454,7 @@ pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Transaction contents.
-        content: TransactionMessage,
+        content: Verified<AnyTx>,
     },
 
     /// Transaction is already committed to the blockchain.
@@ -463,7 +463,7 @@ pub enum TransactionInfo {
 
 impl TransactionInfo {
     /// Returns the content of this transaction.
-    pub fn content(&self) -> &TransactionMessage {
+    pub fn content(&self) -> &Verified<AnyTx> {
         match *self {
             TransactionInfo::InPool { ref content } => content,
             TransactionInfo::Committed(ref tx) => tx.content(),
@@ -529,7 +529,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     /// Return transaction message without proof.
-    pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<TransactionMessage> {
+    pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<Verified<AnyTx>> {
         self.schema.transactions().get(tx_hash)
     }
 
@@ -549,7 +549,7 @@ impl<'a> BlockchainExplorer<'a> {
     fn committed_transaction(
         &self,
         tx_hash: &Hash,
-        maybe_content: Option<TransactionMessage>,
+        maybe_content: Option<Verified<AnyTx>>,
     ) -> CommittedTransaction {
         let location = self
             .schema

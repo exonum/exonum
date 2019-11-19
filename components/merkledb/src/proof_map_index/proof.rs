@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36 (ECR-3827)
+
 use exonum_crypto::Hash;
 use failure::Fail;
 use serde::{Deserializer, Serializer};
 use serde_derive::{Deserialize, Serialize};
 
-use std::borrow::Cow;
+use std::{borrow::Cow, marker::PhantomData};
 
 use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
@@ -25,7 +27,7 @@ use super::{
 };
 use crate::{BinaryValue, HashTag, ObjectHash};
 
-pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
+use crate::proof_map_index::key::{Hashed, ToProofPath};
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -231,7 +233,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
 /// #    access::AccessExt, Database, TemporaryDB, BinaryValue, MapProof, HashTag,
-/// #    proof_map_index::ProofPath,
+/// #    proof_map_index::{Hashed, ToProofPath},
 /// # };
 /// # use exonum_crypto::hash;
 /// # fn main() {
@@ -246,7 +248,7 @@ impl<K, V> OptionalEntry<K, V> {
 ///     serde_json::to_value(&proof).unwrap(),
 ///     json!({
 ///         "proof": [{
-///             "path": ProofPath::new(&h1),
+///             "path": Hashed::transform_key(&h1),
 ///             "hash": HashTag::hash_leaf(&100_u32.to_bytes()),
 ///         }],
 ///         "entries": [{ "key": h2, "value": 200 }],
@@ -267,9 +269,11 @@ impl<K, V> OptionalEntry<K, V> {
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct MapProof<K, V> {
+pub struct MapProof<K, V, KeyMode = Hashed> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
+    #[serde(skip)]
+    _key_mode: PhantomData<KeyMode>,
 }
 
 /// Version of `MapProof` obtained after verification.
@@ -372,7 +376,7 @@ fn collect(entries: &[Cow<'_, MapProofEntry>]) -> Result<Hash, MapProofError> {
     }
 }
 
-impl<K, V> MapProof<K, V> {
+impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof
@@ -404,6 +408,7 @@ impl<K, V> MapProof<K, V> {
         Self {
             entries: vec![],
             proof: vec![],
+            _key_mode: PhantomData,
         }
     }
 
@@ -443,10 +448,11 @@ impl<K, V> MapProof<K, V> {
     }
 }
 
-impl<K, V> MapProof<K, V>
+impl<K, V, KeyMode> MapProof<K, V, KeyMode>
 where
     K: ObjectHash,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use self::MapProofError::*;
@@ -478,7 +484,7 @@ where
         // In order to do this, it suffices to locate the closest smaller path in the proof entries
         // and check only it.
         for e in &self.entries {
-            let path = ProofPath::new(e.key());
+            let path = KeyMode::transform_key(e.key());
 
             match self.proof.binary_search_by(|pe| {
                 pe.path
@@ -542,7 +548,7 @@ where
         proof.extend(self.entries.iter().filter_map(|e| {
             e.as_kv().map(|(k, v)| {
                 Cow::Owned(MapProofEntry {
-                    path: ProofPath::new(k),
+                    path: KeyMode::transform_key(&k),
                     hash: HashTag::hash_leaf(&v.to_bytes()),
                 })
             })

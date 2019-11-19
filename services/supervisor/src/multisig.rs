@@ -36,7 +36,7 @@ use exonum::{
 ///
 /// Votes are represented as public keys of authors and no verification for
 /// ownership is performed within this index.
-pub struct MultisigIndex<T: Access, V> {
+pub struct MultisigIndex<T: Access, V: ObjectHash> {
     index: ProofMapIndex<T::Base, V, BinarySet<PublicKey>>,
 }
 

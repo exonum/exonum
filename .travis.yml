@@ -111,16 +111,16 @@ jobs:
     install:
     - |
       if [ ! -f "$HOME/.kcov/bin/kcov" ]; then
-        wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
-        tar xzf v36.tar.gz
-        cd kcov-36
+        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
+        tar xzf master.tar.gz
+        cd kcov-master
         mkdir build
         cd build
         cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.kcov -DCMAKE_BUILD_TYPE=Release
         make -j2
         make install
         cd ../..
-        rm -rf kcov-36
+        rm -rf kcov-master
       fi
     script:
     - cargo test --no-run

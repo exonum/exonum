@@ -16,7 +16,7 @@
 
 pub use self::node::{BranchNode, Node};
 pub use self::{
-    key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
+    key::{Hashed, ProofPath, Raw, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
@@ -45,11 +45,12 @@ mod proof_builder;
 mod tests;
 
 // Necessary to allow building proofs.
-impl<T, K, V> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V>
+impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     fn root_node(&self) -> Option<(ProofPath, Node)> {
         self.get_root_node()
@@ -73,11 +74,12 @@ where
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
-pub struct ProofMapIndex<T: RawAccess, K, V> {
+pub struct ProofMapIndex<T: RawAccess, K, V, KeyMode: ToProofPath<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, ProofPath>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
+    _key_mode: PhantomData<KeyMode>,
 }
 
 /// An iterator over the entries of a `ProofMapIndex`.
@@ -175,11 +177,12 @@ impl BinaryAttribute for ProofPath {
     }
 }
 
-impl<T, K, V> FromAccess<T> for ProofMapIndex<T::Base, K, V>
+impl<T, K, V, KeyMode> FromAccess<T> for ProofMapIndex<T::Base, K, V, KeyMode>
 where
     T: Access,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::ProofMap)?;
@@ -187,11 +190,19 @@ where
     }
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V>
+/// Raw variant of the `ProofMapIndex`, useful for keys that mapped directly to
+/// `ProofPath` without hashing. For example `Hash` and `PublicKey`.
+///
+/// It's possible to use any type that can be represented with byte array of length 32
+/// as a key for this map.
+pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
+
+impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, state) = view.into_parts();
@@ -200,6 +211,7 @@ where
             state,
             _k: PhantomData,
             _v: PhantomData,
+            _key_mode: PhantomData,
         }
     }
 
@@ -293,7 +305,7 @@ where
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: K) -> MapProof<K, V> {
+    pub fn get_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
         self.create_proof(key)
     }
 
@@ -310,7 +322,7 @@ where
     ///
     /// let proof = index.get_multiproof(vec!["foo".to_owned(), "bar".to_owned()]);
     /// ```
-    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V>
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V, KeyMode>
     where
         KI: IntoIterator<Item = K>,
     {
@@ -469,11 +481,12 @@ where
     }
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V>
+impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccessMut,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
@@ -624,7 +637,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let proof_path = ProofPath::new(key);
+        let proof_path = KeyMode::transform_key(key);
         let root_path = match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_path = prefix;
@@ -634,11 +647,7 @@ where
                 if i < proof_path.len() {
                     let mut branch = BranchNode::empty();
                     branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &leaf_hash);
-                    branch.set_child(
-                        prefix_path.bit(i),
-                        &prefix_path.suffix(i),
-                        &prefix_data.object_hash(),
-                    );
+                    branch.set_child(prefix_path.bit(i), &prefix_path.suffix(i), &prefix_data);
                     let new_prefix = proof_path.prefix(i);
                     self.base.put(&new_prefix, branch);
                     new_prefix
@@ -704,7 +713,7 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
-        let proof_path = ProofPath::new(key);
+        let proof_path = KeyMode::transform_key(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -774,11 +783,12 @@ where
     }
 }
 
-impl<T, K, V> ObjectHash for ProofMapIndex<T, K, V>
+impl<T, K, V, KeyMode> ObjectHash for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
     /// For hash of the empty map see [`HashTag::empty_map_hash`].
@@ -858,27 +868,33 @@ where
     }
 }
 
-impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
+impl<T, K, V, KeyMode> fmt::Debug for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey,
     V: BinaryValue + fmt::Debug,
+    KeyMode: ToProofPath<K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Entry<'a, T: RawAccess, K, V: BinaryValue> {
-            index: &'a ProofMapIndex<T, K, V>,
+        struct Entry<'a, T: RawAccess, K, V: BinaryValue, KeyMode: ToProofPath<K>> {
+            index: &'a ProofMapIndex<T, K, V, KeyMode>,
             path: ProofPath,
             hash: Hash,
             node: Node,
         }
 
-        impl<'a, T, K, V> Entry<'a, T, K, V>
+        impl<'a, T, K, V, KeyMode> Entry<'a, T, K, V, KeyMode>
         where
             T: RawAccess,
-            K: BinaryKey + ObjectHash,
+            K: BinaryKey,
             V: BinaryValue,
+            KeyMode: ToProofPath<K>,
         {
-            fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
+            fn new(
+                index: &'a ProofMapIndex<T, K, V, KeyMode>,
+                hash: Hash,
+                path: ProofPath,
+            ) -> Self {
                 Self {
                     index,
                     path,
@@ -896,11 +912,12 @@ where
             }
         }
 
-        impl<T, K, V> fmt::Debug for Entry<'_, T, K, V>
+        impl<T, K, V, KeyMode> fmt::Debug for Entry<'_, T, K, V, KeyMode>
         where
             T: RawAccess,
-            K: BinaryKey + ObjectHash,
+            K: BinaryKey,
             V: BinaryValue + fmt::Debug,
+            KeyMode: ToProofPath<K>,
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.node {
