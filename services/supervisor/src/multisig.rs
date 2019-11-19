@@ -21,13 +21,14 @@ use std::{
     collections::BTreeSet,
     fmt,
     io::{Cursor, Write},
+    mem,
 };
 
 use exonum::{
     crypto::{self, Hash, PublicKey},
     merkledb::{
         access::{Access, AccessError, FromAccess, RawAccessMut},
-        BinaryKey, BinaryValue, IndexAddress, ObjectHash, ProofMapIndex,
+        BinaryKey, BinaryValue, Error as MerkledbError, IndexAddress, ObjectHash, ProofMapIndex,
     },
 };
 
@@ -143,13 +144,23 @@ impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut values = BTreeSet::new();
 
+        // Read the sequence of the (byte size, value bytes) pairs and deserialize them.
         let mut reader = bytes.as_ref();
         while !reader.is_empty() {
+            // Verify that buffer size is enough and read the bytes length of the value.
+            if reader.len() < mem::size_of::<u64>() {
+                return Err(MerkledbError::new("Insufficient buffer size").into());
+            }
             let bytes_len = LittleEndian::read_u64(reader) as usize;
-            reader = &reader[8..];
+            reader = &reader[mem::size_of::<u64>()..];
+
+            // Verify remaining size and read the value.
+            if reader.len() < bytes_len {
+                return Err(MerkledbError::new("Insufficient buffer size").into());
+            }
             let value = T::from_bytes(Cow::Borrowed(&reader[0..bytes_len]))?;
-            reader = &reader[bytes_len..];
             values.insert(value);
+            reader = &reader[bytes_len..];
         }
 
         Ok(Self(values))
