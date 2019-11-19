@@ -14,13 +14,15 @@
 
 //! Information schema for the runtime dispatcher.
 
+use exonum_crypto::Hash;
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Fork, MapIndex,
+    Fork, MapIndex, ObjectHash, ProofMapIndex,
 };
 
-use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec};
 use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
+
+use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec};
 
 const ARTIFACTS: &str = "core.dispatcher.artifacts";
 const PENDING_ARTIFACTS: &str = "core.dispatcher.pending_artifacts";
@@ -44,8 +46,8 @@ impl<T: Access> Schema<T> {
     }
 
     /// Artifacts registry indexed by the artifact name.
-    pub(crate) fn artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
-        self.access.clone().get_map(ARTIFACTS)
+    pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, String, ArtifactSpec> {
+        self.access.clone().get_proof_map(ARTIFACTS)
     }
 
     pub(super) fn pending_artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
@@ -54,8 +56,8 @@ impl<T: Access> Schema<T> {
 
     /// Set of launched service instances.
     // TODO Get rid of data duplication in information schema. [ECR-3222]
-    pub(crate) fn service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
-        self.access.clone().get_map(SERVICE_INSTANCES)
+    pub(crate) fn service_instances(&self) -> ProofMapIndex<T::Base, String, InstanceSpec> {
+        self.access.clone().get_proof_map(SERVICE_INSTANCES)
     }
 
     /// Set of pending service instances.
@@ -116,6 +118,15 @@ impl<T: Access> Schema<T> {
                     .get(name)
                     .map(|spec| (spec, DeployStatus::Pending))
             })
+    }
+
+    /// Returns hashes for tables with proofs.
+    #[allow(dead_code)]
+    pub(crate) fn state_hash(&self) -> Vec<Hash> {
+        vec![
+            self.artifacts().object_hash(),
+            self.service_instances().object_hash(),
+        ]
     }
 }
 
