@@ -170,7 +170,7 @@ pub use self::{
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAddress, IndexType, ResolvedRef, SystemInfo},
+    views::{IndexAddress, IndexType, ResolvedAddress, SystemInfo},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'

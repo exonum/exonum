@@ -22,7 +22,7 @@ use crate::{
     db,
     validation::is_valid_index_name,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
-    Database, DbOptions, Fork, ListIndex, MapIndex, ResolvedRef, RocksDB, TemporaryDB,
+    Database, DbOptions, Fork, ListIndex, MapIndex, ResolvedAddress, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -30,7 +30,7 @@ const PREFIXED_IDX: (&str, u64) = ("idx", 42);
 
 // Conversion to simplify `ResolvedRef` instantiation for tests. This conversion
 // is not used in the main code, so it's intentionally placed here.
-impl From<(&str, u64)> for ResolvedRef {
+impl From<(&str, u64)> for ResolvedAddress {
     fn from((name, id): (&str, u64)) -> Self {
         Self {
             name: name.to_owned(),
@@ -59,7 +59,7 @@ fn assert_initial_state<T: RawAccess>(view: &View<T>) {
 fn test_changelog<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<ResolvedRef> + Copy,
+    I: Into<ResolvedAddress> + Copy,
 {
     let mut fork = db.fork();
     {
@@ -183,7 +183,7 @@ fn _views_in_same_family<T: Database>(db: &T) {
 fn test_two_mutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<ResolvedRef> + Copy,
+    I: Into<ResolvedAddress> + Copy,
 {
     let fork = db.fork();
 
@@ -196,7 +196,7 @@ where
 fn test_mutable_and_immutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<ResolvedRef> + Copy,
+    I: Into<ResolvedAddress> + Copy,
 {
     let fork = db.fork();
 
@@ -209,7 +209,7 @@ where
 fn test_clear_view<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<ResolvedRef> + Copy,
+    I: Into<ResolvedAddress> + Copy,
 {
     let fork = db.fork();
     {
@@ -272,7 +272,7 @@ where
 fn test_fork_iter<T, I>(db: &T, address: I)
 where
     T: Database,
-    I: Into<ResolvedRef> + Copy,
+    I: Into<ResolvedAddress> + Copy,
 {
     let fork = db.fork();
     {
@@ -369,7 +369,7 @@ fn test_database_check_correct_version() {
     let db = TemporaryDB::default();
     let snapshot = db.snapshot();
 
-    let view = View::new(&snapshot, ResolvedRef::system(db::DB_METADATA));
+    let view = View::new(&snapshot, ResolvedAddress::system(db::DB_METADATA));
     let version: u8 = view.get(db::VERSION_NAME).unwrap();
     assert_eq!(version, db::DB_VERSION);
 }
@@ -384,7 +384,7 @@ fn test_database_check_incorrect_version() {
         let db = RocksDB::open(&dir, &opts).unwrap();
         let fork = db.fork();
         {
-            let mut view = View::new(&fork, ResolvedRef::system(db::DB_METADATA));
+            let mut view = View::new(&fork, ResolvedAddress::system(db::DB_METADATA));
             view.put(db::VERSION_NAME, 2_u8);
         }
         db.merge(fork.into_patch()).unwrap();

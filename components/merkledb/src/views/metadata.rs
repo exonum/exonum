@@ -22,7 +22,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
 use super::{
-    system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedRef, View,
+    system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View,
 };
 use crate::{validation::assert_valid_name, BinaryValue};
 
@@ -273,7 +273,7 @@ where
         self.metadata.state = Some(state);
         View::new(
             self.index_access.clone(),
-            ResolvedRef::system(INDEXES_POOL_NAME),
+            ResolvedAddress::system(INDEXES_POOL_NAME),
         )
         .put(&self.index_full_name, self.metadata.to_bytes());
     }
@@ -282,7 +282,7 @@ where
         self.metadata.state = None;
         View::new(
             self.index_access.clone(),
-            ResolvedRef::system(INDEXES_POOL_NAME),
+            ResolvedAddress::system(INDEXES_POOL_NAME),
         )
         .put(&self.index_full_name, self.metadata.to_bytes());
     }
@@ -294,10 +294,8 @@ pub(super) struct IndexesPool<T: RawAccess>(View<T>);
 
 impl<T: RawAccess> IndexesPool<T> {
     pub(super) fn new(index_access: T) -> Self {
-        Self(View::new(
-            index_access,
-            ResolvedRef::system(INDEXES_POOL_NAME),
-        ))
+        let view = View::new(index_access, ResolvedAddress::system(INDEXES_POOL_NAME));
+        Self(view)
     }
 
     pub(super) fn len(&self) -> u64 {
@@ -338,7 +336,7 @@ impl<T: RawAccess> IndexesPool<T> {
 }
 
 /// Obtains `object_hash` for an aggregated index.
-pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedRef) -> Hash {
+pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedAddress) -> Hash {
     use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
     let index_full_name = addr.name.as_bytes().to_vec();
@@ -415,14 +413,14 @@ where
             metadata
         });
         let real_index_type = metadata.index_type;
-        let addr = ResolvedRef {
+        let addr = ResolvedAddress {
             name: index_name,
             id: NonZeroU64::new(metadata.identifier),
         };
 
         let is_aggregated = !is_phantom
             && index_type.is_merkelized()
-            && index_address.bytes.is_none()
+            && index_address.id_in_group.is_none()
             && index_address.name != STATE_AGGREGATOR;
 
         let mut view = View::new(index_access, addr);

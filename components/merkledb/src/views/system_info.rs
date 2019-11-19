@@ -19,7 +19,7 @@ pub(super) const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
 /// fork.get_map(("plain_map", &2)).put(&2_u8, "s0 plane".to_owned());
 ///
 /// let system_info = SystemInfo::new(&fork);
-/// assert!(system_info.index_count() >= 3);
+/// assert_eq!(system_info.index_count(), 3);
 /// // ^-- The database may also contain system indexes.
 ///
 /// let patch = fork.into_patch();
@@ -55,9 +55,13 @@ impl<T: RawAccess> SystemInfo<T> {
     /// Returns the total number of indexes in the storage. This information is always up to date
     /// (even for `Fork`s).
     ///
-    /// System-defined indexes (e.g., `state_aggregator`) are *included* into this count.
+    /// System-defined indexes (e.g., `state_aggregator`) are *excluded* from this count.
     pub fn index_count(&self) -> u64 {
-        IndexesPool::new(self.0.clone()).len() - 1
+        // `state_aggregator` is the only system index so far. (There are more system *views*,
+        // but they do not have view IDs.) It should be created on database initialization
+        // since it involves `check_database()`, which creates a `Fork` and converts it into `Patch`.
+        // We use saturating subtraction just in case.
+        IndexesPool::new(self.0.clone()).len().saturating_sub(1)
     }
 
     /// Returns the state hash of the database. The state hash is up to date for `Snapshot`s

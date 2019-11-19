@@ -23,8 +23,12 @@ use smallvec::SmallVec;
 
 use crate::{
     db::{check_database, Change},
-    Database, DbOptions, Iter, Iterator, Patch, ResolvedRef, Snapshot,
+    Database, DbOptions, Iter, Iterator, Patch, ResolvedAddress, Snapshot,
 };
+
+/// Size of a byte representation of an index ID, which is used to prefix index keys
+/// in a column family.
+const ID_SIZE: usize = mem::size_of::<u64>();
 
 /// Database implementation on top of [`RocksDB`](https://rocksdb.org)
 /// backend.
@@ -64,7 +68,7 @@ struct RocksDBIterator<'a> {
     iter: Peekable<DBIterator<'a>>,
     key: Option<Box<[u8]>>,
     value: Option<Box<[u8]>>,
-    prefix: Option<[u8; 8]>,
+    prefix: Option<[u8; ID_SIZE]>,
     ended: bool,
 }
 
@@ -103,15 +107,20 @@ impl RocksDB {
             };
 
             if changes.is_cleared() {
-                self.clear_ref(&mut batch, cf, &resolved)?;
+                self.clear_prefix(&mut batch, cf, &resolved)?;
             }
 
             if let Some(id_bytes) = resolved.id_to_bytes() {
+                // Write changes to the column family with each key prefixed by the ID of the
+                // resolved address.
+
+                // We assume that typical key sizes are less than `64 - 8 = 56` bytes,
+                // so that they fit into stack.
                 let mut buffer: SmallVec<[u8; 64]> = SmallVec::new();
                 buffer.extend_from_slice(&id_bytes);
 
                 for (key, change) in changes.into_data() {
-                    buffer.truncate(8);
+                    buffer.truncate(ID_SIZE);
                     buffer.extend_from_slice(&key);
                     match change {
                         Change::Put(ref value) => batch.put_cf(cf, &buffer, value)?,
@@ -119,6 +128,7 @@ impl RocksDB {
                     }
                 }
             } else {
+                // Write changes to the column family as-is.
                 for (key, change) in changes.into_data() {
                     match change {
                         Change::Put(ref value) => batch.put_cf(cf, &key, value)?,
@@ -131,24 +141,24 @@ impl RocksDB {
         self.db.write_opt(batch, w_opts).map_err(Into::into)
     }
 
-    // Removes all keys with a specified prefix from a column family.
-    fn clear_ref(
+    /// Removes all keys with a specified prefix from a column family.
+    fn clear_prefix(
         &self,
         batch: &mut WriteBatch,
         cf: ColumnFamily<'_>,
-        resolved: &ResolvedRef,
+        resolved: &ResolvedAddress,
     ) -> crate::Result<()> {
-        let snapshot = self.typed_snapshot();
-        let mut iterator = snapshot.typed_iter(resolved, &[]);
+        let snapshot = self.rocksdb_snapshot();
+        let mut iterator = snapshot.rocksdb_iter(resolved, &[]);
         while iterator.next().is_some() {
-            // We've already got the full key inside the iterator!
+            // The ID prefix is already included to the keys yielded by the iterator.
             batch.delete_cf(cf, iterator.key.as_ref().unwrap())?;
         }
         Ok(())
     }
 
     #[allow(unsafe_code)]
-    fn typed_snapshot(&self) -> RocksDBSnapshot {
+    fn rocksdb_snapshot(&self) -> RocksDBSnapshot {
         RocksDBSnapshot {
             // SAFETY:
             // The snapshot carries an `Arc` to the database to make sure that database
@@ -160,7 +170,7 @@ impl RocksDB {
 }
 
 impl RocksDBSnapshot {
-    fn typed_iter(&self, name: &ResolvedRef, from: &[u8]) -> RocksDBIterator<'_> {
+    fn rocksdb_iter(&self, name: &ResolvedAddress, from: &[u8]) -> RocksDBIterator<'_> {
         use rocksdb::{Direction, IteratorMode};
 
         let from = name.keyed(from);
@@ -183,7 +193,7 @@ impl RocksDBSnapshot {
 
 impl Database for RocksDB {
     fn snapshot(&self) -> Box<dyn Snapshot> {
-        Box::new(self.typed_snapshot())
+        Box::new(self.rocksdb_snapshot())
     }
 
     fn merge(&self, patch: Patch) -> crate::Result<()> {
@@ -199,7 +209,7 @@ impl Database for RocksDB {
 }
 
 impl Snapshot for RocksDBSnapshot {
-    fn get(&self, name: &ResolvedRef, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
         if let Some(cf) = self.db.cf_handle(&name.name) {
             match self.snapshot.get_cf(cf, name.keyed(key)) {
                 Ok(value) => value.map(|v| v.to_vec()),
@@ -210,8 +220,8 @@ impl Snapshot for RocksDBSnapshot {
         }
     }
 
-    fn iter(&self, name: &ResolvedRef, from: &[u8]) -> Iter<'_> {
-        Box::new(self.typed_iter(name, from))
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
+        Box::new(self.rocksdb_iter(name, from))
     }
 }
 
@@ -221,25 +231,22 @@ impl<'a> Iterator for RocksDBIterator<'a> {
             return None;
         }
 
-        if let Some((key, value)) = self.iter.next() {
-            if let Some(ref prefix) = self.prefix {
-                if &key[..8] != prefix {
-                    self.ended = true;
-                    return None;
-                }
+        let (key, value) = self.iter.next()?;
+        if let Some(ref prefix) = self.prefix {
+            if &key[..8] != prefix {
+                self.ended = true;
+                return None;
             }
-
-            self.key = Some(key);
-            let key = if self.prefix.is_some() {
-                &self.key.as_ref()?[8..]
-            } else {
-                &self.key.as_ref()?[..]
-            };
-            self.value = Some(value);
-            Some((key, self.value.as_ref()?))
-        } else {
-            None
         }
+
+        self.key = Some(key);
+        let key = if self.prefix.is_some() {
+            &self.key.as_ref()?[8..]
+        } else {
+            &self.key.as_ref()?[..]
+        };
+        self.value = Some(value);
+        Some((key, self.value.as_ref()?))
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
@@ -249,11 +256,11 @@ impl<'a> Iterator for RocksDBIterator<'a> {
 
         let (key, value) = self.iter.peek()?;
         let key = if let Some(prefix) = self.prefix {
-            if key[..8] != prefix {
+            if key[..ID_SIZE] != prefix {
                 self.ended = true;
                 return None;
             }
-            &key[8..]
+            &key[ID_SIZE..]
         } else {
             &key[..]
         };

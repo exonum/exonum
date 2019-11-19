@@ -46,7 +46,7 @@ pub trait AccessExt: Access {
         I: FromAccess<Self>,
     {
         // We know that `Group` implementation of `Restore` never fails
-        Group::from_access(self, IndexAddress::with_root(name)).unwrap()
+        Group::from_access(self, IndexAddress::new(name)).unwrap()
     }
 
     /// Gets an entry index with the specified address.

@@ -23,15 +23,20 @@ use std::{
 };
 
 use crate::{
-    views::{get_object_hash, AsReadonly, RawAccess, ResolvedRef, View},
+    views::{get_object_hash, AsReadonly, RawAccess, ResolvedAddress, View},
     Error, Result, SystemInfo,
 };
 
-/// Map containing changes with a corresponding key.
+/// Changes related to a specific `View`.
 #[derive(Debug, Clone)]
 pub struct ViewChanges {
+    /// Changes within the view.
     pub(super) data: BTreeMap<Vec<u8>, Change>,
+    /// Was the view cleared as a part of changes?
     is_cleared: bool,
+    /// Is the view aggregated into `state_hash` of the database?
+    /// Storing this information directly in the changes allows to avoid relatively expensive
+    /// metadata lookups during state aggregator update in `Fork::into_patch()`.
     is_aggregated: bool,
 }
 
@@ -73,7 +78,7 @@ type ChangesCell = Option<Rc<ViewChanges>>;
 
 #[derive(Debug, Default)]
 struct WorkingPatch {
-    changes: RefCell<HashMap<ResolvedRef, ChangesCell>>,
+    changes: RefCell<HashMap<ResolvedAddress, ChangesCell>>,
 }
 
 #[derive(Debug)]
@@ -108,7 +113,7 @@ impl Deref for ChangesRef {
 #[derive(Debug)]
 pub struct ChangesMut<'a> {
     parent: WorkingPatchRef<'a>,
-    key: ResolvedRef,
+    key: ResolvedAddress,
     changes: Option<Rc<ViewChanges>>,
 }
 
@@ -154,7 +159,7 @@ impl WorkingPatch {
 
     /// Takes a cell with changes for a specific `View` out of the patch.
     /// The returned cell is guaranteed to contain an `Rc` with an exclusive ownership.
-    fn take_view_changes(&self, address: &ResolvedRef) -> ChangesCell {
+    fn take_view_changes(&self, address: &ResolvedAddress) -> ChangesCell {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
             let view_changes = changes.get_mut(address).map(Option::take);
@@ -180,7 +185,7 @@ impl WorkingPatch {
 
     /// Clones changes for a specific `View` from the patch. Panics if the changes
     /// are mutably borrowed.
-    fn clone_view_changes(&self, address: &ResolvedRef) -> Rc<ViewChanges> {
+    fn clone_view_changes(&self, address: &ResolvedAddress) -> Rc<ViewChanges> {
         let mut changes = self.changes.borrow_mut();
         // Get changes for the specified address.
         let changes: &ChangesCell = changes
@@ -226,9 +231,13 @@ impl WorkingPatch {
             });
 
             if changes.is_aggregated {
-                patch.changed_aggregated_refs.insert(address.clone());
+                patch.changed_aggregated_addrs.insert(address.clone());
             }
 
+            // The patch may already contain changes related to the `address`. If it does,
+            // we extend these changes with the new changes (relying on the fact that
+            // newer changes override older ones), unless the view was cleared (in which case,
+            // the old changes do not matter and should be forgotten).
             let patch_changes = patch
                 .changes
                 .entry(address)
@@ -342,8 +351,10 @@ pub struct Fork {
 #[derive(Debug)]
 pub struct Patch {
     snapshot: Box<dyn Snapshot>,
-    changes: HashMap<ResolvedRef, ViewChanges>,
-    changed_aggregated_refs: HashSet<ResolvedRef>,
+    changes: HashMap<ResolvedAddress, ViewChanges>,
+    /// Addresses of aggregated indexes that were changed within this patch. This information
+    /// is used to update the state aggregator in `Fork::into_patch()`.
+    changed_aggregated_addrs: HashSet<ResolvedAddress>,
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
@@ -401,7 +412,7 @@ pub trait Database: Send + Sync + 'static {
             patch: Patch {
                 snapshot: self.snapshot(),
                 changes: HashMap::new(),
-                changed_aggregated_refs: HashSet::new(),
+                changed_aggregated_addrs: HashSet::new(),
             },
             working_patch: WorkingPatch::new(),
         }
@@ -448,7 +459,7 @@ pub trait DatabaseExt: Database {
     /// Returns an error in the same situations as `Database::merge()`.
     fn merge_with_backup(&self, patch: Patch) -> Result<Patch> {
         let snapshot = self.snapshot();
-        let changed_aggregated_refs = patch.changed_aggregated_refs.clone();
+        let changed_aggregated_refs = patch.changed_aggregated_addrs.clone();
         let mut rev_changes = HashMap::with_capacity(patch.changes.len());
 
         for (name, changes) in &patch.changes {
@@ -483,7 +494,7 @@ pub trait DatabaseExt: Database {
         Ok(Patch {
             snapshot: self.snapshot(),
             changes: rev_changes,
-            changed_aggregated_refs,
+            changed_aggregated_addrs: changed_aggregated_refs,
         })
     }
 }
@@ -501,18 +512,18 @@ impl<T: Database> DatabaseExt for T {}
 pub trait Snapshot: Send + Sync + 'static {
     /// Returns a value corresponding to the specified key as a raw vector of bytes,
     /// or `None` if it does not exist.
-    fn get(&self, name: &ResolvedRef, key: &[u8]) -> Option<Vec<u8>>;
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>>;
 
     /// Returns `true` if the snapshot contains a value for the specified key.
     ///
     /// Default implementation checks existence of the value using [`get`](#tymethod.get).
-    fn contains(&self, name: &ResolvedRef, key: &[u8]) -> bool {
+    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
         self.get(name, key).is_some()
     }
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter(&self, name: &ResolvedRef, from: &[u8]) -> Iter<'_>;
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -528,13 +539,13 @@ pub trait Iterator {
 
 impl Patch {
     /// Iterates over changes in this patch.
-    pub(crate) fn into_changes(self) -> HashMap<ResolvedRef, ViewChanges> {
+    pub(crate) fn into_changes(self) -> HashMap<ResolvedAddress, ViewChanges> {
         self.changes
     }
 }
 
 impl Snapshot for Patch {
-    fn get(&self, name: &ResolvedRef, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
         if let Some(changes) = self.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
@@ -546,7 +557,7 @@ impl Snapshot for Patch {
         self.snapshot.get(name, key)
     }
 
-    fn contains(&self, name: &ResolvedRef, key: &[u8]) -> bool {
+    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
         if let Some(changes) = self.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
@@ -558,7 +569,7 @@ impl Snapshot for Patch {
         self.snapshot.contains(name, key)
     }
 
-    fn iter(&self, name: &ResolvedRef, from: &[u8]) -> Iter<'_> {
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
         let range = (Bound::Included(from), Bound::Unbounded);
         let changes = match self.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
@@ -579,7 +590,7 @@ impl RawAccess for &'_ Patch {
         *self as &dyn Snapshot
     }
 
-    fn changes(&self, _address: &ResolvedRef) -> Self::Changes {}
+    fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
 }
 
 impl AsReadonly for &'_ Patch {
@@ -613,7 +624,7 @@ impl Fork {
         // returned by this method is converted back to a `Fork`, we won't need to update
         // its state aggregator unless the *new* changes in the `Fork` concern aggregated indexes.
         let changed_aggregated_refs =
-            mem::replace(&mut self.patch.changed_aggregated_refs, HashSet::new());
+            mem::replace(&mut self.patch.changed_aggregated_addrs, HashSet::new());
         let updated_entries = changed_aggregated_refs
             .into_iter()
             .map(|addr| (addr.name.clone(), get_object_hash(&self.patch, addr)));
@@ -652,7 +663,7 @@ impl<'a> RawAccess for &'a Fork {
         &self.patch
     }
 
-    fn changes(&self, address: &ResolvedRef) -> Self::Changes {
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
         let changes = self.working_patch.take_view_changes(address);
         ChangesMut {
             changes,
@@ -669,7 +680,7 @@ impl RawAccess for Rc<Fork> {
         &self.patch
     }
 
-    fn changes(&self, address: &ResolvedRef) -> Self::Changes {
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
         let changes = self.working_patch.take_view_changes(address);
         ChangesMut {
             changes,
@@ -738,7 +749,7 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
         &self.0.patch
     }
 
-    fn changes(&self, address: &ResolvedRef) -> Self::Changes {
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
         ChangesRef {
             inner: self.0.working_patch.clone_view_changes(address),
         }
@@ -752,15 +763,15 @@ impl AsRef<dyn Snapshot> for dyn Snapshot {
 }
 
 impl Snapshot for Box<dyn Snapshot> {
-    fn get(&self, name: &ResolvedRef, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
         self.as_ref().get(name, key)
     }
 
-    fn contains(&self, name: &ResolvedRef, key: &[u8]) -> bool {
+    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
         self.as_ref().contains(name, key)
     }
 
-    fn iter(&self, name: &ResolvedRef, from: &[u8]) -> Iter<'_> {
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
         self.as_ref().iter(name, from)
     }
 }
@@ -913,7 +924,7 @@ pub const VERSION_NAME: &str = "version";
 pub fn check_database(db: &mut dyn Database) -> Result<()> {
     let fork = db.fork();
     {
-        let addr = ResolvedRef::system(DB_METADATA);
+        let addr = ResolvedAddress::system(DB_METADATA);
         let mut view = View::new(&fork, addr);
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
             if saved_version != DB_VERSION {
@@ -951,7 +962,7 @@ mod tests {
         }
         let expected_set: HashSet<_> = changes
             .into_iter()
-            .map(|(name, key, change)| (ResolvedRef::system(name), key, change))
+            .map(|(name, key, change)| (ResolvedAddress::system(name), key, change))
             .collect();
         assert_eq!(patch_set, expected_set);
     }
@@ -1103,18 +1114,18 @@ mod tests {
 
         let changed_refs: HashSet<_> = fork
             .patch
-            .changed_aggregated_refs
+            .changed_aggregated_addrs
             .iter()
             .map(|addr| addr.name.as_str())
             .collect();
         assert_eq!(changed_refs, HashSet::from_iter(vec!["foo", "bar"]));
 
         let patch = fork.into_patch();
-        assert!(patch.changed_aggregated_refs.is_empty());
+        assert!(patch.changed_aggregated_addrs.is_empty());
         let mut fork = Fork::from(patch);
         fork.get_list("baz").push(3_u64);
         fork.flush();
-        assert!(fork.patch.changed_aggregated_refs.is_empty());
+        assert!(fork.patch.changed_aggregated_addrs.is_empty());
 
         fork.get_proof_list("other_list").push(42_i32);
         fork.get_proof_map::<_, u64, u64>("bar").clear();
@@ -1122,7 +1133,7 @@ mod tests {
 
         let changed_refs: HashSet<_> = fork
             .patch
-            .changed_aggregated_refs
+            .changed_aggregated_addrs
             .iter()
             .map(|addr| addr.name.as_str())
             .collect();

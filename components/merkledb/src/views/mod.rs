@@ -13,7 +13,7 @@
 // limitations under the License.
 
 pub use self::{
-    address::{IndexAddress, ResolvedRef},
+    address::{IndexAddress, ResolvedAddress},
     metadata::{get_object_hash, BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
     system_info::SystemInfo,
 };
@@ -36,7 +36,7 @@ mod tests;
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
 pub struct View<T: RawAccess> {
-    address: ResolvedRef,
+    address: ResolvedAddress,
     index_access: T,
     changes: T::Changes,
 }
@@ -98,7 +98,7 @@ pub trait RawAccess: Clone {
     /// Reference to a `Snapshot`.
     fn snapshot(&self) -> &dyn Snapshot;
     /// Returns changes related to specific `address` compared to the `snapshot()`.
-    fn changes(&self, address: &ResolvedRef) -> Self::Changes;
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes;
 }
 
 /// Allows to mutate data in indexes.
@@ -146,7 +146,7 @@ macro_rules! impl_snapshot_access {
                 self.as_ref()
             }
 
-            fn changes(&self, _address: &ResolvedRef) -> Self::Changes {}
+            fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
         }
 
         impl AsReadonly for $typ {
@@ -166,7 +166,7 @@ impl_snapshot_access!(std::sync::Arc<dyn Snapshot>);
 
 impl<T: RawAccess> View<T> {
     /// Creates a new view for an index with the specified address.
-    pub(crate) fn new(index_access: T, address: impl Into<ResolvedRef>) -> Self {
+    pub(crate) fn new(index_access: T, address: impl Into<ResolvedAddress>) -> Self {
         let address = address.into();
         let changes = index_access.changes(&address);
         Self {
