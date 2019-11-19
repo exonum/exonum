@@ -80,7 +80,7 @@ impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
     }
 }
 
-pub struct ValidatorMultisig<T: Access, V> {
+pub struct ValidatorMultisig<T: Access, V: ObjectHash> {
     index: ProofMapIndex<T::Base, V, BinarySet<PublicKey>>,
 }
 

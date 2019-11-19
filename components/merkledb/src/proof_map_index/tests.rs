@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{hash, Hash, HashStream};
+use exonum_crypto::{hash, Hash, HashStream, HASH_SIZE};
 use pretty_assertions::assert_eq;
 use rand::{
     self,
@@ -22,18 +22,25 @@ use rand::{
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{self, json};
 
-use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
+use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash, marker::PhantomData};
 
 use super::{
     key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
     node::BranchNode,
-    MapProof, MapProofError, ProofMapIndex, ProofPath,
+    MapProof, MapProofError, ProofPath,
 };
+use crate::proof_map_index::{Hashed, ProofMapIndex, Raw, ToProofPath};
 use crate::{
     access::AccessExt, BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
+
+impl ObjectHash for [u8; HASH_SIZE] {
+    fn object_hash(&self) -> Hash {
+        hash(self)
+    }
+}
 
 // Makes large data set with unique keys
 fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
@@ -84,62 +91,1087 @@ fn generate_random_data_keys<R: Rng>(
     (0..len).map(kv_generator).collect::<Vec<_>>()
 }
 
-#[test]
-fn test_map_methods() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
+struct ProofMapTester<S> {
+    _s: PhantomData<S>,
+}
 
-    let mut index = fork.get_proof_map(IDX_NAME);
-    assert_eq!(index.get(&[1; 32]), None);
-    assert!(!index.contains(&[1; 32]));
+impl<S> ProofMapTester<S>
+where
+    S: ToProofPath<[u8; 32]>,
+{
+    fn test_map_methods() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut index = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
 
-    index.put(&[1; 32], 1_u8);
-    assert_eq!(index.get(&[1; 32]), Some(1_u8));
-    assert!(index.contains(&[1; 32]));
+        assert_eq!(index.get(&[1; 32]), None);
+        assert!(!index.contains(&[1; 32]));
 
-    index.remove(&[1; 32]);
-    assert!(!index.contains(&[1; 32]));
-    assert_eq!(index.get(&[1; 32]), None);
+        index.put(&[1; 32], 1_u8);
 
-    index.put(&[1; 32], 1_u8);
-    index.put(&[2; 32], 2_u8);
-    index.put(&[3; 32], 3_u8);
-    index.remove(&[3; 32]);
-    index.remove(&[2; 32]);
-    index.clear();
-    assert!(!index.contains(&[2; 32]));
-    assert!(!index.contains(&[3; 32]));
+        assert_eq!(index.get(&[1; 32]), Some(1_u8));
+        assert!(index.contains(&[1; 32]));
+
+        index.remove(&[1; 32]);
+
+        assert!(!index.contains(&[1; 32]));
+        assert_eq!(index.get(&[1; 32]), None);
+
+        index.put(&[1; 32], 1_u8);
+        index.put(&[2; 32], 2_u8);
+        index.put(&[3; 32], 3_u8);
+
+        index.remove(&[3; 32]);
+        index.remove(&[2; 32]);
+
+        index.clear();
+
+        assert!(!index.contains(&[2; 32]));
+        assert!(!index.contains(&[3; 32]));
+    }
+
+    fn test_insert_trivial() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let fork1 = db1.fork();
+        let fork2 = db2.fork();
+
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index1.put(&[255; 32], vec![1]);
+        index1.put(&[254; 32], vec![2]);
+
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index2.put(&[254; 32], vec![2]);
+        index2.put(&[255; 32], vec![1]);
+
+        assert_eq!(index1.get(&[255; 32]), Some(vec![1]));
+        assert_eq!(index1.get(&[254; 32]), Some(vec![2]));
+        assert_eq!(index2.get(&[255; 32]), Some(vec![1]));
+        assert_eq!(index2.get(&[254; 32]), Some(vec![2]));
+
+        assert_ne!(index1.object_hash(), HashTag::empty_map_hash());
+        assert_eq!(index1.object_hash(), index2.object_hash());
+    }
+
+    fn test_insert_same_key() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        assert_eq!(table.object_hash(), HashTag::empty_map_hash());
+        let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
+        let hash = HashStream::new()
+            .update(&[HashTag::MapBranchNode as u8])
+            .update(root_prefix)
+            .update(HashTag::hash_leaf(&[2]).as_ref())
+            .hash();
+
+        table.put(&[255; 32], vec![1]);
+        table.put(&[255; 32], vec![2]);
+        assert_eq!(table.get(&[255; 32]), Some(vec![2]));
+        assert_eq!(table.object_hash(), HashTag::hash_map_node(hash));
+    }
+
+    fn test_insert_simple() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let fork1 = db1.fork();
+        let fork2 = db2.fork();
+
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index1.put(&[255; 32], vec![3]);
+        index1.put(&[254; 32], vec![2]);
+        index1.put(&[250; 32], vec![1]);
+        index1.put(&[254; 32], vec![5]);
+
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index2.put(&[250; 32], vec![1]);
+        index2.put(&[254; 32], vec![2]);
+        index2.put(&[255; 32], vec![3]);
+        index2.put(&[254; 32], vec![5]);
+
+        assert!(index1.object_hash() != Hash::zero());
+        assert_eq!(index1.object_hash(), index2.object_hash());
+    }
+
+    fn test_insert_reverse() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let fork1 = db1.fork();
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index1.put(&[42; 32], vec![1]);
+        index1.put(&[64; 32], vec![2]);
+        index1.put(&[240; 32], vec![3]);
+        index1.put(&[245; 32], vec![4]);
+        index1.put(&[250; 32], vec![5]);
+        index1.put(&[255; 32], vec![6]);
+
+        let fork2 = db2.fork();
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index2.put(&[255; 32], vec![6]);
+        index2.put(&[250; 32], vec![5]);
+        index2.put(&[245; 32], vec![4]);
+        index2.put(&[240; 32], vec![3]);
+        index2.put(&[64; 32], vec![2]);
+        index2.put(&[42; 32], vec![1]);
+
+        assert!(index2.object_hash() != Hash::zero());
+        assert_eq!(index2.object_hash(), index1.object_hash());
+    }
+
+    fn test_remove_trivial() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let fork1 = db1.fork();
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index1.put(&[255; 32], vec![6]);
+        index1.remove(&[255; 32]);
+
+        let fork2 = db2.fork();
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index2.put(&[255; 32], vec![6]);
+        index2.remove(&[255; 32]);
+
+        assert_eq!(index1.object_hash(), HashTag::empty_map_hash());
+        assert_eq!(index2.object_hash(), HashTag::empty_map_hash());
+    }
+
+    fn test_remove_simple() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let fork1 = db1.fork();
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        index1.put(&[255; 32], vec![1]);
+        index1.put(&[250; 32], vec![2]);
+        index1.put(&[245; 32], vec![3]);
+
+        index1.remove(&[255; 32]);
+        index1.remove(&[245; 32]);
+
+        let fork2 = db2.fork();
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index2.put(&[250; 32], vec![2]);
+        index2.put(&[255; 32], vec![1]);
+        index2.put(&[245; 32], vec![3]);
+
+        index2.remove(&[255; 32]);
+        index2.remove(&[245; 32]);
+
+        assert_eq!(index2.get(&[250; 32]), Some(vec![2]));
+        assert_eq!(index1.get(&[250; 32]), Some(vec![2]));
+        assert!(index1.get(&[255; 32]).is_none());
+        assert!(index2.get(&[255; 32]).is_none());
+        assert!(index1.get(&[245; 32]).is_none());
+        assert!(index2.get(&[245; 32]).is_none());
+
+        assert_eq!(index1.object_hash(), index2.object_hash());
+    }
+
+    fn test_remove_reverse() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let fork1 = db1.fork();
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        index1.put(&[42; 32], vec![1]);
+        index1.put(&[64; 32], vec![2]);
+        index1.put(&[240; 32], vec![3]);
+        index1.put(&[245; 32], vec![4]);
+        index1.put(&[250; 32], vec![5]);
+        index1.put(&[255; 32], vec![6]);
+
+        index1.remove(&[255; 32]);
+        index1.remove(&[250; 32]);
+        index1.remove(&[245; 32]);
+        index1.remove(&[240; 32]);
+        index1.remove(&[64; 32]);
+        index1.remove(&[42; 32]);
+
+        let fork2 = db2.fork();
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        index2.put(&[255; 32], vec![6]);
+        index2.put(&[250; 32], vec![5]);
+        index2.put(&[245; 32], vec![4]);
+        index2.put(&[240; 32], vec![3]);
+        index2.put(&[64; 32], vec![2]);
+        index2.put(&[42; 32], vec![1]);
+
+        index2.remove(&[42; 32]);
+        index2.remove(&[64; 32]);
+        index2.remove(&[240; 32]);
+        index2.remove(&[245; 32]);
+        index2.remove(&[250; 32]);
+        index2.remove(&[255; 32]);
+
+        assert_eq!(index2.object_hash(), index1.object_hash());
+    }
+
+    fn test_clear() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+
+        let mut index = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        index.put(&[1; 32], 1);
+        let root_hash = index.merkle_root();
+
+        index.clear();
+        assert_eq!(index.merkle_root(), Hash::zero());
+
+        index.put(&[1; 32], 1);
+        assert_eq!(index.merkle_root(), root_hash);
+    }
+
+    fn test_fuzz_insert() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let mut data = generate_random_data(100);
+        let mut rng = rand::thread_rng();
+        let fork1 = db1.fork();
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        for item in &data {
+            index1.put(&item.0, item.1.clone());
+        }
+
+        let fork2 = db2.fork();
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        data.shuffle(&mut rng);
+        for item in &data {
+            index2.put(&item.0, item.1.clone());
+        }
+
+        for item in &data {
+            let v1 = index1.get(&item.0);
+            let v2 = index2.get(&item.0);
+            assert_eq!(v1.as_ref(), Some(&item.1));
+            assert_eq!(v2.as_ref(), Some(&item.1));
+        }
+
+        assert!(index2.object_hash() != HashTag::empty_map_hash());
+        assert_eq!(index2.object_hash(), index1.object_hash());
+
+        // Test same keys
+        data.shuffle(&mut rng);
+        for item in &data {
+            index1.put(&item.0, vec![1]);
+        }
+        data.shuffle(&mut rng);
+        for item in &data {
+            index2.put(&item.0, vec![1]);
+        }
+
+        for item in &data {
+            let v1 = index1.get(&item.0);
+            let v2 = index2.get(&item.0);
+            assert_eq!(v1.as_ref(), Some(&vec![1]));
+            assert_eq!(v2.as_ref(), Some(&vec![1]));
+        }
+        assert_eq!(index2.object_hash(), index1.object_hash());
+    }
+
+    fn test_build_proof_in_empty_tree() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        // Just to notify the compiler of the types used; same key is added and then removed from tree.
+        table.put(&[230; 32], vec![1]);
+        table.remove(&[230; 32]);
+
+        let proof = table.get_proof([244; 32]);
+        assert_eq!(proof.proof_unchecked(), vec![]);
+        check_map_proof(&proof, None, &table);
+    }
+
+    fn test_build_multiproof_in_empty_tree() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        // Just to notify the compiler of the types used; same key is added and then removed from tree.
+        table.put(&[230; 32], vec![1]);
+        table.remove(&[230; 32]);
+
+        let keys = vec![[0; 32], [230; 32], [244; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(proof.proof_unchecked(), vec![]);
+        check_map_multiproof(&proof, keys, &table);
+    }
+
+    fn test_build_proof_in_single_node_tree() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        table.put(&[230; 32], vec![1]);
+        let proof = table.get_proof([230; 32]);
+        assert_eq!(proof.proof_unchecked(), vec![]);
+        check_map_proof(&proof, Some([230; 32]), &table);
+
+        let proof = table.get_proof([128; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[230; 32]), HashTag::hash_leaf(&[1]))]
+        );
+        check_map_proof(&proof, None, &table);
+    }
+
+    fn test_build_multiproof_in_single_node_tree() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        table.put(&[230; 32], vec![1]);
+
+        let keys = vec![[230; 32], [1; 32], [129; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(proof.proof_unchecked(), vec![]);
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[229; 32], [1; 32], [129; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[230; 32]), HashTag::hash_leaf(&[1]))]
+        );
+        check_map_multiproof(&proof, keys, &table);
+    }
+
+    fn test_build_proof_in_complex_tree() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        table.put(&[128; 32], vec![1]); // 128 = 0b1000_0000 ~ ProofPath(00000001...)
+        table.put(&[32; 32], vec![2]); //   32 = 0b0010_0000 ~ ProofPath(00000100...)
+        let proof = table.get_proof([128; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
+        );
+        check_map_proof(&proof, Some([128; 32]), &table);
+
+        let proof = table.get_proof([32; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1]))]
+        );
+        check_map_proof(&proof, Some([32; 32]), &table);
+
+        // Key left of all keys in the tree
+        let proof = table.get_proof([0; 32]);
+        let exp_proof = vec![
+            (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+            (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+        ];
+        assert_eq!(proof.proof_unchecked(), exp_proof);
+        check_map_proof(&proof, None, &table);
+
+        // Key between the keys in the tree
+        let proof = table.get_proof([64; 32]); // 64 ~ ProofPath(00000010...)
+        assert_eq!(proof.proof_unchecked(), exp_proof);
+        check_map_proof(&proof, None, &table);
+
+        // Key to the right of all keys
+        let proof = table.get_proof([255; 32]);
+        assert_eq!(proof.proof_unchecked(), exp_proof);
+        check_map_proof(&proof, None, &table);
+
+        // Insert key that splits 15-bit segment off the left key in the tree.
+        // The key itself is to the left of the `[128; 32]` key.
+        let left_key = {
+            let mut key = [0; 32];
+            key[0] = 128;
+            table.put(&key, vec![3]);
+            key
+        };
+
+        let left_hash = {
+            let mut node = BranchNode::empty();
+            node.set_child(
+                ChildKind::Left,
+                &S::transform_key(&left_key),
+                &HashTag::hash_leaf(&[3]),
+            );
+            node.set_child(
+                ChildKind::Right,
+                &S::transform_key(&[128; 32]),
+                &HashTag::hash_leaf(&[1]),
+            );
+            node.object_hash()
+        };
+
+        let proof = table.get_proof([128; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_proof(&proof, Some([128; 32]), &table);
+
+        let proof = table.get_proof([64; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_proof(&proof, None, &table);
+
+        let proof = table.get_proof([32; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&left_key).prefix(15), left_hash)]
+        );
+        check_map_proof(&proof, Some([32; 32]), &table);
+
+        let proof = table.get_proof([1; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_proof(&proof, None, &table);
+
+        // Insert key that splits 12-bit segment off the [32; 32] key in the tree.
+        // The key is to the right of the [32; 32] key.
+        let right_key = {
+            let mut key = [0; 32];
+            key[0] = 32;
+            key[1] = 0b1001_0000; // represented as `..00001001..` in `ProofPath`
+            table.put(&key, vec![4]);
+            key
+        };
+
+        let right_hash = {
+            let mut node = BranchNode::empty();
+            node.set_child(
+                ChildKind::Left,
+                &S::transform_key(&[32; 32]),
+                &HashTag::hash_leaf(&[2]),
+            );
+            node.set_child(
+                ChildKind::Right,
+                &S::transform_key(&right_key),
+                &HashTag::hash_leaf(&[4]),
+            );
+            node.object_hash()
+        };
+
+        let proof = table.get_proof([128; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&right_key).prefix(12), right_hash),
+            ]
+        );
+        check_map_proof(&proof, Some([128; 32]), &table);
+
+        // Non-existing key between two children at the root node
+        let proof = table.get_proof([64; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&right_key).prefix(12), right_hash),
+            ]
+        );
+        check_map_proof(&proof, None, &table);
+
+        // Non-existing key between the first added node `[128; 32]` and the `left_key`.
+        let nonexisting_key = {
+            let mut key = [0; 32];
+            key[0] = 128;
+            key[1] = 128;
+            key[29] = 29;
+            key
+        };
+
+        let proof = table.get_proof(nonexisting_key);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&right_key).prefix(12), right_hash),
+            ]
+        );
+        check_map_proof(&proof, None, &table);
+
+        let subtree_hash = table.merkle_root();
+        table.put(&[129; 32], vec![5]);
+        // The tree is now as follows:
+        // - Bits(0000_0): -> (subtree_hash)
+        //   - Bits(...001_0000_000): -> (left_hash)
+        //     - left_key -> [3]
+        //     - [1; 32] -> [1]
+        //   - Bits(...100_0000): -> (right_hash)
+        //     - [4; 32] -> [2]
+        //     - right_key -> [4]
+        // - [129; 32] -> [5]
+
+        let proof = table.get_proof([129; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[0; 32]).prefix(5), subtree_hash)]
+        );
+        check_map_proof(&proof, Some([129; 32]), &table);
+
+        let proof = table.get_proof([1; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&[0; 32]).prefix(5), subtree_hash),
+                (S::transform_key(&[129; 32]), HashTag::hash_leaf(&[5])),
+            ]
+        );
+        check_map_proof(&proof, None, &table);
+
+        let proof = table.get_proof([32; 32]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key).prefix(15), left_hash),
+                (S::transform_key(&right_key), HashTag::hash_leaf(&[4])),
+                (S::transform_key(&[129; 32]), HashTag::hash_leaf(&[5])),
+            ]
+        );
+        check_map_proof(&proof, Some([32; 32]), &table);
+    }
+
+    fn test_build_multiproof_simple() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        table.put(&[128; 32], vec![1]);
+        table.put(&[32; 32], vec![2]);
+
+        let keys = vec![[0; 32], [128; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32], [32; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(proof.proof_unchecked(), vec![]);
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[64; 32], [0; 32], [129; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[64; 32], [129; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[64; 32], [64; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_multiproof(&proof, vec![[64; 32]], &table);
+
+        let keys = vec![[128; 32], [64; 32], [128; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
+        );
+        check_map_multiproof(&proof, vec![[128; 32], [64; 32]], &table);
+
+        let keys = vec![[255; 32], [129; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        // Insert key that splits 15-bit segment off the left key in the tree.
+        // The key itself is to the left of the `[1; 32]` key.
+        let left_key = {
+            let mut key = [0; 32];
+            key[0] = 128;
+            table.put(&key, vec![3]);
+            key
+        };
+
+        let left_hash = {
+            let mut node = BranchNode::empty();
+            node.set_child(
+                ChildKind::Left,
+                &S::transform_key(&left_key),
+                &HashTag::hash_leaf(&[3]),
+            );
+            node.set_child(
+                ChildKind::Right,
+                &S::transform_key(&[128; 32]),
+                &HashTag::hash_leaf(&[1]),
+            );
+            node.object_hash()
+        };
+
+        let proof = table.get_multiproof(vec![[0; 32]]);
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&[128; 32]).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_multiproof(&proof, vec![[0; 32]], &table);
+
+        let keys = {
+            // `key > [128; 32]`, which is visible from the `left_key` / `[128; 32]` junction
+            let mut key = [128; 32];
+            key[1] = 8;
+            vec![[0; 32], key, [64; 32]]
+        };
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&[128; 32]).prefix(15), left_hash),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[0; 32], [128; 32], [64; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2])),
+            ]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[0; 32], [128; 32], [32; 32], [64; 32], [129; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&left_key), HashTag::hash_leaf(&[3]))]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = vec![[0; 32], [32; 32], [255; 32]];
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![(S::transform_key(&[128; 32]).prefix(15), left_hash)]
+        );
+        check_map_multiproof(&proof, keys, &table);
+
+        let keys = {
+            // `key` is between `left_key` and `[128; 32]`, so they both should be returned
+            // in the proof to prove non-existence of `key`
+            let mut key = [0; 32];
+            key[0] = 128;
+            key[1] = 128;
+            vec![[0; 32], [32; 32], key]
+        };
+        let proof = table.get_multiproof(keys.clone());
+        assert_eq!(
+            proof.proof_unchecked(),
+            vec![
+                (S::transform_key(&left_key), HashTag::hash_leaf(&[3])),
+                (S::transform_key(&[128; 32]), HashTag::hash_leaf(&[1])),
+            ]
+        );
+        check_map_multiproof(&proof, keys, &table);
+    }
+
+    fn test_fuzz_delete() {
+        let db1 = TemporaryDB::default();
+        let db2 = TemporaryDB::default();
+        let mut data = generate_random_data(100);
+        let mut rng = rand::thread_rng();
+        let fork1 = db1.fork();
+        let mut index1 = fork1.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        for item in &data {
+            index1.put(&item.0, item.1.clone());
+        }
+
+        let fork2 = db2.fork();
+        let mut index2 = fork2.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+        data.shuffle(&mut rng);
+
+        for item in &data {
+            index2.put(&item.0, item.1.clone());
+        }
+
+        let saved_hash = index1.object_hash();
+
+        let mut keys_to_remove = data
+            .iter()
+            .take(50)
+            .map(|(key, _)| *key)
+            .collect::<Vec<_>>();
+
+        keys_to_remove.shuffle(&mut rng);
+        for key in &keys_to_remove {
+            index1.remove(key);
+        }
+        keys_to_remove.shuffle(&mut rng);
+        for key in &keys_to_remove {
+            index2.remove(key);
+        }
+
+        for key in &keys_to_remove {
+            assert!(index1.get(key).is_none());
+            assert!(index2.get(key).is_none());
+        }
+
+        assert!(index2.object_hash() != Hash::zero());
+        assert_eq!(index2.object_hash(), index1.object_hash());
+
+        for item in &data {
+            index1.put(&item.0, item.1.clone());
+        }
+        data.shuffle(&mut rng);
+        for item in &data {
+            index2.put(&item.0, item.1.clone());
+        }
+
+        for item in &data {
+            let v1 = index1.get(&item.0);
+            let v2 = index2.get(&item.0);
+            assert_eq!(v1.as_ref(), Some(&item.1));
+            assert_eq!(v2.as_ref(), Some(&item.1));
+        }
+        assert_eq!(index2.object_hash(), index1.object_hash());
+        assert_eq!(index2.object_hash(), saved_hash);
+    }
+
+    fn test_fuzz_insert_after_delete() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut index = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        let data = generate_random_data(100);
+
+        for item in &data[0..50] {
+            index.put(&item.0, item.1.clone());
+        }
+        let saved_hash = index.object_hash();
+        for item in &data[50..] {
+            index.put(&item.0, item.1.clone());
+        }
+        for item in &data[50..] {
+            index.remove(&item.0);
+        }
+
+        for item in &data[0..50] {
+            let v1 = index.get(&item.0);
+            assert_eq!(v1.as_ref(), Some(&item.1));
+        }
+        for item in &data[50..] {
+            let v1 = index.get(&item.0);
+            assert_eq!(v1.as_ref(), None);
+        }
+        assert_eq!(index.object_hash(), saved_hash);
+    }
+
+    fn test_iter() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut map_index = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
+
+        let k0 = [0; 32];
+        let k1 = [1; 32];
+        let k2 = [2; 32];
+        let k3 = [3; 32];
+        let k4 = [4; 32];
+
+        map_index.put(&k1, 1_u8);
+        map_index.put(&k2, 2_u8);
+        map_index.put(&k3, 3_u8);
+
+        assert_eq!(
+            map_index.iter().collect::<Vec<([u8; 32], u8)>>(),
+            vec![(k1, 1), (k2, 2), (k3, 3)]
+        );
+
+        assert_eq!(
+            map_index.iter_from(&k0).collect::<Vec<([u8; 32], u8)>>(),
+            vec![(k1, 1), (k2, 2), (k3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&k1).collect::<Vec<([u8; 32], u8)>>(),
+            vec![(k1, 1), (k2, 2), (k3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&k2).collect::<Vec<([u8; 32], u8)>>(),
+            vec![(k2, 2), (k3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&k4).collect::<Vec<([u8; 32], u8)>>(),
+            Vec::<([u8; 32], u8)>::new()
+        );
+
+        assert_eq!(
+            map_index.keys().collect::<Vec<[u8; 32]>>(),
+            vec![k1, k2, k3]
+        );
+
+        assert_eq!(
+            map_index.keys_from(&k0).collect::<Vec<[u8; 32]>>(),
+            vec![k1, k2, k3]
+        );
+        assert_eq!(
+            map_index.keys_from(&k1).collect::<Vec<[u8; 32]>>(),
+            vec![k1, k2, k3]
+        );
+        assert_eq!(
+            map_index.keys_from(&k2).collect::<Vec<[u8; 32]>>(),
+            vec![k2, k3]
+        );
+        assert_eq!(
+            map_index.keys_from(&k4).collect::<Vec<[u8; 32]>>(),
+            Vec::<[u8; 32]>::new()
+        );
+
+        assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
+
+        assert_eq!(
+            map_index.values_from(&k0).collect::<Vec<u8>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            map_index.values_from(&k1).collect::<Vec<u8>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(map_index.values_from(&k2).collect::<Vec<u8>>(), vec![2, 3]);
+        assert_eq!(
+            map_index.values_from(&k4).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
+    }
 }
 
 #[test]
-fn test_insert_trivial() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-    let fork1 = db1.fork();
-    let fork2 = db2.fork();
+fn test_map_methods_raw() {
+    ProofMapTester::<Raw>::test_map_methods()
+}
 
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-    index1.put(&[255; 32], vec![1]);
-    index1.put(&[254; 32], vec![2]);
+#[test]
+fn test_map_methods_hashed() {
+    ProofMapTester::<Hashed>::test_map_methods()
+}
 
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    index2.put(&[254; 32], vec![2]);
-    index2.put(&[255; 32], vec![1]);
+#[test]
+fn test_insert_trivial_raw() {
+    ProofMapTester::<Raw>::test_insert_trivial()
+}
 
-    assert_eq!(index1.get(&[255; 32]), Some(vec![1]));
-    assert_eq!(index1.get(&[254; 32]), Some(vec![2]));
-    assert_eq!(index2.get(&[255; 32]), Some(vec![1]));
-    assert_eq!(index2.get(&[254; 32]), Some(vec![2]));
+#[test]
+fn test_insert_trivial_hashed() {
+    ProofMapTester::<Hashed>::test_insert_trivial()
+}
 
-    assert_ne!(index1.object_hash(), HashTag::empty_map_hash());
-    assert_eq!(index1.object_hash(), index2.object_hash());
+#[test]
+fn test_insert_same_key_raw() {
+    ProofMapTester::<Raw>::test_insert_same_key()
+}
+
+#[test]
+fn test_insert_simple_raw() {
+    ProofMapTester::<Raw>::test_insert_simple()
+}
+
+#[test]
+fn test_insert_simple_hashed() {
+    ProofMapTester::<Hashed>::test_insert_simple()
+}
+
+#[test]
+fn test_insert_reverse_raw() {
+    ProofMapTester::<Raw>::test_insert_reverse()
+}
+
+#[test]
+fn test_insert_reverse_hashed() {
+    ProofMapTester::<Hashed>::test_insert_reverse()
+}
+
+#[test]
+fn test_remove_trivial_raw() {
+    ProofMapTester::<Raw>::test_remove_trivial()
+}
+
+#[test]
+fn test_remove_trivial_hashed() {
+    ProofMapTester::<Hashed>::test_remove_trivial()
+}
+
+#[test]
+fn test_remove_simple_raw() {
+    ProofMapTester::<Raw>::test_remove_simple()
+}
+
+#[test]
+fn test_remove_simple_hashed() {
+    ProofMapTester::<Hashed>::test_remove_simple()
+}
+
+#[test]
+fn test_remove_reverse_raw() {
+    ProofMapTester::<Raw>::test_remove_reverse()
+}
+
+#[test]
+fn test_remove_reverse_hashed() {
+    ProofMapTester::<Hashed>::test_remove_reverse()
+}
+
+#[test]
+fn test_clear_raw() {
+    ProofMapTester::<Raw>::test_clear()
+}
+
+#[test]
+fn test_clear_hashed() {
+    ProofMapTester::<Hashed>::test_clear()
+}
+
+#[test]
+fn test_fuzz_insert_raw() {
+    ProofMapTester::<Raw>::test_fuzz_insert()
+}
+
+#[test]
+fn test_fuzz_insert_hashed() {
+    ProofMapTester::<Hashed>::test_fuzz_insert()
+}
+
+#[test]
+fn test_build_proof_in_empty_tree_raw() {
+    ProofMapTester::<Raw>::test_build_proof_in_empty_tree()
+}
+
+#[test]
+fn test_build_proof_in_empty_tree_hashed() {
+    ProofMapTester::<Hashed>::test_build_proof_in_empty_tree()
+}
+
+#[test]
+fn test_build_multiproof_in_empty_tree_raw() {
+    ProofMapTester::<Raw>::test_build_multiproof_in_empty_tree()
+}
+
+#[test]
+fn test_build_multiproof_in_empty_tree_hashed() {
+    ProofMapTester::<Hashed>::test_build_multiproof_in_empty_tree()
+}
+
+#[test]
+fn test_build_multiproof_in_single_node_tree_raw() {
+    ProofMapTester::<Raw>::test_build_multiproof_in_single_node_tree()
+}
+
+#[test]
+fn test_build_multiproof_in_single_node_tree_hashed() {
+    ProofMapTester::<Hashed>::test_build_multiproof_in_single_node_tree()
+}
+
+#[test]
+fn test_build_proof_in_complex_tree_raw() {
+    ProofMapTester::<Raw>::test_build_proof_in_complex_tree()
+}
+
+#[test]
+fn test_build_multiproof_simple_raw() {
+    ProofMapTester::<Raw>::test_build_multiproof_simple()
+}
+
+#[test]
+fn test_fuzz_delete_raw() {
+    ProofMapTester::<Raw>::test_fuzz_delete()
+}
+
+#[test]
+fn test_fuzz_delete_hashed() {
+    ProofMapTester::<Hashed>::test_fuzz_delete()
+}
+
+#[test]
+fn test_fuzz_insert_after_delete_raw() {
+    ProofMapTester::<Raw>::test_fuzz_insert_after_delete()
+}
+
+#[test]
+fn test_fuzz_insert_after_delete_hashed() {
+    ProofMapTester::<Hashed>::test_fuzz_insert_after_delete()
+}
+
+#[test]
+fn test_iter_raw() {
+    ProofMapTester::<Raw>::test_iter()
+}
+
+#[test]
+fn test_iter_hashed() {
+    ProofMapTester::<Hashed>::test_iter()
+}
+
+#[test]
+fn test_build_proof_in_single_node_tree_raw() {
+    ProofMapTester::<Raw>::test_build_proof_in_single_node_tree()
+}
+
+#[test]
+fn test_build_proof_in_single_node_tree_hashed() {
+    ProofMapTester::<Hashed>::test_build_proof_in_single_node_tree()
 }
 
 #[test]
 fn test_insert_same_key() {
-    let db = TemporaryDB::new();
+    let db = TemporaryDB::default();
     let fork = db.fork();
-    let mut table = fork.get_proof_map(IDX_NAME);
+    let mut table = fork.get_raw_proof_map(IDX_NAME);
     assert_eq!(table.object_hash(), HashTag::empty_map_hash());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
     let hash = HashStream::new()
@@ -155,161 +1187,8 @@ fn test_insert_same_key() {
 }
 
 #[test]
-fn test_insert_simple() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-    let fork1 = db1.fork();
-    let fork2 = db2.fork();
-
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-    index1.put(&[255; 32], vec![3]);
-    index1.put(&[254; 32], vec![2]);
-    index1.put(&[250; 32], vec![1]);
-    index1.put(&[254; 32], vec![5]);
-
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    index2.put(&[250; 32], vec![1]);
-    index2.put(&[254; 32], vec![2]);
-    index2.put(&[255; 32], vec![3]);
-    index2.put(&[254; 32], vec![5]);
-
-    assert!(index1.object_hash() != Hash::zero());
-    assert_eq!(index1.object_hash(), index2.object_hash());
-}
-
-#[test]
-fn test_insert_reverse() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-    let fork1 = db1.fork();
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-    index1.put(&[42; 32], vec![1]);
-    index1.put(&[64; 32], vec![2]);
-    index1.put(&[240; 32], vec![3]);
-    index1.put(&[245; 32], vec![4]);
-    index1.put(&[250; 32], vec![5]);
-    index1.put(&[255; 32], vec![6]);
-
-    let fork2 = db2.fork();
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    index2.put(&[255; 32], vec![6]);
-    index2.put(&[250; 32], vec![5]);
-    index2.put(&[245; 32], vec![4]);
-    index2.put(&[240; 32], vec![3]);
-    index2.put(&[64; 32], vec![2]);
-    index2.put(&[42; 32], vec![1]);
-
-    assert!(index2.object_hash() != Hash::zero());
-    assert_eq!(index2.object_hash(), index1.object_hash());
-}
-
-#[test]
-fn test_remove_trivial() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-
-    let fork1 = db1.fork();
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-    index1.put(&[255; 32], vec![6]);
-    index1.remove(&[255; 32]);
-
-    let fork2 = db2.fork();
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    index2.put(&[255; 32], vec![6]);
-    index2.remove(&[255; 32]);
-
-    assert_eq!(index1.object_hash(), HashTag::empty_map_hash());
-    assert_eq!(index2.object_hash(), HashTag::empty_map_hash());
-}
-
-#[test]
-fn test_remove_simple() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-    let fork1 = db1.fork();
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-    index1.put(&[255; 32], vec![1]);
-    index1.put(&[250; 32], vec![2]);
-    index1.put(&[245; 32], vec![3]);
-    index1.remove(&[255; 32]);
-    index1.remove(&[245; 32]);
-
-    let fork2 = db2.fork();
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    index2.put(&[250; 32], vec![2]);
-    index2.put(&[255; 32], vec![1]);
-    index2.put(&[245; 32], vec![3]);
-    index2.remove(&[255; 32]);
-    index2.remove(&[245; 32]);
-
-    assert_eq!(index2.get(&[250; 32]), Some(vec![2]));
-    assert_eq!(index1.get(&[250; 32]), Some(vec![2]));
-    assert!(index1.get(&[255; 32]).is_none());
-    assert!(index2.get(&[255; 32]).is_none());
-    assert!(index1.get(&[245; 32]).is_none());
-    assert!(index2.get(&[245; 32]).is_none());
-
-    assert_eq!(index1.object_hash(), index2.object_hash());
-}
-
-#[test]
-fn test_remove_reverse() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-    let fork1 = db1.fork();
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-    index1.put(&[42; 32], vec![1]);
-    index1.put(&[64; 32], vec![2]);
-    index1.put(&[240; 32], vec![3]);
-    index1.put(&[245; 32], vec![4]);
-    index1.put(&[250; 32], vec![5]);
-    index1.put(&[255; 32], vec![6]);
-
-    index1.remove(&[255; 32]);
-    index1.remove(&[250; 32]);
-    index1.remove(&[245; 32]);
-    index1.remove(&[240; 32]);
-    index1.remove(&[64; 32]);
-    index1.remove(&[42; 32]);
-
-    let fork2 = db2.fork();
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    index2.put(&[255; 32], vec![6]);
-    index2.put(&[250; 32], vec![5]);
-    index2.put(&[245; 32], vec![4]);
-    index2.put(&[240; 32], vec![3]);
-    index2.put(&[64; 32], vec![2]);
-    index2.put(&[42; 32], vec![1]);
-
-    index2.remove(&[42; 32]);
-    index2.remove(&[64; 32]);
-    index2.remove(&[240; 32]);
-    index2.remove(&[245; 32]);
-    index2.remove(&[250; 32]);
-    index2.remove(&[255; 32]);
-
-    assert_eq!(index2.object_hash(), index1.object_hash());
-}
-
-#[test]
-fn test_clear() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-
-    let mut index = fork.get_proof_map(IDX_NAME);
-    index.put(&[1; 32], 1);
-    let root_hash = index.merkle_root();
-
-    index.clear();
-    assert_eq!(index.merkle_root(), Hash::zero());
-
-    index.put(&[1; 32], 1);
-    assert_eq!(index.merkle_root(), root_hash);
-}
-
-#[test]
 fn test_merkle_root_leaf() {
-    let db = TemporaryDB::new();
+    let db = TemporaryDB::default();
     let fork = db.fork();
     let mut index = fork.get_proof_map(IDX_NAME);
 
@@ -319,68 +1198,23 @@ fn test_merkle_root_leaf() {
 
     let merkle_root = HashStream::new()
         .update(&[HashTag::MapBranchNode as u8])
-        .update(ProofPath::new(&key).as_bytes())
+        .update(Hashed::transform_key(&key).as_bytes())
         .update(HashTag::hash_leaf(&value).as_ref())
         .hash();
     assert_eq!(HashTag::hash_map_node(merkle_root), index.object_hash());
 }
 
-#[test]
-fn test_fuzz_insert() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-    let mut data = generate_random_data(100);
-    let mut rng = rand::thread_rng();
-    let fork1 = db1.fork();
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-
-    for item in &data {
-        index1.put(&item.0, item.1.clone());
-    }
-
-    let fork2 = db2.fork();
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    data.shuffle(&mut rng);
-    for item in &data {
-        index2.put(&item.0, item.1.clone());
-    }
-
-    for item in &data {
-        let v1 = index1.get(&item.0);
-        let v2 = index2.get(&item.0);
-        assert_eq!(v1.as_ref(), Some(&item.1));
-        assert_eq!(v2.as_ref(), Some(&item.1));
-    }
-
-    assert!(index2.object_hash() != HashTag::empty_map_hash());
-    assert_eq!(index2.object_hash(), index1.object_hash());
-
-    // Test same keys
-    data.shuffle(&mut rng);
-    for item in &data {
-        index1.put(&item.0, vec![1]);
-    }
-    data.shuffle(&mut rng);
-    for item in &data {
-        index2.put(&item.0, vec![1]);
-    }
-
-    for item in &data {
-        let v1 = index1.get(&item.0);
-        let v2 = index2.get(&item.0);
-        assert_eq!(v1.as_ref(), Some(&vec![1]));
-        assert_eq!(v2.as_ref(), Some(&vec![1]));
-    }
-    assert_eq!(index2.object_hash(), index1.object_hash());
-}
-
-fn check_map_proof<K, V>(proof: &MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<&Fork, K, V>)
-where
+fn check_map_proof<K, V, S>(
+    proof: &MapProof<K, V, S>,
+    key: Option<K>,
+    table: &ProofMapIndex<&Fork, K, V, S>,
+) where
     K: BinaryKey + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
+    S: ToProofPath<K>,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
-    let deserialized_proof: MapProof<K, V> = serde_json::from_value(serialized_proof).unwrap();
+    let deserialized_proof: MapProof<K, V, S> = serde_json::from_value(serialized_proof).unwrap();
 
     let entries = match key {
         Some(key) => {
@@ -408,13 +1242,14 @@ where
     assert_eq!(deserialized_proof.index_hash(), proof.index_hash());
 }
 
-fn check_map_multiproof<K, V>(
-    proof: &MapProof<K, V>,
+fn check_map_multiproof<K, V, S>(
+    proof: &MapProof<K, V, S>,
     keys: Vec<K>,
-    table: &ProofMapIndex<&Fork, K, V>,
+    table: &ProofMapIndex<&Fork, K, V, S>,
 ) where
     K: BinaryKey + ObjectHash + PartialEq + Debug,
     V: BinaryValue + ObjectHash + PartialEq + Debug,
+    S: ToProofPath<K>,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -430,12 +1265,17 @@ fn check_map_multiproof<K, V>(
         }
 
         // Sort entries and missing keys by the order imposed by the `ProofPath`
-        // serialization of the keys.
+        // serialization of the keys
         entries.sort_unstable_by(|&(ref x, _), &(ref y, _)| {
-            ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
+            S::transform_key(x)
+                .partial_cmp(&S::transform_key(y))
+                .unwrap()
         });
-        missing_keys
-            .sort_unstable_by(|x, y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+        missing_keys.sort_unstable_by(|x, y| {
+            S::transform_key(x)
+                .partial_cmp(&S::transform_key(y))
+                .unwrap()
+        });
 
         (entries, missing_keys)
     };
@@ -444,8 +1284,11 @@ fn check_map_multiproof<K, V>(
     assert_eq!(proof.index_hash(), table.object_hash());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
-        actual_keys
-            .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
+        actual_keys.sort_unstable_by(|&x, &y| {
+            S::transform_key(x)
+                .partial_cmp(&S::transform_key(y))
+                .unwrap()
+        });
         actual_keys
     });
     assert_eq!(
@@ -456,7 +1299,9 @@ fn check_map_multiproof<K, V>(
         {
             let mut actual_entries = proof.entries().collect::<Vec<_>>();
             actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
-                ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
+                S::transform_key(x)
+                    .partial_cmp(&S::transform_key(y))
+                    .unwrap()
             });
             actual_entries
         }
@@ -543,8 +1388,8 @@ fn test_invalid_map_proofs() {
 
     let h = hash(&[1]);
 
-    let proof: MapProof<[u8; 32], Vec<u8>> =
-        MapProof::new().add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h);
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> =
+        MapProof::new().add_proof_entry(Raw::transform_key(&[1; 32]).prefix(240), h);
     match proof.check().unwrap_err() {
         NonTerminalNode(..) => {}
         e => panic!("expected non-terminal node error, got {}", e),
@@ -557,39 +1402,47 @@ fn test_invalid_map_proofs() {
         ],
         "entries": []
     });
-    let proof: MapProof<[u8; 32], Vec<u8>> = serde_json::from_value(json).unwrap();
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = serde_json::from_value(json).unwrap();
     match proof.check().unwrap_err() {
         InvalidOrdering(..) => {}
         e => panic!("expected invalid ordering error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(77), h);
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(3), h)
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(77), h);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         EmbeddedPaths { .. } => {}
         e => panic!("expected embedded paths error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
-        .add_proof_entry(ProofPath::new(&[1; 32]), h)
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[1; 32]).prefix(3), h)
+        .add_entry([1; 32], vec![1, 2, 3]);
+    match proof.check().unwrap_err() {
+        EmbeddedPaths { .. } => {}
+        e => panic!("expected embedded paths error, got {}", e),
+    }
+
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[0; 32]).prefix(10), h)
+        .add_proof_entry(Raw::transform_key(&[1; 32]), h)
         .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
         DuplicatePath(..) => {}
         e => panic!("expected duplicate path error, got {}", e),
     }
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::new()
-        .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
+    let proof: MapProof<[u8; 32], Vec<u8>, Raw> = MapProof::new()
+        .add_proof_entry(Raw::transform_key(&[0; 32]).prefix(10), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .add_entry([1; 32], vec![1, 2, 3]);
     match proof.check().unwrap_err() {
@@ -599,467 +1452,8 @@ fn test_invalid_map_proofs() {
 }
 
 #[test]
-fn test_build_proof_in_empty_tree() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut table = fork.get_proof_map(IDX_NAME);
-
-    // Just to notify the compiler of the types used; same key is added and then removed from tree.
-    table.put(&[230; 32], vec![1]);
-    table.remove(&[230; 32]);
-
-    let proof = table.get_proof([244; 32]);
-    assert_eq!(proof.proof_unchecked(), vec![]);
-    check_map_proof(&proof, None, &table);
-}
-
-#[test]
-fn test_build_multiproof_in_empty_tree() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut table = fork.get_proof_map(IDX_NAME);
-
-    // Just to notify the compiler of the types used; same key is added and then removed from tree.
-    table.put(&[230; 32], vec![1]);
-    table.remove(&[230; 32]);
-
-    let keys = vec![[0; 32], [230; 32], [244; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(proof.proof_unchecked(), vec![]);
-    check_map_multiproof(&proof, keys, &table);
-}
-
-#[test]
-fn test_build_proof_in_single_node_tree() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut table = fork.get_proof_map(IDX_NAME);
-
-    table.put(&[230; 32], vec![1]);
-    let proof = table.get_proof([230; 32]);
-    assert_eq!(proof.proof_unchecked(), vec![]);
-    check_map_proof(&proof, Some([230; 32]), &table);
-
-    let proof = table.get_proof([128; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[230; 32]), HashTag::hash_leaf(&[1]))]
-    );
-    check_map_proof(&proof, None, &table);
-}
-
-#[test]
-fn test_build_multiproof_in_single_node_tree() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut table = fork.get_proof_map(IDX_NAME);
-
-    table.put(&[230; 32], vec![1]);
-
-    let keys = vec![[230; 32], [1; 32], [129; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(proof.proof_unchecked(), vec![]);
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[229; 32], [1; 32], [129; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[230; 32]), HashTag::hash_leaf(&[1]))]
-    );
-    check_map_multiproof(&proof, keys, &table);
-}
-
-#[test]
-fn test_build_proof_in_complex_tree() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut table = fork.get_proof_map(IDX_NAME);
-
-    table.put(&[128; 32], vec![1]); // 128 = 0b1000_0000 ~ ProofPath(00000001...)
-    table.put(&[32; 32], vec![2]); //   32 = 0b0010_0000 ~ ProofPath(00000100...)
-    let proof = table.get_proof([128; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
-    );
-    check_map_proof(&proof, Some([128; 32]), &table);
-
-    let proof = table.get_proof([32; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1]))]
-    );
-    check_map_proof(&proof, Some([32; 32]), &table);
-
-    // Key left of all keys in the tree
-    let proof = table.get_proof([0; 32]);
-    let exp_proof = vec![
-        (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-        (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-    ];
-    assert_eq!(proof.proof_unchecked(), exp_proof);
-    check_map_proof(&proof, None, &table);
-
-    // Key between the keys in the tree
-    let proof = table.get_proof([64; 32]); // 64 ~ ProofPath(00000010...)
-    assert_eq!(proof.proof_unchecked(), exp_proof);
-    check_map_proof(&proof, None, &table);
-
-    // Key to the right of all keys
-    let proof = table.get_proof([255; 32]);
-    assert_eq!(proof.proof_unchecked(), exp_proof);
-    check_map_proof(&proof, None, &table);
-
-    // Insert key that splits 15-bit segment off the left key in the tree.
-    // The key itself is to the left of the `[128; 32]` key.
-    let left_key = {
-        let mut key = [0; 32];
-        key[0] = 128;
-        table.put(&key, vec![3]);
-        key
-    };
-
-    let left_hash = {
-        let mut node = BranchNode::empty();
-        node.set_child(
-            ChildKind::Left,
-            &ProofPath::new(&left_key),
-            &HashTag::hash_leaf(&[3]),
-        );
-        node.set_child(
-            ChildKind::Right,
-            &ProofPath::new(&[128; 32]),
-            &HashTag::hash_leaf(&[1]),
-        );
-        node.object_hash()
-    };
-
-    let proof = table.get_proof([128; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_proof(&proof, Some([128; 32]), &table);
-
-    let proof = table.get_proof([64; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key).prefix(15), left_hash),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_proof(&proof, None, &table);
-
-    let proof = table.get_proof([32; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&left_key).prefix(15), left_hash)]
-    );
-    check_map_proof(&proof, Some([32; 32]), &table);
-
-    let proof = table.get_proof([1; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key).prefix(15), left_hash),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_proof(&proof, None, &table);
-
-    // Insert key that splits 12-bit segment off the [32; 32] key in the tree.
-    // The key is to the right of the [32; 32] key.
-    let right_key = {
-        let mut key = [0; 32];
-        key[0] = 32;
-        key[1] = 0b1001_0000; // represented as `..00001001..` in `ProofPath`
-        table.put(&key, vec![4]);
-        key
-    };
-
-    let right_hash = {
-        let mut node = BranchNode::empty();
-        node.set_child(
-            ChildKind::Left,
-            &ProofPath::new(&[32; 32]),
-            &HashTag::hash_leaf(&[2]),
-        );
-        node.set_child(
-            ChildKind::Right,
-            &ProofPath::new(&right_key),
-            &HashTag::hash_leaf(&[4]),
-        );
-        node.object_hash()
-    };
-
-    let proof = table.get_proof([128; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-            (ProofPath::new(&right_key).prefix(12), right_hash),
-        ]
-    );
-    check_map_proof(&proof, Some([128; 32]), &table);
-
-    // Non-existing key between two children at the root node
-    let proof = table.get_proof([64; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key).prefix(15), left_hash),
-            (ProofPath::new(&right_key).prefix(12), right_hash),
-        ]
-    );
-    check_map_proof(&proof, None, &table);
-
-    // Non-existing key between the first added node `[128; 32]` and the `left_key`.
-    let nonexisting_key = {
-        let mut key = [0; 32];
-        key[0] = 128;
-        key[1] = 128;
-        key[29] = 29;
-        key
-    };
-
-    let proof = table.get_proof(nonexisting_key);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-            (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-            (ProofPath::new(&right_key).prefix(12), right_hash),
-        ]
-    );
-    check_map_proof(&proof, None, &table);
-
-    let subtree_hash = table.merkle_root();
-    table.put(&[129; 32], vec![5]);
-    // The tree is now as follows:
-    // - Bits(0000_0): -> (subtree_hash)
-    //   - Bits(...001_0000_000): -> (left_hash)
-    //     - left_key -> [3]
-    //     - [1; 32] -> [1]
-    //   - Bits(...100_0000): -> (right_hash)
-    //     - [4; 32] -> [2]
-    //     - right_key -> [4]
-    // - [129; 32] -> [5]
-
-    let proof = table.get_proof([129; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[0; 32]).prefix(5), subtree_hash)]
-    );
-    check_map_proof(&proof, Some([129; 32]), &table);
-
-    let proof = table.get_proof([1; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[0; 32]).prefix(5), subtree_hash),
-            (ProofPath::new(&[129; 32]), HashTag::hash_leaf(&[5])),
-        ]
-    );
-    check_map_proof(&proof, None, &table);
-
-    let proof = table.get_proof([32; 32]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key).prefix(15), left_hash),
-            (ProofPath::new(&right_key), HashTag::hash_leaf(&[4])),
-            (ProofPath::new(&[129; 32]), HashTag::hash_leaf(&[5])),
-        ]
-    );
-    check_map_proof(&proof, Some([32; 32]), &table);
-}
-
-#[test]
-fn test_build_multiproof_simple() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut table = fork.get_proof_map(IDX_NAME);
-
-    table.put(&[128; 32], vec![1]);
-    table.put(&[32; 32], vec![2]);
-
-    let keys = vec![[0; 32], [128; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32], [32; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(proof.proof_unchecked(), vec![]);
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[64; 32], [0; 32], [129; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[64; 32], [129; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[64; 32], [64; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_multiproof(&proof, vec![[64; 32]], &table);
-
-    let keys = vec![[128; 32], [64; 32], [128; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
-    );
-    check_map_multiproof(&proof, vec![[128; 32], [64; 32]], &table);
-
-    let keys = vec![[255; 32], [129; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    // Insert key that splits 15-bit segment off the left key in the tree.
-    // The key itself is to the left of the `[1; 32]` key.
-    let left_key = {
-        let mut key = [0; 32];
-        key[0] = 128;
-        table.put(&key, vec![3]);
-        key
-    };
-
-    let left_hash = {
-        let mut node = BranchNode::empty();
-        node.set_child(
-            ChildKind::Left,
-            &ProofPath::new(&left_key),
-            &HashTag::hash_leaf(&[3]),
-        );
-        node.set_child(
-            ChildKind::Right,
-            &ProofPath::new(&[128; 32]),
-            &HashTag::hash_leaf(&[1]),
-        );
-        node.object_hash()
-    };
-
-    let proof = table.get_multiproof(vec![[0; 32]]);
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[128; 32]).prefix(15), left_hash),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_multiproof(&proof, vec![[0; 32]], &table);
-
-    let keys = {
-        // `key > [128; 32]`, which is visible from the `left_key` / `[128; 32]` junction
-        let mut key = [128; 32];
-        key[1] = 8;
-        vec![[0; 32], key, [64; 32]]
-    };
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[128; 32]).prefix(15), left_hash),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[0; 32], [128; 32], [64; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-            (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
-        ]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[0; 32], [128; 32], [32; 32], [64; 32], [129; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&left_key), HashTag::hash_leaf(&[3]))]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = vec![[0; 32], [32; 32], [255; 32]];
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![(ProofPath::new(&[128; 32]).prefix(15), left_hash)]
-    );
-    check_map_multiproof(&proof, keys, &table);
-
-    let keys = {
-        // `key` is between `left_key` and `[128; 32]`, so they both should be returned
-        // in the proof to prove non-existence of `key`
-        let mut key = [0; 32];
-        key[0] = 128;
-        key[1] = 128;
-        vec![[0; 32], [32; 32], key]
-    };
-    let proof = table.get_multiproof(keys.clone());
-    assert_eq!(
-        proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&left_key), HashTag::hash_leaf(&[3])),
-            (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
-        ]
-    );
-    check_map_multiproof(&proof, keys, &table);
-}
-
-#[test]
 fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
-    let db = TemporaryDB::new();
+    let db = TemporaryDB::default();
     let mut rng = thread_rng();
     let batch_sizes = (7..9).map(|x| 1 << x);
 
@@ -1084,7 +1478,7 @@ fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
 
 #[test]
 fn test_fuzz_insert_build_proofs() {
-    let db = TemporaryDB::new();
+    let db = TemporaryDB::default();
     let mut rng = thread_rng();
     let batch_sizes = (7..9).map(|x| (1 << x) - 1);
 
@@ -1105,7 +1499,7 @@ fn test_fuzz_insert_build_proofs() {
 
 #[test]
 fn test_fuzz_insert_build_multiproofs() {
-    let db = TemporaryDB::new();
+    let db = TemporaryDB::default();
     let mut rng = thread_rng();
     let batch_sizes = (7..9).map(|x| 1 << x);
 
@@ -1127,7 +1521,7 @@ fn test_fuzz_insert_build_multiproofs() {
 #[test]
 fn test_fuzz_delete_build_proofs() {
     const SAMPLE_SIZE: usize = 200;
-    let db = TemporaryDB::new();
+    let db = TemporaryDB::default();
 
     let mut rng = thread_rng();
     let mut exists_keys = HashSet::default();
@@ -1164,177 +1558,6 @@ fn test_fuzz_delete_build_proofs() {
         let proof = table.get_proof(key);
         check_map_proof(&proof, None, &table);
     }
-}
-
-#[test]
-fn test_fuzz_delete() {
-    let db1 = TemporaryDB::new();
-    let db2 = TemporaryDB::new();
-    let mut data = generate_random_data(100);
-    let mut rng = rand::thread_rng();
-    let fork1 = db1.fork();
-    let mut index1 = fork1.get_proof_map(IDX_NAME);
-
-    for item in &data {
-        index1.put(&item.0, item.1.clone());
-    }
-
-    let fork2 = db2.fork();
-    let mut index2 = fork2.get_proof_map(IDX_NAME);
-    data.shuffle(&mut rng);
-
-    for item in &data {
-        index2.put(&item.0, item.1.clone());
-    }
-
-    let saved_hash = index1.object_hash();
-
-    let mut keys_to_remove = data
-        .iter()
-        .take(50)
-        .map(|(key, _)| *key)
-        .collect::<Vec<_>>();
-
-    keys_to_remove.shuffle(&mut rng);
-    for key in &keys_to_remove {
-        index1.remove(key);
-    }
-    keys_to_remove.shuffle(&mut rng);
-    for key in &keys_to_remove {
-        index2.remove(key);
-    }
-
-    for key in &keys_to_remove {
-        assert!(index1.get(key).is_none());
-        assert!(index2.get(key).is_none());
-    }
-
-    assert!(index2.object_hash() != Hash::zero());
-    assert_eq!(index2.object_hash(), index1.object_hash());
-
-    for item in &data {
-        index1.put(&item.0, item.1.clone());
-    }
-    data.shuffle(&mut rng);
-    for item in &data {
-        index2.put(&item.0, item.1.clone());
-    }
-
-    for item in &data {
-        let v1 = index1.get(&item.0);
-        let v2 = index2.get(&item.0);
-        assert_eq!(v1.as_ref(), Some(&item.1));
-        assert_eq!(v2.as_ref(), Some(&item.1));
-    }
-    assert_eq!(index2.object_hash(), index1.object_hash());
-    assert_eq!(index2.object_hash(), saved_hash);
-}
-
-#[test]
-fn test_fuzz_insert_after_delete() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut index = fork.get_proof_map(IDX_NAME);
-
-    let data = generate_random_data(100);
-
-    for item in &data[0..50] {
-        index.put(&item.0, item.1.clone());
-    }
-    let saved_hash = index.object_hash();
-    for item in &data[50..] {
-        index.put(&item.0, item.1.clone());
-    }
-    for item in &data[50..] {
-        index.remove(&item.0);
-    }
-
-    for item in &data[0..50] {
-        let v1 = index.get(&item.0);
-        assert_eq!(v1.as_ref(), Some(&item.1));
-    }
-    for item in &data[50..] {
-        let v1 = index.get(&item.0);
-        assert_eq!(v1.as_ref(), None);
-    }
-    assert_eq!(index.object_hash(), saved_hash);
-}
-
-#[test]
-fn test_iter() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let mut map_index = fork.get_proof_map(IDX_NAME);
-
-    let k0 = [0; 32];
-    let k1 = [1; 32];
-    let k2 = [2; 32];
-    let k3 = [3; 32];
-    let k4 = [4; 32];
-
-    map_index.put(&k1, 1_u8);
-    map_index.put(&k2, 2_u8);
-    map_index.put(&k3, 3_u8);
-
-    assert_eq!(
-        map_index.iter().collect::<Vec<([u8; 32], u8)>>(),
-        vec![(k1, 1), (k2, 2), (k3, 3)]
-    );
-
-    assert_eq!(
-        map_index.iter_from(&k0).collect::<Vec<([u8; 32], u8)>>(),
-        vec![(k1, 1), (k2, 2), (k3, 3)]
-    );
-    assert_eq!(
-        map_index.iter_from(&k1).collect::<Vec<([u8; 32], u8)>>(),
-        vec![(k1, 1), (k2, 2), (k3, 3)]
-    );
-    assert_eq!(
-        map_index.iter_from(&k2).collect::<Vec<([u8; 32], u8)>>(),
-        vec![(k2, 2), (k3, 3)]
-    );
-    assert_eq!(
-        map_index.iter_from(&k4).collect::<Vec<([u8; 32], u8)>>(),
-        Vec::<([u8; 32], u8)>::new()
-    );
-
-    assert_eq!(
-        map_index.keys().collect::<Vec<[u8; 32]>>(),
-        vec![k1, k2, k3]
-    );
-
-    assert_eq!(
-        map_index.keys_from(&k0).collect::<Vec<[u8; 32]>>(),
-        vec![k1, k2, k3]
-    );
-    assert_eq!(
-        map_index.keys_from(&k1).collect::<Vec<[u8; 32]>>(),
-        vec![k1, k2, k3]
-    );
-    assert_eq!(
-        map_index.keys_from(&k2).collect::<Vec<[u8; 32]>>(),
-        vec![k2, k3]
-    );
-    assert_eq!(
-        map_index.keys_from(&k4).collect::<Vec<[u8; 32]>>(),
-        Vec::<[u8; 32]>::new()
-    );
-
-    assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
-
-    assert_eq!(
-        map_index.values_from(&k0).collect::<Vec<u8>>(),
-        vec![1, 2, 3]
-    );
-    assert_eq!(
-        map_index.values_from(&k1).collect::<Vec<u8>>(),
-        vec![1, 2, 3]
-    );
-    assert_eq!(map_index.values_from(&k2).collect::<Vec<u8>>(), vec![2, 3]);
-    assert_eq!(
-        map_index.values_from(&k4).collect::<Vec<u8>>(),
-        Vec::<u8>::new()
-    );
 }
 
 #[test]
@@ -1412,7 +1635,7 @@ fn test_tree_with_hashed_key() {
         HashTag::hash_map_node(HashTag::hash_single_entry_map(&key, &h))
     }
 
-    let db = TemporaryDB::new();
+    let db = TemporaryDB::default();
     let fork = db.fork();
     let mut table = fork.get_proof_map(IDX_NAME);
 
@@ -1441,7 +1664,7 @@ fn test_tree_with_hashed_key() {
     assert_eq!(
         proof.proof_unchecked(),
         vec![(
-            ProofPath::new(&Point::new(3, 4)),
+            Hashed::transform_key(&Point::new(3, 4)),
             HashTag::hash_leaf(&[2, 3, 4])
         )]
     );
@@ -1461,6 +1684,9 @@ fn test_tree_with_hashed_key() {
     assert_eq!(table.get(&other_key), Some(vec![1, 2, 3]));
     assert_eq!(
         table.object_hash(),
-        hash_isolated_node(&ProofPath::new(&other_key), &HashTag::hash_leaf(&[1, 2, 3]))
+        hash_isolated_node(
+            &Hashed::transform_key(&other_key),
+            &HashTag::hash_leaf(&[1, 2, 3])
+        )
     );
 }

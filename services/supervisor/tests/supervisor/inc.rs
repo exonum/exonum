@@ -147,8 +147,12 @@ impl Configure for IncService {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {
-            "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
-            "panic" => panic!("Aaaa!"),
+            "error" => {
+                let error =
+                    DispatcherError::malformed_arguments("IncService: Configure error request");
+                return Err(error.into());
+            }
+            "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
         }
     }
@@ -169,9 +173,11 @@ impl Configure for IncService {
 
         match params.as_str() {
             "apply_error" => {
-                Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
+                let error =
+                    DispatcherError::malformed_arguments("IncService: Configure error request");
+                return Err(error.into());
             }
-            "apply_panic" => panic!("Aaaa!"),
+            "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
         }
     }

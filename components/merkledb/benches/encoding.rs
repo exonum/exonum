@@ -19,11 +19,10 @@ use criterion::{black_box, Bencher, Criterion};
 use failure::{self, format_err};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-use exonum_crypto::{self, Hash};
+use exonum_crypto::{self, hash, Hash};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value,
-    proof_map_index::{BranchNode, ProofPath},
-    BinaryKey, BinaryValue, ObjectHash,
+    impl_object_hash_for_binary_value, proof_map_index::BranchNode, BinaryKey, BinaryValue,
+    ObjectHash,
 };
 
 const CHUNK_SIZE: usize = 64;
@@ -182,7 +181,13 @@ where
 
 fn bench_binary_key_concat(b: &mut Bencher<'_>) {
     b.iter_with_setup(
-        || ("prefixed.key", Hash::zero(), ProofPath::new(&Hash::zero())),
+        || {
+            (
+                "prefixed.key",
+                Hash::zero(),
+                hash(&[0; 32]), // emulate ProofPath::new(&Hash::zero())).
+            )
+        },
         |(prefix, key, path)| {
             let mut v = vec![0; prefix.size() + key.size() + path.size()];
             let mut pos = prefix.write(&mut v);

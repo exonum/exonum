@@ -6,14 +6,13 @@ use exonum_crypto::Hash;
 use super::{
     key::{BitsRange, ChildKind, ProofPath},
     node::{BranchNode, Node},
-    MapProof,
+    MapProof, ToProofPath,
 };
-use crate::ObjectHash;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
 
-impl<K, V> MapProof<K, V> {
+impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     /// Includes a proof of existence / absence of a single key when a proof of multiple
     /// keys is requested.
     fn process_key(
@@ -129,7 +128,10 @@ impl ContourNode {
     }
 
     // Adds this contour node into a proof builder.
-    fn add_to_proof<K, V>(self, mut builder: MapProof<K, V>) -> MapProof<K, V> {
+    fn add_to_proof<K, V, KeyMode>(
+        self,
+        mut builder: MapProof<K, V, KeyMode>,
+    ) -> MapProof<K, V, KeyMode> {
         if !self.visited_right {
             // This works due to the following observation: If neither of the child nodes
             // were visited when the node is being ejected from the contour,
@@ -158,22 +160,21 @@ impl ContourNode {
 /// implement `BuildProof` as well.
 ///
 /// [`MerklePatriciaTree`]: trait.MerklePatriciaTree.html
-pub trait BuildProof<K, V> {
+pub trait BuildProof<K, V, KeyMode> {
     /// Creates a proof of existence / absence for a single key.
-    fn create_proof(&self, key: K) -> MapProof<K, V>;
+    fn create_proof(&self, key: K) -> MapProof<K, V, KeyMode>;
 
     /// Creates a proof of existence / absence for multiple keys.
-    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V>;
+    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V, KeyMode>;
 }
 
-impl<K, V, T> BuildProof<K, V> for T
+impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
-    K: ObjectHash,
     T: MerklePatriciaTree<K, V>,
+    KeyMode: ToProofPath<K>,
 {
-    fn create_proof(&self, key: K) -> MapProof<K, V> {
-        let searched_path = ProofPath::new(&key);
-
+    fn create_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
+        let searched_path = KeyMode::transform_key(&key);
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut left_hashes = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
@@ -242,14 +243,16 @@ where
         }
     }
 
-    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V> {
+    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V, KeyMode> {
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut proof = MapProof::new();
 
                 let searched_paths = {
-                    let mut keys: Vec<_> =
-                        keys.into_iter().map(|k| (ProofPath::new(&k), k)).collect();
+                    let mut keys: Vec<_> = keys
+                        .into_iter()
+                        .map(|k| (KeyMode::transform_key(&k), k))
+                        .collect();
 
                     keys.sort_unstable_by(|x, y| {
                         // `unwrap` is safe here because all keys start from the same position `0`
@@ -284,7 +287,7 @@ where
                 let mut found_key: Option<K> = None;
 
                 for key in keys {
-                    let searched_path = ProofPath::new(&key);
+                    let searched_path = KeyMode::transform_key(&key);
                     if root_path == searched_path {
                         found_key = Some(key);
                     } else {
