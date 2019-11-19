@@ -302,10 +302,12 @@ fn master_key_path_current_dir() {
         .run()
         .unwrap();
 
-    let current_dir = std::env::current_dir().unwrap();
-    let expected_path = current_dir.join("master.key.toml");
-
+    let expected_path = PathBuf::from(".")
+        .canonicalize()
+        .unwrap()
+        .join("master.key.toml");
     let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
+
     assert_eq!(
         sec_cfg["master_key_path"],
         expected_path.to_str().unwrap().into()
