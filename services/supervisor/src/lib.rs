@@ -82,18 +82,16 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
 
                 // `ConfigureCall` interface was checked during the config verifying
                 // so panic on `expect` here is unlikely and means a bug in the implementation.
-                let configure_result = context
+                context
                     .interface::<ConfigureCall<'_>>(config.instance_id)
                     .expect("Obtaining Configure interface failed")
-                    .apply_config(config.params.clone());
-
-                if let Err(e) = configure_result {
-                    log::error!(
-                        "An error occurred while applying service configuration. {}",
-                        e
-                    );
-                    return Err(());
-                }
+                    .apply_config(config.params.clone())
+                    .map_err(|e| {
+                        log::error!(
+                            "An error occurred while applying service configuration. {}",
+                            e
+                        );
+                    })?;
             }
 
             ConfigChange::StartService(start_service) => {
