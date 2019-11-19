@@ -118,7 +118,7 @@ impl Display for ErrorKind {
 /// Usually you can implement conversion from your own error type to the `ExecutionError` via
 /// deriving `IntoExecutionError` from `exonum-derive` crate.
 ///
-/// This macro implements `From<MyError>` conversion to the `ExecutionError` for the given enum.
+/// This macro implements `From<MyError> for ExecutionError` conversion for the given enum.
 /// Enumeration should have an explicit discriminant for each error kind.
 /// Derives `Display` and `Fail` traits using documentation comments for each error kind.
 ///
