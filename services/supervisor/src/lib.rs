@@ -109,10 +109,11 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
                     start_service.name,
                     start_service.artifact
                 );
-            let id = Schema::new(context.service_data()).assign_instance_id();
-            let (instance_spec, config) = start_service.into_parts(id);
+                let id = Schema::new(context.service_data()).assign_instance_id();
+                let (instance_spec, config) = start_service.into_parts(id);
 
-            context.start_adding_service(instance_spec, config)
+                context
+                    .start_adding_service(instance_spec, config)
                     .map_err(|e| {
                         log::error!("Service start request failed. {}", e);
                     })?;
