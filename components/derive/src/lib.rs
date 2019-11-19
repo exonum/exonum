@@ -148,7 +148,7 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
 ///
 /// * `#[exonum_interface(crate = "path")]`
 ///
-/// Prefix of the `exonum` crate (usually "crate" or "exonum"). By default is "exonum".
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
 #[proc_macro_attribute]
 pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_interface::impl_exonum_interface(attr, item)
