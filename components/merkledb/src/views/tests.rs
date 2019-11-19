@@ -28,7 +28,7 @@ use crate::{
 const IDX_NAME: &str = "idx_name";
 const PREFIXED_IDX: (&str, u64) = ("idx", 42);
 
-// Conversion to simplify `ResolvedRef` instantiation for tests. This conversion
+// Conversion to simplify `ResolvedAddress` instantiation for tests. This conversion
 // is not used in the main code, so it's intentionally placed here.
 impl From<(&str, u64)> for ResolvedAddress {
     fn from((name, id): (&str, u64)) -> Self {

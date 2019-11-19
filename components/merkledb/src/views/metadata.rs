@@ -325,7 +325,7 @@ impl<T: RawAccess> IndexesPool<T> {
         let len = self.len();
         let metadata = IndexMetadata {
             identifier: len + 1,
-            // ^-- Identifier should be non-zero to translate to a correct id in `ResolvedRef`
+            // ^-- Identifier should be non-zero to translate to a correct id in `ResolvedAddress`
             index_type,
             state: None,
         };

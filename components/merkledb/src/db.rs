@@ -459,7 +459,7 @@ pub trait DatabaseExt: Database {
     /// Returns an error in the same situations as `Database::merge()`.
     fn merge_with_backup(&self, patch: Patch) -> Result<Patch> {
         let snapshot = self.snapshot();
-        let changed_aggregated_refs = patch.changed_aggregated_addrs.clone();
+        let changed_aggregated_addrs = patch.changed_aggregated_addrs.clone();
         let mut rev_changes = HashMap::with_capacity(patch.changes.len());
 
         for (name, changes) in &patch.changes {
@@ -494,7 +494,7 @@ pub trait DatabaseExt: Database {
         Ok(Patch {
             snapshot: self.snapshot(),
             changes: rev_changes,
-            changed_aggregated_addrs: changed_aggregated_refs,
+            changed_aggregated_addrs,
         })
     }
 }
@@ -620,12 +620,12 @@ impl Fork {
     pub fn into_patch(mut self) -> Patch {
         self.flush();
 
-        // Replacing `changed_aggregated_refs` has a beneficial side-effect: if the patch
+        // Replacing `changed_aggregated_addrs` has a beneficial side-effect: if the patch
         // returned by this method is converted back to a `Fork`, we won't need to update
         // its state aggregator unless the *new* changes in the `Fork` concern aggregated indexes.
-        let changed_aggregated_refs =
+        let changed_aggregated_addrs =
             mem::replace(&mut self.patch.changed_aggregated_addrs, HashSet::new());
-        let updated_entries = changed_aggregated_refs
+        let updated_entries = changed_aggregated_addrs
             .into_iter()
             .map(|addr| (addr.name.clone(), get_object_hash(&self.patch, addr)));
 
@@ -1104,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    fn updated_refs_are_efficiently_updated() {
+    fn updated_addrs_are_efficiently_updated() {
         let db = TemporaryDB::new();
         let mut fork = db.fork();
         fork.get_proof_list("foo").push(1_u64);
@@ -1112,13 +1112,13 @@ mod tests {
         fork.get_list("baz").push(3_u64);
         fork.flush();
 
-        let changed_refs: HashSet<_> = fork
+        let changed_addrs: HashSet<_> = fork
             .patch
             .changed_aggregated_addrs
             .iter()
             .map(|addr| addr.name.as_str())
             .collect();
-        assert_eq!(changed_refs, HashSet::from_iter(vec!["foo", "bar"]));
+        assert_eq!(changed_addrs, HashSet::from_iter(vec!["foo", "bar"]));
 
         let patch = fork.into_patch();
         assert!(patch.changed_aggregated_addrs.is_empty());
@@ -1131,13 +1131,13 @@ mod tests {
         fork.get_proof_map::<_, u64, u64>("bar").clear();
         fork.flush();
 
-        let changed_refs: HashSet<_> = fork
+        let changed_addrs: HashSet<_> = fork
             .patch
             .changed_aggregated_addrs
             .iter()
             .map(|addr| addr.name.as_str())
             .collect();
-        assert_eq!(changed_refs, HashSet::from_iter(vec!["bar", "other_list"]));
+        assert_eq!(changed_addrs, HashSet::from_iter(vec!["bar", "other_list"]));
 
         let patch = fork.into_patch();
         let aggregator = SystemInfo::new(&patch).state_aggregator();
