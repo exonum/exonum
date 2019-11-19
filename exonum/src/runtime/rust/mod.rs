@@ -28,6 +28,161 @@
 //! [`ServiceFactory`][ServiceFactory] trait. The trait creates service instances and provides
 //! information about the artifact.
 //!
+//! # Examples
+//!
+//! ## Minimal complete example of an Exonum service definition.
+//!
+//! ```
+//! use exonum::{
+//!     proto::schema::doc_tests,
+//!     runtime::{
+//!         rust::{CallContext, Service},
+//!         BlockchainData, ExecutionError,
+//!     },
+//! };
+//! use exonum_derive::{
+//!     exonum_interface, BinaryValue, IntoExecutionError,
+//!     ObjectHash, ServiceDispatcher, ServiceFactory
+//! };
+//! use exonum_merkledb::Snapshot;
+//! use exonum_proto::ProtobufConvert;
+//! use exonum_crypto::Hash;
+//!
+//! // Determine the types of data that will be used in service transactions.
+//!
+//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+//! #[protobuf_convert(source = "doc_tests::Point")]
+//! pub struct Point {
+//!     pub x: i32,
+//!     pub y: i32,
+//! }
+//!
+//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+//! #[protobuf_convert(source = "doc_tests::CreateWallet")]
+//! pub struct CreateWallet {
+//!     pub name: String,
+//! }
+//!
+//! // You may create service-specific error types.
+//!
+//! #[derive(Debug, IntoExecutionError)]
+//! pub enum Error {
+//!     PointAlreadyExists = 0,
+//!     WalletAlreadyExists = 1,
+//! }
+//!
+//! // Define the transaction interface for your service by creating a trait with
+//! // the following attribute and method signatures.
+//! // This attribute implements `Interface` trait for this trait and `Transaction`
+//! // trait for each argument.
+//! #[exonum_interface]
+//! pub trait Transactions {
+//!     // Each method of the trait should have a signature of the following format. The argument
+//!     // should implement the `BinaryValue` trait.
+//!     fn create_wallet(
+//!         &self,
+//!         context: CallContext<'_>,
+//!         arg: CreateWallet,
+//!     ) -> Result<(), ExecutionError>; // You may use `ExecutionError` directly.
+//!     // Also you can use any type which implements `Into<ExecutionError>` for the error.
+//!     fn add_point(
+//!         &self,
+//!         context: CallContext<'_>,
+//!         arg: Point,
+//!     ) -> Result<(), Error>;
+//! }
+//!
+//! // In order a service could process transactions, you have to implement the
+//! // `ServiceDispatcher` trait, which can be derived using the corresponding macro.
+//! // To explain to the runtime how to create instances of this service, you have to implement
+//! // the `ServiceFactory` trait by using the `ServiceFactory` derive macro.
+//! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+//! // Declare that the service implements the `Transactions` interface that was presented above.
+//! #[service_dispatcher(implements("Transactions"))]
+//! // By default the macro uses the crate name and version to provide an artifact ID for this
+//! // service factory. You should only provide a path to the generated Protobuf schema.
+//! #[service_factory(proto_sources = "exonum::proto::schema")]
+//! pub struct PointService;
+//!
+//! // Do not forget to implement the `Transactions` and `Service` traits for the service.
+//!
+//! impl Transactions for PointService {
+//!     fn create_wallet(
+//!         &self,
+//!         _context: CallContext<'_>,
+//!         _arg: CreateWallet,
+//!     ) -> Result<(), ExecutionError> {
+//!         // Some business logic...
+//!         Ok(())
+//!     }
+//!
+//!     fn add_point(
+//!         &self,
+//!         _context: CallContext<'_>,
+//!         _arg: Point
+//!     ) -> Result<(), Error> {
+//!         // Some business logic...
+//!         Ok(())
+//!     }
+//! }
+//!
+//! impl Service for PointService {
+//!     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+//!         Vec::new()
+//!     }
+//! }
+//! ```
+//!
+//! ## Stateful Service Definition
+//!
+//! Beware of stateful services in production, use this functionality only for debugging and
+//! prototyping.
+//!
+//! ```
+//! use exonum::runtime::{rust::Service, BlockchainData};
+//! use exonum_crypto::Hash;
+//! use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+//! use exonum_merkledb::Snapshot;
+//!
+//! #  #[exonum_interface]
+//! #  pub trait Transactions {}
+//!
+//! // If your service has a state, for example, for debugging purposes, then you can
+//! // use a separate structure for the service.
+//!
+//! #[derive(Debug, Default, ServiceDispatcher)]
+//! #[service_dispatcher(implements("Transactions"))]
+//! pub struct StatefulService {
+//!     state: u64,
+//! }
+//!
+//! #[derive(Debug, ServiceFactory)]
+//! #[service_factory(
+//!     // In this case you have to specify the service constructor explicitly.
+//!     service_constructor = "Self::new_instance",
+//!     proto_sources = "exonum::proto::schema",
+//!     // To specify the artifact name and/or version explicitly you have to use the
+//!     // following attributes.
+//!     artifact_name = "stateful",
+//!     artifact_version = "1.0.0",
+//! )]
+//! pub struct StatefulServiceFactory;
+//!
+//! impl StatefulServiceFactory {
+//!     fn new_instance(&self) -> Box<dyn Service> {
+//!         Box::new(StatefulService::default())
+//!     }
+//! }
+//!
+//! # impl Transactions for StatefulService {}
+//! #
+//! #  impl Service for StatefulService {
+//! #      fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+//! #          Vec::new()
+//! #      }
+//! #  }
+//! ```
+//!
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
