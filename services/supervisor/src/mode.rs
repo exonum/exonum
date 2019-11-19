@@ -21,11 +21,11 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
-use exonum::helpers::{byzantine_quorum, multisig::ValidatorMultisig};
+use exonum::helpers::byzantine_quorum;
 use exonum_crypto::Hash;
 use exonum_merkledb::access::Access;
 
-use super::DeployRequest;
+use super::{multisig::MultisigIndex, DeployRequest};
 
 /// Simple supervisor mode: to deploy service one have to send
 /// one request to any of the validators.
@@ -43,14 +43,14 @@ pub trait SupervisorMode: std::fmt::Debug + Send + Sync + Copy + 'static {
     /// Checks whether deploy should be performed within the network.
     fn deploy_approved<T: Access>(
         deploy: &DeployRequest,
-        deploy_requests: &ValidatorMultisig<T, DeployRequest>,
+        deploy_requests: &MultisigIndex<T, DeployRequest>,
         validators: usize,
     ) -> bool;
 
     /// Checks whether config can be applied for the network.
     fn config_approved<T: Access>(
         config_hash: &Hash,
-        config_confirms: &ValidatorMultisig<T, Hash>,
+        config_confirms: &MultisigIndex<T, Hash>,
         validators: usize,
     ) -> bool;
 }
@@ -58,7 +58,7 @@ pub trait SupervisorMode: std::fmt::Debug + Send + Sync + Copy + 'static {
 impl SupervisorMode for Simple {
     fn deploy_approved<T: Access>(
         deploy: &DeployRequest,
-        deploy_requests: &ValidatorMultisig<T, DeployRequest>,
+        deploy_requests: &MultisigIndex<T, DeployRequest>,
         _validators: usize,
     ) -> bool {
         // For simple supervisor request from 1 validator is enough.
@@ -67,7 +67,7 @@ impl SupervisorMode for Simple {
 
     fn config_approved<T: Access>(
         config_hash: &Hash,
-        config_confirms: &ValidatorMultisig<T, Hash>,
+        config_confirms: &MultisigIndex<T, Hash>,
         _validators: usize,
     ) -> bool {
         config_confirms.confirmations(&config_hash) >= 1
@@ -77,7 +77,7 @@ impl SupervisorMode for Simple {
 impl SupervisorMode for Decentralized {
     fn deploy_approved<T: Access>(
         deploy: &DeployRequest,
-        deploy_requests: &ValidatorMultisig<T, DeployRequest>,
+        deploy_requests: &MultisigIndex<T, DeployRequest>,
         validators: usize,
     ) -> bool {
         let confirmations = deploy_requests.confirmations(&deploy);
@@ -88,7 +88,7 @@ impl SupervisorMode for Decentralized {
 
     fn config_approved<T: Access>(
         config_hash: &Hash,
-        config_confirms: &ValidatorMultisig<T, Hash>,
+        config_confirms: &MultisigIndex<T, Hash>,
         validators: usize,
     ) -> bool {
         let confirmations = config_confirms.confirmations(&config_hash);

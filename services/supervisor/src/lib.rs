@@ -40,6 +40,7 @@ pub mod mode;
 mod api;
 mod configure;
 mod errors;
+mod multisig;
 mod proto;
 mod proto_structures;
 mod schema;

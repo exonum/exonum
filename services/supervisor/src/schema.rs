@@ -14,7 +14,6 @@
 
 use exonum::{
     crypto::Hash,
-    helpers::multisig::ValidatorMultisig,
     runtime::{ArtifactId, InstanceId},
 };
 use exonum_merkledb::{
@@ -23,8 +22,8 @@ use exonum_merkledb::{
 };
 
 use super::{
-    ConfigProposalWithHash, DeployConfirmation, DeployRequest, StartService,
-    MAX_BUILTIN_INSTANCE_ID,
+    multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
+    StartService, MAX_BUILTIN_INSTANCE_ID,
 };
 
 const DEPLOY_REQUESTS: &str = "deploy_requests";
@@ -39,11 +38,11 @@ const VACANT_INSTANCE_ID: &str = "vacant_instance_id";
 /// Service information schema.
 #[derive(Debug)]
 pub struct Schema<T: Access> {
-    pub deploy_requests: ValidatorMultisig<T, DeployRequest>,
-    pub deploy_confirmations: ValidatorMultisig<T, DeployConfirmation>,
+    pub deploy_requests: MultisigIndex<T, DeployRequest>,
+    pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
-    pub pending_instances: ValidatorMultisig<T, StartService>,
-    pub config_confirms: ValidatorMultisig<T, Hash>,
+    pub pending_instances: MultisigIndex<T, StartService>,
+    pub config_confirms: MultisigIndex<T, Hash>,
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
     pub configuration_number: Entry<T::Base, u64>,
     pub vacant_instance_id: Entry<T::Base, InstanceId>,
