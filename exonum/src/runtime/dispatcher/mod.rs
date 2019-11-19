@@ -44,14 +44,6 @@ mod schema;
 #[cfg(test)]
 mod tests;
 
-/// Max instance identifier for builtin service.
-///
-/// By analogy with the privileged ports of the network, we use a range 0..1023 of instance
-/// identifiers for built-in services which can be created only during the blockchain genesis
-/// block creation.
-// FIXME: remove
-pub const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
-
 #[derive(Debug)]
 struct ServiceInfo {
     runtime_id: u32,
@@ -109,9 +101,6 @@ impl Dispatcher {
     /// # Panics
     ///
     /// * If instance spec contains invalid service name or artifact id.
-    /// * If instance id is greater than [`MAX_BUILTIN_INSTANCE_ID`]
-    ///
-    /// [`MAX_BUILTIN_INSTANCE_ID`]: constant.MAX_BUILTIN_INSTANCE_ID.html
     pub(crate) fn add_builtin_service(
         &mut self,
         fork: &mut Fork,
@@ -119,12 +108,6 @@ impl Dispatcher {
         artifact_spec: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        assert!(
-            spec.id < MAX_BUILTIN_INSTANCE_ID,
-            "Instance identifier for builtin service should be lesser than {}",
-            MAX_BUILTIN_INSTANCE_ID
-        );
-
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
@@ -376,11 +359,6 @@ impl Dispatcher {
             },
         );
         Ok(())
-    }
-
-    /// Assigns an instance identifier to the new service instance.
-    pub(crate) fn assign_instance_id(fork: &Fork) -> InstanceId {
-        Schema::new(fork).assign_instance_id()
     }
 }
 
