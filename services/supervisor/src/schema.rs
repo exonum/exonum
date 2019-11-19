@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::Hash, runtime::ArtifactId};
+use exonum::{
+    crypto::Hash,
+    runtime::{ArtifactId, InstanceId},
+};
 use exonum_merkledb::{
     access::{Access, FromAccess, Prefixed},
     Entry, Fork, ObjectHash, ProofMapIndex,
@@ -20,8 +23,17 @@ use exonum_merkledb::{
 
 use super::{
     multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    StartService,
+    StartService, MAX_BUILTIN_INSTANCE_ID,
 };
+
+const DEPLOY_REQUESTS: &str = "deploy_requests";
+const DEPLOY_CONFIRMATIONS: &str = "deploy_confirmations";
+const PENDING_DEPLOYMENTS: &str = "pending_deployments";
+const PENDING_INSTANCES: &str = "pending_instances";
+const CONFIG_CONFIRMS: &str = "config_confirms";
+const PENDING_PROPOSAL: &str = "pending_proposal";
+const CONFIGURATION_NUMBER: &str = "configuration_number";
+const VACANT_INSTANCE_ID: &str = "vacant_instance_id";
 
 /// Service information schema.
 #[derive(Debug)]
@@ -33,32 +45,21 @@ pub struct Schema<T: Access> {
     pub config_confirms: MultisigIndex<T, Hash>,
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
     pub configuration_number: Entry<T::Base, u64>,
+    pub vacant_instance_id: Entry<T::Base, InstanceId>,
 }
 
 impl<'a, T: Access> Schema<Prefixed<'a, T>> {
     /// Constructs schema for the given `access`.
     pub fn new(access: Prefixed<'a, T>) -> Self {
         Self {
-            deploy_requests: FromAccess::from_access(access.clone(), "deploy_requests".into())
-                .unwrap(),
-            deploy_confirmations: FromAccess::from_access(
-                access.clone(),
-                "deploy_confirmations".into(),
-            )
-            .unwrap(),
-            pending_deployments: FromAccess::from_access(
-                access.clone(),
-                "pending_deployments".into(),
-            )
-            .unwrap(),
-            pending_instances: FromAccess::from_access(access.clone(), "pending_instances".into())
-                .unwrap(),
-            config_confirms: FromAccess::from_access(access.clone(), "config_confirms".into())
-                .unwrap(),
-            pending_proposal: FromAccess::from_access(access.clone(), "pending_proposal".into())
-                .unwrap(),
-            configuration_number: FromAccess::from_access(access, "configuration_number".into())
-                .unwrap(),
+            deploy_requests: construct(&access, DEPLOY_REQUESTS),
+            deploy_confirmations: construct(&access, DEPLOY_CONFIRMATIONS),
+            pending_deployments: construct(&access, PENDING_DEPLOYMENTS),
+            pending_instances: construct(&access, PENDING_INSTANCES),
+            config_confirms: construct(&access, CONFIG_CONFIRMS),
+            pending_proposal: construct(&access, PENDING_PROPOSAL),
+            configuration_number: construct(&access, CONFIGURATION_NUMBER),
+            vacant_instance_id: construct(&access, VACANT_INSTANCE_ID),
         }
     }
 
@@ -83,4 +84,22 @@ impl Schema<Prefixed<'_, &Fork>> {
         let new_configuration_number = self.configuration_number.get().unwrap_or(0) + 1;
         self.configuration_number.set(new_configuration_number);
     }
+
+    /// Assign unique identifier for an instance.
+    pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
+        let id = self
+            .vacant_instance_id
+            .get()
+            .unwrap_or(MAX_BUILTIN_INSTANCE_ID);
+        self.vacant_instance_id.set(id + 1);
+        id
+    }
+}
+
+/// Creates an index given its name and access object.
+fn construct<'a, T: Access, U: FromAccess<Prefixed<'a, T>>>(
+    access: &Prefixed<'a, T>,
+    index_name: &str,
+) -> U {
+    FromAccess::from_access(access.clone(), index_name.into()).unwrap()
 }
