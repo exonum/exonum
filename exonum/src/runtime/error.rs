@@ -119,8 +119,8 @@ impl Display for ErrorKind {
 /// deriving `IntoExecutionError` from `exonum-derive` crate.
 ///
 /// This macro implements `From<MyError>` conversion to the `ExecutionError` for the given enum.
-/// Enumeration should have an explicit discriminant for each variant.
-/// Derives `Display` and `Fail` traits using documentation comments of each variant.
+/// Enumeration should have an explicit discriminant for each error kind.
+/// Derives `Display` and `Fail` traits using documentation comments for each error kind.
 ///
 /// # Examples
 ///
@@ -129,14 +129,14 @@ impl Display for ErrorKind {
 /// ```
 /// use exonum_derive::IntoExecutionError;
 ///
-/// /// Error codes emitted by wallet transactions during execution.
+/// /// Error codes emitted by wallet transactions during execution:
 /// #[derive(Debug, IntoExecutionError)]
 /// pub enum Error {
 ///     /// Content hash already exists.
 ///     HashAlreadyExists = 0,
-///     /// Unable to parse service configuration.
+///     /// Unable to parse the service configuration.
 ///     ConfigParseError = 1,
-///     /// Time service with the specified name doesn't exist.
+///     /// Time service with the specified name does not exist.
 ///     TimeServiceNotFound = 2,
 /// }
 /// ```
@@ -150,7 +150,7 @@ impl Display for ErrorKind {
 /// #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 /// #[execution_error(kind = "runtime")]
 /// enum SampleRuntimeError {
-///     /// Incorrect information to call transaction.
+///     /// Incorrect information to call the transaction.
 ///     IncorrectCallInfo = 1,
 ///     /// Incorrect transaction payload.
 ///     IncorrectPayload = 2,

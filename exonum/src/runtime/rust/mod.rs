@@ -71,20 +71,20 @@
 //!     WalletAlreadyExists = 1,
 //! }
 //!
-//! // Define the transactions interface for your service by creating a trait with
+//! // Define the transaction interface for your service by creating a trait with
 //! // the following attribute and method signatures.
 //! // This attribute implements `Interface` trait for this trait and `Transaction`
-//! // trait for each arg.
+//! // trait for each argument.
 //! #[exonum_interface]
 //! pub trait Transactions {
-//!     // Each method of trait should have signature like the following. Argument
-//!     // should implement `BinaryValue` trait.
+//!     // Each method of the trait should have a signature of the following format. The argument
+//!     // should implement the `BinaryValue` trait.
 //!     fn create_wallet(
 //!         &self,
 //!         context: CallContext<'_>,
 //!         arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError>; // You may use `ExecutionError` directly.
-//!     // Also you can use for error any type which implements `Into<ExecutionError>`.
+//!     // Also you can use any type which implements `Into<ExecutionError>` for the error.
 //!     fn add_point(
 //!         &self,
 //!         context: CallContext<'_>,
@@ -92,19 +92,19 @@
 //!     ) -> Result<(), Error>;
 //! }
 //!
-//! // In order for a service to process transactions, you have to implement the
+//! // In order a service could process transactions, you have to implement the
 //! // `ServiceDispatcher` trait, which can be derived using the corresponding macro.
-//! // To explain runtime how to create instances of this service you have to implement
-//! // `ServiceFactory` trait by using the `ServiceFactory` derive macro.
+//! // To explain to the runtime how to create instances of this service, you have to implement
+//! // the `ServiceFactory` trait by using the `ServiceFactory` derive macro.
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-//! // Declare that a service implements a `Transactions` interface that was presented above.
+//! // Declare that the service implements the `Transactions` interface that was presented above.
 //! #[service_dispatcher(implements("Transactions"))]
-//! // By default macro uses crate name and version to provide artifact ID for this
-//! // service factory. You should only provide path to the generated Protobuf schema.
+//! // By default the macro uses the crate name and version to provide an artifact ID for this
+//! // service factory. You should only provide a path to the generated Protobuf schema.
 //! #[service_factory(proto_sources = "exonum::proto::schema")]
 //! pub struct PointService;
 //!
-//! // Don't forget to implement the `Transactions` and `Service` traits for our service.
+//! // Do not forget to implement the `Transactions` and `Service` traits for the service.
 //!
 //! impl Transactions for PointService {
 //!     fn create_wallet(
@@ -133,7 +133,7 @@
 //! }
 //! ```
 //!
-//! ## Stateful service definition
+//! ## Stateful Service Definition
 //!
 //! Beware of stateful services in production, use this functionality only for debugging and
 //! prototyping.
@@ -147,7 +147,7 @@
 //! #  #[exonum_interface]
 //! #  pub trait Transactions {}
 //!
-//! // If your service has a state, for example for debugging purposes, then you can
+//! // If your service has a state, for example, for debugging purposes, then you can
 //! // use a separate structure for the service.
 //!
 //! #[derive(Debug, Default, ServiceDispatcher)]
@@ -158,10 +158,10 @@
 //!
 //! #[derive(Debug, ServiceFactory)]
 //! #[service_factory(
-//!     // In this case you have to specify service constructor explicitly.
+//!     // In this case you have to specify the service constructor explicitly.
 //!     service_constructor = "Self::new_instance",
 //!     proto_sources = "exonum::proto::schema",
-//!     // To specify artifact name and/or version explicitly you have to use the
+//!     // To specify the artifact name and/or version explicitly you have to use the
 //!     // following attributes.
 //!     artifact_name = "stateful",
 //!     artifact_version = "1.0.0",
