@@ -3,7 +3,7 @@
 **Status:**
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.com/exonum/exonum)
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
-[![codecov](https://codecov.io/gh/exonum/exonum/branch/master/graph/badge.svg)](https://codecov.io/gh/exonum/exonum)
+[![coverage](https://coveralls.io/repos/github/exonum/exonum/badge.svg?branch=master)](https://coveralls.io/github/exonum/exonum?branch=master)
 
 **Project info:**
 [![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)
