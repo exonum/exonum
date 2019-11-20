@@ -372,7 +372,7 @@ impl Dispatcher {
         let mut schema = Schema::new(fork as &Fork);
         let current_max_id = schema.max_builtin_id();
         if Some(instance_id) > current_max_id {
-            // ID from spec is greater than know max ID, update it.
+            // ID from spec is greater than known max ID, update it.
             schema.set_max_builtin_id(instance_id);
         }
     }
