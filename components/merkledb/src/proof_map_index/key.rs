@@ -66,12 +66,12 @@ pub struct Hashed;
 pub struct Raw;
 
 /// Trait defining key transforming function used to transform key to `ProofPath`.
-pub trait ToProofPath<K> {
+pub trait ToProofPath<K: ?Sized> {
     /// Transforms key to `ProofPath`.
     fn transform_key(key: &K) -> ProofPath;
 }
 
-impl<K: ObjectHash> ToProofPath<K> for Hashed {
+impl<K: ObjectHash + ?Sized> ToProofPath<K> for Hashed {
     fn transform_key(key: &K) -> ProofPath {
         ProofPath::from_bytes(key.object_hash())
     }

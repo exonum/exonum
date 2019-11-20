@@ -504,7 +504,11 @@ where
         hash
     }
 
-    fn remove_leaf(&mut self, proof_path: &ProofPath, key: &K) {
+    fn remove_leaf<Q>(&mut self, proof_path: &ProofPath, key: &Q)
+    where
+        K: Borrow<Q>,
+        Q: BinaryKey + ?Sized,
+    {
         self.base.remove(proof_path);
         self.base.remove(&key.to_value_path());
     }
@@ -577,12 +581,16 @@ where
         }
     }
 
-    fn remove_node(
+    fn remove_node<Q>(
         &mut self,
         parent: &BranchNode,
         proof_path: &ProofPath,
-        key: &K,
-    ) -> RemoveAction {
+        key: &Q,
+    ) -> RemoveAction
+    where
+        K: Borrow<Q>,
+        Q: BinaryKey + ?Sized,
+    {
         let child_path = parent
             .child_path(proof_path.bit(0))
             .start_from(proof_path.start());
@@ -720,7 +728,12 @@ where
     /// index.remove(&hash);
     /// assert!(!index.contains(&hash));
     /// ```
-    pub fn remove(&mut self, key: &K) {
+    pub fn remove<Q>(&mut self, key: &Q)
+    where
+        K: Borrow<Q>,
+        Q: BinaryKey + ?Sized,
+        KeyMode: ToProofPath<Q>,
+    {
         let proof_path = KeyMode::transform_key(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
