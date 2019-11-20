@@ -462,7 +462,7 @@ fn test_bad_service_instance_name() {
 
     let system_api = api.exonum_api();
     let expected_description =
-        "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-.";
+        "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-";
     let expected_status = Err(ExecutionError {
         kind: ExecutionErrorKind::Service { code: 7 },
         description: expected_description.into(),

@@ -5,6 +5,7 @@ use crate::{
     views::IndexAddress,
     BinaryKey,
 };
+use crate::validation::assert_valid_prefix;
 
 /// Group of indexes distinguished by a prefix.
 ///
@@ -51,6 +52,7 @@ where
     I: FromAccess<T>,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        assert_valid_prefix(&addr.name);
         Ok(Self {
             access,
             prefix: addr,

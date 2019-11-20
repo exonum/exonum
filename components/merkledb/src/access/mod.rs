@@ -7,11 +7,8 @@ use std::{borrow::Cow, fmt};
 pub use self::extensions::AccessExt;
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
-use crate::{
-    validation::assert_index_valid_name,
-    views::{IndexAddress, IndexType, ViewWithMetadata},
-};
-use crate::validation::{assert_valid_prefix_name};
+use crate::validation::assert_valid_prefix;
+use crate::views::{IndexAddress, IndexType, ViewWithMetadata};
 
 mod extensions;
 
@@ -94,7 +91,7 @@ impl<'a, T: Access> Prefixed<'a, T> {
     /// Will panic if the prefix does not conform to valid names for indexes.
     pub fn new(prefix: impl Into<Cow<'a, str>>, access: T) -> Self {
         let prefix = prefix.into();
-        assert_valid_prefix_name(prefix.as_ref());
+        assert_valid_prefix(prefix.as_ref());
         Self { access, prefix }
     }
 }

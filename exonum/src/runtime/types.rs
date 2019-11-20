@@ -14,7 +14,7 @@
 
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
-    validation::{is_valid_index_name, is_valid_artifact_name, is_valid_service_name},
+    validation::{is_allowed_latin1_char, is_valid_prefix},
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
@@ -24,7 +24,6 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use super::InstanceDescriptor;
 use crate::{helpers::ValidateInput, proto::schema};
-use exonum_merkledb::validation::{check_valid_service_name, check_valid_artifact_name};
 
 /// Unique service instance identifier.
 ///
@@ -168,9 +167,9 @@ impl ArtifactId {
 
     /// Check that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
-        // Extended version of `exonum_merkledb::is_valid_name` that also allows ':`.
+        // Extended version of `exonum_merkledb::is_valid_name` that also allows '.' and ':'.
         name.as_ref().iter().all(|&c| match c {
-            58 => true,
+            46 | 58 => true,
             c => is_allowed_latin1_char(c),
         })
     }
@@ -184,7 +183,8 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             Self::is_valid_name(&self.name),
-            "Artifact name contains an illegal character, use only: a-zA-Z0-9 and one of _-.:"
+            "Artifact name({}) contains an illegal character, use only: a-zA-Z0-9 and one of _-.:",
+            &self.name,
         );
         Ok(())
     }
@@ -263,7 +263,7 @@ pub struct InstanceSpec {
     /// The name serves as a primary identifier of this service in most operations.
     /// It is assigned by the network administrators.
     ///
-    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
+    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\:-_]+`
     pub name: String,
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,
@@ -288,7 +288,16 @@ impl InstanceSpec {
 
     /// Checks that the instance name contains only allowed characters and is not empty.
     pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
-        check_valid_service_name(name)
+        let name = name.as_ref();
+        ensure!(
+            !name.is_empty(),
+            "Service instance name should not be empty"
+        );
+        ensure!(
+            is_valid_prefix(name),
+            "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-"
+        );
+        Ok(())
     }
 
     /// Return the corresponding descriptor of this instance specification.
