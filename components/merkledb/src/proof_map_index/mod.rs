@@ -36,6 +36,7 @@ use crate::{
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
+use crate::validation::{is_valid_artifact_name, is_valid_service_name};
 
 mod key;
 mod node;

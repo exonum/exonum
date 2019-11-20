@@ -14,7 +14,7 @@
 
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
-    validation::{is_allowed_latin1_char, is_valid_index_name},
+    validation::{is_valid_index_name, is_valid_artifact_name, is_valid_service_name},
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
@@ -24,6 +24,7 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use super::InstanceDescriptor;
 use crate::{helpers::ValidateInput, proto::schema};
+use exonum_merkledb::validation::{check_valid_service_name, check_valid_artifact_name};
 
 /// Unique service instance identifier.
 ///
@@ -178,6 +179,7 @@ impl ArtifactId {
 impl ValidateInput for ArtifactId {
     type Error = failure::Error;
 
+    /// Check that the artifact name contains only allowed characters and is not empty.
     fn validate(&self) -> Result<(), Self::Error> {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
@@ -286,16 +288,7 @@ impl InstanceSpec {
 
     /// Checks that the instance name contains only allowed characters and is not empty.
     pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
-        let name = name.as_ref();
-        ensure!(
-            !name.is_empty(),
-            "Service instance name should not be empty"
-        );
-        ensure!(
-            is_valid_index_name(name),
-            "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
-        );
-        Ok(())
+        check_valid_service_name(name)
     }
 
     /// Return the corresponding descriptor of this instance specification.
@@ -369,11 +362,11 @@ fn parse_artifact_id_incorrect_layout() {
         ("ava:123", "invalid digit found in string"),
         (
             "123:I am a service!",
-            "Artifact name contains an illegal character",
+            "Artifact name(I am a service!) contains an illegal character",
         ),
         (
             "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!",
-            "Artifact name contains an illegal character",
+            "Artifact name(\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!) contains an illegal character",
         ),
     ];
 
