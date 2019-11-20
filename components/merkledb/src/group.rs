@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 
+use crate::validation::assert_valid_prefix;
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::IndexAddress,
     BinaryKey,
 };
-use crate::validation::assert_valid_prefix;
 
 /// Group of indexes distinguished by a prefix.
 ///
