@@ -43,6 +43,7 @@ mod error;
 mod schema;
 #[cfg(test)]
 mod tests;
+mod types;
 
 #[derive(Debug)]
 struct ServiceInfo {
