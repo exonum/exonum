@@ -972,3 +972,82 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     api.exonum_api()
         .assert_tx_status(confirmation.object_hash(), &expected_status.into());
 }
+
+/// Checks that service IDs are assigned sequentially starting from the
+/// ID next to max builtin ID.
+#[test]
+fn test_id_assignment() {
+    let max_builtin_id = SUPERVISOR_INSTANCE_ID;
+
+    // Deploy inc service & start two instances.
+    let instance_name_1 = "inc";
+    let instance_name_2 = "inc2";
+    let mut testkit = testkit_with_inc_service();
+    deploy_default(&mut testkit);
+
+    let artifact = artifact_default();
+    let deadline = testkit.height().next();
+
+    let request_1 = StartService {
+        artifact: artifact.clone(),
+        name: instance_name_1.into(),
+        config: Vec::default(),
+    };
+    let request_2 = StartService {
+        artifact: artifact.clone(),
+        name: instance_name_2.into(),
+        config: Vec::default(),
+    };
+
+    let request = ConfigPropose::new(0, deadline)
+        .start_service(request_1)
+        .start_service(request_2);
+
+    let api = testkit.api();
+    start_service(&api, request);
+    testkit.create_block();
+
+    // Check that new instances have IDs 1 and 2.
+    let api = testkit.api();
+    assert_eq!(find_instance_id(&api, instance_name_1), max_builtin_id + 1);
+    assert_eq!(find_instance_id(&api, instance_name_2), max_builtin_id + 2);
+}
+
+/// Checks that if builtin IDs space is sparse (here we have `Supervisor` with ID 0 and
+/// `IncService` with ID 100), the ID for the new service will be next to the max
+/// builtin ID (101 in our case).
+#[test]
+fn test_id_assignment_sparse() {
+    let max_builtin_id = 100;
+
+    // Create testkit with builtin instance with ID 100.
+    let mut testkit = TestKitBuilder::validator()
+        .with_logger()
+        .with_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(InstanceCollection::new(IncService).with_instance(
+            max_builtin_id,
+            "inc",
+            (),
+        ))
+        .create();
+
+    let artifact = artifact_default();
+    let deadline = testkit.height().next();
+
+    let instance_name = "inc2";
+    let request = StartService {
+        artifact: artifact.clone(),
+        name: instance_name.into(),
+        config: Vec::default(),
+    };
+
+    let request = ConfigPropose::new(0, deadline).start_service(request);
+
+    let api = testkit.api();
+    start_service(&api, request);
+    testkit.create_block();
+
+    // Check that new instance has ID 101.
+    let api = testkit.api();
+    assert_eq!(find_instance_id(&api, instance_name), max_builtin_id + 1);
+}

@@ -23,7 +23,7 @@ use exonum_merkledb::{
 
 use super::{
     multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    StartService, MAX_BUILTIN_INSTANCE_ID,
+    StartService,
 };
 
 const DEPLOY_REQUESTS: &str = "deploy_requests";
@@ -81,18 +81,21 @@ impl<'a, T: Access> Schema<Prefixed<'a, T>> {
 
 impl Schema<Prefixed<'_, &Fork>> {
     pub fn increase_configuration_number(&mut self) {
-        let new_configuration_number = self.configuration_number.get().unwrap_or(0) + 1;
+        let new_configuration_number = self.get_configuration_number() + 1;
         self.configuration_number.set(new_configuration_number);
     }
 
     /// Assign unique identifier for an instance.
-    pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
-        let id = self
-            .vacant_instance_id
-            .get()
-            .unwrap_or(MAX_BUILTIN_INSTANCE_ID);
+    /// Returns `None` if `vacant_instance_id` entry was not initialized.
+    pub(crate) fn assign_instance_id(&mut self) -> Option<InstanceId> {
+        let id = self.vacant_instance_id.get()?;
         self.vacant_instance_id.set(id + 1);
-        id
+        Some(id)
+    }
+
+    /// Initializes `vacant_instance_id` with provided value.
+    pub(crate) fn initialize_instance_id(&mut self, value: InstanceId) {
+        self.vacant_instance_id.set(value);
     }
 }
 
