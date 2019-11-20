@@ -26,7 +26,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Blockchain, IndexCoordinates, IndexOwner},
+    blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
     crypto::Hash,
     helpers::ValidateInput,
     merkledb::BinaryValue,
@@ -130,12 +130,12 @@ impl Dispatcher {
             let state = runtime.state_hashes(access);
             aggregator.extend(
                 // Runtime state hash.
-                IndexCoordinates::locate(IndexOwner::Runtime(*runtime_id), state.runtime),
+                IndexCoordinates::locate(SchemaOrigin::Runtime(*runtime_id), state.runtime),
             );
             for (instance_id, instance_hashes) in state.instances {
                 aggregator.extend(
                     // Instance state hashes.
-                    IndexCoordinates::locate(IndexOwner::Service(instance_id), instance_hashes),
+                    IndexCoordinates::locate(SchemaOrigin::Service(instance_id), instance_hashes),
                 );
             }
         }
