@@ -121,27 +121,24 @@ pub fn impl_object_hash(input: TokenStream) -> TokenStream {
     tokens.into()
 }
 
-/// Check that latin1 character is allowed in index name.
-/// Only these combination of symbols are allowed:
-///
-/// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`
-pub fn is_allowed_latin1_char(c: u8) -> bool {
+/// Checks that an ASCII character is allowed in the `IndexAddress` component.
+pub fn is_allowed_component_char(c: u8) -> bool {
     match c {
-        48..=57    // 0..9
-        | 65..=90  // A..Z
-        | 97..=122 // a..z
-        | 45       // -
-        | 95       // _
-        => true,
+        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_' => true,
         _ => false,
     }
 }
 
-fn validate_index_name(name: &str) -> Result<(), String> {
+fn validate_address_component(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("Name shouldn't be empty".to_owned());
     }
-    if !name.as_bytes().iter().copied().all(is_allowed_latin1_char) {
+    if !name
+        .as_bytes()
+        .iter()
+        .copied()
+        .all(is_allowed_component_char)
+    {
         return Err(format!(
             "Name `{}` contains invalid chars (allowed: `A-Z`, `a-z`, `0-9`, `_` and `-`)",
             name
@@ -254,7 +251,7 @@ impl FromDeriveInput for FromAccess {
 
                     for field in &this.fields {
                         if let Some(ref name) = field.name_suffix {
-                            validate_index_name(name).map_err(|msg| {
+                            validate_address_component(name).map_err(|msg| {
                                 darling::Error::custom(msg).with_span(&field.span)
                             })?;
                             if !field_names.insert(name) {
