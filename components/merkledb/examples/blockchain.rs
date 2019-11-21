@@ -6,7 +6,7 @@ use std::{borrow::Cow, convert::AsRef};
 use exonum_crypto::{Hash, PublicKey};
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
+    access::{Access, RawAccessMut},
     impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
@@ -88,12 +88,6 @@ struct Schema<T: Access> {
     pub blocks: ListIndex<T::Base, Hash>,
     pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
     pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
-}
-
-impl<T: Access> Schema<T> {
-    fn new(access: T) -> Self {
-        Self::from_root(access).unwrap()
-    }
 }
 
 impl<T: Access> Schema<T>

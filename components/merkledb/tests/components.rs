@@ -32,20 +32,15 @@ where
 }
 
 #[derive(FromAccess)]
-struct Complex<T: Access> {
+// Since the name ends with `Schema`, the `new` constructor is derived automatically
+struct ComplexSchema<T: Access> {
     count: Entry<T::Base, u64>,
     generic: Generic<T, String>,
     lazy: Lazy<T, Simple<T>>,
     group: Group<T, str, Simple<T>>,
 }
 
-impl<T: Access> Complex<T> {
-    fn new(access: T) -> Self {
-        Self::from_root(access).unwrap()
-    }
-}
-
-impl<T: Access> Complex<T>
+impl<T: Access> ComplexSchema<T>
 where
     T::Base: RawAccessMut,
 {
@@ -62,7 +57,7 @@ fn embedded_components() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut complex = Complex::new(&fork);
+        let mut complex = ComplexSchema::new(&fork);
         assert!(!complex.count.exists());
         complex.modify(1, "!".to_owned());
         complex.modify(2, "!!".to_owned());
@@ -184,6 +179,42 @@ fn component_with_implicit_type_param() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     fork.get_proof_map("map").put(&1_u64, 2_u64);
-    let schema = Schema::from_root(&fork).unwrap();
+    let schema = Schema::new(&fork);
+    assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
+}
+
+#[test]
+fn schema_with_non_standard_naming() {
+    #[derive(FromAccess)]
+    #[from_access(schema)]
+    struct NonStandard<T: Access> {
+        map: ProofMapIndex<T::Base, u64, u64>,
+    }
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    fork.get_proof_map("map").put(&1_u64, 2_u64);
+    let schema = NonStandard::new(&fork);
+    assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
+}
+
+#[test]
+fn opt_out_from_schema() {
+    #[derive(FromAccess)]
+    #[from_access(schema = false)]
+    struct NotSchema<T: Access> {
+        map: ProofMapIndex<T::Base, u64, u64>,
+    }
+
+    impl<T: Access> NotSchema<T> {
+        fn new(access: T, msg: &str) -> Self {
+            Self::from_root(access).expect(msg)
+        }
+    }
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    fork.get_proof_map("map").put(&1_u64, 2_u64);
+    let schema = NotSchema::new(&fork, "huh?");
     assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
 }

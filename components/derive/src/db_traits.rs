@@ -163,6 +163,16 @@ struct FromAccess {
 struct FromAccessAttrs {
     #[darling(default)]
     transparent: bool,
+
+    // We need an `Option` in order to discern explicit `schema = false` opt-out.
+    #[darling(default)]
+    schema: Option<bool>,
+}
+
+impl FromAccessAttrs {
+    fn is_schema(&self) -> bool {
+        self.schema.unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Default, FromMeta)]
@@ -214,9 +224,13 @@ impl FromAccess {
 
 impl FromDeriveInput for FromAccess {
     fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
-        let attrs = find_meta_attrs("from_access", &input.attrs)
+        let mut attrs = find_meta_attrs("from_access", &input.attrs)
             .map(|meta| FromAccessAttrs::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(FromAccessAttrs::default()))?;
+
+        if attrs.schema.is_none() && input.ident.to_string().ends_with("Schema") {
+            attrs.schema = Some(true);
+        }
 
         match &input.data {
             Data::Struct(DataStruct { fields, .. }) => {
@@ -387,6 +401,23 @@ impl ToTokens for FromAccess {
             }
         };
         tokens.extend(expanded);
+
+        if self.attrs.is_schema() {
+            let expanded = quote! {
+                impl #impl_generics #name #ty_generics #where_clause {
+                    /// Creates a new schema instance rooted in the provided `access`.
+                    ///
+                    /// # Panics
+                    ///
+                    /// Panics if the schema components cannot be instantiated
+                    /// (e.g., because an index included in the schema has a wrong type).
+                    pub fn new(access: #access_ident) -> Self {
+                        #tr::from_root(access).unwrap()
+                    }
+                }
+            };
+            tokens.extend(expanded);
+        }
     }
 }
 
