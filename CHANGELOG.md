@@ -67,7 +67,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-merkledb
 
-- Dot symbol is not allowed in index names and group prefixes anymore . (#1558)
+- Dot symbol is not allowed anymore in indexes with prefixed access. (#1558)
 
 ### New Features
 

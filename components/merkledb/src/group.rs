@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-use crate::validation::assert_valid_index_name_component;
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::IndexAddress,
@@ -52,7 +51,6 @@ where
     I: FromAccess<T>,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
-        assert_valid_index_name_component(&addr.name);
         Ok(Self {
             access,
             prefix: addr,

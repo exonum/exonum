@@ -21,6 +21,7 @@ use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
 use super::{IndexAddress, RawAccess, RawAccessMut, View};
+use crate::access::{AccessError, AccessErrorKind};
 use crate::{validation::assert_index_valid_full_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
@@ -317,8 +318,8 @@ where
         index_access: T,
         index_address: &IndexAddress,
         index_type: IndexType,
-    ) -> Result<Self, Self> {
-        assert_index_valid_full_name(index_address.name());
+    ) -> Result<Self, AccessError> {
+        assert_index_valid_full_name(index_address)?;
         // Actual name.
         let index_name = index_address.name.clone();
         // Full name for internal usage.
@@ -336,7 +337,7 @@ where
         // Set index address name, since metadata itself doesn't know it.
         index_address.name = index_name;
         let this = Self {
-            view: View::new(index_access, index_address),
+            view: View::new(index_access, index_address.clone()),
             metadata,
             index_full_name,
             is_phantom,
@@ -344,7 +345,13 @@ where
         if real_index_type == index_type {
             Ok(this)
         } else {
-            Err(this)
+            Err(AccessError {
+                addr: index_address,
+                kind: AccessErrorKind::WrongIndexType {
+                    expected: index_type,
+                    actual: real_index_type,
+                },
+            })
         }
     }
 

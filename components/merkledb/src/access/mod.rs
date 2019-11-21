@@ -7,7 +7,7 @@ use std::{borrow::Cow, fmt};
 pub use self::extensions::AccessExt;
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
-use crate::validation::assert_valid_index_name_component;
+use crate::validation::assert_valid_name_component;
 use crate::views::{IndexAddress, IndexType, ViewWithMetadata};
 
 mod extensions;
@@ -53,13 +53,7 @@ impl<T: RawAccess> Access for T {
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        ViewWithMetadata::get_or_create(self, &addr, index_type).map_err(|e| AccessError {
-            addr,
-            kind: AccessErrorKind::WrongIndexType {
-                expected: index_type,
-                actual: e.index_type(),
-            },
-        })
+        ViewWithMetadata::get_or_create(self, &addr, index_type)
     }
 }
 
@@ -91,7 +85,7 @@ impl<'a, T: Access> Prefixed<'a, T> {
     /// Will panic if the prefix does not conform to valid names for indexes.
     pub fn new(prefix: impl Into<Cow<'a, str>>, access: T) -> Self {
         let prefix = prefix.into();
-        assert_valid_index_name_component(prefix.as_ref());
+        assert_valid_name_component(prefix.as_ref());
         Self { access, prefix }
     }
 }
@@ -140,6 +134,14 @@ pub enum AccessErrorKind {
         /// Actual index type.
         actual: IndexType,
     },
+
+    /// Index has invalid name.
+    #[fail(display = "{}", _0)]
+    InvalidIndexName(String),
+
+    /// System index has invalid name.
+    #[fail(display = "{}", _0)]
+    InvalidSystemIndexName(String),
 
     /// Custom error.
     #[fail(display = "{}", _0)]

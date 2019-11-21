@@ -169,7 +169,7 @@ impl ArtifactId {
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
         // Extended version of `exonum_merkledb::is_valid_name` that also allows '.' and ':'.
         name.as_ref().iter().all(|&c| match c {
-            46 | 58 => true,
+            b'.' | b':' => true,
             c => is_allowed_index_name_char(c),
         })
     }
