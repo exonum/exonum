@@ -723,7 +723,7 @@ impl BlockResponse {
 /// This type describes all possible types of Exonum messages
 /// which are used in p2p communications.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "consensus::ExonumMessage")]
+#[protobuf_convert(source = "consensus::ExonumMessage", rename(case = "snake_case"), impl_from_trait)]
 pub enum ExonumMessage {
     /// Exonum transaction.
     AnyTx(AnyTx),

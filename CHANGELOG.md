@@ -100,6 +100,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `system/v1/shutdown` endpoint has been modified and now accepts empty POST
   requests. (#1526)
 
+- `exonum-protobuf-convert` has been replaced with external `protobuf-convert`
+  crate. (#1559)
+
 #### exonum-merkledb
 
 - `ProofListIndex::extend()` method has been refactored, leading to up to 10x
