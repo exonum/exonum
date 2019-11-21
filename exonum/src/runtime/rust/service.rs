@@ -170,6 +170,8 @@ pub struct AfterCommitContext<'a> {
     snapshot: &'a dyn Snapshot,
     /// Transaction broadcaster.
     broadcaster: Broadcaster<'a>,
+    /// ID of the node as a validator.
+    validator_id: Option<ValidatorId>,
 }
 
 impl<'a> AfterCommitContext<'a> {
@@ -185,11 +187,11 @@ impl<'a> AfterCommitContext<'a> {
         Self {
             mailbox,
             snapshot,
+            validator_id,
             broadcaster: Broadcaster {
                 instance,
                 service_keypair,
                 tx_sender,
-                validator_id,
             },
         }
     }
@@ -217,11 +219,18 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns the ID of this node as a validator. If the node is not a validator, returns `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
-        self.broadcaster.validator_id
+        self.validator_id
     }
 
-    /// Returns transaction broadcaster.
-    pub fn broadcast(&self) -> Broadcaster<'a> {
+    /// Returns a transaction broadcaster if the current node is a validator. If the node
+    /// is not a validator, returns `None`.
+    pub fn broadcast(&self) -> Option<Broadcaster<'a>> {
+        self.validator_id?;
+        Some(self.broadcaster)
+    }
+
+    /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
+    pub fn generic_broadcast(&self) -> Broadcaster<'a> {
         self.broadcaster
     }
 
@@ -240,31 +249,34 @@ impl<'a> AfterCommitContext<'a> {
 }
 
 /// Transaction broadcaster.
+///
+/// Transaction broadcast allows a service to create one or more transactions in the `after_commit`
+/// handler. The transactions are addressed to the executing service instance.
+///
+/// Broadcasting functionality is primarily useful for services that receive information
+/// from outside the blockchain and need to translate it to transactions. As an example,
+/// a time oracle service may broadcast local node time and build the blockchain-wide time
+/// by processing corresponding transactions.
 #[derive(Debug, Clone, Copy)]
 pub struct Broadcaster<'a> {
     instance: InstanceDescriptor<'a>,
     service_keypair: &'a (PublicKey, SecretKey),
     tx_sender: &'a ApiSender,
-    validator_id: Option<ValidatorId>,
 }
 
 impl Broadcaster<'_> {
-    /// Signs and broadcasts a transaction to the other nodes in the network, but only
-    /// if this node is a validator.
-    pub fn send_if_validator<Svc: ?Sized, T, F>(self, create_tx: F)
+    /// Signs and broadcasts a transaction to the other nodes in the network.
+    pub fn send<Svc: ?Sized, T>(self, tx: T)
     where
         T: Transaction<Svc>,
-        F: FnOnce() -> T,
     {
-        if self.validator_id.is_some() {
-            let msg = create_tx().sign(
-                self.instance.id,
-                self.service_keypair.0,
-                &self.service_keypair.1,
-            );
-            if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
-                error!("Couldn't broadcast transaction {}.", e);
-            }
+        let msg = tx.sign(
+            self.instance.id,
+            self.service_keypair.0,
+            &self.service_keypair.1,
+        );
+        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
+            error!("Couldn't broadcast transaction {}.", e);
         }
     }
 
@@ -275,41 +287,34 @@ impl Broadcaster<'_> {
             instance_id: self.instance.id,
             service_keypair: self.service_keypair.to_owned(),
             tx_sender: self.tx_sender.to_owned(),
-            is_validator: self.validator_id.is_some(),
         }
     }
 }
 
-/// Transaction broadcaster.
+/// A version of `Broadcaster` that has static lifetime and thus can be sent to another thread
+/// or otherwise used for async operations.
+///
+/// See [`Broadcaster`] for the functionality description.
 #[derive(Debug, Clone)]
 pub struct OwnedBroadcaster {
     instance_id: InstanceId,
     service_keypair: (PublicKey, SecretKey),
     tx_sender: ApiSender,
-    is_validator: bool,
 }
 
 impl OwnedBroadcaster {
-    /// Signs and broadcasts a transaction to the other nodes in the network, but only
-    /// if this node is a validator.
-    ///
-    /// # Safety
-    ///
-    /// Note that the node may cease to be a validator by the time the transaction is broadcast.
-    pub fn send_if_validator<Svc: ?Sized, T, F>(&self, create_tx: F)
+    /// Signs and broadcasts a transaction to the other nodes in the network.
+    pub fn send<Svc: ?Sized, T>(self, tx: T)
     where
         T: Transaction<Svc>,
-        F: FnOnce() -> T,
     {
-        if self.is_validator {
-            let msg = create_tx().sign(
-                self.instance_id,
-                self.service_keypair.0,
-                &self.service_keypair.1,
-            );
-            if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
-                error!("Couldn't broadcast transaction {}.", e);
-            }
+        let msg = tx.sign(
+            self.instance_id,
+            self.service_keypair.0,
+            &self.service_keypair.1,
+        );
+        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
+            error!("Couldn't broadcast transaction {}.", e);
         }
     }
 }

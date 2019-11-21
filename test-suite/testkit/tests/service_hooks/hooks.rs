@@ -89,6 +89,10 @@ impl AfterCommitService {
         self.counter.load(Ordering::SeqCst)
     }
 
+    pub fn switch_to_generic_broadcast(&self) {
+        self.counter.store(100_000, Ordering::SeqCst);
+    }
+
     pub fn new_instance(&self) -> Box<dyn Service> {
         Box::new(self.clone())
     }
@@ -100,9 +104,16 @@ impl Service for AfterCommitService {
     }
 
     fn after_commit(&self, context: AfterCommitContext<'_>) {
-        self.counter.fetch_add(1, Ordering::SeqCst);
-        context
-            .broadcast()
-            .send_if_validator(|| TxAfterCommit::new(context.height()));
+        let counter = self.counter.fetch_add(1, Ordering::SeqCst);
+
+        // Test both validator-specific and generic sending.
+        let tx = TxAfterCommit::new(context.height());
+        if counter < 10_000 {
+            if let Some(broadcast) = context.broadcast() {
+                broadcast.send(tx);
+            }
+        } else {
+            context.generic_broadcast().send(tx);
+        }
     }
 }

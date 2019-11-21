@@ -190,7 +190,8 @@ pub use self::{
     call_context::CallContext,
     error::Error,
     service::{
-        AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
+        AfterCommitContext, Broadcaster, Interface, OwnedBroadcaster, Service, ServiceDispatcher,
+        ServiceFactory, Transaction,
     },
 };
 

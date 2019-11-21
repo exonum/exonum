@@ -28,7 +28,7 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, CallContext, Service},
+        rust::{AfterCommitContext, Broadcaster, CallContext, Service},
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -240,17 +240,19 @@ where
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
-            let tx_sender = context.broadcast().into_owned();
+            let tx_sender = context.broadcast().map(Broadcaster::into_owned);
 
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
+            // We should deploy the artifact for all nodes, but send confirmations only
+            // if the node is a validator.
             extensions.start_deploy(artifact, spec, move || {
-                tx_sender.send_if_validator(|| {
+                if let Some(tx_sender) = tx_sender {
                     log::trace!(
                         "Sending confirmation for deployment request {:?}",
                         unconfirmed_request
                     );
-                    DeployConfirmation::from(unconfirmed_request)
-                });
+                    tx_sender.send(DeployConfirmation::from(unconfirmed_request));
+                }
                 Ok(())
             });
         }
