@@ -86,7 +86,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 In `exonum` 0.13, a new service workflow was introduced, named
 "dynamic services".
 
-Key points of this feature is the following:
+Key points of this feature are the following:
 
 - `exonum` now supports different environments of code execution (runtimes).
   Only native `rust` runtime is enabled by default, but with this feature
