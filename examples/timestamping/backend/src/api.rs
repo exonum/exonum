@@ -18,7 +18,7 @@ use exonum_merkledb::{proof_map_index::Raw, MapProof};
 use exonum::{
     blockchain::{BlockProof, IndexCoordinates, SchemaOrigin},
     crypto::Hash,
-    runtime::api::{self, ServiceApiBuilder, ServiceApiState},
+    runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
 use crate::schema::{Schema, TimestampEntry};

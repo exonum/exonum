@@ -18,8 +18,10 @@ use exonum::{
     blockchain::{ExecutionError, InstanceCollection},
     crypto::Hash,
     runtime::{
-        api::{self, ServiceApiBuilder},
-        rust::{CallContext, Service},
+        rust::{
+            api::{self, ServiceApiBuilder},
+            CallContext, Service,
+        },
         BlockchainData, DispatcherError, InstanceId,
     },
 };

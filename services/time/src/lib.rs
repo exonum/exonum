@@ -45,8 +45,7 @@ pub mod transactions;
 use exonum::{
     crypto::Hash,
     runtime::{
-        api::ServiceApiBuilder,
-        rust::{AfterCommitContext, Service},
+        rust::{api::ServiceApiBuilder, AfterCommitContext, Service},
         BlockchainData,
     },
 };

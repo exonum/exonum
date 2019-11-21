@@ -12,142 +12,288 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Rust runtime specific API endpoints.
+//! Building blocks for creating HTTP API of Rust services.
 
-use std::collections::HashMap;
+pub use crate::api::{Error, FutureResult, Result};
+
+use exonum_merkledb::{access::Prefixed, Snapshot};
+use futures::IntoFuture;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    api::{self, ApiBuilder},
-    proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
+    api::{ApiBuilder, ApiScope},
+    blockchain::Blockchain,
+    crypto::{PublicKey, SecretKey},
+    node::ApiSender,
+    runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
 
-use super::{RustArtifactId, RustRuntime};
-
-/// Artifact Protobuf file sources.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ProtoSourceFile {
-    /// File name.
-    pub name: String,
-    /// File contents.
-    pub content: String,
+/// Provide the current blockchain state snapshot to API handlers.
+///
+/// This structure allows a service API handler to interact with the service instance
+/// and other parts of the blockchain.
+#[derive(Debug)]
+pub struct ServiceApiState<'a> {
+    /// Service instance descriptor of the current API handler.
+    pub instance: InstanceDescriptor<'a>,
+    /// Service key pair of the current node.
+    pub service_keypair: &'a (PublicKey, SecretKey),
+    api_sender: &'a ApiSender,
+    // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
+    snapshot: Box<dyn Snapshot>,
 }
 
-/// Protobuf sources query parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ProtoSourcesQuery {
-    /// Artifact identifier, if specified, query returns the source files of the artifact,
-    /// otherwise it returns source files of Exonum itself.
-    pub artifact: Option<String>,
+impl<'a> ServiceApiState<'a> {
+    /// Create service API state snapshot from the given blockchain and instance descriptor.
+    pub fn from_api_context(blockchain: &'a Blockchain, instance: InstanceDescriptor<'a>) -> Self {
+        Self {
+            service_keypair: blockchain.service_keypair(),
+            instance,
+            api_sender: blockchain.sender(),
+            snapshot: blockchain.snapshot(),
+        }
+    }
+
+    /// Returns readonly access to blockchain data.
+    pub fn data(&'a self) -> BlockchainData<&dyn Snapshot> {
+        BlockchainData::new(&self.snapshot, self.instance)
+    }
+
+    /// Returns readonly access to the data of the executing service.
+    pub fn service_data(&'a self) -> Prefixed<&dyn Snapshot> {
+        self.data().for_executing_service()
+    }
+
+    /// Return a reference to the transactions sender.
+    pub fn sender(&self) -> &ApiSender {
+        self.api_sender
+    }
 }
 
-/// Artifact Protobuf specification for the Exonum clients.
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct ArtifactProtobufSpec {
-    /// List of Protobuf files that make up the service interface.
+/// Exonum API builder for the concrete service API [scope].
+///
+/// [scope]: ../../api/struct.ApiScope.html
+#[derive(Debug, Clone)]
+pub struct ServiceApiScope {
+    inner: ApiScope,
+    blockchain: Blockchain,
+    descriptor: (InstanceId, String),
+}
+
+impl ServiceApiScope {
+    /// Create a new service API scope for the specified service instance.
+    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
+        Self {
+            inner: ApiScope::new(),
+            blockchain,
+            descriptor: instance.into(),
+        }
+    }
+
+    /// Add a readonly endpoint handler to the service API scope.
     ///
-    /// The common interface entry point is always in the `service.proto` file.
-    /// Entry point contains descriptions of the service transactions and configuration
-    /// parameters. Message with the configuration parameters should be named as `Config`.
-    pub sources: Vec<ProtoSourceFile>,
-    /// List of service's proto include files.
-    pub includes: Vec<ProtoSourceFile>,
-}
+    /// In HTTP backends this type of endpoint corresponds to `GET` requests.
+    /// [Read more.](../../api/struct.ApiScope.html#endpoint)
+    pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        self.inner
+            .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
+                let state = ServiceApiState::from_api_context(
+                    &blockchain,
+                    InstanceDescriptor {
+                        id: descriptor.0,
+                        name: descriptor.1.as_ref(),
+                    },
+                );
+                let result = handler(&state, query);
+                Box::new(result.into_future())
+            });
+        self
+    }
 
-impl ArtifactProtobufSpec {
-    /// Creates a new artifact Protobuf specification instance from the given
-    /// list of Protobuf sources and includes.
-    pub fn new(
-        sources: impl IntoIterator<Item = impl Into<ProtoSourceFile>>,
-        includes: impl IntoIterator<Item = impl Into<ProtoSourceFile>>,
-    ) -> Self {
-        Self {
-            sources: sources.into_iter().map(|x| x.into()).collect(),
-            includes: includes.into_iter().map(|x| x.into()).collect(),
-        }
+    /// Add an endpoint handler to the service API scope.
+    ///
+    /// In HTTP backends this type of endpoint corresponds to `POST` requests.
+    /// [Read more.](../../api/struct.ApiScope.html#endpoint_mut)
+    pub fn endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        self.inner
+            .endpoint_mut(name, move |query: Q| -> crate::api::FutureResult<I> {
+                let state = ServiceApiState::from_api_context(
+                    &blockchain,
+                    InstanceDescriptor {
+                        id: descriptor.0,
+                        name: descriptor.1.as_ref(),
+                    },
+                );
+                let result = handler(&state, query);
+                Box::new(result.into_future())
+            });
+        self
+    }
+
+    /// Return a mutable reference to the underlying web backend.
+    pub fn web_backend(&mut self) -> &mut crate::api::backends::actix::ApiBuilder {
+        self.inner.web_backend()
     }
 }
 
-impl From<&(&str, &str)> for ProtoSourceFile {
-    fn from(v: &(&str, &str)) -> Self {
+/// Exonum service API builder which is used to add endpoints to the node API.
+///
+/// # Examples
+///
+/// The example below shows a common practice of the API implementation.
+///
+/// ```rust
+/// use serde_derive::{Deserialize, Serialize};
+///
+/// use exonum::{
+///     blockchain::Schema,
+///     crypto::{self, Hash},
+///     node::ExternalMessage,
+///     runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
+/// };
+/// use exonum_merkledb::ObjectHash;
+///
+/// // Declare a type which describes an API specification and implementation.
+/// pub struct MyApi;
+///
+/// // Declare structures for requests and responses.
+///
+/// // For the web backend `MyQuery` will be deserialized from the `block_height={number}` string.
+/// #[derive(Deserialize, Clone, Copy)]
+/// pub struct MyQuery {
+///     pub block_height: u64,
+/// }
+///
+/// // For the web backend `BlockInfo` will be serialized into a JSON string.
+/// #[derive(Serialize, Clone, Copy)]
+/// pub struct BlockInfo {
+///     pub hash: Hash,
+/// }
+///
+/// // Create API handlers.
+/// impl MyApi {
+///     // Immutable handler which returns a hash of the block at the given height.
+///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
+///         let schema = state.data().for_core();
+///         Ok(schema
+///             .block_hashes_by_height()
+///             .get(query.block_height)
+///             .map(|hash| BlockInfo { hash }))
+///     }
+///
+///     // Mutable handler which sends `Shutdown` request to the node.
+///     pub fn shutdown(state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///         state
+///             .sender()
+///             .send_external_message(ExternalMessage::Shutdown)
+///             .map_err(From::from)
+///     }
+///
+///     // Simple handler without any parameters.
+///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///         Ok(())
+///     }
+///
+///     // You may also create asynchronous handlers for long requests.
+///     pub fn async_operation(
+///         _state: &ServiceApiState,
+///         query: MyQuery,
+///     ) -> api::FutureResult<Option<Hash>> {
+///         Box::new(futures::lazy(move || {
+///             Ok(Some(query.block_height.object_hash()))
+///         }))
+///     }
+/// }
+///
+/// fn wire_api(builder: &mut ServiceApiBuilder) -> &mut ServiceApiBuilder {
+///     // Add `MyApi` handlers to the corresponding builder.
+///     builder
+///         .public_scope()
+///         .endpoint("v1/ping", MyApi::ping)
+///         .endpoint("v1/block_hash", MyApi::block_hash)
+///         .endpoint("v1/async_operation", MyApi::async_operation);
+///     // Add a mutable endpoint to the private API.
+///     builder
+///         .private_scope()
+///         .endpoint_mut("v1/shutdown", MyApi::shutdown);
+///     builder
+/// }
+///
+/// # fn main() {
+/// #     use exonum::{blockchain::Blockchain, node::ApiSender, runtime::InstanceDescriptor};
+/// #     use exonum_merkledb::TemporaryDB;
+/// #     use futures::sync::mpsc;
+/// #
+/// #     let blockchain = Blockchain::new(
+/// #         TemporaryDB::new(),
+/// #         crypto::gen_keypair(),
+/// #         ApiSender::new(mpsc::channel(0).0),
+/// #     );
+/// #     let mut builder = ServiceApiBuilder::new(
+/// #         blockchain,
+/// #         InstanceDescriptor {
+/// #             id: 1100,
+/// #             name: "example",
+/// #         },
+/// #     );
+/// #     wire_api(&mut builder);
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct ServiceApiBuilder {
+    blockchain: Blockchain,
+    public_scope: ServiceApiScope,
+    private_scope: ServiceApiScope,
+}
+
+impl ServiceApiBuilder {
+    /// Create a new service API builder for the specified service instance.
+    #[doc(hidden)]
+    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
         Self {
-            name: v.0.to_owned(),
-            content: v.1.to_owned(),
+            blockchain: blockchain.clone(),
+            public_scope: ServiceApiScope::new(blockchain.clone(), instance),
+            private_scope: ServiceApiScope::new(blockchain, instance),
         }
+    }
+
+    /// Return a mutable reference to the public API scope builder.
+    pub fn public_scope(&mut self) -> &mut ServiceApiScope {
+        &mut self.public_scope
+    }
+
+    /// Return a mutable reference to the private API scope builder.
+    pub fn private_scope(&mut self) -> &mut ServiceApiScope {
+        &mut self.private_scope
+    }
+
+    /// Return a reference to the blockchain.
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
     }
 }
 
-fn exonum_proto_sources() -> Vec<ProtoSourceFile> {
-    let proto = EXONUM_PROTO_SOURCES
-        .as_ref()
-        .iter()
-        .map(From::from)
-        .collect::<Vec<_>>();
-    let includes = EXONUM_INCLUDES
-        .as_ref()
-        .iter()
-        .map(From::from)
-        .collect::<Vec<_>>();
-
-    proto.into_iter().chain(includes).collect()
-}
-
-fn filter_exonum_proto_sources(
-    files: Vec<ProtoSourceFile>,
-    exonum_sources: &[ProtoSourceFile],
-) -> Vec<ProtoSourceFile> {
-    files
-        .into_iter()
-        .filter(|file| !exonum_sources.contains(file))
-        .collect()
-}
-
-/// Returns API builder instance with the appropriate endpoints for the specified
-/// Rust runtime instance.
-pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, ApiBuilder)> {
-    let artifact_proto_sources = runtime
-        .available_artifacts
-        .iter()
-        .map(|(artifact_id, service_factory)| {
-            (
-                artifact_id.clone(),
-                service_factory.artifact_protobuf_spec(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-    let exonum_sources = exonum_proto_sources();
-    // Cache filtered sources to avoid expensive operations in the endpoint handler.
-    let filtered_sources = artifact_proto_sources
-        .into_iter()
-        .map(|(artifact_id, sources)| {
-            let mut proto = sources.sources;
-            proto.extend(filter_exonum_proto_sources(
-                sources.includes,
-                &exonum_sources,
-            ));
-            (artifact_id, proto)
-        })
-        .collect::<HashMap<_, _>>();
-
-    let mut builder = ApiBuilder::new();
-    builder
-        .public_scope()
-        // This endpoint returns list of protobuf source files of the specified artifact,
-        // otherwise it returns source files of Exonum itself.
-        .endpoint("proto-sources", {
-            move |query: ProtoSourcesQuery| -> Result<Vec<ProtoSourceFile>, api::Error> {
-                if let Some(artifact_id) = query.artifact {
-                    let artifact_id = artifact_id.parse::<RustArtifactId>()?;
-                    filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
-                        api::Error::NotFound(format!(
-                            "Unable to find sources for artifact {}",
-                            artifact_id
-                        ))
-                    })
-                } else {
-                    Ok(exonum_sources.clone())
-                }
-            }
-        });
-
-    std::iter::once((["runtimes/", RustRuntime::NAME].concat(), builder))
+impl From<ServiceApiBuilder> for ApiBuilder {
+    fn from(inner: ServiceApiBuilder) -> Self {
+        Self {
+            public_scope: inner.public_scope.inner,
+            private_scope: inner.private_scope.inner,
+        }
+    }
 }

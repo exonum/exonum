@@ -32,7 +32,10 @@ pub mod wallet;
 
 use exonum::{
     crypto::Hash,
-    runtime::{api::ServiceApiBuilder, rust::Service, BlockchainData},
+    runtime::{
+        rust::{api::ServiceApiBuilder, Service},
+        BlockchainData,
+    },
 };
 use exonum_merkledb::Snapshot;
 

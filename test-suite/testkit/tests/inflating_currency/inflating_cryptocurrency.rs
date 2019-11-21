@@ -16,8 +16,10 @@ use exonum::{
     crypto::{Hash, PublicKey},
     helpers::Height,
     runtime::{
-        api::{self, ServiceApiBuilder},
-        rust::{CallContext, Service},
+        rust::{
+            api::{self, ServiceApiBuilder},
+            CallContext, Service,
+        },
         BlockchainData, InstanceId,
     },
 };

@@ -186,15 +186,16 @@
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    api::ArtifactProtobufSpec,
     call_context::CallContext,
     error::Error,
+    runtime_api::ArtifactProtobufSpec,
     service::{
         AfterCommitContext, Broadcaster, Interface, OwnedBroadcaster, Service, ServiceDispatcher,
         ServiceFactory, Transaction,
     },
 };
 
+pub mod api;
 pub mod error;
 
 use exonum_merkledb::{validation::is_valid_index_name, Snapshot};
@@ -214,16 +215,16 @@ use crate::{
     helpers::Height,
 };
 
+use self::api::ServiceApiBuilder;
 use super::{
-    api::ServiceApiBuilder,
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
-mod api;
 mod call_context;
+mod runtime_api;
 mod service;
 #[cfg(test)]
 mod tests;
@@ -368,7 +369,7 @@ impl RustRuntime {
                     ApiBuilder::from(builder),
                 )
             })
-            .chain(self::api::endpoints(self))
+            .chain(self::runtime_api::endpoints(self))
             .collect()
     }
 

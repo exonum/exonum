@@ -15,9 +15,9 @@
 use exonum::{
     blockchain::ConsensusConfig,
     crypto::Hash,
-    runtime::{
+    runtime::rust::{
         api::{self, ServiceApiBuilder, ServiceApiState},
-        rust::Transaction,
+        Transaction,
     },
 };
 use exonum_merkledb::ObjectHash;

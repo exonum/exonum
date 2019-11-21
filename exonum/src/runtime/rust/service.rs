@@ -23,13 +23,14 @@ use crate::{
     messages::Verified,
     node::ApiSender,
     runtime::{
-        api::ServiceApiBuilder,
         dispatcher::{Action, Mailbox},
         AnyTx, ArtifactId, CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
-use super::{ArtifactProtobufSpec, BlockchainData, CallContext, RustArtifactId};
+use super::{
+    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, RustArtifactId,
+};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.

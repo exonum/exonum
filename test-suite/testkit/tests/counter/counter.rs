@@ -23,8 +23,10 @@ use exonum::{
     crypto::Hash,
     messages::{AnyTx, Verified},
     runtime::{
-        api::{ServiceApiBuilder, ServiceApiState},
-        rust::{CallContext, Service},
+        rust::{
+            api::{ServiceApiBuilder, ServiceApiState},
+            CallContext, Service,
+        },
         BlockchainData, InstanceId,
     },
 };
