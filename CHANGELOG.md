@@ -101,7 +101,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   requests. (#1526)
 
 - `exonum-protobuf-convert` has been replaced with external `protobuf-convert`
-  crate. (#1559)
+  crate. (#1561)
 
 #### exonum-merkledb
 
