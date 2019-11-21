@@ -35,7 +35,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
   
-- Dot symbol is not allowed in service names. (#1558)
+- Dot symbol is not allowed in service names anymore. (#1558)
 
 - Placeholder for changes due to dynamic services (#9999)
 
@@ -64,6 +64,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   
 - Protobuf serialization for crypto types are now implemented in `exonum-crypto`
   crate (#1496).
+
+#### exonum-merkledb
+
+- Dot symbol is not allowed in index names and group prefixes anymore . (#1558)
 
 ### New Features
 
@@ -94,8 +98,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - For `Hash` keys both map variants works the same, because `ObjectHash`
   implementation for `Hash` returns the hash itself.
-  
-- Dot symbol is not allowed in index and group prefixes. (#1558)
 
 ### Internal improvements
 

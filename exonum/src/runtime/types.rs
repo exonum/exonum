@@ -14,7 +14,7 @@
 
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
-    validation::{is_allowed_latin1_char, is_valid_prefix},
+    validation::{is_allowed_index_name_char, is_valid_index_name_component},
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
@@ -170,7 +170,7 @@ impl ArtifactId {
         // Extended version of `exonum_merkledb::is_valid_name` that also allows '.' and ':'.
         name.as_ref().iter().all(|&c| match c {
             46 | 58 => true,
-            c => is_allowed_latin1_char(c),
+            c => is_allowed_index_name_char(c),
         })
     }
 }
@@ -183,7 +183,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             Self::is_valid_name(&self.name),
-            "Artifact name({}) contains an illegal character, use only: a-zA-Z0-9 and one of _-.:",
+            "Artifact name ({}) contains an illegal character, use only: a-zA-Z0-9 and one of _-.:",
             &self.name,
         );
         Ok(())
@@ -294,8 +294,8 @@ impl InstanceSpec {
             "Service instance name should not be empty"
         );
         ensure!(
-            is_valid_prefix(name),
-            "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-"
+            is_valid_index_name_component(name),
+            "Service instance name ({}) contains illegal character, use only: a-zA-Z0-9 and one of _-", name
         );
         Ok(())
     }
@@ -371,11 +371,11 @@ fn parse_artifact_id_incorrect_layout() {
         ("ava:123", "invalid digit found in string"),
         (
             "123:I am a service!",
-            "Artifact name(I am a service!) contains an illegal character",
+            "Artifact name (I am a service!) contains an illegal character",
         ),
         (
             "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!",
-            "Artifact name(\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!) contains an illegal character",
+            "Artifact name (\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!) contains an illegal character",
         ),
     ];
 
@@ -408,18 +408,22 @@ fn test_instance_spec_validate_incorrect() {
                 "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
                 "0:my-service:1.0.0"
             ),
-            "Service instance name contains illegal character",
+            "Service instance name (\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}) contains illegal character",
         ),
         (
             InstanceSpec::new(3, "space service", "1:java.runtime.service"),
-            "Service instance name contains illegal character",
+            "Service instance name (space service) contains illegal character",
         ),
         (
-            InstanceSpec::new(4, "foo_service", ""),
+            InstanceSpec::new(4, "dot.service", "1:java.runtime.service"),
+            "Service instance name (dot.service) contains illegal character",
+        ),
+        (
+            InstanceSpec::new(5, "foo_service", ""),
             "Wrong artifact id format",
         ),
         (
-            InstanceSpec::new(5, "foo_service", ":"),
+            InstanceSpec::new(6, "foo_service", ":"),
             "cannot parse integer from empty string",
         ),
     ];

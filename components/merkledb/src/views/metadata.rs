@@ -21,7 +21,7 @@ use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
 use super::{IndexAddress, RawAccess, RawAccessMut, View};
-use crate::{validation::assert_index_valid_name, BinaryValue};
+use crate::{validation::assert_index_valid_full_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
@@ -318,7 +318,7 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, Self> {
-        assert_index_valid_name(index_address.name());
+        assert_index_valid_full_name(index_address.name());
         // Actual name.
         let index_name = index_address.name.clone();
         // Full name for internal usage.
