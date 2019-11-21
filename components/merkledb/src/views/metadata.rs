@@ -22,7 +22,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use super::{IndexAddress, RawAccess, RawAccessMut, View};
 use crate::access::{AccessError, AccessErrorKind};
-use crate::{validation::assert_index_valid_full_name, BinaryValue};
+use crate::{validation::check_index_valid_full_name, BinaryValue};
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
@@ -319,7 +319,7 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
-        assert_index_valid_full_name(index_address)?;
+        check_index_valid_full_name(index_address)?;
         // Actual name.
         let index_name = index_address.name.clone();
         // Full name for internal usage.

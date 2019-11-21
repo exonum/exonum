@@ -45,51 +45,54 @@ pub fn is_allowed_index_name_char(c: u8) -> bool {
     }
 }
 
-fn assert_valid_name<S: AsRef<str> + Copy, F>(name: S, predicate: F, desc: &str)
+fn check_valid_name<S: AsRef<str> + Copy, F>(
+    name: S,
+    predicate: F,
+    desc: &str,
+) -> Result<(), String>
 where
     F: Fn(S) -> bool,
 {
     if name.as_ref().is_empty() {
-        panic!("Index name must not be empty")
-    }
-
-    if !predicate(name) {
-        panic!(
+        Err("Index name must not be empty".into())
+    } else if !predicate(name) {
+        Err(format!(
             "Wrong characters using in name ({}). {}",
             name.as_ref(),
             desc
-        );
+        ))
+    } else {
+        Ok(())
     }
 }
 
-/// Calls the `is_valid_index_full_name` function with the given name
-/// and panics if it returns `false`.
-pub(crate) fn assert_index_valid_full_name(addr: &IndexAddress) -> Result<(), AccessError> {
-    let name = addr.name.clone();
+/// Calls the `is_valid_index_full_name` function with the given index address.
+pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), AccessError> {
+    let name = &addr.name;
     let is_system = name.starts_with("__");
 
-    let msg = if name.is_empty() {
-        "Index name must not be empty".into()
-    } else if !is_valid_index_full_name(&name) {
-        format!("Wrong characters using in name ({}). Use: a-zA-Z0-9 and _-.", name)
-    } else {
-        return Ok(())
-    };
+    match check_valid_name(name, is_valid_index_full_name, "Use: a-zA-Z0-9 and _-.") {
+        Err(msg) => {
+            let kind = if is_system {
+                AccessErrorKind::InvalidIndexName(msg)
+            } else {
+                AccessErrorKind::InvalidSystemIndexName(msg)
+            };
 
-    let kind = if is_system {
-        AccessErrorKind::InvalidIndexName(msg)
-    } else {
-        AccessErrorKind::InvalidSystemIndexName(msg)
-    };
-
-    Err(AccessError {
-        addr: addr.clone(),
-        kind,
-    })
+            Err(AccessError {
+                addr: addr.clone(),
+                kind,
+            })
+        }
+        _ => Ok(()),
+    }
 }
 
 /// Calls the `is_valid_index_name_component` function with the given
 /// name and panics if it returns `false`.
 pub(crate) fn assert_valid_name_component(name: &str) {
-    assert_valid_name(name, is_valid_index_name_component, "Use: a-zA-Z0-9 and _-")
+    if let Err(msg) = check_valid_name(name, is_valid_index_name_component, "Use: a-zA-Z0-9 and _-")
+    {
+        panic!(msg)
+    }
 }
