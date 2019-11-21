@@ -165,7 +165,7 @@ impl ArtifactId {
         Ok(artifact)
     }
 
-    /// Check that the artifact name contains only allowed characters and is not empty.
+    /// Checks that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
         // Extended version of `exonum_merkledb::is_valid_name` that also allows '.' and ':'.
         name.as_ref().iter().all(|&c| match c {
@@ -178,7 +178,7 @@ impl ArtifactId {
 impl ValidateInput for ArtifactId {
     type Error = failure::Error;
 
-    /// Check that the artifact name contains only allowed characters and is not empty.
+    /// Checks that the artifact name contains only allowed characters and is not empty.
     fn validate(&self) -> Result<(), Self::Error> {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(

@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-/// Validate index name.
+/// Validates index name.
 pub fn is_valid_index_full_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref()
         .as_bytes()
@@ -11,7 +11,7 @@ pub fn is_valid_index_full_name<S: AsRef<str>>(name: S) -> bool {
         .all(|c| is_allowed_index_name_char(c) || c == 46)
 }
 
-/// Validate index name prefix, it shouldn't contain the dot.
+/// Validates index name prefix, it shouldn't contain the dot.
 pub fn is_valid_index_name_component<S: AsRef<str>>(name: S) -> bool {
     name.as_ref()
         .as_bytes()
@@ -20,7 +20,7 @@ pub fn is_valid_index_name_component<S: AsRef<str>>(name: S) -> bool {
         .all(is_allowed_index_name_char)
 }
 
-/// Check that character is allowed in index name.
+/// Checks that character is allowed in index name.
 /// Only these combination of symbols are allowed:
 ///
 /// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`
