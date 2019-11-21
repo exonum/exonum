@@ -305,10 +305,10 @@ fn test_dispatcher_simple() {
     // Check if the services are ready for deploy.
     let mut fork = db.fork();
     dispatcher
-        .deploy_artifact_sync(&fork, rust_artifact.clone(), vec![])
+        .commit_artifact_sync(&fork, rust_artifact.clone(), vec![])
         .unwrap();
     dispatcher
-        .deploy_artifact_sync(&fork, java_artifact.clone(), vec![])
+        .commit_artifact_sync(&fork, java_artifact.clone(), vec![])
         .unwrap();
 
     // Check if the services are ready for initiation. Note that the artifacts are pending at this

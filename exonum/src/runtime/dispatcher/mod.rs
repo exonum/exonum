@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::{error::Error, schema::Schema};
+pub use self::{
+    error::Error,
+    schema::{Schema, SchemaNg},
+};
 
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{
@@ -112,7 +115,7 @@ impl Dispatcher {
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
-            self.deploy_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
+            self.commit_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
         }
 
         // Start the built-in service instance.
@@ -172,12 +175,16 @@ impl Dispatcher {
     pub(crate) fn commit_artifact(
         fork: &Fork,
         artifact: ArtifactId,
-        spec: Vec<u8>,
+        payload: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
-        Schema::new(fork).add_pending_artifact(artifact, spec)?;
-        Ok(())
+        SchemaNg::new(fork)
+            .add_pending_artifact(ArtifactSpec {
+                artifact: artifact.clone(),
+                payload: payload.clone(),
+            })
+            .map_err(From::from)
     }
 
     fn block_until_deployed(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
@@ -192,8 +199,9 @@ impl Dispatcher {
         }
     }
 
-    /// Deploys an artifact synchronously, i.e., blocking until the artifact is deployed.
-    pub(crate) fn deploy_artifact_sync(
+    /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
+    /// deployed.
+    pub(crate) fn commit_artifact_sync(
         &mut self,
         fork: &Fork,
         artifact: ArtifactId,
@@ -201,6 +209,9 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let spec = spec.into_bytes();
         Self::commit_artifact(fork, artifact.clone(), spec.clone())?;
+        let mut schema = SchemaNg::new(fork);
+        schema.mark_pending_artifacts_as_active();
+        schema.take_pending_artifacts();
         self.block_until_deployed(artifact, spec);
         Ok(())
     }
@@ -225,6 +236,10 @@ impl Dispatcher {
     }
 
     /// Calls `before_commit` for all currently active services, isolating each call.
+    ///
+    /// Changes the status of pending artifacts and services to active in the merkelized
+    /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
+    /// calculated for proposal and actually committed block.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
@@ -237,6 +252,9 @@ impl Dispatcher {
                 fork.rollback();
             }
         }
+
+        let mut schema = SchemaNg::new(&*fork);
+        schema.mark_pending_artifacts_as_active();
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
@@ -250,11 +268,10 @@ impl Dispatcher {
         let snapshot = fork.snapshot_without_unflushed_changes();
         let mut schema = Schema::new(&*fork);
 
-        // Deploy pending artifacts.
-        let mut artifacts = schema.pending_artifacts();
-        for spec in artifacts.values() {
-            self.block_until_deployed(spec.artifact.clone(), spec.payload.clone());
-            schema.add_artifact(spec.artifact, spec.payload);
+        // Block futures with pending deployments.
+        let mut schema_ng = SchemaNg::new(&*fork);
+        for spec in schema_ng.take_pending_artifacts() {
+            self.block_until_deployed(spec.artifact, spec.payload);
         }
 
         // Start pending services.
@@ -264,7 +281,6 @@ impl Dispatcher {
                 .expect("Cannot add service");
             schema.add_service(spec);
         }
-        artifacts.clear();
         services.clear();
     }
 
