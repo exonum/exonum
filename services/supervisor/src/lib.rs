@@ -118,7 +118,7 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
 
 /// Assigns the instance ID for a new service, initializing the schema `vacant_instance_id`
 /// entry if needed.
-fn assign_instance_id(context: &mut CallContext<'_>) -> InstanceId {
+fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
     let mut schema = Schema::new(context.service_data());
     match schema.assign_instance_id() {
         Some(id) => id,
