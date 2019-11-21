@@ -598,11 +598,13 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
 
         // By convention, services don't handle `after_commit()` on the genesis block.
-        if CoreSchema::new(snapshot).height() == Height(0) {
+        let core_schema = CoreSchema::new(snapshot);
+        if core_schema.height() == Height(0) {
             return;
         }
 
         let blockchain = self.blockchain();
+        let validator_id = core_schema.validator_id(blockchain.service_keypair().0);
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,
@@ -610,6 +612,7 @@ impl Runtime for RustRuntime {
                 snapshot,
                 blockchain.service_keypair(),
                 blockchain.sender(),
+                validator_id,
             ));
         }
     }

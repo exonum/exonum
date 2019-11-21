@@ -78,15 +78,9 @@ impl Service for TimeService {
 
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext<'_>) {
-        // The transaction must be created by the validator.
-        if context
-            .data()
-            .for_core()
-            .validator_id(context.service_keypair.0)
-            .is_some()
-        {
-            context.broadcast_transaction(TxTime::new(self.time.current_time()));
-        }
+        context
+            .broadcast()
+            .send_if_validator(|| TxTime::new(self.time.current_time()));
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

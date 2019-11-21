@@ -101,7 +101,8 @@ impl Service for AfterCommitService {
 
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         self.counter.fetch_add(1, Ordering::SeqCst);
-        let tx = TxAfterCommit::new(context.height());
-        context.broadcast_transaction(tx);
+        context
+            .broadcast()
+            .send_if_validator(|| TxAfterCommit::new(context.height()));
     }
 }

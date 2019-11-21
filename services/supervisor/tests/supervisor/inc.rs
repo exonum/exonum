@@ -150,7 +150,7 @@ impl Configure for IncService {
             "error" => {
                 let error =
                     DispatcherError::malformed_arguments("IncService: Configure error request");
-                return Err(error.into());
+                Err(error)
             }
             "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
@@ -175,7 +175,7 @@ impl Configure for IncService {
             "apply_error" => {
                 let error =
                     DispatcherError::malformed_arguments("IncService: Configure error request");
-                return Err(error.into());
+                Err(error)
             }
             "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),

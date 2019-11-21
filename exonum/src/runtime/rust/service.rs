@@ -19,7 +19,7 @@ use std::fmt::{self, Debug};
 
 use crate::{
     crypto::{Hash, PublicKey, SecretKey},
-    helpers::Height,
+    helpers::{Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
     runtime::{
@@ -164,16 +164,12 @@ pub trait Transaction<Svc: ?Sized>: BinaryValue {
 
 /// Provide context for the `after_commit` handler.
 pub struct AfterCommitContext<'a> {
-    /// Service instance associated with the current context.
-    pub instance: InstanceDescriptor<'a>,
     /// Reference to the dispatcher mailbox.
     mailbox: &'a mut Mailbox,
     /// Read-only snapshot of the current blockchain state.
     snapshot: &'a dyn Snapshot,
-    /// Service key pair of the current node.
-    pub service_keypair: &'a (PublicKey, SecretKey),
-    /// Channel to send signed transactions to the transactions pool.
-    tx_sender: &'a ApiSender,
+    /// Transaction broadcaster.
+    broadcaster: Broadcaster<'a>,
 }
 
 impl<'a> AfterCommitContext<'a> {
@@ -184,19 +180,23 @@ impl<'a> AfterCommitContext<'a> {
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
+        validator_id: Option<ValidatorId>,
     ) -> Self {
         Self {
             mailbox,
-            instance,
             snapshot,
-            service_keypair,
-            tx_sender,
+            broadcaster: Broadcaster {
+                instance,
+                service_keypair,
+                tx_sender,
+                validator_id,
+            },
         }
     }
 
     /// Returns blockchain data for the snapshot associated with this context.
     pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
-        BlockchainData::new(self.snapshot, self.instance)
+        BlockchainData::new(self.snapshot, self.broadcaster.instance)
     }
 
     /// Returns snapshot of the data for the executing service.
@@ -210,29 +210,19 @@ impl<'a> AfterCommitContext<'a> {
         self.data().for_core().height()
     }
 
-    /// Signs and broadcasts a transaction to the other nodes in the network.
-    pub fn broadcast_transaction<Svc: ?Sized>(&self, tx: impl Transaction<Svc>) {
-        let msg = tx.sign(
-            self.instance.id,
-            self.service_keypair.0,
-            &self.service_keypair.1,
-        );
-        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
-            error!("Couldn't broadcast transaction {}.", e);
-        }
+    /// Returns the service key of this node.
+    pub fn service_key(&self) -> PublicKey {
+        self.broadcaster.service_keypair.0
     }
 
-    /// Broadcasts a transaction to the other nodes in the network.
-    /// This transaction should be signed externally.
-    pub fn broadcast_signed_transaction(&self, msg: Verified<AnyTx>) {
-        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
-            error!("Couldn't broadcast transaction {}.", e);
-        }
+    /// Returns the ID of this node as a validator. If the node is not a validator, returns `None`.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.broadcaster.validator_id
     }
 
-    /// Returns a transaction broadcaster.
-    pub fn transaction_broadcaster(&self) -> ApiSender {
-        self.tx_sender.clone()
+    /// Returns transaction broadcaster.
+    pub fn broadcast(&self) -> Broadcaster<'a> {
+        self.broadcaster
     }
 
     /// Provides a privileged interface to the supervisor service.
@@ -240,12 +230,87 @@ impl<'a> AfterCommitContext<'a> {
     /// `None` will be returned if the caller is not a supervisor.
     #[doc(hidden)]
     pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions<'_>> {
-        if !is_supervisor(self.instance.id) {
+        if !is_supervisor(self.broadcaster.instance.id) {
             return None;
         }
         Some(SupervisorExtensions {
             mailbox: &mut *self.mailbox,
         })
+    }
+}
+
+/// Transaction broadcaster.
+#[derive(Debug, Clone, Copy)]
+pub struct Broadcaster<'a> {
+    instance: InstanceDescriptor<'a>,
+    service_keypair: &'a (PublicKey, SecretKey),
+    tx_sender: &'a ApiSender,
+    validator_id: Option<ValidatorId>,
+}
+
+impl Broadcaster<'_> {
+    /// Signs and broadcasts a transaction to the other nodes in the network, but only
+    /// if this node is a validator.
+    pub fn send_if_validator<Svc: ?Sized, T, F>(self, create_tx: F)
+    where
+        T: Transaction<Svc>,
+        F: FnOnce() -> T,
+    {
+        if self.validator_id.is_some() {
+            let msg = create_tx().sign(
+                self.instance.id,
+                self.service_keypair.0,
+                &self.service_keypair.1,
+            );
+            if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
+                error!("Couldn't broadcast transaction {}.", e);
+            }
+        }
+    }
+
+    /// Converts the broadcaster into the owned representation, which can be used to broadcast
+    /// transactions asynchronously.
+    pub fn into_owned(self) -> OwnedBroadcaster {
+        OwnedBroadcaster {
+            instance_id: self.instance.id,
+            service_keypair: self.service_keypair.to_owned(),
+            tx_sender: self.tx_sender.to_owned(),
+            is_validator: self.validator_id.is_some(),
+        }
+    }
+}
+
+/// Transaction broadcaster.
+#[derive(Debug, Clone)]
+pub struct OwnedBroadcaster {
+    instance_id: InstanceId,
+    service_keypair: (PublicKey, SecretKey),
+    tx_sender: ApiSender,
+    is_validator: bool,
+}
+
+impl OwnedBroadcaster {
+    /// Signs and broadcasts a transaction to the other nodes in the network, but only
+    /// if this node is a validator.
+    ///
+    /// # Safety
+    ///
+    /// Note that the node may cease to be a validator by the time the transaction is broadcast.
+    pub fn send_if_validator<Svc: ?Sized, T, F>(&self, create_tx: F)
+    where
+        T: Transaction<Svc>,
+        F: FnOnce() -> T,
+    {
+        if self.is_validator {
+            let msg = create_tx().sign(
+                self.instance_id,
+                self.service_keypair.0,
+                &self.service_keypair.1,
+            );
+            if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
+                error!("Couldn't broadcast transaction {}.", e);
+            }
+        }
     }
 }
 
@@ -279,7 +344,7 @@ impl SupervisorExtensions<'_> {
 impl Debug for AfterCommitContext<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
-            .field("instance", &self.instance)
+            .field("instance", &self.broadcaster.instance)
             .finish()
     }
 }

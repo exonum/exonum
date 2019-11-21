@@ -28,7 +28,7 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, CallContext, Service, Transaction},
+        rust::{AfterCommitContext, CallContext, Service},
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -219,48 +219,38 @@ where
         }
     }
 
+    /// Sends confirmation transaction for unconfirmed deployment requests.
     fn after_commit(&self, mut context: AfterCommitContext<'_>) {
-        let schema = Schema::new(context.service_data());
-        let keypair = context.service_keypair;
-        let instance_id = context.instance.id;
-        let core_schema = context.data().for_core();
-        let is_validator = core_schema
-            .validator_id(context.service_keypair.0)
-            .is_some();
+        let service_key = context.service_key();
 
-        // Sends confirmation transaction for unconfirmed deployment requests.
-        let deployments: Vec<_> = schema
-            .pending_deployments
-            .values()
-            .filter(|request| {
-                let confirmation = DeployConfirmation::from(request.clone());
-                !schema
-                    .deploy_confirmations
-                    .confirmed_by(&confirmation, &keypair.0)
-            })
-            .collect();
-        drop(schema);
+        let deployments: Vec<_> = {
+            let schema = Schema::new(context.service_data());
+            schema
+                .pending_deployments
+                .values()
+                .filter(|request| {
+                    let confirmation = DeployConfirmation::from(request.clone());
+                    !schema
+                        .deploy_confirmations
+                        .confirmed_by(&confirmation, &service_key)
+                })
+                .collect()
+        };
 
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
-            let keypair = context.service_keypair.clone();
-            let tx_sender = context.transaction_broadcaster();
+            let tx_sender = context.broadcast().into_owned();
 
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
             extensions.start_deploy(artifact, spec, move || {
-                if is_validator {
+                tx_sender.send_if_validator(|| {
                     log::trace!(
                         "Sending confirmation for deployment request {:?}",
                         unconfirmed_request
                     );
-
-                    let transaction = DeployConfirmation::from(unconfirmed_request);
-                    tx_sender
-                        .broadcast_transaction(transaction.sign(instance_id, keypair.0, &keypair.1))
-                        .map_err(|e| log::error!("Couldn't broadcast transaction {}", e))
-                        .ok();
-                }
+                    DeployConfirmation::from(unconfirmed_request)
+                });
                 Ok(())
             });
         }
