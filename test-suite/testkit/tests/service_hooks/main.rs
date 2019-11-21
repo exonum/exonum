@@ -60,6 +60,27 @@ fn test_after_commit() {
     assert!(expected_block_sizes);
 }
 
+/// An auditor should not broadcast transactions.
+#[test]
+fn test_after_commit_with_auditor() {
+    let service = AfterCommitService::new();
+    let mut testkit = TestKitBuilder::auditor()
+        .with_validators(2)
+        .with_rust_service(after_commit_service_instances(service.clone()))
+        .create();
+
+    for i in 1..5 {
+        let block = testkit.create_block();
+        assert!(block.is_empty());
+        assert_eq!(service.counter() as u64, i);
+
+        let blockchain = testkit.blockchain();
+        let keypair = blockchain.service_keypair();
+        let tx = TxAfterCommit::new(Height(i)).sign(SERVICE_ID, keypair.0, &keypair.1);
+        assert!(!testkit.is_tx_in_pool(&tx.object_hash()));
+    }
+}
+
 #[test]
 fn restart_testkit() {
     let service = AfterCommitService::new();
