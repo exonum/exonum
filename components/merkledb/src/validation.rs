@@ -44,12 +44,14 @@ where
     }
 }
 
-/// Calls the `is_valid_name` function with the given name and panics if it returns `false`.
+/// Calls the `is_valid_index_full_name` function with the given name
+/// and panics if it returns `false`.
 pub(crate) fn assert_index_valid_full_name<S: AsRef<str> + Copy + fmt::Debug>(name: S) {
     assert_valid_name(name, is_valid_index_full_name, "Use: a-zA-Z0-9 and _-.")
 }
 
-/// Calls the `is_valid_prefix` function with the given name and panics if it returns `false`.
+/// Calls the `is_valid_index_name_component` function with the given
+/// name and panics if it returns `false`.
 pub(crate) fn assert_valid_index_name_component<S: AsRef<str> + Copy + fmt::Debug>(name: S) {
     assert_valid_name(name, is_valid_index_name_component, "Use: a-zA-Z0-9 and _-")
 }
