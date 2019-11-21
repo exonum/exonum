@@ -4,6 +4,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
+use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
@@ -81,6 +82,7 @@ impl Transaction {
     }
 }
 
+#[derive(FromAccess)]
 struct Schema<T: Access> {
     pub transactions: MapIndex<T::Base, Hash, Transaction>,
     pub blocks: ListIndex<T::Base, Hash>,
@@ -90,13 +92,7 @@ struct Schema<T: Access> {
 
 impl<T: Access> Schema<T> {
     fn new(access: T) -> Self {
-        Self {
-            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
-            blocks: FromAccess::from_access(access.clone(), "blocks".into()).unwrap(),
-            wallets: FromAccess::from_access(access.clone(), "wallets".into()).unwrap(),
-            wallet_history: FromAccess::from_access(access.clone(), "wallet_history".into())
-                .unwrap(),
-        }
+        Self::from_root(access).unwrap()
     }
 }
 
