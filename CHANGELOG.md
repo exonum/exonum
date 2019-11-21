@@ -139,39 +139,39 @@ Key points:
     feature implementation.
     Pull requests are ordered chronologically.</summary>
 
-    - #1253: Interface mocks for dynamic services
+- #1253: Interface mocks for dynamic services
 
-    - #1263: Add new rust services interface
+- #1263: Add new rust services interface
 
-    - #1261: Basic dispatcher functionality
+- #1261: Basic dispatcher functionality
 
-    - #1275: Dynamic services integration
+- #1275: Dynamic services integration
 
-    - #1345: Implement a new `Transaction` trait [ECR-3222]
+- #1345: Implement a new `Transaction` trait [ECR-3222]
 
-    - #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
 
-    - #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
+- #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
 
-    - #1376: Restore system API endpoints
+- #1376: Restore system API endpoints
 
-    - #1389: Check and improve messages verification procedure [ECR-3272]
+- #1389: Check and improve messages verification procedure [ECR-3272]
 
-    - #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
+- #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
 
-    - #1467: Implement Configure interface [ECR-3306]
+- #1467: Implement Configure interface [ECR-3306]
 
-    - #1473: Extract supervisor service from core
+- #1473: Extract supervisor service from core
 
-    - #1482: Add shutdown method into runtime trait
+- #1482: Add shutdown method into runtime trait
 
-    - #1484: Implement configuration update logic in Supervisor [ECR-3583]
+- #1484: Implement configuration update logic in Supervisor [ECR-3583]
 
-    - #1492: Do start and initialize service at single step [ECR-3222]
+- #1492: Do start and initialize service at single step [ECR-3222]
 
-    - #1537: Finalize Exonum-derive macros [ECR-3800]
+- #1537: Finalize Exonum-derive macros [ECR-3800]
 
-    - #1538: Supervisor modes [ECR-3794] [ECR-3771]
+- #1538: Supervisor modes [ECR-3794] [ECR-3771]
 
 </details>
 <!-- markdownlint-enable no-inline-html -->
@@ -184,239 +184,239 @@ Key points:
     to the Dynamic Services feature implementation.
     Pull requests are ordered chronologically.</summary>
 
-    - #1243: Old behavior dispatcher
+- #1243: Old behavior dispatcher
 
-    - #1509: Make dispatcher mostly synchronous
+- #1509: Make dispatcher mostly synchronous
 
-    - #1245: Add basic runtime env interface + rust implementation
+- #1245: Add basic runtime env interface + rust implementation
 
-    - #1253: Interface mocks for dynamic services
+- #1253: Interface mocks for dynamic services
 
-    - #1261: Basic dispatcher functionality
+- #1261: Basic dispatcher functionality
 
-    - #1263: Add new rust services interface
+- #1263: Add new rust services interface
 
-    - #1267: Move configuration service to the core
+- #1267: Move configuration service to the core
 
-    - #1269: Rust artifact and additional functionality for rust runtime.
+- #1269: Rust artifact and additional functionality for rust runtime.
 
-    - #1270: Dynamic configuration service
+- #1270: Dynamic configuration service
 
-    - #1275: Dynamic services integration
+- #1275: Dynamic services integration
 
-    - #1287: Remove macro from service interface trait definition
+- #1287: Remove macro from service interface trait definition
 
-    - #1290: Add support of state hash calculation into runtimes & services
+- #1290: Add support of state hash calculation into runtimes & services
 
-    - #1291: Change service builder and web api.
+- #1291: Change service builder and web api.
 
-    - #1325: Dynamic services: fix time service compilation
+- #1325: Dynamic services: fix time service compilation
 
-    - #1326: Remove genesis_init from dynamic services [ECR-3226]
+- #1326: Remove genesis_init from dynamic services [ECR-3226]
 
-    - #1327: Remove unsafe code from runtimes
+- #1327: Remove unsafe code from runtimes
 
-    - #1330: A small amount of code improvements. [ECR-3222]
+- #1330: A small amount of code improvements. [ECR-3222]
 
-    - #1331: Rename dispatch to call_info
+- #1331: Rename dispatch to call_info
 
-    - #1332: Fix tests in blockchain module
+- #1332: Fix tests in blockchain module
 
-    - #1334: Fix sandbox tests in dynamic services [ECR-3230]
+- #1334: Fix sandbox tests in dynamic services [ECR-3230]
 
-    - #1336: Rename traits methods in dynamic services  [ECR-3222]
+- #1336: Rename traits methods in dynamic services  [ECR-3222]
 
-    - #1337: Fix a lot of tests in dynamic services
+- #1337: Fix a lot of tests in dynamic services
 
-    - #1338: Refine `start_service` logic [ECR-3222, ECR-3235]
+- #1338: Refine `start_service` logic [ECR-3222, ECR-3235]
 
-    - #1340: Fix testkit [ECR-3229]
+- #1340: Fix testkit [ECR-3229]
 
-    - #1343: Add service name and id to `Service` trait methods. [ECR-3235]
+- #1343: Add service name and id to `Service` trait methods. [ECR-3235]
 
-    - #1345: Implement a new `Transaction` trait [ECR-3222]
+- #1345: Implement a new `Transaction` trait [ECR-3222]
 
-    - #1346: Fix transactions benchmarks in dynamic services
+- #1346: Fix transactions benchmarks in dynamic services
 
-    - #1348: Fix big performance regression in dynamic services
+- #1348: Fix big performance regression in dynamic services
 
-    - #1349: Don't verify SignedMessage during the deserialization
+- #1349: Don't verify SignedMessage during the deserialization
 
-    - #1350: Refactor signature verification code [ECR-3222]
+- #1350: Refactor signature verification code [ECR-3222]
 
-    - #1353: Rework blockchain explorer [ECR-3259]
+- #1353: Rework blockchain explorer [ECR-3259]
 
-    - #1354: Fix `cargo test --all` compilation
+- #1354: Fix `cargo test --all` compilation
 
-    - #1357: Some refactoring by clippy suggestion
+- #1357: Some refactoring by clippy suggestion
 
-    - #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
 
-    - #1367: Rename ArtifactSpec to ArtifactId [ECR-3291]
+- #1367: Rename ArtifactSpec to ArtifactId [ECR-3291]
 
-    - #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
+- #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
 
-    - #1374: Polish code and make travis almost happy
+- #1374: Polish code and make travis almost happy
 
-    - #1375: Add deadline_height to StartService transaction [ECR-3298]
+- #1375: Add deadline_height to StartService transaction [ECR-3298]
 
-    - #1376: Restore system API endpoints
+- #1376: Restore system API endpoints
 
-    - #1378: Finalize artifact deployment logic [ECR-3291]
+- #1378: Finalize artifact deployment logic [ECR-3291]
 
-    - #1379: Implement state_hash computation for dispatcher.
+- #1379: Implement state_hash computation for dispatcher.
 
-    - #1380: Make tests green again.
+- #1380: Make tests green again.
 
-    - #1381: Include proto file sources in artifact information. [ECR-3309]
+- #1381: Include proto file sources in artifact information. [ECR-3309]
 
-    - #1382: Replace impl_service_dispatcher by the attribute in
-      service_interface [ECR-3222]
+- #1382: Replace impl_service_dispatcher by the attribute in
+  service_interface [ECR-3222]
 
-    - #1387: Improve execution error handling for dynamic services [ECR-3236]
+- #1387: Improve execution error handling for dynamic services [ECR-3236]
 
-    - #1389: Check and improve messages verification procedure [ECR-3272]
+- #1389: Check and improve messages verification procedure [ECR-3272]
 
-    - #1392: Implement verification for ArtifactId and InstanceSpec
-      with the unit tests [ECR-3360]
+- #1392: Implement verification for ArtifactId and InstanceSpec
+  with the unit tests [ECR-3360]
 
-    - #1393: Add macro to implement hex serde representation
-      for the BinaryValue types [ECR-3222]
+- #1393: Add macro to implement hex serde representation
+  for the BinaryValue types [ECR-3222]
 
-    - #1394: Update documentation of the messages module [ECR-3275]
+- #1394: Update documentation of the messages module [ECR-3275]
 
-    - #1396: Document runtime life cycle [ECR-3275]
+- #1396: Document runtime life cycle [ECR-3275]
 
-    - #1405: Dynamic services supervisor tests [ECR-3266]
+- #1405: Dynamic services supervisor tests [ECR-3266]
 
-    - #1411: Refine Runtime trait [ECR-3412]
+- #1411: Refine Runtime trait [ECR-3412]
 
-    - #1427: Try to re deploy artifact before registration.
+- #1427: Try to re deploy artifact before registration.
 
-    - #1429: Review unwraps in dynamic services [ECR-3419]
+- #1429: Review unwraps in dynamic services [ECR-3419]
 
-    - #1430: Expand documentation on configuration parameters usage [ECR-3463]
+- #1430: Expand documentation on configuration parameters usage [ECR-3463]
 
-    - #1431: Update dispatcher info to show changes in list
-      of deployed artifacts
+- #1431: Update dispatcher info to show changes in list
+  of deployed artifacts
 
-    - #1432: Refine exonum-derive crate on top of darling [ECR-3343]
+- #1432: Refine exonum-derive crate on top of darling [ECR-3343]
 
-    - #1434: Replace `dispatcher` attribute in `exonum_service`
-      by the `service_interface` in `ServiceFactory` [ECR-3474]
+- #1434: Replace `dispatcher` attribute in `exonum_service`
+  by the `service_interface` in `ServiceFactory` [ECR-3474]
 
-    - #1438: Remove dispatcher reference from Runtime trait
+- #1438: Remove dispatcher reference from Runtime trait
 
-    - #1443: Replace fabric module with exonum-cli crate [ECR-3457]
+- #1443: Replace fabric module with exonum-cli crate [ECR-3457]
 
-    - #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
+- #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
 
-    - #1451: Add the service interface name option to the proto files
+- #1451: Add the service interface name option to the proto files
 
-    - #1452: Remove default state_hash implementation
+- #1452: Remove default state_hash implementation
 
-    - #1454: Simplify blockchain configuration [ECR-3357]
+- #1454: Simplify blockchain configuration [ECR-3357]
 
-    - #1462: Fix API Freeze on startup
+- #1462: Fix API Freeze on startup
 
-    - #1465: Improve ProtobufConvert for enum variants
+- #1465: Improve ProtobufConvert for enum variants
 
-    - #1467: Implement Configure interface [ECR-3306]
+- #1467: Implement Configure interface [ECR-3306]
 
-    - #1472: Fix some of the testkit ignored doctests
+- #1472: Fix some of the testkit ignored doctests
 
-    - #1473: Extract supervisor service from core
+- #1473: Extract supervisor service from core
 
-    - #1476: Improve support for additional runtimes in TestKit [ECR-3444]
+- #1476: Improve support for additional runtimes in TestKit [ECR-3444]
 
-    - #1482: Add shutdown method into runtime trait
+- #1482: Add shutdown method into runtime trait
 
-    - #1483: Use strings for protobuf files
+- #1483: Use strings for protobuf files
 
-    - #1484: Implement configuration update logic in Supervisor [ECR-3583]
+- #1484: Implement configuration update logic in Supervisor [ECR-3583]
 
-    - #1488: Add support of external runtimes to exonum-cli
+- #1488: Add support of external runtimes to exonum-cli
 
-    - #1489: Avoid waiting in the `add_transaction` endpoint [ECR-3222]
+- #1489: Avoid waiting in the `add_transaction` endpoint [ECR-3222]
 
-    - #1490: Fix supervisor creation
+- #1490: Fix supervisor creation
 
-    - #1491: Polish testkit [ECR-3222]
+- #1491: Polish testkit [ECR-3222]
 
-    - #1492: Do start and initialize service at single step [ECR-3222]
+- #1492: Do start and initialize service at single step [ECR-3222]
 
-    - #1493: Document Rust runtime services traits [ECR-3275]
+- #1493: Document Rust runtime services traits [ECR-3275]
 
-    - #1494: Enhancements in Testkit
+- #1494: Enhancements in Testkit
 
-    - #1495: Implement API endpoints that shows config
-      proposals in Supervisor [ECR-3610]
+- #1495: Implement API endpoints that shows config
+  proposals in Supervisor [ECR-3610]
 
-    - #1504: Clarify runtime shutdown method [ECR-3696]
+- #1504: Clarify runtime shutdown method [ECR-3696]
 
-    - #1505: Proto optimization [ECR-3472]
+- #1505: Proto optimization [ECR-3472]
 
-    - #1508: Remove validator_id method from AfterCommitContext
+- #1508: Remove validator_id method from AfterCommitContext
 
-    - #1509: Make dispatcher mostly synchronous
+- #1509: Make dispatcher mostly synchronous
 
-    - #1511: Add includes to proto-sources
+- #1511: Add includes to proto-sources
 
-    - #1514: Use enum to represent ErrorKind [ECR-3717]
+- #1514: Use enum to represent ErrorKind [ECR-3717]
 
-    - #1515: Introduce test-suite directory
+- #1515: Introduce test-suite directory
 
-    - #1517: Clarify SignedMessage documentation [ECR-3478]
+- #1517: Clarify SignedMessage documentation [ECR-3478]
 
-    - #1518: Remove data duplication from DeployConfirmation [ECR-3770]
+- #1518: Remove data duplication from DeployConfirmation [ECR-3770]
 
-    - #1519: Add anonymous lifetimes [ECR-3757]
+- #1519: Add anonymous lifetimes [ECR-3757]
 
-    - #1520: SimpleSupervisor: Verify that config proposal
-      is sent by validator [ECR-3742]
+- #1520: SimpleSupervisor: Verify that config proposal
+  is sent by validator [ECR-3742]
 
-    - #1521: Implement ObjectHash for SignedMessage
+- #1521: Implement ObjectHash for SignedMessage
 
-    - #1522: Remove ApiContext structure [ECR-3745]
+- #1522: Remove ApiContext structure [ECR-3745]
 
-    - #1525: Make protobuf artifacts implementation detail
+- #1525: Make protobuf artifacts implementation detail
 
-      of Rust runtime [ECR-3776]
+  of Rust runtime [ECR-3776]
 
-    - #1526: Sending an empty POST request to /shutdown endpoint
-      doesn't work [ECR-3756]
+- #1526: Sending an empty POST request to /shutdown endpoint
+  doesn't work [ECR-3756]
 
-    - #1528: Document parts of Rust runtime [ECR-3285]
+- #1528: Document parts of Rust runtime [ECR-3285]
 
-    - #1530: Improve `Runtime` docs
+- #1530: Improve `Runtime` docs
 
-    - #1531: ProofMapIndex variants for hashed and raw keys [ECR-3777]
+- #1531: ProofMapIndex variants for hashed and raw keys [ECR-3777]
 
-    - #1537: Finalize Exonum-derive macros [ECR-3800]
+- #1537: Finalize Exonum-derive macros [ECR-3800]
 
-    - #1538: Supervisor modes [ECR-3794] [ECR-3771]
+- #1538: Supervisor modes [ECR-3794] [ECR-3771]
 
-    - #1539: Restore warn(missing_docs) in the Exonum crate [ECR-3821]
+- #1539: Restore warn(missing_docs) in the Exonum crate [ECR-3821]
 
-    - #1540: Deploy workflow
+- #1540: Deploy workflow
 
-    - #1542: Write proper examples for the Exonum traits derivation [ECR-3822]
+- #1542: Write proper examples for the Exonum traits derivation [ECR-3822]
 
-    - #1544: Remove atty dependency
+- #1544: Remove atty dependency
 
-    - #1546: Move multisig module to the supervisor crate [ECR-3823]
+- #1546: Move multisig module to the supervisor crate [ECR-3823]
 
-    - #1547: Remove metrics module
+- #1547: Remove metrics module
 
-    - #1548: Remove TransactionMessage alias [ECR-3222]
+- #1548: Remove TransactionMessage alias [ECR-3222]
 
-    - #1549: Encapsulate Blockchain fields [ECR-3222]
+- #1549: Encapsulate Blockchain fields [ECR-3222]
 
-    - #1550: Remove isolate method [ECR-3820]
+- #1550: Remove isolate method [ECR-3820]
 
-    - #1552: Assign instance IDs in the Supervisor [ECR-3746]
+- #1552: Assign instance IDs in the Supervisor [ECR-3746]
 
-    - #1555: Update MerkleDB docs
+- #1555: Update MerkleDB docs
 
 </details>
 <!-- markdownlint-enable no-inline-html -->
