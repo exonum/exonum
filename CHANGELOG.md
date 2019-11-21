@@ -77,7 +77,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   module in the `exonum`. (#1459)
 
 - Protobuf serialization for crypto types are now implemented in `exonum-crypto`
-  crate .(#1496)
+  crate. (#1496)
 
 ### Dynamic Services feature
 
@@ -111,6 +111,9 @@ Key points of this feature is the following:
 There are a lot of backward-incompatible changes introduced within 0.13 release,
 so for the best effort you can compare `cryptocurrency` example service versions
 for [0.12.1][crypt-0-12] and [0.13.0][crypt-0-13] releases.
+
+[crypt-0-12]: https://github.com/exonum/exonum/blob/v0.12.1/examples/cryptocurrency/
+[crypt-0-13]: https://github.com/exonum/exonum/blob/v0.13/examples/cryptocurrency/
 
 Key points:
 
