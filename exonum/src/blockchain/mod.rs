@@ -25,7 +25,7 @@ pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection, InstanceConfig},
     config::{ConsensusConfig, ValidatorKeys},
-    schema::{IndexCoordinates, Schema, SchemaOrigin, TxLocation},
+    schema::{CallLocation, IndexCoordinates, Schema, SchemaOrigin, TxLocation},
 };
 
 pub mod config;
@@ -287,9 +287,14 @@ impl BlockchainMut {
                 .expect("Transaction execution error");
         }
 
-        // Skip execution for genesis block.
+        // Skip `before_commit` hook for the genesis block.
         if height > Height(0) {
-            self.dispatcher.before_commit(&mut fork);
+            let results = self.dispatcher.before_commit(&mut fork);
+            let mut call_results = Schema::new(&fork).call_results(height);
+            for (service_id, result) in results {
+                let location = CallLocation::BeforeCommit(service_id);
+                call_results.put(&location, ExecutionStatus(result));
+            }
         }
 
         // Get tx & state hash.
@@ -314,17 +319,20 @@ impl BlockchainMut {
             }
             sum_table.object_hash()
         };
+
         let tx_hash = schema.block_transactions(height).object_hash();
+        let call_hash = schema.call_results(height).object_hash();
 
         // Create block.
-        let block = Block::new(
+        let block = Block {
             proposer_id,
             height,
-            tx_hashes.len() as u32,
-            last_hash,
+            tx_count: tx_hashes.len() as u32,
+            prev_hash: last_hash,
             tx_hash,
             state_hash,
-        );
+            call_hash,
+        };
         trace!("execute block = {:?}", block);
 
         // Calculate block hash.
@@ -368,9 +376,10 @@ impl BlockchainMut {
         }
 
         let mut schema = Schema::new(&*fork);
-        schema
-            .transaction_results()
-            .put(&tx_hash, ExecutionStatus(tx_result));
+        schema.call_results(height).put(
+            &CallLocation::Transaction(index as u64),
+            ExecutionStatus(tx_result),
+        );
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
         let location = TxLocation::new(height, index as u64);
@@ -398,7 +407,7 @@ impl BlockchainMut {
         // Consensus messages cache is useful only during one height, so it should be
         // cleared when a new height is achieved.
         schema.consensus_messages_cache().clear();
-        let txs_in_block = schema.last_block().tx_count();
+        let txs_in_block = schema.last_block().tx_count;
         schema.update_transaction_count(u64::from(txs_in_block));
 
         let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();

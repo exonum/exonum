@@ -108,12 +108,12 @@ impl<'a> BlockInfo<'a> {
     ///
     /// This method is equivalent to calling `block.header().height()`.
     pub fn height(&self) -> Height {
-        self.header.height()
+        self.header.height
     }
 
     /// Returns the number of transactions in this block.
     pub fn len(&self) -> usize {
-        self.header.tx_count() as usize
+        self.header.tx_count as usize
     }
 
     /// Is this block empty (i.e., contains no transactions)?
@@ -242,7 +242,7 @@ impl BlockWithTransactions {
     ///
     /// This method is equivalent to calling `block.header.height()`.
     pub fn height(&self) -> Height {
-        self.header.height()
+        self.header.height
     }
 
     /// Returns the number of transactions in this block.
@@ -541,7 +541,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
-        let tx_hashes_table = self.schema.block_transactions(block.height());
+        let tx_hashes_table = self.schema.block_transactions(block.height);
         tx_hashes_table.iter().collect()
     }
 
@@ -569,7 +569,7 @@ impl<'a> BlockchainExplorer<'a> {
         let time = median_precommits_time(&block_precommits.precommits);
 
         // Unwrap is OK here, because we already know that transaction is committed.
-        let status = self.schema.transaction_results().get(tx_hash).unwrap();
+        let status = self.schema.transaction_result(location).unwrap();
 
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {

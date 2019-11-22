@@ -19,11 +19,12 @@ use exonum_merkledb::{HashTag, ObjectHash};
 use crate::{
     blockchain::Block,
     helpers::{Height, Round, ValidatorId},
+    messages::{Propose, Verified},
 };
 
 use super::{
     sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
-    timestamping_sandbox,
+    timestamping_sandbox, Sandbox,
 };
 
 #[test]
@@ -61,18 +62,33 @@ fn test_send_propose_and_prevote() {
     ));
 }
 
-#[test]
-fn test_send_prevote() {
-    let sandbox = timestamping_sandbox();
-
-    let propose = sandbox.create_propose(
+fn create_propose(sandbox: &Sandbox) -> Verified<Propose> {
+    sandbox.create_propose(
         ValidatorId(2),
         Height(1),
         Round(1),
         sandbox.last_hash(),
         vec![],
         sandbox.secret_key(ValidatorId(2)),
-    );
+    )
+}
+
+fn create_block(sandbox: &Sandbox) -> Block {
+    Block {
+        proposer_id: ValidatorId(2),
+        height: Height(1),
+        tx_count: 0,
+        prev_hash: sandbox.last_hash(),
+        tx_hash: HashTag::empty_list_hash(),
+        state_hash: sandbox.last_state_hash(),
+        call_hash: sandbox.call_hash_for_empty_block(),
+    }
+}
+
+#[test]
+fn test_send_prevote() {
+    let sandbox = timestamping_sandbox();
+    let propose = create_propose(&sandbox);
 
     sandbox.recv(&propose);
     sandbox.broadcast(&sandbox.create_prevote(
@@ -88,24 +104,8 @@ fn test_send_prevote() {
 #[test]
 fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
-
-    let propose = sandbox.create_propose(
-        ValidatorId(2),
-        Height(1),
-        Round(1),
-        sandbox.last_hash(),
-        vec![],
-        sandbox.secret_key(ValidatorId(2)),
-    );
-
-    let block = Block::new(
-        ValidatorId(2),
-        Height(1),
-        0,
-        sandbox.last_hash(),
-        HashTag::empty_list_hash(),
-        sandbox.last_state_hash(),
-    );
+    let propose = create_propose(&sandbox);
+    let block = create_block(&sandbox);
 
     sandbox.recv(&propose);
     sandbox.broadcast(&sandbox.create_prevote(
@@ -148,24 +148,8 @@ fn test_get_lock_and_send_precommit() {
 #[test]
 fn test_commit() {
     let sandbox = timestamping_sandbox();
-
-    let propose = sandbox.create_propose(
-        ValidatorId(2),
-        Height(1),
-        Round(1),
-        sandbox.last_hash(),
-        vec![],
-        sandbox.secret_key(ValidatorId(2)),
-    );
-
-    let block = Block::new(
-        ValidatorId(2),
-        Height(1),
-        0,
-        sandbox.last_hash(),
-        HashTag::empty_list_hash(),
-        sandbox.last_state_hash(),
-    );
+    let propose = create_propose(&sandbox);
+    let block = create_block(&sandbox);
 
     sandbox.recv(&propose);
     sandbox.broadcast(&sandbox.create_prevote(

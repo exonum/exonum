@@ -18,6 +18,7 @@
 //! handling such as correct round state transition.
 
 use bit_vec::BitVec;
+use exonum_crypto::Hash;
 use exonum_merkledb::ObjectHash;
 
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
@@ -28,7 +29,7 @@ use crate::{
     node::state::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
-    sandbox::{self, compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+    sandbox::{self, sandbox_tests_helper::*, timestamping_sandbox},
 };
 
 /// check scenario:
@@ -81,7 +82,7 @@ fn request_propose_when_get_prevote() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        empty_hash(),
+        Hash::zero(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -92,7 +93,7 @@ fn request_propose_when_get_prevote() {
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             Height(1),
-            empty_hash(),
+            Hash::zero(),
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -108,7 +109,7 @@ fn request_prevotes_when_get_prevote_message() {
         ValidatorId(2),
         Height(1),
         Round(1),
-        empty_hash(),
+        Hash::zero(),
         Round(1),
         sandbox.secret_key(ValidatorId(2)),
     ));
@@ -119,7 +120,7 @@ fn request_prevotes_when_get_prevote_message() {
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             Height(1),
-            empty_hash(),
+            Hash::zero(),
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -134,7 +135,7 @@ fn request_prevotes_when_get_prevote_message() {
             sandbox.public_key(ValidatorId(2)),
             Height(1),
             Round(1),
-            empty_hash(),
+            Hash::zero(),
             validators,
             sandbox.secret_key(ValidatorId(0)),
         ),
@@ -412,9 +413,7 @@ fn handle_precommit_remove_request_prevotes() {
 #[test]
 fn lock_to_propose_and_send_prevote() {
     let sandbox = timestamping_sandbox();
-
     let empty_propose = ProposeBuilder::new(&sandbox).build();
-
     sandbox.recv(&empty_propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &empty_propose.clone()));
 
@@ -424,16 +423,11 @@ fn lock_to_propose_and_send_prevote() {
     let propose = ProposeBuilder::new(&sandbox)
         .with_tx_hashes(&[tx.object_hash()])
         .build();
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
-
+    let block = sandbox.create_block(&[tx.clone()]);
     sandbox.recv(&propose);
 
     // inc round
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
-
     sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
@@ -501,11 +495,8 @@ fn lock_remove_request_prevotes() {
 
     // add round
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
     let block = BlockBuilder::new(&sandbox).build();
-
     sandbox.recv(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
@@ -574,7 +565,6 @@ fn handle_precommit_different_block_hash() {
     // precommits with this block will be received
     // without tx
     let block = BlockBuilder::new(&sandbox).build();
-
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
@@ -633,10 +623,7 @@ fn handle_precommit_positive_scenario_commit() {
     let propose = ProposeBuilder::new(&sandbox)
         .with_tx_hashes(&[tx.object_hash()]) //ordinary propose, but with this unreceived tx
         .build();
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -726,12 +713,10 @@ fn handle_precommit_positive_scenario_commit() {
 #[test]
 fn lock_not_send_prevotes_after_commit() {
     let sandbox = timestamping_sandbox();
-
     let propose = ProposeBuilder::new(&sandbox).build();
 
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox).build();
-
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
@@ -1016,10 +1001,7 @@ fn commit_using_unknown_propose_with_precommits() {
         .build();
 
     // precommits with this block will be received
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -1130,7 +1112,7 @@ fn handle_full_propose_wrong_state_hash() {
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.object_hash())
-        .with_state_hash(&empty_hash())
+        .with_state_hash(&Hash::zero())
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -1302,11 +1284,8 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
 
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
-    let first_block = BlockBuilder::new(&sandbox)
-        .with_proposer_id(ValidatorId(0))
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let mut first_block = sandbox.create_block(&[tx.clone()]);
+    first_block.proposer_id = ValidatorId(0);
 
     // this propose will be used during second commit
     let height_one_propose = ProposeBuilder::new(&sandbox)
@@ -1315,13 +1294,13 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .with_prev_hash(&first_block.object_hash())
         .build();
 
-    // this block will be created during second commit while manually creating precommits
-    let second_block = BlockBuilder::new(&sandbox)
+    // This empty block will be created during second commit while manually creating precommits.
+    let mut second_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(3))
-        .with_height(Height(2))
-        .with_prev_hash(&first_block.object_hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
+        .with_state_hash(&first_block.state_hash)
         .build();
+    second_block.height = Height(2);
+    second_block.prev_hash = first_block.object_hash();
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -1440,12 +1419,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         .build();
 
     // precommits with this block would be received if transaction will be received
-    let block = BlockBuilder::new(&sandbox)
-        .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
-
+    let block = sandbox.create_block(&[tx.clone()]);
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         current_height,

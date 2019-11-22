@@ -14,7 +14,8 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
-    BinaryKey, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
+    impl_binary_key_for_binary_value, BinaryKey, Entry, KeySetIndex, ListIndex, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
 use exonum_proto::ProtobufConvert;
@@ -26,7 +27,7 @@ use crate::{
     crypto::{self, Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
-    proto,
+    proto::{self, schema::blockchain as pb_blockchain},
     runtime::InstanceId,
 };
 
@@ -43,7 +44,7 @@ macro_rules! define_names {
 
 define_names!(
     TRANSACTIONS => "transactions";
-    TRANSACTION_RESULTS => "transaction_results";
+    CALL_RESULTS => "call_results";
     TRANSACTIONS_LEN => "transactions_len";
     TRANSACTIONS_POOL => "transactions_pool";
     TRANSACTIONS_POOL_LEN => "transactions_pool_len";
@@ -62,7 +63,9 @@ define_names!(
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
-#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
+)]
 #[protobuf_convert(source = "proto::TxLocation")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
@@ -72,7 +75,7 @@ pub struct TxLocation {
 }
 
 impl TxLocation {
-    /// New tx_location
+    /// Creates a new transaction location.
     pub fn new(block_height: Height, position_in_block: u64) -> Self {
         Self {
             block_height,
@@ -84,6 +87,7 @@ impl TxLocation {
     pub fn block_height(&self) -> Height {
         self.block_height
     }
+
     /// Zero-based position of this transaction in the block.
     pub fn position_in_block(&self) -> u64 {
         self.position_in_block
@@ -120,8 +124,20 @@ impl<T: Access> Schema<T> {
     ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
-    pub fn transaction_results(&self) -> ProofMapIndex<T::Base, Hash, ExecutionStatus> {
-        self.access.clone().get_proof_map(TRANSACTION_RESULTS)
+    pub fn call_results(
+        &self,
+        block_height: Height,
+    ) -> ProofMapIndex<T::Base, CallLocation, ExecutionStatus> {
+        self.access
+            .clone()
+            .get_proof_map((CALL_RESULTS, &block_height.0))
+    }
+
+    /// Returns the result of the execution of a transaction with the specified location.
+    /// If the location does not correspond to a transaction, returns `None`.
+    pub fn transaction_result(&self, location: TxLocation) -> Option<ExecutionStatus> {
+        let call_location = CallLocation::Transaction(location.position_in_block as u64);
+        self.call_results(location.block_height).get(&call_location)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -276,10 +292,7 @@ impl<T: Access> Schema<T> {
 
     /// Returns the `state_hash` table for core tables.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.consensus_config_entry().object_hash(),
-            self.transaction_results().object_hash(),
-        ]
+        vec![self.consensus_config_entry().object_hash()]
     }
 
     /// Attempts to find a `ValidatorId` by the provided service public key.
@@ -333,6 +346,18 @@ where
         len_index.set(new_len);
     }
 }
+
+/// Location of an isolated call within a block.
+#[derive(Debug, Clone, Copy, PartialEq, BinaryValue, ObjectHash, ProtobufConvert)]
+#[protobuf_convert(source = "pb_blockchain::CallLocation", oneof_field = "call")]
+pub enum CallLocation {
+    /// Call of a transaction within the block.
+    Transaction(u64),
+    /// Call of `before_commit` hook in a service.
+    BeforeCommit(InstanceId),
+}
+
+impl_binary_key_for_binary_value!(CallLocation);
 
 /// Describes the origin of the information schema.
 ///

@@ -329,7 +329,7 @@ fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> E
     let (block_hash, patch) = blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
-        &[tx.object_hash()],
+        &[tx_hash],
         &mut BTreeMap::new(),
     );
 
@@ -337,10 +337,9 @@ fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> E
         .commit(patch, block_hash, vec![], &mut BTreeMap::new())
         .unwrap();
     let snapshot = blockchain.snapshot();
-    Schema::new(&snapshot)
-        .transaction_results()
-        .get(&tx_hash)
-        .unwrap()
+    let schema = Schema::new(&snapshot);
+    let location = schema.transactions_locations().get(&tx_hash).unwrap();
+    schema.transaction_result(location).unwrap()
 }
 
 fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> BlockchainMut {

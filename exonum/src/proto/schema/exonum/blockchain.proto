@@ -27,11 +27,19 @@ message Block {
   exonum.crypto.Hash prev_hash = 4;
   exonum.crypto.Hash tx_hash = 5;
   exonum.crypto.Hash state_hash = 6;
+  exonum.crypto.Hash call_hash = 7;
 }
 
 message TxLocation {
   uint64 block_height = 1;
   uint64 position_in_block = 2;
+}
+
+message CallLocation {
+  oneof call {
+    uint64 transaction = 1;
+    uint32 before_commit = 2;
+  }
 }
 
 // Consensus configuration parameters

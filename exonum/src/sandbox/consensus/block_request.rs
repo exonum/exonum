@@ -21,7 +21,7 @@ use std::time::Duration;
 use crate::{
     helpers::{Height, Round, ValidatorId},
     node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
-    sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 
 /// HANDLE block response
@@ -35,15 +35,9 @@ use crate::{
 #[test]
 fn handle_block_response_tx_in_pool() {
     let sandbox = timestamping_sandbox();
-
     let tx = gen_timestamping_tx();
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -124,15 +118,9 @@ fn handle_block_response_tx_in_pool() {
 #[test]
 fn handle_block_response_with_unknown_tx() {
     let sandbox = timestamping_sandbox();
-
     let tx = gen_timestamping_tx();
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -231,13 +219,8 @@ fn handle_block_response_with_invalid_txs_order() {
 
     let tx1 = gen_timestamping_tx();
     let tx2 = gen_timestamping_tx();
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_txs_hashes(&[tx1.object_hash(), tx2.object_hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx1.clone(), tx2.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -309,16 +292,10 @@ fn handle_block_response_with_invalid_txs_order() {
 #[test]
 fn handle_block_response_with_invalid_precommits() {
     let sandbox = timestamping_sandbox();
-
     let tx = gen_timestamping_tx();
-
     let propose = ProposeBuilder::new(&sandbox).build();
 
-    let block1 = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.object_hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
-
+    let block1 = sandbox.create_block(&[tx.clone()]);
     let block2 = BlockBuilder::new(&sandbox).build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -395,18 +372,12 @@ fn handle_block_response_with_invalid_precommits() {
 #[test]
 fn handle_block_response_with_known_transaction() {
     let sandbox = timestamping_sandbox();
-
     let tx1 = gen_timestamping_tx();
     let tx2 = gen_timestamping_tx();
-
     sandbox.recv(&tx1);
 
     let propose = ProposeBuilder::new(&sandbox).build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_txs_hashes(&[tx1.object_hash(), tx2.object_hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx1.clone(), tx2.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -503,19 +474,13 @@ fn handle_block_response_with_known_transaction() {
 #[test]
 fn handle_block_response_with_all_known_transactions() {
     let sandbox = timestamping_sandbox();
-
     let tx1 = gen_timestamping_tx();
     let tx2 = gen_timestamping_tx();
-
     sandbox.recv(&tx1);
     sandbox.recv(&tx2);
 
     let propose = ProposeBuilder::new(&sandbox).build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_txs_hashes(&[tx1.object_hash(), tx2.object_hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx1.clone(), tx2.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -597,7 +562,6 @@ fn handle_block_response_with_all_known_transactions() {
 #[test]
 fn received_block_while_there_is_full_propose() {
     let sandbox = timestamping_sandbox();
-
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -605,11 +569,7 @@ fn received_block_while_there_is_full_propose() {
         .with_validator(ValidatorId(2))
         .with_tx_hashes(&[tx.object_hash()])
         .build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     sandbox.recv(&sandbox.create_status(
         sandbox.public_key(ValidatorId(3)),
@@ -669,9 +629,7 @@ fn received_block_while_there_is_full_propose() {
     ));
 
     sandbox.recv(&propose);
-
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
-
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
         &sandbox.create_transactions_request(
@@ -723,15 +681,9 @@ fn received_block_while_there_is_full_propose() {
 #[test]
 fn received_block_while_there_is_pending_block() {
     let sandbox = timestamping_sandbox();
-
     let tx = gen_timestamping_tx();
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     sandbox.recv(&sandbox.create_status(
         sandbox.public_key(ValidatorId(3)),
@@ -850,15 +802,9 @@ fn received_block_while_there_is_pending_block() {
 #[ignore]
 fn transactions_request_to_multiple_nodes() {
     let sandbox = timestamping_sandbox();
-
     let tx = gen_timestamping_tx();
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.object_hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     sandbox.recv(&sandbox.create_status(
         sandbox.public_key(ValidatorId(2)),

@@ -217,7 +217,7 @@ fn test_explorer_block_iter() {
     create_block(&mut blockchain, vec![]); // Height(7)
     create_block(&mut blockchain, vec![]); // Height(8)
     create_block(&mut blockchain, txs.take(5).collect()); // Height(9)
-    assert_eq!(blockchain.as_ref().last_block().height(), Height(9));
+    assert_eq!(blockchain.as_ref().last_block().height, Height(9));
 
     let snapshot = blockchain.snapshot();
     let explorer = BlockchainExplorer::new(snapshot.as_ref());

@@ -224,18 +224,24 @@ impl Dispatcher {
     }
 
     /// Calls `before_commit` for all currently active services, isolating each call.
-    pub(crate) fn before_commit(&self, fork: &mut Fork) {
-        for (&service_id, info) in &self.service_infos {
-            let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            if self.runtimes[&info.runtime_id]
-                .before_commit(context, service_id)
-                .is_ok()
-            {
-                fork.flush();
-            } else {
-                fork.rollback();
-            }
-        }
+    pub(crate) fn before_commit(
+        &self,
+        fork: &mut Fork,
+    ) -> Vec<(InstanceId, Result<(), ExecutionError>)> {
+        self.service_infos
+            .iter()
+            .map(|(&service_id, info)| {
+                let context = ExecutionContext::new(self, fork, Caller::Blockchain);
+                let result = self.runtimes[&info.runtime_id].before_commit(context, service_id);
+
+                if result.is_ok() {
+                    fork.flush();
+                } else {
+                    fork.rollback();
+                }
+                (service_id, result)
+            })
+            .collect()
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
