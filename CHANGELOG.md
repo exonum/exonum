@@ -89,8 +89,8 @@ In `exonum` 0.13, a new service workflow is introduced, named
 Key points of this feature are the following:
 
 - `exonum` now supports different environments of code execution (runtimes).
-  Only native `rust` runtime is enabled by default, but 
-  support of different programming languages can be added quite easily.
+  Only native `rust` runtime is enabled by default, but support of
+  different programming languages can be added quite easily.
 
   For details see the [`Runtime` trait docs][runtime-trait] and the
   [`sample_runtime` example][sample-runtime].
@@ -105,6 +105,17 @@ Key points of this feature are the following:
   For details see [`runtime` module docs][runtime-docs].
 
   [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+
+- Services now can have initialization parameters, provided within service start
+  procedure.
+
+- Services now support configuration changes via `Configure` interface.
+
+- `configuration` service was replaced with the `supervisor` service, which is
+  capable of not only changing configuration, but of deploying and starting
+  services as well. For details see [`supervisor` service][supervisor].
+
+  [supervisor]: https://github.com/exonum/exonum/tree/v0.13/services/supervisor
 
 #### Migration Guide
 
@@ -176,7 +187,7 @@ Key points:
 </details>
 <!-- markdownlint-enable no-inline-html -->
 
-#### Full History of the Dynamic Services Implementation 
+#### Full History of the Dynamic Services Implementation
 
 <!-- markdownlint-disable no-inline-html -->
 <details>
@@ -455,7 +466,9 @@ Key points:
 
 #### exonum-cli
 
-- `exonum-cli` now provides a public reexport of `structopt` crate (#1461).
+- Old `fabric` module is replaced with new `exonum-cli` crate. (#1443)
+
+- `exonum-cli` provides a public reexport of `structopt` crate. (#1461)
 
 ### Internal Improvements
 
