@@ -10,11 +10,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - **Most important**: new Dynamic Services feature was introduced. For details see
-  [Dynamic Services](#dynamic-services-feature) section of changelog.
+  the [Dynamic Services](#dynamic-services-feature) section of the changelog.
 
 - Used `rust` version is updated to 1.38.0. (#1481)
 
-- Transaction serialization format was changed to the `protobuf`. (#1283)
+- Transaction serialization format was changed to `protobuf`. (#1283)
 
 - `NotFound` error message for `explorer/v1/block` endpoint now includes
   the actual blockchain height. (#1498)
@@ -31,7 +31,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Command line parameters `--service-key-pass` and `--consensus-key-pass` was
   removed in favor of `--master-key-pass` parameter. For example now you can
-  run node with the command below. (#1459)
+  run the node with the command below. (#1459)
 
     ```bash
     cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
@@ -46,7 +46,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-merkledb
 
-- Nested proofs for `ProofListIndex` are replaced with flat
+- Nested proofs for `ProofListIndex` are replaced with a flat
   (non-recursive) format. (#1450)
 
 - Differentiated (read-only / read-write) access to the database
@@ -62,9 +62,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Introduced a new crate `exonum-protobuf-convert`. Derive macro
   `ProtobufConvert` is moved to this crate. (#1501)
 
-- Derive macro `ProtobufConvert` now doesn't derive `BinaryValue` and
+- Derive macro `ProtobufConvert` now does not derive the `BinaryValue` and
   `ObjectHash` traits. There are separate derive macros for them in
-  `exonum-derive` crate. (#1501)
+  the `exonum-derive` crate. (#1501)
 
 #### exonum-build
 
@@ -76,40 +76,40 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
   module in the `exonum`. (#1459)
 
-- Protobuf serialization for crypto types are now implemented in `exonum-crypto`
+- Protobuf serialization for crypto types is now implemented in the `exonum-crypto`
   crate. (#1496)
 
-### Dynamic Services feature
+### Dynamic Services Feature
 
 #### Overview
 
-In `exonum` 0.13, a new service workflow was introduced, named
-"dynamic services".
+In `exonum` 0.13, a new service workflow is introduced, named
+"Dynamic Services".
 
 Key points of this feature are the following:
 
 - `exonum` now supports different environments of code execution (runtimes).
-  Only native `rust` runtime is enabled by default, but with this feature
+  Only native `rust` runtime is enabled by default, but 
   support of different programming languages can be added quite easily.
 
-  For details see [`Runtime` trait docs][runtime-trait] and
+  For details see the [`Runtime` trait docs][runtime-trait] and the
   [`sample_runtime` example][sample-runtime].
 
   [runtime-trait]: https://docs.rs/exonum/0.13.0/exonum/runtime/trait.Runtime.html
   [sample-runtime]: https://github.com/exonum/exonum/tree/v0.13/examples/sample_runtime
 
-- Services are not anymore statically tied to the compiled binary. There is
-  support of dynamic adding new service types (aka artifacts) and starting new
+- Services are not statically tied to the compiled binary anymore. There is
+  support of adding new service types (aka artifacts) dynamically and starting new
   instances of services.
 
   For details see [`runtime` module docs][runtime-docs].
 
   [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
 
-#### Migration guide
+#### Migration Guide
 
-There are a lot of backward-incompatible changes introduced within 0.13 release,
-so for the best effort you can compare `cryptocurrency` example service versions
+There are a lot of backward-incompatible changes introduced within 0.13 release.
+So to make the changes apparent, compare the `Cryptocurrency` example service versions
 for [0.12.1][crypt-0-12] and [0.13.0][crypt-0-13] releases.
 
 [crypt-0-12]: https://github.com/exonum/exonum/blob/v0.12.1/examples/cryptocurrency/
@@ -120,13 +120,13 @@ Key points:
 - Merkledb schema is now declarative and can contain indices as fields.
 
 - Access to the database is now isolated for services.
-  Service can't get a write access to other service or blockchain schema.
+  A service cannot get the write access to another service or the blockchain schema.
 
-- Transactions don't have an `execute` method anymore. Instead, service defines
-  and implements an interface trait which contain all the business logic.
+- Transactions do not have the `execute` method anymore. Instead, a service defines
+  and implements an interface trait which contains all the business logic.
 
-- Services aren't launched at the node start by default. For launching a
-  service, consider using an [`exonum-launcher`][launcher] tool.
+- Services do not launch at the node start by default. For launching a
+  service, use an [`exonum-launcher`][launcher] tool.
 
   [launcher]: https://github.com/exonum/exonum-launcher
 
@@ -134,9 +134,9 @@ Key points:
 
 <!-- markdownlint-disable no-inline-html -->
 <details>
-    <summary>Under the spoiler you can find list of pull requests
-    which have significant meaning for the Dynamic Services
-    feature implementation.
+    <summary>Below you can find a list of pull requests
+    which have significant meaning for the implementation of the Dynamic Services
+    feature.
     Pull requests are ordered chronologically.</summary>
 
 - #1253: Interface mocks for dynamic services
@@ -176,12 +176,12 @@ Key points:
 </details>
 <!-- markdownlint-enable no-inline-html -->
 
-#### Dynamic services implementation full history
+#### Full History of the Dynamic Services Implementation 
 
 <!-- markdownlint-disable no-inline-html -->
 <details>
-    <summary>Under the spoiler you can find list of all pull requests related
-    to the Dynamic Services feature implementation.
+    <summary>Below you can find a list of all pull requests related
+    to the implementation of the Dynamic Services feature.
     Pull requests are ordered chronologically.</summary>
 
 - #1243: Old behavior dispatcher
@@ -457,27 +457,27 @@ Key points:
 
 - `exonum-cli` now provides a public reexport of `structopt` crate (#1461).
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
 - `system/v1/shutdown` endpoint has been modified and now accepts empty POST
   requests. (#1526)
 
-- `keys` module was moved into `exonum-keys` crate. (#1497)
+- `keys` module has been moved into `exonum-keys` crate. (#1497)
 
 #### exonum-merkledb
 
 - `ProofListIndex::extend()` method has been refactored, leading to up to 10x
   performance improvements for large lists. (#1455)
 
-- Proofs building mechanisms were heavily refactored. (#1460)
+- Proofs building mechanisms have been heavily refactored. (#1460)
 
 ### Bug Fixes
 
 #### exonum
 
-- Localhost ports 8080/8081 became allowed in CORS within `run-dev` mode. (#1415)
+- Localhost ports 8080/8081 are now allowed in CORS within the `run-dev` mode. (#1415)
 
 #### exonum-merkledb
 
