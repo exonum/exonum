@@ -5,10 +5,118 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Breaking changes
+
+#### exonum
+
 - `create_checkpoint` method has been implemented for the `RocksDB` struct.
   This method uses
   [RocksDB checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints)
   functionality under the hood.
+
+- `NotFound` error message for `explorer/v1/block` endpoint now includes
+  the actual blockchain height. (#1498)
+
+- `system/v1/rebroadcast` endpoint has been removed. (#1445)
+
+- Added a possibility to specify compression algorithm for the database. (#1447)
+
+- Updated `hex` dependency with changes in the methods signatures of the `ToHex`
+  trait. (#1468)
+
+- Validator keys are now derived from single master key. Master key is
+  stored in encrypted file. (#1459)
+
+- Command line parameters `--service-key-pass` and `--consensus-key-pass` was
+  removed in favor of `--master-key-pass` parameter. For example now you can
+  run node with the command below (#1459).
+
+    ```bash
+    cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
+    ```
+
+  - `StoppedTestKit::resume` accepts list of runtimes instead of a list of services.
+
+  - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
+  now returns value instead of reference.
+
+- Placeholder for changes due to dynamic services (#9999)
+
+#### exonum-proto
+
+- Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` is moved
+  to this crate. (#1496)
+
+#### exonum-protobuf-convert
+
+- Introduced a new crate `exonum-protobuf-convert`. Derive macro `ProtobufConvert`
+  is moved to this crate. (#1501)
+
+- Derive macro `ProtobufConvert` now doesn't derive `BinaryValue` and `ObjectHash`
+  traits. There are separate derive macros for them in `exonum-derive` crate. (#1501)
+
+#### exonum-build
+
+- Method `protobuf_generate` is now private, use `exonum_build::ProtobufGenerator`
+  instead (#1496).
+
+#### exonum-crypto
+
+- Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
+  module in the `exonum`. (#1459)
+  
+- Protobuf serialization for crypto types are now implemented in `exonum-crypto`
+  crate (#1496).
+
+### New Features
+
+#### exonum
+
+- New config params `http_backend_config.server_restart_max_retries` and
+  `http_backend_config.server_restart_retry_timeout` added into `NetworkConfiguration`.
+  They are intended to configure restart settings of the HTTP-server (#1536).
+
+#### exonum-merkledb
+
+- `ProofListIndex` now implements `truncate()` and `pop()` methods, allowing
+  to eject elements from the list. (#1455)
+
+- `IndexAccess` trait is implemented for several new types, notably,
+  `Rc<dyn Snapshot>`, `Arc<dyn Snapshot>` and `Rc<Fork>`. (#1455)
+
+- `HashTag::hash_list()` was extended to support values of any appropriate type,
+  not only `Hash`. (#1455)
+
+- `ProtobufConvert` has been implemented for `MapProof`. (#1512)
+
+- New variant of the `ProofMapIndex` have been introduced - `RawProofMapIndex`.
+  It is used for keys that maps directly to `ProofPath`, for example `Hash` and
+  `PublicKey`. (#1531)
+
+  - By default `ProofMapIndex` is used for keys that implement `ObjectHash`.
+
+  - For `Hash` keys both map variants works the same, because `ObjectHash`
+  implementation for `Hash` returns the hash itself.
+
+### Internal improvements
+
+#### exonum
+
+- `system/v1/shutdown` endpoint has been modified and now accepts empty POST
+  requests. (#1526)
+
+#### exonum-merkledb
+
+- `ProofListIndex::extend()` method has been refactored, leading to up to 10x
+  performance improvements for large lists. (#1455)
+
+## 0.12.1 - 2019-09-19
+
+### Bug Fixes
+
+#### exonum
+
+- A message length checking has been fixed (#1463)
 
 ## 0.12.0 - 2019-08-14
 
@@ -16,6 +124,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Module `storage` has been replace by `exonum-merkledb` crate. See related section
 - Signatures of methods `Service::initialize` and `Service::before_commit` has been
   changed. Now they take immutable reference to `Fork` instead of mutable. (#1293)
 
@@ -62,6 +171,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
   median precommit times in the `time` field within each returned block,
   rather than in a separate array. (#1278)
+
+- `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
+  An additional field in the response of the endpoint was added. The field
+  corresponds to the total number of transactions in the blockchain. (#1289)
 
 - `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
   An additional field in the response of the endpoint was added. The field
@@ -121,6 +234,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
     `(bits_len + 7) / 8` bytes.
 
+#### exonum-crypto
+
+- Removed deprecated `CryptoHash` trait, use `exonum-merkledb::ObjectHash`
+  instead (#1361)
+
 ### New features
 
 #### exonum
@@ -171,6 +289,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added new request message `PoolTransactionsRequest` to obtain pool transactions
  from another peers. (#1404)
 
+- Endpoints `explorer/v1/block` and `explorer/v1/transactions` were extended
+  with adding additional fields `service_id` and `time`. (#1386)
+
 #### exonum-merkledb
 
 - Updated `ProofMapIndex` data layout. (#1293)
@@ -187,6 +308,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - `get_object_existed` and `get_object_existed_mut` methods of `Fork` and `Snapshot`
     returns optional references to index.
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
+- Added a new endpoint `system/v1/services` for displaying information
+  about available services. (#1288)
 
 - `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
 

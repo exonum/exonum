@@ -14,17 +14,16 @@
 
 //! Cryptocurrency API.
 
-use exonum_merkledb::{ListProof, MapProof};
+use exonum_merkledb::{proof_map_index::Raw, ListProof, MapProof};
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, TransactionMessage},
+    blockchain::{BlockProof, IndexCoordinates, SchemaOrigin},
     crypto::{Hash, PublicKey},
-    explorer::BlockchainExplorer,
-    helpers::Height,
+    messages::{AnyTx, Verified},
+    runtime::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
-use crate::{wallet::Wallet, Schema, CRYPTOCURRENCY_SERVICE_ID};
+use crate::{wallet::Wallet, Schema};
 
 /// Describes the query parameters for the `get_wallet` endpoint.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -37,9 +36,9 @@ pub struct WalletQuery {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletProof {
     /// Proof of the whole database table.
-    pub to_table: MapProof<Hash, Hash>,
+    pub to_table: MapProof<IndexCoordinates, Hash>,
     /// Proof of the specific wallet in this table.
-    pub to_wallet: MapProof<PublicKey, Wallet>,
+    pub to_wallet: MapProof<PublicKey, Wallet, Raw>,
 }
 
 /// Wallet history.
@@ -48,7 +47,7 @@ pub struct WalletHistory {
     /// Proof of the list of transaction hashes.
     pub proof: ListProof<Hash>,
     /// List of above transactions.
-    pub transactions: Vec<TransactionMessage>,
+    pub transactions: Vec<Verified<AnyTx>>,
 }
 
 /// Wallet information.
@@ -68,39 +67,37 @@ pub struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting a single wallet.
-    pub fn wallet_info(state: &ServiceApiState, query: WalletQuery) -> api::Result<WalletInfo> {
-        let snapshot = state.snapshot();
-        let general_schema = blockchain::Schema::new(&snapshot);
-        let currency_schema = Schema::new(&snapshot);
+    pub fn wallet_info(
+        self,
+        state: &ServiceApiState<'_>,
+        pub_key: PublicKey,
+    ) -> api::Result<WalletInfo> {
+        let blockchain_schema = state.data().for_core();
+        let currency_schema = Schema::new(state.service_data());
+        let current_height = blockchain_schema.height();
 
-        let max_height = general_schema.block_hashes_by_height().len() - 1;
-
-        let block_proof = general_schema
-            .block_and_precommits(Height(max_height))
+        let block_proof = blockchain_schema
+            .block_and_precommits(current_height)
             .unwrap();
-
-        let to_table: MapProof<Hash, Hash> =
-            general_schema.get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
-
-        let to_wallet: MapProof<PublicKey, Wallet> =
-            currency_schema.wallets().get_proof(query.pub_key);
+        let to_table = blockchain_schema
+            .state_hash_aggregator()
+            .get_proof(SchemaOrigin::Service(state.instance.id).coordinate_for(0));
+        let to_wallet = currency_schema.wallets.get_proof(pub_key);
 
         let wallet_proof = WalletProof {
             to_table,
             to_wallet,
         };
-
-        let wallet = currency_schema.wallet(&query.pub_key);
-
-        let explorer = BlockchainExplorer::new(state.blockchain());
+        let wallet = currency_schema.wallets.get(&pub_key);
 
         let wallet_history = wallet.map(|_| {
-            let history = currency_schema.wallet_history(&query.pub_key);
+            // `history` is always present for existing wallets.
+            let history = currency_schema.wallet_history.get(&pub_key);
             let proof = history.get_range_proof(0..history.len());
 
             let transactions = history
                 .iter()
-                .map(|record| explorer.transaction_without_proof(&record).unwrap())
+                .map(|tx_hash| blockchain_schema.transactions().get(&tx_hash).unwrap())
                 .collect::<Vec<_>>();
 
             WalletHistory {
@@ -117,9 +114,12 @@ impl PublicApi {
     }
 
     /// Wires the above endpoint to public scope of the given `ServiceApiBuilder`.
-    pub fn wire(builder: &mut ServiceApiBuilder) {
-        builder
-            .public_scope()
-            .endpoint("v1/wallets/info", Self::wallet_info);
+    pub fn wire(self, builder: &mut ServiceApiBuilder) {
+        builder.public_scope().endpoint(
+            "v1/wallets/info",
+            move |state: &ServiceApiState<'_>, query: WalletQuery| {
+                self.wallet_info(state, query.pub_key)
+            },
+        );
     }
 }

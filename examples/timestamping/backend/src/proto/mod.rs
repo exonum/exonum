@@ -15,10 +15,9 @@
 //! Module of the rust-protobuf generated files.
 
 #![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
 
-pub use self::timestamping::{Timestamp, TimestampEntry, TxTimestamp};
+pub use self::service::{Config, Timestamp, TimestampEntry, TxTimestamp};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::proto::schema::*;
+use exonum::crypto::proto::*;

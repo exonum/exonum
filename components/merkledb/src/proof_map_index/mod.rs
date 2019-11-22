@@ -14,29 +14,25 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
-#[doc(hidden)]
 pub use self::node::{BranchNode, Node};
 pub use self::{
-    key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
-    proof::{CheckedMapProof, MapProof, MapProofError},
+    key::{Hashed, ProofPath, Raw, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
+    proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
-use std::{
-    fmt,
-    io::{Error, Read, Write},
-    marker::PhantomData,
-};
+use std::{fmt, io, marker::PhantomData};
 
 use exonum_crypto::Hash;
 
 use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
-    proof::{create_multiproof, create_proof},
+    proof_builder::{BuildProof, MerklePatriciaTree},
 };
-use crate::views::{AnyObject, IndexAddress};
 use crate::{
+    access::{Access, AccessError, FromAccess},
     views::{
-        BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
+        BinaryAttribute, IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess,
+        RawAccessMut, View, ViewWithMetadata,
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
@@ -44,8 +40,30 @@ use crate::{
 mod key;
 mod node;
 mod proof;
+mod proof_builder;
 #[cfg(test)]
 mod tests;
+
+// Necessary to allow building proofs.
+impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, KeyMode>
+where
+    T: RawAccess,
+    K: BinaryKey,
+    V: BinaryValue,
+    KeyMode: ToProofPath<K>,
+{
+    fn root_node(&self) -> Option<(ProofPath, Node)> {
+        self.get_root_node()
+    }
+
+    fn node(&self, path: &ProofPath) -> Node {
+        self.get_node_unchecked(path)
+    }
+
+    fn value(&self, key: &K) -> V {
+        self.get_value_unchecked(key)
+    }
+}
 
 /// A Merkelized version of a map that provides proofs of existence or non-existence for the map
 /// keys.
@@ -56,11 +74,12 @@ mod tests;
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
-pub struct ProofMapIndex<T: IndexAccess, K, V> {
+pub struct ProofMapIndex<T: RawAccess, K, V, KeyMode: ToProofPath<K> = Hashed> {
     base: View<T>,
-    state: IndexState<T, Option<ProofPath>>,
+    state: IndexState<T, ProofPath>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
+    _key_mode: PhantomData<KeyMode>,
 }
 
 /// An iterator over the entries of a `ProofMapIndex`.
@@ -104,25 +123,6 @@ pub struct ProofMapIndexValues<'a, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
 }
 
-impl<T, K, V> AnyObject<T> for ProofMapIndex<T, K, V>
-where
-    T: IndexAccess,
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::ProofMap
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
-    }
-}
-
 /// TODO Clarify documentation. [ECR-2820]
 enum RemoveAction {
     KeyNotFound,
@@ -155,150 +155,63 @@ impl<T: BinaryKey> ValuePath for T {
     }
 }
 
-impl BinaryAttribute for Option<ProofPath> {
+impl BinaryAttribute for ProofPath {
     fn size(&self) -> usize {
-        match self {
-            Some(path) => path.size(),
-            None => 0,
-        }
+        PROOF_PATH_SIZE
     }
 
-    fn write<W: Write>(&self, buffer: &mut W) {
-        if let Some(path) = self {
-            let mut tmp = [0_u8; PROOF_PATH_SIZE];
-            path.write(&mut tmp);
-            buffer.write_all(&tmp).unwrap();
-        }
-    }
-
-    fn read<R: Read>(buffer: &mut R) -> Result<Self, Error> {
+    fn write(&self, buffer: &mut Vec<u8>) {
         let mut tmp = [0_u8; PROOF_PATH_SIZE];
-        let proof_path = match buffer.read(&mut tmp).unwrap() {
-            0 => None,
-            PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
-            other => panic!("Unexpected attribute length: {}", other),
-        };
-        Ok(proof_path)
+        BinaryKey::write(self, &mut tmp);
+        buffer.extend_from_slice(&tmp[..]);
+    }
+
+    fn read(buffer: &[u8]) -> Result<Self, io::Error> {
+        if buffer.len() != PROOF_PATH_SIZE {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Invalid `ProofPath` size",
+            ));
+        }
+        Ok(<Self as BinaryKey>::read(buffer))
     }
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V>
+impl<T, K, V, KeyMode> FromAccess<T> for ProofMapIndex<T::Base, K, V, KeyMode>
 where
-    T: IndexAccess,
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    T: Access,
+    K: BinaryKey,
+    V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &fork);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ProofMap)
-            .index_name(index_name)
-            .build();
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::ProofMap)?;
+        Ok(Self::new(view))
+    }
+}
+
+/// Raw variant of the `ProofMapIndex`, useful for keys that mapped directly to
+/// `ProofPath` without hashing. For example `Hash` and `PublicKey`.
+///
+/// It's possible to use any type that can be represented with byte array of length 32
+/// as a key for this map.
+pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
+
+impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
+where
+    T: RawAccess,
+    K: BinaryKey,
+    V: BinaryValue,
+    KeyMode: ToProofPath<K>,
+{
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
             _k: PhantomData,
             _v: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, common prefix of its keys
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    ///
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new_in_family(
-    ///     name,
-    ///     &index_id,
-    ///     &snapshot,
-    ///  );
-    ///
-    /// let fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new_in_family(
-    ///     name,
-    ///     &index_id,
-    ///     &fork,
-    ///  );
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey,
-        I: ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::ProofMap)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-        Self {
-            base,
-            state,
-            _k: PhantomData,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofMap)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _k: PhantomData,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::ProofMap)
-            .build();
-
-        Self {
-            base,
-            state,
-            _k: PhantomData,
-            _v: PhantomData,
+            _key_mode: PhantomData,
         }
     }
 
@@ -339,13 +252,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// assert_eq!(None, index.get(&hash));
@@ -362,13 +274,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// assert!(!index.contains(&hash));
@@ -385,22 +296,17 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new("index", &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: K) -> MapProof<K, V> {
-        create_proof(
-            key,
-            self.get_root_node(),
-            |path| self.get_node_unchecked(path),
-            |key| self.get_value_unchecked(key),
-        )
+    pub fn get_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
+        self.create_proof(key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -408,24 +314,19 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Vec<u8>, u8> = ProofMapIndex::new("index", &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, String, u8>("name");
     ///
-    /// let proof = index.get_multiproof(vec![vec![0; 32], vec![1; 32]]);
+    /// let proof = index.get_multiproof(vec!["foo".to_owned(), "bar".to_owned()]);
     /// ```
-    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V>
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V, KeyMode>
     where
         KI: IntoIterator<Item = K>,
     {
-        create_multiproof(
-            keys,
-            self.get_root_node(),
-            |path| self.get_node_unchecked(path),
-            |key| self.get_value_unchecked(key),
-        )
+        self.create_multiproof(keys)
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
@@ -434,19 +335,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ProofMapIndexIter<K, V> {
+    pub fn iter(&self) -> ProofMapIndexIter<'_, K, V> {
         ProofMapIndexIter {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
             _k: PhantomData,
@@ -459,19 +359,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// for key in index.keys() {
     ///     println!("{:?}", key);
     /// }
     /// ```
-    pub fn keys(&self) -> ProofMapIndexKeys<K> {
+    pub fn keys(&self) -> ProofMapIndexKeys<'_, K> {
         ProofMapIndexKeys {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
             _k: PhantomData,
@@ -484,19 +383,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> ProofMapIndexValues<V> {
+    pub fn values(&self) -> ProofMapIndexValues<'_, V> {
         ProofMapIndexValues {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
         }
@@ -508,20 +406,19 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let hash = Hash::default();
     /// for val in index.iter_from(&hash) {
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
+    pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<'_, K, V> {
         ProofMapIndexIter {
             base_iter: self
                 .base
@@ -536,20 +433,19 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let hash = Hash::default();
     /// for key in index.keys_from(&hash) {
     ///     println!("{:?}", key);
     /// }
     /// ```
-    pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
+    pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<'_, K> {
         ProofMapIndexKeys {
             base_iter: self
                 .base
@@ -564,27 +460,34 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_proof_map::<_, Hash, u8>("name");
     ///
     /// let hash = Hash::default();
     /// for val in index.values_from(&hash) {
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
+    pub fn values_from(&self, from: &K) -> ProofMapIndexValues<'_, V> {
         ProofMapIndexValues {
             base_iter: self
                 .base
                 .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
         }
     }
+}
 
+impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
+where
+    T: RawAccessMut,
+    K: BinaryKey,
+    V: BinaryValue,
+    KeyMode: ToProofPath<K>,
+{
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
         let hash = HashTag::hash_leaf(&value.to_bytes());
@@ -598,8 +501,8 @@ where
         self.base.remove(&key.to_value_path());
     }
 
-    fn update_root_path(&mut self, path: Option<ProofPath>) {
-        self.state.set(path)
+    fn update_root_path(&mut self, path: ProofPath) {
+        self.state.set(path);
     }
 
     // Inserts a new node of the current branch and returns the updated hash
@@ -722,20 +625,19 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let proof_path = ProofPath::new(key);
+        let proof_path = KeyMode::transform_key(key);
         let root_path = match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_path = prefix;
@@ -745,11 +647,7 @@ where
                 if i < proof_path.len() {
                     let mut branch = BranchNode::empty();
                     branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &leaf_hash);
-                    branch.set_child(
-                        prefix_path.bit(i),
-                        &prefix_path.suffix(i),
-                        &prefix_data.object_hash(),
-                    );
+                    branch.set_child(prefix_path.bit(i), &prefix_path.suffix(i), &prefix_data);
                     let new_prefix = proof_path.prefix(i);
                     self.base.put(&new_prefix, branch);
                     new_prefix
@@ -792,7 +690,7 @@ where
                 proof_path
             }
         };
-        self.update_root_path(Some(root_path));
+        self.update_root_path(root_path);
     }
 
     /// Removes a key from the proof map.
@@ -800,13 +698,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -816,15 +713,16 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
-        let proof_path = ProofPath::new(key);
+        let proof_path = KeyMode::transform_key(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
                 if proof_path == prefix {
                     self.remove_leaf(&proof_path, key);
-                    self.update_root_path(None);
+                    self.state.unset();
                 }
             }
+
             Some((prefix, Node::Branch(mut branch))) => {
                 // Truncate prefix
                 let i = prefix.common_prefix_len(&proof_path);
@@ -834,7 +732,8 @@ where
                         RemoveAction::Leaf => {
                             // After removing one of leaves second child becomes a new root.
                             self.base.remove(&prefix);
-                            self.update_root_path(Some(branch.child_path(!suffix_path.bit(0))));
+                            let root_path = branch.child_path(!suffix_path.bit(0));
+                            self.update_root_path(root_path);
                         }
                         RemoveAction::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
@@ -845,13 +744,11 @@ where
                             branch.set_child_hash(suffix_path.bit(0), &hash);
                             self.base.put(&prefix, branch);
                         }
-                        RemoveAction::KeyNotFound => return,
+                        RemoveAction::KeyNotFound => {}
                     }
-                } else {
-                    return;
                 }
             }
-            None => return,
+            None => {}
         }
     }
 
@@ -866,13 +763,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -883,15 +779,16 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
+        self.state.unset();
     }
 }
 
-impl<T, K, V> ObjectHash for ProofMapIndex<T, K, V>
+impl<T, K, V, KeyMode> ObjectHash for ProofMapIndex<T, K, V, KeyMode>
 where
-    T: IndexAccess,
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    T: RawAccess,
+    K: BinaryKey,
+    V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
     /// For hash of the empty map see [`HashTag::empty_map_hash`].
@@ -899,13 +796,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &fork);
+    /// let mut index = fork.get_proof_map("name");
     ///
     /// let default_hash = index.object_hash();
     /// assert_eq!(HashTag::empty_map_hash(), default_hash);
@@ -922,11 +818,11 @@ where
     }
 }
 
-impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
+impl<'a, T, K, V> std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     type Item = (K::Owned, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
@@ -972,29 +868,34 @@ where
     }
 }
 
-#[allow(clippy::use_self)]
-impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
+impl<T, K, V, KeyMode> fmt::Debug for ProofMapIndex<T, K, V, KeyMode>
 where
-    T: IndexAccess,
-    K: BinaryKey + ObjectHash,
-    V: BinaryValue + ObjectHash + fmt::Debug,
+    T: RawAccess,
+    K: BinaryKey,
+    V: BinaryValue + fmt::Debug,
+    KeyMode: ToProofPath<K>,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct Entry<'a, T: 'a + IndexAccess, K: 'a, V: 'a + BinaryValue> {
-            index: &'a ProofMapIndex<T, K, V>,
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        struct Entry<'a, T: RawAccess, K, V: BinaryValue, KeyMode: ToProofPath<K>> {
+            index: &'a ProofMapIndex<T, K, V, KeyMode>,
             path: ProofPath,
             hash: Hash,
             node: Node,
         }
 
-        impl<'a, T, K, V> Entry<'a, T, K, V>
+        impl<'a, T, K, V, KeyMode> Entry<'a, T, K, V, KeyMode>
         where
-            T: IndexAccess,
-            K: BinaryKey + ObjectHash,
-            V: BinaryValue + ObjectHash,
+            T: RawAccess,
+            K: BinaryKey,
+            V: BinaryValue,
+            KeyMode: ToProofPath<K>,
         {
-            fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
-                Entry {
+            fn new(
+                index: &'a ProofMapIndex<T, K, V, KeyMode>,
+                hash: Hash,
+                path: ProofPath,
+            ) -> Self {
+                Self {
                     index,
                     path,
                     hash,
@@ -1011,13 +912,14 @@ where
             }
         }
 
-        impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
+        impl<T, K, V, KeyMode> fmt::Debug for Entry<'_, T, K, V, KeyMode>
         where
-            T: IndexAccess,
-            K: BinaryKey + ObjectHash,
-            V: BinaryValue + ObjectHash + fmt::Debug,
+            T: RawAccess,
+            K: BinaryKey,
+            V: BinaryValue + fmt::Debug,
+            KeyMode: ToProofPath<K>,
         {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.node {
                     Node::Leaf(ref value) => f
                         .debug_struct("Leaf")

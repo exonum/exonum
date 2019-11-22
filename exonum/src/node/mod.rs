@@ -25,6 +25,8 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
+use exonum_keys::{read_keys_from_file, Keys};
+use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
@@ -33,6 +35,7 @@ use toml::Value;
 
 use std::{
     collections::{BTreeMap, HashSet},
+    convert::TryFrom,
     fmt,
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -41,28 +44,34 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
-    ApiAccess, ApiAggregator,
+use crate::{
+    api::{
+        backends::actix::{
+            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig,
+        },
+        manager::UpdateEndpoints,
+        node::SharedNodeState,
+        ApiAccess, ApiAggregator,
+    },
+    blockchain::{
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection, Schema,
+        ValidatorKeys,
+    },
+    crypto::{self, Hash, PublicKey, SecretKey},
+    events::{
+        error::{into_failure, LogError},
+        noise::HandshakeParams,
+        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest,
+        NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
+        TimeoutRequest,
+    },
+    helpers::{
+        config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
+    },
+    messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
+    node::state::SharedConnectList,
+    runtime::Runtime,
 };
-use crate::blockchain::{
-    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
-};
-use crate::crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
-use crate::events::{
-    error::{into_failure, LogError},
-    noise::HandshakeParams,
-    HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
-    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
-};
-use crate::helpers::{
-    config::ConfigManager,
-    fabric::{NodePrivateConfig, NodePublicConfig},
-    user_agent, Height, Milliseconds, Round, ValidatorId,
-};
-use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
-use crate::node::state::SharedConnectList;
-use exonum_merkledb::{Database, DbOptions};
 
 mod basic;
 mod connect_list;
@@ -76,13 +85,11 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Signed<RawTransaction>),
+    Transaction(Verified<AnyTx>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
-    /// Rebroadcast transactions from the pool.
-    Rebroadcast,
 }
 
 /// Node timeout types.
@@ -104,7 +111,7 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: ::std::fmt::Debug + Send + 'static {
+pub trait SystemStateProvider: std::fmt::Debug + Send + 'static {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -126,7 +133,7 @@ pub struct NodeHandler {
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
     /// Blockchain.
-    pub blockchain: Blockchain,
+    pub blockchain: BlockchainMut,
     /// Known peer addresses.
     pub peer_discovery: Vec<String>,
     /// Does this node participate in the consensus?
@@ -151,10 +158,6 @@ pub struct ServiceConfig {
 /// Listener config.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
-    /// Public key.
-    pub consensus_public_key: PublicKey,
-    /// Secret key.
-    pub consensus_secret_key: SecretKey,
     /// ConnectList.
     pub connect_list: ConnectList,
     /// Socket address.
@@ -236,23 +239,15 @@ impl Default for MemoryPoolConfig {
 
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct NodeConfig<T = SecretKey> {
-    /// Initial config that will be written in the first block.
-    pub genesis: GenesisConfig,
+pub struct NodeConfig {
+    /// Initial consensus configuration that will be written in the genesis block.
+    pub consensus: ConsensusConfig,
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
     pub external_address: String,
     /// Network configuration.
     pub network: NetworkConfiguration,
-    /// Consensus public key.
-    pub consensus_public_key: PublicKey,
-    /// Consensus secret key.
-    pub consensus_secret_key: T,
-    /// Service public key.
-    pub service_public_key: PublicKey,
-    /// Service secret key.
-    pub service_secret_key: T,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -267,82 +262,95 @@ pub struct NodeConfig<T = SecretKey> {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
+    /// Path to the master key file.
+    pub master_key_path: PathBuf,
+    /// Validator keys.
+    #[serde(skip)]
+    pub keys: Keys,
 }
 
-impl NodeConfig<PathBuf> {
+impl NodeConfig {
     /// Converts `NodeConfig<PathBuf>` to `NodeConfig<SecretKey>` reading the key files.
     pub fn read_secret_keys(
         self,
         config_file_path: impl AsRef<Path>,
-        consensus_passphrase: &[u8],
-        service_passphrase: &[u8],
+        master_key_passphrase: &[u8],
     ) -> NodeConfig {
         let config_folder = config_file_path.as_ref().parent().unwrap();
-        let consensus_key_path = if self.consensus_secret_key.is_absolute() {
-            self.consensus_secret_key
+        let master_key_path = if self.master_key_path.is_absolute() {
+            self.master_key_path.clone()
         } else {
-            config_folder.join(&self.consensus_secret_key)
-        };
-        let service_key_path = if self.service_secret_key.is_absolute() {
-            self.service_secret_key
-        } else {
-            config_folder.join(&self.service_secret_key)
+            config_folder.join(&self.master_key_path)
         };
 
-        let consensus_secret_key = read_keys_from_file(&consensus_key_path, consensus_passphrase)
-            .expect("Could not read consensus_secret_key from file")
-            .1;
-        let service_secret_key = read_keys_from_file(&service_key_path, service_passphrase)
-            .expect("Could not read service_secret_key from file")
-            .1;
+        let keys = read_keys_from_file(&master_key_path, master_key_passphrase)
+            .expect("Could not read master_key_path from file");
+
         NodeConfig {
-            consensus_secret_key,
-            service_secret_key,
-            genesis: self.genesis,
+            consensus: self.consensus,
             listen_address: self.listen_address,
             external_address: self.external_address,
             network: self.network,
-            consensus_public_key: self.consensus_public_key,
-            service_public_key: self.service_public_key,
             api: self.api,
             mempool: self.mempool,
             services_configs: self.services_configs,
             database: self.database,
             connect_list: self.connect_list,
             thread_pool_size: self.thread_pool_size,
+            master_key_path: self.master_key_path,
+            keys,
         }
+    }
+
+    /// Returns a service key pair of the node.
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
+        (self.keys.service_pk(), self.keys.service_sk().clone())
     }
 }
 
-impl<T> NodeConfig<T> {
-    fn validate_or_panic(&self) {
+impl ValidateInput for NodeConfig {
+    type Error = failure::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
         let capacity = &self.mempool.events_pool_capacity;
-        if capacity.internal_events_capacity < 3 {
-            panic!(
-                "internal_events_capacity({}) must be strictly larger than 2",
-                capacity.internal_events_capacity
-            );
-        }
-        if capacity.network_requests_capacity == 0 {
-            panic!(
-                "network_requests_capacity({}) must be strictly larger than 0",
-                capacity.network_requests_capacity
-            );
-        }
+        ensure!(
+            capacity.internal_events_capacity > 3,
+            "internal_events_capacity({}) must be strictly larger than 2",
+            capacity.internal_events_capacity
+        );
+        ensure!(
+            capacity.network_requests_capacity > 0,
+            "network_requests_capacity({}) must be strictly larger than 0",
+            capacity.network_requests_capacity
+        );
+
+        let backend_config = &self.network.http_backend_config;
+        ensure!(
+            backend_config.server_restart_max_retries > 0,
+            "server_restart_max_retries({}) must be strictly larger than 0",
+            backend_config.server_restart_max_retries
+        );
+        ensure!(
+            backend_config.server_restart_retry_timeout > 0,
+            "server_restart_retry_timeout({}) must be strictly larger than 0",
+            backend_config.server_restart_retry_timeout
+        );
+
         // Sanity checks for cases of accidental negative overflows.
         let sanity_max = 2_usize.pow(16);
-        if capacity.internal_events_capacity >= sanity_max {
-            panic!(
-                "internal_events_capacity({}) must be smaller than {}",
-                capacity.internal_events_capacity, sanity_max,
-            );
-        }
-        if capacity.network_requests_capacity >= sanity_max {
-            panic!(
-                "network_requests_capacity({}) must be smaller than {}",
-                capacity.network_requests_capacity, sanity_max,
-            );
-        }
+        ensure!(
+            capacity.internal_events_capacity < sanity_max,
+            "internal_events_capacity({}) must be smaller than {}",
+            capacity.internal_events_capacity,
+            sanity_max,
+        );
+        ensure!(
+            capacity.network_requests_capacity < sanity_max,
+            "network_requests_capacity({}) must be smaller than {}",
+            capacity.network_requests_capacity,
+            sanity_max,
+        );
+        self.consensus.validate()
     }
 }
 
@@ -359,6 +367,8 @@ pub struct Configuration {
     pub peer_discovery: Vec<String>,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
+    /// Validator keys.
+    pub keys: Keys,
 }
 
 /// Channel for messages, timeouts and api requests.
@@ -421,20 +431,6 @@ pub struct ConnectListConfig {
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectListConfig` from validators public configs.
-    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
-        let peers = list
-            .iter()
-            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
-            .map(|config| ConnectInfo {
-                public_key: config.validator_keys.consensus_key,
-                address: config.address.clone(),
-            })
-            .collect();
-
-        ConnectListConfig { peers }
-    }
-
     /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
         let peers = peers
@@ -465,7 +461,7 @@ impl ConnectListConfig {
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
-        blockchain: Blockchain,
+        blockchain: BlockchainMut,
         external_address: &str,
         sender: NodeSender,
         system_state: Box<dyn SystemStateProvider>,
@@ -474,45 +470,41 @@ impl NodeHandler {
         config_file_path: Option<String>,
     ) -> Self {
         let (last_hash, last_height) = {
-            let block = blockchain.last_block();
-            (block.hash(), block.height().next())
+            let block = blockchain.as_ref().last_block();
+            (block.object_hash(), block.height().next())
         };
 
         let snapshot = blockchain.snapshot();
+        let consensus_config = Schema::new(&snapshot).consensus_config();
+        info!("Creating a node with config: {:#?}", consensus_config);
 
-        let stored = Schema::new(&snapshot).actual_configuration();
-        info!("Creating a node with config: {:#?}", stored);
-
-        let validator_id = stored
+        let validator_id = consensus_config
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
+            .position(|pk| pk.consensus_key == config.keys.consensus_pk())
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Message::concrete(
+        let connect = Verified::from_value(
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
                 &user_agent::get(),
             ),
-            config.listener.consensus_public_key,
-            &config.listener.consensus_secret_key,
+            config.keys.consensus_pk(),
+            &config.keys.consensus_sk(),
         );
 
         let connect_list = config.listener.connect_list;
         let state = State::new(
             validator_id,
-            config.listener.consensus_public_key,
-            config.listener.consensus_secret_key,
-            config.service.service_public_key,
-            config.service.service_secret_key,
             connect_list,
-            stored,
+            consensus_config,
             connect,
-            blockchain.get_saved_peers(),
+            blockchain.as_ref().get_saved_peers(),
             last_hash,
             last_height,
             system_state.current_time(),
+            config.keys,
         );
 
         let node_role = NodeRole::new(validator_id);
@@ -538,10 +530,13 @@ impl NodeHandler {
         }
     }
 
-    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Signed<T> {
-        Message::concrete(
+    fn sign_message<T>(&self, message: T) -> Verified<T>
+    where
+        T: TryFrom<SignedMessage> + Into<ExonumMessage> + TryFrom<ExonumMessage>,
+    {
+        Verified::from_value(
             message,
-            *self.state.consensus_public_key(),
+            self.state.consensus_public_key(),
             self.state.consensus_secret_key(),
         )
     }
@@ -604,7 +599,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(Signed::author);
+            let it = self.state.peers().values().map(Verified::author);
             let it = it.chain(
                 self.state()
                     .connect_list()
@@ -623,8 +618,7 @@ impl NodeHandler {
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-
-        // Recover previous saved round if any
+        // Recover previous saved round if any.
         let round = schema.consensus_round();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
@@ -775,12 +769,12 @@ impl NodeHandler {
 
     /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain.last_block().hash()
+        self.blockchain.as_ref().last_block().object_hash()
     }
 
     /// Returns the number of uncommitted transactions.
     pub fn uncommitted_txs_count(&self) -> u64 {
-        self.blockchain.pool_size() + self.state.tx_cache_len() as u64
+        self.blockchain.as_ref().pool_size() + self.state.tx_cache_len() as u64
     }
 
     /// Returns start time of the requested round.
@@ -799,7 +793,7 @@ impl NodeHandler {
 }
 
 impl fmt::Debug for NodeHandler {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
@@ -812,6 +806,11 @@ impl ApiSender {
     /// Creates new `ApiSender` with given channel.
     pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
         ApiSender(inner)
+    }
+
+    /// Creates a dummy sender which cannot send messages.
+    pub fn closed() -> Self {
+        ApiSender(mpsc::channel(0).0)
     }
 
     /// Add peer to peer list
@@ -831,15 +830,15 @@ impl ApiSender {
     }
 
     /// Broadcast transaction to other node.
-    pub fn broadcast_transaction(&self, tx: Signed<RawTransaction>) -> Result<(), Error> {
+    pub fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
 }
 
 impl fmt::Debug for ApiSender {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("ApiSender { .. }")
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ApiSender").finish()
     }
 }
 
@@ -853,7 +852,7 @@ pub struct ConnectInfo {
 }
 
 impl fmt::Display for ConnectInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.address)
     }
 }
@@ -882,7 +881,13 @@ pub struct NodeChannel {
         mpsc::Sender<InternalRequest>,
         mpsc::Receiver<InternalRequest>,
     ),
-    /// Channel for api requests.
+    /// Channel for transferring API endpoints from producers (e.g., Rust runtime) to the
+    /// `ApiManager`.
+    pub endpoints: (
+        mpsc::Sender<UpdateEndpoints>,
+        mpsc::Receiver<UpdateEndpoints>,
+    ),
+    /// Channel for API requests.
     pub api_requests: (
         mpsc::Sender<ExternalMessage>,
         mpsc::Receiver<ExternalMessage>,
@@ -896,6 +901,7 @@ pub struct NodeChannel {
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
+    api_runtime_config: SystemRuntimeConfig,
     api_options: NodeApiConfig,
     network_config: NetworkConfiguration,
     handler: NodeHandler,
@@ -910,6 +916,7 @@ impl NodeChannel {
         Self {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
+            endpoints: mpsc::channel(buffer_sizes.internal_events_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
             internal_events: mpsc::channel(buffer_sizes.internal_events_capacity),
@@ -928,47 +935,102 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new<D: Into<Arc<dyn Database>>>(
-        db: D,
-        services: Vec<Box<dyn Service>>,
+    pub fn new(
+        database: impl Into<Arc<dyn Database>>,
+        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
+        services: impl IntoIterator<Item = InstanceCollection>,
+        node_cfg: NodeConfig,
+        config_file_path: Option<String>,
+    ) -> Self {
+        node_cfg
+            .validate()
+            .expect("Node configuration is inconsistent");
+        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
+        let blockchain = Blockchain::new(
+            database,
+            node_cfg.service_keypair(),
+            ApiSender::new(channel.api_requests.0.clone()),
+        );
+        let blockchain = BlockchainBuilder::new(blockchain, node_cfg.consensus.clone())
+            .with_rust_runtime(channel.endpoints.0.clone(), services)
+            .with_external_runtimes(external_runtimes)
+            .build()
+            .expect("Cannot create dispatcher");
+        Self::with_blockchain(blockchain, channel, node_cfg, config_file_path)
+    }
+
+    /// Creates a node for the given blockchain and node configuration.
+    pub fn with_blockchain(
+        blockchain: BlockchainMut,
+        channel: NodeChannel,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
 
-        node_cfg.validate_or_panic();
-
-        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let mut blockchain = Blockchain::new(
-            db,
-            services,
-            node_cfg.service_public_key,
-            node_cfg.service_secret_key.clone(),
-            ApiSender::new(channel.api_requests.0.clone()),
-        );
-        blockchain.initialize(node_cfg.genesis.clone()).unwrap();
-
         let peers = node_cfg.connect_list.addresses();
-
         let config = Configuration {
             listener: ListenerConfig {
-                consensus_public_key: node_cfg.consensus_public_key,
-                consensus_secret_key: node_cfg.consensus_secret_key,
                 connect_list: ConnectList::from_config(node_cfg.connect_list),
                 address: node_cfg.listen_address,
             },
             service: ServiceConfig {
-                service_public_key: node_cfg.service_public_key,
-                service_secret_key: node_cfg.service_secret_key,
+                service_public_key: node_cfg.keys.service_pk(),
+                service_secret_key: node_cfg.keys.service_sk().clone(),
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
             peer_discovery: peers,
+            keys: node_cfg.keys,
         };
 
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
+
+        let api_cfg = node_cfg.api.clone();
+        let api_runtime_config = SystemRuntimeConfig {
+            api_runtimes: {
+                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
+                    let app_config = move |app: App| -> App {
+                        let cors = Cors::from(allow_origin.clone());
+                        app.middleware(cors)
+                    };
+                    Arc::new(app_config)
+                };
+
+                let public_api_handler = api_cfg
+                    .public_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Public,
+                        app_config: api_cfg.public_allow_origin.clone().map(into_app_config),
+                    })
+                    .into_iter();
+                let private_api_handler = api_cfg
+                    .private_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Private,
+                        app_config: api_cfg.private_allow_origin.clone().map(into_app_config),
+                    })
+                    .into_iter();
+                // Collects API handlers.
+                public_api_handler
+                    .chain(private_api_handler)
+                    .collect::<Vec<_>>()
+            },
+            api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
+            server_restart_retry_timeout: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_retry_timeout,
+            server_restart_max_retries: node_cfg
+                .network
+                .http_backend_config
+                .server_restart_max_retries,
+        };
+
         let handler = NodeHandler::new(
             blockchain,
             &node_cfg.external_address,
@@ -978,13 +1040,15 @@ impl Node {
             api_state,
             config_file_path,
         );
+
         Self {
-            api_options: node_cfg.api,
+            api_options: api_cfg,
             handler,
             channel,
             network_config,
-            max_message_len: node_cfg.genesis.consensus.max_message_len,
+            max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
+            api_runtime_config,
         }
     }
 
@@ -1029,79 +1093,30 @@ impl Node {
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
-        let api_state = self.handler.api_state.clone();
-        // Runs actix-web api.
-        let actix_api_runtime = SystemRuntimeConfig {
-            api_runtimes: {
-                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
-                    let app_config = move |app: App| -> App {
-                        let cors = Cors::from(allow_origin.clone());
-                        app.middleware(cors)
-                    };
-                    Arc::new(app_config)
-                };
 
-                let public_api_handler = self
-                    .api_options
-                    .public_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
-                        listen_address,
-                        access: ApiAccess::Public,
-                        app_config: self
-                            .api_options
-                            .public_allow_origin
-                            .clone()
-                            .map(into_app_config),
-                    })
-                    .into_iter();
-                let private_api_handler = self
-                    .api_options
-                    .private_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
-                        listen_address,
-                        access: ApiAccess::Private,
-                        app_config: self
-                            .api_options
-                            .private_allow_origin
-                            .clone()
-                            .map(into_app_config),
-                    })
-                    .into_iter();
-                // Collects API handlers.
-                public_api_handler
-                    .chain(private_api_handler)
-                    .collect::<Vec<_>>()
-            },
-            api_aggregator: ApiAggregator::new(
-                self.handler.blockchain.clone(),
-                self.handler.api_state.clone(),
-            ),
-        }
-        .start()?;
+        let api_state = self.handler.api_state.clone();
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            *self.state().consensus_public_key(),
+            self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
-
         // Stop ws server.
         api_state.shutdown_broadcast_server();
-
-        // Stops actix web runtime.
-        actix_api_runtime.stop()?;
-
-        info!("Exonum node stopped");
         Ok(())
     }
 
-    fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, InternalPart) {
+    fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list().clone();
+
+        self.api_runtime_config
+            .start(self.channel.endpoints.1)
+            .expect("Failed to start api_runtime.");
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {
@@ -1131,7 +1146,7 @@ impl Node {
 
     /// Returns `Blockchain` instance.
     pub fn blockchain(&self) -> Blockchain {
-        self.handler.blockchain.clone()
+        self.handler.blockchain.as_ref().clone()
     }
 
     /// Returns `State`.
@@ -1150,70 +1165,81 @@ impl Node {
     }
 }
 
+// TODO implement transaction verification logic [ECR-3253]
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::blockchain::{
-        ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
+    use exonum_merkledb::{BinaryValue, Snapshot, TemporaryDB};
+    use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
+
+    use crate::{
+        blockchain::Schema,
+        crypto::{gen_keypair, Hash},
+        events::EventHandler,
+        helpers,
+        messages::AnyTx,
+        proto::schema::tests::TxSimple,
+        runtime::{
+            rust::{CallContext, Service, Transaction},
+            BlockchainData, ExecutionError, InstanceId,
+        },
     };
-    use crate::crypto::gen_keypair;
-    use crate::events::EventHandler;
-    use crate::helpers;
-    use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
-    use exonum_merkledb::{BinaryValue, Database, Snapshot, TemporaryDB};
 
-    const SERVICE_ID: u16 = 0;
+    use super::*;
 
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(crate = "crate")]
-    enum SimpleTransactions {
-        TxSimple(TxSimple),
-    }
+    const SERVICE_ID: InstanceId = 15;
 
     impl_binary_value_for_pb_message! { TxSimple }
 
-    impl Transaction for TxSimple {
-        fn execute(&self, _: TransactionContext) -> ExecutionResult {
+    #[exonum_interface(crate = "crate")]
+    pub trait TestInterface {
+        fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
+    }
+
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_dispatcher(crate = "crate", implements("TestInterface"))]
+    #[service_factory(
+        crate = "crate",
+        artifact_name = "test-service",
+        artifact_version = "0.1.0",
+        proto_sources = "crate::proto::schema"
+    )]
+    struct TestService;
+
+    impl TestInterface for TestService {
+        fn simple(&self, _context: CallContext<'_>, _arg: TxSimple) -> Result<(), ExecutionError> {
             Ok(())
         }
     }
 
-    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<RawTransaction> {
+    impl Service for TestService {
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+            vec![]
+        }
+    }
+
+    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
         msg.set_msg("Hello, World!".to_owned());
-        Message::sign_transaction(msg, SERVICE_ID, p_key, s_key)
-    }
-
-    struct TestService;
-
-    impl Service for TestService {
-        fn service_id(&self) -> u16 {
-            SERVICE_ID
-        }
-
-        fn service_name(&self) -> &'static str {
-            "test service"
-        }
-
-        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-            vec![]
-        }
-
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-            Ok(SimpleTransactions::tx_from_raw(raw)?.into())
-        }
+        msg.sign(SERVICE_ID, p_key, s_key)
     }
 
     #[test]
+    #[ignore = "TODO: We have to implement transactions verifier [ECR-3253]"]
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let services = vec![Box::new(TestService) as Box<dyn Service>];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let services = vec![InstanceCollection::new(TestService).with_instance(
+            SERVICE_ID,
+            "test-service",
+            (),
+        )];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+
+        let mut node = Node::new(db, external_runtimes, services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1222,33 +1248,33 @@ mod tests {
         let event = ExternalMessage::Transaction(tx_orig);
         node.handler.handle_event(event.into());
 
-        // Initial transaction should be added to the pool cache.
+        // Initial transaction should be added to the pool.
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        assert_eq!(node.state().tx_cache_len(), 1);
-        assert_eq!(schema.transactions_pool_len(), 0);
+        assert_eq!(schema.transactions_pool_len(), 1);
 
         // Create duplicated transaction.
         let tx_copy = tx.clone();
         let event = ExternalMessage::Transaction(tx_copy);
         node.handler.handle_event(event.into());
 
-        // Duplicated transaction shouldn't be added to the pool cache.
+        // Duplicated transaction shouldn't be added to the pool.
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        assert_eq!(node.state().tx_cache_len(), 1);
-        assert_eq!(schema.transactions_pool_len(), 0);
+        assert_eq!(schema.transactions_pool_len(), 1);
     }
 
     #[test]
+    #[ignore = "TODO: We have to implement transactions verifier [ECR-3253]"]
     fn test_transaction_without_service() {
-        let (p_key, s_key) = gen_keypair();
-
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let (p_key, s_key) = gen_keypair();
+
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let mut node = Node::new(db, external_runtimes, services, node_cfg, None);
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1263,16 +1289,26 @@ mod tests {
     }
 
     #[test]
+    fn test_good_internal_events_config() {
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
+    }
+
+    #[test]
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .internal_events_capacity = 0;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 
     #[test]
@@ -1280,12 +1316,13 @@ mod tests {
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .network_requests_capacity = 0;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 
     #[test]
@@ -1293,13 +1330,16 @@ mod tests {
     fn test_bad_internal_events_capacity_too_large() {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![];
+
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .internal_events_capacity = accidental_large_value;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 
     #[test]
@@ -1307,12 +1347,15 @@ mod tests {
     fn test_bad_network_requests_capacity_too_large() {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
         let services = vec![];
+
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
-        let _ = Node::new(db, services, node_cfg, None);
+        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
     }
 }

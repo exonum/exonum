@@ -57,7 +57,7 @@
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
 //! On the other hand, multiple indices can be stored in the same column family, provided
 //! that their key spaces do not intersect. Isolation is commonly achieved with the help
-//! of column families; see `new_in_family` constructor in the built-in index types.
+//! of [`Group`]s or keyed [`IndexAddress`]es.
 //!
 //! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
@@ -105,6 +105,8 @@
 //! [`BTreeMap`]: https://doc.rust-lang.org/std/collections/struct.BTreeMap.html
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
+//! [`Group`]: struct.Group.html
+//! [`IndexAddress`]: struct.IndexAddress.html
 
 #![warn(
     missing_debug_implementations,
@@ -124,56 +126,71 @@
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
+    clippy::use_self,
+    clippy::default_trait_access,
 )]
 
-#[doc(no_inline)]
-pub use self::proof_map_index::{MapProof, ProofMapIndex};
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
         Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
-        Snapshot,
+        ReadonlyFork, Snapshot,
     },
     entry::Entry,
     error::Error,
-    hash::{root_hash, HashTag, ObjectHash},
+    group::Group,
+    hash::{root_hash, HashTag, ObjectHash, ValidationError},
     key_set_index::KeySetIndex,
     keys::BinaryKey,
+    lazy::Lazy,
     list_index::ListIndex,
     map_index::MapIndex,
     options::DbOptions,
-    proof_list_index::{ListProof, ProofListIndex, ProofOfAbsence},
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAccess, IndexAddress, IndexBuilder, ObjectAccess, Ref, RefMut, View},
+    views::{IndexAddress, IndexType, View},
+};
+// Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
+// does not exist!'
+#[doc(no_inline)]
+pub use self::{
+    proof_list_index::{ListProof, ProofListIndex},
+    proof_map_index::{MapProof, ProofMapIndex, RawProofMapIndex},
 };
 
 #[macro_use]
 extern crate failure;
 
 /// A specialized `Result` type for I/O operations with storage.
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[macro_use]
-mod macros;
+pub mod macros;
 mod backends;
 mod db;
 mod entry;
 mod error;
+mod group;
 mod hash;
 mod keys;
+mod lazy;
 mod options;
 mod values;
 mod views;
 
+pub mod access;
 pub mod key_set_index;
 pub mod list_index;
 pub mod map_index;
 pub mod proof_list_index;
 pub mod proof_map_index;
 pub mod sparse_list_index;
+pub mod validation;
 pub mod value_set_index;
 
-#[cfg(test)]
-mod tests;
+#[cfg(feature = "with-protobuf")]
+pub mod proto;
+
+#[cfg(feature = "with-protobuf")]
+use exonum_proto::ProtobufConvert;

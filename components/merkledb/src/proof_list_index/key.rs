@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde_derive::*;
+
+use std::cmp::Ordering;
+
 use super::super::BinaryKey;
 
 const HEIGHT_SHIFT: u64 = 56;
-const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2_u64.pow(56) - 1
+pub(crate) const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2_u64.pow(56) - 1
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProofListKey {
     index: u64,
     height: u8,
@@ -53,27 +57,11 @@ impl ProofListKey {
         Self::new(self.height + 1, self.index >> 1)
     }
 
-    pub fn left(&self) -> Self {
-        Self::new(self.height - 1, self.index << 1)
-    }
-
-    pub fn right(&self) -> Self {
-        Self::new(self.height - 1, (self.index << 1) + 1)
-    }
-
     pub fn first_left_leaf_index(&self) -> u64 {
         if self.height < 2 {
             self.index
         } else {
             self.index << (self.height - 1)
-        }
-    }
-
-    pub fn first_right_leaf_index(&self) -> u64 {
-        if self.height < 2 {
-            self.index
-        } else {
-            ((self.index << 1) + 1) << (self.height - 2)
         }
     }
 
@@ -103,4 +91,28 @@ impl BinaryKey for ProofListKey {
     fn read(buffer: &[u8]) -> Self {
         Self::from_db_key(<u64 as BinaryKey>::read(buffer))
     }
+}
+
+impl PartialOrd for ProofListKey {
+    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
+        Some(self.cmp(rhs))
+    }
+}
+
+impl Ord for ProofListKey {
+    fn cmp(&self, rhs: &Self) -> Ordering {
+        let height_comparison = self.height.cmp(&rhs.height);
+        if height_comparison == Ordering::Equal {
+            self.index.cmp(&rhs.index)
+        } else {
+            height_comparison
+        }
+    }
+}
+
+#[test]
+fn proof_list_key_ord() {
+    assert!(ProofListKey::new(0, 1000) < ProofListKey::new(0, 1001));
+    assert!(ProofListKey::new(0, 1000) < ProofListKey::new(1, 0));
+    assert_eq!(ProofListKey::new(1, 100), ProofListKey::new(1, 100));
 }

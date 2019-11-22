@@ -7,6 +7,8 @@ branches:
   - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
   # Branch names endings with "-release" (for example "0.9.0-release").
   - /-release$/
+  # Dynamic services branch
+  - dynamic_services
 
 addons:
   apt:
@@ -38,38 +40,45 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.36.0
+  - 1.38.0
 
 cache:
   npm: true
   directories:
-  - $HOME/.local
+  - $HOME/.cache
   - $HOME/.cargo
+  - $HOME/.local
   - $HOME/.kcov
-  - $TRAVIS_BUILD_DIR/target
-  timeout: 900
 
 dist: xenial
 sudo: required
 
 env:
   global:
-  - DEADLINKS_VERS=0.3.0
+  - DEADLINKS_VERS=0.4.1
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - SCCACHE_VERS=0.2.12
   matrix:
   - FEATURE=test
 
+before_install:
+  - sccache -V | grep $SCCACHE_VERS || cargo install sccache --vers $SCCACHE_VERS --force
+  - export RUSTC_WRAPPER=sccache
+
+
 jobs:
   include:
-  # Formatting & other lints that do not require compilation.
+  # Formatting & other lints.
   - name: lints
     install:
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
     - rustup component add rustfmt
     - rustfmt -V
+    - rustup component add clippy
+    - cargo clippy --version
     - nvm install 8 && nvm use 8
     - npm install
     - ./node_modules/.bin/cspell --version
@@ -77,17 +86,22 @@ jobs:
     script:
     - npm run cspell
     - npm run md
-    # Force build.rs execution.
-    - cargo check -p exonum
+    # Clippy lints.
+    - cargo clippy --all --benches --features "long_benchmarks"
+    # Other cargo lints.
     - cargo fmt --all -- --check
     - cargo clean --doc
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
     - mkdir -p target/doc/exonum_configuration
     - mkdir -p target/std/string
-    - touch target/doc/exonum_configuration/enum.Option.html
     - touch target/std/string/struct.String.html
     - touch target/std/primitive.usize.html
+    - mkdir -p target/doc/std/option
+    - touch target/doc/exonum_cli/password/struct.String.html
+    - touch target/doc/std/option/enum.Option.html
+    - touch target/doc/std/primitive.usize.html
+    - touch target/doc/std/primitive.char.html
     # https://github.com/deadlinks/cargo-deadlinks/issues/37
     - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc
@@ -97,16 +111,16 @@ jobs:
     install:
     - |
       if [ ! -f "$HOME/.kcov/bin/kcov" ]; then
-        wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
-        tar xzf v36.tar.gz
-        cd kcov-36
+        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
+        tar xzf master.tar.gz
+        cd kcov-master
         mkdir build
         cd build
         cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.kcov -DCMAKE_BUILD_TYPE=Release
         make -j2
         make install
         cd ../..
-        rm -rf kcov-36
+        rm -rf kcov-master
       fi
     script:
     - cargo test --no-run
@@ -115,41 +129,30 @@ jobs:
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
-  # Tests.
-  - name: test
-    install:
-    - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
+  # Unit tests.
+  - name: unit-test
     script:
     - cargo test --all
+
+  # Run examples.
+  - name: examples
+    script:
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
-    - cargo run -p exonum-testkit --example configuration_change
+    # - cargo run -p exonum-testkit --example configuration_change TODO enable after [ECR-3306]
     - cargo run -p exonum-time --example simple_service
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
 
- # Clippy linting.
-  - name: clippy
+  # Integration tests.
+  - name: integration-tests
     install:
-    - rustup component add clippy
-    - cargo clippy --version
+    - nvm install 8 && nvm use 8
+    - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     script:
-    - cargo clippy --all --tests --examples -- -D warnings
-
-  # Benchmarks (compilation only).
-  - name: benchmarks
-    script:
-    - RUST_LOG=off cargo check --benches --features "long_benchmarks"
-
-before_cache:
-  - |
-    cd $TRAVIS_BUILD_DIR/target/debug
-    rm -rf incremental examples
-    find . -maxdepth 1 -type f -executable -delete
-    find deps -type f -size +20M -delete
-    du -h -d 1 .
+    - echo "TODO"
+    # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308]
+    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+    # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
 
 notifications:
   webhooks:

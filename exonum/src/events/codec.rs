@@ -17,9 +17,10 @@ use bytes::BytesMut;
 use std::mem;
 use tokio_io::codec::{Decoder, Encoder};
 
-use crate::events::noise::{TransportWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
-use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
-
+use crate::{
+    events::noise::{TransportWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH},
+    messages::{BinaryValue, SignedMessage, SIGNED_MESSAGE_MIN_SIZE},
+};
 #[derive(Debug)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
@@ -63,11 +64,11 @@ impl Decoder for MessagesCodec {
             )
         }
 
-        if buf.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
+        if buf.len() <= SIGNED_MESSAGE_MIN_SIZE {
             bail!(
                 "Received malicious message with wrong length: received_len = {}, min_len = {}",
                 buf.len(),
-                EMPTY_SIGNED_MESSAGE_SIZE
+                SIGNED_MESSAGE_MIN_SIZE
             )
         }
 
@@ -80,7 +81,7 @@ impl Encoder for MessagesCodec {
     type Error = failure::Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        self.session.encrypt_msg(msg.raw(), buf)?;
+        self.session.encrypt_msg(&msg.into_bytes(), buf)?;
         Ok(())
     }
 }
@@ -88,64 +89,23 @@ impl Encoder for MessagesCodec {
 #[cfg(test)]
 mod test {
     use bytes::BytesMut;
+    use exonum_merkledb::BinaryValue;
     use tokio_io::codec::{Decoder, Encoder};
 
+    use crate::{
+        crypto::{gen_keypair, Hash},
+        events::noise::{HandshakeParams, NoiseWrapper, TransportWrapper},
+        helpers::Height,
+        messages::{Status, Verified, SIGNED_MESSAGE_MIN_SIZE},
+    };
+
     use super::MessagesCodec;
-    use crate::events::noise::{HandshakeParams, NoiseWrapper, TransportWrapper};
-    use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
-
-    pub fn raw_message(val: Vec<u8>) -> SignedMessage {
-        SignedMessage::from_vec_unchecked(val)
-    }
-
-    #[test]
-    fn decode_message_valid_header_size() {
-        let data = vec![0; EMPTY_SIGNED_MESSAGE_SIZE + 1];
-
-        match get_decoded_message(&data) {
-            Ok(Some(ref message)) if *message == &data[..] => {}
-            _ => panic!("Wrong input"),
-        };
-    }
-
-    #[test]
-    #[should_panic(expected = "Received malicious message with wrong length")]
-    fn decode_message_small_length() {
-        let data = vec![0; EMPTY_SIGNED_MESSAGE_SIZE - 10];
-
-        get_decoded_message(&data).unwrap();
-    }
-
-    #[test]
-    fn decode_message_eof() {
-        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-
-        let data = vec![1_u8; EMPTY_SIGNED_MESSAGE_SIZE + 10];
-        let raw = raw_message(data.clone());
-
-        let mut bytes: BytesMut = BytesMut::new();
-        initiator.encode(raw.clone(), &mut bytes).unwrap();
-        initiator.encode(raw, &mut bytes).unwrap();
-
-        match responder.decode_eof(&mut bytes.clone()) {
-            Ok(Some(ref message)) if *message == &data[..] => {}
-            _ => panic!("Wrong input"),
-        };
-
-        // Emulate EOF behavior.
-        bytes.truncate(1);
-        assert!(responder.decode(&mut bytes).unwrap().is_none());
-
-        bytes.clear();
-        assert!(responder.decode_eof(&mut bytes).unwrap().is_none());
-    }
 
     fn get_decoded_message(data: &[u8]) -> Result<Option<Vec<u8>>, failure::Error> {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        let raw = raw_message(data.to_vec());
 
         let mut bytes: BytesMut = BytesMut::new();
-        initiator.encode(raw, &mut bytes).unwrap();
+        initiator.session.encrypt_msg(data, &mut bytes).unwrap();
 
         responder.decode(&mut bytes)
     }
@@ -197,5 +157,51 @@ mod test {
         };
 
         (responder_codec, initiator_codec)
+    }
+
+    #[test]
+    fn decode_message_valid_header_size() {
+        let data = vec![0; SIGNED_MESSAGE_MIN_SIZE + 1];
+
+        match get_decoded_message(&data) {
+            Ok(Some(ref message)) if *message == &data[..] => {}
+            _ => panic!("Wrong input"),
+        };
+    }
+
+    #[test]
+    #[should_panic(expected = "Received malicious message with wrong length")]
+    fn decode_message_small_length() {
+        let data = vec![0; SIGNED_MESSAGE_MIN_SIZE - 10];
+
+        get_decoded_message(&data).unwrap();
+    }
+
+    #[test]
+    fn decode_message_eof() {
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
+
+        let raw = {
+            let (pk, sk) = gen_keypair();
+            let msg = Verified::from_value(Status::new(Height(0), Hash::zero(), 0), pk, &sk);
+            msg.into_raw()
+        };
+        let data = raw.to_bytes();
+
+        let mut bytes: BytesMut = BytesMut::new();
+        initiator.encode(raw.clone(), &mut bytes).unwrap();
+        initiator.encode(raw, &mut bytes).unwrap();
+
+        match responder.decode_eof(&mut bytes.clone()) {
+            Ok(Some(ref message)) if *message == &data[..] => {}
+            _ => panic!("Wrong input"),
+        };
+
+        // Emulate EOF behavior.
+        bytes.truncate(1);
+        assert!(responder.decode(&mut bytes).unwrap().is_none());
+
+        bytes.clear();
+        assert!(responder.decode_eof(&mut bytes).unwrap().is_none());
     }
 }

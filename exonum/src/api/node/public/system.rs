@@ -14,9 +14,14 @@
 
 //! Public system API.
 
-use crate::api::{ServiceApiScope, ServiceApiState};
-use crate::blockchain::{Schema, SharedNodeState};
-use crate::helpers::user_agent;
+use exonum_merkledb::access::Access;
+
+use crate::{
+    api::{node::SharedNodeState, ApiScope},
+    blockchain::{Blockchain, Schema},
+    helpers::user_agent,
+    runtime::{ArtifactId, DispatcherSchema, InstanceSpec, SnapshotExt},
+};
 
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -51,54 +56,75 @@ pub struct HealthCheckInfo {
     pub connected_peers: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct ServiceInfo {
-    name: String,
-    id: u16,
+/// Services info response.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct DispatcherInfo {
+    /// List of deployed artifacts.
+    pub artifacts: Vec<ArtifactId>,
+    /// List of services.
+    pub services: Vec<InstanceSpec>,
 }
 
-/// Services info response.
+impl DispatcherInfo {
+    /// Loads dispatcher information from database.
+    pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
+        Self {
+            artifacts: schema
+                .artifacts()
+                .values()
+                .map(|spec| spec.artifact)
+                .collect(),
+            services: schema.service_instances().values().collect(),
+        }
+    }
+}
+
+/// Protobuf sources query parameters.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ServicesResponse {
-    services: Vec<ServiceInfo>,
+pub struct ProtoSourcesQuery {
+    /// Artifact identifier, if specified, query returns the source files of the artifact,
+    /// otherwise it returns source files of `exonum` itself.
+    pub artifact: Option<String>,
 }
 
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
-    shared_api_state: SharedNodeState,
+    blockchain: Blockchain,
+    node_state: SharedNodeState,
 }
 
 impl SystemApi {
-    /// Creates a new `public::SystemApi` instance.
-    pub fn new(shared_api_state: SharedNodeState) -> Self {
-        Self { shared_api_state }
+    /// Create a new `public::SystemApi` instance.
+    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
+        Self {
+            blockchain,
+            node_state,
+        }
     }
 
-    fn handle_stats_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_stats_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
-            let snapshot = state.snapshot();
+        api_scope.endpoint(name, move |_query: ()| {
+            let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
             Ok(StatsInfo {
                 tx_pool_size: schema.transactions_pool_len(),
                 tx_count: schema.transactions_len(),
-                tx_cache_size: self.shared_api_state.tx_cache_size(),
+                tx_cache_size: self.node_state.tx_cache_size(),
             })
         });
         self_
     }
 
-    fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            Ok(user_agent::get())
-        });
+    fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        api_scope.endpoint(name, move |_query: ()| Ok(user_agent::get()));
         self
     }
 
-    fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
+        api_scope.endpoint(name, move |_query: ()| {
             Ok(HealthCheckInfo {
                 consensus_status: self.get_consensus_status(),
                 connected_peers: self.get_number_of_connected_peers(),
@@ -107,37 +133,26 @@ impl SystemApi {
         self_
     }
 
-    fn handle_list_services_info(
-        self,
-        name: &'static str,
-        api_scope: &mut ServiceApiScope,
-    ) -> Self {
-        api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
-            let blockchain = state.blockchain();
-            let services = blockchain
-                .service_map()
-                .iter()
-                .map(|(&id, service)| ServiceInfo {
-                    name: service.service_name().to_string(),
-                    id,
-                })
-                .collect::<Vec<_>>();
-            Ok(ServicesResponse { services })
+    fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        let self_ = self.clone();
+        api_scope.endpoint(name, move |_query: ()| {
+            let snapshot = self_.blockchain.snapshot();
+            Ok(DispatcherInfo::load(&snapshot.for_dispatcher()))
         });
         self
     }
 
     fn get_number_of_connected_peers(&self) -> usize {
-        let in_conn = self.shared_api_state.incoming_connections().len();
-        let out_conn = self.shared_api_state.outgoing_connections().len();
-        // We sum incoming and outgoing connections here because we keep only one connection
-        // between nodes. A connection could be incoming or outgoing but only one.
+        let in_conn = self.node_state.incoming_connections().len();
+        let out_conn = self.node_state.outgoing_connections().len();
+        // Sum incoming and outgoing connections here to keep only one connection
+        // between nodes. There can be only one connection - either incoming or outgoing one.
         in_conn + out_conn
     }
 
     fn get_consensus_status(&self) -> ConsensusStatus {
-        if self.shared_api_state.is_enabled() {
-            if self.shared_api_state.consensus_status() {
+        if self.node_state.is_enabled() {
+            if self.node_state.consensus_status() {
                 ConsensusStatus::Active
             } else {
                 ConsensusStatus::Enabled
@@ -147,8 +162,8 @@ impl SystemApi {
         }
     }
 
-    /// Adds public system API endpoints to the corresponding scope.
-    pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
+    /// Add public system API endpoints to the corresponding scope.
+    pub fn wire(self, api_scope: &mut ApiScope) -> &mut ApiScope {
         self.handle_stats_info("v1/stats", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)
             .handle_user_agent_info("v1/user_agent", api_scope)

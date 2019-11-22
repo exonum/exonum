@@ -17,24 +17,31 @@
 use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
-use futures::{Future, IntoFuture};
+use exonum_merkledb::{ObjectHash, Snapshot};
+use futures::{Future, IntoFuture, Sink};
+use hex::FromHex;
 
-use std::ops::{Bound, Range};
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::{Bound, Range},
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     api::{
         backends::actix::{
             self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
         },
+        node::SharedNodeState,
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
-        Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+        ApiBackend, ApiScope, Error as ApiError, FutureResult,
     },
-    blockchain::{Block, SharedNodeState},
+    blockchain::{Block, Blockchain},
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{Message, Precommit, RawTransaction, Signed, SignedMessage},
+    messages::{Precommit, SignedMessage, Verified},
+    node::{ApiSender, ExternalMessage},
+    runtime::CallInfo,
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -53,8 +60,10 @@ pub struct BlocksRange {
 /// Information about a transaction included in the block.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct TxInfo {
-    tx_hash: Hash,
-    service_id: u16,
+    /// Transaction hash.
+    pub tx_hash: Hash,
+    /// Information to call.
+    pub call_info: CallInfo,
 }
 
 /// Information about a block in the blockchain.
@@ -66,7 +75,7 @@ pub struct BlockInfo {
 
     /// Precommits authorizing the block.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub precommits: Option<Vec<Signed<Precommit>>>,
+    pub precommits: Option<Vec<Verified<Precommit>>>,
 
     /// Info of transactions in the block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -150,18 +159,37 @@ impl TransactionQuery {
     }
 }
 
+impl AsRef<str> for TransactionHex {
+    fn as_ref(&self) -> &str {
+        self.tx_body.as_ref()
+    }
+}
+
+impl AsRef<[u8]> for TransactionHex {
+    fn as_ref(&self) -> &[u8] {
+        self.tx_body.as_ref()
+    }
+}
+
 /// Exonum blockchain explorer API.
-#[derive(Debug, Clone, Copy)]
-pub struct ExplorerApi;
+#[derive(Debug, Clone)]
+pub struct ExplorerApi {
+    blockchain: Blockchain,
+}
 
 impl ExplorerApi {
-    /// Returns the explored range and the corresponding headers. The range specifies the smallest
+    /// Create a new `ExplorerApi` instance.
+    pub fn new(blockchain: Blockchain) -> Self {
+        Self { blockchain }
+    }
+
+    /// Return the explored range and the corresponding headers. The range specifies the smallest
     /// and largest heights traversed to collect the number of blocks specified in
     /// the [`BlocksQuery`] struct.
     ///
     /// [`BlocksQuery`]: struct.BlocksQuery.html
-    pub fn blocks(state: &ServiceApiState, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
-        let explorer = BlockchainExplorer::new(state.blockchain());
+    pub fn blocks(snapshot: &dyn Snapshot, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::BadRequest(format!(
                 "Max block count per request exceeded ({})",
@@ -223,68 +251,80 @@ impl ExplorerApi {
         })
     }
 
-    /// Returns the content for a block at a specific height.
-    pub fn block(state: &ServiceApiState, query: BlockQuery) -> Result<BlockInfo, ApiError> {
-        BlockchainExplorer::new(state.blockchain())
-            .block(query.height)
-            .map(From::from)
-            .ok_or_else(|| {
-                ApiError::NotFound(format!("Block for height: {} not found", query.height))
-            })
+    /// Return the content for a block at a specific height.
+    pub fn block(snapshot: &dyn Snapshot, query: BlockQuery) -> Result<BlockInfo, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
+        explorer.block(query.height).map(From::from).ok_or_else(|| {
+            ApiError::NotFound(format!(
+                "Requested block height ({}) exceeds the blockchain height ({})",
+                query.height,
+                explorer.height()
+            ))
+        })
     }
 
-    /// Searches for a transaction, either committed or uncommitted, by the hash.
+    /// Search for a transaction, either committed or uncommitted, by the hash.
     pub fn transaction_info(
-        state: &ServiceApiState,
+        snapshot: &dyn Snapshot,
         query: TransactionQuery,
     ) -> Result<TransactionInfo, ApiError> {
-        BlockchainExplorer::new(state.blockchain())
+        BlockchainExplorer::new(snapshot)
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
-                debug!("{}", description);
                 ApiError::NotFound(description)
             })
     }
-    /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
-    pub fn add_transaction(
-        state: &ServiceApiState,
-        query: TransactionHex,
-    ) -> Result<TransactionResponse, ApiError> {
-        use crate::events::error::into_failure;
-        use crate::messages::ProtocolMessage;
 
-        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_raw_buffer(buf)?;
-        let tx_hash = signed.hash();
-        let signed = RawTransaction::try_from(Message::deserialize(signed)?)
-            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
-        let _ = state
-            .sender()
-            .broadcast_transaction(signed)
-            .map_err(ApiError::from);
-        Ok(TransactionResponse { tx_hash })
+    /// Add transaction into the pool of unconfirmed transactions, and broadcast transaction to other nodes.
+    // TODO move this method to the public system API [ECR-3222]
+    pub fn add_transaction(
+        sender: &ApiSender,
+        query: TransactionHex,
+    ) -> FutureResult<TransactionResponse> {
+        let verify_message = |hex: String| -> Result<_, failure::Error> {
+            let msg = SignedMessage::from_hex(hex)?;
+            let tx_hash = msg.object_hash();
+            let verified = msg.into_verified()?;
+            Ok((verified, tx_hash))
+        };
+
+        let sender = sender.clone();
+        let send_transaction = move |(verified, tx_hash)| {
+            sender
+                .clone()
+                .0
+                .send(ExternalMessage::Transaction(verified))
+                .map(move |_| TransactionResponse { tx_hash })
+                .map_err(|e| ApiError::InternalError(e.into()))
+        };
+
+        Box::new(
+            verify_message(query.tx_body)
+                .into_future()
+                .map_err(|e| ApiError::BadRequest(e.to_string()))
+                .and_then(send_transaction),
+        )
     }
 
     /// Subscribes to events.
     pub fn handle_ws<Q>(
         name: &'static str,
         backend: &mut actix_backend::ApiBuilder,
-        service_api_state: ServiceApiState,
+        blockchain: Blockchain,
         shared_node_state: SharedNodeState,
         extract_query: Q,
     ) where
         Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
     {
         let server = Arc::new(Mutex::new(None));
-        let service_api_state = Arc::new(service_api_state);
 
         let index = move |request: HttpRequest| -> FutureResponse {
             let server = server.clone();
-            let service_api_state = service_api_state.clone();
+            let blockchain = blockchain.clone();
             let mut address = server.lock().expect("Expected mutex lock");
             if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::new(service_api_state)));
+                *address = Some(Arbiter::start(|_| Server::new(blockchain)));
 
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
@@ -306,17 +346,17 @@ impl ExplorerApi {
         });
     }
 
-    /// Adds explorer API endpoints to the corresponding scope.
+    /// Add explorer API endpoints to the corresponding scope.
     pub fn wire(
-        api_scope: &mut ServiceApiScope,
-        service_api_state: ServiceApiState,
+        self,
+        api_scope: &mut ApiScope,
         shared_node_state: SharedNodeState,
-    ) -> &mut ServiceApiScope {
+    ) -> &mut ApiScope {
         // Default subscription for blocks.
         Self::handle_ws(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
-            service_api_state.clone(),
+            self.blockchain.clone(),
             shared_node_state.clone(),
             |_| Ok(SubscriptionType::Blocks),
         );
@@ -324,7 +364,7 @@ impl ExplorerApi {
         Self::handle_ws(
             "v1/transactions/subscribe",
             api_scope.web_backend(),
-            service_api_state.clone(),
+            self.blockchain.clone(),
             shared_node_state.clone(),
             |request| {
                 if request.query().is_empty() {
@@ -344,37 +384,52 @@ impl ExplorerApi {
         Self::handle_ws(
             "v1/ws",
             api_scope.web_backend(),
-            service_api_state.clone(),
-            shared_node_state.clone(),
+            self.blockchain.clone(),
+            shared_node_state,
             |_| Ok(SubscriptionType::None),
         );
         api_scope
-            .endpoint("v1/blocks", Self::blocks)
-            .endpoint("v1/block", Self::block)
-            .endpoint("v1/transactions", Self::transaction_info)
-            .endpoint_mut("v1/transactions", Self::add_transaction)
+            .endpoint("v1/blocks", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::blocks(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/block", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::block(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/transactions", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::transaction_info(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint_mut("v1/transactions", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::add_transaction(blockchain.sender(), query)
+            })
     }
 }
 
 impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
     fn from(inner: explorer::BlockInfo<'a>) -> Self {
-        let txs = inner
-            .transaction_hashes()
-            .iter()
-            .enumerate()
-            .map(|(idx, hash)| {
-                let service_id = inner.transaction(idx).unwrap().content().service_id();
-                TxInfo {
-                    tx_hash: *hash,
-                    service_id,
-                }
-            })
-            .collect::<Vec<TxInfo>>();
-
         Self {
             block: inner.header().clone(),
             precommits: Some(inner.precommits().to_vec()),
-            txs: Some(txs),
+            txs: Some(
+                inner
+                    .transaction_hashes()
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, &tx_hash)| TxInfo {
+                        tx_hash,
+                        call_info: inner
+                            .transaction(idx)
+                            .unwrap()
+                            .content()
+                            .payload()
+                            .call_info
+                            .clone(),
+                    })
+                    .collect(),
+            ),
             time: Some(median_precommits_time(&inner.precommits())),
         }
     }

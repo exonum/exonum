@@ -9,7 +9,7 @@
 [![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](LICENSE.md)
 [![LoC](https://tokei.rs/b1/github/exonum/exonum)](https://github.com/exonum/exonum)
-![rust 1.33.0+ required](https://img.shields.io/badge/rust-1.33.0+-blue.svg?label=Required%20Rust)
+![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
 **Community:**
 [![Join the chat at https://gitter.im/exonum/exonum](https://img.shields.io/gitter/room/exonum/exonum.svg?label=Chat)](https://gitter.im/exonum/exonum)
@@ -28,7 +28,7 @@ infrastructure providers.
 This is the main Exonum repository that includes
 
 * [Exonum core library](exonum/README.md).
-* [Exonum testing framework](testkit/README.md).
+* [Exonum testing framework](test-suite/testkit/README.md).
 * Services:
   * [Configuration service](services/configuration/README.md).
   * [Time service](services/time/README.md).

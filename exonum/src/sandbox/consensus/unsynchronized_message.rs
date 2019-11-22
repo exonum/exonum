@@ -15,11 +15,14 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! message that arrive at the wrong time.
 
+use exonum_merkledb::ObjectHash;
+
 use std::time::Duration;
 
-use crate::crypto::CryptoHash;
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox};
+use crate::{
+    helpers::{Height, Round, ValidatorId},
+    sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+};
 
 #[test]
 fn test_queue_message_from_future_round() {
@@ -29,8 +32,8 @@ fn test_queue_message_from_future_round() {
         ValidatorId(3),
         Height(1),
         Round(2),
-        &sandbox.last_hash(),
-        &[],
+        sandbox.last_hash(),
+        vec![],
         sandbox.secret_key(ValidatorId(3)),
     );
 
@@ -43,7 +46,7 @@ fn test_queue_message_from_future_round() {
         ValidatorId(0),
         Height(1),
         Round(2),
-        &propose.hash(),
+        propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
@@ -56,7 +59,7 @@ fn test_queue_message_from_future_round() {
 /// - handle queued Prevote
 /// - and observe `ProposeRequest` for queued `Prevote`
 #[test]
-#[should_panic(expected = "Send unexpected message Requests(ProposeRequest")]
+#[should_panic(expected = "Sent unexpected message Requests(ProposeRequest")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -65,7 +68,7 @@ fn test_queue_prevote_message_from_next_height() {
         ValidatorId(3),
         Height(2),
         Round(1),
-        &empty_hash(),
+        empty_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -84,7 +87,7 @@ fn test_queue_prevote_message_from_next_height() {
 /// check line from `NodeHandler.handle_consensus()`
 /// case `msg.height() == self.state.height() + 1`
 #[test]
-#[should_panic(expected = "Send unexpected message Consensus(Prevote")]
+#[should_panic(expected = "Sent unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -101,8 +104,8 @@ fn test_queue_propose_message_from_next_height() {
         ValidatorId(0),
         Height(2),
         Round(2),
-        &block_at_first_height.clone().hash(),
-        &[], // there are no transactions in future propose
+        block_at_first_height.clone().object_hash(),
+        vec![], // there are no transactions in future propose
         sandbox.secret_key(ValidatorId(0)),
     );
 
@@ -113,12 +116,12 @@ fn test_queue_propose_message_from_next_height() {
     info!(
         "last_block={:#?}, hash={:?}",
         sandbox.last_block(),
-        sandbox.last_block().hash()
+        sandbox.last_block().object_hash()
     );
     info!(
         "proposed_block={:#?}, hash={:?}",
         block_at_first_height,
-        block_at_first_height.hash()
+        block_at_first_height.object_hash()
     );
 
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));

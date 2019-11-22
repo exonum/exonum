@@ -14,29 +14,29 @@
 
 //! WebSocket API.
 
+// TODO Move module to the backends/actix directory. [ECR-3222]
+
 use actix::*;
 use actix_web::ws;
 use chrono::{DateTime, Utc};
+use exonum_merkledb::{access::Access, ListProof, ObjectHash};
 use futures::Future;
+use hex::FromHex;
 use log::error;
 use rand::{rngs::ThreadRng, Rng};
+
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
-    sync::Arc,
 };
 
-use crate::api::{
-    node::public::explorer::{TransactionHex, TransactionResponse},
-    ServiceApiState,
+use crate::{
+    api::node::public::explorer::{TransactionHex, TransactionResponse},
+    blockchain::{Block, Blockchain, ExecutionStatus, Schema, TxLocation},
+    crypto::Hash,
+    explorer::median_precommits_time,
+    messages::SignedMessage,
 };
-use crate::blockchain::{Block, Schema, TransactionResult, TxLocation};
-use crate::crypto::Hash;
-use crate::events::error::into_failure;
-use crate::explorer::{median_precommits_time, TxStatus};
-use crate::messages::{Message as ExonumMessage, ProtocolMessage, RawTransaction, SignedMessage};
-
-use exonum_merkledb::{IndexAccess, ListProof, Snapshot};
 
 /// Message, coming from websocket connection.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -86,27 +86,29 @@ impl TransactionFilter {
 /// Summary about a particular transaction in the blockchain (without transaction content).
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct CommittedTransactionSummary {
-    tx_hash: Hash,
-    /// Service id of the transaction.
+    /// Transaction identifier.
+    pub tx_hash: Hash,
+    /// ID of service.
     pub service_id: u16,
-    /// ID of the transaction.
+    /// ID of transaction in service.
     pub message_id: u16,
-    #[serde(with = "TxStatus")]
-    status: TransactionResult,
-    location: TxLocation,
-    location_proof: ListProof<Hash>,
-    time: DateTime<Utc>,
+    /// Result of transaction execution.
+    pub status: ExecutionStatus,
+    /// Transaction location in the blockchain.
+    pub location: TxLocation,
+    /// Proof of existence.
+    pub location_proof: ListProof<Hash>,
+    /// Approximate finalization time.
+    pub time: DateTime<Utc>,
 }
 
 impl CommittedTransactionSummary {
-    fn new<T>(schema: &Schema<T>, tx_hash: &Hash) -> Option<Self>
-    where
-        T: AsRef<dyn Snapshot> + IndexAccess,
-    {
+    fn new(schema: &Schema<impl Access>, tx_hash: &Hash) -> Option<Self> {
         let tx = schema.transactions().get(tx_hash)?;
-        let service_id = tx.payload().service_id();
-        let message_id = tx.payload().transaction_id();
-        let status = schema.transaction_results().get(tx_hash)?;
+        let tx = tx.as_ref();
+        let service_id = tx.call_info.instance_id as u16;
+        let tx_id = tx.call_info.method_id as u16;
+        let tx_result = schema.transaction_results().get(tx_hash)?;
         let location = schema.transactions_locations().get(tx_hash)?;
         let location_proof = schema
             .block_transactions(location.block_height())
@@ -120,8 +122,8 @@ impl CommittedTransactionSummary {
         Some(Self {
             tx_hash: *tx_hash,
             service_id,
-            message_id,
-            status,
+            message_id: tx_id,
+            status: tx_result,
             location,
             location_proof,
             time,
@@ -184,15 +186,15 @@ pub(crate) struct Transaction {
 
 pub(crate) struct Server {
     pub subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
-    service_api_state: Arc<ServiceApiState>,
+    blockchain: Blockchain,
     rng: RefCell<ThreadRng>,
 }
 
 impl Server {
-    pub fn new(service_api_state: Arc<ServiceApiState>) -> Self {
+    pub fn new(blockchain: Blockchain) -> Self {
         Self {
             subscribers: BTreeMap::new(),
-            service_api_state,
+            blockchain,
             rng: RefCell::new(rand::thread_rng()),
         }
     }
@@ -218,10 +220,10 @@ impl Server {
     }
 
     fn disconnect_all(&mut self) {
-        for (_, subscriber) in self.subscribers.iter_mut() {
+        for subscriber in self.subscribers.values_mut() {
             for recipient in subscriber.values_mut() {
                 if let Err(err) = recipient.do_send(Message::Close) {
-                    debug!("Can't send Close message to a websocket client: {:?}", err);
+                    warn!("Can't send Close message to a websocket client: {:?}", err);
                 }
             }
             subscriber.clear();
@@ -277,8 +279,7 @@ impl Handler<UpdateSubscriptions> for Server {
         let addr = if let Some(addr) = self
             .subscribers
             .values()
-            .map(HashMap::iter)
-            .flatten()
+            .flat_map(HashMap::iter)
             .find_map(|(k, v)| if k == &id { Some(v.clone()) } else { None })
         {
             addr
@@ -294,7 +295,7 @@ impl Handler<Broadcast> for Server {
     type Result = ();
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
-        let snapshot = self.service_api_state.snapshot();
+        let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let block = schema.blocks().get(&block_hash).unwrap();
         let height = block.height();
@@ -348,15 +349,13 @@ impl Handler<Transaction> for Server {
         Transaction { tx }: Transaction,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let buf: Vec<u8> = hex::decode(tx.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_raw_buffer(buf)?;
-        let tx_hash = signed.hash();
-        let signed = RawTransaction::try_from(ExonumMessage::deserialize(signed)?)
-            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
+        let msg = SignedMessage::from_hex(tx)?;
+        let tx_hash = msg.object_hash();
+        // FIXME Don't ignore message error.
         let _ = self
-            .service_api_state
+            .blockchain
             .sender()
-            .broadcast_transaction(signed);
+            .broadcast_transaction(msg.into_verified()?);
         Ok(TransactionResponse { tx_hash })
     }
 }
@@ -439,7 +438,7 @@ impl Session {
 }
 
 impl Actor for Session {
-    type Context = ws::WebsocketContext<Self, ServiceApiState>;
+    type Context = ws::WebsocketContext<Self, ()>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let address: Recipient<_> = ctx.address().recipient();

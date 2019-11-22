@@ -1,77 +1,120 @@
-use std::borrow::Cow;
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use chrono::Utc;
-use hex::FromHex;
+use exonum_merkledb::ObjectHash;
+use exonum_proto::ProtobufConvert;
+use protobuf::Message as PbMessage;
+
+use std::convert::TryFrom;
+
+use crate::{
+    blockchain::{Block, BlockProof},
+    crypto::{self, gen_keypair, Signature},
+    helpers::{Height, Round, ValidatorId},
+    proto,
+};
 
 use super::{
-    BinaryValue, BlockResponse, Message, Precommit, ProtocolMessage, RawTransaction,
-    ServiceTransaction, Signed, SignedMessage, Status, TransactionsResponse,
-    RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
+    BinaryValue, BlockResponse, Message, Precommit, SignedMessage, Status, TransactionsResponse,
+    Verified, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
 };
-use crate::blockchain::{Block, BlockProof};
-use crate::crypto::{gen_keypair, hash, PublicKey, SecretKey};
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::proto;
 
 #[test]
-fn test_block_response_empty_size() {
-    use crate::crypto::{gen_keypair_from_seed, Seed};
-    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-    let msg = TransactionsResponse::new(&public_key, vec![]);
-    let msg = Message::concrete(msg, public_key, &secret_key);
-    assert_eq!(
-        TRANSACTION_RESPONSE_EMPTY_SIZE,
-        msg.signed_message().raw().len()
+fn test_signed_message_min_size() {
+    let (public_key, secret_key) = gen_keypair();
+    let msg = SignedMessage::new(vec![], public_key, &secret_key);
+    assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.into_bytes().len())
+}
+
+#[test]
+fn test_tx_response_empty_size() {
+    let (public_key, secret_key) = gen_keypair();
+    let msg = TransactionsResponse::new(public_key, vec![]);
+    let msg = Verified::from_value(msg, public_key, &secret_key);
+    assert_eq!(TX_RES_EMPTY_SIZE, msg.into_bytes().len())
+}
+
+#[test]
+fn test_tx_response_with_txs_size() {
+    let (public_key, secret_key) = gen_keypair();
+    let txs = vec![
+        vec![1_u8; 8],
+        vec![2_u8; 16],
+        vec![3_u8; 64],
+        vec![4_u8; 256],
+        vec![5_u8; 4096],
+    ];
+    let txs_size = txs.iter().fold(0, |acc, tx| acc + tx.len());
+    let pb_max_overhead = TX_RES_PB_OVERHEAD_PAYLOAD * txs.len();
+
+    let msg = TransactionsResponse::new(public_key, txs);
+    let msg = Verified::from_value(msg, public_key, &secret_key);
+    assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.into_bytes().len())
+}
+
+#[test]
+fn test_message_roundtrip() {
+    let (pub_key, secret_key) = gen_keypair();
+    let ts = Utc::now();
+
+    let msg = Verified::from_value(
+        Precommit::new(
+            ValidatorId(123),
+            Height(15),
+            Round(25),
+            crypto::hash(&[1, 2, 3]),
+            crypto::hash(&[3, 2, 1]),
+            ts,
+        ),
+        pub_key,
+        &secret_key,
+    );
+
+    let bytes = msg.to_bytes();
+    let msg_enum = Message::from_signed(
+        SignedMessage::from_bytes(bytes.into()).expect("SignedMessage decode."),
     )
-}
-
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "proto::schema::tests::CreateWallet", crate = "crate")]
-struct CreateWallet {
-    pubkey: PublicKey,
-    name: String,
-}
-
-impl CreateWallet {
-    fn new(&pubkey: &PublicKey, name: &str) -> Self {
-        Self {
-            pubkey,
-            name: name.to_owned(),
-        }
-    }
+    .expect("Message deserialize");
+    let msg_roundtrip = Verified::<Precommit>::try_from(msg_enum).expect("Message type");
+    assert_eq!(msg, msg_roundtrip)
 }
 
 #[test]
-fn test_known_transaction() {
-    let res = "57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d\
-    0000800000000a220a2057d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d120b\
-    746573745f77616c6c6574a3dac954f891ff93d0da5d4540773532e81aa90e813f77dc8b95105dea6dcf08a6291fc4210335fc4aa37ba4a80ebc8a57b4cb23602d1b2b1800f25362f77d02";
+fn test_signed_message_unusual_protobuf() {
+    let (pub_key, secret_key) = gen_keypair();
 
-    let pk =
-        PublicKey::from_hex("57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d")
-            .unwrap();
-    let sk = SecretKey::from_hex(
-        "d142addc3951d67a99f3fd25a4c1294ee088f7a907ed13c4cc6f7c74b5b3147f\
-         57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d",
-    )
-    .unwrap();
-    let data = CreateWallet::new(&pk, "test_wallet");
+    let mut ex_msg = proto::ExonumMessage::new();
+    let precommit_msg = Precommit::new(
+        ValidatorId(123),
+        Height(15),
+        Round(25),
+        crypto::hash(&[1, 2, 3]),
+        crypto::hash(&[3, 2, 1]),
+        Utc::now(),
+    );
+    ex_msg.set_precommit(precommit_msg.to_pb());
+    let mut payload = ex_msg.write_to_bytes().unwrap();
+    // Duplicate pb serialization to create unusual but correct protobuf message.
+    payload.append(&mut payload.clone());
 
-    let set = ServiceTransaction::from_raw_unchecked(0, data.to_bytes());
-    let msg = RawTransaction::new(128, set);
-    let msg = Message::concrete(msg, pk, &sk);
-    SignedMessage::from_raw_buffer(hex::decode(res).unwrap()).unwrap();
-    assert_eq!(res, hex::encode(msg.signed_message().raw()));
-}
+    let signed = SignedMessage::new(payload, pub_key, &secret_key);
 
-#[test]
-fn test_empty_tx_size() {
-    use crate::crypto::{gen_keypair_from_seed, Seed};
-    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-    let set = ServiceTransaction::from_raw_unchecked(0, vec![]);
-    let msg = RawTransaction::new(0, set);
-    let msg = Message::concrete(msg, public_key, &secret_key);
-    assert_eq!(RAW_TRANSACTION_EMPTY_SIZE, msg.signed_message().raw().len())
+    let signed_bytes = signed.into_bytes();
+    let msg_enum = Message::from_raw_buffer(signed_bytes).expect("Message deserialize");
+    let deserialized_precommit = Verified::<Precommit>::try_from(msg_enum).expect("Message type");
+    assert_eq!(precommit_msg, *deserialized_precommit.payload())
 }
 
 #[test]
@@ -85,82 +128,98 @@ fn test_block() {
         ValidatorId::zero(),
         Height(500),
         tx_count,
-        &hash(&[1]),
-        &hash(&txs),
-        &hash(&[3]),
+        crypto::hash(&[1]),
+        crypto::hash(&txs),
+        crypto::hash(&[3]),
     );
 
     let precommits = vec![
-        Message::concrete(
+        Verified::from_value(
             Precommit::new(
                 ValidatorId(123),
                 Height(15),
                 Round(25),
-                &hash(&[1, 2, 3]),
-                &hash(&[3, 2, 1]),
+                crypto::hash(&[1, 2, 3]),
+                crypto::hash(&[3, 2, 1]),
                 ts,
             ),
             pub_key,
             &secret_key,
         ),
-        Message::concrete(
+        Verified::from_value(
             Precommit::new(
                 ValidatorId(13),
                 Height(25),
                 Round(35),
-                &hash(&[4, 2, 3]),
-                &hash(&[3, 3, 1]),
+                crypto::hash(&[4, 2, 3]),
+                crypto::hash(&[3, 3, 1]),
                 ts,
             ),
             pub_key,
             &secret_key,
         ),
-        Message::concrete(
+        Verified::from_value(
             Precommit::new(
                 ValidatorId(323),
                 Height(15),
                 Round(25),
-                &hash(&[1, 1, 3]),
-                &hash(&[5, 2, 1]),
+                crypto::hash(&[1, 1, 3]),
+                crypto::hash(&[5, 2, 1]),
                 ts,
             ),
             pub_key,
             &secret_key,
         ),
     ];
-    let transactions = vec![
-        Message::concrete(Status::new(Height(2), &hash(&[]), 0), pub_key, &secret_key).hash(),
-        Message::concrete(Status::new(Height(4), &hash(&[2]), 0), pub_key, &secret_key).hash(),
-        Message::concrete(Status::new(Height(7), &hash(&[3]), 0), pub_key, &secret_key).hash(),
-    ];
-    let precommits_buf: Vec<_> = precommits.iter().map(|x| x.clone().serialize()).collect();
-    let block = Message::concrete(
+    let transactions = [
+        Verified::from_value(
+            Status::new(Height(2), crypto::hash(&[]), 0),
+            pub_key,
+            &secret_key,
+        ),
+        Verified::from_value(
+            Status::new(Height(4), crypto::hash(&[2]), 0),
+            pub_key,
+            &secret_key,
+        ),
+        Verified::from_value(
+            Status::new(Height(7), crypto::hash(&[3]), 0),
+            pub_key,
+            &secret_key,
+        ),
+    ]
+    .iter()
+    .map(ObjectHash::object_hash)
+    .collect::<Vec<_>>();
+
+    let precommits_buf: Vec<_> = precommits.iter().map(BinaryValue::to_bytes).collect();
+    let block = Verified::from_value(
         BlockResponse::new(
-            &pub_key,
+            pub_key,
             content.clone(),
             precommits_buf.clone(),
-            &transactions,
+            transactions.iter().cloned(),
         ),
         pub_key,
         &secret_key,
     );
 
     assert_eq!(block.author(), pub_key);
-    assert_eq!(block.to(), &pub_key);
-    assert_eq!(block.block(), &content);
-    assert_eq!(block.precommits(), precommits_buf);
-    assert_eq!(block.transactions().to_vec(), transactions);
+    assert_eq!(block.payload().to, pub_key);
+    assert_eq!(block.payload().block, content);
+    assert_eq!(block.payload().precommits, precommits_buf);
+    assert_eq!(block.payload().transactions, transactions);
 
-    let block2: Signed<BlockResponse> = ProtocolMessage::try_from(
-        Message::deserialize(SignedMessage::from_raw_buffer(block.serialize()).unwrap()).unwrap(),
-    )
-    .unwrap();
+    let block2: Verified<BlockResponse> = SignedMessage::from_bytes(block.to_bytes().into())
+        .unwrap()
+        .into_verified()
+        .unwrap();
 
     assert_eq!(block2.author(), pub_key);
-    assert_eq!(block2.to(), &pub_key);
-    assert_eq!(block2.block(), &content);
-    assert_eq!(block2.precommits(), precommits_buf);
-    assert_eq!(block2.transactions().to_vec(), transactions);
+    assert_eq!(block2.payload().to, pub_key);
+    assert_eq!(block2.payload().block, content);
+    assert_eq!(block2.payload().precommits, precommits_buf);
+    assert_eq!(block2.payload().transactions, transactions);
     let block_proof = BlockProof {
         block: content.clone(),
         precommits: precommits.clone(),
@@ -175,13 +234,13 @@ fn test_precommit_serde_correct() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = Utc::now();
 
-    let precommit = Message::concrete(
+    let precommit = Verified::from_value(
         Precommit::new(
             ValidatorId(123),
             Height(15),
             Round(25),
-            &hash(&[1, 2, 3]),
-            &hash(&[3, 2, 1]),
+            crypto::hash(&[1, 2, 3]),
+            crypto::hash(&[3, 2, 1]),
             ts,
         ),
         pub_key,
@@ -189,47 +248,32 @@ fn test_precommit_serde_correct() {
     );
 
     let precommit_json = serde_json::to_string(&precommit).unwrap();
-    let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+    let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
     assert_eq!(precommit2, precommit);
 }
 
 #[test]
-#[should_panic(expected = "Cannot verify message.")]
+#[should_panic(expected = "Failed to verify signature.")]
 fn test_precommit_serde_wrong_signature() {
-    use crate::crypto::SIGNATURE_LENGTH;
-
     let (pub_key, secret_key) = gen_keypair();
     let ts = Utc::now();
 
-    let mut precommit = Message::concrete(
+    let mut precommit = Verified::from_value(
         Precommit::new(
             ValidatorId(123),
             Height(15),
             Round(25),
-            &hash(&[1, 2, 3]),
-            &hash(&[3, 2, 1]),
+            crypto::hash(&[1, 2, 3]),
+            crypto::hash(&[3, 2, 1]),
             ts,
         ),
         pub_key,
         &secret_key,
     );
     // Break signature.
-    {
-        let raw_len = precommit.message.raw.len();
-        let signature = &mut precommit.message.raw[raw_len - SIGNATURE_LENGTH..];
-        signature.copy_from_slice(&[0_u8; SIGNATURE_LENGTH]);
-    }
-    let precommit_json = serde_json::to_string(&precommit).unwrap();
-    let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
-    assert_eq!(precommit2, precommit);
-}
+    precommit.raw.signature = Signature::zero();
 
-#[test]
-fn test_raw_transaction_small_size() {
-    assert!(ServiceTransaction::from_bytes(Cow::from(&vec![0_u8; 1])).is_err());
-    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 2])).is_err());
-    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 3])).is_err());
-    let tx = RawTransaction::from_bytes(Cow::from(&vec![0_u8; 4])).unwrap();
-    assert_eq!(tx.service_id, 0);
-    assert_eq!(tx.service_transaction.transaction_id, 0);
+    let precommit_json = serde_json::to_string(&precommit).unwrap();
+    let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+    assert_eq!(precommit2, precommit);
 }

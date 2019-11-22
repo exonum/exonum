@@ -16,10 +16,10 @@ use futures::Future;
 
 use std::marker::PhantomData;
 
-use super::{error, ServiceApiState};
+use super::error;
 
 /// Type alias for the usual synchronous result.
-pub type Result<I> = ::std::result::Result<I, error::Error>;
+pub type Result<I> = std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
 pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 
@@ -31,7 +31,7 @@ pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 ///
 /// For example, for a handler with signature:
 ///
-/// `Fn(state: &ServiceApiState, query: MyQuery) -> Result<MyResponse, api::Error>`
+/// `Fn(query: MyQuery) -> Result<MyResponse, api::Error>`
 ///
 /// Extracted types are:
 ///
@@ -84,7 +84,7 @@ impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
 
 impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
 where
-    F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I>,
+    F: Fn(Q) -> Result<I>,
 {
     fn from(handler: F) -> Self {
         Self {
@@ -100,7 +100,7 @@ where
 
 impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
 where
-    F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I>,
+    F: Fn(Q) -> FutureResult<I>,
 {
     fn from(handler: F) -> Self {
         Self {

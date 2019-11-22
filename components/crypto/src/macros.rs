@@ -51,8 +51,14 @@ macro_rules! implement_public_crypto_wrapper {
         }
     }
 
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
+        }
+    }
+
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             write_short_hex(f, &self[..])?;
@@ -61,7 +67,7 @@ macro_rules! implement_public_crypto_wrapper {
     }
 
     impl fmt::Display for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write_short_hex(f, &self[..])
         }
     }
@@ -100,7 +106,7 @@ macro_rules! implement_private_crypto_wrapper {
     }
 
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             write_short_hex(f, &self[..])?;
@@ -108,13 +114,19 @@ macro_rules! implement_private_crypto_wrapper {
         }
     }
 
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
+        }
+    }
+
     impl ToHex for $name {
-        fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-            (self.0).0.as_ref().write_hex(w)
+        fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
+            (self.0).0.as_ref().encode_hex()
         }
 
-        fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-            (self.0).0.as_ref().write_hex_upper(w)
+        fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
+            (self.0).0.as_ref().encode_hex_upper()
         }
     }
     )
@@ -154,7 +166,7 @@ macro_rules! implement_serde {
 
                 impl<'v> Visitor<'v> for HexVisitor {
                     type Value = $name;
-                    fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                    fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
                         write!(fmt, "expecting str.")
                     }
                     fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>

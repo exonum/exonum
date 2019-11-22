@@ -14,74 +14,69 @@
 
 pub use crate::proto::schema::tests::TxConfig;
 
-use crate::blockchain::{
-    ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
-    TransactionSet,
+use exonum_merkledb::BinaryValue;
+use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
+
+use crate::{
+    blockchain::{ConsensusConfig, ExecutionError},
+    crypto::{Hash, PublicKey, SecretKey},
+    helpers::Height,
+    merkledb::Snapshot,
+    messages::{AnyTx, Verified},
+    runtime::{
+        rust::{CallContext, Service, Transaction},
+        BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
+    },
 };
-use crate::crypto::{Hash, PublicKey, SecretKey};
-use crate::helpers::Height;
-use crate::messages::{Message, RawTransaction, Signed};
-use crate::proto::ProtobufConvert;
-use exonum_merkledb::{BinaryValue, Snapshot};
 
-pub const CONFIG_SERVICE: u16 = 1;
-
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-#[exonum(crate = "crate")]
-enum ConfigUpdaterTransactions {
-    TxConfig(TxConfig),
+#[exonum_interface(crate = "crate")]
+pub trait ConfigUpdaterInterface {
+    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
 }
 
-impl TxConfig {
-    pub fn create_signed(
-        from: &PublicKey,
-        config: &[u8],
-        actual_from: Height,
-        signer: &SecretKey,
-    ) -> Signed<RawTransaction> {
-        let mut msg = TxConfig::new();
-        msg.set_from(from.to_pb());
-        msg.set_config(config.to_vec());
-        msg.set_actual_from(actual_from.0);
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ConfigUpdaterInterface"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "config_updater",
+    artifact_version = "0.1.0",
+    proto_sources = "crate::proto::schema"
+)]
+pub struct ConfigUpdaterService;
 
-        Message::sign_transaction(msg, CONFIG_SERVICE, *from, signer)
-    }
-}
-#[derive(Default)]
-pub struct ConfigUpdateService {}
-
-impl ConfigUpdateService {
-    pub fn new() -> Self {
-        ConfigUpdateService::default()
-    }
-}
-
-impl Transaction for TxConfig {
-    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
-        let mut schema = Schema::new(tc.fork());
-        schema
-            .commit_configuration(StoredConfiguration::try_deserialize(self.get_config()).unwrap());
+impl ConfigUpdaterInterface for ConfigUpdaterService {
+    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
+        context
+            .writeable_core_schema()
+            .consensus_config_entry()
+            .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
     }
 }
 
-impl_binary_value_for_pb_message! { TxConfig }
-
-impl Service for ConfigUpdateService {
-    fn service_name(&self) -> &str {
-        "sandbox_config_updater"
-    }
-
-    fn service_id(&self) -> u16 {
-        CONFIG_SERVICE
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
+impl Service for ConfigUpdaterService {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
     }
+}
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
+impl ConfigUpdaterService {
+    pub const ID: InstanceId = SUPERVISOR_INSTANCE_ID;
+}
+
+impl TxConfig {
+    pub fn create_signed(
+        from: PublicKey,
+        config: &[u8],
+        actual_from: Height,
+        signer: &SecretKey,
+    ) -> Verified<AnyTx> {
+        let mut msg = TxConfig::new();
+        msg.set_from(from.to_pb());
+        msg.set_config(config.to_vec());
+        msg.set_actual_from(actual_from.0);
+        msg.sign(ConfigUpdaterService::ID, from, signer)
     }
 }
+
+impl_binary_value_for_pb_message! { TxConfig }

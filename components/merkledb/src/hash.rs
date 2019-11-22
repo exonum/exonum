@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use byteorder::{ByteOrder, LittleEndian};
+use exonum_crypto::{Hash, HashStream};
+use failure::Fail;
 use hex::FromHex;
-
-use exonum_crypto::{Hash, HashStream, HASH_SIZE};
 
 use crate::{proof_map_index::ProofPath, BinaryValue};
 
@@ -107,8 +107,8 @@ impl HashTag {
     }
 
     /// Computes a list hash for the given list of hashes.
-    pub fn hash_list(hashes: &[Hash]) -> Hash {
-        Self::hash_list_node(hashes.len() as u64, root_hash(hashes))
+    pub fn hash_list<V: BinaryValue + ?Sized>(values: &[V]) -> Hash {
+        Self::hash_list_node(values.len() as u64, root_hash(values))
     }
 
     /// Hash of the map object.
@@ -162,7 +162,7 @@ impl HashTag {
 /// Computes a Merkle root hash for a the given list of hashes.
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
-pub fn root_hash(hashes: &[Hash]) -> Hash {
+pub fn root_hash<V: BinaryValue + ?Sized>(hashes: &[V]) -> Hash {
     if hashes.is_empty() {
         return Hash::zero();
     }
@@ -216,11 +216,17 @@ impl ObjectHash for Hash {
     }
 }
 
-/// Just returns the origin array.
-impl ObjectHash for [u8; HASH_SIZE] {
-    fn object_hash(&self) -> Hash {
-        Hash::new(*self)
-    }
+/// Errors that can occur while validating a `ListProof` or `MapProof` against
+/// a trusted collection hash.
+#[derive(Debug, Fail)]
+pub enum ValidationError<E: Fail> {
+    /// The hash of the proof is not equal to the trusted root hash.
+    #[fail(display = "hash of the proof is not equal to the trusted hash of the list")]
+    UnmatchedRootHash,
+
+    /// The proof is malformed.
+    #[fail(display = "Malformed proof: {}", _0)]
+    Malformed(#[fail(cause)] E),
 }
 
 #[cfg(test)]
@@ -254,5 +260,4 @@ mod tests {
 
         assert_eq!(empty_map_hash, HashTag::empty_map_hash());
     }
-
 }

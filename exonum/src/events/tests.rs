@@ -22,18 +22,21 @@ use std::{
     time::{self, Duration, SystemTime},
 };
 
-use crate::blockchain::ConsensusConfig;
-use crate::crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use crate::events::{
-    error::log_error,
-    network::{NetworkConfiguration, NetworkPart},
-    noise::HandshakeParams,
-    NetworkEvent, NetworkRequest,
-};
-use crate::helpers::user_agent;
-use crate::messages::{Connect, Message, Signed, SignedMessage};
-use crate::node::{
-    state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel,
+use crate::{
+    blockchain::ConsensusConfig,
+    crypto::{
+        gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH,
+        SEED_LENGTH, SIGNATURE_LENGTH,
+    },
+    events::{
+        error::log_error,
+        network::{NetworkConfiguration, NetworkPart},
+        noise::HandshakeParams,
+        NetworkEvent, NetworkRequest,
+    },
+    helpers::user_agent,
+    messages::{BinaryValue, Connect, SignedMessage, Verified},
+    node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel},
 };
 
 #[derive(Debug)]
@@ -78,7 +81,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn connect_with(&self, key: PublicKey, connect: Signed<Connect>) {
+    pub fn connect_with(&self, key: PublicKey, connect: Verified<Connect>) {
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(key, connect.into()))
@@ -94,7 +97,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn wait_for_connect(&mut self) -> Signed<Connect> {
+    pub fn wait_for_connect(&mut self) -> Verified<Connect> {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
@@ -112,7 +115,9 @@ impl TestHandler {
 
     pub fn wait_for_message(&mut self) -> SignedMessage {
         match self.wait_for_event() {
-            Ok(NetworkEvent::MessageReceived(msg)) => SignedMessage::from_vec_unchecked(msg),
+            Ok(NetworkEvent::MessageReceived(msg)) => {
+                SignedMessage::from_bytes(msg.into()).expect("Unable to decode signed message")
+            }
             Ok(other) => panic!("Unexpected message received, {:?}", other),
             Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
@@ -130,7 +135,7 @@ impl TestHandler {
 
 impl Drop for TestHandler {
     fn drop(&mut self) {
-        if !::std::thread::panicking() {
+        if !std::thread::panicking() {
             self.shutdown();
         }
     }
@@ -157,7 +162,7 @@ impl TestEvents {
     pub fn spawn(
         self,
         handshake_params: &HandshakeParams,
-        connect: Signed<Connect>,
+        connect: Verified<Connect>,
     ) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
@@ -170,7 +175,7 @@ impl TestEvents {
         handler_part
     }
 
-    fn into_reactor(self, connect: Signed<Connect>) -> (TestHandler, NetworkPart) {
+    fn into_reactor(self, connect: Verified<Connect>) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
@@ -193,25 +198,26 @@ impl TestEvents {
 
 pub fn connect_message(
     addr: SocketAddr,
-    public_key: &PublicKey,
+    public_key: PublicKey,
     secret_key: &SecretKey,
-) -> Signed<Connect> {
+) -> Verified<Connect> {
     let time = time::UNIX_EPOCH;
-    Message::concrete(
+    Verified::from_value(
         Connect::new(&addr.to_string(), time.into(), &user_agent::get()),
-        *public_key,
+        public_key,
         secret_key,
     )
 }
 
-pub fn raw_message(len: usize) -> SignedMessage {
-    let buffer = vec![0_u8; len];
-    SignedMessage::from_vec_unchecked(buffer)
+pub fn raw_message(payload_len: usize) -> SignedMessage {
+    let buffer = vec![0u8; payload_len];
+    let (pk, sk) = gen_keypair();
+    SignedMessage::new(buffer, pk, &sk)
 }
 
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub connect: Signed<Connect>,
+    pub connect: Verified<Connect>,
     pub connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,
@@ -227,7 +233,7 @@ impl HandshakeParams {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
         let address = "127.0.0.1:8000";
 
-        let connect = Message::concrete(
+        let connect = Verified::from_value(
             Connect::new(address, SystemTime::now().into(), &user_agent::get()),
             public_key,
             &secret_key,
@@ -249,7 +255,7 @@ impl HandshakeParams {
 impl ConnectionParams {
     pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
-        let connect = connect_message(address, &public_key, &secret_key);
+        let connect = connect_message(address, public_key, &secret_key);
         let handshake_params = HandshakeParams::new(
             public_key,
             secret_key.clone(),
@@ -367,18 +373,18 @@ fn test_network_big_message() {
     e2.disconnect_with(first_key);
     assert_eq!(e2.wait_for_disconnect(), first_key);
 }
-
 #[test]
 fn test_network_max_message_len() {
-    let _ = env_logger::try_init();
     let first = "127.0.0.1:17202".parse().unwrap();
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let acceptable_message = raw_message(max_message_length);
+    // Minimal size of protobuf messages can't be determined exactly.
+    let acceptable_message =
+        raw_message(max_message_length - SIGNATURE_LENGTH - PUBLIC_KEY_LENGTH - 100);
     let too_big_message = raw_message(max_message_length + 1000);
-    assert!(too_big_message.raw().len() > max_message_length);
-    assert!(acceptable_message.raw().len() <= max_message_length);
+    assert!(too_big_message.to_bytes().len() > max_message_length);
+    assert!(acceptable_message.to_bytes().len() <= max_message_length);
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info.clone());

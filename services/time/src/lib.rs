@@ -20,14 +20,12 @@
 //! [docs:time]: https://exonum.com/doc/version/latest/advanced/time
 
 #![deny(
-    missing_debug_implementations,
-    missing_docs,
     unsafe_code,
-    bare_trait_objects
+    bare_trait_objects,
+    missing_docs,
+    missing_debug_implementations
 )]
 
-#[macro_use]
-extern crate failure;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
@@ -44,104 +42,86 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
-use exonum_merkledb::{Fork, Snapshot};
-
 use exonum::{
-    api::ServiceApiBuilder,
-    blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
-    helpers::fabric::{Context, ServiceFactory},
-    messages::RawTransaction,
+    runtime::{
+        api::ServiceApiBuilder,
+        rust::{AfterCommitContext, Service},
+        BlockchainData,
+    },
 };
-use serde_json::Value;
+use exonum_merkledb::Snapshot;
+
+use std::sync::Arc;
 
 use crate::{
     schema::TimeSchema,
     time_provider::{SystemTimeProvider, TimeProvider},
-    transactions::*,
+    transactions::{TimeOracleInterface, TxTime},
 };
 
-/// Time service id.
-pub const SERVICE_ID: u16 = 4;
-/// Time service name.
-pub const SERVICE_NAME: &str = "exonum_time";
+// TODO there is no way to provide provider for now.
+// It should be configurable through the configuration service.
 
 /// Define the service.
-#[derive(Debug)]
+#[derive(Debug, ServiceDispatcher)]
+#[service_dispatcher(implements("TimeOracleInterface"))]
 pub struct TimeService {
     /// Current time.
-    time: Box<dyn TimeProvider>,
-}
-
-impl Default for TimeService {
-    fn default() -> TimeService {
-        TimeService {
-            time: Box::new(SystemTimeProvider) as Box<dyn TimeProvider>,
-        }
-    }
-}
-
-impl TimeService {
-    /// Create a new `TimeService`.
-    pub fn new() -> TimeService {
-        TimeService::default()
-    }
-
-    /// Create a new `TimeService` with time provider `T`.
-    pub fn with_provider<T: Into<Box<dyn TimeProvider>>>(time_provider: T) -> TimeService {
-        TimeService {
-            time: time_provider.into(),
-        }
-    }
+    time: Arc<dyn TimeProvider>,
 }
 
 impl Service for TimeService {
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let schema = TimeSchema::new(snapshot);
-        schema.state_hash()
-    }
-
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        TimeTransactions::tx_from_raw(raw).map(Into::into)
-    }
-
-    fn initialize(&self, _fork: &Fork) -> Value {
-        Value::Null
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        TimeSchema::new(data.for_executing_service()).state_hash()
     }
 
     /// Creates transaction after commit of the block.
-    fn after_commit(&self, context: &ServiceContext) {
+    fn after_commit(&self, context: AfterCommitContext<'_>) {
         // The transaction must be created by the validator.
-        if context.validator_id().is_none() {
-            return;
+        if context
+            .data()
+            .for_core()
+            .validator_id(context.service_keypair.0)
+            .is_some()
+        {
+            context.broadcast_transaction(TxTime::new(self.time.current_time()));
         }
-        context.broadcast_transaction(TxTime::new(self.time.current_time()));
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi::wire(builder);
-        api::PrivateApi::wire(builder);
+        api::PublicApi.wire(builder);
+        api::PrivateApi.wire(builder);
     }
 }
 
-/// A time service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct TimeServiceFactory;
+/// Time oracle service factory implementation.
+#[derive(Debug, ServiceFactory)]
+#[service_factory(
+    proto_sources = "proto",
+    service_constructor = "TimeServiceFactory::create_instance"
+)]
+pub struct TimeServiceFactory {
+    time_provider: Arc<dyn TimeProvider>,
+}
 
-impl ServiceFactory for TimeServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
+impl TimeServiceFactory {
+    /// Create a new `TimeServiceFactory` with the custom time provider.
+    pub fn with_provider(time_provider: impl Into<Arc<dyn TimeProvider>>) -> Self {
+        Self {
+            time_provider: time_provider.into(),
+        }
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
-        Box::new(TimeService::new())
+    fn create_instance(&self) -> Box<dyn Service> {
+        Box::new(TimeService {
+            time: self.time_provider.clone(),
+        })
+    }
+}
+
+impl Default for TimeServiceFactory {
+    fn default() -> Self {
+        Self::with_provider(SystemTimeProvider)
     }
 }

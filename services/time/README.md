@@ -3,7 +3,7 @@
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![Docs.rs](https://docs.rs/exonum-time/badge.svg)](https://docs.rs/exonum-time)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.33.0+ required](https://img.shields.io/badge/rust-1.33.0+-blue.svg?label=Required%20Rust)
+![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
 Exonum-time is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
 This service allows to determine time,
@@ -47,8 +47,8 @@ which must be executed no later than the specified time
 (this time is written in the transaction body in a separate field):
 
 ```rust
+#[protobuf_convert(source = "proto::TimeTx")]
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::TimeTx")]
 /// Transaction, which must be executed no later than the specified time (field `time`).
 struct TimeTx {
     time: DateTime<Utc>,

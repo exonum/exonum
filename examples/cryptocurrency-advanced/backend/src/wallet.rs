@@ -15,12 +15,13 @@
 //! Cryptocurrency wallet.
 
 use exonum::crypto::{Hash, PublicKey};
+use exonum_proto::ProtobufConvert;
 
 use super::proto;
 
 /// Wallet information stored in the database.
-#[derive(Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Wallet", serde_pb_convert)]
+#[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Wallet", serde_pb_convert)]
 pub struct Wallet {
     /// `PublicKey` of the wallet.
     pub pub_key: PublicKey,

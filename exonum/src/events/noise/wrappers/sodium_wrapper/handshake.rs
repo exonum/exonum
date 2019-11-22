@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use futures::future::{done, Future};
-use tokio_codec::{Decoder, Framed};
+use tokio_codec::Decoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::net::SocketAddr;
@@ -28,9 +28,9 @@ use crate::{
     },
     events::{
         codec::MessagesCodec,
-        noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+        noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
     },
-    messages::{Connect, Signed},
+    messages::{Connect, Verified},
     node::state::SharedConnectList,
 };
 
@@ -41,7 +41,7 @@ pub struct HandshakeParams {
     pub secret_key: x25519::SecretKey,
     pub remote_key: Option<x25519::PublicKey>,
     pub connect_list: SharedConnectList,
-    pub connect: Signed<Connect>,
+    pub connect: Verified<Connect>,
     max_message_len: u32,
 }
 
@@ -50,7 +50,7 @@ impl HandshakeParams {
         public_key: PublicKey,
         secret_key: SecretKey,
         connect_list: SharedConnectList,
-        connect: Signed<Connect>,
+        connect: Verified<Connect>,
         max_message_len: u32,
     ) -> Self {
         let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
@@ -76,7 +76,7 @@ pub struct NoiseHandshake {
     peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
-    connect: Signed<Connect>,
+    connect: Verified<Connect>,
 }
 
 impl NoiseHandshake {
@@ -127,7 +127,7 @@ impl NoiseHandshake {
         self,
         stream: S,
         message: Vec<u8>,
-    ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>), failure::Error> {
+    ) -> Result<HandshakeData<S>, failure::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -145,7 +145,7 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_wrapper()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
-        Ok((framed, message))
+        Ok((framed, message, remote_static_key))
     }
 
     fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {

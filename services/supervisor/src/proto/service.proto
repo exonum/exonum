@@ -1,0 +1,88 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.supervisor;
+
+import "types.proto";
+import "runtime.proto";
+import "blockchain.proto";
+
+// Transactions
+
+// Request for the artifact deployment.
+message DeployRequest {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+  // Additional information for Runtime to deploy.
+  bytes spec = 2;
+  // The height until which the deployment procedure should be completed.
+  uint64 deadline_height = 3;
+}
+
+// Confirmation that the artifact was successfully deployed by the validator.
+message DeployConfirmation {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+}
+
+// Request for the start service instance
+message StartService {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+  // Instance name.
+  string name = 2;
+  // Instance configuration.
+  bytes config = 3;
+}
+
+// Configuration parameters of the certain service instance.
+message ServiceConfig {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+  // Raw bytes representation of service configuration parameters.
+  bytes params = 2;
+}
+
+// This message contains one atomic configuration change.
+message ConfigChange {
+  oneof message {
+    // New consensus config.
+    exonum.Config consensus = 1;
+    // New service instance config.
+    ServiceConfig service = 2;
+    // New service instance start request.
+    StartService start_service = 3;
+  }
+}
+
+// Request for the configuration change
+message ConfigPropose {
+  // The height until which the update configuration procedure should be completed.
+  uint64 actual_from = 1;
+  // New configuration proposition.
+  repeated ConfigChange changes = 2;
+  // Configuration proposal number to avoid conflicting proposals.
+  // For every proposal, this field should be equal to the amount of
+  // valid processed proposals (no matter accepted or not).
+  // Appropriate value for this field can be obtained via "configuration-number" API endpoint.
+  uint64 configuration_number = 3;
+}
+
+// Confirmation vote for the configuration change
+message ConfigVote {
+  // Hash of configuration proposition.
+  exonum.crypto.Hash propose_hash = 1;
+}

@@ -1,0 +1,65 @@
+external_address = "127.0.0.1:8003"
+listen_address = "0.0.0.0:8003"
+master_key_path = "master.key.toml"
+
+[api]
+state_update_timeout = 10000
+[[connect_list.peers]]
+address = "127.0.0.1:8002"
+public_key = "1c5db001620d5c3748170d901c5f9e0e862f36954539023e6c23b5af05d95c33"
+
+[[connect_list.peers]]
+address = "127.0.0.1:8003"
+public_key = "354e71078665710e0dd69ff1873f644841ad14be470d230921197d7c89812f9b"
+
+[[connect_list.peers]]
+address = "127.0.0.1:8001"
+public_key = "3e73b537673fbede0fb005bdf7688198c5f525b9b229dd1b26a5937a17d04765"
+
+[[connect_list.peers]]
+address = "127.0.0.1:8004"
+public_key = "efe5efef9d9b8bfe547c2587609e5115a701f0a8595c40e73a5e4cfd2ee9586e"
+
+[consensus]
+first_round_timeout = 3000
+max_message_len = 1048576
+max_propose_timeout = 200
+min_propose_timeout = 10
+peers_timeout = 10000
+propose_timeout_threshold = 500
+status_timeout = 5000
+txs_block_limit = 1000
+
+[[consensus.validator_keys]]
+consensus_key = "1c5db001620d5c3748170d901c5f9e0e862f36954539023e6c23b5af05d95c33"
+service_key = "3cbe7e983902d5778b78cc1a87fd8d6226994bc009fdd95310b0d90c5f7cd24c"
+
+[[consensus.validator_keys]]
+consensus_key = "354e71078665710e0dd69ff1873f644841ad14be470d230921197d7c89812f9b"
+service_key = "93fa76b19cb51753080f49eb822e72e030581d2a8100b6fe9efed14f955903b0"
+
+[[consensus.validator_keys]]
+consensus_key = "3e73b537673fbede0fb005bdf7688198c5f525b9b229dd1b26a5937a17d04765"
+service_key = "0f5e2f89f8b807990b7d1ae4f4f93c45243603ad8dde5c3f3e687e31dace7e44"
+
+[[consensus.validator_keys]]
+consensus_key = "efe5efef9d9b8bfe547c2587609e5115a701f0a8595c40e73a5e4cfd2ee9586e"
+service_key = "bb08ac2f74e3bef2308ec6cf06ed6f726b6c13ffa9f60ffe2f32baf3c4d6c2e8"
+
+[database]
+compression_type = "none"
+create_if_missing = true
+[mempool.events_pool_capacity]
+api_requests_capacity = 1024
+internal_events_capacity = 128
+network_events_capacity = 512
+network_requests_capacity = 512
+
+[network]
+max_incoming_connections = 128
+max_outgoing_connections = 128
+tcp_connect_max_retries = 10
+tcp_connect_retry_timeout = 15000
+tcp_nodelay = true
+
+[services_configs]

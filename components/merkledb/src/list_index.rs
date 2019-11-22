@@ -20,11 +20,12 @@
 use std::marker::PhantomData;
 
 use crate::{
+    access::{Access, AccessError, FromAccess},
     views::{
-        AnyObject, IndexAccess, IndexAddress, IndexBuilder, IndexState, IndexType,
-        Iter as ViewIter, View,
+        IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
+        ViewWithMetadata,
     },
-    BinaryKey, BinaryValue,
+    BinaryValue,
 };
 
 /// A list of items where elements are added to the end of the list and are
@@ -37,7 +38,7 @@ use crate::{
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ListIndex<T: IndexAccess, V> {
+pub struct ListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
@@ -56,122 +57,29 @@ pub struct ListIndexIter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
-impl<T, V> AnyObject<T> for ListIndex<T, V>
+impl<T, V> FromAccess<T> for ListIndex<T::Base, V>
 where
-    T: IndexAccess,
+    T: Access,
     V: BinaryValue,
 {
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::List
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::List)?;
+        Ok(Self::new(view))
     }
 }
 
 impl<T, V> ListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::List)
-            .index_name(index_name)
-            .build();
-
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
             _v: PhantomData,
         }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    /// let snapshot = db.snapshot();
-    /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
-    where
-        I: BinaryKey,
-        I: ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(index_access)
-            .index_type(IndexType::List)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::List)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::List)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
     }
 
     /// Returns an element at the indicated position or `None` if the indicated
@@ -180,12 +88,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -200,12 +107,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     /// assert_eq!(None, index.last());
     ///
     /// index.push(42);
@@ -223,12 +129,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -243,12 +148,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -258,7 +162,7 @@ where
     /// assert_eq!(2, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.state.get()
+        self.state.get().unwrap_or_default()
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
@@ -266,12 +170,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -279,7 +182,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ListIndexIter<V> {
+    pub fn iter(&self) -> ListIndexIter<'_, V> {
         ListIndexIter {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
@@ -291,12 +194,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -304,23 +206,28 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
+    pub fn iter_from(&self, from: u64) -> ListIndexIter<'_, V> {
         ListIndexIter {
             base_iter: self.base.iter_from(&(), &from),
         }
     }
+}
 
+impl<T, V> ListIndex<T, V>
+where
+    T: RawAccessMut,
+    V: BinaryValue,
+{
     /// Appends an element to the back of the list.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -331,19 +238,19 @@ where
         self.set_len(len + 1)
     }
 
-    /// Removes the last element from the list and returns it, or returns `None` if it is empty.
+    /// Removes the last element from the list and returns it, or returns `None`
+    /// if the list is empty.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
-    /// assert_eq!(None, index.pop());
+    /// let mut index = fork.get_list("name");
     ///
+    /// assert_eq!(None, index.pop());
     /// index.push(1);
     /// assert_eq!(Some(1), index.pop());
     /// ```
@@ -364,12 +271,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -396,16 +302,14 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
-    ///
     /// index.truncate(3);
     /// assert_eq!(3, index.len());
     /// ```
@@ -426,12 +330,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -462,12 +365,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &fork);
+    /// let mut index = fork.get_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -477,7 +379,7 @@ where
     /// ```
     pub fn clear(&mut self) {
         self.base.clear();
-        self.state.clear();
+        self.state.unset();
     }
 
     fn set_len(&mut self, len: u64) {
@@ -485,9 +387,9 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
+impl<'a, T, V> std::iter::IntoIterator for &'a ListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     type Item = V;
@@ -511,9 +413,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{list_index::ListIndex, views::IndexAccess, Database, Fork, TemporaryDB};
-
-    use std::string::String;
+    use super::*;
+    use crate::{access::AccessExt, Database, Fork, TemporaryDB};
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {
         assert!(list_index.is_empty());
@@ -562,7 +463,6 @@ mod tests {
         list_index.extend(vec![1_u8, 2, 3]);
 
         assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
-
         assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
         assert_eq!(
@@ -572,15 +472,16 @@ mod tests {
     }
 
     fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {
+        #[allow(clippy::needless_pass_by_value)]
+        // ^-- better for type inference: we want `T == &Fork`, not `T == Fork`.
         fn list<T>(index: u32, view: T) -> ListIndex<T, String>
         where
-            T: IndexAccess,
+            T: RawAccessMut,
         {
-            ListIndex::new_in_family("family", &index, view)
+            view.get_list(("family", &index))
         }
 
         assert_ne!(x, y);
-
         let mut fork = db.fork();
 
         // Write data to both indexes.
@@ -620,9 +521,9 @@ mod tests {
         // ...even after fork merge.
         db.merge_sync(fork.into_patch()).expect("merge");
         let snapshot = db.snapshot();
-        let index = list(x, &snapshot);
+        let index: ListIndex<_, String> = snapshot.get_list(("family", &x));
         assert!(index.is_empty());
-        let index = list(y, &snapshot);
+        let index: ListIndex<_, String> = snapshot.get_list(("family", &y));
         assert_eq!(
             index.iter().collect::<Vec<_>>(),
             vec!["baz".to_owned(), "qux".to_owned()]
@@ -637,41 +538,50 @@ mod tests {
 
     #[test]
     fn test_list_index_methods() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = ListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.get_list(IDX_NAME);
         list_index_methods(&mut list_index);
     }
 
     #[test]
     fn test_list_index_in_family_methods() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &fork);
+        let mut list_index = fork.get_list((IDX_NAME, &vec![1]));
         list_index_methods(&mut list_index);
     }
 
     #[test]
     fn test_list_index_iter() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = ListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.get_list(IDX_NAME);
         list_index_iter(&mut list_index);
     }
 
     #[test]
     fn test_list_index_in_family_iter() {
-        let db = TemporaryDB::default();
+        let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &fork);
+        let mut list_index = fork.get_list((IDX_NAME, &vec![1]));
         list_index_iter(&mut list_index);
     }
 
     #[test]
     fn test_list_index_clear_in_family() {
         for &(x, y, merge_before_clear) in FAMILY_CLEAR_PARAMS {
-            let db = TemporaryDB::default();
+            let db = TemporaryDB::new();
             list_index_clear_in_family(&db, x, y, merge_before_clear);
         }
+    }
+
+    #[test]
+    fn restore_after_no_op_initialization() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_list::<_, u32>(IDX_NAME);
+        let list: ListIndex<_, u32> = fork.readonly().get_list(IDX_NAME);
+        assert!(list.is_empty());
     }
 }

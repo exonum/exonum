@@ -19,11 +19,10 @@ use criterion::{black_box, Bencher, Criterion};
 use failure::{self, format_err};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-use exonum_crypto::{self, Hash};
+use exonum_crypto::{self, hash, Hash};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value,
-    proof_map_index::{BranchNode, ProofPath},
-    BinaryKey, BinaryValue, ObjectHash,
+    impl_object_hash_for_binary_value, proof_map_index::BranchNode, BinaryKey, BinaryValue,
+    ObjectHash,
 };
 
 const CHUNK_SIZE: usize = 64;
@@ -47,7 +46,7 @@ impl BinaryValue for SimpleData {
         buffer
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let bytes = bytes.as_ref();
         let id = LittleEndian::read_u16(&bytes[0..2]);
         let class = LittleEndian::read_i16(&bytes[2..4]);
@@ -83,7 +82,7 @@ impl BinaryValue for CursorData {
         buf
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut cursor = bytes.as_ref();
         let id = cursor.read_u16::<LittleEndian>()?;
         let class = cursor.read_i16::<LittleEndian>()?;
@@ -150,19 +149,19 @@ where
     // Runs benchmarks.
     c.bench_function(
         &format!("encoding/{}/to_bytes", name),
-        move |b: &mut Bencher| {
+        move |b: &mut Bencher<'_>| {
             b.iter_with_setup(f, |data| black_box(data.to_bytes()));
         },
     );
     c.bench_function(
         &format!("encoding/{}/into_bytes", name),
-        move |b: &mut Bencher| {
+        move |b: &mut Bencher<'_>| {
             b.iter_with_setup(f, |data| black_box(data.into_bytes()));
         },
     );
     c.bench_function(
         &format!("encoding/{}/from_bytes", name),
-        move |b: &mut Bencher| {
+        move |b: &mut Bencher<'_>| {
             b.iter_with_setup(
                 || {
                     let val = f();
@@ -174,15 +173,21 @@ where
     );
     c.bench_function(
         &format!("encoding/{}/hash", name),
-        move |b: &mut Bencher| {
+        move |b: &mut Bencher<'_>| {
             b.iter_with_setup(f, |data| black_box(data.object_hash()));
         },
     );
 }
 
-fn bench_binary_key_concat(b: &mut Bencher) {
+fn bench_binary_key_concat(b: &mut Bencher<'_>) {
     b.iter_with_setup(
-        || ("prefixed.key", Hash::zero(), ProofPath::new(&Hash::zero())),
+        || {
+            (
+                "prefixed.key",
+                Hash::zero(),
+                hash(&[0; 32]), // emulate ProofPath::new(&Hash::zero())).
+            )
+        },
         |(prefix, key, path)| {
             let mut v = vec![0; prefix.size() + key.size() + path.size()];
             let mut pos = prefix.write(&mut v);

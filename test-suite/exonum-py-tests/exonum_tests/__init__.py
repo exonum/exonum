@@ -1,0 +1,3 @@
+"""Entry point of Python Exonum integration tests module"""
+from exonum_tests.api import *
+from exonum_tests.deploy import *

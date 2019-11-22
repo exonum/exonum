@@ -20,4 +20,4 @@ pub use self::bench_transactions::{CurrencyTx, TimestampTx};
 
 include!(concat!(env!("OUT_DIR"), "/exonum_benches_proto_mod.rs"));
 
-use exonum::proto::schema::*;
+use exonum::crypto::proto::*;

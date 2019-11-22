@@ -18,15 +18,13 @@
 
 #![deny(
     missing_debug_implementations,
-    missing_docs,
+    // missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
 
 #[macro_use]
 extern crate exonum_derive;
-#[macro_use]
-extern crate failure;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -37,59 +35,51 @@ pub mod proto;
 pub mod schema;
 pub mod transactions;
 
-use exonum_merkledb::Snapshot;
-
 use exonum::{
-    api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
+    blockchain::ExecutionError,
     crypto::Hash,
-    helpers::fabric,
-    messages::RawTransaction,
+    merkledb::{BinaryValue, Snapshot},
+    runtime::{
+        api::ServiceApiBuilder,
+        rust::{CallContext, Service},
+        BlockchainData, DispatcherError,
+    },
 };
 
-use crate::{api::PublicApi, schema::Schema, transactions::TimeTransactions};
+use crate::{
+    api::PublicApi as TimestampingApi,
+    schema::{Schema, TimestampEntry},
+    transactions::{Config, Error, TimestampingInterface},
+};
 
-const TIMESTAMPING_SERVICE: u16 = 130;
-const SERVICE_NAME: &str = "timestamping";
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("TimestampingInterface"))]
+#[service_factory(proto_sources = "proto")]
+pub struct TimestampingService;
 
-/// Exonum `Service` implementation.
-#[derive(Debug, Default)]
-pub struct Service;
+impl Service for TimestampingService {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+        let config =
+            Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
-impl blockchain::Service for Service {
-    fn service_id(&self) -> u16 {
-        TIMESTAMPING_SERVICE
+        if context
+            .data()
+            .for_dispatcher()
+            .get_instance(&*config.time_service_name)
+            .is_none()
+        {
+            return Err(Error::TimeServiceNotFound.into());
+        }
+
+        Schema::new(context.service_data()).config.set(config);
+        Ok(())
     }
 
-    fn service_name(&self) -> &'static str {
-        SERVICE_NAME
-    }
-
-    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(view);
-        schema.state_hash()
-    }
-
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = TimeTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        PublicApi::wire(builder);
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug, Clone, Copy)]
-pub struct ServiceFactory;
-
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn make_service(&mut self, _: &fabric::Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service)
+        TimestampingApi.wire(builder);
     }
 }

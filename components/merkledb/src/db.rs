@@ -25,10 +25,11 @@ use std::{
     iter::{Iterator as StdIterator, Peekable},
     mem,
     ops::{Deref, DerefMut},
+    rc::Rc,
 };
 
 use crate::{
-    views::{IndexAccess, IndexAddress, View},
+    views::{AsReadonly, IndexAddress, RawAccess, View},
     Error, Result,
 };
 
@@ -85,7 +86,7 @@ impl Changes {
     }
 
     /// Returns an iterator over the changes.
-    pub fn iter(&self) -> BtmIter<Vec<u8>, Change> {
+    pub fn iter(&self) -> BtmIter<'_, Vec<u8>, Change> {
         self.data.iter()
     }
 
@@ -138,20 +139,52 @@ impl IntoIterator for Changes {
     }
 }
 
+/// Cell holding changes for a specific view. Mutable view borrows take changes out
+/// of the `Option` and unwraps `Rc` into inner data, while immutable borrows clone inner `Rc`.
+type ChangesCell = Option<Rc<ViewChanges>>;
+
 #[derive(Debug, Default)]
 pub struct WorkingPatch {
-    changes: RefCell<HashMap<IndexAddress, Option<ViewChanges>>>,
+    changes: RefCell<HashMap<IndexAddress, ChangesCell>>,
+}
+
+#[derive(Debug)]
+enum WorkingPatchRef<'a> {
+    Borrowed(&'a WorkingPatch),
+    Owned(Rc<Fork>),
+}
+
+impl WorkingPatchRef<'_> {
+    fn patch(&self) -> &WorkingPatch {
+        match self {
+            WorkingPatchRef::Borrowed(patch) => patch,
+            WorkingPatchRef::Owned(ref fork) => &fork.working_patch,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ChangesRef {
+    inner: Rc<ViewChanges>,
+}
+
+impl Deref for ChangesRef {
+    type Target = ViewChanges;
+
+    fn deref(&self) -> &ViewChanges {
+        &*self.inner
+    }
 }
 
 /// `RefMut`, but dumber.
 #[derive(Debug)]
-pub struct ChangesRef<'a> {
-    parent: &'a WorkingPatch,
+pub struct ChangesMut<'a> {
+    parent: WorkingPatchRef<'a>,
     key: IndexAddress,
-    changes: Option<ViewChanges>,
+    changes: Option<Rc<ViewChanges>>,
 }
 
-impl Deref for ChangesRef<'_> {
+impl Deref for ChangesMut<'_> {
     type Target = ViewChanges;
 
     fn deref(&self) -> &ViewChanges {
@@ -161,17 +194,19 @@ impl Deref for ChangesRef<'_> {
     }
 }
 
-impl DerefMut for ChangesRef<'_> {
+impl DerefMut for ChangesMut<'_> {
     fn deref_mut(&mut self) -> &mut ViewChanges {
-        // `.unwrap()` is safe: `changes` can be equal to `None` only when
-        // the instance is being dropped.
-        self.changes.as_mut().unwrap()
+        // `.unwrap()`s are safe:
+        //
+        // - `changes` can be equal to `None` only when the instance is being dropped.
+        // - We know that `Rc` with the changes is unique.
+        Rc::get_mut(self.changes.as_mut().unwrap()).unwrap()
     }
 }
 
-impl Drop for ChangesRef<'_> {
+impl Drop for ChangesMut<'_> {
     fn drop(&mut self) {
-        let mut change_map = self.parent.changes.borrow_mut();
+        let mut change_map = self.parent.patch().changes.borrow_mut();
         let changes = change_map.get_mut(&self.key).unwrap_or_else(|| {
             panic!("insertion point for changes disappeared at {:?}", self.key);
         });
@@ -193,48 +228,107 @@ impl WorkingPatch {
         self.changes.borrow().is_empty()
     }
 
-    /// Returns a mutable reference to the changes corresponding to a certain index.
-    ///
-    /// # Panics
-    ///
-    /// If an index with the `address` already exists in `Fork` that uses this patch.
-    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
+    /// Takes a cell with changes for a specific `View` out of the patch.
+    /// The returned cell is guaranteed to contain an `Rc` with an exclusive ownership.
+    fn take_view_changes(&self, address: &IndexAddress) -> ChangesCell {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
             let view_changes = changes.get_mut(address).map(Option::take);
             view_changes.unwrap_or_else(|| {
                 changes
                     .entry(address.clone())
-                    .or_insert_with(|| Some(ViewChanges::new()))
+                    .or_insert_with(|| Some(Rc::new(ViewChanges::new())))
                     .take()
             })
         };
 
-        assert!(
-            view_changes.is_some(),
-            "multiple mutable borrows of an index at {:?}",
-            address
-        );
+        if let Some(ref view_changes) = view_changes {
+            assert!(
+                Rc::strong_count(view_changes) == 1,
+                "Attempting to borrow {:?} mutably while it's borrowed immutably",
+                address
+            );
+        } else {
+            panic!("Multiple mutable borrows of an index at {:?}", address);
+        }
+        view_changes
+    }
 
+    /// Clones changes for a specific `View` from the patch. Panics if the changes
+    /// are mutably borrowed.
+    fn clone_view_changes(&self, address: &IndexAddress) -> Rc<ViewChanges> {
+        let mut changes = self.changes.borrow_mut();
+        // Get changes for the specified address.
+        let changes: &ChangesCell = changes
+            .entry(address.clone())
+            .or_insert_with(|| Some(Rc::new(ViewChanges::new())));
+
+        changes
+            .as_ref()
+            .unwrap_or_else(|| {
+                // If the `changes` are `None`, this means they have been taken by a previous call
+                // to `take_view_changes` and not yet returned.
+                panic!(
+                    "Attempting to borrow {:?} immutably while it's borrowed mutably",
+                    address
+                );
+            })
+            .clone()
+    }
+
+    /// Returns an immutable reference to the changes corresponding to a certain index.
+    ///
+    /// # Panics
+    ///
+    /// If an index with the `address` is already mutably borrowed.
+    pub fn changes(&self, address: &IndexAddress) -> ChangesRef {
         ChangesRef {
-            changes: view_changes,
-            key: address.clone(),
-            parent: self,
+            inner: self.clone_view_changes(address),
+        }
+    }
+
+    /// Returns a mutable reference to the changes corresponding to a certain index.
+    ///
+    /// # Panics
+    ///
+    /// If an index with the `address` is already borrowed either immutably or mutably.
+    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesMut<'_> {
+        ChangesMut {
+            changes: self.take_view_changes(address),
+            key: address.to_owned(),
+            parent: WorkingPatchRef::Borrowed(self),
         }
     }
 
     pub fn clear(&self, address: &IndexAddress) {
         let mut changes = self.changes.borrow_mut();
         let change = changes.entry(address.clone());
-
         change.and_modify(|v| *v = None);
     }
 
     // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
+            // Check that changes are not borrowed mutably (in this case, the corresponding
+            // `ChangesCell` is `None`).
+            //
+            // Both this and the following `panic`s cannot feasibly be triggered,
+            // since the only place where this method is called (`Fork::flush()`) borrows
+            // `Fork` mutably; this forces both mutable and immutable index borrows to be dropped,
+            // since they borrow `Fork` immutably.
             let changes = changes.unwrap_or_else(|| {
-                panic!("changes are still borrowed at address {:?}", address);
+                panic!(
+                    "changes are still mutably borrowed at address {:?}",
+                    address
+                );
+            });
+            // Check that changes are not borrowed immutably (in this case, there is another
+            // `Rc<_>` pointer to changes somewhere).
+            let changes = Rc::try_unwrap(changes).unwrap_or_else(|_| {
+                panic!(
+                    "changes are still immutably borrowed at address {:?}",
+                    address
+                );
             });
 
             let patch_changes = patch
@@ -318,28 +412,49 @@ pub enum Change {
 /// [`rollback`] methods), which allows rolling back some of the latest changes (e.g., after
 /// a runtime error). Checkpoint is created automatically after calling the `flush` method.
 ///
-/// `Fork` implements the [`Snapshot`] trait and provides methods for both reading and
-/// writing data. Thus, `&mut Fork` is used as a storage view for creating
-/// read-write indices representation.
+/// `Fork` provides methods for both reading and writing data. Thus, `&Fork` is used
+/// as a storage view for creating read-write indices representation.
 ///
 /// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
 /// to a full key (a string column family name + key as an array of bytes within the family).
 ///
-/// **Note.** It is possible to create only one instance of index with the specified name based on a
-/// single fork. This restriction is due to impossibility to obtain multiple mutable references to
-/// the same change set inside the fork.
+/// # Borrow checking
+///
+/// It is possible to create only one instance of index with the specified `IndexAddress` based on a
+/// single fork. If an additional instance is requested, the code will panic in runtime.
+/// Hence, obtaining indexes from a `Fork` functions similarly to [`RefCell::borrow_mut()`].
 ///
 /// For example the code below will panic at runtime.
 ///
-/// ```rust, no_run
-/// use exonum_merkledb::{TemporaryDB, ListIndex, Database};
+/// ```rust,should_panic
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-///
-/// let index1: ListIndex<_, u8> = ListIndex::new("index", &fork);
+/// let index = fork.get_list::<_, u8>("index");
 /// // This code will panic at runtime.
-/// let index2: ListIndex<_, u8> = ListIndex::new("index", &fork);
+/// let index2 = fork.get_list::<_, u8>("index");
 /// ```
+///
+/// To enable immutable / shared references to indexes, you may use [`readonly`] method:
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB, ListIndex, Database};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// fork.get_list::<_, u8>("index").extend(vec![1, 2, 3]);
+///
+/// let readonly = fork.readonly();
+/// let index = readonly.get_list::<_, u8>("index");
+/// // Works fine.
+/// let index2 = readonly.get_list::<_, u8>("index");
+/// ```
+///
+/// It is impossible to mutate index contents having a readonly access to the fork; this is
+/// checked by the Rust type system.
+///
+/// Shared references work like `RefCell::borrow()`; it is a runtime error to try to obtain
+/// a shared reference to an index if there is an exclusive reference to the same index,
+/// and vice versa.
 ///
 /// [`Snapshot`]: trait.Snapshot.html
 /// [`put`]: #method.put
@@ -349,7 +464,10 @@ pub enum Change {
 /// [`into_patch`]: #method.into_patch
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`commit`]: #method.commit
+/// [`flush`]: #method.flush
 /// [`rollback`]: #method.rollback
+/// [`readonly`]: #method.readonly
+/// [`RefCell::borrow_mut()`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html#method.borrow_mut
 #[derive(Debug)]
 pub struct Fork {
     patch: Patch,
@@ -396,18 +514,15 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use exonum_merkledb::{Database, TemporaryDB, IndexBuilder};
+/// use exonum_merkledb::{access::AccessExt, Database, TemporaryDB};
 ///
 /// // not declared as `mut db`!
-/// let db: Box<Database> = Box::new(TemporaryDB::new());
+/// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
 /// let fork = db.fork();
 /// {
-///     let (mut view, _state) = IndexBuilder::new(&fork)
-///         .index_name("index_name")
-///         .build::<()>();
-///     view.put(&vec![1, 2, 3], vec![123]);
+///     let mut list = fork.get_proof_list("list");
+///     list.push(42_u64);
 /// }
-///
 /// db.merge(fork.into_patch()).unwrap();
 /// ```
 ///
@@ -477,7 +592,7 @@ pub trait Snapshot: Send + Sync + 'static {
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter(&self, name: &str, from: &[u8]) -> Iter;
+    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -498,7 +613,7 @@ impl Patch {
     }
 
     /// Return an iterator over the underlying changes.
-    pub fn iter(&self) -> HmIter<String, Changes> {
+    pub fn iter(&self) -> HmIter<'_, String, Changes> {
         self.changes.iter()
     }
 }
@@ -528,7 +643,7 @@ impl Snapshot for Patch {
         self.snapshot.contains(name, key)
     }
 
-    fn iter(&self, name: &str, from: &[u8]) -> Iter {
+    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_> {
         let range = (Included(from), Unbounded);
         let changes = match self.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
@@ -595,6 +710,19 @@ impl Fork {
     pub fn working_patch(&self) -> &WorkingPatch {
         &self.working_patch
     }
+
+    /// Returns snapshot that also captures flushed changes in the fork,
+    /// but does not capture unflushed changes.
+    pub fn snapshot_without_unflushed_changes(&self) -> &dyn Snapshot {
+        &self.patch
+    }
+
+    /// Returns a readonly wrapper around the fork. Indices created based on the readonly
+    /// version cannot be modified; on the other hand, it is possible to have multiple
+    /// copies of an index at the same time.
+    pub fn readonly(&self) -> ReadonlyFork<'_> {
+        ReadonlyFork(self)
+    }
 }
 
 impl From<Patch> for Fork {
@@ -611,8 +739,8 @@ impl From<Patch> for Fork {
     }
 }
 
-impl<'a> IndexAccess for &'a Fork {
-    type Changes = ChangesRef<'a>;
+impl<'a> RawAccess for &'a Fork {
+    type Changes = ChangesMut<'a>;
 
     fn snapshot(&self) -> &dyn Snapshot {
         &self.patch
@@ -623,15 +751,112 @@ impl<'a> IndexAccess for &'a Fork {
     }
 }
 
-impl AsRef<dyn Snapshot> for Fork {
-    fn as_ref(&self) -> &dyn Snapshot {
+impl RawAccess for Rc<Fork> {
+    type Changes = ChangesMut<'static>;
+
+    fn snapshot(&self) -> &dyn Snapshot {
         &self.patch
+    }
+
+    fn changes(&self, address: &IndexAddress) -> Self::Changes {
+        let changes = self.working_patch.take_view_changes(address);
+        ChangesMut {
+            changes,
+            key: address.clone(),
+            parent: WorkingPatchRef::Owned(Self::clone(self)),
+        }
     }
 }
 
-impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
+/// Readonly wrapper for a `Fork`.
+///
+/// This wrapper allows to read from index state from the fork
+/// in a type-safe manner (it is impossible to accidentally modify data in the index), and
+/// without encountering runtime errors when attempting to concurrently get the same index
+/// more than once.
+///
+/// Since the wrapper borrows the `Fork` immutably, it is still possible to access indexes
+/// in the fork directly. In this scenario, the caller should be careful that `ReadonlyFork`
+/// does not access the same indexes as the original `Fork`: this will result in a runtime
+/// error (sort of like attempting both an exclusive and a shared borrow from a `RefCell`
+/// or `RwLock`).
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// fork.get_list("list").push(1_u32);
+/// let readonly: ReadonlyFork<'_> = fork.readonly();
+/// let list = readonly.get_list::<_, u32>("list");
+/// assert_eq!(list.get(0), Some(1));
+/// let same_list = readonly.get_list::<_, u32>("list");
+/// // ^-- Does not result in an error!
+///
+/// // Original fork is still accessible.
+/// let mut map = fork.get_map("map");
+/// map.put(&1_u32, "foo".to_string());
+/// ```
+///
+/// There are no write methods in indexes instantiated from `ReadonlyFork`:
+///
+/// ```compile_fail
+/// # use exonum_merkledb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let readonly: ReadonlyFork<'_> = fork.readonly();
+/// let mut list = readonly.get_list("list");
+/// list.push(1_u32); // Won't compile: no `push` method in `ListIndex<ReadonlyFork, u32>`!
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct ReadonlyFork<'a>(&'a Fork);
+
+impl<'a> AsReadonly for &'a Fork {
+    type Readonly = ReadonlyFork<'a>;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        ReadonlyFork(*self)
+    }
+}
+
+impl<'a> RawAccess for ReadonlyFork<'a> {
+    type Changes = ChangesRef;
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        &self.0.patch
+    }
+
+    fn changes(&self, address: &IndexAddress) -> Self::Changes {
+        ChangesRef {
+            inner: self.0.working_patch.clone_view_changes(address),
+        }
+    }
+}
+
+impl AsRef<Fork> for Fork {
+    fn as_ref(&self) -> &Fork {
+        self
+    }
+}
+
+impl AsRef<dyn Snapshot> for dyn Snapshot {
     fn as_ref(&self) -> &dyn Snapshot {
         self
+    }
+}
+
+impl Snapshot for Box<dyn Snapshot> {
+    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        self.as_ref().get(name, key)
+    }
+
+    fn contains(&self, name: &str, key: &[u8]) -> bool {
+        self.as_ref().contains(name, key)
+    }
+
+    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_> {
+        self.as_ref().iter(name, from)
     }
 }
 
@@ -753,19 +978,19 @@ where
 }
 
 impl fmt::Debug for dyn Database {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Database").finish()
     }
 }
 
 impl fmt::Debug for dyn Snapshot {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Snapshot").finish()
     }
 }
 
 impl fmt::Debug for dyn Iterator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Iterator").finish()
     }
 }
