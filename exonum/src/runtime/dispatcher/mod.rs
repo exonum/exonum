@@ -121,12 +121,8 @@ impl Dispatcher {
         if !self.is_artifact_deployed(&spec.artifact) {
             self.commit_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
         }
-
         // Start the built-in service instance.
-        ExecutionContext::new(self, fork, Caller::Blockchain)
-            .start_adding_service(spec, constructor)?;
-        Schema::new(&*fork).mark_pending_instances_as_active();
-
+        self.commit_service_sync(fork, spec, constructor)?;
         Ok(())
     }
 
@@ -220,9 +216,38 @@ impl Dispatcher {
             payload: payload.into_bytes(),
         };
 
-        let mut schema = Schema::new(fork);
         self.block_until_deployed(spec.artifact.clone(), spec.payload.clone());
-        schema.add_active_artifact(spec.clone())?;
+        Schema::new(fork).add_active_artifact(spec.clone())?;
+        Ok(())
+    }
+
+    /// ECR-3222
+    pub(crate) fn commit_service_sync(
+        &mut self,
+        fork: &mut Fork,
+        spec: InstanceSpec,
+        constructor: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        // TODO: revise dispatcher integrity checks [ECR-3743]
+        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
+
+        let runtime = self
+            .runtime_by_id(spec.artifact.runtime_id)
+            .ok_or(Error::IncorrectRuntime)?;
+        // Initialize service instance.
+        runtime.start_adding_service(
+            ExecutionContext::new(self, fork, Caller::Blockchain),
+            &spec,
+            constructor,
+        )?;
+        // Add service instance to the dispatcher schema.
+        Schema::new(&*fork).add_active_service(spec.clone())?;
+        // Commit started service to Runtime.
+        // If the fork is dirty, `snapshot` will be outdated, which can trip
+        // `Runtime::start_service()` calls.
+        fork.flush();
+        let snapshot = fork.snapshot_without_unflushed_changes();
+        self.start_service(snapshot, &spec)?;
         Ok(())
     }
 
@@ -262,10 +287,7 @@ impl Dispatcher {
                 fork.rollback();
             }
         }
-
-        let mut schema = Schema::new(&*fork);
-        schema.mark_pending_artifacts_as_active();
-        schema.mark_pending_instances_as_active();
+        self.activate_pending_entities(fork);
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
@@ -277,22 +299,28 @@ impl Dispatcher {
         // `Runtime::start_service()` calls.
         fork.flush();
         let snapshot = fork.snapshot_without_unflushed_changes();
+
         // Block futures with pending deployments.
         let mut schema = Schema::new(&*fork);
         for spec in schema.take_pending_artifacts() {
             self.block_until_deployed(spec.artifact, spec.payload);
         }
-
         debug!(
             "commit_block: {:?}",
             schema.instances.iter().collect::<Vec<_>>()
         );
-
         // Start pending services.
         for spec in schema.take_pending_instances() {
             self.start_service(snapshot, &spec)
-                .expect("Cannot add service");
+                .expect("Cannot start service");
         }
+    }
+
+    pub(crate) fn activate_pending_entities(&self, fork: &mut Fork) {
+        debug!("activate_pending_entities");
+        let mut schema = Schema::new(&*fork);
+        schema.mark_pending_artifacts_as_active();
+        schema.mark_pending_instances_as_active();
     }
 
     /// Notifies runtimes about a committed block.

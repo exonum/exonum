@@ -149,7 +149,6 @@ impl Schema<&Fork> {
             .artifact;
 
         debug!("add_pending_service: {:?}", spec);
-        debug!("services: {:?}", self.instances.iter().collect::<Vec<_>>());
 
         // Checks that runtime identifier is proper in instance.
         if artifact_id != spec.artifact {
@@ -176,6 +175,44 @@ impl Schema<&Fork> {
         );
         self.instances_by_id.put(&id, name);
         self.pending_instances.push(spec);
+        Ok(())
+    }
+
+    /// Adds previously started service instance.
+    pub(super) fn add_active_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
+        let artifact_id = self
+            .artifacts
+            .get(&spec.artifact.name)
+            .ok_or(Error::ArtifactNotDeployed)?
+            .spec
+            .artifact;
+
+        debug!("add_active_service: {:?}", spec);
+
+        // Checks that runtime identifier is proper in instance.
+        if artifact_id != spec.artifact {
+            return Err(Error::IncorrectRuntime);
+        }
+        // Checks that instance name doesn't exist.
+        if self.instances.contains(&spec.name) {
+            return Err(Error::ServiceNameExists);
+        }
+        // Checks that instance identifier doesn't exist.
+        // TODO: revise dispatcher integrity checks [ECR-3743]
+        if self.instances_by_id.contains(&spec.id) {
+            return Err(Error::ServiceIdExists);
+        }
+
+        let id = spec.id;
+        let name = spec.name.clone();
+        self.instances.put(
+            &name,
+            InstanceState {
+                spec: spec.clone(),
+                status: ServiceStatus::Active,
+            },
+        );
+        self.instances_by_id.put(&id, name);
         Ok(())
     }
 

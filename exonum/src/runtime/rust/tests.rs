@@ -735,6 +735,8 @@ fn dependent_service_with_no_dependency() {
 
 #[test]
 fn dependent_service_in_same_block() {
+    let _ = crate::helpers::init_logger();
+
     let mut runtime = RustRuntime::new(mpsc::channel(1).0);
     runtime.add_service_factory(Box::new(TestServiceImpl));
     runtime.add_service_factory(Box::new(DependentServiceImpl));
