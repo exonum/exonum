@@ -18,19 +18,18 @@ use crate::{
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// // Since `Access` is implemented for `&Fork` rather than `Fork`, it is necessary
-/// // to use `fork` or `(&fork)` when using the `AccessExt` methods:
+/// // Extension methods can be used on `Fork`s:
 /// {
 ///     let mut list: ListIndex<_, String> = fork.get_list("list");
 ///     list.push("foo".to_owned());
 /// }
-/// // ...same with snapshots:
+/// // ...and on `Snapshot`s:
 /// let snapshot = db.snapshot();
-/// assert!((&snapshot)
+/// assert!(snapshot
 ///     .get_map::<_, u64, String>("map")
 ///     .get(&0)
 ///     .is_none());
-/// // ...but with `ReadonlyFork`, no wrapping is necessary.
+/// // ...and on `ReadonlyFork`s:
 /// let list = fork.readonly().get_list::<_, String>("list");
 /// assert_eq!(list.len(), 1);
 /// ```
@@ -132,23 +131,22 @@ pub trait AccessExt: Access {
         ProofMapIndex::<_, _, _, Raw>::from_access(self, addr.into()).unwrap()
     }
 
-    /// Generic variant of the proof map. Requires implicit `KeyMode` to be constructed.
+    /// Gets a generic proof map. Requires explicit `KeyMode` to be specified.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, Fork, Database, ListIndex, TemporaryDB, ProofMapIndex,
-    ///     proof_map_index::{Raw, Hashed}};
-    /// use exonum_crypto::PublicKey;
-    ///
+    /// # use exonum_merkledb::{
+    /// #     access::AccessExt, Fork, Database, ListIndex, TemporaryDB, ProofMapIndex,
+    /// #     RawProofMapIndex,
+    /// # };
+    /// # use exonum_crypto::PublicKey;
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    ///
     /// // Hashed variant for keys implementing `ObjectHash`.
-    /// let hashed_map: ProofMapIndex<&Fork, u32, u32, Hashed> = fork.get_generic_proof_map("hashed");
-    ///
+    /// let hashed_map: ProofMapIndex<_, u32, u32> = fork.get_generic_proof_map("hashed");
     /// // Raw variant for keys that can be mapped directly to `ProofPath`.
-    /// let raw_map: ProofMapIndex<&Fork, PublicKey, u32, Raw> = fork.get_generic_proof_map("raw");
+    /// let raw_map: RawProofMapIndex<_, PublicKey, u32> = fork.get_generic_proof_map("raw");
     /// ```
     ///
     /// # Panics

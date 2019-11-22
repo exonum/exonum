@@ -9,6 +9,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `create_checkpoint` method has been implemented for the `RocksDB` struct.
+  This method uses
+  [RocksDB checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints)
+  functionality under the hood.
+
 - `NotFound` error message for `explorer/v1/block` endpoint now includes
   the actual blockchain height. (#1498)
 
@@ -166,6 +171,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   cargo run --bin exonum-timestamping -- \
     run -d /tmp/exonum/db/0 -c /tmp/exonum/nodes/0/node.toml
   ```
+
+- `explorer/v1/block` endpoint returns a response in a "flat" format. (#1386)
 
 - `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
   median precommit times in the `time` field within each returned block,

@@ -20,7 +20,9 @@ pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksD
 
 use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
+use rocksdb::{
+    self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
+};
 
 use crate::{
     db::{check_database, Change},
@@ -88,6 +90,18 @@ impl RocksDB {
         };
         check_database(&mut db)?;
         Ok(db)
+    }
+
+    /// Creates checkpoint of this database in the given directory. (see [RocksDb docs][1] for
+    /// details).
+    ///
+    /// Successfully created checkpoint can be opened using `RocksDB::open`.
+    ///
+    /// [1]: https://github.com/facebook/rocksdb/wiki/Checkpoints
+    pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
+        let checkpoint = Checkpoint::new(&*self.db)?;
+        checkpoint.create_checkpoint(path)?;
+        Ok(())
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {

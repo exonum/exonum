@@ -25,7 +25,7 @@ pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection, InstanceConfig},
     config::{ConsensusConfig, ValidatorKeys},
-    schema::{IndexCoordinates, IndexOwner, Schema, TxLocation},
+    schema::{IndexCoordinates, Schema, SchemaOrigin, TxLocation},
 };
 
 pub mod config;
@@ -305,7 +305,7 @@ impl BlockchainMut {
                 .into_iter()
                 // Add state hash of core table.
                 .chain(IndexCoordinates::locate(
-                    IndexOwner::Core,
+                    SchemaOrigin::Core,
                     schema.state_hash(),
                 ));
             // Insert state hashes into the aggregator table.

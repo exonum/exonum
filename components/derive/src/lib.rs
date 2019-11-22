@@ -89,7 +89,7 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
 ///
 /// * `#[service_dispatcher(crate = "path")]`
 ///
-/// Prefix of the `exonum` crate (usually it's "crate" or "exonum").
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
 #[proc_macro_derive(ServiceDispatcher, attributes(service_dispatcher))]
 pub fn service_dispatcher(input: TokenStream) -> TokenStream {
     service_dispatcher::impl_service_dispatcher(input)
@@ -114,10 +114,10 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 ///
 /// * `#[service_factory(crate = "path")]`
 ///
-/// Prefix of the `exonum` crate(usually "crate" or "exonum").
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
 ///
 /// * `#[service_factory(artifact_name = "string")]`
-///   
+///
 /// Override artifact name, by default it uses crate name.
 ///
 /// * `#[service_factory(artifact_version = "string")]`
@@ -133,82 +133,43 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 /// * `#[service_factory(service_name = "string")]`
 ///
 /// Use the specified service name for the ServiceDispatcher derivation instead of the struct name.
-///
-///
-/// # Examples TODO Move to ServiceFactory documentation [ECR-3275]
-///
-/// Typical usage.
-/// ```ignore
-/// #[derive(ServiceFactory, ServiceDispatcher)]
-/// #[service_dispatcher(implements("MyServiceInterface"))]
-/// #[service_factory(proto_sources = "crate::proto")]
-/// pub struct MyService;
-/// ```
-///
-/// But if you have complex logic in service factory you can use custom constructor to create a
-/// new service instances.
-/// ```ignore
-/// // Imagine that you have a stateful service like this
-/// #[derive(Debug)]
-/// pub struct TimeService {
-///     /// Current time.
-///     time: Arc<dyn TimeProvider>,
-/// }
-///
-/// // You can implement service factory, but you cannot just derive `ServiceFactory`
-/// // like in example bellow.
-/// // To resolve this problem you can specify your own constructor for the service instance.
-/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-/// #[service_dispatcher(implements("TimeServiceInterface"))]
-/// #[service_factory(
-///     proto_sources = "proto",
-///     service_constructor = "TimeServiceFactory::create_instance",
-///     service_name = "TimeService",
-/// )]
-/// pub struct TimeServiceFactory {
-///     time_provider: Arc<dyn TimeProvider>,
-/// }
-///
-/// // Arbitrary constructor implementation.
-/// impl TimeServiceFactory {
-///     fn create_instance(&self) -> Box<dyn Service> {
-///         Box::new(TimeService {
-///             time: self.time_provider.clone(),
-///         })
-///     }
-/// }
-/// ```
 #[proc_macro_derive(ServiceFactory, attributes(service_factory))]
 pub fn service_factory(input: TokenStream) -> TokenStream {
     service_factory::impl_service_factory(input)
 }
 
-/// Mark trait as an Exonum service interface.
+/// Derives an Exonum service interface for the specified trait.
+///
+/// See the documentation of the Exonum crate for more information.
+///
+/// # Attributes:
+///
+/// ## Optional
+///
+/// * `#[exonum_interface(crate = "path")]`
+///
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
 #[proc_macro_attribute]
 pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_interface::impl_exonum_interface(attr, item)
 }
 
-/// Derive `Into<ExecutionError>` conversion for the specified enumeration.
+/// Implements `From<MyError> for ExecutionError` conversion for the given enum.
 ///
-/// Enumeration should have an explicit discriminant for each variant.
-/// Also this macro derives `Display` trait using documentation comments of each variant.
+/// Enumeration should have an explicit discriminant for each error kind.
+/// Derives `Display` and `Fail` traits using documentation comments for each error kind.
 ///
-/// # Examples
+/// # Attributes:
 ///
-/// ```ignore
-/// /// Error codes emitted by wallet transactions during execution.
-/// #[derive(Debug, IntoExecutionError)]
-/// pub enum Error {
-///     /// Content hash already exists.
-///     HashAlreadyExists = 0,
-///     /// Unable to parse service configuration.
-///     ConfigParseError = 1,
-///     /// Time service with the specified name doesn't exist.
-///     TimeServiceNotFound = 2,
-/// }
-/// ```
+/// ## Optional
 ///
+/// * `#[execution_error(crate = "path")]`
+///
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
+///
+/// * `#[execution_error(kind = "runtime")]`
+///
+/// Error kind has the following values - `service`, `runtime`. The default value is `service`.
 #[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
 pub fn into_execution_error(input: TokenStream) -> TokenStream {
     execution_error::impl_execution_error(input)

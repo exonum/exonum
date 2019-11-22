@@ -57,7 +57,7 @@
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
 //! On the other hand, multiple indices can be stored in the same column family, provided
 //! that their key spaces do not intersect. Isolation is commonly achieved with the help
-//! of column families; see `new_in_family` constructor in the built-in index types.
+//! of [`Group`]s or keyed [`IndexAddress`]es.
 //!
 //! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
@@ -105,6 +105,8 @@
 //! [`BTreeMap`]: https://doc.rust-lang.org/std/collections/struct.BTreeMap.html
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
+//! [`Group`]: struct.Group.html
+//! [`IndexAddress`]: struct.IndexAddress.html
 
 #![warn(
     missing_debug_implementations,
