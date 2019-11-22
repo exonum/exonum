@@ -29,10 +29,10 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
+        dispatcher::ServiceStatus,
         error::{ErrorKind, ExecutionError},
-        BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
-        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
-        StateHashAggregator,
+        BlockchainData, CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema,
+        ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime, StateHashAggregator,
     },
 };
 
@@ -673,11 +673,11 @@ fn dependent_builtin_service() {
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
         schema.get_instance(SERVICE_INSTANCE_ID).unwrap().1,
-        DeployStatus::Active
+        ServiceStatus::Active
     );
     assert_eq!(
         schema.get_instance("dependent-service").unwrap().1,
-        DeployStatus::Active
+        ServiceStatus::Active
     );
 }
 
@@ -767,7 +767,7 @@ fn dependent_service_in_same_block() {
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
         schema.get_instance("dependent-service").unwrap().1,
-        DeployStatus::Active
+        ServiceStatus::Active
     );
 }
 
@@ -800,6 +800,6 @@ fn dependent_service_in_successive_block() {
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
         schema.get_instance("dependent-service").unwrap().1,
-        DeployStatus::Active
+        ServiceStatus::Active
     );
 }

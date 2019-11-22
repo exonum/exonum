@@ -105,6 +105,22 @@ pub struct ArtifactState {
     pub status: ArtifactStatus,
 }
 
+impl ArtifactState {
+    /// Returns underlining artifact spec if status is active.
+    pub fn active(self) -> Option<ArtifactSpec> {
+        match self.status {
+            ArtifactStatus::Active => Some(self.spec),
+            ArtifactStatus::Pending => None,
+        }
+    }
+}
+
+impl From<ArtifactState> for (ArtifactStatus, ArtifactSpec) {
+    fn from(v: ArtifactState) -> Self {
+        (v.status, v.spec)
+    }
+}
+
 /// Current state of service instance in dispatcher.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::dispatcher::InstanceState")]
@@ -113,4 +129,20 @@ pub struct InstanceState {
     pub spec: InstanceSpec,
     /// Service instance activity status.
     pub status: ServiceStatus,
+}
+
+impl InstanceState {
+    /// Returns underlining instance spec if status is active.
+    pub fn active(self) -> Option<InstanceSpec> {
+        match self.status {
+            ServiceStatus::Active => Some(self.spec),
+            ServiceStatus::Pending => None,
+        }
+    }
+}
+
+impl From<InstanceState> for (ServiceStatus, InstanceSpec) {
+    fn from(v: InstanceState) -> Self {
+        (v.status, v.spec)
+    }
 }

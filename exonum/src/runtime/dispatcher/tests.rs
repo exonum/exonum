@@ -34,9 +34,9 @@ use crate::{
     helpers::{Height, ValidatorId},
     node::ApiSender,
     runtime::{
-        dispatcher::{Action, Dispatcher, Mailbox},
+        dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, CallInfo, Caller, DeployStatus, DispatcherError, DispatcherSchema, ErrorKind,
+        ArtifactId, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
         RuntimeIdentifier, StateHashAggregator,
     },
@@ -265,6 +265,8 @@ fn test_dispatcher_simple() {
     const JAVA_SERVICE_NAME: &str = "java-service";
     const RUST_METHOD_ID: MethodId = 0;
     const JAVA_METHOD_ID: MethodId = 1;
+
+    let _ = crate::helpers::init_logger();
 
     // Create dispatcher and test data.
     let db = Arc::new(TemporaryDB::new());
@@ -575,7 +577,7 @@ fn test_shutdown() {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct ArtifactStatus {
+struct ArtifactDeployStatus {
     attempts: usize,
     is_deployed: bool,
 }
@@ -583,7 +585,7 @@ struct ArtifactStatus {
 #[derive(Debug, Default, Clone)]
 struct DeploymentRuntime {
     // Map of artifact names to deploy attempts and the flag for successful deployment.
-    artifacts: Arc<Mutex<HashMap<String, ArtifactStatus>>>,
+    artifacts: Arc<Mutex<HashMap<String, ArtifactDeployStatus>>>,
     mailbox_actions: Arc<Mutex<Vec<Action>>>,
 }
 
@@ -843,7 +845,7 @@ fn failed_deployment_with_node_restart() {
     let (_, status) = DispatcherSchema::new(&snapshot)
         .get_artifact(&artifact.name)
         .unwrap();
-    assert_eq!(status, DeployStatus::Active);
+    assert_eq!(status, ArtifactStatus::Active);
 }
 
 #[test]
