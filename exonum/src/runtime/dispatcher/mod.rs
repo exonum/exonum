@@ -15,7 +15,7 @@
 pub use self::{
     error::Error,
     schema::Schema,
-    types::{ArtifactState, ArtifactStatus, InstanceState, ServiceStatus},
+    types::{ArtifactState, ArtifactStatus, InstanceState, InstanceStatus},
 };
 
 use exonum_merkledb::{Fork, Snapshot};
@@ -81,7 +81,6 @@ impl Dispatcher {
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
-        debug!("{:?}", schema.instances.iter().collect::<Vec<_>>());
         // Restore information about the deployed services.
         for ArtifactSpec { artifact, payload } in
             schema.artifacts.values().filter_map(ArtifactState::active)
@@ -226,7 +225,6 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// ECR-3222
     pub(crate) fn commit_service_sync(
         &mut self,
         fork: &mut Fork,
@@ -310,10 +308,6 @@ impl Dispatcher {
         for spec in schema.take_pending_artifacts() {
             self.block_until_deployed(spec.artifact, spec.payload);
         }
-        debug!(
-            "commit_block: {:?}",
-            schema.instances.iter().collect::<Vec<_>>()
-        );
         // Start pending services.
         for spec in schema.take_pending_instances() {
             self.start_service(snapshot, &spec)
@@ -322,7 +316,6 @@ impl Dispatcher {
     }
 
     pub(crate) fn activate_pending_entities(&self, fork: &mut Fork) {
-        debug!("activate_pending_entities");
         let mut schema = Schema::new(&*fork);
         schema.mark_pending_artifacts_as_active();
         schema.mark_pending_instances_as_active();

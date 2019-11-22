@@ -23,7 +23,7 @@ use exonum_merkledb::{
 use crate::runtime::{InstanceId, InstanceQuery};
 
 use super::{
-    types::{ArtifactState, ArtifactStatus, InstanceState, ServiceStatus},
+    types::{ArtifactState, ArtifactStatus, InstanceState, InstanceStatus},
     ArtifactSpec, Error, InstanceSpec,
 };
 
@@ -67,7 +67,7 @@ impl<T: Access> Schema<T> {
     pub fn get_instance<'q>(
         &self,
         query: impl Into<InstanceQuery<'q>>,
-    ) -> Option<(InstanceSpec, ServiceStatus)> {
+    ) -> Option<(InstanceSpec, InstanceStatus)> {
         match query.into() {
             InstanceQuery::Id(id) => self
                 .instances_by_id
@@ -100,9 +100,6 @@ impl Schema<&Fork> {
         if self.artifacts.contains(&spec.artifact.name) {
             return Err(Error::ArtifactAlreadyDeployed);
         }
-
-        debug!("add_pending_artifact: {:?}", spec);
-
         // Add artifact to pending artifacts queue.
         self.pending_artifacts.push(spec.clone());
         // Add artifact to registry with pending status.
@@ -123,9 +120,6 @@ impl Schema<&Fork> {
         if self.artifacts.contains(&spec.artifact.name) {
             return Err(Error::ArtifactAlreadyDeployed);
         }
-
-        debug!("add_active_artifact: {:?}", spec);
-
         // Add artifact to registry with active status.
         let artifact_name = spec.artifact.name.clone();
         self.artifacts.put(
@@ -147,8 +141,6 @@ impl Schema<&Fork> {
             .spec
             .artifact;
 
-        debug!("add_pending_service: {:?}", spec);
-
         // Checks that runtime identifier is proper in instance.
         if artifact_id != spec.artifact {
             return Err(Error::IncorrectRuntime);
@@ -169,7 +161,7 @@ impl Schema<&Fork> {
             &name,
             InstanceState {
                 spec: spec.clone(),
-                status: ServiceStatus::Pending,
+                status: InstanceStatus::Pending,
             },
         );
         self.instances_by_id.put(&id, name);
@@ -186,8 +178,6 @@ impl Schema<&Fork> {
             .spec
             .artifact;
 
-        debug!("add_active_service: {:?}", spec);
-
         // Checks that runtime identifier is proper in instance.
         if artifact_id != spec.artifact {
             return Err(Error::IncorrectRuntime);
@@ -208,7 +198,7 @@ impl Schema<&Fork> {
             &name,
             InstanceState {
                 spec: spec.clone(),
-                status: ServiceStatus::Active,
+                status: InstanceStatus::Active,
             },
         );
         self.instances_by_id.put(&id, name);
@@ -218,7 +208,6 @@ impl Schema<&Fork> {
     // Marks pending artifacts as deployed.
     pub(super) fn mark_pending_artifacts_as_active(&mut self) {
         for spec in &self.pending_artifacts {
-            debug!("mark_pending_artifacts_as_active: {:?}", spec);
             self.artifacts.put(
                 &spec.artifact.name.clone(),
                 ArtifactState {
@@ -229,25 +218,24 @@ impl Schema<&Fork> {
         }
     }
 
+    /// Marks pending instances as active.
+    pub(super) fn mark_pending_instances_as_active(&mut self) {
+        for spec in &self.pending_instances {
+            self.instances.put(
+                &spec.name.clone(),
+                InstanceState {
+                    spec,
+                    status: InstanceStatus::Active,
+                },
+            );
+        }
+    }
+
     /// Takes pending artifacts from queue.
     pub(super) fn take_pending_artifacts(&mut self) -> impl IntoIterator<Item = ArtifactSpec> {
         let pending_artifacts = self.pending_artifacts.iter().collect::<Vec<_>>();
         self.pending_artifacts.clear();
         pending_artifacts
-    }
-
-    /// Marks pending instances as active.
-    pub(super) fn mark_pending_instances_as_active(&mut self) {
-        for spec in &self.pending_instances {
-            debug!("mark_pending_instances_as_active: {:?}", spec);
-            self.instances.put(
-                &spec.name.clone(),
-                InstanceState {
-                    spec,
-                    status: ServiceStatus::Active,
-                },
-            );
-        }
     }
 
     /// Takes pending service instances from queue.

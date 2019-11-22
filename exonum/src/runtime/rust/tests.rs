@@ -29,7 +29,7 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        dispatcher::ServiceStatus,
+        dispatcher::InstanceStatus,
         error::{ErrorKind, ExecutionError},
         BlockchainData, CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema,
         ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime, StateHashAggregator,
@@ -51,7 +51,12 @@ fn create_block(blockchain: &BlockchainMut) -> Fork {
     Fork::from(patch)
 }
 
-fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
+fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
+    // FIXME: Due to during the `create_patch` `before_commit` hook invokes without changes in
+    // instances and artifacts, do this call again to mark pending artifacts and instances as
+    // active. [ECR-3222]
+    blockchain.dispatcher().activate_pending_entities(&mut fork);
+
     blockchain
         .commit(
             fork.into_patch(),
@@ -673,11 +678,11 @@ fn dependent_builtin_service() {
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
         schema.get_instance(SERVICE_INSTANCE_ID).unwrap().1,
-        ServiceStatus::Active
+        InstanceStatus::Active
     );
     assert_eq!(
         schema.get_instance("dependent-service").unwrap().1,
-        ServiceStatus::Active
+        InstanceStatus::Active
     );
 }
 
@@ -767,7 +772,7 @@ fn dependent_service_in_same_block() {
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
         schema.get_instance("dependent-service").unwrap().1,
-        ServiceStatus::Active
+        InstanceStatus::Active
     );
 }
 
@@ -800,6 +805,6 @@ fn dependent_service_in_successive_block() {
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
         schema.get_instance("dependent-service").unwrap().1,
-        ServiceStatus::Active
+        InstanceStatus::Active
     );
 }

@@ -288,7 +288,9 @@ impl BlockchainMut {
         }
 
         // Skip execution for genesis block.
+        debug!("Create patch for {}", height);
         if height > Height(0) {
+            debug!("Before commit");
             self.dispatcher.before_commit(&mut fork);
         }
 

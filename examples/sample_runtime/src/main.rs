@@ -25,8 +25,8 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, CallInfo, ServiceStatus, DispatcherError,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
+        rust::Transaction, AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
         StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -332,7 +332,7 @@ fn main() {
             .for_dispatcher()
             .get_instance(instance_name.as_str())
             .unwrap();
-        assert_eq!(status, ServiceStatus::Active);
+        assert_eq!(status, InstanceStatus::Active);
         let instance_id = spec.id;
         // Send an update counter transaction.
         api_sender

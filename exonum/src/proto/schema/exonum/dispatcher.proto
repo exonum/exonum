@@ -27,7 +27,7 @@ enum ArtifactStatus {
     ARTIFACT_ACTIVE = 1;
 }
 
-enum ServiceStatus {
+enum InstanceStatus {
     SERVICE_PENDING = 0;
     SERVICE_ACTIVE = 1;
 }
@@ -39,5 +39,5 @@ message ArtifactState {
 
 message InstanceState {
     exonum.runtime.InstanceSpec spec = 1;
-    ServiceStatus status = 2;
+    InstanceStatus status = 2;
 }

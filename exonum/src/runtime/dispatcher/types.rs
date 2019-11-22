@@ -61,14 +61,14 @@ impl ProtobufConvert for ArtifactStatus {
 
 /// Status of a service instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ServiceStatus {
+pub enum InstanceStatus {
     /// The service instance is pending deployment.
     Pending = 0,
     /// The service instance has been successfully deployed.
     Active = 1,
 }
 
-impl fmt::Display for ServiceStatus {
+impl fmt::Display for InstanceStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Active => f.write_str("active"),
@@ -77,8 +77,8 @@ impl fmt::Display for ServiceStatus {
     }
 }
 
-impl ProtobufConvert for ServiceStatus {
-    type ProtoStruct = schema::dispatcher::ServiceStatus;
+impl ProtobufConvert for InstanceStatus {
+    type ProtoStruct = schema::dispatcher::InstanceStatus;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
@@ -113,6 +113,14 @@ impl ArtifactState {
             ArtifactStatus::Pending => None,
         }
     }
+
+    /// Returns underlining artifact spec if status is pending.    
+    pub fn pending(self) -> Option<ArtifactSpec> {
+        match self.status {
+            ArtifactStatus::Pending => Some(self.spec),
+            ArtifactStatus::Active => None,
+        }
+    }
 }
 
 impl From<ArtifactState> for (ArtifactStatus, ArtifactSpec) {
@@ -128,20 +136,28 @@ pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
     /// Service instance activity status.
-    pub status: ServiceStatus,
+    pub status: InstanceStatus,
 }
 
 impl InstanceState {
     /// Returns underlining instance spec if status is active.
     pub fn active(self) -> Option<InstanceSpec> {
         match self.status {
-            ServiceStatus::Active => Some(self.spec),
-            ServiceStatus::Pending => None,
+            InstanceStatus::Active => Some(self.spec),
+            InstanceStatus::Pending => None,
+        }
+    }
+
+    /// Returns underlining spec spec if status is pending.    
+    pub fn pending(self) -> Option<InstanceSpec> {
+        match self.status {
+            InstanceStatus::Pending => Some(self.spec),
+            InstanceStatus::Active => None,
         }
     }
 }
 
-impl From<InstanceState> for (ServiceStatus, InstanceSpec) {
+impl From<InstanceState> for (InstanceStatus, InstanceSpec) {
     fn from(v: InstanceState) -> Self {
         (v.status, v.spec)
     }
