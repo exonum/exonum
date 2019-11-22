@@ -45,6 +45,8 @@ pub fn is_allowed_index_name_char(c: u8) -> bool {
     }
 }
 
+// Allow because it's looks more readable.
+#[allow(clippy::if_not_else)]
 fn check_valid_name<S: AsRef<str> + Copy, F>(
     name: S,
     predicate: F,
@@ -55,14 +57,14 @@ where
 {
     if name.as_ref().is_empty() {
         Err("Index name must not be empty".into())
-    } else if predicate(name) {
-        Ok(())
-    } else {
+    } else if !predicate(name) {
         Err(format!(
             "Wrong characters using in name ({}). {}",
             name.as_ref(),
             desc
         ))
+    } else {
+        Ok(())
     }
 }
 
