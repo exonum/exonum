@@ -113,15 +113,9 @@ impl Dispatcher {
         if !self.is_artifact_deployed(&spec.artifact) {
             self.deploy_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
         }
-
-        // Copy instance ID for further usage.
-        let instance_id = spec.id;
-
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec, constructor)?;
-
-        self.update_max_builtin_id(fork, instance_id);
         Ok(())
     }
 
@@ -364,17 +358,6 @@ impl Dispatcher {
             },
         );
         Ok(())
-    }
-
-    /// Checks if provided instance ID is greater than the currently stored one
-    /// and updates it if needed.
-    fn update_max_builtin_id(&self, fork: &Fork, instance_id: InstanceId) {
-        let mut schema = Schema::new(fork as &Fork);
-        let current_max_id = schema.max_builtin_id();
-        if Some(instance_id) > current_max_id {
-            // ID from spec is greater than known max ID, update it.
-            schema.set_max_builtin_id(instance_id);
-        }
     }
 }
 

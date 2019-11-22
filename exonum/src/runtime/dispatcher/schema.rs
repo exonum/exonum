@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Fork, MapIndex,
+    Fork, MapIndex, ReadonlyFork,
 };
 
 use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec};
@@ -28,7 +28,6 @@ const SERVICE_INSTANCES: &str = "core.dispatcher.service_instances";
 const PENDING_INSTANCES: &str = "core.dispatcher.pending_service_instances";
 const INSTANCE_IDS: &str = "core.dispatcher.service_instance_ids";
 const PENDING_INSTANCE_IDS: &str = "core.dispatcher.pending_instance_ids";
-const MAX_BUILTIN_ID: &str = "core.dispatcher.max_builtin_id";
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
@@ -118,14 +117,13 @@ impl<T: Access> Schema<T> {
                     .map(|spec| (spec, DeployStatus::Pending))
             })
     }
+}
 
-    /// Gets the highest ID within builtin instances.
-    /// So, if `exonum` starts with 3 builtin instances with IDs "0", "1"
-    /// and "100", the return value will be `Some(100)`.
-    /// If no instances were added during initialization, the return value is `None`.
-    #[doc(hidden)]
-    pub fn max_builtin_id(&self) -> Option<InstanceId> {
-        self.access.clone().get_entry(MAX_BUILTIN_ID).get()
+// `ReadonlyFork` specialization to ensure that we won't leak mutable schema access.
+impl Schema<ReadonlyFork<'_>> {
+    /// Readonly set of launched service instances.
+    pub fn running_instances(&self) -> MapIndex<ReadonlyFork<'_>, String, InstanceSpec> {
+        self.service_instances()
     }
 }
 
@@ -213,10 +211,5 @@ impl Schema<&Fork> {
         let name = spec.name.clone();
         self.service_instances().put(&name, spec);
         self.service_instance_ids().put(&id, name);
-    }
-
-    /// Sets the `max_builtin_id` entry value.
-    pub(super) fn set_max_builtin_id(&mut self, id: InstanceId) {
-        self.access.get_entry(MAX_BUILTIN_ID).set(id);
     }
 }
